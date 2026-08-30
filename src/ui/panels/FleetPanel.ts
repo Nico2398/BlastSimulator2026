@@ -23,7 +23,7 @@ import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier } fr
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow } from '../fleetDetailSections.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
@@ -114,8 +114,15 @@ export class FleetPanel {
    */
   private computeSignature(state: GameState): string {
     const rows = state.vehicles.vehicles.map(v => `${v.id}:${v.type}:${v.tier}:${v.driverId ?? '-'}`).join('|');
+    // pendingDriverVehicleId, not just driverId: an assign click sets it
+    // immediately, but driverId itself stays null for the whole walk to the
+    // vehicle (ArrivalGate.ts only sets it on arrival). Omitting it here let
+    // every OTHER vehicle's already-rendered assign picker (and its `<select>`'s
+    // default option) go stale the moment one assignment claimed an
+    // employee, until some unrelated structural change (a further purchase)
+    // happened to force a fresh render — #715.
     const quals = state.employees.employees.filter(e => e.alive)
-      .map(e => `${e.id}:${e.qualifications.map(q => q.category).join(',')}`).join('|');
+      .map(e => `${e.id}:${e.qualifications.map(q => q.category).join(',')}:${e.pendingDriverVehicleId ?? '-'}`).join('|');
     return `${rows}#${quals}`;
   }
 
@@ -238,10 +245,19 @@ export class FleetPanel {
     const load = makeLoadGauge(v);
     if (load) rows.push(this.tag(load, 'bs-fleet-load'));
 
+    // v.driverId stays null for a driver's whole walk to the vehicle
+    // (ArrivalGate.ts sets it only on arrival), so a pending claim needs its
+    // own row — falling through to makeAssignRow would re-offer the vehicle
+    // as driverless even though someone's already en route to it (#715).
+    const pendingDriver = v.driverId === null
+      ? state.employees.employees.find(e => e.pendingDriverVehicleId === v.id)
+      : undefined;
     rows.push(
       v.driverId !== null
         ? makeDriverRow(v, state, () => this.gameConsole?.(`vehicle driver ${v.id} none`))
-        : makeAssignRow(v, state, employeeId => this.gameConsole?.(`vehicle driver ${v.id} ${employeeId}`), () => this.onNavigateCb?.('crew')),
+        : pendingDriver
+          ? makePendingDriverRow(pendingDriver)
+          : makeAssignRow(v, state, employeeId => this.gameConsole?.(`vehicle driver ${v.id} ${employeeId}`), () => this.onNavigateCb?.('crew')),
     );
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });

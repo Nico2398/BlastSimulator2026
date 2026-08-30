@@ -11,7 +11,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { requestBoardVehicle } from '../../../src/core/entities/VehicleBoarding.js';
+import { requestBoardVehicle, canBoardVehicle } from '../../../src/core/entities/VehicleBoarding.js';
 
 const SEED = 42;
 
@@ -93,6 +93,50 @@ describe('requestBoardVehicle — availability validation', () => {
     const result = requestBoardVehicle(state, vehicle.id, employee.id);
 
     expect(result.success).toBe(false);
+  });
+
+  it('rejects an employee already walking to board a different vehicle', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle: first } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const { vehicle: second } = purchaseVehicle(state.vehicles, 'debris_hauler', 8, 8);
+
+    const boardedFirst = requestBoardVehicle(state, first.id, employee.id);
+    expect(boardedFirst.success).toBe(true);
+
+    const result = requestBoardVehicle(state, second.id, employee.id);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('already walking');
+    // The first request's own claim is untouched by the second, refused one.
+    expect(employee.pendingDriverVehicleId).toBe(first.id);
+  });
+});
+
+describe('canBoardVehicle — read-only eligibility check (#715)', () => {
+  it('reports the same success/failure requestBoardVehicle would apply, without mutating anything', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+
+    const check = canBoardVehicle(state, vehicle.id, employee.id);
+
+    expect(check.success).toBe(true);
+    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.destinationX).toBeNull();
+  });
+
+  it('reports false for an employee already walking to board a different vehicle — the Fleet panel picker\'s own eligibility check', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle: first } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const { vehicle: second } = purchaseVehicle(state.vehicles, 'debris_hauler', 8, 8);
+    requestBoardVehicle(state, first.id, employee.id);
+
+    expect(canBoardVehicle(state, second.id, employee.id).success).toBe(false);
   });
 });
 
