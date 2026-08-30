@@ -2533,6 +2533,7 @@
   "ui.fleet.load": "CHARGE",
   "ui.fleet.load_kg": "{kg} / {cap} kg",
   "ui.fleet.unassign": "Retirer",
+  "ui.fleet.walking_to_board": "{name} en chemin pour embarquer",
   "ui.fleet.no_licensed": "Personne n'est habilité pour {licence}",
   "ui.fleet.train_someone": "Former quelqu'un dans Équipe",
   "ui.fleet.assign": "Affecter",

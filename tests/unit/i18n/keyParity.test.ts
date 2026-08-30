@@ -225,10 +225,19 @@ describe('en.json / fr.json — key-set parity', () => {
     // top-level guard was switched from a hand-rolled literal to
     // requireGame(ctx), reusing console.no_game_loaded — no new keys needed
     // for either reuse.
+    // Baseline is now 3465 (up from 3464): #715 adds one new key,
+    // ui.fleet.walking_to_board -- the Fleet panel's own driver-assign
+    // picker used to filter eligibility on vehicle.driverId alone, which
+    // stays null for a driver's whole walk to the vehicle, so a vehicle
+    // someone had already claimed still fell through to the "pick a driver"
+    // picker (and, once that picker's own eligibility check was fixed to
+    // exclude them, to a misleading "nobody is licensed" warning). A
+    // dedicated pending-driver row needed its own translated string; both
+    // locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3464);
+    expect(Object.keys(en).length).toBe(3465);
   });
 });
 
