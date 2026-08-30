@@ -85,7 +85,7 @@ Four independent channels prove a change works. Each catches what the others mis
 
 ### ▶ There is no later turn
 
-**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling — `npm run scenarios` is ~9 m 20 s in a sandbox and slower on a 2-core runner, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
+**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling, or close enough that a foreground call without an explicit matching timeout gets silently backgrounded by this harness's own shorter default before it ever gets near the cap — `npm run test` is ~500 s on a 2-core runner (it has grown as the suite has; do not re-classify it as "fits" from an old measurement), `npm run scenarios` is ~9 m 20 s in a sandbox and slower on a 2-core runner, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
 
 An unattended session — a GitHub Actions runner, Claude Code on the web — gets **one turn**. When that turn ends the process exits. A background-task notification is delivered on a later turn, and there is no later turn, so it is never delivered at all. Everything not yet pushed dies with the VM. This is the same rule that already governs delegation (`require-foreground-agents.sh`, issues #404 and #406), arriving through the shell instead of through a sub-agent. It cost three runs in four days:
 
@@ -101,6 +101,8 @@ An unattended session — a GitHub Actions runner, Claude Code on the web — ge
 npm run long -- start scenarios -- npm run scenarios
 npm run long -- wait scenarios      # blocks one bounded slice
 ```
+
+**Pass an explicit `timeout` on every one of these calls, `wait` included — never rely on the tool's own default.** The harness backgrounds a foreground Bash call that outruns its default per-call timeout, which is shorter than 600000 ms and shorter than `wait`'s own internal ~540s polling budget: a `wait` call issued with no explicit `timeout` argument can itself be moved to the background before it ever gets to report FINISHED or `75`, which reproduces the exact failure this wrapper exists to prevent, one level up. Pass 600000 explicitly on every `start`/`wait` call.
 
 `wait` exits `75` while the command is still going. **That is not a failure and not a verdict** — call `wait` again, in this same turn, as many times as it takes, until it prints `FINISHED` and the command's own exit code. Then act on that code.
 

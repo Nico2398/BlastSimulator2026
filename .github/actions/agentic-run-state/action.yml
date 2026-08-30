@@ -70,14 +70,23 @@ runs:
           if [ -z "${ISSUE}" ]; then
             echo "(no issue number — nothing to describe)"
           else
+            # Two patterns, not one: a work branch is `pipeline/<role>-<issue>` or
+            # `pipeline/<role>-<issue>-<runid>` (agentic-prompt's naming, family
+            # regex `pipeline/feature-${issueNumber}(?:-[A-Za-z0-9._-]+)?$` a few
+            # lines below in `deliverablePr`). The single `*-${ISSUE}` glob this
+            # used to be only matched the bare form, so a real branch this run
+            # built and left on disk — always run-id-suffixed in practice — read
+            # as "none: ... so the work starts from main" on the retry prompt,
+            # sending the next attempt to rebuild work that already existed.
             found=0
-            for branch in $(git for-each-ref --format='%(refname:short)' "refs/heads/pipeline/*-${ISSUE}"); do
+            for branch in $(git for-each-ref --format='%(refname:short)' \
+              "refs/heads/pipeline/*-${ISSUE}" "refs/heads/pipeline/*-${ISSUE}-*" | sort -u); do
               found=1
               ahead=$(git rev-list --count "main..${branch}" 2>/dev/null || echo '?')
               echo "- ${branch}: ${ahead} commit(s) beyond main"
             done
             if [ "${found}" = "0" ]; then
-              echo "- none: no pipeline/*-${ISSUE} branch exists on this runner, so the work starts from main"
+              echo "- none: no pipeline/*-${ISSUE}(-*) branch exists on this runner, so the work starts from main"
             fi
           fi
           echo "AGENTIC_BRANCH_STATE_EOF"
