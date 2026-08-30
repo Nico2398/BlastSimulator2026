@@ -28,6 +28,8 @@ function makeFragment(id: number, x: number, z: number): FragmentData {
     oreDensities: {},
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
   };
 }
 
