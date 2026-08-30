@@ -55,7 +55,10 @@ describe('deserialize — v2→v3 migration for Vehicle.waitingTicks', () => {
     vehicle.waitingTicks = 4;
 
     const json = serialize(state);
-    const restored = deserialize(json);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 2;
+
+    const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
     expect(restoredVehicle.waitingTicks).toBe(4);
@@ -597,7 +600,10 @@ describe('deserialize — v9→v10 migration for Vehicle.reservedForActionId (#5
     vehicle.reservedForActionId = 42;
 
     const json = serialize(state);
-    const restored = deserialize(json);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 9;
+
+    const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
     expect(restoredVehicle.reservedForActionId).toBe(42);
