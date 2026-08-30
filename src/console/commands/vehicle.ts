@@ -22,6 +22,8 @@ import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+import { requireGame } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 
 // ── tier arg parsing ──
 
@@ -46,14 +48,15 @@ export function vehicleCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
-  const state = ctx.state;
+  const err = requireGame(ctx);
+  if (err) return err;
+  const state = ctx.state!;
   const sub = args[0] ?? 'list';
 
   switch (sub) {
     case 'list': {
       if (state.vehicles.vehicles.length === 0) {
-        return { success: true, output: 'No vehicles.' };
+        return { success: true, output: t('vehicle.list_empty') };
       }
       const lines = ['Fleet:'];
       for (const v of state.vehicles.vehicles) {
@@ -65,11 +68,11 @@ export function vehicleCommand(
     case 'buy': {
       const type = (args[1] ?? '') as VehicleRole;
       if (!getAllVehicleRoles().includes(type)) {
-        return { success: false, output: `Usage: vehicle buy (${getAllVehicleRoles().join('|')})` };
+        return { success: false, output: t('vehicle.buy_usage_role', { roles: getAllVehicleRoles().join('|') }) };
       }
       const tier = parseVehicleTierArg(named);
       if (tier === null) {
-        return { success: false, output: 'Usage: vehicle buy <role> tier:(1|2|3)' };
+        return { success: false, output: t('vehicle.buy_usage_tier') };
       }
       // Checked before purchaseVehicle, which *mutates* — it pushes the
       // vehicle and bumps nextId before it can report a cost. Same predicate
@@ -80,7 +83,10 @@ export function vehicleCommand(
       if (state.cash < cost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: formatMoney(cost),
+            have: formatMoney(state.cash),
+          }),
         };
       }
       // Spawn near grid centre, staggered per fleet index so newly purchased
@@ -108,49 +114,49 @@ export function vehicleCommand(
       const { vehicle } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
-      return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };
+      return { success: true, output: t('vehicle.buy_success', { type, id: vehicle.id, cost }) };
     }
     case 'assign': {
       const id = parseInt(args[1] ?? '', 10);
       const task = (named['task'] ?? 'idle') as VehicleTask;
       const toCoords = (named['to'] ?? '').split(',').map(Number);
-      if (isNaN(id)) return { success: false, output: 'Usage: vehicle assign <id> task:transport from:x,z to:x,z' };
+      if (isNaN(id)) return { success: false, output: t('vehicle.assign_usage') };
       const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
       const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
       if (!assignVehicle(state.vehicles, id, task, targetX, targetZ)) {
-        return { success: false, output: `Vehicle #${id} not found.` };
+        return { success: false, output: t('vehicle.not_found', { id }) };
       }
-      return { success: true, output: `Vehicle #${id} assigned to ${task}.` };
+      return { success: true, output: t('vehicle.assign_success', { id, task }) };
     }
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);
       const toCoords = (named['to'] ?? '').split(',').map(Number);
       if (isNaN(id) || toCoords.length < 2 || toCoords.some(isNaN)) {
-        return { success: false, output: 'Usage: vehicle move <id> to:x,z' };
+        return { success: false, output: t('vehicle.move_usage') };
       }
       if (!moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!)) {
-        return { success: false, output: `Vehicle #${id} not found.` };
+        return { success: false, output: t('vehicle.not_found', { id }) };
       }
-      return { success: true, output: `Vehicle #${id} moving to (${toCoords[0]},${toCoords[1]}).` };
+      return { success: true, output: t('vehicle.move_success', { id, x: toCoords[0]!, z: toCoords[1]! }) };
     }
     case 'driver': {
       const vehicleId = parseInt(args[1] ?? '', 10);
       if (isNaN(vehicleId)) {
-        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId|none>' };
+        return { success: false, output: t('vehicle.driver_usage') };
       }
       if (args[2] === 'none') {
         const result = unassignDriver(state.vehicles, vehicleId);
         if (!result.success) {
           return { success: false, output: result.error! };
         }
-        return { success: true, output: `Vehicle #${vehicleId} driver unassigned.` };
+        return { success: true, output: t('vehicle.driver_unassign_success', { id: vehicleId }) };
       }
       const employeeId = parseInt(args[2] ?? '', 10);
       if (isNaN(employeeId)) {
-        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId|none>' };
+        return { success: false, output: t('vehicle.driver_usage') };
       }
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
-        return { success: false, output: `Vehicle #${vehicleId} not found.` };
+        return { success: false, output: t('vehicle.not_found', { id: vehicleId }) };
       }
       // Validates licence/availability now, but the employee must physically
       // walk to the vehicle before they actually become its driver — resolved
@@ -159,13 +165,13 @@ export function vehicleCommand(
       if (!result.success) {
         return { success: false, output: result.error! };
       }
-      return { success: true, output: `Driver #${employeeId} walking to vehicle #${vehicleId} to board.` };
+      return { success: true, output: t('vehicle.driver_board_success', { employeeId, vehicleId }) };
     }
     case 'haul': {
       const vehicleId = parseInt(args[1] ?? '', 10);
       const fragmentId = parseInt(named['fragment'] ?? '', 10);
       if (isNaN(vehicleId) || isNaN(fragmentId)) {
-        return { success: false, output: 'Usage: vehicle haul <vehicleId> fragment:<fragmentId>' };
+        return { success: false, output: t('vehicle.haul_usage') };
       }
       // Sets intent only — the vehicle must physically drive to the fragment
       // before loading it, then to the depot before unloading — resolved by
@@ -174,24 +180,24 @@ export function vehicleCommand(
       if (!result.success) {
         return { success: false, output: result.error! };
       }
-      return { success: true, output: `Vehicle #${vehicleId} hauling fragment #${fragmentId}.` };
+      return { success: true, output: t('vehicle.haul_success', { id: vehicleId, fragmentId }) };
     }
     case 'scrap': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: vehicle scrap <id>' };
+      if (isNaN(id)) return { success: false, output: t('vehicle.scrap_usage') };
       const vehicle = state.vehicles.vehicles.find(v => v.id === id);
-      if (!vehicle) return { success: false, output: `Vehicle #${id} not found.` };
+      if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
       const residualValue = computeScrapResidualValue(vehicle.type, vehicle.tier, vehicle.hp);
       destroyVehicle(state.vehicles, id);
       state.cash += residualValue;
       addIncome(state.finances, residualValue, 'refund', `Scrap ${vehicle.type} #${id}`, state.tickCount);
-      return { success: true, output: `Vehicle #${id} scrapped. Residual value: $${residualValue}` };
+      return { success: true, output: t('vehicle.scrap_success', { id, value: residualValue }) };
     }
     case 'break': {
       const vehicleId = parseInt(args[1] ?? '', 10);
       const fragmentId = parseInt(named['fragment'] ?? '', 10);
       if (isNaN(vehicleId) || isNaN(fragmentId)) {
-        return { success: false, output: 'Usage: vehicle break <vehicleId> fragment:<fragmentId>' };
+        return { success: false, output: t('vehicle.break_usage') };
       }
       // Sets intent only — the vehicle must physically drive to the boulder
       // before breaking it — resolved by ArrivalGate.tickArrivalGate/
@@ -200,9 +206,9 @@ export function vehicleCommand(
       if (!result.success) {
         return { success: false, output: result.error! };
       }
-      return { success: true, output: `Vehicle #${vehicleId} breaking fragment #${fragmentId}.` };
+      return { success: true, output: t('vehicle.break_success', { id: vehicleId, fragmentId }) };
     }
     default:
-      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul|scrap|break)' };
+      return { success: false, output: t('vehicle.usage') };
   }
 }
