@@ -25,6 +25,7 @@ import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { makeFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
+import { t } from '../../core/i18n/I18n.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
@@ -45,7 +46,7 @@ export function buildCommand(
   switch (sub) {
     case 'list': {
       if (state.buildings.buildings.length === 0) {
-        return { success: true, output: 'No buildings placed.' };
+        return { success: true, output: t('entities.build_list_empty') };
       }
       const lines = ['Buildings:'];
       for (const b of state.buildings.buildings) {
@@ -56,15 +57,18 @@ export function buildCommand(
     }
     case 'destroy': {
       const id = parseInt(args[1] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: build destroy <id>' };
+      if (isNaN(id)) return { success: false, output: t('entities.build_destroy_usage') };
       const toDestroy = state.buildings.buildings.find(b => b.id === id);
-      if (!toDestroy) return { success: false, output: `Building #${id} not found.` };
+      if (!toDestroy) return { success: false, output: t('entities.building_not_found', { id }) };
       const destroyDef = getBuildingDef(toDestroy.type, toDestroy.tier);
       const demolishCost = getDemolishCost(toDestroy);
       if (state.cash < demolishCost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(demolishCost)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: formatMoney(demolishCost),
+            have: formatMoney(state.cash),
+          }),
         };
       }
       state.cash -= demolishCost;
@@ -76,17 +80,17 @@ export function buildCommand(
         const { sizeX, sizeZ } = getDefSize(destroyDef);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toDestroy.x, toDestroy.z, sizeX, sizeZ));
       }
-      return { success: true, output: `Building #${id} demolished. Cost: $${demolishCost}` };
+      return { success: true, output: t('entities.build_destroy_success', { id, cost: demolishCost }) };
     }
     case 'upgrade': {
       const id = parseInt(args[1] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: build upgrade <id>' };
+      if (isNaN(id)) return { success: false, output: t('entities.build_upgrade_usage') };
       const toUpgrade = state.buildings.buildings.find(b => b.id === id);
-      if (!toUpgrade) return { success: false, output: `Building #${id} not found.` };
-      if (toUpgrade.tier >= 3) return { success: false, output: `Building #${id} is already at max tier (T3).` };
+      if (!toUpgrade) return { success: false, output: t('entities.building_not_found', { id }) };
+      if (toUpgrade.tier >= 3) return { success: false, output: t('entities.build_upgrade_max_tier', { id }) };
       const nextTier = (toUpgrade.tier + 1) as BuildingTier;
       if (isPlacementBlockedByResearch(state.buildings, toUpgrade.type, nextTier)) {
-        return { success: false, output: `Tier ${nextTier} ${toUpgrade.type} is not researched — research required before upgrade.` };
+        return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: toUpgrade.type }) };
       }
       const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
       const newDef = getBuildingDef(toUpgrade.type, nextTier);
@@ -94,7 +98,10 @@ export function buildCommand(
       if (state.cash < totalCost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: formatMoney(totalCost),
+            have: formatMoney(state.cash),
+          }),
         };
       }
       const { x, z, type: upgradeType } = toUpgrade;
@@ -105,7 +112,7 @@ export function buildCommand(
         upBounds.width, upBounds.depth, nextTier, upBounds.originX, upBounds.originZ,
       );
       if (!upgradeResult.success) {
-        return { success: false, output: `Upgrade failed: ${upgradeResult.error}` };
+        return { success: false, output: t('entities.build_upgrade_failed', { error: upgradeResult.error! }) };
       }
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
@@ -118,24 +125,29 @@ export function buildCommand(
       }
       return {
         success: true,
-        output: `Upgraded ${upgradeType} #${id} to T${nextTier} (new #${upgradeResult.building!.id}). Cost: $${totalCost}`,
+        output: t('entities.build_upgrade_success', {
+          type: upgradeType, id, tier: nextTier, newId: upgradeResult.building!.id, cost: totalCost,
+        }),
       };
     }
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);
       const toCoords = (named['to'] ?? '').split(',').map(Number);
       if (isNaN(id) || toCoords.length < 2 || toCoords.some(isNaN)) {
-        return { success: false, output: 'Usage: build move <id> to:x,z' };
+        return { success: false, output: t('entities.build_move_usage') };
       }
       const building = state.buildings.buildings.find(b => b.id === id);
-      if (!building) return { success: false, output: `Building #${id} not found.` };
+      if (!building) return { success: false, output: t('entities.building_not_found', { id }) };
       const moveDef = getBuildingDef(building.type, building.tier);
       const { sizeX, sizeZ } = getDefSize(moveDef);
       const moveCost = getMoveCost(building);
       if (state.cash < moveCost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(moveCost)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: formatMoney(moveCost),
+            have: formatMoney(state.cash),
+          }),
         };
       }
       const oldX = building.x;
@@ -162,7 +174,7 @@ export function buildCommand(
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }
-      return { success: true, output: `Building #${id} moved. Cost: $${result.cost}` };
+      return { success: true, output: t('entities.build_move_success', { id, cost: result.cost! }) };
     }
     case 'types': {
       const lines = ['Building types:'];
@@ -181,11 +193,11 @@ export function buildCommand(
       // building here. See buildOrder.ts.
       const type = sub as BuildingType;
       if (!getAllBuildingTypes().includes(type)) {
-        return { success: false, output: `Unknown subcommand or building type: "${sub}". Use: build (list|destroy|upgrade|move|types|<type> at:x,z [tier:N])` };
+        return { success: false, output: t('entities.build_unknown_subcommand', { sub }) };
       }
       const atCoords = (named['at'] ?? '').split(',').map(Number);
       if (atCoords.length < 2 || atCoords.some(isNaN)) {
-        return { success: false, output: `Usage: build ${type} at:x,z [tier:1|2|3]` };
+        return { success: false, output: t('entities.build_type_usage', { type }) };
       }
       const tierParam = parseInt(named['tier'] ?? '1', 10);
       const tier = ([1, 2, 3].includes(tierParam) ? tierParam : 1) as BuildingTier;
@@ -256,7 +268,7 @@ export function zoneCommand(
       const x2 = parseInt(named['x2'] ?? '', 10);
       const z2 = parseInt(named['y2'] ?? named['z2'] ?? '', 10);
       if ([x1, z1, x2, z2].some(isNaN)) {
-        return { success: false, output: 'Usage: zone clear x1:10 y1:10 x2:30 y2:30' };
+        return { success: false, output: t('entities.zone_clear_usage') };
       }
       const bounds: ZoneBounds = { x1, z1, x2, z2 };
       defineZone(state.zone, bounds);
@@ -265,12 +277,15 @@ export function zoneCommand(
       const result = evacuateZone(state, state.zone.activeZone!);
       return {
         success: true,
-        output: `Evacuation ordered. Routing ${result.orderedVehicleIds.length} vehicles and ${result.orderedEmployeeIds.length} employees clear of the zone.`,
+        output: t('entities.zone_clear_success', {
+          vehicleCount: result.orderedVehicleIds.length,
+          employeeCount: result.orderedEmployeeIds.length,
+        }),
       };
     }
     case 'status': {
       if (!state.zone.activeZone) {
-        return { success: true, output: 'No safety zone defined.' };
+        return { success: true, output: t('entities.zone_status_none') };
       }
       const z = state.zone.activeZone;
       const clear = isZoneClear(z, state.vehicles, state.employees);
@@ -280,7 +295,7 @@ export function zoneCommand(
       };
     }
     default:
-      return { success: false, output: 'Usage: zone (clear|status)' };
+      return { success: false, output: t('entities.zone_usage') };
   }
 }
 
