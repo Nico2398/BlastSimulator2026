@@ -12,6 +12,7 @@ import type { SurveyConfidenceOverlayOptions } from '../../src/renderer/SurveyCo
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { makeEmptyGameContext } from '../helpers/gameContext.js';
 
 // ── Minimal SceneManager mock (matches SceneManager interface) ──────────────
 
@@ -64,13 +65,7 @@ function makeCtx(
     state.tickCount = overrides.tick;
   }
   const grid = new VoxelGrid(32, 16, 32);
-  return {
-    state,
-    grid,
-    emitter: { on: vi.fn(), emit: vi.fn() } as any,
-    landscape: null,
-    playableArea: null,
-  };
+  return makeEmptyGameContext({ state, grid, emitter: { on: vi.fn(), emit: vi.fn() } as any });
 }
 
 // ── Test Suite: syncSurveyOverlay is called from syncFromContext ────────────

@@ -4,34 +4,20 @@
 // the serialized GameState — see saveload.ts's header comment).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '16' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '1', size: '16' });
 }
 
 beforeEach(() => resetHoleIds());
 
 describe('saveCommand', () => {
   it('requires a loaded game', () => {
-    const ctx: MiningContext = {
-      state: null, grid: null,
-      emitter: new EventEmitter(),
-      landscape: null,
-      playableArea: null,
-    };
+    const ctx = makeEmptyGameContext();
     const result = saveCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');

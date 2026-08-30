@@ -21,6 +21,8 @@ function makeFragment(id: number, mass: number = 100): FragmentData {
     oreDensities: { dirtite: 0.3 },
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
   };
 }
 
@@ -44,6 +46,8 @@ function makeStoredFragment(
     oreDensities,
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
   };
 }
 

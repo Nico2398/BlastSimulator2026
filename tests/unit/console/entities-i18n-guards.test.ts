@@ -17,8 +17,7 @@
 // coverage is added here.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { buildCommand, zoneCommand } from '../../../src/console/commands/entities.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import {
@@ -27,13 +26,10 @@ import {
   type BuildingType,
   type BuildingTier,
 } from '../../../src/core/entities/Building.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(cash = 1_000_000): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  ctx.state!.cash = cash;
-  ctx.state!.finances.cash = cash;
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });
 }
 
 /** Place a building directly through core placeBuilding, at an arbitrary cell — bypasses cash and the build console command. */

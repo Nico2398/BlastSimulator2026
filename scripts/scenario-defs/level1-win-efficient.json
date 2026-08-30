@@ -1397,7 +1397,7 @@
     },
     {
       "command": "scores",
-      "description": "#553-followup (this batch's own proactive pass, real interaction-mode failures across two separate runs): dropped `ecology: 49.2` and `nuisance: 48` -- live interaction-mode runs read 49.13 and 47.825 here respectively, the same real-time-accrual class as this file's cash checkpoints (line ~1072's own note has the mechanism): both scores recover/decay gradually per tick, and interaction mode's own wall-clock delay around the blast's confirm/report-modal sequence can land this snapshot a fraction of a tick off from command mode's. wellBeing/safety stay exact -- confirmed unaffected across both failing runs.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace.",
       "interaction": [
         {
           "type": "command",
@@ -1412,7 +1412,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 50
+          "safety": 50,
+          "ecology": 55.809999999999945,
+          "nuisance": 48.05
         },
         "changedBy": {
           "tickCount": 0
@@ -1421,7 +1423,7 @@
     },
     {
       "command": "stats",
-      "description": "#553-followup (this batch's own proactive pass): `ecology`/`nuisance` also dropped here -- same reasoning and same reused snapshot as the scores step just above.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above.",
       "interaction": [
         {
           "type": "command",
@@ -1436,7 +1438,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 50
+          "safety": 50,
+          "ecology": 55.809999999999945,
+          "nuisance": 48.05
         },
         "changedBy": {
           "tickCount": 0
@@ -1563,7 +1567,7 @@
     },
     {
       "command": "contract accept type:ore_sale",
-      "description": "#554: dropped `material:gloomium` -- the queued charge action (this issue's own migration, see the `wait_until field:orderedChargeCount` step earlier) burns ~69 real ticks the pre-#554 file never spent, pushing this checkpoint from tick ~280 to tick 349 and landing on a different contract-refresh RNG draw: a direct trace of `contract list` at this exact tick shows the pool holds ore_sale offers for dirtite/treranium/sparkium only, no gloomium (gloomium is just one of eight materials `generateOneContract` can roll -- CONTRACT_ORES in Contract.ts -- never guaranteed present). `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-id=\"18\"]` (the first ore_sale entry in a direct `contract list` trace at this tick, dirtite).",
+      "description": "#715: the Fleet panel's driver-assign picker used to filter eligibility on `vehicle.driverId` alone, which stays null for an employee's whole walk to the vehicle (ArrivalGate.ts only sets it on arrival) -- so buying/assigning three drill_rigs back-to-back kept offering the same already-claimed driller as every subsequent picker's default option, and those assign clicks silently refused (`requestBoardVehicle`'s own already-walking guard). That desynced interaction mode's drilling dispatch order from command mode's explicit ids, producing a real tick-trajectory divergence this file's `equals`-loosening history (#555/#698/#714) had been papering over instead of fixing at the mechanism. Now that the picker (`fleetDetailSections.ts`'s `makeAssignRow`) reuses `canBoardVehicle` -- the same check `requestBoardVehicle` itself enforces -- both modes drill in the same order and reach this step at the identical tick 227, confirmed byte-identical against a direct command-mode `contract list` trace. `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-id=\"10\"]` (the first ore_sale entry in that trace, treranium).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1571,11 +1575,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1593,15 +1597,15 @@
     },
     {
       "command": "contract accept type:rubble_disposal",
-      "description": "#554: `type:rubble_disposal` finds the first rubble-disposal offer in the pool -- a direct trace at this tick shows the real id is 16, not the pre-#554 file's 14 (same tick-shift-changes-the-pool reasoning as the ore_sale accept above).",
+      "description": "#715: `type:rubble_disposal` finds the first rubble-disposal offer in the pool -- a direct trace at the now-shared tick 227 (see the ore_sale accept step's own note above for why both modes reach this tick identically since the driver-assign fix) shows the real id is 11.",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1619,7 +1623,7 @@
     },
     {
       "command": "contract deliver type:ore_sale amount:110",
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg stored of the accepted ore (dirtite). No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #554: dropped the `material:gloomium` filter (same reasoning as the accept step above -- the active contract is whichever ore_sale offer actually got accepted, dirtite here, not gloomium) and updated the blocked DOM id to the real one now offered (18). #585 (this session): declared `commandOutcome: \"refused\"` -- the repo-wide issue #585 audit (tests/unit/lint/ScenarioCommandOutcomes.test.ts) flagged this step as an undeclared command-mode refusal, but this is not the timing bug that audit's other findings are (a hauler that hasn't landed its first delivery yet) -- it is a permanent, by-design guard, re-confirmed via a fresh direct trace (createGameEngine + runCommand, replaying this file's full command sequence in order): storedMassKg and collectedOre sit at 0 from before this contract is even accepted through 200 further probe ticks, well past this contract's own deadline (offered as #12 in that trace, 'Deliver gloomium ore' -- the active ore is gloomium at this tick, not dirtite as the paragraph above still says; the #553/#554/#555 drilling/charging timing changes shifted this checkpoint's real tick count and landed on a different pool draw since that text was written, but which ore is offered is incidental to the guard), expiring unfulfilled at tick 328 for its full $9,519 penalty. `fragments status` confirms all 1,561 mined fragments stay 'On ground' the entire probe, never 'Stored' -- nothing ever hauls them, because no debris_hauler/rock_digger/rock_fragmenter/building_destroyer is ever bought anywhere in this file, only drill_rigs (six, all tier-3, all assigned as drillers). `level1-win-conservative.json`'s own untouched `contract deliver 5 amount:300` guard step documents the identical permanent guard in near-identical words, and `insufficient-funds-guards-visual.json` already establishes `role: 'guard'` + `commandOutcome: 'refused'` as this codebase's own pairing for a genuinely-blocked action. Forcing this delivery to succeed (a hauler purchase, a driver, a wait) would not fix a bug -- it would falsify this level's real trajectory and contradict this step's own pre-existing `expect.blocked`, which already correctly proves the refusal.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- 0.0 kg stored of the accepted ore. No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #715: the driver-assign picker fix (see the accept step's own note above) makes both modes reach this checkpoint at the same tick 227 and accept the same contract -- updated the blocked DOM id to the real one now offered (10, the treranium contract accepted two steps above). #585: declared `commandOutcome: \"refused\"`, a permanent by-design guard rather than a timing gap -- no debris_hauler/rock_digger/rock_fragmenter/building_destroyer is ever bought anywhere in this file, only drill_rigs, so nothing ever hauls the mined ore into storage regardless of which contract happens to be on offer. `level1-win-conservative.json`'s own untouched `contract deliver 5 amount:300` guard step documents the identical permanent guard, and `insufficient-funds-guards-visual.json` already establishes `role: 'guard'` + `commandOutcome: 'refused'` as this codebase's own pairing for a genuinely-blocked action. Forcing this delivery to succeed (a hauler purchase, a driver, a wait) would not fix a bug -- it would falsify this level's real trajectory and contradict this step's own pre-existing `expect.blocked`, which already correctly proves the refusal.",
       "interaction": [
         {
           "type": "command",
@@ -1636,7 +1640,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -1644,7 +1648,7 @@
     },
     {
       "command": "contract deliver type:rubble_disposal amount:80",
-      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #554: updated the blocked DOM id to the real one now offered (16). #585 (this session): declared `commandOutcome: \"refused\"`, same reasoning as the ore_sale guard step just above -- re-confirmed by the same fresh trace: storedMassKg/collectedOre stay 0 through 200 further probe ticks past this contract's own deadline (offered as #11 in that trace, 'Dispose of rubble'), expiring unfulfilled at tick 353 for its full $51 penalty, with `fragments status` confirming the same 1,561 fragments stuck 'On ground' throughout -- no hauling vehicle is ever bought in this file, so this refusal is permanent by design, not a timing gap to wait out.",
+      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #715: updated the blocked DOM id to the real one now offered (11, the rubble contract accepted three steps above -- see the accept step's own note for why both modes now reach this checkpoint identically). #585: declared `commandOutcome: \"refused\"`, same reasoning as the ore_sale guard step just above -- no hauling vehicle is ever bought in this file, so this refusal is permanent by design, not a timing gap to wait out.",
       "interaction": [
         {
           "type": "command",
@@ -1661,7 +1665,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -2636,7 +2640,7 @@
     },
     {
       "command": "scores",
-      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` dropped from `equals` (#555, this merge, real CI): level1's own `LevelDef.scoreDecayRate` (0.03, not the previously hardcoded global 0.05) now genuinely drives nuisance's decay, and the ecology `waitUntil` step above -- needed precisely because that same slower rate makes ecology's own debt take longer to pay off -- consumes a real-time-dependent number of extra ticks that also decays nuisance further: command mode's own path needs 0 extra ticks (ecology already at floor) and reads nuisance at 49.98000000000037, while a real interaction-mode run needed enough extra ticks to close a real ecology debt and read nuisance already clamped at its own floor of 50. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing stays exact -- confirmed unaffected by direct trace. `safety` dropped from `equals` too (#698): same class of divergence as nuisance, confirmed by a real interaction-mode run (screenshots/scenario-level1-win-efficient-interaction) -- command mode reaches tickCount 551 here and reads safety pinned at exactly 0 (ScoreManager.ts's applyDecay excludes a score exactly at 0 from decay -- the same dead-zone this codebase has documented for ecology/wellBeing elsewhere -- so once safety clamps there it stays there unassisted). A live interaction-mode run reaches this same checkpoint at tickCount 578, 27 more ticks than command mode: the ecology `waitUntil` above needed 107 ticks to close ecology's own debt in interaction mode versus 80 in command mode (a real, click-vs-bulk-dispatch pacing difference, same root class #706/#697 diagnosed), and those 27 extra ticks are enough real time for safety -- which never actually reached the exact 0 floor in interaction mode's own trajectory, only dropped low -- to decay back up to 18.60999999999997 before this step reads it. Not a bug to chase at the source (the same click-vs-command dispatch pacing gap #706 accepted rather than force into lockstep); wellBeing/deathCount/levelEndReason all stay exact because they hit true floors/booleans immune to this drift, safety's own trajectory does not.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible.",
       "interaction": [
         {
           "type": "command",
@@ -2651,13 +2655,15 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "ecology": 50
+          "safety": 0,
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
     {
       "command": "stats",
-      "description": "#592: ecology dropped here too -- same reasoning and same reused snapshot as the scores step just above. `safety` dropped from `equals` here too (#698) -- same reused snapshot, same mode-divergence reasoning as the scores step just above.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above.",
       "interaction": [
         {
           "type": "command",
@@ -2672,13 +2678,15 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "ecology": 50
+          "safety": 0,
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
     {
       "command": "campaign status",
-      "description": "#554 Findings, final (supersedes the pre-#554 tickCount-491 calibration): the level still ends in a permanent worker revolt, but far earlier in real terms than any prior calibration found -- during pattern 1's own queued-charge wait (`wait_until field:orderedChargeCount`, ~69 real ticks), before pattern 1's blast even happens, not at any of tickCount 458/471/491. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount). tickCount reads 551 here, not 491 -- the queued charge action's own real elapsed time (charging used to be instant pre-#554) shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks; this is a uniform pacing shift, not a change in when the revolt itself completes. Cash ends lower than the pre-#554 file's $2,029,295, reflecting 60 more ticks (491->551) of payroll/fuel/maintenance for a 4-to-7-person roster on top of the same spend: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), and two punitive random events (an ore-name lawsuit -$20,000, a union strike -$25,000) -- no lucky_strike bonus landed this run. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. Ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the same ~60-tick uniform shift pushes this observation past the point where the #592 living-quarters-overcapacity dip had already recovered to baseline. What #553/#554 together change is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes. `safety` dropped from `equals` here too (#698) -- same reused snapshot, same mode-divergence reasoning as the scores step above: command mode reads safety pinned at exactly 0 (dead-zone clamp), a real interaction-mode run reads 18.60999999999997 (never actually clamped to 0, 27 ticks of decay-driven recovery by this point) -- levelEnded/levelEndReason/holeCount/orderedHoleCount/deathCount all stay exact, confirmed unaffected.",
+      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here.",
       "interaction": [
         {
           "type": "command",
@@ -2693,7 +2701,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
+          "safety": 0,
           "ecology": 50,
+          "nuisance": 50,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

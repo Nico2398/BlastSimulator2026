@@ -133,18 +133,23 @@ exactly one turn. Ending your turn to wait for it discards everything this run
 has done: PR #604 lost 3h11m of finished work that way, and PR #594 lost two
 attempts to it.
 
-If the command fits in one Bash call, run it in the foreground with an explicit
-timeout (the ceiling is 600000 ms):
+A short command fits in one Bash call — run it in the foreground with an
+explicit timeout (the ceiling is 600000 ms):
 
-    npm run test          # ~3m
     npm run typecheck
 
-If it does not fit — \`npm run scenarios\` is ~9m20s and slower on a runner,
-\`npm run ci:await\` waits on CI for as long as CI takes — use the wrapper that
-can be waited on inside this turn:
+\`npm run test\` no longer belongs in that list: it has grown to ~500s on a
+2-core runner (was ~186s when this project started), and a foreground call
+that does not pass an explicit timeout at least that long gets silently moved
+to the background by this harness's own shorter default — with no error, no
+warning, just a result you now have to wait a whole extra turn for. That is
+exactly how issue #842's rescue (PR #872) lost two attempts. \`npm run
+scenarios\` is ~9m20s and slower on a runner, and \`npm run ci:await\` waits
+on CI for as long as CI takes. All three use the wrapper that can be waited
+on inside this turn:
 
-    npm run long -- start scenarios -- npm run scenarios
-    npm run long -- wait scenarios          # repeat while it exits 75
+    npm run long -- start test -- npm run test
+    npm run long -- wait test               # repeat while it exits 75
 
 \`wait\` blocks for one bounded slice and returns 75 meaning "still going, ask
 again". Keep calling it in this same turn until it reports FINISHED, then act on

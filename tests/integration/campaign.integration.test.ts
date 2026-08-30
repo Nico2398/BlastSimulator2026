@@ -2,14 +2,14 @@
 // Covers level progression, star ratings, and campaign commands.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import {
   campaignStartCommand,
   campaignStatusCommand,
   campaignCompleteCommand,
   statsCommand,
 } from '../../src/console/commands/campaign.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
 import {
   createCampaignState,
   recordProfit,
@@ -32,9 +32,7 @@ import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
 }
 
 // ── Campaign ────────────────────────────────────────────────────────────────
@@ -489,7 +487,7 @@ describe('Campaign', () => {
   // ── 12. campaign start with no prior game ──────────────────────────────────
 
   it('campaign start succeeds with no prior game, same as after a fresh new_game', () => {
-    const freshCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+    const freshCtx: GameContext = makeEmptyGameContext();
 
     const result = campaignStartCommand(freshCtx, [], { level: 'tutorial_pit' });
 
@@ -502,7 +500,7 @@ describe('Campaign', () => {
   });
 
   it('campaign start with no prior game rejects a locked level, same as with one', () => {
-    const freshCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+    const freshCtx: GameContext = makeEmptyGameContext();
 
     const result = campaignStartCommand(freshCtx, [], { level: 'grumpstone_ridge' });
 

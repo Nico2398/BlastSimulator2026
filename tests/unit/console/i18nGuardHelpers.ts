@@ -2,8 +2,8 @@
 // i18n-guards test suite (mining/economy/policy/state/saveload
 // *-i18n-guards.test.ts files). Extracted here per #822.
 
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
+import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 /**
  * Build a minimal context representing "no game loaded" — every game-data
@@ -12,5 +12,5 @@ import type { MiningContext } from '../../../src/console/commands/mining.js';
  * optional.
  */
 export function makeEmptyCtx(): MiningContext {
-  return { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+  return makeEmptyGameContext();
 }

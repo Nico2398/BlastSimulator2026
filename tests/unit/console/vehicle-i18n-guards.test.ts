@@ -24,8 +24,7 @@
 // switch to `requireGame(ctx)` actually happened.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import type { GameContext } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee, type EmployeeRole } from '../../../src/core/entities/Employee.js';
@@ -35,13 +34,10 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(cash = 1_000_000): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  ctx.state!.cash = cash;
-  ctx.state!.finances.cash = cash;
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });
 }
 
 /** Buys a debris_hauler directly through purchaseVehicle — bypasses cash and the console layer entirely. */
@@ -396,7 +392,7 @@ describe('vehicle.ts — break success message', () => {
 
 describe('vehicle.ts — no game loaded (bonus fix: requireGame(ctx))', () => {
   function noGameCtx(): GameContext {
-    return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+    return makeEmptyGameContext();
   }
 
   it('matches the exact English console.no_game_loaded literal by default', () => {

@@ -3,9 +3,8 @@
 // pauses the game, and displays event details to the player.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import type { GameContext } from '../../../src/console/commands/world.js';
 import { eventCommand } from '../../../src/console/commands/events.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { getEventById, clearEvents } from '../../../src/core/events/EventPool.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -14,12 +13,11 @@ import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
 }
 
 describe('event fire subcommand', () => {

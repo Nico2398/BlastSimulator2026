@@ -1,24 +1,22 @@
 // BlastSimulator2026 — Shared helper functions for full-level integration tests
 
 import { expect } from 'vitest';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import type { GameContext } from '../../../src/console/commands/world.js';
 import { campaignStartCommand, campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 /**
  * Create a fresh GameContext with a new game of the default mine preset.
  * Used as the base for all full-level test helpers.
  */
 function createBaseContext(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
 }
 
 /** Complete tutorial_pit (threshold 5000) to unlock dusty_hollow. */

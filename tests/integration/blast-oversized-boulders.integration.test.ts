@@ -9,7 +9,7 @@
 // fragments, zero projections).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import { type GameContext } from '../../src/console/commands/world.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { employeeCommand } from '../../src/console/commands/employees.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
@@ -20,8 +20,8 @@ import {
   sequenceCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 /**
  * `cash:` is raised above the $50,000 default because `vehicle buy` now
@@ -31,9 +31,7 @@ import { isOversized } from '../../src/core/mining/BlastCalc.js';
  * asserts anything about money.
  */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1000000 });
 }
 
 /**

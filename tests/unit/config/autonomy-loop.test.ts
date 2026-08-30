@@ -1392,6 +1392,17 @@ describe('a work branch belongs to exactly one run', () => {
     expect(api).toContain('pipelineHeadPattern');
     expect(api).toContain('listMatchingRefs');
   });
+
+  // A work branch this run built is always run-id-suffixed in practice
+  // (agentic-prompt names it `pipeline/<role>-<issue>-<runid>`), but the retry's
+  // disk inventory used to glob only the bare `pipeline/*-<issue>` form. That
+  // read a real branch on disk as "none ... so the work starts from main",
+  // telling the retry to rebuild work that already existed instead of
+  // continuing it — found investigating PR #872's rescue of issue #842.
+  it('the disk inventory globs both the bare and the run-id-suffixed branch name', () => {
+    const state = readFileSync(join(ROOT, '.github/actions/agentic-run-state/action.yml'), 'utf8');
+    expect(state).toContain('"refs/heads/pipeline/*-${ISSUE}" "refs/heads/pipeline/*-${ISSUE}-*"');
+  });
 });
 
 // Only two comments in the system may carry a mention, and both are written by

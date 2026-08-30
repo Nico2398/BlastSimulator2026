@@ -237,11 +237,17 @@
     // or assertions changed; no src/ production files touched. 8 errors
     // remain across the 6 still-excluded ./unit/economy/*.test.ts files, for
     // a follow-up issue.
-    "./unit/economy/BoulderBreaking.approach.test.ts",
-    "./unit/economy/BoulderBreaking.test.ts",
-    "./unit/economy/FragmentApproach.test.ts",
-    "./unit/economy/HaulDispatch.test.ts",
-    "./unit/economy/HaulingTask.test.ts",
-    "./unit/economy/Logistics.test.ts"
+    // #842 fixed the ./unit/economy/*.test.ts cluster (6 -> 0 entries): 8 TS2739
+    // errors across BoulderBreaking.approach, BoulderBreaking, FragmentApproach,
+    // HaulDispatch, HaulingTask, Logistics -- each file's makeFragment() (and
+    // Logistics.test.ts's makeStoredFragment()) built a FragmentData object
+    // literal missing the required halfExtents/shapeSeed fields, same drift as
+    // the #804/#806/#845/#846/#848/#849 clusters. Fixed by adding
+    // halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, to each fixture,
+    // matching #806's precedent values. Plus 1 TS6133 in HaulDispatch.test.ts:
+    // an unused GameState type import, dropped. No test logic or assertions
+    // changed. All exclude entries from the tests/tsconfig.json fixture-drift
+    // sweep (#743 onward) are now resolved -- tsc --noEmit is green across
+    // tests/ with nothing left in this list but node_modules/../dist.
   ]
 }

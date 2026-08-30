@@ -13,7 +13,7 @@
 // below is expected to fail until #552 is implemented.
 
 import { describe, it, expect } from 'vitest';
-import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
+import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
@@ -35,6 +35,8 @@ function makeFragment(id: number, x: number, z: number, mass = 1000): FragmentDa
     oreDensities: {},
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
   };
 }
 

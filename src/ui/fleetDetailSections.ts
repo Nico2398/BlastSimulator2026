@@ -9,7 +9,9 @@ import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier } from '../core/entities/Vehicle.js';
 import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
+import { canBoardVehicle } from '../core/entities/VehicleBoarding.js';
 
 export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): string {
   return t(getVehicleDefByTier(type, tier).nameKey);
@@ -91,11 +93,35 @@ export function makeDriverRow(v: Vehicle, state: GameState, onUnassign: () => vo
   return wrap;
 }
 
+/**
+ * A driver already walking to board this vehicle, not yet arrived —
+ * `v.driverId` stays null the whole walk (ArrivalGate.ts only sets it on
+ * arrival), so without this the card would fall through to `makeAssignRow`
+ * and, pre-#715, silently re-offer the same employee as if nobody had
+ * claimed the vehicle yet. No unassign control: cancelling an in-progress
+ * walk has no console command today, only display.
+ */
+export function makePendingDriverRow(employee: Employee): HTMLElement {
+  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
+  wrap.append(
+    iconEl('drive', 12, 0.6),
+    el('span', { text: t('ui.fleet.walking_to_board', { name: employee.name }), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+  );
+  return wrap;
+}
+
 /** No driver: an eligible-crew picker, or a warning + cross-link to Crew when nobody on the roster holds the licence. */
 export function makeAssignRow(v: Vehicle, state: GameState, onAssign: (employeeId: number) => void, onGoToCrew: () => void): HTMLElement {
   const licence = ROLE_LICENCE_REQUIRED[v.type];
-  const taken = new Set(state.vehicles.vehicles.filter(o => o.id !== v.id && o.driverId !== null).map(o => o.driverId));
-  const eligible = state.employees.employees.filter(e => e.alive && !taken.has(e.id) && e.qualifications.some(q => q.category === licence));
+  // canBoardVehicle is the single source of truth requestBoardVehicle itself
+  // enforces — not a hand-rolled driverId-only "taken" set: an employee
+  // already walking to board a different vehicle has pendingDriverVehicleId
+  // set, but vehicle.driverId stays null for the whole walk (ArrivalGate.ts
+  // only sets it on arrival), so the old driverId-only filter kept offering
+  // them here. Clicking Assign for them then silently failed
+  // canBoardVehicle's own already-walking check inside requestBoardVehicle,
+  // with no feedback in the UI (#715).
+  const eligible = state.employees.employees.filter(e => canBoardVehicle(state, v.id, e.id).success);
 
   if (eligible.length === 0) {
     const warn = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;padding:9px;border-radius:4px;background:var(--bsx-well)' } });

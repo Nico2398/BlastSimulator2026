@@ -2,14 +2,13 @@
 // Tests for driver-info display in `vehicle list` output.
 
 import { describe, it, expect } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 /** Default fields for hand-built Employee test fixtures below (mirrors hireEmployee's defaults). */
 const EMPLOYEE_DEFAULTS = {
@@ -49,15 +48,7 @@ function resolveDriverBoarding(ctx: MiningContext): void {
 // ── Test context factory ──
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
 }
 
 function addTruckVehicle(ctx: MiningContext): number {

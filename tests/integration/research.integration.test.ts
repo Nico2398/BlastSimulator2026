@@ -9,19 +9,17 @@
 // DO NOT implement anything here — only add implementation to src/.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { researchCommand } from '../../src/console/commands/research.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { queueResearchTask, isTierUnlocked, placeBuilding } from '../../src/core/entities/Building.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '500000' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32', cash: '500000' });
 }
 
 /**

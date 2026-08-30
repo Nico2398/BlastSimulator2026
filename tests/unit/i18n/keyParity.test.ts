@@ -225,7 +225,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // top-level guard was switched from a hand-rolled literal to
     // requireGame(ctx), reusing console.no_game_loaded — no new keys needed
     // for either reuse.
-    // Baseline is now 3465 (up from 3464): #788 point 3 moved the ramp
+    // Baseline is now 3465 (up from 3464): #715 adds one new key,
+    // ui.fleet.walking_to_board -- the Fleet panel's own driver-assign
+    // picker used to filter eligibility on vehicle.driverId alone, which
+    // stays null for a driver's whole walk to the vehicle, so a vehicle
+    // someone had already claimed still fell through to the "pick a driver"
+    // picker (and, once that picker's own eligibility check was fixed to
+    // exclude them, to a misleading "nobody is licensed" warning). A
+    // dedicated pending-driver row needed its own translated string; both
+    // locales translated.
+    // Baseline is now 3466 (up from 3465): #788 point 3 moved the ramp
     // length bound (finite/positive + MAX_RAMP_LENGTH) from
     // buildRampCommand into core's validateRampOrder so every caller of
     // buildRamp gets it, not just the console command. validateRampOrder
@@ -241,7 +250,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3465);
+    expect(Object.keys(en).length).toBe(3466);
   });
 });
 

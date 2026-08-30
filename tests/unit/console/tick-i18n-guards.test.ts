@@ -8,24 +8,16 @@
 // 'fr', so a hardcoded string that merely matches en.json cannot pass.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { tickCommand } from '../../../src/console/commands/tick.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import { getAllEvents } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import * as EventSystemModule from '../../../src/core/events/EventSystem.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '24' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
 }
 
 // The global event pool (EventPool.ts's module-level array) is populated by

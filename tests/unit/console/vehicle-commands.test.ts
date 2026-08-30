@@ -2,26 +2,17 @@
 // Tests for the `driver` sub-command and driver-aware `list` output.
 
 import { describe, it, expect } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 // ── Test context factory ──
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
 }
 
 /**

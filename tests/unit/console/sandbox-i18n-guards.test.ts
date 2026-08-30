@@ -16,11 +16,11 @@ import { type GameContext } from '../../../src/console/commands/world.js';
 import { sandboxCommand } from '../../../src/console/commands/sandbox.js';
 import { SANDBOX_DIFFICULTY_ORDER } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 function freshCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+  return makeEmptyGameContext();
 }
 
 afterEach(() => setLocale('en'));

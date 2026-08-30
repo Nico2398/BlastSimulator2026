@@ -19,7 +19,6 @@
 // after them would leave the entity behind.
 
 import { describe, it, expect } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
@@ -39,16 +38,10 @@ import { TARGET_COSTS, MAFIA_THRESHOLD } from '../../../src/core/economy/Corrupt
 import { ACCIDENT_COST, FRAME_COST, FRAME_EVIDENCE_TICKS } from '../../../src/core/events/MafiaActions.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { STARTING_CASH } from '../../../src/core/config/balance.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(cash: number): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
   setCash(ctx, cash);
   return ctx;
 }
@@ -700,7 +693,7 @@ describe('employee raise — invalid amount override sanitization (#534)', () =>
 
 describe('new_game cash: — invalid cash override sanitization (#534)', () => {
   function freshCtx(): MiningContext {
-    return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+    return makeEmptyGameContext();
   }
 
   it('falls back to STARTING_CASH for cash:notanumber', () => {
@@ -760,7 +753,7 @@ describe('start_level — invalid cash override sanitization (#534 campaign.ts)'
   const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
   function freshCtx(): MiningContext {
-    return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+    return makeEmptyGameContext();
   }
 
   it('does not set cash to Infinity for a cash override that overflows parseInt', () => {

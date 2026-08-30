@@ -7,6 +7,7 @@ import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
 import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
 
@@ -17,6 +18,51 @@ afterAll(() => {
   if (fs.existsSync(TEST_SAVE_DIR)) {
     fs.rmSync(TEST_SAVE_DIR, { recursive: true });
   }
+});
+
+// ── v2→v3 migration for Vehicle.waitingTicks ────────────────────────────────
+// waitingTicks was added to the Vehicle interface at save version 3. A
+// pre-v3 save's vehicles predate the field entirely — it must default to 0,
+// matching purchaseVehicle's own default.
+//
+// GAP found during the #768 test-writer pass: the existing suite had no
+// dedicated coverage of this migration block (planner's plan listed it, but
+// no describe block exercised it). Added here as the minimum
+// characterization test to pin down current (pre-refactor) behavior.
+
+describe('deserialize — v2→v3 migration for Vehicle.waitingTicks', () => {
+  it('a pre-v3 vehicle with no waitingTicks field loads with waitingTicks: 0', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 2;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    expect(vehicleList).toHaveLength(1);
+    delete vehicleList[0]!['waitingTicks'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.vehicles).toHaveLength(1);
+    expect(restored.vehicles.vehicles[0]!.waitingTicks).toBe(0);
+  });
+
+  it('a pre-v3 save with a non-zero waitingTicks is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.waitingTicks = 4;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 2;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restoredVehicle.waitingTicks).toBe(4);
+  });
 });
 
 describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () => {
@@ -65,6 +111,66 @@ describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () =>
     });
     const restored = deserialize(v4save);
     expect(restored.collectedOre).toEqual({});
+  });
+});
+
+// ── v6→v7 migration for GameState.softwareTier / tubingState ───────────────
+// softwareTier and tubingState moved onto GameState from the console-only
+// MiningContext at save version 7. A pre-v7 save has neither field at all —
+// softwareTier defaults to 0 and tubingState defaults to a fresh
+// createTubingState() shape ({ inventory: 0, installedHoles: new Set() }),
+// matching createGame's own defaults.
+//
+// GAP found during the #768 test-writer pass: no existing test covered this
+// migration block. Added here as the minimum characterization test to pin
+// down current (pre-refactor) behavior.
+
+describe('deserialize — v6→v7 migration for GameState.softwareTier / tubingState', () => {
+  it('a save missing softwareTier entirely loads with softwareTier: 0', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    delete parsed['softwareTier'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.softwareTier).toBe(0);
+  });
+
+  it('a save missing tubingState entirely loads with an empty tubingState (inventory: 0, no installed holes)', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    delete parsed['tubingState'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.tubingState.inventory).toBe(0);
+    expect(restored.tubingState.installedHoles).toBeInstanceOf(Set);
+    expect(restored.tubingState.installedHoles.size).toBe(0);
+  });
+
+  it('a tubingState with installed holes round-trips its Set through serialize/deserialize unchanged', () => {
+    const state = createGame({ seed: 42 });
+    state.tubingState.inventory = 3;
+    state.tubingState.installedHoles.add('H1');
+    state.tubingState.installedHoles.add('H2');
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.tubingState.inventory).toBe(3);
+    expect(restored.tubingState.installedHoles).toEqual(new Set(['H1', 'H2']));
+  });
+
+  it('a save with softwareTier already set is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    state.softwareTier = 2;
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.softwareTier).toBe(2);
   });
 });
 
@@ -238,6 +344,150 @@ describe('deserialize — GameState.ghostPreviewsRevision backward compat (#761)
   });
 });
 
+// ── deserialize — event system field defaults (unconditional) ──────────────
+// firedEventIds/lastEventTick/actionCountSinceEvent/cooldownMinIntervalTicks
+// are ensured unconditionally, not gated on save version, for a save whose
+// events object predates one or more of these fields.
+//
+// GAP found during the #768 test-writer pass: no existing test covered this
+// block. Added here as the minimum characterization test to pin down
+// current (pre-refactor) behavior.
+
+describe('deserialize — event system field defaults', () => {
+  it('an events object missing all four fields loads with the createGame defaults', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const eventsRaw = parsed['events'] as Record<string, unknown>;
+    delete eventsRaw['firedEventIds'];
+    delete eventsRaw['lastEventTick'];
+    delete eventsRaw['actionCountSinceEvent'];
+    delete eventsRaw['cooldownMinIntervalTicks'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.events.firedEventIds).toEqual([]);
+    expect(restored.events.lastEventTick).toBe(0);
+    expect(restored.events.actionCountSinceEvent).toBe(0);
+    expect(restored.events.cooldownMinIntervalTicks).toBeNull();
+  });
+
+  it('an events object already carrying non-default values is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    state.events.firedEventIds = ['e1'];
+    state.events.lastEventTick = 12;
+    state.events.actionCountSinceEvent = 3;
+    state.events.cooldownMinIntervalTicks = 5;
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.events.firedEventIds).toEqual(['e1']);
+    expect(restored.events.lastEventTick).toBe(12);
+    expect(restored.events.actionCountSinceEvent).toBe(3);
+    expect(restored.events.cooldownMinIntervalTicks).toBe(5);
+  });
+});
+
+// ── deserialize — Employee.restNeedKey / activeTaskSkill defaults ──────────
+// Both fields are ensured unconditionally for an employee saved before they
+// existed. Absent means "not tracked" — encoded as null on both, matching
+// hireEmployee's own defaults.
+//
+// GAP found during the #768 test-writer pass: no existing test covered this
+// block. Added here as the minimum characterization test to pin down
+// current (pre-refactor) behavior.
+
+describe('deserialize — Employee.restNeedKey / activeTaskSkill defaults', () => {
+  it('an employee missing both fields loads with restNeedKey: null and activeTaskSkill: null', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    hireEmployee(state.employees, 'driller', rng);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const employeesRaw = parsed['employees'] as Record<string, unknown>;
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>>;
+    expect(employeeList).toHaveLength(1);
+    delete employeeList[0]!['restNeedKey'];
+    delete employeeList[0]!['activeTaskSkill'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.employees.employees).toHaveLength(1);
+    expect(restored.employees.employees[0]!.restNeedKey).toBeNull();
+    expect(restored.employees.employees[0]!.activeTaskSkill).toBeNull();
+  });
+
+  it('an employee already carrying non-null values for both fields is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.restNeedKey = 'hunger';
+    employee.activeTaskSkill = 'blasting';
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.restNeedKey).toBe('hunger');
+    expect(restoredEmployee.activeTaskSkill).toBe('blasting');
+  });
+});
+
+// ── deserialize — surveyedPositions / uniqueOresExtracted default to an
+// empty Set when the field is entirely absent ──────────────────────────────
+// Both fields are Set<string> in memory, serialized as { __type: 'Set',
+// values: [...] } by `serialize`'s replacer. A save with the field missing
+// outright (not merely an empty array) must still restore to an empty Set
+// rather than throwing or leaving the field undefined.
+//
+// GAP found during the #768 test-writer pass: the existing suite only ever
+// exercised these two restore branches indirectly (a hand-written v4
+// fixture with `surveyedPositions: []` and `uniqueOresExtracted: []`, and
+// the general round-trip test at the bottom of this file) — neither
+// asserted directly on the restored Set, and neither covered the
+// field-entirely-absent branch. Added here as the minimum characterization
+// test to pin down current (pre-refactor) behavior for all three restore
+// branches this idiom's extraction (`restoreSetField`) must preserve.
+
+describe('deserialize — surveyedPositions / uniqueOresExtracted default to empty Set when absent', () => {
+  it('a save with surveyedPositions entirely absent restores it as an empty Set', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    delete parsed['surveyedPositions'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.surveyedPositions).toEqual(new Set());
+  });
+
+  it('a save with levelStats.uniqueOresExtracted entirely absent restores it as an empty Set', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const levelStatsRaw = parsed['levelStats'] as Record<string, unknown>;
+    delete levelStatsRaw['uniqueOresExtracted'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.levelStats.uniqueOresExtracted).toEqual(new Set());
+  });
+
+  it('surveyedPositions and uniqueOresExtracted with values round-trip through serialize/deserialize unchanged', () => {
+    const state = createGame({ seed: 42 });
+    state.surveyedPositions.add('3,4');
+    state.levelStats.uniqueOresExtracted.add('boomite_ore');
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.surveyedPositions).toEqual(new Set(['3,4']));
+    expect(restored.levelStats.uniqueOresExtracted).toEqual(new Set(['boomite_ore']));
+  });
+});
+
 // ── v8→v9 migration for Employee.taskQueue (#549) ───────────────────────────
 // SAVE_VERSION bumped 8→9 when Employee gained a `taskQueue: number[]` field
 // (cost-based per-employee action selection). A save written before that has
@@ -312,6 +562,51 @@ describe('deserialize — v8→v9 migration for Employee.taskQueue (#549)', () =
 
     const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
     expect(restoredEmployee.taskQueue).toEqual([7, 8]);
+  });
+});
+
+// ── v9→v10 migration for Vehicle.reservedForActionId (#550) ────────────────
+// SAVE_VERSION bumped 9→10 when Vehicle gained a `reservedForActionId:
+// number | null` field (vehicle-gated actions). A pre-v10 save has no
+// reservation on any vehicle — it must default to null, matching
+// purchaseVehicle's own default.
+//
+// GAP found during the #768 test-writer pass: no existing test covered this
+// migration block. Added here as the minimum characterization test to pin
+// down current (pre-refactor) behavior.
+
+describe('deserialize — v9→v10 migration for Vehicle.reservedForActionId (#550)', () => {
+  it('a v9 fixture with a vehicle missing reservedForActionId loads with reservedForActionId: null', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 9;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    expect(vehicleList).toHaveLength(1);
+    delete vehicleList[0]!['reservedForActionId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.vehicles).toHaveLength(1);
+    expect(restored.vehicles.vehicles[0]!.reservedForActionId).toBeNull();
+  });
+
+  it('a pre-v10 save with reservedForActionId already set is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.reservedForActionId = 42;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 9;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restoredVehicle.reservedForActionId).toBe(42);
   });
 });
 
