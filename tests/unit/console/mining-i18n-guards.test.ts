@@ -421,6 +421,14 @@ describe('mining.ts #797 remaining rejection strings — English literal + fr di
       run: (ctx) => buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '0' }),
     },
     {
+      // #788 point 3: the MAX_RAMP_LENGTH bound moved into core's
+      // validateRampOrder, but stays translatable via messageKey/t() same as
+      // the sibling invalid-length case above.
+      name: 'build_ramp — too long',
+      englishLiteral: 'Ramp too long: 5000m exceeds the 1000m limit per ramp.',
+      run: (ctx) => buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5000' }),
+    },
+    {
       name: 'survey — invalid coordinates',
       englishLiteral: 'Invalid coordinates: x and z must be integers.',
       run: (ctx) => surveyCommand(ctx, ['seismic'], { x: 'abc', z: '10' }),

@@ -3318,6 +3318,7 @@
   "mining.preview.usage": "Usage: preview energy|fragments|projections|vibrations",
   "mining.build_ramp.cancel_usage": "Usage: build_ramp cancel id:<ramp-id>",
   "mining.build_ramp.invalid_length": "Invalid ramp length: length must be a finite positive number.",
+  "mining.build_ramp.too_long": "Ramp too long: {length}m exceeds the {limit}m limit per ramp.",
   "mining.weather.set_usage": "Usage: weather set <state>. Valid: {valid}",
   "mining.survey.usage": "Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Unknown method \"{method}\". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",

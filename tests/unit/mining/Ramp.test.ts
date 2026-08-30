@@ -5,7 +5,7 @@ import {
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   type RampDef, type RampDirection,
 } from '../../../src/core/mining/Ramp.js';
-import { RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 
 function fillGrid(grid: VoxelGrid) {
@@ -329,10 +329,10 @@ describe('validateRampOrder (#555)', () => {
     expect(result.cost).toBe(0);
   });
 
-  it('rejects a non-positive length with buildRamp\'s own message', () => {
+  it('rejects a non-positive length with a finite-positive message', () => {
     const result = validateRampOrder({ ...BASE_RAMP, length: 0 }, 50000);
     expect(result.success).toBe(false);
-    expect(result.message).toBe('Ramp length must be positive');
+    expect(result.message).toBe('Invalid ramp length: length must be a finite positive number.');
     expect(result.cost).toBe(0);
   });
 
@@ -341,5 +341,32 @@ describe('validateRampOrder (#555)', () => {
     expect(result.success).toBe(false);
     expect(result.message).toBe('Target depth must be positive');
     expect(result.cost).toBe(0);
+  });
+
+  // #788 point 3: the length bound used to live only in buildRampCommand
+  // (the console command) — it now lives here, in core, so every caller of
+  // buildRamp/validateRampOrder is protected, not just the console.
+  it('rejects a non-finite length, carrying a translation key for the console layer', () => {
+    const result = validateRampOrder({ ...BASE_RAMP, length: Infinity }, 50000);
+    expect(result.success).toBe(false);
+    expect(result.message.toLowerCase()).toContain('finite');
+    expect(result.cost).toBe(0);
+    expect(result.messageKey).toBe('mining.build_ramp.invalid_length');
+  });
+
+  it('rejects a length exceeding MAX_RAMP_LENGTH, naming the length and the limit, carrying a translation key + params', () => {
+    const result = validateRampOrder({ ...BASE_RAMP, length: MAX_RAMP_LENGTH + 1 }, 50_000_000);
+    expect(result.success).toBe(false);
+    expect(result.message.toLowerCase()).toContain('too long');
+    expect(result.message).toContain(String(MAX_RAMP_LENGTH + 1));
+    expect(result.message).toContain(String(MAX_RAMP_LENGTH));
+    expect(result.cost).toBe(0);
+    expect(result.messageKey).toBe('mining.build_ramp.too_long');
+    expect(result.messageParams).toEqual({ length: MAX_RAMP_LENGTH + 1, limit: MAX_RAMP_LENGTH });
+  });
+
+  it('accepts a length exactly at MAX_RAMP_LENGTH (boundary)', () => {
+    const result = validateRampOrder({ ...BASE_RAMP, length: MAX_RAMP_LENGTH }, 50_000_000);
+    expect(result.success).toBe(true);
   });
 });
