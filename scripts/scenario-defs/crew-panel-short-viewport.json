@@ -46,7 +46,7 @@
     },
     {
       "command": "employee list",
-      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly.",
+      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly. The 400ms wait after the wheel action is a settle delay, not padding: page.mouse.wheel() resolving does not guarantee the scroll has actually landed — Chrome can commit a wheel-triggered scroll on the compositor thread after the CDP call returns, independent of how fast the page itself is running. CI (PR #888, shard 6/10, Chrome 127) caught this asserting scrollTop immediately after the wheel action — 'expected scrollTop=50, got 0' — reproducibly, on a build that already had both real fixes applied; sandbox testing here (Chrome 141, a dedicated browser per run rather than CI's shared one across a shard) never hit it, which is exactly the kind of margin a settle wait removes instead of relying on. This is the standard remedy for that class of Puppeteer/Chrome wheel-scroll flake.",
       "interaction": [
         { "type": "viewport", "width": 1280, "height": 600 },
         { "type": "ensurePanel", "panel": "employees" },
@@ -56,6 +56,7 @@
         { "type": "assert", "selector": "#bs-employee-panel .bsx-panel-body", "property": "scrollTop", "expectedValue": 0 },
         { "type": "mousemove", "x": 190, "y": 300 },
         { "type": "wheel", "deltaX": 0, "deltaY": 50 },
+        { "type": "wait", "durationMs": 400 },
         { "type": "screenshot" },
         {
           "type": "assert",
