@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash, Skill, TodoWrite
 skills:
   - dev-coding-conventions
   - dev-architecture
+  - dev-design-principles
 hooks:
   PreToolUse:
     - matcher: Bash
@@ -40,7 +41,21 @@ Adjust review depth based on `risk_tier` from context:
 - **Config** — hardcoded balance numbers. Must use `src/core/config/`.
 - **Dead code** — unreachable branches, unused imports, commented-out code.
 - **Naming** — inconsistent identifiers vs conventions in `dev-coding-conventions` skill.
-- **SOLID principles** — violations of single responsibility (function, class, or file doing too much — no lint test owns file cohesion, judge it here), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-coding-conventions` skill.
+- **SOLID principles** — violations of single responsibility (function, class, or file doing too much — no lint test owns file cohesion, judge it here), open/closed (the next variant edits existing code instead of adding a catalog entry), Liskov substitution (a subtype that breaks its supertype's contract), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-design-principles` skill.
+
+### Durability Under Project Growth
+Judge every changed unit against the five questions in `dev-design-principles` — one reason to
+change, coupling, genericity, cost curve, extension. The three the other checks do not reach:
+
+- **Coupling inside a layer** — a helper taking `GameState` to read two fields, a module reading
+  another module's internal shape field-by-field, an import that closes a cycle. Layer boundaries
+  above catch none of these.
+- **Cost curve** — nested iteration over two collections that both grow with the game, a full
+  recompute of a derived structure (navgrid, terrain mesh) after a local change, per-tick work that
+  walks more than one growth axis. Name the axis and the growth that makes it hurt; a complexity
+  claim nobody measured is a guess.
+- **Speculative generality** — an abstraction, type parameter, registry or config flag with exactly
+  one consumer. Flag it as readily as duplication: both cost every future reader.
 
 ### Coding Conventions (Naming & Intent)
 - **Names translate intent** — a reader unfamiliar with the codebase must understand what a

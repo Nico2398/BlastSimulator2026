@@ -38,6 +38,9 @@ handles that) — focus on **semantic and structural** duplication.
 - Side effects mixed with pure computation in the same function body.
 
 ### Generic Code in Specific Places
+Placement follows the genericity test in `dev-design-principles`: a unit that still reads as a
+coherent tool once the feature that motivated it is deleted belongs in the shared layer.
+
 - Utility-style helpers (array manipulation, string formatting, math, sorting) defined inside
   domain-specific modules (`gameplay/`, `combat/`, `mining/`) instead of `src/core/` or a
   shared utility layer.
@@ -45,6 +48,13 @@ handles that) — focus on **semantic and structural** duplication.
   specific module.
 - Type aliases or interfaces with no domain-specific meaning defined in feature files instead
   of `src/core/types/` or a shared types barrel.
+
+### Specific Code Wearing a Generic Name
+- A mechanism in a shared layer that branches on the one caller it was written for — it carries that
+  caller's name or a discriminant only that caller produces. Coupled, not shared.
+- An abstraction, type parameter, registry or config flag introduced with exactly one consumer.
+  Speculative generality costs every future reader more than the duplication it was meant to
+  prevent — `dev-design-principles` holds the bar it must clear.
 
 ### Factorization Opportunities (within changed files)
 - The same conditional expression or guard clause repeated in multiple functions in the diff.

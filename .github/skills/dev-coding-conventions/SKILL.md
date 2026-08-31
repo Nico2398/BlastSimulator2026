@@ -72,6 +72,8 @@ Physics/rendering can use try/catch for unexpected errors. Never let game crash 
 
 ## Performance Considerations
 
+Concrete measures below; the general rule for how cost must scale as the game grows is in `dev-design-principles`.
+
 - Marching cubes recalculation localized — only recompute chunks near blast
 - Fragment count capped per blast (max 2000) to avoid physics overload
 - Event system timers use delta-time accumulation, not setTimeout
@@ -105,5 +107,5 @@ Handle all technical decisions autonomously (architecture, algorithms, tests, ba
 - Approve if: all acceptance criteria pass, tests pass, code is clean
 - Request changes if: tests fail or code quality issues exist
   → Comment `@copilot <specific fix instruction>` so agent can iterate
-- **SOLID compliance** — single responsibility (one concern per class/function), open/closed (extendable without modifying existing), Liskov substitution (substitutable types), interface segregation (narrow interfaces), dependency inversion (depend on abstractions, not concretions).
+- **SOLID compliance and durability under growth** — single responsibility, open/closed, Liskov substitution, interface segregation, dependency inversion, plus coupling, genericity, and cost curve: `dev-design-principles` holds the criteria and the counterweight against speculative generality.
 - Tag @Nico2398 if: architectural decisions needed, ambiguous requirements, or creative direction needed

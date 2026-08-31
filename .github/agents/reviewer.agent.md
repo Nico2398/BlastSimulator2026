@@ -55,6 +55,11 @@ Fix every mismatch before proceeding.
 - [ ] No reverse dependency: renderer never imported by core
 - [ ] No `Math.random()` — use `src/core/math/Random.ts`
 - [ ] Single responsibility per file — per `dev-coding-conventions` skill, judgment not a line count
+- [ ] Durable under growth — per `dev-design-principles` skill: helpers take the narrowest input
+      rather than whole aggregates, no module reads another's internal shape field-by-field, no
+      nested scan over two collections that both grow, no full recompute of a derived structure
+      after a local change, the next variant is a catalog entry rather than an edit to a `switch`
+- [ ] No abstraction, type parameter, registry or config flag introduced with one consumer
 
 ## Step 4: i18n
 

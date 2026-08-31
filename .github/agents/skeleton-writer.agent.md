@@ -29,6 +29,20 @@ Write **empty stubs only**. No implementation logic. No tests. Establish the sha
 | Empty class skeletons with method signatures | Imports beyond type dependencies |
 | Re-exports in barrel files | Config values or constants |
 
+## API Surface Rules
+
+The signatures written here decide how coupled and how reusable the feature stays for the rest of its
+life — implementation cannot widen a narrow seam or narrow a wide one. Apply `dev-design-principles`
+while writing them:
+
+- Each parameter list takes the narrowest input that does the job. A signature taking `GameState` to
+  read two fields is a coupling decision, not a convenience.
+- Each type and stub sits with the concern it serves: shared when it stays coherent with the
+  motivating feature deleted, inside the feature when it does not.
+- A family of variants gets one discriminated union and one dispatch point, so the next variant is an
+  addition.
+- Introduce no abstraction, type parameter or registry the plan does not name a consumer for.
+
 ## Rules
 
 - Stubs must compile — no `any` unless unavoidable for return type placeholders.
@@ -42,3 +56,4 @@ Write **empty stubs only**. No implementation logic. No tests. Establish the sha
 
 - `dev-architecture` — module boundaries, allowed imports
 - `dev-coding-conventions` — naming, file structure, export conventions
+- `dev-design-principles` — coupling, genericity, and extension at the API surface

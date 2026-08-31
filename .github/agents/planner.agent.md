@@ -18,7 +18,12 @@ Produce structured implementation plan from issue. Read-only — no code changes
 2. Inspect codebase: `read_file`, `grep`, `list_dir`.
 3. Load skill spec if relevant: `get_skill_context('<skill>')`.
 4. Resolve every requirement the issue leaves open, applying the default-and-record rule in `agentic-decision-autonomy`. Each one becomes a `Decision` entry in the plan with its own acceptance criterion — the implementer builds it, not re-decides it. Escalate only a genuine blocker from that skill's list.
-5. Produce plan with exact file paths, acceptance criteria, edge cases.
+5. Size each new unit against the five questions in `dev-design-principles` — one reason to change,
+   coupling, genericity, cost curve, extension. Name the seam each new file sits on, the narrowest
+   input each new function takes, and the growth axis any per-tick work walks. Where a mechanism
+   serves a family (rock types, building tiers, event categories), plan the catalog entry, not the
+   `switch` branch.
+6. Produce plan with exact file paths, acceptance criteria, edge cases.
 
 ## Output Format
 ```
@@ -39,6 +44,8 @@ Produce structured implementation plan from issue. Read-only — no code changes
 - edge case 1
 ### Architecture Notes
 - module boundaries, data flow
+- seam for each new unit: what it knows, what it takes, what changes force it to change
+- growth axis and expected cost for anything running per tick or per frame
 ```
 
 ## Rules
