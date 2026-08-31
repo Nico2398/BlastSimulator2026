@@ -1,17 +1,36 @@
 ---
 name: dev-design-principles
 description: >
-  Design philosophy for BlastSimulator2026 code meant to survive the project's evolution: single
-  responsibility, coupling limits inside a layer, genericity without speculation, cost that scales
-  with the game's growth axes, and extension without edit. Use when designing an API surface,
-  implementing or refactoring a feature, or reviewing a change for durability.
+  Judgment calls about whether BlastSimulator2026 code survives the project's growth: what a unit is
+  allowed to know, what it takes as input, how its cost scales with more rock types, entities and
+  voxels, and whether the next variant is an addition or an edit. Answers "will this still hold in a
+  year", not "how is this written here" — style, naming, i18n and error-handling form are
+  `dev-coding-conventions`, layer boundaries and data flow are `dev-architecture`. Use when shaping
+  an API surface, deciding where a new unit lives, weighing an abstraction, or reviewing a change for
+  coupling, genericity, cost curve or extensibility.
 ---
+
+## Scope boundary
+
+Every question here is a judgment with no single correct answer, decided against how the project
+grows. Questions with one settled answer belong elsewhere:
+
+| Question | Skill |
+|----------|-------|
+| What may this unit know? What does it take as input? How does its cost grow? Is the next variant an addition? | this skill |
+| How is this written here — naming, exports, `Result<T>`, i18n, `TODO(#N)`, config placement, PRNG, whether a file mixes concerns | `dev-coding-conventions` |
+| Which layer may import which; where state lives; how the tick loop and events are ordered | `dev-architecture` |
+
+Convention questions have a right answer to look up. These have a trade-off to argue, and the
+argument is always about growth.
 
 ## What durable means here
 
 The game grows in one direction only: more rock types, more buildings, more vehicles, more events,
 bigger levels, more employees. Code is durable when that growth costs an addition and not a rewrite.
-Five questions decide it. Every one of them is answerable from the diff alone.
+Five questions decide it. Every one of them is answerable from the diff alone. The first applies to
+functions, classes and files alike; for files specifically, `dev-coding-conventions` states how the
+call is made and why no lint test owns it.
 
 | Question | Passes when | Fails when |
 |----------|-------------|------------|

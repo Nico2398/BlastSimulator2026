@@ -1,10 +1,17 @@
 ---
 name: dev-coding-conventions
 description: >
-  Coding conventions, workflow rules, and style guidelines for BlastSimulator2026: TypeScript strict,
-  naming conventions, i18n rules, error handling, console command patterns, and performance
-  considerations. Use when writing or reviewing code to ensure consistency.
+  The settled answers for how code is written in BlastSimulator2026 — TypeScript strict, naming,
+  exports, file cohesion, i18n, `Result<T>` error handling, `TODO(#N)`, console command pattern,
+  centralized config, seeded PRNG, concrete performance measures. Each has one correct form to look
+  up, so a change either matches or does not. Use when writing or reviewing code for consistency;
+  for judgment calls about coupling, genericity, cost growth and extensibility, use
+  `dev-design-principles` instead.
 ---
+
+This file holds the answers that are already decided. Whether a design survives the project's growth
+— what a unit knows, what it takes, how its cost scales, whether the next variant is an addition —
+is argued rather than looked up: `dev-design-principles`.
 
 ## Bug Fix / Feature Request Workflow
 
