@@ -39,6 +39,7 @@ export class TutorialRails {
   private held = false;
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
+  private lastProgressTrainingActive = false;
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
@@ -49,6 +50,7 @@ export class TutorialRails {
     this.stepStartTick = state?.tickCount ?? 0;
     this.lastProgressSignature = null;
     this.lastProgressTick = this.stepStartTick;
+    this.lastProgressTrainingActive = false;
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
@@ -110,10 +112,15 @@ export class TutorialRails {
     if (!state) return this.held;
     const decision = decideClock(
       state, this.stepStartTick, this.budget, this.waitsOnWork,
-      { signature: this.lastProgressSignature, tick: this.lastProgressTick },
+      {
+        signature: this.lastProgressSignature,
+        tick: this.lastProgressTick,
+        trainingActive: this.lastProgressTrainingActive,
+      },
     );
     this.lastProgressSignature = decision.progressSignature;
     this.lastProgressTick = decision.lastProgressTick;
+    this.lastProgressTrainingActive = decision.trainingActive;
     const { hold } = decision;
 
     if (hold && !state.isPaused) {
