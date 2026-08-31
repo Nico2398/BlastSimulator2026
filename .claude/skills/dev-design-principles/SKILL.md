@@ -75,6 +75,14 @@ entry, a config flag deferring a decision nobody asked to defer — each is a la
 forever, bought for a consumer that never arrives. The bar is a second real consumer today, **or** a
 mechanism that got smaller by knowing less. One of the two, else keep it concrete.
 
+**The third option.** Generalize-speculatively or stay-concrete is not the whole choice. When a new
+caller needs behaviour an existing unit almost provides, the second consumer is not imagined — it is
+in this diff, so the bar above is met by adapting that unit and missed by copying it. Prefer the
+smallest edit that leaves the unit unaware of both callers: widen a parameter, lift a constant into an
+argument, delete a branch the new caller makes redundant. Its current callers keep their behaviour and
+their tests. Write a second implementation when the two behaviours differ in intent rather than in
+detail — a copy made to avoid editing shared code is the shape to catch.
+
 Genericity is a property of the API surface, so it is decided when that surface is designed and
 cleaned during refactor. A green phase writes the minimum that passes its tests and widens nothing.
 
@@ -116,6 +124,7 @@ Flag, with the growth or change that makes it hurt named concretely:
 - Full recompute of a derived structure after a local change
 - A new `switch` on a discriminant already switched elsewhere
 - A new abstraction, type parameter, registry or flag with exactly one consumer
+- A new unit reimplementing behaviour an existing one nearly provides, where adapting it was the smaller edit
 
 Leave alone:
 

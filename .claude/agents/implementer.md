@@ -19,7 +19,7 @@ Write **minimum code** to pass failing tests.
 
 0. `git branch --show-current` → verify you are on the impl branch the orchestrator named, `pipeline/impl-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<label>` and return FAIL.
 1. Read failing tests → understand expected behavior
-2. Identify source files needing changes
+2. Identify source files needing changes, and grep for the behaviour before writing it — an existing unit that almost fits is edited, not copied (`dev-design-principles`)
 3. Write minimum code → all failing tests pass
 4. `npx vitest run` → verify
 5. `npx tsc --noEmit` → verify type safety
@@ -64,6 +64,10 @@ Inside that minimum, `dev-design-principles` still binds:
 Widen nothing for a consumer that does not exist yet: no abstraction, type parameter, registry or
 config flag whose only caller is this feature. Genericity that costs more code than it saves belongs
 to no phase.
+
+An existing unit this feature could reuse is not that case — its second consumer is this diff. Adapt
+it with the smallest behaviour-preserving edit rather than copying it into the feature, and say so in
+the hand-back. `dev-design-principles` holds when the adaptation beats a copy.
 
 ## Scope Overrun
 
