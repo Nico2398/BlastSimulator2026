@@ -77,7 +77,14 @@ export function isReachable(selector: string): boolean {
  */
 export function resolveStageIndex(stages: TutorialStage[]): number {
   for (let i = stages.length - 1; i >= 0; i--) {
-    if (isReachable(stages[i]!.target)) return i;
+    const stage = stages[i]!;
+    if (isReachable(stage.target)) return i;
+    // `target` is gone — before falling back to an earlier stage, check
+    // whether this stage's own action is what made it disappear (#903): a
+    // booked course replaces the Train button with a status view, and that
+    // status view is this stage's `doneTarget`. Only reached here because
+    // `target` already failed, so `target` still wins whenever it resolves.
+    if (stage.doneTarget && isReachable(stage.doneTarget)) return i;
   }
   return 0;
 }
@@ -149,12 +156,23 @@ export interface ClockDecision {
   progressSignature: string | null;
   /** Tick at which the carried-forward signature last changed. */
   lastProgressTick: number;
+  /**
+   * True when this decision found at least one employee mid-course. Carried
+   * forward into the next check's `ClockProgress` (#903) so a course that
+   * finishes between two checks — `tickTraining` clears `trainingState` on
+   * the very tick `decideClock` next runs — still reads as "work just
+   * finished" rather than "nothing was ever happening", and does not snap the
+   * hold on before the step's own `isComplete` gets a chance to fire.
+   */
+  trainingActive: boolean;
 }
 
 /** Tracks the outstanding work's signature and when it last changed. */
 export interface ClockProgress {
   signature: string | null;
   tick: number;
+  /** Mirrors `ClockDecision.trainingActive` from the previous check. */
+  trainingActive?: boolean;
 }
 
 /**
@@ -163,7 +181,22 @@ export interface ClockProgress {
  * Shared by `isWorkInProgress` and `workSignature` so the two stay in sync.
  */
 function hasOutstandingWork(e: Employee): boolean {
-  return e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null;
+  return (
+    e.activeActionId !== null
+    || e.pendingDriverVehicleId !== null
+    || e.destinationX !== null
+    || e.trainingState != null
+  );
+}
+
+/**
+ * True if any employee is mid-course (#903). Kept separate from
+ * `hasOutstandingWork`/`isWorkInProgress` because a live course gets treated
+ * differently by `decideClock`: bounded, self-resolving work that must never
+ * be judged "stalled", where every other outstanding-work signal can be.
+ */
+function hasActiveTraining(state: GameState): boolean {
+  return state.employees.employees.some((e) => e.trainingState != null);
 }
 
 /**
@@ -202,7 +235,7 @@ function workSignature(state: GameState): string {
     .map((e) => [
       e.id, e.x, e.z, e.activeActionId, e.pendingDriverVehicleId,
       e.destinationX, e.destinationZ, e.taskTicksRemaining, e.restTicksRemaining,
-      e.pendingTaskDuration, e.pendingRestDuration,
+      e.pendingTaskDuration, e.pendingRestDuration, e.trainingState?.ticksRemaining ?? '',
     ].join(','))
     .join(';');
 
@@ -268,14 +301,45 @@ export function decideClock(
 ): ClockDecision {
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
+  const trainingActive = hasActiveTraining(state);
   if (spent < budget) {
-    return { hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+    return {
+      hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
+    };
   }
   if (!waitsOnWork) {
-    return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+    return {
+      hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
+    };
   }
+
+  // A live course is bounded, self-resolving work: `ticksRemaining` only ever
+  // reaches 0 by the sim actually ticking, so holding the clock on one
+  // because its signature "looks stale" would be self-defeating — the hold
+  // itself is what stops the ticking that would finish the course (#903).
+  // Unlike a stalled walk or a blocked haul, a course in progress is never
+  // "stuck": it either keeps counting down or it is already done.
+  if (trainingActive) {
+    const signature = workSignature(state);
+    return { hold: false, spent, progressSignature: signature, lastProgressTick: tickCount, trainingActive };
+  }
+
   if (!isWorkInProgress(state)) {
-    return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+    // A course can clear `trainingState` on the very tick this runs next —
+    // `tickTraining` finishes it inside the same simulation tick that is
+    // about to make this check's caller re-read `isComplete`. Snapping the
+    // hold on immediately would re-pause the game one call before the step
+    // notices it is done, and nothing left running would ever lift it again.
+    // Give exactly this one check the same "still fine" answer training got
+    // one tick ago, then fall back to the normal immediate hold from here.
+    if (progress.trainingActive === true) {
+      return {
+        hold: false, spent, progressSignature: null, lastProgressTick: tickCount, trainingActive: false,
+      };
+    }
+    return {
+      hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
+    };
   }
 
   const signature = workSignature(state);
@@ -291,7 +355,7 @@ export function decideClock(
   const sinceProgress = tickCount - lastProgressTick;
 
   if (sinceProgress < WORK_GRACE_TICKS) {
-    return { hold: false, spent, progressSignature: signature, lastProgressTick };
+    return { hold: false, spent, progressSignature: signature, lastProgressTick, trainingActive };
   }
-  return { hold: true, spent, progressSignature: signature, lastProgressTick };
+  return { hold: true, spent, progressSignature: signature, lastProgressTick, trainingActive };
 }

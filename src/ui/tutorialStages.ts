@@ -33,6 +33,12 @@ export interface TutorialStage {
    * nothing about. The picker draws this area and refuses to confirm outside it.
    */
   region?: TileRegion;
+  /**
+   * Alternate selector that also counts this stage as reached, checked only
+   * once `target` itself is unreachable — for a stage whose control is
+   * replaced by a status view once its own action starts (#903).
+   */
+  doneTarget?: string;
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the

@@ -20,6 +20,13 @@ import { TOOLBAR_TARGET } from '../../src/ui/tutorialStepHelpers.js';
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
 
+/**
+ * Consecutive `waitForTutorialStep` polls the clock may report held with no
+ * progress before the wait fails loudly by name, instead of running out its
+ * outer `maxTicks`/`timeout` budget silently stalled (#903).
+ */
+export const CLOCK_HELD_FAIL_AFTER_POLLS = 1;
+
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
   left: 'left',
@@ -608,6 +615,7 @@ export async function executeActionOnPage(
       // own pacing budget.
       let ticksUsed = 0;
       let blockedTicks = 0;
+      let heldWithoutProgress = 0;
       for (;;) {
         const st = await page.evaluate(() => {
           const run = (window as unknown as {
@@ -615,7 +623,7 @@ export async function executeActionOnPage(
           }).__gameConsole;
           run?.('tick 1');
           const fn = (window as unknown as {
-            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null };
+            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null; clockHeld: boolean };
           }).__tutorialState;
           const tutorialState = fn === undefined ? null : fn();
           const getState = (window as unknown as {
@@ -636,7 +644,21 @@ export async function executeActionOnPage(
         );
         // Tutorial gone (finished or never started) — nothing left to wait on.
         if (st === null || !st.active) break;
+        // Reaching the goal wins even when the clock happens to read held on
+        // this same poll — the tutorial releases the clock for the next step
+        // in that same instant, and that is not a deadlock (#903).
         if (st.stepId !== null && wanted.includes(st.stepId)) break;
+        if (st.clockHeld) {
+          heldWithoutProgress++;
+          if (heldWithoutProgress >= CLOCK_HELD_FAIL_AFTER_POLLS) {
+            throw new Error(
+              `Clock held on step "${st.stepId ?? 'none'}" while waiting for `
+              + `${wanted.map(s => `"${s}"`).join(' or ')} — a real player could not advance this`,
+            );
+          }
+        } else {
+          heldWithoutProgress = 0;
+        }
         if (ticksUsed >= maxTicks || Date.now() > deadline) {
           throw new Error(
             `waitForTutorialStep: tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
