@@ -20,6 +20,13 @@ import { TOOLBAR_TARGET } from '../../src/ui/tutorialStepHelpers.js';
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
 
+/**
+ * Consecutive `waitForTutorialStep` polls the clock may report held with no
+ * progress before the wait fails loudly by name, instead of running out its
+ * outer `maxTicks`/`timeout` budget silently stalled (#903).
+ */
+export const CLOCK_HELD_FAIL_AFTER_POLLS = 1;
+
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
   left: 'left',
@@ -630,6 +637,9 @@ export async function executeActionOnPage(
         ticksUsed++;
         const blockedThisTick = Boolean(st?.pendingEvent);
         blockedTicks = blockedThisTick ? blockedTicks + 1 : 0;
+        // TODO(#903): track heldWithoutProgress counter and throw a named
+        // "clock held" error once it reaches CLOCK_HELD_FAIL_AFTER_POLLS,
+        // instead of letting a held tutorial clock run out maxTicks/timeout.
         onProgress?.(
           `waitForTutorialStep on "${st?.stepId ?? 'none'}", live control ${st?.stageTarget ?? 'none'}, `
           + `want ${wanted.map(s => `"${s}"`).join(' or ')}, tick ${ticksUsed}/${maxTicks}`,

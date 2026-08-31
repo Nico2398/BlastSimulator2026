@@ -241,6 +241,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   wrap.appendChild(microLabel(t('ui.crew.training')));
 
   if (e.trainingState) {
+    // TODO(#903): tag in-training element with bs-training-active class and data-skill attribute
     wrap.appendChild(well([el('span', {
       text: t('ui.crew.training_in_progress', { skill: t(`skill.${e.trainingState.skill}`), n: e.trainingState.ticksRemaining }),
       attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },

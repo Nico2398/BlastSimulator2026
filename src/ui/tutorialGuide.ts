@@ -79,6 +79,7 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
   for (let i = stages.length - 1; i >= 0; i--) {
     if (isReachable(stages[i]!.target)) return i;
   }
+  // TODO(#903): fall back to stages[i].doneTarget when target is unreachable
   return 0;
 }
 
@@ -163,6 +164,7 @@ export interface ClockProgress {
  * Shared by `isWorkInProgress` and `workSignature` so the two stay in sync.
  */
 function hasOutstandingWork(e: Employee): boolean {
+  // TODO(#903): also check e.trainingState
   return e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null;
 }
 
@@ -190,6 +192,7 @@ function hasOutstandingVehicleWork(v: Vehicle): boolean {
  * `isWorkInProgress` inspects, generic across every `waitsOnWork` step.
  */
 function workSignature(state: GameState): string {
+  // TODO(#903): include trainingState.ticksRemaining in fingerprint
   const pendingIds = (state.pendingActions ?? [])
     .map((a) => a.id)
     .sort((a, b) => a - b)
