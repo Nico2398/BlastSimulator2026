@@ -77,9 +77,15 @@ export function isReachable(selector: string): boolean {
  */
 export function resolveStageIndex(stages: TutorialStage[]): number {
   for (let i = stages.length - 1; i >= 0; i--) {
-    if (isReachable(stages[i]!.target)) return i;
+    const stage = stages[i]!;
+    if (isReachable(stage.target)) return i;
+    // `target` is gone — before falling back to an earlier stage, check
+    // whether this stage's own action is what made it disappear (#903): a
+    // booked course replaces the Train button with a status view, and that
+    // status view is this stage's `doneTarget`. Only reached here because
+    // `target` already failed, so `target` still wins whenever it resolves.
+    if (stage.doneTarget && isReachable(stage.doneTarget)) return i;
   }
-  // TODO(#903): fall back to stages[i].doneTarget when target is unreachable
   return 0;
 }
 
@@ -164,8 +170,12 @@ export interface ClockProgress {
  * Shared by `isWorkInProgress` and `workSignature` so the two stay in sync.
  */
 function hasOutstandingWork(e: Employee): boolean {
-  // TODO(#903): also check e.trainingState
-  return e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null;
+  return (
+    e.activeActionId !== null
+    || e.pendingDriverVehicleId !== null
+    || e.destinationX !== null
+    || e.trainingState != null
+  );
 }
 
 /**
@@ -192,7 +202,6 @@ function hasOutstandingVehicleWork(v: Vehicle): boolean {
  * `isWorkInProgress` inspects, generic across every `waitsOnWork` step.
  */
 function workSignature(state: GameState): string {
-  // TODO(#903): include trainingState.ticksRemaining in fingerprint
   const pendingIds = (state.pendingActions ?? [])
     .map((a) => a.id)
     .sort((a, b) => a - b)
@@ -205,7 +214,7 @@ function workSignature(state: GameState): string {
     .map((e) => [
       e.id, e.x, e.z, e.activeActionId, e.pendingDriverVehicleId,
       e.destinationX, e.destinationZ, e.taskTicksRemaining, e.restTicksRemaining,
-      e.pendingTaskDuration, e.pendingRestDuration,
+      e.pendingTaskDuration, e.pendingRestDuration, e.trainingState?.ticksRemaining ?? '',
     ].join(','))
     .join(';');
 

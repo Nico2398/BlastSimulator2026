@@ -26,9 +26,12 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
       target: '#bs-employee-panel [data-employee-id="2"] .bs-detail-toggle',
       hintKey: 'tutorial.stage.expand_driller',
     },
-    // TODO(#903): add doneTarget to train-driller's final stage
     {
       target: '#bs-employee-panel [data-employee-id="2"] .bs-train-btn[data-skill="driving.drill_rig"]',
+      // Booking the course replaces this button with a status view (#903) —
+      // once that happens, the status view scoped to this same employee +
+      // skill is what proves the stage was reached.
+      doneTarget: '#bs-employee-panel [data-employee-id="2"] .bs-training-active[data-skill="driving.drill_rig"]',
       hintKey: 'tutorial.stage.train_drill_rig',
     },
   ],
@@ -57,9 +60,11 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
       target: '#bs-employee-panel [data-employee-id="1"] .bs-detail-toggle',
       hintKey: 'tutorial.stage.expand_digger',
     },
-    // TODO(#903): add doneTarget to train-digger's final stage
     {
       target: '#bs-employee-panel [data-employee-id="1"] .bs-train-btn[data-skill="driving.excavator"]',
+      // Same fallback as train-driller's final stage above, scoped to this
+      // employee + skill (#903).
+      doneTarget: '#bs-employee-panel [data-employee-id="1"] .bs-training-active[data-skill="driving.excavator"]',
       hintKey: 'tutorial.stage.train_excavator',
     },
   ],

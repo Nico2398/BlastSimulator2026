@@ -241,10 +241,15 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   wrap.appendChild(microLabel(t('ui.crew.training')));
 
   if (e.trainingState) {
-    // TODO(#903): tag in-training element with bs-training-active class and data-skill attribute
+    // Stable class + data-skill mirror the Train button's own bs-train-btn/
+    // data-skill marking (below) — this is what the tutorial's doneTarget
+    // selectors resolve against once the button they replace is gone (#903).
+    // Employee scoping comes from the wrapping [data-employee-id] row
+    // (CrewPanel.ts) this section renders inside, same as the button.
     wrap.appendChild(well([el('span', {
+      className: 'bs-training-active',
       text: t('ui.crew.training_in_progress', { skill: t(`skill.${e.trainingState.skill}`), n: e.trainingState.ticksRemaining }),
-      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)', 'data-skill': e.trainingState.skill },
     })]));
     return wrap;
   }
