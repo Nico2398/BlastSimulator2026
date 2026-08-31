@@ -14,7 +14,6 @@ import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDi
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
-import { MAX_RAMP_LENGTH } from '../../../core/config/balance.js';
 
 /** Payload carried by a queued `dig_ramp_segment` PendingAction (#555). */
 export interface RampSegmentActionPayload {
@@ -67,27 +66,23 @@ export function buildRampCommand(
     length = parseInt(named['length'] ?? '10', 10);
   }
 
-  // Pre-check runs before rampFootprint/cellsInRect build the array (the cost this
-  // bounds), and therefore also before validateRampOrder's own length<=0 check below —
-  // that check stays as a safety net for any other caller of buildRamp/validateRampOrder,
-  // but on this call path it is now unreachable for length<1.
-  if (!Number.isFinite(length) || length < 1) {
-    return { success: false, output: t('mining.build_ramp.invalid_length') };
-  }
-  if (length > MAX_RAMP_LENGTH) {
-    return {
-      success: false,
-      output: `Ramp too long: ${length}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
-    };
+  const rampDef: RampDef = { originX, originZ, direction, length, targetDepth: depth };
+
+  // validateRampOrder runs first, before rampFootprint/cellsInRect build any
+  // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole
+  // bound on ramp length (#788 point 3), so a non-finite or oversized length
+  // is rejected here in bounded time rather than by this command's own copy
+  // of the check. A messageKey means the failure is translatable (#797); use
+  // it over the plain-English message fallback.
+  const validation = validateRampOrder(rampDef, ctx.state!.cash);
+  if (!validation.success) {
+    const output = validation.messageKey ? t(validation.messageKey, validation.messageParams) : validation.message;
+    return { success: false, output };
   }
 
   const footprint = rampFootprint(originX, originZ, direction, length);
   const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
-
-  const rampDef: RampDef = { originX, originZ, direction, length, targetDepth: depth };
-  const validation = validateRampOrder(rampDef, ctx.state!.cash);
-  if (!validation.success) return { success: false, output: validation.message };
 
   const segments = defineRampSegments(ctx.grid!, rampDef);
 

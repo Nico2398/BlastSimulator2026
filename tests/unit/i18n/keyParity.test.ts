@@ -234,10 +234,23 @@ describe('en.json / fr.json — key-set parity', () => {
     // exclude them, to a misleading "nobody is licensed" warning). A
     // dedicated pending-driver row needed its own translated string; both
     // locales translated.
+    // Baseline is now 3466 (up from 3465): #788 point 3 moved the ramp
+    // length bound (finite/positive + MAX_RAMP_LENGTH) from
+    // buildRampCommand into core's validateRampOrder so every caller of
+    // buildRamp gets it, not just the console command. validateRampOrder
+    // now returns a translation key (messageKey/messageParams) alongside
+    // its plain-English message fallback, mirroring BlastPlan.ts's
+    // ValidationError.issue pattern (#633) — the console command translates
+    // via t() so the length-bound guard stays locale-sensitive exactly as
+    // #797 required, even though the check itself now lives in core. 1 new
+    // key — mining.build_ramp.too_long (the MAX_RAMP_LENGTH rejection,
+    // previously an untranslated literal built inline in the console
+    // command) — both locales translated; the pre-existing
+    // mining.build_ramp.invalid_length key is unchanged.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3465);
+    expect(Object.keys(en).length).toBe(3466);
   });
 });
 

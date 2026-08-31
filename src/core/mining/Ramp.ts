@@ -6,7 +6,7 @@ import { formatMoney } from '../economy/formatMoney.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
-import { RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
+import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
 
 // ── Config ──
 
@@ -111,22 +111,60 @@ export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };
 
 // ── Ordered ramp excavation (#555 — order-then-work, mirrors #554) ──
 
+/** Result of {@link validateRampOrder}. */
+export interface RampOrderValidation {
+  success: boolean;
+  /** Plain-English fallback message for a caller that doesn't translate. */
+  message: string;
+  cost: number;
+  /**
+   * Translation key for `message`, present only on the length-bound
+   * failures — mirrors BlastPlan.ts's `ValidationError.issue` (#633): core
+   * carries the key, the console/UI layer resolves it with `t()`. Absent
+   * (falls back to `message`) for the cash/depth checks below, matching
+   * their pre-existing untranslated behavior.
+   */
+  messageKey?: string;
+  messageParams?: Record<string, string | number>;
+}
+
 /**
  * Validate a ramp order against `cash` without carving anything — the
  * order-time check `buildRampCommand` runs before queuing excavation work.
  * Same length/depth/cash checks and messages `buildRamp` has always run,
  * extracted so order-time validation and progressive excavation share one
  * source of truth (#555).
+ *
+ * The finite/positive and MAX_RAMP_LENGTH checks run first, ahead of the
+ * cost/depth checks, and ahead of any footprint or claim work a caller does
+ * with `ramp.length` — this is the sole bound on ramp length, not a mirror
+ * of one in the console command, so every caller of `buildRamp` gets it for
+ * free (#788 point 3).
  */
-export function validateRampOrder(ramp: RampDef, cash: number): { success: boolean; message: string; cost: number } {
+export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidation {
+  if (!Number.isFinite(ramp.length) || ramp.length < 1) {
+    return {
+      success: false,
+      message: 'Invalid ramp length: length must be a finite positive number.',
+      cost: 0,
+      messageKey: 'mining.build_ramp.invalid_length',
+    };
+  }
+
+  if (ramp.length > MAX_RAMP_LENGTH) {
+    return {
+      success: false,
+      message: `Ramp too long: ${ramp.length}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
+      cost: 0,
+      messageKey: 'mining.build_ramp.too_long',
+      messageParams: { length: ramp.length, limit: MAX_RAMP_LENGTH },
+    };
+  }
+
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
   if (cash < totalCost) {
     return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
-  }
-
-  if (ramp.length <= 0) {
-    return { success: false, message: 'Ramp length must be positive', cost: 0 };
   }
 
   if (ramp.targetDepth <= 0) {
