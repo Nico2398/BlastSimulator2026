@@ -602,7 +602,7 @@ export class GameRenderer {
       // read fields `deps` had already moved past (#767 regression).
       getTerrainSurfaceY: () => 0,
       landscapeEdgeHeightSampler: ctx => landscapeEdgeHeightSampler(ctx),
-      playableCut: grid => playableCut(grid),
+      playableCut: (grid, edgeHeight) => playableCut(grid, edgeHeight),
       rebuildBorderWall: () => {},
       siteBoundsChanged: () => false,
     };

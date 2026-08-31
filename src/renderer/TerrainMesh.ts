@@ -13,6 +13,8 @@
 
 import * as THREE from 'three';
 import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid } from '../core/world/VoxelGrid.js';
+import { surfaceDensityAt } from '../core/world/TerrainGen.js';
+import { haloSurfaceHeight, meshedCellRect } from './terrain/PlayableCoverage.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
@@ -43,12 +45,24 @@ export interface DirtyRegion {
 
 export type EdgeHeightSampler = (x: number, z: number) => number;
 
-/** Virtual density for a column TerrainMesh does not own, using the
- *  landscape's theoretical height, so gradient-normal sampling near the
- *  site edge doesn't fall into "air" where the ground actually continues.
- *  Same half-voxel crossing convention as emitVertex/computeVoxelColumnSurfaceHeight. */
+/**
+ * Density for a column TerrainMesh does not own, standing in the neighbouring
+ * landscape's ground where the grid has nothing (#559 for normals, #907 for
+ * geometry).
+ *
+ * This is `TerrainGen.surfaceDensityAt` — literally the function the core fills
+ * a real column with — not a look-alike beside it. That matters twice over.
+ * The obvious reason is that the halo column then reads exactly as if the grid
+ * owned it, so nothing about the mesh changes character at the site edge. The
+ * sharper one is the band width: `surfaceDensityAt` ramps over two voxels
+ * precisely so that the two samples straddling the surface are both unclamped
+ * and marching cubes' linear crossing lands on the height exactly. The one-
+ * voxel ramp this used to carry (`surfaceHeight + 0.5 - y`) always clamps on
+ * one side of the crossing, which bends it by up to 8.6 cm — tolerable when it
+ * only tilted a normal, a visible step once it decides where the ground is.
+ */
 export function virtualEdgeDensity(surfaceHeight: number, y: number): number {
-  return Math.max(0, Math.min(1, surfaceHeight + 0.5 - y));
+  return surfaceDensityAt(y, surfaceHeight);
 }
 
 // ---------- Edge vertex lookup: for each of 12 cube edges, which 2 corners ----------
@@ -74,19 +88,35 @@ interface CornerSample {
 }
 
 /**
- * Density at one integer lattice corner, for gradient-normal sampling only.
- * A column the grid doesn't own reads as air (0) unless an edge height
- * sampler is installed, in which case it reads as the virtual density of
- * the landscape's theoretical/live ground there (#559) — this only feeds
- * densityGradientNormal's finite differences; sampleCorner/cubeIndex (which
- * decide geometry/topology) always use grid.densityAt directly and are
- * untouched by this.
+ * Density at one integer lattice corner: the grid's own where it owns the
+ * column, and the neighbouring landscape's ground where it does not.
+ *
+ * Geometry and normals read the SAME field. #559 extended the field past the
+ * site for normals only, on the reasoning that topology should stay the grid's
+ * business — but that left the halo cube marching solid rock against air, so
+ * the mesh's outer boundary fell on the x/z-edge crossings roughly half a metre
+ * inside the halo and a voxel below the surface, while the landscape stopped a
+ * full metre out. The half-metre of ground between them belonged to nobody, and
+ * that slot, with the step at its lip, is the gap #907 reports. Filling the halo
+ * column with the neighbouring ground instead puts the outermost vertex on the
+ * halo node itself, at exactly the height the landscape samples there, so the
+ * two sheets share that node (see `virtualEdgeDensity`).
+ *
+ * With no sampler installed — tests, and any caller with no landscape — an
+ * unowned column reads as air exactly as before.
  */
 function cornerDensityForNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number {
-  if (sampler && !grid.containsColumn(x, z)) {
-    return virtualEdgeDensity(sampler(x, z), y);
-  }
-  return grid.densityAt(x, y, z);
+  const virtual = virtualColumnDensity(grid, sampler, x, y, z);
+  return virtual ?? grid.densityAt(x, y, z);
+}
+
+/** The landscape-ground density standing in for an unowned column at (x, y, z),
+ *  or null when the grid owns the column or no sampler can answer for it. */
+function virtualColumnDensity(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number | null {
+  if (!sampler || grid.containsColumn(x, z)) return null;
+  const height = haloSurfaceHeight(grid, sampler(x, z));
+  if (!Number.isFinite(height)) return null;
+  return virtualEdgeDensity(height, y);
 }
 
 /** Density with trilinear interpolation, so the gradient below is continuous. */
@@ -132,7 +162,19 @@ function densityGradientNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | nul
   return [-gx / len, -gy / len, -gz / len];
 }
 
-function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerSample {
+function sampleCorner(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): CornerSample {
+  const virtual = virtualColumnDensity(grid, sampler, x, y, z);
+  if (virtual !== null) {
+    // Ground beside the site: the landscape carries no ore (#458 A18), and its
+    // rock comes from the nearest owned column at the same height rather than
+    // from the sampler. Both sheets read one strata pipeline, so a column one
+    // metre apart resolves to the same surface rock in all but a stratum
+    // contour's own width — and it is the rock already drawn a metre inside the
+    // edge, so the halo cannot introduce a colour break the site does not
+    // already have. An air corner keeps rockId '' and inherits from the other
+    // end of its edge, exactly as an out-of-grid corner does today.
+    return { density: virtual, rockId: nearestOwnedRock(grid, x, y, z), oreId: '', oreAmt: 0 };
+  }
   const density = grid.densityAt(x, y, z);
   const rockId = grid.dominantRockAt(x, y, z);
   const ores = grid.oresAt(x, y, z);
@@ -144,6 +186,14 @@ function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerS
     }
   }
   return { density, rockId, oreId, oreAmt };
+}
+
+/** Dominant rock at the owned column nearest (x, z), same y — '' when that
+ *  column is air there or the site owns nothing at all. */
+function nearestOwnedRock(grid: VoxelGrid, x: number, y: number, z: number): string {
+  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, x));
+  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, z));
+  return grid.dominantRockAt(cx, y, cz);
 }
 
 /** Appends one interpolated vertex's position and rock/ore attributes to the output arrays. */
@@ -417,40 +467,46 @@ export class TerrainMesh {
     const rockWeight: number[] = [];
     const ore: number[] = [];
 
-    // March one cell PAST the grid on every side, and one cell before it on the
-    // low side, so the cubes straddling the boundary are emitted too.
-    // `densityAt` reads out of bounds as air, so a straddling cube has solid
-    // corners inside and empty corners outside and marches into a wall face —
-    // which is what seals the playable volume. Stopping at sizeX-1 instead left
-    // the mesh open along its four sides: an unclosed shell you could see
-    // straight into wherever the terrain was cut back, which is exactly what a
-    // blast at the edge of the site did.
+    // Which cells this chunk marches — including the west/north halo that seals
+    // the playable volume — comes from meshedCellRect, the same function
+    // LandscapeMesh's cut is a point test against (PlayableCoverage.ts). Every
+    // earlier pass at this seam derived those bounds here and re-derived the
+    // matching "already the playable mesh's ground" predicate elsewhere, and
+    // the two drifted; there is one of them now, so they cannot (#907).
     const rect = this.grid.chunkRect(cx, cz);
-    if (!rect) {
+    const meshed = meshedCellRect(this.grid, cx, cz);
+    if (!rect || !meshed) {
       this.chunks.set(key, null);
       return 0;
     }
-    // Extend one cube outward only where no owned chunk lies beyond that
-    // side: an owned neighbour marches those cubes itself, and marching them
-    // twice would emit the interior wall between two claimed chunks.
-    const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
     if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
       this.chunks.set(key, null);
       return 0;
     }
     const oy = cy * CHUNK_SIZE;
-    const xStart = hasWest ? rect.minX : rect.minX - 1;
-    const zStart = hasNorth ? rect.minZ : rect.minZ - 1;
+    const xStart = meshed.minX;
+    const zStart = meshed.minZ;
     const yStart = oy;
-    const xEnd = rect.maxX;
-    const zEnd = rect.maxZ;
+    const xEnd = meshed.maxX;
+    const zEnd = meshed.maxZ;
     const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
 
+    // No per-cube skirt cutoff here any more (#907). #560 stopped the skirt at
+    // a fixed margin below the neighbouring ground because the halo column read
+    // as air, so "solid inside, air outside" marched a wall down the site's full
+    // depth whether or not anything could see it. The halo now carries the
+    // neighbouring ground's own density, so a cube below both surfaces has solid
+    // corners on both sides and marches to nothing on its own — the skirt is
+    // gone by construction rather than by a height rule. Keeping the cutoff would
+    // now delete real geometry: the wall of a crater blasted at the site edge is
+    // exactly a cube whose halo side is solid ground and whose site side is air,
+    // and every metre of it more than SKIRT_VISIBILITY_MARGIN_M below the
+    // surrounding ground would have been skipped, leaving a see-through pit. The
+    // cutoff still guards whole-chunk skipping, where the same slab-is-below-both
+    // -surfaces reasoning does hold (canSkipChunkMarch).
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {
         for (let x = xStart; x < xEnd; x++) {
-          const floorY = this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast, hasNorth, hasSouth);
-          if (floorY !== null && y + 1 < floorY) continue;
           this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
@@ -632,7 +688,7 @@ export class TerrainMesh {
     const corners: CornerSample[] = new Array(8);
     for (let i = 0; i < 8; i++) {
       const [dx, dy, dz] = CORNER_OFFSETS[i]!;
-      corners[i] = sampleCorner(this.grid, x + dx, y + dy, z + dz);
+      corners[i] = sampleCorner(this.grid, this.edgeHeightSampler, x + dx, y + dy, z + dz);
     }
 
     let cubeIndex = 0;

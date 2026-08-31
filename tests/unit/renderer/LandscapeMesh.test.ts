@@ -1173,3 +1173,149 @@ describe('subdivideOutsideQuad / MID_STEP (#559, optional coarse-to-fine transit
     expect(ore.length).toBe(vertexCount * 2);
   });
 });
+
+describe('classifyQuad — cells, and a fine ring on both sides of the claim edge (#907)', () => {
+  function cut(claims: (x: number, z: number) => boolean): PlayableCut {
+    return {
+      rect: { minX: -100, minZ: -100, maxX: 100, maxZ: 100 },
+      ownsColumn: claims,
+      meshClaimsColumn: claims,
+    };
+  }
+
+  it("counts a quad's own 16 cells, not its four corner nodes", () => {
+    // The cell at x = 4 belongs to the NEXT quad. Claiming only that cell must
+    // leave this quad with nothing of its own claimed — the node-corner rule
+    // called it 'boundary' and kept the neighbour's cell as well, which is the
+    // doubled square metre on the site's east/south edge.
+    const playable = cut((x, z) => x === 4 && z === 0);
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('boundary'); // adjacent, so still fine…
+    // …but its own cells are all unclaimed, which is what the keep rule sees.
+    expect(classifyQuad(cut((x, z) => x >= 4 && z >= 0), 0, 0, 4, 4)).toBe('boundary');
+    expect(classifyQuad(cut((x, z) => x >= 8 && z >= 0), 0, 0, 4, 4)).toBe('outside');
+  });
+
+  it("is 'inside' only when every one of its own cells is claimed", () => {
+    expect(classifyQuad(cut((x, z) => x >= 0 && x < 4 && z >= 0 && z < 4), 0, 0, 4, 4)).toBe('inside');
+    // One cell short — the quad still has ground of its own to draw.
+    expect(classifyQuad(cut((x, z) => x >= 0 && x < 4 && z >= 0 && z < 3), 0, 0, 4, 4)).toBe('boundary');
+  });
+
+  it("is 'boundary' for a fully-unclaimed quad that touches the claim, so the ring exists on the outside too (#907)", () => {
+    // The case that put a 4 m-spaced landscape edge against a 1 m-spaced
+    // playable one: with the claim edge exactly on a lattice line, the quad
+    // outside it has no claimed cell at all, yet it is the quad that meets the
+    // playable mesh. Edge-adjacent and corner-adjacent both count.
+    expect(classifyQuad(cut(x => x >= 4), 0, 0, 4, 4)).toBe('boundary');   // shares the x = 4 edge
+    expect(classifyQuad(cut(z => z >= 4), 0, 0, 4, 4)).toBe('boundary');
+    expect(classifyQuad(cut((x, z) => x === 4 && z === 4), 0, 0, 4, 4)).toBe('boundary'); // diagonal only
+    // Two cells away: genuinely open ground.
+    expect(classifyQuad(cut(x => x >= 5), 0, 0, 4, 4)).toBe('outside');
+  });
+
+  it('is outside for a quad the claim cannot reach, without consulting the predicate', () => {
+    let calls = 0;
+    const playable: PlayableCut = {
+      rect: { minX: 0, minZ: 0, maxX: 32, maxZ: 32 },
+      ownsColumn: () => { calls++; return true; },
+    };
+    expect(classifyQuad(playable, 400, 400, 404, 404)).toBe('outside');
+    expect(calls).toBe(0);
+  });
+});
+
+describe('buildBoundaryQuad — the flat-edge rule stops at the claim (#907)', () => {
+  /** Curved in both axes, so a 4 m chord is measurably wrong everywhere. */
+  const curved = (compId: number) => (x: number, z: number) => ({
+    height: 10 + Math.sin(x * 1.3) * 2 + Math.cos(z * 0.9) * 1.5,
+    biomeId: 0,
+    surfCompId: compId,
+  });
+
+  function run(playable: PlayableCut, palette: CompositionPalette, compId: number, sides?: {
+    coarseWest: boolean; coarseEast: boolean; coarseNorth: boolean; coarseSouth: boolean;
+  }) {
+    const positions: number[] = [], normals: number[] = [], rockA: number[] = [];
+    const rockB: number[] = [], rockWeight: number[] = [], ore: number[] = [], indices: number[] = [];
+    buildBoundaryQuad(
+      positions, normals, rockA, rockB, rockWeight, ore, indices,
+      0, 0, 4, 4, curved(compId), palette, playable,
+      ...(sides ? [sides] as const : []),
+    );
+    return { positions, indices };
+  }
+
+  function heightAt(positions: number[], x: number, z: number): number | null {
+    for (let i = 0; i < positions.length; i += 3) {
+      if (Math.abs(positions[i]! - x) < 1e-6 && Math.abs(positions[i + 2]! - z) < 1e-6) return positions[i + 1]!;
+    }
+    return null;
+  }
+
+  it('keeps a fine cell on its own minimum corner alone — never on a neighbour cell\'s corner node', () => {
+    const { palette, compId } = makePalette();
+    // Cells 0..2 unclaimed, cell 3 (spanning x 3..4) claimed.
+    const claims = (x: number): boolean => Math.floor(x) >= 3;
+    const playable: PlayableCut = {
+      rect: { minX: 3, minZ: -100, maxX: 100, maxZ: 100 },
+      ownsColumn: claims, meshClaimsColumn: claims,
+    };
+    const { positions } = run(playable, palette, compId);
+    // Node x = 3 is the shared ring and must be emitted; node x = 4 belongs
+    // only to the dropped cell and must not be.
+    expect(heightAt(positions, 3, 2)).not.toBeNull();
+    expect(heightAt(positions, 4, 2)).toBeNull();
+  });
+
+  it('places a node facing the claim at the sampled height, not on the parent chord', () => {
+    const { palette, compId } = makePalette();
+    const claims = (x: number): boolean => Math.floor(x) >= 4; // claim edge exactly on the quad's east side
+    const playable: PlayableCut = {
+      rect: { minX: 4, minZ: -100, maxX: 100, maxZ: 100 },
+      ownsColumn: claims, meshClaimsColumn: claims,
+    };
+    const sample = curved(compId);
+    const { positions } = run(playable, palette, compId, {
+      coarseWest: true, coarseEast: false, coarseNorth: true, coarseSouth: true,
+    });
+
+    const y = heightAt(positions, 4, 2);
+    expect(y).not.toBeNull();
+    expect(y!).toBeCloseTo(sample(4, 2).height, 9);
+    // ...and that is a different number from the chord the flat-edge rule
+    // would have put there, so the assertion above has teeth.
+    const chord = sample(4, 0).height + (2 / 4) * (sample(4, 4).height - sample(4, 0).height);
+    expect(Math.abs(y! - chord)).toBeGreaterThan(0.1);
+  });
+
+  it('still follows the parent chord on a side facing a coarser neighbour (#491 T-junction rule kept)', () => {
+    const { palette, compId } = makePalette();
+    const claims = (x: number): boolean => Math.floor(x) >= 4;
+    const playable: PlayableCut = {
+      rect: { minX: 4, minZ: -100, maxX: 100, maxZ: 100 },
+      ownsColumn: claims, meshClaimsColumn: claims,
+    };
+    const sample = curved(compId);
+    const { positions } = run(playable, palette, compId, {
+      coarseWest: true, coarseEast: false, coarseNorth: true, coarseSouth: true,
+    });
+
+    const y = heightAt(positions, 2, 0); // north side, facing a coarse neighbour
+    expect(y).not.toBeNull();
+    const chord = sample(0, 0).height + (2 / 4) * (sample(4, 0).height - sample(0, 0).height);
+    expect(y!).toBeCloseTo(chord, 9);
+  });
+
+  it('defaults every side to the chord when no neighbourhood is supplied', () => {
+    const { palette, compId } = makePalette();
+    const claims = (x: number): boolean => Math.floor(x) >= 4;
+    const playable: PlayableCut = {
+      rect: { minX: 4, minZ: -100, maxX: 100, maxZ: 100 },
+      ownsColumn: claims, meshClaimsColumn: claims,
+    };
+    const sample = curved(compId);
+    const { positions } = run(playable, palette, compId);
+    const chord = sample(4, 0).height + (2 / 4) * (sample(4, 4).height - sample(4, 0).height);
+    expect(heightAt(positions, 4, 2)!).toBeCloseTo(chord, 9);
+  });
+});
