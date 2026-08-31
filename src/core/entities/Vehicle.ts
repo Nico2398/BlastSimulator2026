@@ -44,7 +44,7 @@ export interface VehicleDef {
   maintenanceCostPerTick: number;
   /** Fuel cost per tick when active ($). */
   fuelCostPerTick: number;
-  /** Capacity: tons for haulers, m³/tick for diggers, holes/tick for drills. */
+  /** Capacity: kg for haulers (see `payloadKg`), m³/tick for diggers, holes/tick for drills. */
   capacity: number;
   /** Movement speed (grid cells per tick). */
   speed: number;

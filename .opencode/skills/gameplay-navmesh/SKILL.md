@@ -16,23 +16,9 @@ Employees + vehicles navigate mine surface autonomously, routing around drill ho
 
 The `NavGrid` is 2D array of `NavCell` covering VoxelGrid's live X×Z **bounding box**. The site grows as the player claims chunks (#473), so the grid carries `originX`/`originZ` alongside `width`/`height`: `cells` is indexed locally (`cells[z - originZ][x - originX]`) while every public query takes world coordinates. Use `cellAt(x, z)` / `setCellAt(x, z, cell)`; never index `cells` with a world coordinate. Columns inside the bounding box the site does not own — the notch a non-rectangular site leaves when its box is squared off — are `void`.
 
-```typescript
-export type NavCellType =
-  | 'walkable'    // Open surface, clear of obstacles
-  | 'blocked'     // Building footprint, parked vehicle, or pit edge
-  | 'drill_hole'  // Active/drilled hole — agents avoid stepping in
-  | 'ramp'        // Slope connecting bench levels; walkable with speed penalty
-  | 'void';       // No solid voxel below — not accessible
+`src/core/nav/NavGrid.ts` declares `NavCellType` and `NavCell` (`type`, `moveCost` where 1.0 is normal and higher is slower, `benchLevel` counting down from 0 at the surface, `vehicleOccupied`) and is the authority on their fields — `vehicleOccupied` in particular carries a narrow contract stated there, not a general per-tick occupancy map.
 
-export interface NavCell {
-  type: NavCellType;
-  moveCost: number;       // 1.0 = normal; >1.0 = slower
-  benchLevel: number;     // 0 = surface, 1 = first bench below, etc.
-  vehicleOccupied: boolean; // updated every tick
-}
-```
-
-**Derivation rules:**
+**Derivation rules** — what each cell type means is what makes it that type:
 1. `void` if no solid voxel below surface at that column
 2. `drill_hole` if a `DrillHole` exists at (x, z)
 3. `blocked` if building footprint covers it, or vehicle parked/stationary
@@ -52,22 +38,7 @@ export interface NavCell {
 
 8-directional movement (cardinal + diagonal). Diagonal moves cost √2 × `moveCost`.
 
-```typescript
-export interface PathRequest {
-  agentId: number;
-  fromX: number;
-  fromZ: number;
-  toX: number;
-  toZ: number;
-  avoidVehicles: boolean;
-}
-
-export interface PathResult {
-  found: boolean;
-  waypoints: Array<{ x: number; z: number }>;
-  totalCost: number;
-}
-```
+`src/core/nav/Pathfinding.ts` declares `PathRequest` (from/to in NavGrid cell space, plus `avoidVehicles`), `PathResult` (`found`, `waypoints`, `totalCost` — waypoints empty when `found` is false) and `RampConnection`. Read it before calling `findPath`.
 
 **Heuristic — octile distance (standard for 8-directional grids):**
 ```

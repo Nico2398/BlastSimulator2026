@@ -86,7 +86,7 @@ Rules for a bypass:
 
 A bypassed run is a normal run: full verification, `READY TO MERGE`, no draft, nothing about it holds the PR.
 
-**3. Pause.** There is no bypass — the task cannot be delivered at all until the thing you found lands. Procedure below.
+**3. Pause.** There is no bypass — the task cannot be delivered at all until the thing you found lands. Read `references/pausing.md` and follow it before halting: it holds the five steps, the handover PR body, and the two ways a pause is undone by accident.
 
 ## ▶ Pausing — you are blocked by an issue, not by a human
 
@@ -96,48 +96,7 @@ Work — a defect, a missing affordance, a broken harness, an unrunnable channel
 
 An answer — which of two contradictory requirements is meant, a credential nobody has — needs a person. Block.
 
-**Pausing, step by step:**
-
-1. **File the blocker** as an ordinary issue, per `agentic-issue-creation`. It gets `ready` if you are confident it is real and specified, which after hitting it head-on you usually are.
-2. **Set it as your issue's dependency** — the `blocked_by` relationship *and* the `## Blocked by` section, both, per `agentic-issue-creation`'s "Setting a dependency". The relationship is what `assignability.cjs` trusts.
-3. **Save whatever you finished.** If you have commits, push `pipeline/feature-<label>` and open a **draft** pull request against `main`, labelled `paused`, carrying `Closes #<your issue>` and no `READY TO MERGE`. Its body states what is done, what remains, and what the blocker changes — format below. With no commits, skip this; there is nothing to hand over.
-4. **Return your issue to the queue:** add `ready`, add `paused`, remove `in-progress`. `agentic-intake.yml` keeps the label defined, but create it idempotently first rather than assuming — the same `--force` pattern the `decision-review` label uses above, so a repository that has never paused does not fail the step:
-
-   ```bash
-   gh label create paused --color fbca04 --force \
-     --description "A run stopped here on a dependency; the queue returns to it when that dependency lands"
-   ```
-5. **Comment on your issue** naming the blocker, what you finished, and the PR that holds it. Stop with `PAUSED: waiting on #<blocker>`.
-
-What then happens without anyone watching: `assignability.cjs` skips your issue while the blocker is open, `handle-failure.yml` chains the queue on to the next issue, the pipeline works the blocker, and when the blocker's PR merges your issue becomes assignable again. The next run is told to resume from your draft PR's branch rather than start over.
-
-**The handover PR body:**
-
-```markdown
-Closes #<your issue>
-
-⏸️ **Paused — waiting on #<blocker>.**
-
-## Done
-- <what is on this branch, and which verification channels passed on it>
-
-## Remaining
-- <what is left, in the order to do it>
-
-## What #<blocker> changes
-<why the remaining work could not be done until that issue lands, and what
-becomes possible once it has>
-
-## Resuming
-Continue on this branch. Do not open a second pull request against
-#<your issue> — an issue with a second open PR is unassignable to everyone.
-Re-run every verification channel: these results were recorded against an
-older `main`.
-```
-
-**Never close a paused PR to tidy up, and never merge it.** Closing discards the work; merging lands a half-finished change. It stays a draft until the run that resumes it finishes it.
-
-**Never leave a paused issue holding `in-progress`.** The pause is terminal for your session — `agentic-run-state` reads the `paused` label and schedules no retry — and an issue left `in-progress` defers every later assignment until the watchdog sweeps it.
+A pause files the blocker, sets it as this issue's dependency, hands over whatever is finished on a draft PR labelled `paused`, and returns the issue to the queue as `ready` + `paused` with `in-progress` removed. Every step of it, verbatim, with the commands and the PR body: `references/pausing.md`. Follow that file rather than reconstructing the sequence — a pause that skips a step strands the issue.
 
 ## ▶ Genuine blockers — the whole list
 
@@ -157,18 +116,7 @@ Everything not on that list is a decision to take, a fix to make, a bypass to wr
 
 ## There is no asking
 
-`AskUserQuestion` is blocked project-wide, in two layers, and `npm run validate:context` fails if either goes missing. The tool suspends the session waiting for an answer nobody is there to give — the issue holds `in-progress` for as long as it waits, and every assignment behind it waits too. That is the halt this whole skill exists to prevent, arriving through a tool call instead of through a decision.
-
-| Layer | Where | Holds when |
-|-------|-------|-----------|
-| `permissions.deny` | `.claude/settings.json` | The permission system is consulted at all |
-| `PreToolUse` hook | `.claude/hooks/no-ask-user-question.sh` | Always — a hook runs on the tool call whatever mode the session is in |
-
-The second layer is not redundancy. A session running with permissions bypassed never consults a deny rule, and an unattended session — a GitHub Actions runner, Claude Code on the web — is both the one that bypasses prompts and the one whose question can never be answered. The deny rule states the intent; the hook is what holds where it matters.
-
-The denial removes an escape hatch, not an option: **an open choice was never a question to ask.** Default it and record it. A genuine blocker from the list above goes onto the issue as a comment, which is where a human will actually find it — asynchronously, in the place that already holds the run's history — rather than into a prompt in a session that has since ended.
-
-This binds an interactive session at a keyboard exactly as it binds a pipeline run, and deliberately: the same context files drive both, and a rule that applies only when nobody is watching is a rule the pipeline cannot rely on.
+`AskUserQuestion` is blocked project-wide, by a deny rule and a `PreToolUse` hook, in an interactive session exactly as in a pipeline run. **An open choice was never a question to ask** — default it and record it; a genuine blocker from the list above goes onto the issue as a comment, where a human finds it asynchronously. Both enforcement layers, and why one alone does not hold: `references/no-asking.md`.
 
 ## Churn is not a blocker
 
