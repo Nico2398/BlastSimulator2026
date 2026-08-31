@@ -25,8 +25,8 @@ export const SURVEY_METHODS: SurveyMethod[] = ['seismic', 'core_sample', 'aerial
 /**
  * The result produced when a survey is completed.
  *
- * `estimates` is a two-level map:  outer key = resource/zone label,
- * inner key = grade/sub-zone label, value = numeric estimate (e.g. proportion).
+ * `estimates` is a two-level map: outer key = column key `"x,z"`,
+ * inner key = ore id, value = estimated density in [0, 1].
  *
  * `confidence` must be in [0, 1].
  */
@@ -43,7 +43,7 @@ export interface SurveyResult {
   completedTick: number;
   /** ID of the surveyor entity that performed the survey. */
   surveyorId: number;
-  /** Nested numeric estimates keyed by resource then grade. */
+  /** Estimated ore densities keyed by column `"x,z"` then ore id. */
   estimates: Record<string, Record<string, number>>;
   /** Confidence in the estimates, clamped to [0, 1]. */
   confidence: number;

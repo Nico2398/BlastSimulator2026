@@ -2,7 +2,7 @@
 name: gameplay-vehicle-fleet
 description: >
   Vehicle fleet specification for BlastSimulator2026: 5 vehicle roles with 3 tiers each,
-  TypeScript schemas, driver qualification,   traffic and routing logic, and task types. Use when implementing or modifying vehicles, driving,
+  driver qualification, traffic and routing logic, and task types. Use when implementing or modifying vehicles, driving,
   traffic, hauling, drilling, digging, or demolition mechanics.
 ---
 
@@ -36,51 +36,13 @@ Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 | `purchaseCost` | ×1.0 | ×2.0 | ×4.0 |
 | `maintenanceCostPerTick` | ×1.0 | ×1.4 | ×2.0 |
 
-## TypeScript Schema
+## Types
 
-```typescript
-export type VehicleRole =
-  | 'building_destroyer'
-  | 'debris_hauler'
-  | 'drill_rig'
-  | 'rock_digger'
-  | 'rock_fragmenter';
+`src/core/entities/Vehicle.ts` declares the shapes and is the only authority on their fields: `VehicleRole` (the five roles above), `VehicleTier`, `VehicleDef` (catalogue entry — costs, `speed` in cells/tick, `capacity`, role-specific `workRate`, `maxHp`), `Vehicle` (the live instance), `VehicleOperationalState` and `VehicleTask`. Read that file before writing against any of them — the field names there are what typechecks.
 
-export type VehicleTier = 1 | 2 | 3;
+Units and per-role meanings the code does not state: `capacity` is kg for a Debris Hauler, m³/tick for a Rock Digger, holes/tick for a Drill Rig; `nameKey` is an i18n key of the form `vehicle.<role>.tier<N>`; a payload is carried by the Debris Hauler alone. Tier-1 base stats and the tier multipliers above live in `src/core/config/balance.ts`.
 
-export interface VehicleDef {
-  role: VehicleRole;
-  tier: VehicleTier;
-  nameKey: string;               // i18n key, e.g. 'vehicle.debris_hauler.tier1'
-  purchaseCost: number;
-  maintenanceCostPerTick: number;
-  speed: number;                 // cells/tick
-  capacity: number;              // kg for hauler, m³ for digger, etc.
-  workRate: number;              // voxels/tick, kg/tick, etc. (role-specific)
-  maxHp: number;
-}
-
-export interface Vehicle {
-  id: number;
-  role: VehicleRole;
-  tier: VehicleTier;
-  x: number;
-  z: number;
-  hp: number;
-  driverId: number | null;       // Employee ID of driver; null = uncrewed
-  state: VehicleState;
-  targetX: number | null;
-  targetZ: number | null;
-  payloadKg: number;             // Debris Hauler only
-}
-
-export type VehicleState =
-  | 'idle'      // parked, no task
-  | 'moving'    // travelling to target
-  | 'working'   // drilling, digging, hauling, demolishing, or fragmenting
-  | 'waiting'   // blocked by traffic; retries each tick
-  | 'broken';   // requires repair at Vehicle Depot
-```
+Operational states and what each means for the player: `idle` parked with no task, `moving` travelling to target, `working` drilling/digging/hauling/demolishing/fragmenting, `waiting` blocked by traffic and retrying each tick, `broken` needing repair at a Vehicle Depot.
 
 ## Driver Qualification
 

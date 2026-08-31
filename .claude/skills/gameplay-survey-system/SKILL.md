@@ -31,22 +31,7 @@ finalError = baseError * (1 - (skillLevel - 1) * 0.12)
 
 ## Survey Result Data
 
-```typescript
-export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
-
-export interface SurveyResult {
-  id: number;
-  method: SurveyMethod;
-  centerX: number;
-  centerZ: number;
-  completedTick: number;
-  surveyorId: number;
-  /** Estimated ore densities: (x,z) → ore_id → estimated density 0–1 */
-  estimates: Record<string, Record<string, number>>;
-  /** Confidence factor 0–1 based on surveyor skill and method accuracy */
-  confidence: number;
-}
-```
+`src/core/mining/SurveyCalc.ts` declares `SurveyMethod`, `SurveyResult` and `EstimateSurveyParams`, and is the authority on their fields. `estimates` is keyed column-first: `"x,z"` → ore id → estimated density in [0, 1], with zero estimates omitted; `confidence` in [0, 1] comes from surveyor skill and method accuracy.
 
 Survey results **stale after 100 ticks** (terrain disturbed by blasts). UI renders confidence heatmap overlay.
 
@@ -66,13 +51,7 @@ Always use seeded PRNG (`src/core/math/Random.ts`) — never `Math.random()`.
 
 ## Rock Composition (Voxel Data Model, Ch.5 prerequisite)
 
-Each voxel stores mixture of up to 4 rock types with coefficients summing to 1.0:
-
-```typescript
-export interface VoxelRockComposition {
-  rocks: Array<{ rockId: string; coefficient: number }>;
-}
-```
+Each voxel stores a mixture of up to 4 rock types with coefficients summing to 1.0 — empty for air. `VoxelRockComposition` and the `VoxelData` record that holds it are declared in `src/core/world/VoxelGrid.ts`.
 
 Generation: per-rock Simplex noise field + level bias, normalized. Feeds texture rendering + blast energy threshold calculation.
 

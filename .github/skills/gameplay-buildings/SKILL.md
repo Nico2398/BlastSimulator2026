@@ -110,26 +110,9 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
-## TypeScript Reference
+## Types
 
-```typescript
-export type BuildingType =
-  | 'driving_center' | 'blasting_academy' | 'management_office' | 'geology_lab'
-  | 'research_center' | 'living_quarters' | 'explosive_warehouse' | 'freight_warehouse'
-  | 'vehicle_depot' | 'ramp';
+`src/core/entities/Building.ts` declares `BuildingType`, `BuildingTier` and `BuildingDef`, and is the only authority on their fields — costs, `footprint` and the approach `entryPoint`/`exitPoint` offsets, `capacity`, `maxHp`, `scoreEffects`. Read that file before writing against them.
 
-export type BuildingTier = 1 | 2 | 3;
-
-export interface BuildingDef {
-  type: BuildingType;
-  tier: BuildingTier;
-  nameKey: string;           // i18n key
-  footprint: number[][];     // [x, z] relative cell offsets
-  constructCost: number;
-  demolishCost: number;
-  maintenanceCostPerTick: number;
-  capacity: number;          // role-specific (beds, kg, m³, …)
-  structuralResistance: number; // blast energy sum threshold before destruction
-}
-```
+Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, kg for a warehouse, vehicle slots for a depot); `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
 

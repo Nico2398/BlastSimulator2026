@@ -108,16 +108,7 @@ If player builds a **Living Quarters Tier 2+**, an 8-tick shift cycle activates:
 - `employee_shift_change` event fired at shift boundaries
 - Without Living Quarters Tier 2+: employees remain awake indefinitely (fatigue accumulates faster)
 
-## TypeScript Reference
+## Types
 
-```typescript
-// Fields added to Employee interface (Ch.3):
-export interface Employee {
-  // ... existing fields ...
-  hunger: number;       // 0–100
-  fatigue: number;      // 0–100
-  breakNeed: number;    // 0–100
-  collapsing: boolean;
-}
-```
+The three gauges (`hunger`, `fatigue`, `breakNeed`, each 0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.
 
