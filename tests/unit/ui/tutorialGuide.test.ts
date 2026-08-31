@@ -138,6 +138,106 @@ describe('resolveStageIndex', () => {
   });
 });
 
+describe('resolveStageIndex — doneTarget fallback (#903)', () => {
+  // Shaped like train-driller's final stage: `target` is the `.bs-train-btn`
+  // row, which the crew panel replaces with an "in training" status view
+  // (makeTrainingSection, crewDetailSections.ts) the instant the course is
+  // booked — so `target` goes unreachable at exactly the moment the step
+  // should be considered DONE, not regressed. `doneTarget` is the status
+  // view's own selector, checked only once `target` itself is unreachable.
+  const stages: TutorialStage[] = [
+    { target: '#open', hintKey: 'a' },
+    { target: '#expand', hintKey: 'b' },
+    {
+      target: '.bs-train-btn[data-skill="driving.drill_rig"]',
+      doneTarget: '.bs-training-active[data-skill="driving.drill_rig"]',
+      hintKey: 'c',
+    },
+  ];
+
+  it('resolves to the doneTarget stage once its own target is unreachable but its doneTarget is reachable', () => {
+    button('open');
+    button('expand');
+    const status = document.createElement('div');
+    status.className = 'bs-training-active';
+    status.setAttribute('data-skill', 'driving.drill_rig');
+    document.body.appendChild(status);
+    withBox(status);
+
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('still resolves to the stage itself when its own target is the reachable one (course not yet booked)', () => {
+    button('open');
+    button('expand');
+    const trainBtn = document.createElement('button');
+    trainBtn.className = 'bs-train-btn';
+    trainBtn.setAttribute('data-skill', 'driving.drill_rig');
+    document.body.appendChild(trainBtn);
+    withBox(trainBtn);
+
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('falls back to an earlier stage when neither target nor doneTarget is reachable', () => {
+    button('open');
+    button('expand');
+
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+
+  it('does not consult doneTarget on a stage whose target IS reachable (target always wins)', () => {
+    button('open');
+    button('expand');
+    const trainBtn = document.createElement('button');
+    trainBtn.className = 'bs-train-btn';
+    trainBtn.setAttribute('data-skill', 'driving.drill_rig');
+    document.body.appendChild(trainBtn);
+    withBox(trainBtn);
+    // A stray doneTarget element also present should not change the result.
+    const status = document.createElement('div');
+    status.className = 'bs-training-active';
+    status.setAttribute('data-skill', 'driving.drill_rig');
+    document.body.appendChild(status);
+    withBox(status);
+
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('regression guard: still returns 0 when the whole panel/container is hidden, even though the stage has a doneTarget', () => {
+    // The panel-close-to-recover behavior (see the vehicle-buy-assign block
+    // above) must survive doneTarget's addition: closing the container makes
+    // BOTH target and doneTarget unreachable, and the rail must fall all the
+    // way back to stage 0, not get stuck pointing at a hidden doneTarget.
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    document.body.appendChild(panel);
+
+    const open = document.createElement('button');
+    open.id = 'open';
+    panel.appendChild(open);
+    withBox(open);
+
+    const status = document.createElement('div');
+    status.className = 'bs-training-active';
+    status.setAttribute('data-skill', 'driving.drill_rig');
+    panel.appendChild(status);
+    withBox(status);
+
+    // The doneTarget status view is reachable inside the open panel, so the
+    // rail resolves to the final stage via the fallback — not stuck on an
+    // earlier one.
+    expect(resolveStageIndex(stages)).toBe(2);
+
+    // Closing the whole panel takes #open, #expand AND the doneTarget status
+    // out at once — the rail must fall all the way back to stage 0, not get
+    // stuck pointing at a doneTarget that is technically still in the DOM but
+    // inside a hidden ancestor.
+    panel.style.display = 'none';
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
+});
+
 describe('resolveStageIndex — vehicle-buy-assign regression (#858)', () => {
   // Sub-stage 3 of the vehicle-buy-assign tutorial stage targets
   // `#bs-vehicle-panel [data-vtype="debris_hauler"] .bs-vehicle-assign-btn`
@@ -702,6 +802,112 @@ describe('decideClock', () => {
       // Grace measured from when staleness began (freezeAt), not from
       // stepStartTick(0) — same contract as the employee-walk stall test above.
       expect(last!.hold).toBe(true);
+    });
+  });
+
+  // -- #903: train-driller/train-digger book a course via `employee train`,
+  // which sets trainingState but touches none of activeActionId/
+  // pendingDriverVehicleId/destinationX — the fields hasOutstandingWork
+  // actually reads. A trainee therefore reads as fully idle here, exactly
+  // like the #552 hauling-vehicle gap above: the clock holds once the step's
+  // tickBudget (25 for train-driller/train-digger) is spent, and GameLoop
+  // returns early on state.isPaused, so tickTraining (EmployeeTraining.ts)
+  // never runs again — the tutorial deadlocks at stage 2/3 forever.
+  describe('trainee employees mid-course (#903)', () => {
+    it('keeps running past budget while an employee has a live trainingState, even though every other signal is idle', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.employees.employees = [
+        {
+          activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+          trainingState: { buildingId: 1, skill: 'driving.drill_rig', ticksRemaining: 12, fee: 100 },
+        } as never,
+      ];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('holds once budget is spent when no employee is training and every other signal is idle (control)', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.employees.employees = [
+        {
+          activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+          trainingState: null,
+        } as never,
+      ];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+    });
+
+    it('workSignature (via progressSignature) differs between two states where only trainingState.ticksRemaining differs', () => {
+      const s1 = state();
+      s1.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s1.employees.employees = [
+        {
+          activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+          trainingState: { buildingId: 1, skill: 'driving.drill_rig', ticksRemaining: 12, fee: 100 },
+        } as never,
+      ];
+      const d1 = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true);
+
+      const s2 = state();
+      s2.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s2.employees.employees = [
+        {
+          activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+          trainingState: { buildingId: 1, skill: 'driving.drill_rig', ticksRemaining: 11, fee: 100 },
+        } as never,
+      ];
+      const d2 = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true);
+
+      expect(d1.progressSignature).not.toBeNull();
+      expect(d2.progressSignature).not.toBeNull();
+      expect(d1.progressSignature).not.toBe(d2.progressSignature);
+    });
+
+    it('never holds a waitsOnWork step past tickBudget + WORK_GRACE_TICKS while a training course keeps decrementing, matching train-driller\'s real 25-tick budget', () => {
+      const budget = 25; // train-driller/train-digger's own tickBudget
+      let progress: ClockProgress = { signature: null, tick: 0 };
+      let ticksRemaining = 20;
+      for (let tick = 0; tick <= budget + 2 * WORK_GRACE_TICKS; tick++) {
+        const s = state();
+        s.tickCount = tick;
+        // A fresh ticksRemaining every tick — the course is provably still
+        // running, never stalled.
+        s.employees.employees = [
+          {
+            activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+            trainingState: { buildingId: 1, skill: 'driving.drill_rig', ticksRemaining: Math.max(0, ticksRemaining), fee: 100 },
+          } as never,
+        ];
+        const decision = decideClock(s, 0, budget, true, progress);
+        if (tick > budget + WORK_GRACE_TICKS) {
+          expect(decision.hold).toBe(false);
+        }
+        progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+        ticksRemaining -= 1;
+      }
+    });
+
+    it('boundary: training completes exactly when ticksRemaining hits 0 on the same tick the budget is spent — no false hold, and completion can flip true', () => {
+      // Mirrors the #478-style boundary tests above: the course started with
+      // exactly `budget` ticks remaining, so it finishes precisely as the
+      // step's own allowance runs out. The clock must not hold on that exact
+      // tick — tickTraining (EmployeeTraining.ts) still needs to run once
+      // more, un-paused, to actually grant the qualification and clear
+      // trainingState.
+      const budget = 25;
+      const s = state();
+      s.tickCount = budget;
+      s.employees.employees = [
+        {
+          activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+          trainingState: { buildingId: 1, skill: 'driving.drill_rig', ticksRemaining: 0, fee: 100 },
+        } as never,
+      ];
+      // trainingState is still non-null on this exact tick (tickTraining
+      // clears it only once ticksRemaining <= 0 is actually processed), so
+      // this must still read as outstanding work and not hold.
+      expect(decideClock(s, 0, budget, true).hold).toBe(false);
     });
   });
 });

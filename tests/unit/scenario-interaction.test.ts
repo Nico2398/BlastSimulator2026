@@ -14,7 +14,9 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Page } from 'puppeteer';
-import { executeActionOnPage, resolveEventIfPendingOnPage } from '../../scripts/shared/interaction-executor.js';
+import {
+  executeActionOnPage, resolveEventIfPendingOnPage, CLOCK_HELD_FAIL_AFTER_POLLS,
+} from '../../scripts/shared/interaction-executor.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 
@@ -300,6 +302,57 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
     await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
       /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 4 tick\(s\); blocked by a pending event for 1 tick\(s\)/,
     );
+  });
+
+  // Issue #903: a held tutorial clock (TutorialRails.updateClock sets
+  // isPaused and never releases it, e.g. the train-driller/train-digger
+  // deadlock) used to look identical to an ordinary slow-progress stall —
+  // the wait just kept looping `tick 1` (a no-op while genuinely paused,
+  // since GameLoop.ts's own tick() returns early on state.isPaused) until
+  // the outer maxTicks/timeout budget ran out, burning the scenario's whole
+  // wall-clock allowance to report a plain "never reached" message with no
+  // hint that the clock was the reason. Failing fast, by name, the moment
+  // clockHeld has been observed for CLOCK_HELD_FAIL_AFTER_POLLS consecutive
+  // polls turns that into an immediate, diagnostic failure instead.
+  describe('waitForTutorialStep fails fast, by name, on a held clock instead of stalling out the full tick budget (#903)', () => {
+    it('throws a distinct "clock held" error once clockHeld has been observed true for CLOCK_HELD_FAIL_AFTER_POLLS consecutive polls, well before maxTicks is ever approached', async () => {
+      const evaluate = vi.fn().mockResolvedValue({
+        active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true,
+      });
+      const page = fakePage({ evaluate });
+      const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
+      const action = {
+        type: 'waitForTutorialStep' as const, stepId: 'buy-drill-rig-assign', maxTicks: 3000, timeout: 30000,
+      };
+
+      const failure = await executeActionOnPage(page, action, step).then(
+        () => null,
+        (err: Error) => err,
+      );
+
+      expect(failure, 'waitForTutorialStep resolved instead of failing on a held clock').not.toBeNull();
+      expect(failure!.message).toMatch(/clock held/i);
+      // A genuinely distinct failure mode, not the ordinary exhausted-budget
+      // message with a suffix tacked on.
+      expect(failure!.message).not.toMatch(/tutorial never reached/);
+      // Fails on the threshold, not by looping all the way to maxTicks —
+      // exactly the wall-clock cost this fix exists to avoid.
+      expect(evaluate).toHaveBeenCalledTimes(CLOCK_HELD_FAIL_AFTER_POLLS);
+    });
+
+    it('does not throw the clock-held error when clockHeld is true on the exact same poll the wanted step is already reached', async () => {
+      const evaluate = vi.fn().mockResolvedValueOnce({
+        active: true, stepId: 'buy-drill-rig-assign', stageTarget: '#bs-vehicle-panel', clockHeld: true,
+      });
+      const page = fakePage({ evaluate });
+      const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
+      const action = {
+        type: 'waitForTutorialStep' as const, stepId: 'buy-drill-rig-assign', maxTicks: 3000, timeout: 30000,
+      };
+
+      await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+      expect(evaluate).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

@@ -1,13 +1,34 @@
 // @vitest-environment jsdom
 // BlastSimulator2026 — Tutorial rails, stateful half
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TutorialRails } from '../../../src/ui/tutorialRails.js';
 import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+
+// #903: a stage shaped like train-driller's final one — a `target` that
+// disappears (replaced by an "in training" status view, crewDetailSections.ts)
+// the instant the player uses it, and a `doneTarget` that takes over once
+// `target` itself is unreachable. `stagesFor('fake-train-step', ...)` is
+// mocked here rather than reusing the real 'train-driller' entry in
+// tutorialStagesTraining.ts, which does not yet carry a doneTarget (that
+// file is the implementer's to change, not the test-writer's).
+vi.mock('../../../src/ui/tutorialStages.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/ui/tutorialStages.js')>();
+  const fakeTrainStages = [
+    { target: '#open', hintKey: 'a' },
+    { target: '#expand', hintKey: 'b' },
+    { target: '.bs-train-btn', doneTarget: '.bs-training-active', hintKey: 'c' },
+  ];
+  return {
+    ...actual,
+    stagesFor: (stepId: string, highlightTarget?: string) =>
+      (stepId === 'fake-train-step' ? fakeTrainStages : actual.stagesFor(stepId, highlightTarget)),
+  };
+});
 
 function withBox(el: HTMLElement): HTMLElement {
   el.getBoundingClientRect = () => ({
@@ -315,5 +336,73 @@ describe('a stage whose control is missing or blocked is detected (#489)', () =>
 
     hireSurveyor();
     expect(rails.refresh().stageIndex).toBe(1);
+  });
+});
+
+describe('TutorialRails — doneTarget survives at the rails level (#903)', () => {
+  // Bug 2's real shape: booking a course replaces the .bs-train-btn row with
+  // an in-training status view (crewDetailSections.ts's makeTrainingSection).
+  // Before #903's fix, resolveStageIndex's "last reachable stage wins" search
+  // found neither the vanished target nor anything later, and fell all the
+  // way back to an EARLIER, already-completed stage ("expand the driller's
+  // card") — re-instructing a completed action instead of holding at the
+  // stage the player just finished.
+
+  function openStage(): HTMLElement {
+    const btn = document.createElement('button');
+    btn.id = 'open';
+    document.body.appendChild(btn);
+    return withBox(btn);
+  }
+
+  function expandStage(): HTMLElement {
+    const btn = document.createElement('button');
+    btn.id = 'expand';
+    document.body.appendChild(btn);
+    return withBox(btn);
+  }
+
+  function trainButton(): HTMLElement {
+    const btn = document.createElement('button');
+    btn.className = 'bs-train-btn';
+    document.body.appendChild(btn);
+    return withBox(btn);
+  }
+
+  function trainingActiveStatus(): HTMLElement {
+    const div = document.createElement('div');
+    div.className = 'bs-training-active';
+    document.body.appendChild(div);
+    return withBox(div);
+  }
+
+  it('resolves to the final stage while its own target (the train button) is still live', () => {
+    openStage();
+    expandStage();
+    trainButton();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'fake-train-step' }, state());
+
+    const view = rails.refresh();
+    expect(view.stageIndex).toBe(2);
+    expect(view.stageTarget).toBe('.bs-train-btn');
+  });
+
+  it('does not drop back to an earlier stage once the train button is replaced by the in-training status view', () => {
+    openStage();
+    expandStage();
+    const trainBtn = trainButton();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'fake-train-step' }, state());
+    expect(rails.refresh().stageIndex).toBe(2);
+
+    // Player clicks Train: the crew panel swaps the button row for the
+    // status view. The control this stage was pointing at is gone.
+    trainBtn.remove();
+    trainingActiveStatus();
+
+    const view = rails.refresh();
+    expect(view.stageIndex).toBe(2);
+    expect(view.stageTarget).toBe('.bs-train-btn');
   });
 });
