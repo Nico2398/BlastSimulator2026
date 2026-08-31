@@ -28,7 +28,7 @@ Context loads progressively. Reach for the narrowest layer that answers the ques
 | Layer | Location | When it loads | Holds |
 |-------|----------|---------------|-------|
 | This file | `.claude/CLAUDE.md` | Every session | Project identity, verification gate, layer map |
-| Rules | `.claude/rules/*.md` | Path-scoped rules load when you touch matching files; unscoped ones every session | Hard invariants per area of the tree |
+| Rules | `.claude/rules/*.md` | Path-scoped rules load when you touch matching files; unscoped ones every session | Hard invariants per area of the tree, mirrored to `.github/instructions/` and `.opencode/rules/` |
 | Skills | `.claude/skills/*/SKILL.md` | On demand, by task relevance or `/name` | Domain specs, procedures, conventions |
 | Agent definitions | `.claude/agents/*.md` | When that agent runs | Role, procedure, tool budget, preloaded skills |
 
@@ -38,7 +38,7 @@ Never restate content across layers. Reference it by name.
 
 Prefix categories:
 - `gameplay-*` — game mechanics specs (blast, buildings, navmesh, survey, vehicles, employee skills/needs, game design)
-- `dev-*` — architecture, design principles, coding conventions, testing strategy, visual testing
+- `dev-*` — architecture, design principles, coding conventions, testing strategy, visual testing, scenario authoring
 - `agentic-*` — pipeline orchestration, decision autonomy, context authoring, workflow authoring, issue creation
 
 **Skills-First:** before any task, load related skill(s) for domain rules, procedures, and constraints.
@@ -71,7 +71,7 @@ Four independent channels prove a change works. Each catches what the others mis
 5. **"Already fixed" and "no change needed" are claims about the whole issue, not about a diff.** With no diff there is nothing to scope the channels down to, so run every channel the issue's own verification list names. A verdict of already-resolved reached on a subset of them is unproven.
 6. **A channel already red before you arrived is a finding, not a precondition.** Never skip, downgrade, or discount a channel because it was failing on `main` when you started — that is how a red channel outlives the one session positioned to notice it. Fix it, or state plainly that it is red, what fails, and why you are not fixing it. Reporting work done while a required channel is red is a false report no matter who broke it.
 
-**The other three channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `visual`'s interaction-mode scenarios are the only channel that plays the game: a `role: 'player'` scenario step can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`), so a click that cannot complete fails the scenario and names the blocking control. Procedures live in the `dev-visual-testing` skill; step roles in `.claude/rules/scenario-defs.md`.
+**The other three channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `visual`'s interaction-mode scenarios are the only channel that plays the game: a `role: 'player'` scenario step can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`), so a click that cannot complete fails the scenario and names the blocking control. Procedures live in the `dev-visual-testing` skill; step roles in the `dev-scenario-authoring` skill.
 
 **You have vision.** Screenshots are readable evidence: capture the PNG, then open it with the Read tool and describe what is actually on screen. A rendering change is unverified until an image has been inspected — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 

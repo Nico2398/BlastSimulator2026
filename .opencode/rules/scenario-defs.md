@@ -1,11 +1,3 @@
----
-paths:
-  - "scripts/scenario-defs/**/*.json"
-  - "scripts/scenario-*.ts"
-  - "scripts/run-all-scenarios.ts"
-  - "scripts/shared/*.ts"
----
-
 # Scenario Definitions
 
 Scenario JSON drives two verification channels from one file: `scenario` (command mode, pure Node.js) and `visual` (interaction mode, real Puppeteer clicks). In command mode, a step whose command the console refuses (`success: false`) fails the scenario unless the step declares `commandOutcome`.

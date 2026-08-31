@@ -1,18 +1,3 @@
----
-paths:
-  - ".claude/**/*.md"
-  - ".claude/**/*.json"
-  - ".claude/hooks/**"
-  - ".github/agents/**"
-  - ".github/skills/**"
-  - ".github/prompts/**"
-  - ".github/instructions/**"
-  - ".github/copilot-instructions.md"
-  - ".opencode/**/*.md"
-  - ".opencode/**/*.json"
-  - ".opencode/plugin/**"
----
-
 # Context File Authoring
 
 Skill, agent, command, and rule files are the project's instruction surface. Editing them changes how every future session behaves.
