@@ -1,16 +1,5 @@
 ---
-paths:
-  - ".claude/**/*.md"
-  - ".claude/**/*.json"
-  - ".claude/hooks/**"
-  - ".github/agents/**"
-  - ".github/skills/**"
-  - ".github/prompts/**"
-  - ".github/instructions/**"
-  - ".github/copilot-instructions.md"
-  - ".opencode/**/*.md"
-  - ".opencode/**/*.json"
-  - ".opencode/plugin/**"
+applyTo: ".claude/**/*.md,.claude/**/*.json,.claude/hooks/**,.github/agents/**,.github/skills/**,.github/prompts/**,.github/instructions/**,.github/copilot-instructions.md,.opencode/**/*.md,.opencode/**/*.json,.opencode/plugin/**"
 ---
 
 # Context File Authoring

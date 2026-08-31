@@ -4,7 +4,7 @@ Satirical open-pit mine management game (Theme Hospital meets capitalism). Carto
 
 ## How to read all context files
 
-copilot-instructions.md, agent definitions, and skills all use this convention. Two kinds of content. Obey their rules:
+copilot-instructions.md, agent definitions, instructions files, and skills all use this convention. Two kinds of content. Obey their rules:
 
 ### ▶ INSTRUCTION blocks
 - Marked by: `▶` prefix, numbered step lists, or the word "PROCEDURE" in a header
@@ -23,8 +23,12 @@ copilot-instructions.md, agent definitions, and skills all use this convention. 
 
 Skills in `.github/skills/` auto-load based on task relevance. Prefix categories:
 - `gameplay-*` — Game mechanics
-- `dev-*` — Software development
+- `dev-*` — Software development (architecture, conventions, testing, visual testing, scenario authoring)
 - `agentic-*` — Agentic workflow automation
+
+## Rules
+
+Path-scoped instructions in `.github/instructions/` carry the hard invariants for one area of the tree. Each one states its scope in `applyTo` and names the skill holding the detail. They mirror `.claude/rules/` and `.opencode/rules/` word-for-word — edit all three together.
 
 ## Validation Commands
 
@@ -117,34 +121,4 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 ## Communication Style
 
-Respond terse. All technical substance stay. Only fluff die.
-
-ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift.
-
-### Rules
-
-Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Technical terms exact. Code blocks unchanged. Errors quoted exact.
-
-Pattern: `[thing] [action] [reason]. [next step].`
-
-Not: "Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by..."
-Yes: "Bug in auth middleware. Token expiry check use `<` not `<=`. Fix:"
-
-### Intensity (full)
-
-Drop articles, fragments OK, short synonyms.
-
-### Auto-Clarity
-
-Drop terse style when:
-- Security warnings
-- Irreversible action confirmations
-- Multi-step sequences where fragment order or omitted conjunctions risk misread
-- Compression itself creates technical ambiguity
-- User asks to clarify or repeats question
-
-Resume terse after clear part done.
-
-### Boundaries
-
-Code/commits/PRs: write normal. "stop caveman" or "normal mode": revert.
+Carried by the `communication-style` instructions file (`.github/instructions/communication-style.instructions.md`), which applies to every session. It is stated there once rather than restated here, so the three runtimes cannot drift apart on it.

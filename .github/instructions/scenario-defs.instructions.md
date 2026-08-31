@@ -1,9 +1,5 @@
 ---
-paths:
-  - "scripts/scenario-defs/**/*.json"
-  - "scripts/scenario-*.ts"
-  - "scripts/run-all-scenarios.ts"
-  - "scripts/shared/*.ts"
+applyTo: "scripts/scenario-defs/**/*.json,scripts/scenario-*.ts,scripts/run-all-scenarios.ts,scripts/shared/*.ts"
 ---
 
 # Scenario Definitions

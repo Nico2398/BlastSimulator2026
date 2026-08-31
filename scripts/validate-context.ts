@@ -19,6 +19,8 @@
  *   8. Every command has a mirror in the other two runtimes
  *   9. Files bundled with a skill are mirrored too, and named by their SKILL.md
  *  10. Each runtime's entry point states the same gates, channels, and skills
+ *  11. Every rule is mirrored to the other two runtimes, with matching globs,
+ *      stays within the rule body limit, and is actually loaded by OpenCode
  *
  * Usage:
  *   npx tsx scripts/validate-context.ts
@@ -48,6 +50,17 @@ const SKILL_FIELDS = new Set([
 
 /** Frontmatter fields recognised on a path-scoped rule. */
 const RULE_FIELDS = new Set(['paths']);
+
+/** Frontmatter fields Copilot recognises on a path-scoped instructions file. */
+const INSTRUCTIONS_FIELDS = new Set(['applyTo', 'excludeAgent']);
+
+/**
+ * A rule is injected whole, without the agent choosing to load it, and one
+ * runtime loads every rule on every session. A rule that grows into a
+ * specification is paid for on every run that touches its paths — the body
+ * belongs in a skill, with the rule stating the invariant and naming it.
+ */
+const RULE_BODY_LIMIT = 6000;
 
 /** Built-in tools available to a subagent. */
 const TOOLS = new Set([
@@ -215,6 +228,101 @@ function checkSkill(file: ParsedFile, skills: Set<string>): ContextIssue[] {
   }
   return issues;
 }
+
+/** Frontmatter and body of a rule file, tolerating a rule with no frontmatter. */
+function parseRule(path: string): { frontmatter: string; body: string } {
+  const text = readFileSync(path, 'utf8');
+  const parsed = parse(path);
+  return parsed ?? { frontmatter: '', body: text };
+}
+
+/**
+ * Rules mirror three ways like skills and agents do, because the invariants
+ * they carry are the project's, not one harness's. Each runtime scopes them
+ * its own way — Claude Code by `paths`, Copilot by `applyTo`, OpenCode not at
+ * all (its copies load every session via `instructions` in opencode.json) — so
+ * frontmatter differs and bodies must not. An unmirrored rule is an invariant
+ * two thirds of the project's agents never see, and it fails silently: the
+ * rule keeps working in the runtime that has it.
+ */
+function checkRuleMirrors(): ContextIssue[] {
+  const issues: ContextIssue[] = [];
+
+  for (const path of markdownFiles(join(ROOT, '.claude/rules'))) {
+    const stem = basename(path, '.md');
+    const rule = parseRule(path);
+    const body = rule.body.trim();
+    const globs = listField(rule.frontmatter, 'paths');
+    const applyTo = globs.length > 0 ? globs.join(',') : '**';
+
+    if (body.length > RULE_BODY_LIMIT) {
+      issues.push({
+        file: path,
+        message:
+          `rule body is ${body.length} bytes, over the ${RULE_BODY_LIMIT} limit — ` +
+          'move the detail into a skill and state the invariant here',
+      });
+    }
+
+    const copilot = join(ROOT, '.github/instructions', `${stem}.instructions.md`);
+    if (existsSync(copilot)) {
+      const mirror = parse(copilot);
+      if (!mirror) {
+        issues.push({ file: copilot, message: 'missing YAML frontmatter — Copilot needs `applyTo` to scope it' });
+      } else {
+        issues.push(...checkUnknownFields(mirror, INSTRUCTIONS_FIELDS, 'instructions file'));
+        const declared = listField(mirror.frontmatter, 'applyTo').join(',').replace(/^["']|["']$/g, '');
+        if (declared !== applyTo) {
+          issues.push({
+            file: copilot,
+            message: `applyTo \`${declared}\` does not match the rule's paths \`${applyTo}\``,
+          });
+        }
+        if (mirror.body.trim() !== body) {
+          issues.push({ file: copilot, message: `body differs from .claude/rules/${stem}.md` });
+        }
+      }
+    } else {
+      issues.push({ file: copilot, message: `missing mirror of rule \`${stem}\`` });
+    }
+
+    const opencode = join(ROOT, '.opencode/rules', `${stem}.md`);
+    if (existsSync(opencode)) {
+      if (readFileSync(opencode, 'utf8').trim() !== body) {
+        issues.push({ file: opencode, message: `body differs from .claude/rules/${stem}.md` });
+      }
+    } else {
+      issues.push({ file: opencode, message: `missing mirror of rule \`${stem}\`` });
+    }
+  }
+
+  issues.push(...checkOpenCodeRuleLoading());
+  return issues;
+}
+
+/**
+ * OpenCode has no path-scoped rule layer: its copies reach the model only
+ * because opencode.json lists them. Drop the entry and every mirrored rule
+ * becomes a file nothing reads, with no error anywhere.
+ */
+function checkOpenCodeRuleLoading(): ContextIssue[] {
+  const path = join(ROOT, '.opencode/opencode.json');
+  if (!existsSync(path)) {
+    return [{ file: path, message: 'missing — OpenCode loads no rules without it' }];
+  }
+  const config = JSON.parse(readFileSync(path, 'utf8')) as { instructions?: string[] };
+  const instructions = config.instructions ?? [];
+  if (!instructions.includes(RULES_GLOB)) {
+    return [{
+      file: path,
+      message: `\`instructions\` lacks \`${RULES_GLOB}\` — the mirrored rules reach no OpenCode session`,
+    }];
+  }
+  return [];
+}
+
+/** How opencode.json names the rules directory, relative to its own location. */
+const RULES_GLOB = 'rules/*.md';
 
 /** The file each runtime loads on every session. */
 const ENTRY_POINTS = [
@@ -611,6 +719,7 @@ export function validateContextFiles(): ContextIssue[] {
     }
   }
 
+  issues.push(...checkRuleMirrors());
   issues.push(...checkEntryPoints(skills));
   issues.push(...checkSettings());
   issues.push(...checkCrossRuntimeSync());
@@ -626,7 +735,7 @@ function main(): void {
     console.log(
       'Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, ' +
         'settings.json hook registration and denied tools, bundled skill files, runtime entry points, ' +
-        'cross-runtime sync.'
+        'rule mirrors and their path scoping, cross-runtime sync.'
     );
   } else {
     console.error(`${issues.length} context file issue(s):\n`);

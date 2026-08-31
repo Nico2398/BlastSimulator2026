@@ -47,18 +47,28 @@ All context files — skills, agent definitions, and slash commands — duplicat
 
 **Rule:** Same body content. Frontmatter fields differ per solution.
 
-### Path-Scoped Rules (Claude Code)
+### Path-Scoped Rules
 
-`.claude/rules/*.md` holds hard invariants for one area of the tree. A `paths` frontmatter list makes a rule load only when files matching those globs are touched; a rule with no `paths` loads every session.
+A rule holds the hard invariants for one area of the tree, and reaches an agent because it touched a matching file — not because it chose to load anything. That is what a rule buys over a skill, and it is why a rule stays short.
+
+| Agent | File | Scoping |
+|-------|------|---------|
+| Copilot | `.github/instructions/<name>.instructions.md` | `applyTo`, one comma-separated glob string |
+| Claude Code | `.claude/rules/<name>.md` | `paths`, a YAML list of globs |
+| OpenCode | `.opencode/rules/<name>.md` | none — every rule loads every session |
+
+**Rule:** body word-for-word identical across all three. The Copilot copy's `applyTo` lists the same globs, in the same order, that the Claude Code copy's `paths` lists; an unscoped rule is `applyTo: "**"`. The OpenCode copy carries the body alone, no frontmatter, and reaches a session only because `instructions` in `opencode.json` names the rules directory.
+
+OpenCode loading every rule every session is what caps a rule's length: `validate:context` fails a rule body over 6000 bytes. A rule that wants to be longer is a skill that has not been split out yet.
 
 Choose the layer by lifetime and scope:
 
 | Content | Goes in |
 |---------|---------|
-| Always-true project facts, verification gate | `.claude/CLAUDE.md` |
-| Invariants for one directory | `.claude/rules/` with `paths` |
-| Procedures and domain specs loaded on demand | `.claude/skills/` |
-| Role, tool budget, preloaded skills for one agent | `.claude/agents/` |
+| Always-true project facts, verification gate | the runtime's entry point |
+| Invariants for one directory | a rule, scoped to that directory |
+| Procedures and domain specs loaded on demand | a skill |
+| Role, tool budget, preloaded skills for one agent | an agent definition |
 
 Rules state the invariant and name the skill that details it. They never restate the skill.
 
@@ -87,15 +97,19 @@ An unrecognised frontmatter field raises no error — it is ignored. A tool rest
 
 `paths` only.
 
+### Copilot instructions file (`.github/instructions/*.instructions.md`)
+
+`applyTo`, `excludeAgent`. `applyTo` is one comma-separated string, not a list. The OpenCode copy takes no frontmatter at all.
+
 ## Verify a Context Change
 
 ```bash
 npm run validate:context
 ```
 
-Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, confirms every bundled skill file is named by its SKILL.md, and diffs bodies across the three runtime directories. Run it after any context edit — these failures are invisible at runtime.
+Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, confirms every bundled skill file is named by its SKILL.md, diffs bodies across the three runtime directories, and holds the rule mirrors to matching globs, the body limit, and an OpenCode config that actually loads them. Run it after any context edit — these failures are invisible at runtime.
 
-Entry points are checked differently from everything else. Each runtime loads one on every session — `.claude/CLAUDE.md`, `.github/copilot-instructions.md`, `.opencode/AGENTS.md` — and their wording diverges by design: Claude Code has vision and a `rules/` layer, so the other two inline what those rules say and describe a capability gate of their own. Bodies are therefore not diffed. What is checked is what they promise: the same gates, the same verification channels, and skill names that resolve. Keep a divergence there only where the runtime genuinely differs, and state the same invariant on both sides of it.
+Entry points are checked differently from everything else. Each runtime loads one on every session — `.claude/CLAUDE.md`, `.github/copilot-instructions.md`, `.opencode/AGENTS.md` — and their wording diverges by design: Claude Code has vision, and each harness executes a long-running command its own way. Bodies are therefore not diffed. What is checked is what they promise: the same gates, the same verification channels, and skill names that resolve. Keep a divergence there only where the runtime genuinely differs, and state the same invariant on both sides of it.
 
 ## Communication Standards
 
