@@ -26,13 +26,6 @@ outputs:
       Single-line reference to what triggered the run ("issue 42", "pr 17",
       "manual"). Safe to pass as a slash-command argument.
     value: ${{ steps.build.outputs.entity }}
-  branch_suffix:
-    description: >
-      Suffix every work branch this run creates carries: `<issue>-<run id>`, or
-      just the run id when the trigger names no issue. Unique per run, which is
-      what keeps one run's branch from colliding with the branch an earlier run
-      abandoned.
-    value: ${{ steps.build.outputs.branch_suffix }}
   feature_branch:
     description: "The branch this run's deliverable lands on, `pipeline/feature-<suffix>`."
     value: ${{ steps.build.outputs.feature_branch }}
@@ -161,5 +154,4 @@ runs:
           core.setOutput('prompt', prompt);
           core.setOutput('issue', issue);
           core.setOutput('entity', entity);
-          core.setOutput('branch_suffix', suffix);
           core.setOutput('feature_branch', featureBranch);
