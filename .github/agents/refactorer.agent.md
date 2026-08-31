@@ -27,6 +27,11 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 - Seeded PRNG only (no `Math.random()`)
 - Move hardcoded numbers to `src/core/config/`
 - Remove stale scaffolding (see Diff Review below)
+- Narrow a helper's input to the values it reads, where the whole aggregate was passed
+- Route a field-by-field read of another module's structure through that module's exported function
+- Collapse a second `switch` on a discriminant already dispatched elsewhere into the existing one
+- Delete an abstraction, type parameter, registry or config flag this run introduced with one
+  consumer — speculative generality is refactor material exactly like duplication
 
 ## Never
 
@@ -46,6 +51,14 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 - [ ] User-facing strings via `t('key')`
 - [ ] `en.json` + `fr.json` matching entries
 - [ ] Fictional names localized
+
+### Durability — per `dev-design-principles`
+- [ ] Each unit has one reason to change
+- [ ] Helpers take the narrowest input that does the job
+- [ ] Shared-layer code stays coherent with the motivating feature deleted; feature-specific code
+      lives with its feature
+- [ ] Per-tick and per-frame work walks one growth axis; local changes recompute locally
+- [ ] The next variant is a catalog entry, dispatched in one place
 
 ### Error Handling
 - [ ] Core functions return `Result<T>`, not throw
@@ -74,4 +87,5 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 
 - `dev-coding-conventions` — style, naming, error handling
 - `dev-architecture` — module boundaries, data flow
+- `dev-design-principles` — coupling, genericity, cost curve, extension
 - `dev-testing-strategy` — test conventions
