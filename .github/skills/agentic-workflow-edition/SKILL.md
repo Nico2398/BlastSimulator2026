@@ -98,6 +98,39 @@ Every workflow here can fire twice: webhooks redeliver, sweeps repeat, humans di
 - Branch on **state, not on messages**. `agentic-auto-merge` re-reads the PR and decides from `mergeable_state` plus the runs, because a refusal string it did not recognise once fell through to a warning and a green step — and PR #434 sat unmerged while both arming paths reported success.
 - When reading workflow runs on a head: keep the newest run per `workflow_id` (`cancel-in-progress` leaves superseded runs behind, and a stale `cancelled` reads as red forever), skip the workflow the code itself is running in (or it waits on itself), and treat `skipped`/`neutral` as passes.
 
+## ▶ Rule 6 — Nothing here removes a line but you
+
+Every rule above only adds. Rule 1 adds a guard, Rule 4 adds a report, Rule 5 adds a marker, "Write the incident into the file" adds a paragraph, and "How a change here is proven" adds a pinned assertion for each of them. Nothing in this layer ever fails because a mechanism outlived the incident that justified it: a workflow no event can reach reports `success`, an output nobody reads costs nothing, an inlined copy whose reason expired still passes the test that pins it. Dead code here is silent by construction — the same property every guard in this layer was written to fight.
+
+So deletion is a rule, not a judgement call. **Nothing is minimal by default; it is minimal because somebody removed something.**
+
+### ▶ In the same change that adds a mechanism
+
+1. **Name what it replaces, and delete that.** A new guard that covers an older one's case makes the older one dead the moment it lands. Two guards for one failure is not defence in depth — it is one guard and one thing that will be edited on the wrong assumption. Defence in depth is two guards for two *different* failure modes, and the comment has to say which is which.
+2. **Grep every name you declared, before you declare it.** `grep -rn "outputs\.<name>" .github/ tests/ scripts/` — zero hits outside the file that declares it means do not declare it. Same for a composite-action input no caller passes, and for a `module.exports` entry no `require()` and no test destructures.
+3. **Re-read the comments in the file you touched.** A comment that counts ("exactly three mechanisms", "only two things start a session", "two of its sites run without a checkout") is a tally that nothing updates for you, and it is read as fact by the next session.
+
+### What dead looks like in this layer
+
+Each row is a real finding from the August 2026 sweep. None of them broke anything, and none of them would ever have failed a test.
+
+| Shape | How it got there |
+|-------|------------------|
+| A workflow no event can reach | `workflow_dispatch`-only, doing setup work nothing consumes. `copilot-setup-steps.yml`'s entire contract is its exact filename and job id; renaming it into the `agentic-` family made it inert, and nothing anywhere noticed |
+| A workflow whose `if:` no real event satisfies | `claude-code-review.yml` excludes the `pipeline/`, `claude/`, `opencode/` and `copilot/` head prefixes — which is every pull request this repository actually opens |
+| A declared output nothing reads | `agentic-prompt.branch_suffix`, `agentic-run-state.terminal`, `agentic-auto-merge.unmarked`. Each is computed, exported, and consumed by nobody |
+| A declared input no caller passes | `agentic-auto-merge.merge_method`: configurability invented for a caller that was never written |
+| An export no caller and no test imports | Thirteen entries across `.github/scripts/`. Every one is used *inside* its own module, so the symbol is live and only the export is dead — which is why nothing catches it |
+| An inlined copy whose stated reason expired | `agentic-run-state` inlines the deliverable-PR predicate "because it runs without a checkout". Both of its callers check out at `fetch-depth: 0`, so it could `require()` the shared module the way `agentic-assign` does |
+| A comment naming a mechanism that has moved | Both runners still close with "only two things start a session". There are four, and one of them (`agentic-chain-on-close.yml`) exists precisely because that comment's reasoning was incomplete |
+
+### The comment budget
+
+The incident comments are load-bearing and stay — but they are 26% of the workflow and action lines in this tree and 44% of the decision modules, so they are also the part that grows fastest and is checked least. Two bounds:
+
+- **An incident comment belongs to a mechanism.** When the mechanism goes, the comment goes with it. A paragraph about a run that was lost to code no longer present is a trap, not a record.
+- **One incident, one place.** #554's unique-branch-suffix story is told in `agentic-prompt`, `agentic-auto-merge`, `agentic-watchdog` and `agentic-ci-failure`. The mechanism's own file gets the story; the others get a pointer to it.
+
 ## Repository variables
 
 Configuration lives in repository variables, defaults live in code, and a bad value never disables a safety mechanism: an unparseable limit falls back to its default, an unrecognised agent name fails the step loudly, and a stall threshold below the job timeout is clamped up with a warning. Document every new variable in `references/github-loop.md`'s table — including its default and what breaks when it is off.
@@ -108,10 +141,12 @@ The Actions layer has no runtime you can drive locally, so its channel is `logic
 
 1. Add or update the assertions in `tests/unit/config/autonomy-loop.test.ts`. Pin the trigger, the token, and every guard — each of them fails silently in production.
 2. Read the **shipped source**, never a copy of it. The existing tests lift `agentic-auto-merge`'s inline script out of its `action.yml` and evaluate the real function; a re-typed duplicate drifts and then passes forever.
-3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three because two of its sites run without a checkout, and the "is a runner session live" check exists in two (`agentic-recover-blocked`, `agentic-ci-failure.yml`) for the same reason — pin every copy so they cannot disagree. Pinning each copy's own content is not enough: #614 happened because both liveness copies were individually pinned and still drifted, one polling the full set of non-terminal Actions run statuses and the other only two of them, with nothing ever comparing them. Assert the copies equal each other, not only that each contains what it should.
+3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three, one of which (`agentic-watchdog.yml`) genuinely runs without a checkout, and the "is a runner session live" check exists in two (`agentic-recover-blocked`, `agentic-ci-failure.yml`) for the same reason — pin every copy so they cannot disagree. Pinning each copy's own content is not enough: #614 happened because both liveness copies were individually pinned and still drifted, one polling the full set of non-terminal Actions run statuses and the other only two of them, with nothing ever comparing them. Assert the copies equal each other, not only that each contains what it should.
 4. `npm run test` and `npm run typecheck`. A YAML parse check (`python3 -c "import yaml; yaml.safe_load(open(...))"`) catches an indentation error before a push does.
 5. State in the PR body which mechanism changed and which run it was lost to. Nothing about this layer is self-evident three months later.
 
 ## Write the incident into the file
 
 Every non-obvious mechanism here carries a comment naming the run that made it necessary — #404, #430, #434, #499, #507, #552, #581. That is not decoration: the guards look redundant, and each one was added after a queue stalled for a day. A comment that says *what* the code does can be deleted safely by anyone; a comment that says which PR was lost cannot.
+
+That is a reason to keep the incident, not a licence to keep the file. Rule 6's comment budget bounds this: the record travels with the mechanism and is told once, in the mechanism's own file.

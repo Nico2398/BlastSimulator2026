@@ -339,11 +339,13 @@ jobs:
           self_issue: ${{ steps.context.outputs.issue }}
 
       # No chaining step here, deliberately. A run whose deliverable was an
-      # answer or an executed command closes its own issue and stops there: it
-      # opened no PR, so there is no merge to chain from, and starting the next
-      # session without one would be the pipeline deciding to run again on its
-      # own. Only two things start a session — a human dispatching
-      # `agentic-trigger.yml`, or a merged pipeline PR via
-      # `auto-assign-next.yml`. The issue is still released (closed, `done`,
-      # `in-progress` dropped), so the queue is free the moment somebody asks
-      # for the next run.
+      # answer or an executed command closes its own issue and stops there: a
+      # runner starting the next session would be the pipeline deciding to run
+      # again on its own, with no view of the queue it is restarting. Four
+      # workflows start a session, and every one of them reacts to an event with
+      # that view: `agentic-trigger.yml` (a human dispatching it),
+      # `auto-assign-next.yml` (a merged pipeline PR), `handle-failure.yml` (a
+      # run that halted `blocked` or `paused`), and `agentic-chain-on-close.yml`
+      # (this very case — the issue closed with no PR). The close is what this
+      # step's absence hands to that last one; the issue is released (closed,
+      # `done`, `in-progress` dropped) and the chain happens over there.
