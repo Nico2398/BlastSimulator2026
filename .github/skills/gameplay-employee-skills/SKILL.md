@@ -64,30 +64,7 @@ ticksRequired = baseDuration / (proficiency_multiplier * wellbeing_multiplier * 
 
 ## Pending-Action Pool & Ghost Preview
 
-```typescript
-export interface PendingAction {
-  id: number;
-  type: ActionType;
-  status: 'queued' | 'assigned' | 'in_progress';
-  holderId: number | null;  // employee id once claimed, else null
-  requiredSkill: SkillQualification;
-  requiredVehicleRole: VehicleRole | null;  // null = on-foot task
-  targetX: number;
-  targetZ: number;
-  targetY: number;
-  payload: Record<string, unknown>;
-}
-
-export type ActionType =
-  | 'drill_hole'
-  | 'charge_hole'
-  | 'set_sequence'
-  | 'place_building'
-  | 'demolish_building'
-  | 'survey'
-  | 'fragment_debris'
-  | 'haul_debris';
-```
+`src/core/state/GameState.ts` declares `PendingAction`, `PendingActionStatus`, `ActionType` and `GhostPreview`, and is the only authority on their fields and on which action types exist. Read it before queueing or claiming an action — the pool grows a type per feature, so a list written down anywhere else is already short.
 
 A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` (unclaimed, `holderId: null`) → `assigned` (claimed, employee en route) → `in_progress` (employee working it) → exits the pool via completion or cancellation, the two ways an action's lifecycle ends. `claimPendingAction` (`src/core/engine/TaskDispatch.ts`) transitions `status`/`holderId` in place; `completePendingAction` removes the action from the pool on normal completion. `cancelAction` (same file) removes it at any stage — queued, assigned, or in-progress — releases the holder employee (if any) back to idle, and refunds order-time costs via `addIncome`; it refuses engine-owned `rest` actions, which are not player-cancellable. Both completion and cancellation call the shared `clearActiveTaskFields(emp)` helper to reset the employee's active-task state.
 
@@ -125,26 +102,9 @@ Meals auto-scheduled at hunger threshold (default: eat when hunger < 40). Break 
 
 Shows: name, portrait, skill qualifications with proficiency stars, current task, time remaining, task queue (5 entries, reorderable), need meters (Hunger/Fatigue/Social/Comfort), active modifiers with source, salary breakdown, XP progress per qualification.
 
-## TypeScript Reference
+## Types
 
-```typescript
-export interface SkillQualification {
-  category: SkillCategory;
-  proficiencyLevel: 1 | 2 | 3 | 4 | 5;
-  xp: number;
-}
+`src/core/entities/Employee.ts` declares `Employee`, `SkillQualification`, `SkillCategory` and `TrainingState`, and is the only authority on their fields. Read it before writing against an employee — the record carries the whole dispatch state machine (claimed action, pending arrival, rest, movement), not only the fields this spec discusses.
 
-export interface Employee {
-  id: number;
-  name: string;
-  qualifications: SkillQualification[];
-  salaryPerTick: number;
-  taskQueue: number[];  // PendingAction ids, capped at MAX_EMPLOYEE_TASK_QUEUE_DEPTH (active + queued)
-  // Need meters (Ch.7):
-  hunger: number;
-  fatigue: number;
-  breakNeed: number;
-  collapsing: boolean;
-}
-```
+`taskQueue` holds `PendingAction` ids beyond the claimed one, bounded by `MAX_EMPLOYEE_TASK_QUEUE_DEPTH` and executed in cheapest-next order recomputed from the employee's current position — the order is not fixed at enqueue time.
 
