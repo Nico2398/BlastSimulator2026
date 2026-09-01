@@ -163,6 +163,7 @@ export function paintToggleButton(btn: HTMLElement, active: boolean, inactiveBor
   btn.style.borderColor = active ? 'var(--bsx-amber)' : inactiveBorderColor;
   btn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
   btn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
+  btn.setAttribute('aria-pressed', active ? 'true' : 'false');
 }
 
 /** Stat grid (blast report, pre-flight): N equal columns, each a key/value cell. */

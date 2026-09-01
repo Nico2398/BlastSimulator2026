@@ -278,3 +278,22 @@ export function createEvacuateZoneStep(): TutorialStep {
     isComplete: isEvacuationZoneClear,
   };
 }
+
+/**
+ * Whether the survey confidence overlay (#496) is currently toggled on, read
+ * off the Survey panel's own toggle button — the same `aria-pressed` state
+ * `paintToggleButton` (dom.ts) stamps on it.
+ */
+export function isSurveyOverlayToggleOn(): boolean {
+  throw new Error('not implemented');
+}
+
+/**
+ * Helper: create the toggle-survey-overlay tutorial step (#905) — completes
+ * on a single click of the Survey panel's existing overlay toggle button in
+ * either direction, so the state the tutorial leaves it in is the one the
+ * player chose.
+ */
+export function createSurveyOverlayToggleStep(): TutorialStep {
+  throw new Error('not implemented');
+}
