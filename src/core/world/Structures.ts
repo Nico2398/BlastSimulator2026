@@ -375,7 +375,6 @@ export function traceRivers(
   extentHalf: number = DEFAULT_LANDSCAPE_EXTENT_HALF,
 ): RiverPath[] {
   const extent = landscapeExtent(playableRect, extentHalf);
-  const excludeRect = expandRect(playableRect, PLAYABLE_RIVER_MARGIN);
   const heightAt = (x: number, z: number) => sampleBaseHeight(fields, x, z, shapingAt(x, z));
 
   const candidates: Array<{ x: number; z: number; h: number }> = [];
@@ -394,8 +393,9 @@ export function traceRivers(
   const rivers: RiverPath[] = [];
   for (const spring of candidates.slice(0, MAX_SPRINGS)) {
     const traced = traceOneRiver(seed, spring, heightAt, extent);
-    if (traced.points.some(p => insideRect(excludeRect, p.x, p.z))) continue;
-    rivers.push(finalizeRiver(traced, heightAt));
+    const river = finalizeRiver(traced, heightAt);
+    if (riverChannelNearRect(river, playableRect, PLAYABLE_RIVER_MARGIN)) continue;
+    rivers.push(river);
   }
   return rivers;
 }
@@ -464,6 +464,9 @@ export function placeLandmarks(
     const radius = kind === 'mesa'
       ? 60 + 40 * cellRand(seed, rx, rz, LANDMARK_RADIUS_SALT)
       : 50 + 30 * cellRand(seed, rx, rz, LANDMARK_RADIUS_SALT);
+    // final accept/reject, now that radius is known — the coarse candidate
+    // filter above (margin only) is a fast, permissive superset filter.
+    if (pointRectDistance(playableRect, c.x, c.z) < LANDMARK_MIN_DIST_FROM_PLAYABLE + radius) continue;
     const hBase = sampleBaseHeight(fields, c.x, c.z, shapingAt(c.x, c.z));
 
     landmarks.push({
@@ -537,7 +540,6 @@ export function placeVillages(
   extentHalf: number = DEFAULT_LANDSCAPE_EXTENT_HALF,
 ): Village[] {
   const extent = landscapeExtent(playableRect, extentHalf);
-  const excludeRect = expandRect(playableRect, PLAYABLE_VILLAGE_MARGIN);
   const heightAt = (x: number, z: number) => sampleBaseHeight(fields, x, z, shapingAt(x, z));
 
   const candidates: Array<{ x: number; z: number; score: number }> = [];
@@ -548,7 +550,8 @@ export function placeVillages(
       const x = extent.minX + cx * VILLAGE_CELL + cellRand(seed, cx, cz, VILLAGE_JITTER_X_SALT) * VILLAGE_CELL;
       const z = extent.minZ + cz * VILLAGE_CELL + cellRand(seed, cx, cz, VILLAGE_JITTER_Z_SALT) * VILLAGE_CELL;
 
-      if (insideRect(excludeRect, x, z)) continue; // hard reject — the tested invariant
+      // hard reject — the tested invariant; VILLAGE_PAD_RADIUS is the village's own radius (fixed, undrawn at this stage)
+      if (pointRectDistance(playableRect, x, z) < PLAYABLE_VILLAGE_MARGIN + VILLAGE_PAD_RADIUS) continue;
 
       const h = heightAt(x, z);
       if (!(h > 2 && h < 40)) continue;
@@ -712,8 +715,12 @@ export function riverChannelNearRect(
   rect: Rect,
   extra: number,
 ): boolean {
-  void river; void rect; void extra;
-  throw new Error('not implemented'); // TODO: implement
+  for (let i = 0; i < river.points.length - 1; i++) {
+    const p0 = river.points[i]!, p1 = river.points[i + 1]!;
+    const width = Math.max(river.widths[i] ?? 0, river.widths[i + 1] ?? 0);
+    if (segmentRectDistance(p0.x, p0.z, p1.x, p1.z, rect) < width + extra) return true;
+  }
+  return false;
 }
 
 /** Extra metres of standoff around a protected footprint, so a claim never abuts a village wall or riverbank. */
@@ -732,11 +739,7 @@ export function rectTouchesProtectedStructure(structures: ProtectedStructures, r
     if (pointRectDistance(rect, landmark.x, landmark.z) < landmark.radius + PROTECTED_MARGIN) return true;
   }
   for (const river of structures.rivers) {
-    for (let i = 0; i < river.points.length - 1; i++) {
-      const p0 = river.points[i]!, p1 = river.points[i + 1]!;
-      const width = Math.max(river.widths[i] ?? 0, river.widths[i + 1] ?? 0);
-      if (segmentRectDistance(p0.x, p0.z, p1.x, p1.z, rect) < width + PROTECTED_MARGIN) return true;
-    }
+    if (riverChannelNearRect(river, rect, PROTECTED_MARGIN)) return true;
   }
   return false;
 }
