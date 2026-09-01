@@ -96,10 +96,10 @@ export interface StructureSet {
 /** Half-extent (metres) of the landscape search/build area around the playable rect's centre (A16). */
 const DEFAULT_LANDSCAPE_EXTENT_HALF = 1600;
 
-const PLAYABLE_RIVER_MARGIN = 32;
-const PLAYABLE_VILLAGE_MARGIN = 100;
+export const PLAYABLE_RIVER_MARGIN = 32;
+export const PLAYABLE_VILLAGE_MARGIN = 100;
 const PLAYABLE_FOREST_MARGIN = 8;
-const LANDMARK_MIN_DIST_FROM_PLAYABLE = 400;
+export const LANDMARK_MIN_DIST_FROM_PLAYABLE = 400;
 const LANDMARK_MIN_SEPARATION = 500;
 
 const SPRING_CELL = 400;
@@ -698,6 +698,22 @@ function segmentRectDistance(
     if (d < best) best = d;
   }
   return best;
+}
+
+/**
+ * True when any segment of `river`'s carved channel — width linearly
+ * interpolated per segment, conservatively bounded by the larger of its
+ * two endpoint widths — comes within `extra` metres of `rect`. Exact
+ * per-segment closest-approach (not a sample-point test), so it cannot
+ * miss a channel dipping toward `rect` between two traced points (#913).
+ */
+export function riverChannelNearRect(
+  river: Pick<RiverPath, 'points' | 'widths'>,
+  rect: Rect,
+  extra: number,
+): boolean {
+  void river; void rect; void extra;
+  throw new Error('not implemented'); // TODO: implement
 }
 
 /** Extra metres of standoff around a protected footprint, so a claim never abuts a village wall or riverbank. */
