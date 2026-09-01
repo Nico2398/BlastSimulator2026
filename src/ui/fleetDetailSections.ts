@@ -73,6 +73,16 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   return row;
 }
 
+/** Shared shell for the drive-icon + single-line-label rows below: driver, pending driver, unmanned. */
+function makeDriveIconRow(label: string, color: string): HTMLElement {
+  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
+  wrap.append(
+    iconEl('drive', 12, 0.6),
+    el('span', { text: label, attrs: { style: `font:500 10px/1 var(--bsx-font-ui);color:${color}` } }),
+  );
+  return wrap;
+}
+
 /**
  * Driver row when a vehicle already has one. Player-facing driver assignment
  * is gone (#921) — a vehicle's driver is now claimed automatically by
@@ -80,13 +90,8 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
  * anymore.
  */
 export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
-  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
   const driver = state.employees.employees.find(e => e.id === v.driverId);
-  wrap.append(
-    iconEl('drive', 12, 0.6),
-    el('span', { text: driver?.name ?? `#${v.driverId}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
-  );
-  return wrap;
+  return makeDriveIconRow(driver?.name ?? `#${v.driverId}`, 'var(--bsx-text-secondary)');
 }
 
 /**
@@ -98,12 +103,7 @@ export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
  * walk has no console command today, only display.
  */
 export function makePendingDriverRow(employee: Employee): HTMLElement {
-  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
-  wrap.append(
-    iconEl('drive', 12, 0.6),
-    el('span', { text: t('ui.fleet.walking_to_board', { name: employee.name }), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-  );
-  return wrap;
+  return makeDriveIconRow(t('ui.fleet.walking_to_board', { name: employee.name }), 'var(--bsx-text-micro)');
 }
 
 /**
@@ -133,10 +133,5 @@ export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => 
     return warn;
   }
 
-  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
-  wrap.append(
-    iconEl('drive', 12, 0.6),
-    el('span', { text: t('ui.fleet.unmanned'), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-  );
-  return wrap;
+  return makeDriveIconRow(t('ui.fleet.unmanned'), 'var(--bsx-text-micro)');
 }
