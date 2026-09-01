@@ -728,7 +728,7 @@ describe('TutorialOverlay (12.4)', () => {
 
       expect(titleEl.textContent).toBe('Vitesse de Jeu');
       expect(textEl.textContent).toBe(
-        "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre supérieure !",
+        "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre du haut !",
       );
     });
 
