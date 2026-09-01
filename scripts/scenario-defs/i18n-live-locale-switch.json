@@ -226,7 +226,7 @@
     },
     {
       "command": "tutorial_start",
-      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out.",
+      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out. #904: the tutorial now opens on hire-surveyor instead of time-speed (see tutorialSteps.ts), so this waits for that step and checks its own French title instead.",
       "interaction": [
         {
           "type": "command",
@@ -238,13 +238,13 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "hire-surveyor"
         },
         {
           "type": "assert",
           "selector": ".bs-tutorial-box .bs-panel-title",
           "property": "textContent",
-          "expectedValue": "Vitesse de Jeu"
+          "expectedValue": "Embaucher Prospecteur"
         },
         {
           "type": "assert",
@@ -266,8 +266,37 @@
       "role": "setup"
     },
     {
+      "command": "employee hire role:surveyor",
+      "description": "#904: hire-surveyor is now the tutorial's opening step, completable immediately (no ticks required). Open the Crew panel — a second panel, open at the same time as the tutorial card — and hire through its own Hire button. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch. Advances the coach card to the time-speed step, whose title is asserted in French.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "time-speed"
+        },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-box .bs-panel-title",
+          "property": "textContent",
+          "expectedValue": "Vitesse de Jeu"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "time speed:2",
-      "description": "Advance past the time-speed step (its own target, always reachable) so the Crew panel — the hire-surveyor step's rails target — becomes clickable, proving a panel can be opened mid-tutorial while the locale switch made earlier is still in effect.",
+      "description": "Advance past the time-speed step (its own target, always reachable) so the tutorial reaches survey — its first genuine wait — proving the locale switch made earlier is still in effect this late into the tutorial. No title assertion needed past this point (the file's own locale-regression purpose is already proven by the two coach-card titles and the Crew panel above); confirming the wait itself succeeds is enough.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -275,20 +304,14 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "hire-surveyor"
-        },
-        {
-          "type": "assert",
-          "selector": ".bs-tutorial-box .bs-panel-title",
-          "property": "textContent",
-          "expectedValue": "Embaucher Prospecteur"
+          "stepId": "survey"
         }
       ],
       "role": "player"
     },
     {
       "command": "state full",
-      "description": "Open the Crew panel — a second panel, open at the same time as the tutorial card. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch.",
+      "description": "Reopen the Crew panel once more, later in the tutorial (at the survey step) — an independent, later check that a panel opened at this point still reads French, distinct from the hire-time check above which happened at the tutorial's very first step. The surveyor already hired above, so this only re-toggles the toolbar panel and re-asserts its presence; toolbar panels auto-close on the mutual-exclusion rule when another opens, so this click's job is confirming the panel still renders (usable, not torn down) this late, not re-proving the hire.",
       "interaction": [
         {
           "type": "clickSelector",
