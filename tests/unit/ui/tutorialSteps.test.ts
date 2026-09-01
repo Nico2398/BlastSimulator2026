@@ -88,8 +88,12 @@ describe('tutorialSteps', () => {
   // ── 11 ───────────────────────────────────────────────────────────────────
   it('step IDs follow the issue-specified sequence', () => {
     const expectedIds: string[] = [
-      'time-speed',
+      // #904: time-speed moved from index 0 to right before the first step
+      // the player has to wait on (survey, waitsOnWork:true) — hire-surveyor
+      // is now first, since it completes on the hire alone and does not
+      // need the clock running.
       'hire-surveyor',
+      'time-speed',
       'survey',
       'hire-driller',
       'build-living-quarters',
@@ -131,6 +135,37 @@ describe('tutorialSteps', () => {
     ];
     const actualIds = TUTORIAL_STEPS.map(s => s.id);
     expect(actualIds).toEqual(expectedIds);
+  });
+
+  // ── #904: time-speed suggested at the first wait, not as the opening step ─
+  describe('time-speed lesson sits at the first wait, not at the tutorial opening (#904)', () => {
+    it('opens on hire-surveyor, not time-speed', () => {
+      expect(TUTORIAL_STEPS[0]!.id).toBe('hire-surveyor');
+    });
+
+    it('time-speed is the second step', () => {
+      expect(TUTORIAL_STEPS[1]!.id).toBe('time-speed');
+    });
+
+    it('no step earlier than immediately before the first waitsOnWork step is time-speed', () => {
+      // General invariant, not hardcoded to an index: whatever the first
+      // genuinely-waited-on step is, time-speed may sit immediately before
+      // it (the approved position) but nothing earlier than that.
+      const firstWaitIdx = TUTORIAL_STEPS.findIndex((s) => s.waitsOnWork === true);
+      expect(firstWaitIdx).toBeGreaterThan(-1);
+      for (let i = 0; i < firstWaitIdx - 1; i++) {
+        expect(TUTORIAL_STEPS[i]!.id, `step at index ${i} is time-speed, more than one step before the first wait (index ${firstWaitIdx})`).not.toBe('time-speed');
+      }
+    });
+
+    it("time-speed's index sits at, or immediately before, the first waitsOnWork step's index", () => {
+      const firstWaitIdx = TUTORIAL_STEPS.findIndex((s) => s.waitsOnWork === true);
+      const timeSpeedIdx = TUTORIAL_STEPS.findIndex((s) => s.id === 'time-speed');
+      expect(firstWaitIdx).toBeGreaterThan(-1);
+      expect(timeSpeedIdx).toBeGreaterThan(-1);
+      expect(timeSpeedIdx).toBeLessThanOrEqual(firstWaitIdx);
+      expect(firstWaitIdx - timeSpeedIdx).toBeLessThanOrEqual(1);
+    });
   });
 
   // ── 12 ───────────────────────────────────────────────────────────────────
@@ -335,12 +370,13 @@ describe('tutorialSteps', () => {
   });
 
   // ── 16 ───────────────────────────────────────────────────────────────────
-  it('step 0 (time-speed) only completes on a genuine speed increase', () => {
-    const step0 = TUTORIAL_STEPS[0]!;
-    const snap = step0.captureSnapshot!({ timeScale: 1 } as GameState);
+  it('time-speed only completes on a genuine speed increase', () => {
+    // Looked up by id, not index (#904 reorder moves time-speed off index 0).
+    const timeSpeedStep = TUTORIAL_STEPS.find((s) => s.id === 'time-speed')!;
+    const snap = timeSpeedStep.captureSnapshot!({ timeScale: 1 } as GameState);
     // Same speed as when the step opened — the player has not acted yet.
-    expect(step0.isComplete({ timeScale: 1 } as GameState, snap)).toBe(false);
-    expect(step0.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
+    expect(timeSpeedStep.isComplete({ timeScale: 1 } as GameState, snap)).toBe(false);
+    expect(timeSpeedStep.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
   });
 
   // ── 17 ───────────────────────────────────────────────────────────────────

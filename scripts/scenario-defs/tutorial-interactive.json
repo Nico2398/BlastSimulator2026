@@ -35,7 +35,7 @@
     {
       "command": "tutorial_start",
       "timeout": 30,
-      "description": "Step time-speed: coach mark docked bottom-centre, speed button glowing, mine still visible",
+      "description": "#904: opening step is hire-surveyor, not time-speed — suggesting a faster clock made no sense as the very first card, with an empty site and nothing queued a faster clock would deliver sooner. Coach mark docked bottom-centre, Crew toolbar button glowing, mine still visible.",
       "role": "setup",
       "interaction": [
         {
@@ -48,11 +48,11 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "hire-surveyor"
         }
       ],
       "expect": {
-        "tutorialStep": "time-speed"
+        "tutorialStep": "hire-surveyor"
       }
     },
     {
@@ -66,29 +66,6 @@
           "command": "time resume"
         }
       ]
-    },
-    {
-      "command": "time speed:2",
-      "timeout": 30,
-      "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Hire Surveyor",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "hire-surveyor"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "hire-surveyor"
-      }
     },
     {
       "command": "state",
@@ -109,7 +86,7 @@
     {
       "command": "employee hire role:surveyor",
       "timeout": 30,
-      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site",
+      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site. #904: card advances to time-speed next, not survey.",
       "role": "player",
       "interaction": [
         {
@@ -118,16 +95,39 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "survey"
+          "stepId": "time-speed"
         }
       ],
       "expect": {
-        "tutorialStep": "survey",
+        "tutorialStep": "time-speed",
         "increased": [
           "employeeCount"
         ],
         "blocked": ".bs-return-map",
         "note": "The tutorial is on rails: leaving for the world map mid-step is how a player loses it, so that button must be inert while the tutorial is up (mirrors tutorial.json's hire-surveyor beat)."
+      }
+    },
+    {
+      "command": "time speed:2",
+      "timeout": 30,
+      "description": "#904: time-speed moved to sit right before the first step the player has to wait on (survey) instead of opening the tutorial. Real click on the speed button cycles 1x to 2x, card advances to Survey.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "survey"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey"
       }
     },
     {
