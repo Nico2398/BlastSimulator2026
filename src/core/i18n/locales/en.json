@@ -3001,6 +3001,7 @@
   "tutorial.stage.grid_tool": "Press Grid Tool to lay out drill holes.",
   "tutorial.stage.drill_area": "Click anywhere inside the blue square outlined in the scene. The grid snaps to it.",
   "tutorial.stage.charge_all": "Press Charge All Holes.",
+  "tutorial.stage.open_sequence_tab": "Click the 3 Sequence tab in the Blast panel.",
   "tutorial.stage.auto_sequence": "Press Auto Sequence to set the detonation delays.",
   "tutorial.stage.sound_horn": "Sound the horn and clear the blast zone before firing.",
   "tutorial.stage.execute": "Press BLAST!",

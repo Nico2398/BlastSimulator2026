@@ -514,3 +514,80 @@ describe('train-digger (#903): a booked course must not deadlock the tutorial cl
     expect(TUTORIAL_STEPS[idx + 1]!.id).toBe('buy-rock-digger-assign');
   });
 });
+
+// ── charge → sequence (#926): the step and the panel must never disagree ──
+//
+// BlastWorkshop.ts's suggestStep (not exported — its Charge-tab condition is
+// mirrored below as `stillOnChargeTab`) keeps the Blast Workshop on its
+// Charge tab for as long as any hole is still unlit. The 'charge' tutorial
+// step used to complete the instant the FIRST of several holes charged
+// (createComparisonStep's generic "value increased"), moving the tutorial on
+// to 'sequence' while the panel — correctly reading the plan as still
+// mid-charge — stayed on Charge. The Sequence tab's own controls live in a
+// hidden tab body at that point, so the rail had nothing reachable to point
+// at: a real dead end (issue #926). This test drains a real multi-hole
+// charge order through the real engine and pins the step's completion
+// against the panel's own criterion at every tick in between.
+function stillOnChargeTab(state: GameState): boolean {
+  const holes = state.drillHoles;
+  return !holes.every(h => state.chargesByHole[h.id]);
+}
+
+describe('charge (#926): completion never runs ahead of the panel\'s own Charge tab', () => {
+  it('stays incomplete on every partially-charged tick, and completes exactly when the panel would also move on', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
+    for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      run('tick 1');
+    }
+    const holeCount = ctx.state!.drillHoles.length;
+    expect(holeCount).toBeGreaterThan(1);
+
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+
+    const step = TUTORIAL_STEPS.find(s => s.id === 'charge')!;
+    let sawPartialCharge = false;
+
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      run('tick 1');
+
+      const chargedCount = Object.keys(ctx.state!.chargesByHole).length;
+      if (chargedCount > 0 && chargedCount < holeCount) {
+        sawPartialCharge = true;
+        // The regression itself: a plain "value increased" comparison would
+        // already report done here, while the panel still correctly wants
+        // to stay on Charge.
+        expect(stillOnChargeTab(ctx.state!)).toBe(true);
+        expect(step.isComplete(ctx.state!, {})).toBe(false);
+      }
+    }
+    expect(sawPartialCharge, 'the drain loop never observed a partially-charged plan — this test would not have caught the regression').toBe(true);
+    expect(Object.keys(ctx.state!.plannedChargesByHole).length).toBe(0);
+
+    // Fully charged: the step and the panel now agree it is time to move on.
+    expect(stillOnChargeTab(ctx.state!)).toBe(false);
+    expect(step.isComplete(ctx.state!, {})).toBe(true);
+
+    // The run continues cleanly through sequence and blast.
+    const sequenceStep = TUTORIAL_STEPS.find(s => s.id === 'sequence')!;
+    const sequenceSnapshot = sequenceStep.captureSnapshot!(ctx.state!);
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+    expect(sequenceStep.isComplete(ctx.state!, sequenceSnapshot)).toBe(true);
+
+    const blastResult = run('blast');
+    expect(blastResult.success, blastResult.output).toBe(true);
+  });
+});

@@ -1,14 +1,16 @@
+// @vitest-environment jsdom
 // BlastSimulator2026 — Tutorial stage table
 //
 // A stage selector that matches nothing strands the player: the guide blocks
 // every control and highlights none, with no way forward and no Skip button to
 // escape with. These tests are the guard against that.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
@@ -217,6 +219,102 @@ describe('toggle-survey-overlay stage fallback (#905)', () => {
     const stages = stagesFor('toggle-survey-overlay', TARGET);
     expect(stages).toHaveLength(1);
     expect(stages[0]!.target).toBe(TARGET);
+  });
+});
+
+describe('sequence stage list — Charge-tab reachability regression (#926)', () => {
+  // Mirrors BlastWorkshop.ts's real DOM shape: a toolbar button that opens
+  // the panel, a `#bs-blast-panel` root holding a tab strip (`[data-step]`,
+  // always on screen regardless of which tab is active) and one body per
+  // step (display:none unless its own tab is the active one).
+  function withBox(el: HTMLElement): HTMLElement {
+    el.getBoundingClientRect = () => ({
+      width: 40, height: 20, top: 0, left: 0, right: 40, bottom: 20, x: 0, y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+    return el;
+  }
+
+  function makeButton(attrs: Record<string, string>, parent: HTMLElement): HTMLButtonElement {
+    const btn = document.createElement('button');
+    for (const [k, v] of Object.entries(attrs)) btn.setAttribute(k, v);
+    parent.appendChild(btn);
+    withBox(btn);
+    return btn;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('resolves to a reachable control while the workshop is showing the Charge tab, not the already-open toolbar hint', () => {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    makeButton({ 'data-panel': 'blast' }, toolbar);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    document.body.appendChild(panel);
+    const strip = document.createElement('div');
+    panel.appendChild(strip);
+    makeButton({ 'data-step': '2' }, strip);
+    makeButton({ 'data-step': '3' }, strip);
+
+    // Charge tab body: visible (the crew is still mid-charge, so the panel's
+    // own auto-advance correctly keeps it on screen).
+    const chargeBody = document.createElement('div');
+    chargeBody.style.display = '';
+    panel.appendChild(chargeBody);
+    makeButton({ 'data-action': 'charge-all' }, chargeBody);
+
+    // Sequence tab body: hidden — its own auto-sequence button is not on
+    // screen yet.
+    const sequenceBody = document.createElement('div');
+    sequenceBody.style.display = 'none';
+    panel.appendChild(sequenceBody);
+    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
+
+    const stages = TUTORIAL_STAGES['sequence']!;
+    const index = resolveStageIndex(stages);
+    const resolved = stages[index]!;
+
+    expect(
+      resolved.target,
+      'sequence rail fell back to the already-satisfied "open the Blast panel" hint, ' +
+      'with no reachable control to click',
+    ).not.toBe(stages[0]!.target);
+    expect(isReachable(resolved.target)).toBe(true);
+  });
+
+  it('resolves to Auto Sequence once the panel actually shows the Sequence tab', () => {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    makeButton({ 'data-panel': 'blast' }, toolbar);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    document.body.appendChild(panel);
+    const strip = document.createElement('div');
+    panel.appendChild(strip);
+    makeButton({ 'data-step': '2' }, strip);
+    makeButton({ 'data-step': '3' }, strip);
+
+    const chargeBody = document.createElement('div');
+    chargeBody.style.display = 'none';
+    panel.appendChild(chargeBody);
+    makeButton({ 'data-action': 'charge-all' }, chargeBody);
+
+    const sequenceBody = document.createElement('div');
+    sequenceBody.style.display = '';
+    panel.appendChild(sequenceBody);
+    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
+
+    const stages = TUTORIAL_STAGES['sequence']!;
+    const index = resolveStageIndex(stages);
+    expect(stages[index]!.target).toBe('#bs-blast-panel [data-action="auto-sequence"]');
+    expect(isReachable(stages[index]!.target)).toBe(true);
   });
 });
 

@@ -3001,6 +3001,7 @@
   "tutorial.stage.grid_tool": "Appuyez sur Outil Grille pour disposer les trous de forage.",
   "tutorial.stage.drill_area": "Cliquez n’importe où dans le carré bleu entouré dans la scène. La grille s’y aligne.",
   "tutorial.stage.charge_all": "Appuyez sur Charger tous les trous.",
+  "tutorial.stage.open_sequence_tab": "Cliquez sur l'onglet 3 Séquence dans le panneau Tir.",
   "tutorial.stage.auto_sequence": "Appuyez sur Séquence auto pour régler les retards de détonation.",
   "tutorial.stage.sound_horn": "Sonnez la corne et évacuez la zone de tir avant de tirer.",
   "tutorial.stage.execute": "Appuyez sur TIR !",
