@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
+import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 
 // ---------- Config ----------
 
@@ -23,6 +24,9 @@ const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
 interface Bar {
   group: THREE.Group;
   fillMesh: THREE.Mesh;
+  tween: FillTween;
+  easedFraction: number;
+  targetFraction: number;
 }
 
 // ---------- Main class ----------
@@ -101,6 +105,7 @@ export class TaskProgressBar {
         anchor.add(bar.group);
       }
 
+      bar.targetFraction = fraction;
       bar.fillMesh.scale.x = fraction;
     }
 
@@ -111,7 +116,12 @@ export class TaskProgressBar {
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
-  update(_dt: number): void {
+  update(dt: number): void {
+    void dt; void stepFillTween;
+    // TODO: implement in green phase — call stepFillTween(bar.tween,
+    // bar.easedFraction, bar.targetFraction, dt) per bar and write the
+    // result into bar.easedFraction / bar.fillMesh.scale.x instead of the
+    // direct assignment currently done in sync().
     for (const { group } of this.bars.values()) {
       group.quaternion.copy(this.camera.quaternion);
     }
@@ -150,7 +160,7 @@ export class TaskProgressBar {
     fillMesh.scale.x = 0;
     group.add(fillMesh);
 
-    return { group, fillMesh };
+    return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
   }
 
   private removeBar(id: number): void {
