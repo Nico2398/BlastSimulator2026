@@ -147,11 +147,16 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // and `.bs-vehicle-haul-btn` never renders for it — no control exists to
   // click, not merely one that's disabled.
   'vehicle haul 1 fragment:0',
-  // vehicle-driver-assignment-visual.json: vehicle #1 already has a driver
-  // (FleetPanel shows only Unassign, not the assign picker), and even that
-  // picker would never list employee #2 (a blaster has no driving.truck
-  // licence) — genuinely unreachable by a click.
-  'vehicle driver 1 2',
+  // Post-#921, the Fleet panel's Assign/Unassign controls were removed
+  // entirely (vehicles are claimed automatically now); `vehicle driver` has
+  // no UI equivalent left and none is coming back, so every scenario step
+  // that still needs to pin a specific employee/vehicle pairing (rather
+  // than rely on non-deterministic auto-claim ordering when multiple
+  // qualified candidates exist) runs it as bootstrap. Prefix-matched
+  // (`matchesBootstrapEntry`), same as `corrupt` above, so this one entry
+  // covers every `vehicle driver <vehicleId> <employeeId>` command in the
+  // suite.
+  'vehicle driver',
   // vehicle-task-states-visual.json: `vehicle assign <id> task:<task>`
   // writes the VehicleTask enum directly, skipping the drive/load/unload
   // sequence ArrivalGate drives — a test-only state poke alongside
