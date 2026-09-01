@@ -712,7 +712,12 @@ describe('TutorialOverlay (12.4)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       const state = createMockState();
-      tut.start(state); // step 0 ('tutorial.step1.title' / 'tutorial.step1'), rendered in EN
+      tut.start(state);
+      // Step 0 is 'hire-surveyor' (#904 reorder); advance to step 1
+      // ('time-speed', 'tutorial.step1.title' / 'tutorial.step1'), rendered
+      // in EN, to exercise the same locale-re-application behaviour this
+      // test has always targeted.
+      (tut as unknown as { advanceToNextStep(): void }).advanceToNextStep();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
@@ -723,7 +728,7 @@ describe('TutorialOverlay (12.4)', () => {
 
       expect(titleEl.textContent).toBe('Vitesse de Jeu');
       expect(textEl.textContent).toBe(
-        'Utilisez les contrôles de vitesse sur la gauche de la barre du haut pour accélérer le jeu. Essayez la vitesse 2× ou 4× !',
+        "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre supérieure !",
       );
     });
 
