@@ -17,6 +17,7 @@ import {
   DEFAULT_TICK_BUDGET,
   WORK_GRACE_TICKS,
 } from '../../../src/ui/tutorialGuide.js';
+import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
 import type { ClockProgress } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
