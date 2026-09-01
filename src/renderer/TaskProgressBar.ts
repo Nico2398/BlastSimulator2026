@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
+import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 
 // ---------- Config ----------
 
@@ -23,6 +24,9 @@ const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
 interface Bar {
   group: THREE.Group;
   fillMesh: THREE.Mesh;
+  tween: FillTween;
+  easedFraction: number;
+  targetFraction: number;
 }
 
 // ---------- Main class ----------
@@ -94,14 +98,26 @@ export class TaskProgressBar {
 
       let bar = this.bars.get(employee.id);
       if (!bar) {
+        // First appearance — snap immediately, no easing-in from zero.
         bar = this.createBar();
+        bar.tween = createFillTween(fraction);
+        bar.easedFraction = fraction;
+        bar.targetFraction = fraction;
+        bar.fillMesh.scale.x = fraction;
         this.bars.set(employee.id, bar);
+      } else {
+        // Existing bar: only retarget here. dt=0 makes this a no-op for a
+        // forward retarget (actual easing happens per-frame in update()) but
+        // still snaps immediately for a backward retarget (task changed,
+        // cancelled, or re-dispatched) — stepFillTween's backward branch
+        // ignores dt, so this doesn't have to wait for the next update().
+        bar.targetFraction = fraction;
+        bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
+        bar.fillMesh.scale.x = bar.easedFraction;
       }
       if (bar.group.parent !== anchor) {
         anchor.add(bar.group);
       }
-
-      bar.fillMesh.scale.x = fraction;
     }
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).
@@ -111,9 +127,11 @@ export class TaskProgressBar {
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
-  update(_dt: number): void {
-    for (const { group } of this.bars.values()) {
-      group.quaternion.copy(this.camera.quaternion);
+  update(dt: number): void {
+    for (const bar of this.bars.values()) {
+      bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
+      bar.fillMesh.scale.x = bar.easedFraction;
+      bar.group.quaternion.copy(this.camera.quaternion);
     }
   }
 
@@ -150,7 +168,7 @@ export class TaskProgressBar {
     fillMesh.scale.x = 0;
     group.add(fillMesh);
 
-    return { group, fillMesh };
+    return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
   }
 
   private removeBar(id: number): void {

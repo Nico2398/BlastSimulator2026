@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { TaskProgressBar } from '../../../src/renderer/TaskProgressBar.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -264,5 +265,101 @@ describe('TaskProgressBar', () => {
     expect(anchorA.children.length).toBe(0);
     expect(anchorB.children.length).toBe(0);
     bar.dispose();
+  });
+
+  describe('fill easing between ticks (#906)', () => {
+    // activeTaskTotalTicks: 100 throughout — makes taskProgressFraction
+    // (1 - ticksRemaining / totalTicks) land on round fractions.
+    function empAtFraction(id: number, fraction: number): Employee {
+      const ticksRemaining = Math.round((1 - fraction) * 100);
+      return makeEmployee({ id, taskTicksRemaining: ticksRemaining, activeTaskTotalTicks: 100 });
+    }
+
+    it('two forward sync() retargets followed by a small update(dt) ease strictly between the old and new fraction', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      bar.update(MOVE_TWEEN_DURATION_S / 2);
+
+      const fillX = findFillMesh(anchor).scale.x;
+      expect(fillX).toBeGreaterThan(0.2);
+      expect(fillX).toBeLessThan(0.6);
+      bar.dispose();
+    });
+
+    it('repeated update() calls with no intervening sync() leave the fill unchanged once converged', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.update(MOVE_TWEEN_DURATION_S); // fully converge to 0.6
+
+      const convergedX = findFillMesh(anchor).scale.x;
+      expect(convergedX).toBeCloseTo(0.6, 5);
+
+      bar.update(0.016);
+      bar.update(0.016);
+      bar.update(0.016);
+
+      expect(findFillMesh(anchor).scale.x).toBe(convergedX);
+      bar.dispose();
+    });
+
+    it('a sync() retarget lower than the current eased fraction (task changed/re-dispatched) snaps immediately, with no update() call needed', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      // First appearance snaps straight to 0.9 (bar creation — unaffected by #906).
+      bar.sync([empAtFraction(1, 0.9)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.9, 5);
+
+      // Task changed underneath the employee — new target is lower.
+      bar.sync([empAtFraction(1, 0.05)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.05, 5);
+      bar.dispose();
+    });
+
+    it('update(0) produces no change in the fill', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      const beforeX = findFillMesh(anchor).scale.x;
+
+      bar.update(0);
+
+      expect(findFillMesh(anchor).scale.x).toBe(beforeX);
+      bar.dispose();
+    });
+
+    it('a very large dt passed to update() converges the fill to exactly the target fraction, with no overshoot', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      bar.update(10);
+
+      const fillX = findFillMesh(anchor).scale.x;
+      expect(fillX).toBeCloseTo(0.6, 5);
+      expect(fillX).toBeLessThanOrEqual(0.6 + 1e-9);
+      bar.dispose();
+    });
   });
 });
