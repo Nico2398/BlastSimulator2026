@@ -98,15 +98,26 @@ export class TaskProgressBar {
 
       let bar = this.bars.get(employee.id);
       if (!bar) {
+        // First appearance — snap immediately, no easing-in from zero.
         bar = this.createBar();
+        bar.tween = createFillTween(fraction);
+        bar.easedFraction = fraction;
+        bar.targetFraction = fraction;
+        bar.fillMesh.scale.x = fraction;
         this.bars.set(employee.id, bar);
+      } else {
+        // Existing bar: only retarget here. dt=0 makes this a no-op for a
+        // forward retarget (actual easing happens per-frame in update()) but
+        // still snaps immediately for a backward retarget (task changed,
+        // cancelled, or re-dispatched) — stepFillTween's backward branch
+        // ignores dt, so this doesn't have to wait for the next update().
+        bar.targetFraction = fraction;
+        bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
+        bar.fillMesh.scale.x = bar.easedFraction;
       }
       if (bar.group.parent !== anchor) {
         anchor.add(bar.group);
       }
-
-      bar.targetFraction = fraction;
-      bar.fillMesh.scale.x = fraction;
     }
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).
@@ -117,13 +128,10 @@ export class TaskProgressBar {
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
   update(dt: number): void {
-    void dt; void stepFillTween;
-    // TODO: implement in green phase — call stepFillTween(bar.tween,
-    // bar.easedFraction, bar.targetFraction, dt) per bar and write the
-    // result into bar.easedFraction / bar.fillMesh.scale.x instead of the
-    // direct assignment currently done in sync().
-    for (const { group } of this.bars.values()) {
-      group.quaternion.copy(this.camera.quaternion);
+    for (const bar of this.bars.values()) {
+      bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
+      bar.fillMesh.scale.x = bar.easedFraction;
+      bar.group.quaternion.copy(this.camera.quaternion);
     }
   }
 

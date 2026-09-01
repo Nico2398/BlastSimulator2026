@@ -4,9 +4,8 @@
 // (a task progress bar's fill fraction) instead of an (x, z) position.
 // No THREE import — same pure-logic-out-of-mesh-class seam.
 
-// Green phase: reuse `smoothstep` from '../core/math/Smoothstep.js' and the
-// `MOVE_TWEEN_DURATION_S` constant from './MovementInterpolation.js' for the
-// eased-duration math below — do not redefine either.
+import { smoothstep } from '../core/math/Smoothstep.js';
+import { MOVE_TWEEN_DURATION_S } from './MovementInterpolation.js';
 
 export interface FillTween {
   prevFraction: number;
@@ -38,7 +37,37 @@ export function stepFillTween(
   targetFraction: number,
   dt: number,
 ): number {
-  void tween; void renderFraction; void targetFraction; void dt;
-  // TODO: implement in green phase
-  throw new Error('not implemented');
+  // Backward retarget — the underlying task changed (fresh task, cancelled,
+  // re-dispatched). Snap instantly instead of easing backward, regardless of
+  // dt (even dt === 0 — e.g. a sync() call ahead of the next update() frame).
+  if (targetFraction < renderFraction - FILL_SNAP_BACKWARD_EPSILON) {
+    tween.prevFraction = targetFraction;
+    tween.targetFraction = targetFraction;
+    tween.elapsedS = MOVE_TWEEN_DURATION_S;
+    return targetFraction;
+  }
+
+  // Forward retarget: target changed since the last step (or this is the
+  // first step toward it) — re-tween from the currently rendered fraction,
+  // not the tween's stale prev/target, so a mid-ease retarget doesn't pop.
+  if (targetFraction !== tween.targetFraction) {
+    tween.prevFraction = renderFraction;
+    tween.targetFraction = targetFraction;
+    tween.elapsedS = 0;
+  }
+
+  if (dt === 0) return renderFraction;
+
+  tween.elapsedS += dt;
+
+  // Converged (or a large dt jumped past the duration) — return the target
+  // exactly rather than relying on smoothstep(1)'s arithmetic to cancel out.
+  if (tween.elapsedS >= MOVE_TWEEN_DURATION_S) {
+    tween.elapsedS = MOVE_TWEEN_DURATION_S;
+    tween.prevFraction = targetFraction;
+    return targetFraction;
+  }
+
+  const ease = smoothstep(0, MOVE_TWEEN_DURATION_S, tween.elapsedS);
+  return tween.prevFraction + (tween.targetFraction - tween.prevFraction) * ease;
 }
