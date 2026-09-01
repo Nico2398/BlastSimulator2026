@@ -1152,7 +1152,6 @@
           "command": "vehicle driver 7 8"
         }
       ],
-      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "role": "bootstrap",
       "expect": {
         "changedBy": {
@@ -1166,7 +1165,7 @@
           "surveyCount": 3
         }
       },
-      "description": "#553: Frank Dusty (employee #8) boards this file's own drill_rig (vehicle #7, bought above) -- the 2nd concurrent driller/drill_rig pair, alongside the free staffed rig (vehicle #1, driven by employee #1) crewed at the top of this file."
+      "description": "#553: Frank Dusty (employee #8) boards this file's own drill_rig (vehicle #7, bought above) -- the 2nd concurrent driller/drill_rig pair, alongside the free staffed rig (vehicle #1, driven by employee #1) crewed at the top of this file. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click."
     },
     {
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:25,25",

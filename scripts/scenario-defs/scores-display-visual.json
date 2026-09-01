@@ -169,7 +169,7 @@
     },
     {
       "command": "vehicle driver 2 2",
-      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above.",
+      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
           "type": "command",
