@@ -22,20 +22,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: staffed:true does NOT auto-assign a driver -- the free drill_rig (vehicle #1) is still a mesh nobody can drive until employee #1, the only qualified driller on the roster at this point, boards it. The assign row's <select> defaults to its only eligible option (employee #1 is the sole driving.drill_rig holder here), so the plain assign click resolves to them without needing to pick an option.",
-      "role": "player",
+      "description": "#553: staffed:true does NOT auto-assign a driver -- the free drill_rig (vehicle #1) is still a mesh nobody can drive until employee #1, the only qualified driller on the roster at this point, boards it. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0

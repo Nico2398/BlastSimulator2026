@@ -158,43 +158,25 @@
     },
     {
       "command": "vehicle driver 1 1",
-      "description": "#601-followup: `makeAssignRow` (fleetDetailSections.ts) renders a `<select>` of every not-yet-`driverId`-bound qualified employee, defaulting to whichever sorts first, with `.bs-vehicle-assign-btn` submitting whatever the select currently holds -- an explicit `set` on the select (rather than relying on the picker's own default option) is what actually pins the driver, since `driverId` isn't set until the walk-to-board completes, so a second click issued before the first driver has physically boarded still sees the first driller as an eligible, first-sorted default (sandbox-confirmed: without the `set` below, vehicle #2's assign click silently reassigned driller #1 again -- \"Employee already walking to board a vehicle\" -- leaving vehicle #2 permanently driverless). Does NOT re-click the vehicles toolbar tab: the panel is already open, left there by the preceding `vehicle buy drill_rig` purchase -- the `employee assign_skill` bootstrap step in between uses `command` type, not a click, so panel state is unchanged.",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] select",
-          "value": "1"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "vehicle driver 2 2",
       "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] select",
-          "value": "2"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 2 2"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "build management_office at:5,5",

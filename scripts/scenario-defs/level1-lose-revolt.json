@@ -22,25 +22,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] select",
-          "value": "1"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: crews the free rig so it's actually usable. #591: previously this was the single decision that doomed this file -- vehicle #1's shortest path from its (0,2) spawn to the first drill_plan's origin (5,5) stepped onto (2,2), permanently occupied by the staffed debris_hauler (vehicle #2, no driver, never moves), and EntityMovementTick.ts's occupancy check had no stuck-detection or replanning fallback for a blocked-but-pathable route. #591 fixed both halves of that: the staffed fleet's spawn spacing widened (SPAWN_TILE_SPACING, GameState.ts) so the debris_hauler no longer sits on vehicle #1's route, and EntityMovementTick.ts now wires in VehicleOccupancyReroute.ts's stuck-detection/reroute regardless. Vehicle #1 now drives and drills for real from here (see top-level description) -- but employee #1 still never gets idle time, and with no living quarters on this level to replenish its needs gauges, this remains the first domino in this file's real conclusion. #601-followup (issue #631, real interaction-mode finding): added an explicit `set` on the driver-picker select before clicking assign -- with only one qualified employee available at this point it happened to already default correctly, but left implicit it set up the real bug at step 14 below (vehicle #5's own assign), so pinned here too for consistency and to rule this step out definitively when diagnosing that one.",
-      "role": "player",
+      "description": "#553: crews the free rig so it's actually usable. #591: previously this was the single decision that doomed this file -- vehicle #1's shortest path from its (0,2) spawn to the first drill_plan's origin (5,5) stepped onto (2,2), permanently occupied by the staffed debris_hauler (vehicle #2, no driver, never moves), and EntityMovementTick.ts's occupancy check had no stuck-detection or replanning fallback for a blocked-but-pathable route. #591 fixed both halves of that: the staffed fleet's spawn spacing widened (SPAWN_TILE_SPACING, GameState.ts) so the debris_hauler no longer sits on vehicle #1's route, and EntityMovementTick.ts now wires in VehicleOccupancyReroute.ts's stuck-detection/reroute regardless. Vehicle #1 now drives and drills for real from here (see top-level description) -- but employee #1 still never gets idle time, and with no living quarters on this level to replenish its needs gauges, this remains the first domino in this file's real conclusion. #921: the Fleet panel's Assign/Unassign controls (and the driver-picker select this step used to steer) are gone entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -297,21 +284,12 @@
       "command": "vehicle driver 5 12",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
-          "value": "12"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 5 12"
         }
       ],
-      "description": "#553: employee #12 (licensed above) takes the new rig (vehicle #5). #601-followup (issue #631, real interaction-mode finding): added an explicit `set` on the driver-picker select before clicking assign. `makeAssignRow` (fleetDetailSections.ts) renders a <select> of every not-yet-driverId-bound qualified employee, defaulting to whichever sorts first, and driverId isn't set until the walk-to-board completes -- this file issues no `tick` at all between step 1's own assign click and this one (time resume alone does not advance the scenarioMode clock), so employee #1 is still mid-walk-to-board vehicle #1, still 'eligible', and still sorts first. Without the `set`, this step's click silently re-submitted employee #1 instead of #12: sandbox-confirmed via a direct `vehicle list` probe immediately after this step -- both vehicle #1 and vehicle #5 read driver:none, neither assignment ever completing -- which left this file's whole first drilling pattern uncrewed (holeCount stuck at 0).",
-      "role": "player",
+      "description": "#553: employee #12 (licensed above) takes the new rig (vehicle #5). #921: the Fleet panel's Assign/Unassign controls (and the driver-picker select this step used to steer) are gone entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0

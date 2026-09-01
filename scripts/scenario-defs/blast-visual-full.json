@@ -167,33 +167,25 @@
     },
     {
       "command": "vehicle driver 1 1",
-      "description": "#553 crew-walkout fix: crews drill_rig #1 with driller #1 explicitly. Sandbox-measured: with two rigs and three employees (only two of them qualified), the auto-board dispatch that a single lone driller/rig pair could rely on picks an inconsistent pairing and one hole is permanently left undrilled -- explicit `vehicle driver` assignment (same convention as level3-playthrough-win.json's own two-driller crewing) removes the ambiguity. Does NOT re-click the vehicles toolbar tab: the panel is already open, left that way by the preceding `vehicle buy drill_rig` (vehicle #2) step -- the two `employee assign_skill` bootstrap steps in between use `command` type, not a click, so panel state is unchanged. UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open (same class of bug already fixed elsewhere in this PR), which is what made this step's own assign button resolve to zero size.",
+      "description": "#553 crew-walkout fix: crews drill_rig #1 with driller #1 explicitly. Sandbox-measured: with two rigs and three employees (only two of them qualified), the auto-board dispatch that a single lone driller/rig pair could rely on picks an inconsistent pairing and one hole is permanently left undrilled -- explicit `vehicle driver` assignment (same convention as level3-playthrough-win.json's own two-driller crewing) removes the ambiguity. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "vehicle driver 2 2",
-      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above.",
+      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above. #921: bootstrap command, same as above.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 2 2"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",

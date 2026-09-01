@@ -385,18 +385,14 @@
     },
     {
       "command": "vehicle driver 2 2",
-      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #2 (#553's driller renumbering) — the assign button click alone boards them.",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 2 2"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "tick 10",
@@ -516,17 +512,14 @@
     },
     {
       "command": "vehicle driver 3 3",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 3 3"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "tick 10",

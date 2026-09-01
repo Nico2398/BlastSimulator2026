@@ -22,22 +22,14 @@
     },
     {
       "command": "vehicle driver 3 4",
-      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, the first of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants (balance.ts), before ordering any excavation work.",
+      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, the first of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants (balance.ts), before ordering any excavation work. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 3 4"
         }
       ],
-      "role": "player"
+      "role": "bootstrap"
     },
     {
       "command": "build_ramp origin:20,20 direction:south length:6 depth:6",

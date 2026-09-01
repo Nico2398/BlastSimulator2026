@@ -27,20 +27,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: crews the free drill_rig (vehicle #1) with the free driller (employee #1) staffed:true just hired -- unmanned, the rig is a mesh no queued drill_hole action can ever start against.",
-      "role": "player",
+      "description": "#553: crews the free drill_rig (vehicle #1) with the free driller (employee #1) staffed:true just hired -- unmanned, the rig is a mesh no queued drill_hole action can ever start against. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -962,16 +954,12 @@
       "command": "vehicle driver 6 8",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 6 8"
         }
       ],
-      "description": "#553: driller #8 crews the second drill_rig -- 2 concurrent driller/drill_rig pairs (staffed's #1/#1 and this pair) for the drilling wait below. issue #585: vehicle #6, not #7 -- the earlier build-freight_warehouse step now really builds one via a real click too (not just command mode), so the second rock_digger this file used to buy never happens in either mode, and the second drill_rig is #6 in both.",
-      "role": "player",
+      "description": "#553: driller #8 crews the second drill_rig -- 2 concurrent driller/drill_rig pairs (staffed's #1/#1 and this pair) for the drilling wait below. issue #585: vehicle #6, not #7 -- the earlier build-freight_warehouse step now really builds one via a real click too (not just command mode), so the second rock_digger this file used to buy never happens in either mode, and the second drill_rig is #6 in both. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 32,

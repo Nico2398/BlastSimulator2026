@@ -257,23 +257,14 @@
     },
     {
       "command": "vehicle driver 5 6",
-      "description": "Vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. Employee 3 (staffed:true's own driving.truck-licensed driver, untaken since its original vehicle mount is gone or never filled) sorts ahead of #6 in the driver <select>'s roster-order option list, so the unset dropdown defaults to #3, not #6 -- the explicit 'set' step below picks option value \"6\" before the assign click, matching the console command's own explicit employee id (mirrors hauling-gate.json's own `vehicle driver 5 6` step, which has this identical ambiguity).",
+      "description": "Vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
-          "value": "6"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 5 6"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
