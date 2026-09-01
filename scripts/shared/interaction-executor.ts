@@ -451,48 +451,68 @@ export async function executeActionOnPage(
       // immediately (#699). Bounded to exactly one retry so a selector
       // genuinely covered by something else (a tutorial rail, a real layout
       // bug) still fails loudly with today's exact error.
-      let deadline = Date.now() + timeoutMs;
-      let retriedCoveredOnce = false;
-      for (;;) {
-        const reason = await page.evaluate((sel: string) => {
-          const probe = (window as unknown as {
-            __probeSelector?: (s: string) => string | null;
-          }).__probeSelector;
-          if (probe === undefined) return null;
-          // Scroll into view before probing, exactly as page.click will before
-          // clicking: a row below a panel's fold has its centre over the game
-          // canvas until scrolled, and probing that reads as covered-forever.
-          document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
-          return probe(sel);
-        }, action.selector);
-        if (reason === null) break;
-        if (Date.now() > deadline) {
-          if (!retriedCoveredOnce && reason === 'covered') {
-            retriedCoveredOnce = true;
-            const resolved = await resolveEventIfPendingOnPage(page, 8000);
-            if (resolved) {
-              deadline += 5000;
-              continue;
+      //
+      // A panel that rebuilds its whole card list on any signature change
+      // (FleetPanel's computeSignature, e.g.) can also swap the probed node
+      // for an identically-selected replacement in the gap between the probe
+      // resolving "usable" and page.click actually landing — a background
+      // `tick`/bootstrap command elsewhere on the page, not this action's own
+      // target, triggered the rebuild. That reads as "found: false" on the
+      // immediate re-inspect even though the control never stopped existing.
+      // One bounded retry of the whole probe-then-click cycle covers it,
+      // mirroring the 'covered' retry above — a selector that never appears
+      // at all still exhausts its real budget and fails loudly.
+      let vanishedRetried = false;
+      clickAttempt: for (;;) {
+        let deadline = Date.now() + timeoutMs;
+        let retriedCoveredOnce = false;
+        for (;;) {
+          const reason = await page.evaluate((sel: string) => {
+            const probe = (window as unknown as {
+              __probeSelector?: (s: string) => string | null;
+            }).__probeSelector;
+            if (probe === undefined) return null;
+            // Scroll into view before probing, exactly as page.click will before
+            // clicking: a row below a panel's fold has its centre over the game
+            // canvas until scrolled, and probing that reads as covered-forever.
+            document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+            return probe(sel);
+          }, action.selector);
+          if (reason === null) break;
+          if (Date.now() > deadline) {
+            if (!retriedCoveredOnce && reason === 'covered') {
+              retriedCoveredOnce = true;
+              const resolved = await resolveEventIfPendingOnPage(page, 8000);
+              if (resolved) {
+                deadline += 5000;
+                continue;
+              }
             }
+            throw new Error(
+              `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
+            );
           }
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        try {
+          await page.click(action.selector, { button: btn });
+        } catch (err) {
+          const report = await inspectSelector(page, action.selector);
+          if (!vanishedRetried && !report.found) {
+            vanishedRetried = true;
+            continue clickAttempt;
+          }
+          // Puppeteer's own message ("Node is either not clickable or not an
+          // Element") names nothing, so a failure reports only that *something*
+          // on the page could not be clicked. Name the selector and say why it
+          // was refused — inert almost always means a `pointer-events: none`
+          // rail, which is a real player-facing block, not a test flake.
           throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(report)}`,
+            { cause: err },
           );
         }
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      try {
-        await page.click(action.selector, { button: btn });
-      } catch (err) {
-        // Puppeteer's own message ("Node is either not clickable or not an
-        // Element") names nothing, so a failure reports only that *something*
-        // on the page could not be clicked. Name the selector and say why it
-        // was refused — inert almost always means a `pointer-events: none`
-        // rail, which is a real player-facing block, not a test flake.
-        throw new Error(
-          `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
-          { cause: err },
-        );
+        break;
       }
       break;
     }

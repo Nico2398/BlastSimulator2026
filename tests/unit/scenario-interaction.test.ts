@@ -135,6 +135,59 @@ describe('a player step whose click cannot complete fails and names the selector
   });
 });
 
+describe('clickSelector retries once when the target vanishes between the wait and the click (#929 CI finding)', () => {
+  it('retries the whole probe-then-click cycle once when a background re-render (e.g. FleetPanel rebuilding every card on an unrelated vehicle\'s signature change) swaps the node out from under the click, and succeeds on the second attempt', async () => {
+    const selector = '#bs-vehicle-panel [data-vehicle-id="2"] .bsx-btn-danger';
+    const evaluate = vi.fn()
+      // 1st probe: usable.
+      .mockResolvedValueOnce(null)
+      // inspectSelector after the 1st click throws: the rebuild already
+      // swapped this node out — genuinely gone, not covered/disabled.
+      .mockResolvedValueOnce({ found: false })
+      // 2nd probe (retry): usable again, against the replacement node.
+      .mockResolvedValueOnce(null);
+    const click = vi.fn()
+      .mockRejectedValueOnce(new Error('Node is either not clickable or not an Element'))
+      .mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate, click });
+    const step: ScenarioStepDef = {
+      command: 'vehicle scrap 2',
+      description: 'scrap the parked debris_hauler',
+      role: 'player',
+      interaction: [{ type: 'clickSelector', selector }],
+    };
+
+    await expect(
+      executeActionOnPage(page, { type: 'clickSelector', selector }, step),
+    ).resolves.toBeUndefined();
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(click).toHaveBeenNthCalledWith(1, selector, { button: 'left' });
+    expect(click).toHaveBeenNthCalledWith(2, selector, { button: 'left' });
+  });
+
+  it('still fails loudly, naming the selector, when the target is genuinely gone on the retry too (bounded to one retry)', async () => {
+    const selector = '#bs-vehicle-panel [data-vehicle-id="2"] .bsx-btn-danger';
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(null) // 1st probe: usable
+      .mockResolvedValueOnce({ found: false }) // inspect after 1st click throw
+      .mockResolvedValueOnce(null) // 2nd probe (retry): usable
+      .mockResolvedValueOnce({ found: false }); // inspect after 2nd click throw
+    const click = vi.fn().mockRejectedValue(new Error('Node is either not clickable or not an Element'));
+    const page = fakePage({ evaluate, click });
+    const step: ScenarioStepDef = {
+      command: 'vehicle scrap 2',
+      description: 'scrap the parked debris_hauler',
+      role: 'player',
+      interaction: [{ type: 'clickSelector', selector }],
+    };
+
+    await expect(
+      executeActionOnPage(page, { type: 'clickSelector', selector }, step),
+    ).rejects.toThrow('element vanished from the DOM between the wait and the click');
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('executeActionOnPage — waitUntil (issue #590, #601)', () => {
   it('resolves once the polled field reaches the target, looping the console\'s own deterministic tick 1', async () => {
     // #601: one page.evaluate call per tick (tick 1 + event-status check +
