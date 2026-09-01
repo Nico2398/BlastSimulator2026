@@ -226,7 +226,7 @@
     },
     {
       "command": "tutorial_start",
-      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out.",
+      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out. #904: the tutorial now opens on hire-surveyor instead of time-speed (see tutorialSteps.ts), so this waits for that step and checks its own French title instead.",
       "interaction": [
         {
           "type": "command",
@@ -238,13 +238,13 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "hire-surveyor"
         },
         {
           "type": "assert",
           "selector": ".bs-tutorial-box .bs-panel-title",
           "property": "textContent",
-          "expectedValue": "Vitesse de Jeu"
+          "expectedValue": "Embaucher Prospecteur"
         },
         {
           "type": "assert",
@@ -266,29 +266,8 @@
       "role": "setup"
     },
     {
-      "command": "time speed:2",
-      "description": "Advance past the time-speed step (its own target, always reachable) so the Crew panel — the hire-surveyor step's rails target — becomes clickable, proving a panel can be opened mid-tutorial while the locale switch made earlier is still in effect.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "hire-surveyor"
-        },
-        {
-          "type": "assert",
-          "selector": ".bs-tutorial-box .bs-panel-title",
-          "property": "textContent",
-          "expectedValue": "Embaucher Prospecteur"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "state full",
-      "description": "Open the Crew panel — a second panel, open at the same time as the tutorial card. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch.",
+      "command": "employee hire role:surveyor",
+      "description": "#904: hire-surveyor is now the tutorial's opening step, completable immediately (no ticks required). Open the Crew panel — a second panel, open at the same time as the tutorial card — and hire through its own Hire button. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch. Advances the coach card to the time-speed step, whose title is asserted in French.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -299,8 +278,52 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "time-speed"
+        },
+        {
           "type": "assert",
-          "selector": "#bs-employee-panel"
+          "selector": ".bs-tutorial-box .bs-panel-title",
+          "property": "textContent",
+          "expectedValue": "Vitesse de Jeu"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "time speed:2",
+      "description": "Advance past the time-speed step (its own target, always reachable) so the tutorial reaches survey — its first genuine wait — proving the locale switch made earlier is still in effect this late into the tutorial. No title assertion needed past this point (the file's own locale-regression purpose is already proven by the two coach-card titles and the Crew panel above); confirming the wait itself succeeds is enough.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "survey"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "state full",
+      "description": "Reopen a panel once more, later in the tutorial (at the survey step) — an independent, later check that a panel opened at this point still reads French, distinct from the hire-time Crew-panel check above which happened at the tutorial's very first step. #904: the Crew/employees toolbar button this step used to reopen is no longer the live target once the tutorial has advanced onto 'survey' — the tutorial rails (src/ui/tutorialGuide.ts) make every control except the current step's own target inert, and 'survey's own target is the Survey toolbar button (TOOLBAR_TARGET.survey, tutorialStepHelpers.ts), confirmed by CI round 2's failure clicking the Crew button here. Reopening the Survey panel instead proves the same thing the Crew reopen used to — a panel opened this late in the tutorial still renders (usable, not torn down) — without completing the step, since 'survey' only completes on a real survey command, not merely opening its own panel.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-survey-panel"
         }
       ],
       "role": "player"

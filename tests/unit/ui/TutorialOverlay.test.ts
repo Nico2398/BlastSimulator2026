@@ -5,6 +5,8 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSt
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 function createMockState(): GameState {
   return createGame({ seed: 42, mineType: 'tutorial' });
@@ -119,7 +121,11 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       expect(state.isPaused).toBe(true);
 
-      state.timeScale = 2;
+      // Step 0 (hire-surveyor, #904 reorder) completes on a genuine new
+      // hire, not a speed change — its own completion check is
+      // tick-independent so it must be satisfiable while the clock is
+      // still held.
+      hireEmployee(state.employees, 'surveyor', new Random(1));
       tut.onCommandExecuted(state);
       expect(state.isPaused).toBe(false);
     });
@@ -202,7 +208,8 @@ describe('TutorialOverlay (12.4)', () => {
 
       const titleEl = container.querySelector('.bs-panel-title');
       const before = titleEl?.textContent ?? '';
-      state.timeScale = 2;
+      // Step 0 (hire-surveyor, #904 reorder) completes on a genuine new hire.
+      hireEmployee(state.employees, 'surveyor', new Random(1));
       tut.onCommandExecuted(state);
       expect(titleEl?.textContent).not.toBe(before);
     });
@@ -264,8 +271,9 @@ describe('TutorialOverlay (12.4)', () => {
       vi.advanceTimersByTime(5000);
       expect(titleEl?.textContent).toBe(before);
 
-      // The player raises the speed; the next poll picks it up.
-      state.timeScale = 2;
+      // The player hires a surveyor (step 0, hire-surveyor, #904 reorder);
+      // the next poll picks it up.
+      hireEmployee(state.employees, 'surveyor', new Random(1));
       vi.advanceTimersByTime(2500);
       expect(titleEl?.textContent).not.toBe(before);
       vi.useRealTimers();
@@ -367,90 +375,86 @@ describe('TutorialOverlay (12.4)', () => {
     it('render() applies highlight class to element matching highlightTarget', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      // Create a target element matching the highlight target for step 0
-      const target = document.createElement('div');
-      target.className = 'bs-speed-btn';
-      const speedBtn = document.createElement('button');
-      speedBtn.dataset['speed'] = '2';
-      target.appendChild(speedBtn);
-      const hudTop = document.createElement('div');
-      hudTop.id = 'bs-hud-top';
-      hudTop.appendChild(target);
-      document.body.appendChild(hudTop);
+      // Step 0 is now hire-surveyor (#904 reorder), whose highlightTarget
+      // (createHireStep's default, TOOLBAR_TARGET.employees) is the Crew/
+      // employees toolbar button, '#bs-toolbar [data-panel="employees"]' —
+      // not the speed button.
+      const toolbar = document.createElement('div');
+      toolbar.id = 'bs-toolbar';
+      const employeesBtn = document.createElement('button');
+      employeesBtn.dataset['panel'] = 'employees';
+      toolbar.appendChild(employeesBtn);
+      document.body.appendChild(toolbar);
 
       tut.start(createMockState());
-      // Step 0 (time-speed) has highlightTarget '#bs-hud-top .bs-speed-btn button[data-speed]'
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
-      hudTop.remove();
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(true);
+      toolbar.remove();
     });
 
     it('highlight is cleared when advancing to next step', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      const target = document.createElement('div');
-      target.className = 'bs-speed-btn';
-      const speedBtn = document.createElement('button');
-      speedBtn.dataset['speed'] = '2';
-      target.appendChild(speedBtn);
-      const hudTop = document.createElement('div');
-      hudTop.id = 'bs-hud-top';
-      hudTop.appendChild(target);
-      document.body.appendChild(hudTop);
+      const toolbar = document.createElement('div');
+      toolbar.id = 'bs-toolbar';
+      const employeesBtn = document.createElement('button');
+      employeesBtn.dataset['panel'] = 'employees';
+      toolbar.appendChild(employeesBtn);
+      document.body.appendChild(toolbar);
 
-      tut.start(createMockState());
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
-
-      // Advance by completing step 0 (time-speed: increase timeScale)
       const state = createMockState();
-      state.timeScale = 2;
+      tut.start(state);
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(true);
+
+      // Advance by completing step 0 (hire-surveyor, #904 reorder): hire a
+      // new surveyor — no longer completed by raising timeScale.
+      hireEmployee(state.employees, 'surveyor', new Random(1));
       tut.onCommandExecuted(state);
       // After advancing, highlight should be removed from old element
       // (and new highlight may be applied if new step has target)
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
-      hudTop.remove();
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(false);
+      toolbar.remove();
     });
 
     it('highlight is cleared when the tutorial finishes', () => {
+      // Using step 0's own real target (employees toolbar button, #904
+      // reorder) rather than advancing to the speed-button step first:
+      // finish() clearing whatever is currently highlighted is the
+      // behaviour under test, not which step happens to be first.
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      const target = document.createElement('div');
-      target.className = 'bs-speed-btn';
-      const speedBtn = document.createElement('button');
-      speedBtn.dataset['speed'] = '2';
-      target.appendChild(speedBtn);
-      const hudTop = document.createElement('div');
-      hudTop.id = 'bs-hud-top';
-      hudTop.appendChild(target);
-      document.body.appendChild(hudTop);
+      const toolbar = document.createElement('div');
+      toolbar.id = 'bs-toolbar';
+      const employeesBtn = document.createElement('button');
+      employeesBtn.dataset['panel'] = 'employees';
+      toolbar.appendChild(employeesBtn);
+      document.body.appendChild(toolbar);
 
       tut.start(createMockState());
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(true);
 
       tut.finish();
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
-      hudTop.remove();
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(false);
+      toolbar.remove();
     });
 
     it('highlight is cleared on dispose', () => {
+      // Same choice as the "finishes" test above: step 0's own real target.
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      const target = document.createElement('div');
-      target.className = 'bs-speed-btn';
-      const speedBtn = document.createElement('button');
-      speedBtn.dataset['speed'] = '2';
-      target.appendChild(speedBtn);
-      const hudTop = document.createElement('div');
-      hudTop.id = 'bs-hud-top';
-      hudTop.appendChild(target);
-      document.body.appendChild(hudTop);
+      const toolbar = document.createElement('div');
+      toolbar.id = 'bs-toolbar';
+      const employeesBtn = document.createElement('button');
+      employeesBtn.dataset['panel'] = 'employees';
+      toolbar.appendChild(employeesBtn);
+      document.body.appendChild(toolbar);
 
       tut.start(createMockState());
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(true);
 
       tut.dispose();
       overlay = null;
-      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
-      hudTop.remove();
+      expect(employeesBtn.classList.contains('bsx-highlight')).toBe(false);
+      toolbar.remove();
     });
 
     it('highlightTarget with undefined selector does not throw', () => {
@@ -708,7 +712,12 @@ describe('TutorialOverlay (12.4)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       const state = createMockState();
-      tut.start(state); // step 0 ('tutorial.step1.title' / 'tutorial.step1'), rendered in EN
+      tut.start(state);
+      // Step 0 is 'hire-surveyor' (#904 reorder); advance to step 1
+      // ('time-speed', 'tutorial.step1.title' / 'tutorial.step1'), rendered
+      // in EN, to exercise the same locale-re-application behaviour this
+      // test has always targeted.
+      (tut as unknown as { advanceToNextStep(): void }).advanceToNextStep();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
@@ -719,7 +728,7 @@ describe('TutorialOverlay (12.4)', () => {
 
       expect(titleEl.textContent).toBe('Vitesse de Jeu');
       expect(textEl.textContent).toBe(
-        'Utilisez les contrôles de vitesse sur la gauche de la barre du haut pour accélérer le jeu. Essayez la vitesse 2× ou 4× !',
+        "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre du haut !",
       );
     });
 

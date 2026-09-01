@@ -61,7 +61,19 @@ export interface TutorialStep {
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
-  // ── Step 0: time-speed ──
+  // ── Step 0: hire-surveyor ──
+  // Opens the tutorial: hiring is completable immediately (isComplete reads
+  // only state.employees), unlike the old opener (time-speed), which asked
+  // the player to try a speed control before anything was on the site to
+  // speed up. #904 moved time-speed to sit right before the first real wait
+  // (survey) instead.
+  createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
+
+  // ── Step 1: time-speed ──
+  // #904: relocated here, immediately before 'survey' — the tutorial's first
+  // genuine wait (a surveyor walks to the target, the result lands ticks
+  // later). Teaching the speed controls right before the first wait, instead
+  // of before the player has done anything, is when the lesson pays off.
   {
     id: 'time-speed',
     titleKey: 'tutorial.step1.title',
@@ -75,9 +87,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       return state.timeScale > prev;
     },
   },
-
-  // ── Step 1: hire-surveyor ──
-  createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
 
   // ── Step 2: survey ──
   createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:23 z:23'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),

@@ -192,4 +192,73 @@ describe('Tutorial pause behaviour (#371)', () => {
     expect(everHeld).toBe(false);
     expect(state.isPaused).toBe(false);
   });
+
+  // ── 6. step 0 pause/resume behaviour (#904) ─────────────────────────────
+  //
+  // The tutorial's opening step moves from 'time-speed' to 'hire-surveyor':
+  // suggesting a faster clock made no sense as the very first card, with an
+  // empty site and nothing queued that a faster clock would deliver sooner.
+  // The first place the player genuinely waits is 'survey' (waitsOnWork:true) —
+  // time-speed now sits immediately before it instead.
+  //
+  // Two hard constraints from #904 apply to whichever step ends up first:
+  //   1. tutorial_start leaves the game paused (#585) — the opening step must
+  //      still be completable while state.isPaused is true, and completing it
+  //      must be what resumes the clock (no new resume mechanism needed).
+  //   2. Step ids are referenced by name elsewhere (scenario JSON, other
+  //      tests) — this suite pins the id, not just an index.
+  describe('tutorial step 0 completes while paused and resumes the clock (#904)', () => {
+    it('opens on hire-surveyor, not time-speed', () => {
+      // TUTORIAL_STEPS[0] is hire-surveyor — the tutorial's opening step must
+      // be completable immediately, with no wait, per #904.
+      expect(TUTORIAL_STEPS[0]!.id).toBe('hire-surveyor');
+    });
+
+    it('step 0 is completable while state.isPaused is still true, right after tutorial_start (#585)', () => {
+      const { runner, ctx } = createRunner();
+      expect(runner.run('new_game seed:42 size:24').success).toBe(true);
+      expect(campaignStartCommand(ctx, [], { level: 'tutorial_pit' }).success).toBe(true);
+
+      const tutorial = new TutorialOverlay(container);
+      overlay = tutorial;
+      tutorial.start(ctx.state!);
+      expect(ctx.state!.isPaused).toBe(true);
+
+      // hire-surveyor's completion checks only state.employees — a genuinely
+      // new hire of the target role — never the clock, so it completes
+      // without a single tick having run.
+      expect(TUTORIAL_STEPS[0]!.id).toBe('hire-surveyor');
+      expect(runner.run('employee hire role:surveyor').success).toBe(true);
+      tutorial.onCommandExecuted(ctx.state!);
+      expect(ctx.state!.isPaused).toBe(false);
+    });
+
+    it('completing tutorial step 0 resumes the clock, whichever step is first (regression guard)', () => {
+      // Step-identity-agnostic: exercises the existing
+      // advanceToNextStep() -> releaseClock() path, unconditional on which
+      // step is actually first. Passes both before and after the #904 reorder.
+      const { runner, ctx } = createRunner();
+      expect(runner.run('new_game seed:42 size:24').success).toBe(true);
+      expect(campaignStartCommand(ctx, [], { level: 'tutorial_pit' }).success).toBe(true);
+
+      const tutorial = new TutorialOverlay(container);
+      overlay = tutorial;
+      tutorial.start(ctx.state!);
+      expect(ctx.state!.isPaused).toBe(true);
+
+      const step0 = TUTORIAL_STEPS[0]!;
+      if (step0.commands && step0.commands.length > 0) {
+        // A step whose own hint is a runnable command (e.g. any hire step) —
+        // run it for real, the same way a player's click would.
+        expect(runner.run(step0.commands[0]!).success).toBe(true);
+      } else {
+        // time-speed (today's opening step) carries no command hint; its
+        // completion is a direct speed increase.
+        ctx.state!.timeScale = (ctx.state!.timeScale ?? 1) + 1;
+      }
+
+      tutorial.onCommandExecuted(ctx.state!);
+      expect(ctx.state!.isPaused).toBe(false);
+    });
+  });
 });

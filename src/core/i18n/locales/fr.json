@@ -2700,7 +2700,7 @@
   "tutorial.finish": "Terminer",
   "tutorial.console_hint": "Équivalent console",
   "tutorial.progress": "Progression",
-  "tutorial.step1": "Utilisez les contrôles de vitesse sur la gauche de la barre du haut pour accélérer le jeu. Essayez la vitesse 2× ou 4× !",
+  "tutorial.step1": "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre du haut !",
   "tutorial.step2": "Embauchez un prospecteur pour scanner le terrain à la recherche de gisements. Ouvrez le panneau Équipe et cliquez sur Embauche.",
   "tutorial.step3": "Effectuez maintenant un sondage sismique pour révéler les emplacements de minerai souterrains.",
   "tutorial.step4": "Embauchez un foreur pour préparer les trous de mine. Consultez le panneau Équipe.",
