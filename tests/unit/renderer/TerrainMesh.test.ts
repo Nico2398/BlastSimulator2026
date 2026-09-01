@@ -421,16 +421,113 @@ describe('TerrainMesh', () => {
     });
   });
 
-  describe('virtualEdgeDensity (#559)', () => {
-    // Same half-voxel crossing convention as emitVertex/
-    // computeVoxelColumnSurfaceHeight: solid (1) a half-voxel below the
-    // surface, air (0) a half-voxel above, linear in between.
-    it('is 1 well below surfaceHeight - 0.5 (fully solid)', () => {
+  describe('the sealing halo is meshed as the neighbouring ground (#907)', () => {
+    /** A one-chunk site filled to a fractional surface, so the crossing is not on a lattice line. */
+    function siteGrid(sizeY = 16, surfaceH = 6.4): VoxelGrid {
+      const grid = new VoxelGrid(16, sizeY, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          for (let y = 0; y <= Math.ceil(surfaceH); y++) {
+            const d = Math.max(0, Math.min(1, 0.5 + (surfaceH - y) / 2));
+            if (d > 0) grid.fillVoxel(x, y, z, compId, {}, d);
+          }
+        }
+      }
+      return grid;
+    }
+
+    /** Every emitted vertex, keyed by its exact integer lattice node. */
+    function nodeHeights(mesh: TerrainMesh): Map<string, number[]> {
+      const out = new Map<string, number[]>();
+      for (const m of mesh.meshes) {
+        const pos = m.geometry.attributes['position'] as THREE.BufferAttribute;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          if (Math.abs(x - Math.round(x)) > 1e-6 || Math.abs(z - Math.round(z)) > 1e-6) continue;
+          const k = `${Math.round(x)},${Math.round(z)}`;
+          out.set(k, [...(out.get(k) ?? []), pos.getY(i)]);
+        }
+      }
+      return out;
+    }
+
+    it('puts a vertex on every halo ring node, at exactly the height the sampler reports there', () => {
+      // The contract the landscape's boundary ring is built against: both
+      // sheets place that node from the same number. Before #907 the halo
+      // column read as air, so the mesh stopped about half a metre short of
+      // the ring and a voxel below it — the slot, and the step beside it.
+      const grid = siteGrid();
+      const sampler = (x: number, z: number): number => 6.4 + 0.1 * x + 0.05 * z;
+      const mesh = new TerrainMesh(new THREE.Scene(), grid);
+      mesh.setEdgeHeightSampler(sampler);
+      mesh.buildAll();
+
+      const nodes = nodeHeights(mesh);
+      for (const [x, z] of [[-1, 4], [-1, 0], [-1, 15], [16, 4], [4, -1], [4, 16], [-1, -1], [16, 16]] as const) {
+        const ys = nodes.get(`${x},${z}`);
+        expect(ys, `no vertex on ring node ${x},${z}`).toBeDefined();
+        const want = sampler(x, z);
+        expect(
+          ys!.some(y => Math.abs(y - want) < 1e-6),
+          `ring node ${x},${z}: expected a vertex at ${want}, got ${ys!.join(',')}`,
+        ).toBe(true);
+      }
+      mesh.dispose();
+    });
+
+    it('emits no ground past the ring — the landscape owns everything beyond it', () => {
+      const grid = siteGrid();
+      const mesh = new TerrainMesh(new THREE.Scene(), grid);
+      mesh.setEdgeHeightSampler(() => 6.4);
+      mesh.buildAll();
+      const bounds = mesh.getBounds()!;
+      expect(bounds.minX).toBeGreaterThanOrEqual(-1);
+      expect(bounds.minZ).toBeGreaterThanOrEqual(-1);
+      expect(bounds.maxX).toBeLessThanOrEqual(16);
+      expect(bounds.maxZ).toBeLessThanOrEqual(16);
+      mesh.dispose();
+    });
+
+    it('a crater blasted at the site edge is still walled far below the neighbouring ground (#560 kept, #907)', () => {
+      // #560 stopped the boundary wall SKIRT_VISIBILITY_MARGIN_M below the
+      // neighbouring ground, which was right while the halo read as air and
+      // that wall was a full-depth skirt nobody could see. With the halo
+      // carrying real ground, the same cube is the crater's own wall — cutting
+      // it off would open a see-through hole into the pit.
+      const grid = siteGrid(32, 20.4);
+      for (let x = 0; x < 5; x++) {
+        for (let z = 4; z < 11; z++) {
+          for (let y = 6; y < 32; y++) grid.clearVoxel(x, y, z);
+        }
+      }
+      const mesh = new TerrainMesh(new THREE.Scene(), grid);
+      mesh.setEdgeHeightSampler(() => 20.4);
+      mesh.buildAll();
+
+      // Look horizontally into the crater from outside the site, well below the
+      // old cutoff (floor(20.4) - 2 = 18): the wall has to stop the ray.
+      const raycaster = new THREE.Raycaster();
+      for (const y of [16, 12, 8]) {
+        raycaster.set(new THREE.Vector3(-6, y, 7.5), new THREE.Vector3(1, 0, 0));
+        const hits = raycaster.intersectObjects(mesh.meshes, false);
+        expect(hits.length, `see-through into the crater at y=${y}`).toBeGreaterThan(0);
+        expect(hits[0]!.point.x, `wall at y=${y} is not at the site edge`).toBeLessThanOrEqual(0.001);
+      }
+      mesh.dispose();
+    });
+  });
+
+  describe('virtualEdgeDensity (#559, band width #907)', () => {
+    // The same field TerrainGen fills a real column with
+    // (TerrainGen.surfaceDensityAt): solid a full voxel below the surface, air
+    // a full voxel above, linear in between.
+    it('is 1 a full voxel below surfaceHeight (fully solid)', () => {
       expect(virtualEdgeDensity(5, 2)).toBe(1);
       expect(virtualEdgeDensity(5, 4)).toBe(1);
     });
 
-    it('is 0 well above surfaceHeight + 0.5 (fully air)', () => {
+    it('is 0 a full voxel above surfaceHeight (fully air)', () => {
       expect(virtualEdgeDensity(5, 6)).toBe(0);
       expect(virtualEdgeDensity(5, 8)).toBe(0);
     });
@@ -439,11 +536,36 @@ describe('TerrainMesh', () => {
       expect(virtualEdgeDensity(5, 5)).toBeCloseTo(0.5, 6);
     });
 
-    it('interpolates linearly across the one-voxel transition band', () => {
-      expect(virtualEdgeDensity(5, 4.5)).toBeCloseTo(1, 6);
-      expect(virtualEdgeDensity(5, 4.75)).toBeCloseTo(0.75, 6);
-      expect(virtualEdgeDensity(5, 5.25)).toBeCloseTo(0.25, 6);
-      expect(virtualEdgeDensity(5, 5.5)).toBeCloseTo(0, 6);
+    it('interpolates linearly across the two-voxel transition band', () => {
+      expect(virtualEdgeDensity(5, 4)).toBeCloseTo(1, 6);
+      expect(virtualEdgeDensity(5, 4.5)).toBeCloseTo(0.75, 6);
+      expect(virtualEdgeDensity(5, 5.5)).toBeCloseTo(0.25, 6);
+      expect(virtualEdgeDensity(5, 6)).toBeCloseTo(0, 6);
+    });
+
+    it('is unclamped at BOTH integer samples straddling the surface, whatever its fractional part (#907)', () => {
+      // This is the whole reason the band is two voxels wide. Marching cubes
+      // reads only the two integer samples either side of the crossing and
+      // interpolates linearly between them; if either is clamped, the crossing
+      // it computes is not the height the field was built around. A one-voxel
+      // band clamps one of them for every non-half-integer height, bending the
+      // crossing by up to 8.6 cm — invisible while this only tilted a normal,
+      // a step in the ground once it decides where the ground is.
+      for (const frac of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99]) {
+        const h = 7 + frac;
+        const below = virtualEdgeDensity(h, 7);
+        const above = virtualEdgeDensity(h, 8);
+        // Correct topology: solid below the surface, air above it.
+        expect(below, `y=7 not solid for h=${h}`).toBeGreaterThanOrEqual(0.5);
+        expect(above, `y=8 not air for h=${h}`).toBeLessThan(0.5);
+        // Neither sample is pinned to a clamp bound it would have overshot, so
+        // the linear crossing marching cubes computes between them lands
+        // exactly on h. A one-voxel band gives 7.29 here for h = 7.25.
+        expect(below, `y=7 clamped for h=${h}`).toBeLessThanOrEqual(1);
+        expect(above, `y=8 clamped for h=${h}`).toBeGreaterThanOrEqual(0);
+        const t = (0.5 - below) / (above - below);
+        expect(7 + t, `crossing for h=${h}`).toBeCloseTo(h, 9);
+      }
     });
 
     it('is stable across different surfaceHeight values (translation invariant)', () => {

@@ -18,6 +18,7 @@ import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHe
 import type { SceneManager } from './SceneManager.js';
 import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
+import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 
 /**
@@ -68,7 +69,8 @@ export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, regio
   // level's landscape and then be thrown away.
   if (!ctx.landscape || !ctx.grid || !deps.landscape || !deps.landscapeHandle) return;
 
-  deps.landscape.build(deps.landscapeHandle, ctx.grid.palette, playableCut(ctx.grid));
+  const handle = deps.landscapeHandle;
+  deps.landscape.build(deps.landscapeHandle, ctx.grid.palette, playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height));
   rebuildBorderWall(deps, ctx);
 }
 
@@ -80,16 +82,35 @@ export function siteBoundsChanged(deps: TerrainDeps, grid: VoxelGrid | null): bo
   return true;
 }
 
-/** The site's live shape, for the landscape mesher to cut itself against (#473 D8). */
-export function playableCut(grid: VoxelGrid): PlayableCut {
+/**
+ * The site's live shape, for the landscape mesher to cut itself against (#473 D8).
+ *
+ * `edgeHeight` is the landscape's own theoretical height sampler — the same one
+ * TerrainMesh marches its sealing halo against. With it, `boundaryHeightAt`
+ * answers for the halo ring as well as for owned ground, so the landscape's last
+ * node is placed at exactly the height the playable mesh renders there rather
+ * than at a separately-sampled value that agrees only when nothing clamps.
+ */
+export function playableCut(grid: VoxelGrid, edgeHeight?: (x: number, z: number) => number): PlayableCut {
   return {
     rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
     ownsColumn: (x, z) => grid.containsColumn(x, z),
-    // Live surface height, so the landscape's claim-boundary ring matches
-    // whatever the playable marching-cubes mesh renders there right now —
-    // before or after a blast — instead of the static WorldGen prediction.
-    boundaryHeightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
-    meshClaimsColumn: (x, z) => grid.claimsColumnForMeshing(x, z),
+    // What the playable mesh draws at this column, by the same two rules it
+    // draws by: the live voxel surface where it owns the ground — before or
+    // after a blast, never the static WorldGen prediction — and the neighbouring
+    // ground, clamped into the grid's own vertical range, on the sealing halo
+    // ring it shares with the landscape (#907). NaN anywhere it draws nothing,
+    // which is the landscape's signal to use its own sampled height.
+    boundaryHeightAt: (x, z) => {
+      const live = computeVoxelColumnSurfaceHeight(grid, x, z);
+      if (!Number.isNaN(live)) return live;
+      if (!edgeHeight || !nodeTouchesMeshedCell(grid, x, z)) return NaN;
+      return haloSurfaceHeight(grid, edgeHeight(x, z));
+    },
+    // The very cells TerrainMesh marches, read from the one function that
+    // decides its march bounds — not a second derivation of the same rule
+    // (#907, PlayableCoverage.ts).
+    meshClaimsColumn: (x, z) => meshClaimsCell(grid, x, z),
   };
 }
 

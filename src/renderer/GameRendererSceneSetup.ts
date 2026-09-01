@@ -93,7 +93,7 @@ export interface SceneSetupDeps {
   renderedEmployeeIds: Set<number>;
   getTerrainSurfaceY: (x: number, z: number) => number;
   landscapeEdgeHeightSampler: (ctx: MiningContext) => ((x: number, z: number) => number) | null;
-  playableCut: (grid: VoxelGrid) => PlayableCut;
+  playableCut: (grid: VoxelGrid, edgeHeight?: (x: number, z: number) => number) => PlayableCut;
   rebuildBorderWall: (ctx: MiningContext) => void;
   siteBoundsChanged: (grid: VoxelGrid | null) => boolean;
 }
@@ -224,7 +224,7 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
   // landmark for this seed — hand it to the claim path rather than have it
   // trace them all a second time (#473 D6).
   ctx.playableArea?.adoptStructures(handle.structureSet);
-  deps.landscape.build(handle, ctx.grid.palette, deps.playableCut(ctx.grid));
+  deps.landscape.build(handle, ctx.grid.palette, deps.playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height));
   // Record what we just cut against, so the next terrain:updated only
   // rebuilds when the site has actually moved since this build.
   deps.siteBoundsChanged(ctx.grid);

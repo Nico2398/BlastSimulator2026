@@ -314,35 +314,6 @@ export class VoxelGrid {
     return this.ownerOf(x, 0, z) !== null;
   }
 
-  /** True at an owned column, or at the single-voxel west/north halo column
-   *  TerrainMesh's "march one cube past the site" wall-sealing convention
-   *  actually emits geometry into. #559 root cause 4: LandscapeMesh must
-   *  treat this set, not raw containsColumn, as "already TerrainMesh's
-   *  ground" so the two meshes claim disjoint cells. */
-  claimsColumnForMeshing(x: number, z: number): boolean {
-    if (this.containsColumn(x, z)) return true;
-
-    // West halo: TerrainMesh.rebuildChunk marches one column west of an
-    // owned chunk's own rect when that chunk has no owned neighbour to its
-    // west. (x, z) is that halo column exactly when (x+1, z) is owned (which,
-    // combined with (x, z) itself being unowned, means x+1 sits at the west
-    // edge of its owning chunk's rect) and that chunk has no west neighbour.
-    if (this.containsColumn(x + 1, z)) {
-      const cx = chunkIndexOf(x + 1);
-      const cz = chunkIndexOf(z);
-      if (!this.hasChunk(cx - 1, cz)) return true;
-    }
-
-    // North halo: symmetric on z.
-    if (this.containsColumn(x, z + 1)) {
-      const cx = chunkIndexOf(x);
-      const cz = chunkIndexOf(z + 1);
-      if (!this.hasChunk(cx, cz - 1)) return true;
-    }
-
-    return false;
-  }
-
   /** The chunk covering (x, z) if the site has one, or null. Does not check the chunk's owned sub-rect. */
   private chunkAt(x: number, z: number): VoxelChunk | null {
     const key = chunkKey(chunkIndexOf(x), chunkIndexOf(z));

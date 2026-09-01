@@ -1,23 +1,38 @@
-// BlastSimulator2026 — Landscape mesher (#458 T3.2/D7/A16, #491)
+// BlastSimulator2026 — Landscape mesher (#458 T3.2/D7/A16, #491, #907)
 // Builds real ground geometry for LandscapeMap's tiles, replacing
 // DistantScenery's ring of unrelated decorative primitives with continuous
 // terrain that actually meets the playable voxel mesh at its edge.
 //
 // One indexed grid Mesh per LandscapeTile, at the map's stored coarse
-// resolution (4m by default): quads fully outside the playable rect are
-// emitted as-is, quads fully inside it are dropped (the voxel mesh owns that
-// ground), and quads straddling the boundary are subdivided down to
-// FINE_STEP (1m) by buildBoundaryQuad instead of duplicated by a second,
-// overlapping "seam" mesh (#491 — the old two-mesh overlap-and-hide-the-seam
-// design left a ~20m band where the coarse tile's loose corner-in-rect test
-// and the fine seam mesh's own placement could disagree, producing floating
-// or detached ground shards along ridges/slopes). Every boundary quad's
-// outer perimeter interpolates linearly between its PARENT coarse quad's own
-// corner heights (the "flat-edge rule") so it always meets its unsubdivided
-// coarse neighbours with no crack, while interior boundary nodes — and the
-// exact claim edge, via PlayableCut.boundaryHeightAt — read the live surface
-// so a blast never opens a gap before the next rebuild moves the boundary.
-
+// resolution (4m by default). Every coarse quad is classified against the live
+// claim (classifyQuad): quads whose every cell the playable mesh draws are
+// dropped, quads that hold or touch a drawn cell are subdivided to FINE_STEP
+// (1m) by buildBoundaryQuad, their neighbours to MID_STEP, and open ground is
+// emitted whole. There is no second overlapping "seam" mesh (#491 — the old
+// two-mesh overlap-and-hide-the-seam design left a ~20m band where the coarse
+// tile's loose corner-in-rect test and the fine seam mesh's own placement could
+// disagree, producing floating or detached ground shards along ridges/slopes).
+//
+// Two rules make the join exact rather than approximate (#907):
+//
+//   **Ownership is a cell test, and the same one the playable mesh marches by.**
+//   `PlayableCut.meshClaimsColumn` answers about the 1 m cell at (x, z), which
+//   is one marching-cubes cube column, and a fine cell is kept exactly when the
+//   answer for its own minimum corner is no. In production that predicate is
+//   `PlayableCoverage.meshClaimsCell`, a point test against the very rect
+//   TerrainMesh's march loop runs over — so the two sheets cannot disagree
+//   about a square metre.
+//
+//   **The flat-edge rule stops at the claim.** A boundary quad's perimeter node
+//   is placed by linear interpolation between its PARENT coarse quad's corner
+//   heights, so it meets an unsubdivided coarser neighbour with no T-junction
+//   crack (#491) — but only on the sides that actually face one. On a side
+//   facing another fine quad, or facing the claim itself, the node takes the
+//   live surface height (`PlayableCut.boundaryHeightAt`, falling back to the
+//   theoretical WorldGen height) — the same number the playable mesh puts its
+//   own vertex at. Applying the chord on the claim side is what put the
+//   landscape's boundary ring on a straight 4 m line while the playable mesh
+//   followed the sampled ground between the same two coarse nodes.
 import * as THREE from 'three';
 import type { LandscapeHandle } from '../../console/commands/world.js';
 import type { LandscapeTile } from '../../core/world/LandscapeMap.js';
@@ -27,6 +42,11 @@ import { rockIndexOf } from '../../core/world/RockCatalog.js';
 
 /** Sample spacing of a boundary quad's subdivision, metres — matches the old seam mesh's resolution. */
 const FINE_STEP = 1;
+
+/** How far past its own bounding rect the playable mesh can draw ground: one
+ *  cell, the west/north sealing halo (`PlayableCoverage.meshedCellRect`). Only
+ *  used to reject quads that cannot possibly touch the claim. */
+const PLAYABLE_HALO_CELLS = 1;
 
 /** Intermediate subdivision step between FINE_STEP boundary quads and the
  *  coarse open-ground quads, so the resolution jump isn't a one-step cliff
@@ -90,13 +110,16 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 export interface PlayableCut {
   rect: Rect;
   ownsColumn(x: number, z: number): boolean;
-  /** Live surface height at (x, z), when known — used at the claim boundary
-   *  so the landscape's edge matches whatever the playable mesh currently
-   *  renders there. Falls back to the theoretical WorldGen height when absent. */
+  /** The height the playable mesh renders at column (x, z), or NaN where it
+   *  renders nothing — the landscape's signal to use its own sampled height.
+   *  On the shared ring this is what makes the two sheets place the same node
+   *  at the same Y, before or after a blast (#559, #907). */
   boundaryHeightAt?(x: number, z: number): number;
-  /** Ground TerrainMesh will actually draw into, including its 1-voxel
-   *  outward-march halo — narrower "not mine to draw" test than ownsColumn.
-   *  Falls back to ownsColumn when absent (#559). */
+  /** True when the playable mesh draws ground over the 1 m CELL whose minimum
+   *  corner is (x, z) — including the sealing halo it marches one cell past its
+   *  own rect. A cell test, not a column test: the cell at the high edge of a
+   *  quad belongs to the next quad (#559 root cause 4, #907). Falls back to
+   *  ownsColumn when absent. */
   meshClaimsColumn?(x: number, z: number): boolean;
 }
 
@@ -131,24 +154,87 @@ export function rockBlendFor(palette: CompositionPalette, surfCompId: number): {
 }
 
 /**
- * Classifies one coarse-tile quad (given by its two opposite corners)
- * against the live claim boundary: fully outside the playable rect (kept
- * as-is), fully inside it (dropped — the voxel mesh owns that ground), or
- * straddling the boundary (needs clipping/subdivision via buildBoundaryQuad
- * instead of being emitted whole).
+ * Classifies one coarse-tile quad (given by its two opposite corners) against
+ * the live claim boundary: 'inside' (dropped — the voxel mesh owns every cell
+ * of it), 'boundary' (subdivided to FINE_STEP by buildBoundaryQuad), or
+ * 'outside' (emitted whole, or at MID_STEP when it borders the fine ring).
+ *
+ * Two things this has to get right, and both were wrong before #907.
+ *
+ * **It classifies CELLS, not corner nodes.** A quad covers the 1 m cells whose
+ * minimum corners run over [x0, x1) x [z0, z1) — the cell at x1 belongs to the
+ * next quad. Testing the four corner nodes counted that neighbouring cell as
+ * part of this quad, so the last claimed cell before the east/south edge of the
+ * site was kept by the landscape as well as marched by TerrainMesh: two sheets
+ * over the same square metre.
+ *
+ * **A quad entirely outside the claim still needs the fine ring when it touches
+ * it.** The landscape's coarse lattice is aligned to the playable rect's centre
+ * (LandscapeMap tiles the world from there at COARSE_STEP), so a rect whose span
+ * is a multiple of 2 * COARSE_STEP — every level's is — puts its own edge exactly
+ * on a lattice line. Every cell on one side is then claimed and every cell on the
+ * other is not, no quad straddles anything, and the claim edge ends up between an
+ * 'inside' quad and a plain COARSE_STEP 'outside' quad with no fine ring anywhere
+ * near it: a 4 m-spaced landscape edge butted against a 1 m-spaced playable one.
+ * So a fully-unclaimed quad that shares an edge or a corner with a claimed cell is
+ * 'boundary' too, and the ring exists on whichever side of the lattice line the
+ * claim happens to fall.
  */
 export function classifyQuad(playable: PlayableCut, x0: number, z0: number, x1: number, z1: number): 'outside' | 'inside' | 'boundary' {
   const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
-  const owned = [
-    claims(x0, z0),
-    claims(x1, z0),
-    claims(x0, z1),
-    claims(x1, z1),
-  ];
-  if (owned.every(o => o)) return 'inside';
-  if (owned.every(o => !o)) return 'outside';
-  return 'boundary';
+
+  // Nothing the playable mesh draws can reach further than one cell outside its
+  // own bounding rect (the west/north sealing halo), so a quad whose expanded
+  // neighbourhood misses that band is 'outside' without a single cell test —
+  // this runs over every quad of every tile that touches the rect.
+  const { rect } = playable;
+  if (
+    x1 + FINE_STEP <= rect.minX - PLAYABLE_HALO_CELLS || x0 - FINE_STEP >= rect.maxX ||
+    z1 + FINE_STEP <= rect.minZ - PLAYABLE_HALO_CELLS || z0 - FINE_STEP >= rect.maxZ
+  ) return 'outside';
+
+  let claimedCells = 0;
+  let totalCells = 0;
+  for (let z = z0; z < z1; z += FINE_STEP) {
+    for (let x = x0; x < x1; x += FINE_STEP) {
+      totalCells++;
+      if (claims(x, z)) claimedCells++;
+    }
+  }
+  if (claimedCells === totalCells && totalCells > 0) return 'inside';
+  if (claimedCells > 0) return 'boundary';
+
+  // Fully unclaimed: fine anyway when it touches the claimed region, so the two
+  // sheets meet at one shared node spacing.
+  for (let z = z0 - FINE_STEP; z <= z1; z += FINE_STEP) {
+    for (let x = x0 - FINE_STEP; x <= x1; x += FINE_STEP) {
+      if (x >= x0 && x < x1 && z >= z0 && z < z1) continue; // own cells: already counted
+      if (claims(x, z)) return 'boundary';
+    }
+  }
+  return 'outside';
 }
+
+/**
+ * Which sides of a boundary quad face a neighbour emitted at a COARSER step
+ * than FINE_STEP (an 'outside' quad, whether coarse or MID_STEP). Those sides —
+ * and only those — take the flat-edge rule.
+ *
+ * Sides are named by the axis end they sit on: west/north are the x0/z0 sides,
+ * east/south the x1/z1 sides.
+ */
+export interface BoundaryQuadSides {
+  coarseWest: boolean;
+  coarseEast: boolean;
+  coarseNorth: boolean;
+  coarseSouth: boolean;
+}
+
+/** Every side coarse — the pre-#907 behaviour, and the right answer for a lone
+ *  quad with no classified neighbourhood (tests, and callers with no map). */
+const ALL_SIDES_COARSE: BoundaryQuadSides = {
+  coarseWest: true, coarseEast: true, coarseNorth: true, coarseSouth: true,
+};
 
 /**
  * Emits the clipped/subdivided geometry for one boundary quad (a coarse-tile
@@ -156,21 +242,27 @@ export function classifyQuad(playable: PlayableCut, x0: number, z0: number, x1: 
  * at fine (FINE_STEP) resolution against the live claim edge so it meets the
  * playable mesh with no overlap and no gap.
  *
- * Subdivides the one coarse quad into SUBDIV×SUBDIV fine cells and keeps a
- * cell only if at least one of its 4 corners is unowned — this is what drops
- * the pit-side ground entirely rather than duplicating it. Every kept cell's
- * two triangles are appended to the (growable) output arrays the caller's
- * coarse pass already populated for its own tile.
+ * Subdivides the one coarse quad into SUBDIV×SUBDIV fine cells and keeps a cell
+ * exactly when the playable mesh does not draw it — a single test on the cell's
+ * own minimum corner, which is what `meshClaimsColumn` answers about. The old
+ * rule kept a cell if ANY of its four corner nodes was unclaimed, which counted
+ * the neighbouring cell past the quad's high edge as part of this cell and so
+ * kept the last claimed row before the site's east/south edge: two sheets over
+ * the same square metre, z-fighting by construction (#907).
  *
- * Node positions follow the flat-edge rule: a node sitting exactly on the
- * PARENT coarse quad's own perimeter is placed by linear interpolation
- * between that side's two coarse corner heights (never the true sampled
- * height), so the boundary quad's outer edge always matches whatever an
- * unsubdivided neighbouring coarse quad computes for the same edge — no
- * T-junction crack is possible. Interior nodes use the live surface height
- * (`playable.boundaryHeightAt`) when the caller supplies one, falling back to
- * the theoretical WorldGen height otherwise, so the boundary ring never
- * drifts from what the playable marching-cubes mesh renders after a blast.
+ * Node positions follow the flat-edge rule — a node on the PARENT coarse quad's
+ * perimeter is placed by linear interpolation between that side's two coarse
+ * corner heights rather than by sampling — but only on the sides `sides` marks
+ * coarse. That rule exists to meet an unsubdivided neighbour with no T-junction
+ * crack (#491), and it has nothing to answer for on a side facing another fine
+ * quad (both sample the same nodes) or facing the claim itself (the neighbour
+ * there is the playable mesh, at 1 m spacing). Applying it on the claim side is
+ * what put the landscape's own boundary ring on a straight 4 m chord while the
+ * playable mesh followed the sampled ground between the same two coarse nodes.
+ *
+ * Every other node takes the live surface height (`playable.boundaryHeightAt`)
+ * when the caller supplies one, falling back to the theoretical WorldGen height
+ * otherwise, so the ring never drifts from what the playable mesh renders.
  */
 export function buildBoundaryQuad(
   positions: number[],
@@ -184,6 +276,7 @@ export function buildBoundaryQuad(
   sampleColumn: SampleFn,
   palette: CompositionPalette,
   playable: PlayableCut,
+  sides: BoundaryQuadSides = ALL_SIDES_COARSE,
 ): void {
   const subdiv = Math.max(1, Math.round((x1 - x0) / FINE_STEP));
   const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
@@ -232,18 +325,27 @@ export function buildBoundaryQuad(
     const z = z0 + row * FINE_STEP;
     const sample = sampleColumn(x, z);
 
-    const onXEdge = col === 0 || col === subdiv;
-    const onZEdge = row === 0 || row === subdiv;
+    const onWest = col === 0, onEast = col === subdiv;
+    const onNorth = row === 0, onSouth = row === subdiv;
+    const flatX = (onWest && sides.coarseWest) || (onEast && sides.coarseEast);
+    const flatZ = (onNorth && sides.coarseNorth) || (onSouth && sides.coarseSouth);
 
     let y: number;
-    if (onXEdge && onZEdge) {
-      y = col === 0 ? (row === 0 ? h00 : h01) : (row === 0 ? h10 : h11);
-    } else if (onZEdge) {
+    if ((onWest || onEast) && (onNorth || onSouth)) {
+      // A quad corner is itself a coarse lattice node, so its flat-edge value
+      // and its sampled value are the same number for any node outside the
+      // claim — and a corner shared with a coarser neighbour always is one,
+      // since that neighbour is only classified 'outside' when no cell in its
+      // own expanded neighbourhood is claimed. Preferring the parent corner
+      // whenever either incident side is coarse keeps that identity explicit.
+      const corner = onWest ? (onNorth ? h00 : h01) : (onNorth ? h10 : h11);
+      y = flatX || flatZ ? corner : trueHeightAt(x, z);
+    } else if (flatZ) {
       const t = col / subdiv;
-      y = row === 0 ? h00 + t * (h10 - h00) : h01 + t * (h11 - h01);
-    } else if (onXEdge) {
+      y = onNorth ? h00 + t * (h10 - h00) : h01 + t * (h11 - h01);
+    } else if (flatX) {
       const t = row / subdiv;
-      y = col === 0 ? h00 + t * (h01 - h00) : h10 + t * (h11 - h10);
+      y = onWest ? h00 + t * (h01 - h00) : h10 + t * (h11 - h10);
     } else {
       y = trueHeightAt(x, z);
     }
@@ -268,12 +370,9 @@ export function buildBoundaryQuad(
 
   for (let row = 0; row < subdiv; row++) {
     for (let col = 0; col < subdiv; col++) {
-      const cx0 = x0 + col * FINE_STEP, cx1 = cx0 + FINE_STEP;
-      const cz0 = z0 + row * FINE_STEP, cz1 = cz0 + FINE_STEP;
-      const anyUnowned =
-        !claims(cx0, cz0) || !claims(cx1, cz0) ||
-        !claims(cx0, cz1) || !claims(cx1, cz1);
-      if (!anyUnowned) continue; // fully claimed — the playable mesh owns this cell
+      // One test, on the cell's own minimum corner: `claims` answers about the
+      // 1 m cell at (x, z), which is exactly one marching-cubes cube column.
+      if (claims(x0 + col * FINE_STEP, z0 + row * FINE_STEP)) continue; // the playable mesh draws this cell
 
       const i0 = emitVertex(row, col);
       const i1 = emitVertex(row, col + 1);
@@ -517,25 +616,29 @@ export class LandscapeMesh {
       }
     }
 
-    // Classify every coarse quad up front (only when the tile can possibly
-    // touch the rect) so an 'outside' quad can tell whether it borders a
-    // 'boundary' quad and needs MID_STEP subdivision — otherwise the
-    // FINE_STEP boundary ring meets COARSE_STEP open ground in one
-    // resolution jump, which itself reads as a seam (#559).
-    const quadClass = new Map<number, 'inside' | 'outside' | 'boundary'>();
-    if (touchesRect) {
-      for (let row = 0; row < n - 1; row++) {
-        const z0 = tile.originZ + row * step, z1 = z0 + step;
-        for (let col = 0; col < n - 1; col++) {
-          const x0 = tile.originX + col * step, x1 = x0 + step;
-          quadClass.set(row * (n - 1) + col, classifyQuad(playable, x0, z0, x1, z1));
-        }
-      }
-    }
-    const isBoundaryQuad = (row: number, col: number): boolean => {
-      if (row < 0 || col < 0 || row >= n - 1 || col >= n - 1) return false;
-      return quadClass.get(row * (n - 1) + col) === 'boundary';
+    // Classify quads by WORLD position, not by tile-local index, and memoize.
+    //
+    // Two tiles meet along a shared line of quads, and a claim can straddle it
+    // (LandscapeMap tiles the world from the playable rect's own centre, so the
+    // tutorial site sits astride a tile corner). A tile-local lookup answers
+    // "not a boundary quad" for anything past its own edge, so the two tiles
+    // disagreed about the resolution — and therefore about the flat-edge rule —
+    // on exactly the quads they share. classifyQuad is a pure function of world
+    // coordinates and the cut, so asking it directly gives both tiles the same
+    // answer (#907).
+    const quadClass = new Map<string, 'inside' | 'outside' | 'boundary'>();
+    const classAt = (x0: number, z0: number): 'inside' | 'outside' | 'boundary' => {
+      if (!touchesRect) return 'outside';
+      const key = `${x0},${z0}`;
+      const cached = quadClass.get(key);
+      if (cached !== undefined) return cached;
+      const cls = classifyQuad(playable, x0, z0, x0 + step, z0 + step);
+      quadClass.set(key, cls);
+      return cls;
     };
+    /** True when the quad at (x0, z0) is emitted at a coarser step than
+     *  FINE_STEP, and a fine neighbour must flat-edge the side facing it. */
+    const isCoarserQuad = (x0: number, z0: number): boolean => classAt(x0, z0) === 'outside';
 
     const indices: number[] = [];
     for (let row = 0; row < n - 1; row++) {
@@ -543,18 +646,24 @@ export class LandscapeMesh {
       for (let col = 0; col < n - 1; col++) {
         if (touchesRect) {
           const x0 = tile.originX + col * step, x1 = x0 + step;
-          const cls = quadClass.get(row * (n - 1) + col)!;
+          const cls = classAt(x0, z0);
           if (cls === 'inside') continue;
           if (cls === 'boundary') {
             buildBoundaryQuad(
               positions, normals, rockA, rockB, rockWeight, ore, indices,
               x0, z0, x1, z1, sampleColumn, palette, playable,
+              {
+                coarseWest: isCoarserQuad(x0 - step, z0),
+                coarseEast: isCoarserQuad(x1, z0),
+                coarseNorth: isCoarserQuad(x0, z0 - step),
+                coarseSouth: isCoarserQuad(x0, z1),
+              },
             );
             continue;
           }
           const adjacentToBoundary =
-            isBoundaryQuad(row - 1, col) || isBoundaryQuad(row + 1, col) ||
-            isBoundaryQuad(row, col - 1) || isBoundaryQuad(row, col + 1);
+            classAt(x0 - step, z0) === 'boundary' || classAt(x1, z0) === 'boundary' ||
+            classAt(x0, z0 - step) === 'boundary' || classAt(x0, z1) === 'boundary';
           if (adjacentToBoundary) {
             subdivideOutsideQuad(
               positions, normals, rockA, rockB, rockWeight, ore, indices,

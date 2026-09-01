@@ -21,6 +21,7 @@ import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
+import { playableCut } from '../../../src/renderer/GameRendererTerrain.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -869,22 +870,47 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
     return makeGameContext({ mineType, seed: '42', size: '64' });
   }
 
-  it('playableCut(grid).meshClaimsColumn delegates to grid.claimsColumnForMeshing', async () => {
-    const claimsSpy = vi.spyOn(VoxelGrid.prototype, 'claimsColumnForMeshing');
+  it('playableCut(grid) cuts the landscape against the cells TerrainMesh actually marches (#907)', async () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
 
-    renderer.syncFromContext(await makeLandscapeCtx());
+    renderer.syncFromContext(ctx);
 
-    // The landscape build cuts itself against playableCut(grid), whose
-    // meshClaimsColumn is wired straight to grid.claimsColumnForMeshing
-    // (GameRenderer.playableCut) -- a boundary quad anywhere in the built
-    // landscape necessarily calls it via LandscapeMesh's classifyQuad.
-    expect(claimsSpy).toHaveBeenCalled();
-    const [x, z] = claimsSpy.mock.calls[0]!;
-    expect(typeof x).toBe('number');
-    expect(typeof z).toBe('number');
-    claimsSpy.mockRestore();
+    // meshClaimsColumn is meshClaimsCell against this very grid, so the
+    // landscape's cut and TerrainMesh's march bounds cannot answer differently
+    // about a square metre (PlayableCoverage.ts). Spot-check the ring the two
+    // sheets share and one cell either side of it.
+    const grid = ctx.grid!;
+    const cut = playableCut(grid);
+    expect(cut.meshClaimsColumn).toBeDefined();
+    const claims = cut.meshClaimsColumn!;
+    expect(claims(grid.minX, grid.minZ)).toBe(true);                  // owned
+    expect(claims(grid.minX - 1, grid.minZ)).toBe(true);              // west sealing halo
+    expect(claims(grid.minX - 1, grid.minZ - 1)).toBe(true);          // its diagonal corner
+    expect(claims(grid.minX - 2, grid.minZ)).toBe(false);             // the landscape's
+    expect(claims(grid.maxX - 1, grid.minZ)).toBe(true);              // last owned cell
+    expect(claims(grid.maxX, grid.minZ)).toBe(false);                 // the landscape's
+  });
+
+  it('playableCut(grid, edgeHeight).boundaryHeightAt answers on the shared ring, and only there (#907)', async () => {
+    const ctx = await makeLandscapeCtx();
+    const grid = ctx.grid!;
+    const edgeHeight = (x: number, z: number): number => 7.25 + x * 0 + z * 0;
+    const cut = playableCut(grid, edgeHeight);
+    const at = cut.boundaryHeightAt!;
+
+    // Inside the site: the live voxel surface, never the sampler.
+    expect(at(grid.minX + 4, grid.minZ + 4)).not.toBe(7.25);
+    expect(Number.isNaN(at(grid.minX + 4, grid.minZ + 4))).toBe(false);
+    // On the ring the landscape shares with the playable mesh: the sampler,
+    // so both sheets place that node at the same height.
+    expect(at(grid.minX - 1, grid.minZ + 4)).toBeCloseTo(7.25, 9);
+    expect(at(grid.maxX, grid.minZ + 4)).toBeCloseTo(7.25, 9);
+    // One node further out the playable mesh draws nothing, and the landscape
+    // must fall back to its own sampled height rather than to a clamped one.
+    expect(Number.isNaN(at(grid.minX - 2, grid.minZ + 4))).toBe(true);
+    expect(Number.isNaN(at(grid.maxX + 1, grid.minZ + 4))).toBe(true);
   });
 
   it('loadGame() sets the terrain edge-height sampler BEFORE buildAll(), and it is non-null afterward', async () => {
