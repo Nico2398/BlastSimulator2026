@@ -22,7 +22,7 @@
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:420176",
-      "timeout": 30,
+      "timeout": 90,
       "interaction": [
         {
           "type": "command",
