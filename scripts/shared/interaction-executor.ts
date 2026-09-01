@@ -25,7 +25,7 @@ const PICKER_TIMEOUT_MS = 5000;
  * progress before the wait fails loudly by name, instead of running out its
  * outer `maxTicks`/`timeout` budget silently stalled (#903).
  */
-export const CLOCK_HELD_FAIL_AFTER_POLLS = 1;
+export const CLOCK_HELD_FAIL_AFTER_POLLS = 2;
 
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
@@ -623,7 +623,7 @@ export async function executeActionOnPage(
           }).__gameConsole;
           run?.('tick 1');
           const fn = (window as unknown as {
-            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null; clockHeld: boolean };
+            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null; clockHeld: boolean; stageIndex: number };
           }).__tutorialState;
           const tutorialState = fn === undefined ? null : fn();
           const getState = (window as unknown as {
@@ -652,8 +652,10 @@ export async function executeActionOnPage(
           heldWithoutProgress++;
           if (heldWithoutProgress >= CLOCK_HELD_FAIL_AFTER_POLLS) {
             throw new Error(
-              `Clock held on step "${st.stepId ?? 'none'}" while waiting for `
-              + `${wanted.map(s => `"${s}"`).join(' or ')} — a real player could not advance this`,
+              `waitForTutorialStep: clock held — it is on "${st.stepId ?? 'none'}", `
+              + `stage ${st.stageIndex}, live control ${st.stageTarget ?? 'none'}, after ${ticksUsed} tick(s), `
+              + `while waiting for ${wanted.map(s => `"${s}"`).join(' or ')} `
+              + `— a real player could not advance past this`,
             );
           }
         } else {
