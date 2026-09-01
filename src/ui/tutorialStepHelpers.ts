@@ -279,13 +279,16 @@ export function createEvacuateZoneStep(): TutorialStep {
   };
 }
 
+/** Selector for the Survey panel's own confidence-overlay toggle button (#496). */
+export const SURVEY_OVERLAY_TOGGLE_TARGET = '#bs-survey-panel [data-role="overlay-toggle"]';
+
 /**
  * Whether the survey confidence overlay (#496) is currently toggled on, read
  * off the Survey panel's own toggle button — the same `aria-pressed` state
  * `paintToggleButton` (dom.ts) stamps on it.
  */
 export function isSurveyOverlayToggleOn(): boolean {
-  const btn = document.querySelector('#bs-survey-panel [data-role="overlay-toggle"]');
+  const btn = document.querySelector(SURVEY_OVERLAY_TOGGLE_TARGET);
   if (!btn) return true;
   return btn.getAttribute('aria-pressed') === 'true';
 }
@@ -301,7 +304,7 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
     id: 'toggle-survey-overlay',
     titleKey: 'tutorial.step_overlaytoggle.title',
     textKey: 'tutorial.step_overlaytoggle',
-    highlightTarget: '#bs-survey-panel [data-role="overlay-toggle"]',
+    highlightTarget: SURVEY_OVERLAY_TOGGLE_TARGET,
     captureSnapshot: () => ({
       overlayOn: isSurveyOverlayToggleOn(),
     }),
