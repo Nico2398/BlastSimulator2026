@@ -623,7 +623,7 @@ export async function executeActionOnPage(
           }).__gameConsole;
           run?.('tick 1');
           const fn = (window as unknown as {
-            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null; clockHeld: boolean };
+            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null; clockHeld: boolean; stageIndex: number };
           }).__tutorialState;
           const tutorialState = fn === undefined ? null : fn();
           const getState = (window as unknown as {
