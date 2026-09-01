@@ -251,10 +251,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial step, inserted after 'survey' -- 2 new keys,
     // tutorial.step_overlaytoggle.title and tutorial.step_overlaytoggle, both
     // locales translated.
+    // Baseline is now 3467 (down from 3468): #921 removes player-facing
+    // vehicle driver assignment from the UI -- ui.fleet.assign and
+    // ui.fleet.unassign removed, ui.fleet.unmanned added, both locales
+    // (net -1 key per locale).
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3468);
+    expect(Object.keys(en).length).toBe(3467);
   });
 });
 
