@@ -764,6 +764,77 @@ describe('Vehicle fleet', () => {
       expect(sawQueued).toBe(true);
     });
   });
+
+  // ── #921: player-facing driver assignment removed — the fully automatic
+  // claim/board/release path already exists in core (VehicleReservation.ts,
+  // VehicleBoarding.ts, ArrivalGate.resolveBoarding) and needs no changes for
+  // this issue. These two tests pin that no manual affordance
+  // (`vehicleCommand(['driver', ...])` / `assignDriver`) is ever needed for a
+  // queued vehicle-gated task to claim, board, and complete on its own.
+  describe('fully automatic driver claim — no player affordance used (#921)', () => {
+    it('a bought vehicle + a licensed, idle employee + a queued vehicle-gated action: driverId is set to that employee and the action progresses with zero manual "vehicle driver"/assignDriver calls', () => {
+      const eid = hireOne(ctx, 'driller');
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+
+      // Nothing below this line ever calls vehicleCommand(['driver', ...]) or
+      // the core assignDriver() function — the claim has to happen on its own.
+      const dispatch = employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      expect(dispatch.success).toBe(true);
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      let sawDriverSet = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === actionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId === eid) sawDriverSet = true;
+      }
+
+      expect(sawDriverSet).toBe(true);
+      // The action progressed all the way to completion — removed from the
+      // pending pool, with the vehicle released again.
+      expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+    });
+
+    it('two licensed employees queued for the same vehicle role with only one free vehicle: only one boards at a time, the other claims it once released', () => {
+      const eid1 = hireOne(ctx, 'driller');
+      employeeCommand(ctx, ['assign_skill', String(eid1)], { skill: 'driving.drill_rig', level: '1' });
+      const rng = new Random(11);
+      hireEmployee(ctx.state!.employees, 'driller', rng, 16, 16);
+      const eid2 = ctx.state!.employees.employees.find(e => e.id !== eid1)!.id;
+      assignSkill(ctx.state!.employees, eid2, 'driving.drill_rig', 1);
+
+      // Exactly one free drill_rig for both to compete over.
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+
+      const dispatch1 = employeeCommand(ctx, ['dispatch', String(eid1)], { x: '10', z: '10', skill: 'blasting', vehicle: 'drill_rig' });
+      expect(dispatch1.success).toBe(true);
+      const actionId1 = ctx.state!.pendingActions[0]!.id;
+      const dispatch2 = employeeCommand(ctx, ['dispatch', String(eid2)], { x: '30', z: '30', skill: 'blasting', vehicle: 'drill_rig' });
+      expect(dispatch2.success).toBe(true);
+      const actionId2 = ctx.state!.pendingActions.find(a => a.id !== actionId1)!.id;
+
+      // Tick until both actions have resolved, sampling the vehicle's driver
+      // on every tick. There is only one drill_rig, so at no point may it
+      // simultaneously be driven by both employees (it can only ever hold
+      // one driverId at a time) — the second driller has to wait for the
+      // first to finish and release it.
+      const driversSeen = new Set<number>();
+      for (let i = 0; i < 400 && (ctx.state!.pendingActions.some(a => a.id === actionId1) || ctx.state!.pendingActions.some(a => a.id === actionId2)); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId !== null) driversSeen.add(vehicle.driverId);
+      }
+
+      // Both employees eventually drove the shared vehicle, one after the
+      // other — proving the second one queued behind the first rather than
+      // being rejected outright or somehow sharing the vehicle concurrently.
+      expect(driversSeen.has(eid1)).toBe(true);
+      expect(driversSeen.has(eid2)).toBe(true);
+      expect(ctx.state!.pendingActions.find(a => a.id === actionId1)).toBeUndefined();
+      expect(ctx.state!.pendingActions.find(a => a.id === actionId2)).toBeUndefined();
+    });
+  });
 });
 
 // ── Occupancy-block reroute/stuck escalation — end-to-end repro (issue #591) ──

@@ -559,7 +559,12 @@ describe('tutorialSteps', () => {
     // the player: the card never completes and there is nothing left to click.
     // vehicle-buy-assign did exactly that — assigning a driver sends them
     // walking to the vehicle, and ArrivalGate only seats them on arrival.
-    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'train-digger', 'buy-rock-digger-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver', 'evacuate-zone'];
+    // #921: buy-drill-rig-assign/buy-rock-digger-assign/vehicle-buy-assign
+    // drop out of this list — a vehicle's driver is claimed automatically now
+    // (VehicleReservation/ArrivalGate), so these three steps complete
+    // synchronously on the purchase itself and no longer need to wait on the
+    // simulation to run a driver's walk-and-board.
+    const SIMULATION_OWNED = ['survey', 'train-driller', 'train-digger', 'haul-debris', 'contract-deliver', 'evacuate-zone'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {
@@ -569,14 +574,53 @@ describe('tutorialSteps', () => {
         expect(step!.tickBudget ?? 0).toBeGreaterThan(0);
       });
     }
+  });
 
-    it('vehicle-buy-assign names a driver who actually holds a driving licence', () => {
-      // The hint command is what a stuck player copies into the console. It
-      // pointed at employee 1 — the surveyor hired in step 2, who has geology
-      // and no licence at all, so the command it suggested could only fail.
-      const step = TUTORIAL_STEPS.find((s) => s.id === 'vehicle-buy-assign')!;
-      expect(step.commands).toContain('vehicle driver 1 4');
-    });
+  // ── #921: purchase-completing steps (driver assignment removed) ──────────
+  // buy-drill-rig-assign, buy-rock-digger-assign and vehicle-buy-assign used
+  // to wait on a driver's walk-and-board (assignDriver sends them walking;
+  // ArrivalGate seats them only on arrival). Now that a vehicle's driver is
+  // claimed automatically, there is nothing left for the player to click
+  // after the purchase — each step must complete the instant a vehicle of the
+  // role it teaches exists, the same "value increased" shape createComparisonStep
+  // already gives every other purchase/build step in this file (e.g.
+  // build-living-quarters, build-storage).
+  describe('purchase-completing steps no longer wait on an assigned driver (#921)', () => {
+    const PURCHASE_COMPLETING: Array<{ id: string; role: string }> = [
+      { id: 'buy-drill-rig-assign', role: 'drill_rig' },
+      { id: 'buy-rock-digger-assign', role: 'rock_digger' },
+      { id: 'vehicle-buy-assign', role: 'debris_hauler' },
+    ];
+
+    for (const { id, role } of PURCHASE_COMPLETING) {
+      describe(`step "${id}"`, () => {
+        it('carries no manual "vehicle driver ..." command hint', () => {
+          const step = TUTORIAL_STEPS.find((s) => s.id === id)!;
+          expect(step, `no tutorial step with id "${id}"`).toBeDefined();
+          const commands = step.commands ?? [];
+          for (const cmd of commands) {
+            expect(cmd, `step "${id}" still hints a manual driver-assign command: "${cmd}"`).not.toMatch(/vehicle driver/);
+          }
+        });
+
+        it(`completes once a vehicle of role "${role}" exists, with no driver required`, () => {
+          const step = TUTORIAL_STEPS.find((s) => s.id === id)!;
+          const before = { vehicles: { vehicles: [] } } as unknown as GameState;
+          const snap = step.captureSnapshot ? step.captureSnapshot(before) : {};
+          const after = {
+            vehicles: { vehicles: [{ id: 1, type: role, driverId: null }] },
+          } as unknown as GameState;
+          expect(step.isComplete(after, snap)).toBe(true);
+        });
+
+        it('does not complete before the vehicle is bought', () => {
+          const step = TUTORIAL_STEPS.find((s) => s.id === id)!;
+          const before = { vehicles: { vehicles: [] } } as unknown as GameState;
+          const snap = step.captureSnapshot ? step.captureSnapshot(before) : {};
+          expect(step.isComplete(before, snap)).toBe(false);
+        });
+      });
+    }
   });
 
   // ── evacuate-zone (#557) ─────────────────────────────────────────────────

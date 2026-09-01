@@ -203,6 +203,36 @@ describe('haul-debris stage list (#552 — self-dispatching, no manual Haul butt
   });
 });
 
+describe('buy-drill-rig-assign / buy-rock-digger-assign / vehicle-buy-assign stage lists (#921 — no player driver assignment)', () => {
+  // A vehicle's driver is claimed automatically now (VehicleReservation/
+  // ArrivalGate), so the third stage each of these used to carry — clicking
+  // `.bs-vehicle-assign-btn` — is gone. Each list ends on the vehicle-buy
+  // click itself.
+  const RETARGETED_IDS = ['buy-drill-rig-assign', 'buy-rock-digger-assign', 'vehicle-buy-assign'];
+
+  for (const id of RETARGETED_IDS) {
+    it(`"${id}" has exactly 2 stages, ending on the vehicle-buy click`, () => {
+      const stages = TUTORIAL_STAGES[id];
+      expect(stages, `no TUTORIAL_STAGES entry for "${id}"`).toBeDefined();
+      expect(stages!.length, `"${id}" should have 2 stages now that assign is automatic`).toBe(2);
+      const last = stages![stages!.length - 1]!;
+      expect(last.target, `"${id}"'s last stage should target the vehicle-buy control, not an assign button`)
+        .not.toMatch(/assign/i);
+    });
+
+    it(`"${id}" has no stage targeting the retired ".bs-vehicle-assign-btn" control`, () => {
+      const stages = TUTORIAL_STAGES[id] ?? [];
+      for (const stage of stages) {
+        expect(stage.target).not.toMatch(/bs-vehicle-assign-btn/);
+        expect(stage.also ?? []).not.toEqual(
+          expect.arrayContaining([expect.stringMatching(/bs-vehicle-assign-btn/)]),
+        );
+        expect(stage.doneTarget ?? '').not.toMatch(/bs-vehicle-assign-btn/);
+      }
+    });
+  }
+});
+
 describe('toggle-survey-overlay stage fallback (#905)', () => {
   // Genuinely one click — no explicit TUTORIAL_STAGES entry needed.
   // stagesFor()'s own fallback (a single stage built from the step's
