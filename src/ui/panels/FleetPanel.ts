@@ -23,7 +23,7 @@ import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier } fr
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow, makePendingDriverRow } from '../fleetDetailSections.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
@@ -247,17 +247,17 @@ export class FleetPanel {
 
     // v.driverId stays null for a driver's whole walk to the vehicle
     // (ArrivalGate.ts sets it only on arrival), so a pending claim needs its
-    // own row — falling through to makeAssignRow would re-offer the vehicle
+    // own row — falling through to makeNoDriverRow would re-offer the vehicle
     // as driverless even though someone's already en route to it (#715).
     const pendingDriver = v.driverId === null
       ? state.employees.employees.find(e => e.pendingDriverVehicleId === v.id)
       : undefined;
     rows.push(
       v.driverId !== null
-        ? makeDriverRow(v, state, () => this.gameConsole?.(`vehicle driver ${v.id} none`))
+        ? makeDriverRow(v, state)
         : pendingDriver
           ? makePendingDriverRow(pendingDriver)
-          : makeAssignRow(v, state, employeeId => this.gameConsole?.(`vehicle driver ${v.id} ${employeeId}`), () => this.onNavigateCb?.('crew')),
+          : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
     );
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
@@ -271,12 +271,12 @@ export class FleetPanel {
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
     // Mirrors the dealership buy buttons' own [data-vtype] (this file's
-    // header comment) so a tutorial stage can scope an owned-vehicle control
-    // (e.g. .bs-vehicle-assign-btn below) to a specific vehicle TYPE, not just
-    // "the first matching element in the DOM" — see tutorialStages.ts's
-    // 'vehicle-buy-assign' (and tutorialStagesTraining.ts's
-    // 'buy-drill-rig-assign'/'buy-rock-digger-assign') for why that
-    // distinction matters (#557 follow-up).
+    // header comment) so a tutorial stage can scope its purchase target to a
+    // specific vehicle TYPE, not just "the first matching element in the
+    // DOM" — see tutorialStages.ts's 'vehicle-buy-assign' (and
+    // tutorialStagesTraining.ts's 'buy-drill-rig-assign'/
+    // 'buy-rock-digger-assign') for why that distinction matters (#557
+    // follow-up).
     wrap.dataset['vtype'] = v.type;
     wrap.style.cursor = 'pointer';
     wrap.addEventListener('click', (e) => {

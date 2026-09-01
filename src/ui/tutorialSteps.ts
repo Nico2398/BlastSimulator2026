@@ -206,6 +206,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // already had a driver and requiring a driven vehicle outside that set
   // keeps this step from false-completing on some other already-driven
   // vehicle, the same guard vehicle-buy-assign now needs for the same reason.
+  // TODO(#921): complete on purchase, not driven vehicle — driver assignment
+  // is now automatic (VehicleReservation/ArrivalGate), so this step's
+  // `commands` hint and isComplete's "some newly-driven vehicle" check are
+  // stale. Left structurally valid pending test-writer's exact expect shape.
   {
     id: 'buy-drill-rig-assign',
     titleKey: 'tutorial.step_buydrillrig.title',
@@ -255,6 +259,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // buy-drill-rig-assign above, and for the same reason: the drill_rig
   // bought there already has a driver, so a naive "some vehicle has a
   // driver" check would false-complete instantly.
+  // TODO(#921): complete on purchase, not driven vehicle — same as
+  // buy-drill-rig-assign above.
   {
     id: 'buy-rock-digger-assign',
     titleKey: 'tutorial.step_buyrockdigger.title',
@@ -428,6 +434,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // Snapshotting which vehicle ids already had a driver and requiring a
   // driven vehicle outside that set (the same guard buy-drill-rig-assign
   // above needs, for the same reason) keeps this step honest again.
+  // TODO(#921): complete on purchase, not driven vehicle — same as
+  // buy-drill-rig-assign above.
   {
     id: 'vehicle-buy-assign',
     titleKey: 'tutorial.step14.title',
