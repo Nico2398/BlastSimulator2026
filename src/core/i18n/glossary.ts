@@ -80,7 +80,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     relevantKeys: [
       'role.driver',
       'tutorial.step13', 'tutorial.step13.title', 'tutorial.step14',
-      'tutorial.stage.hire_driver', 'tutorial.stage.vehicle_assign',
+      'tutorial.stage.hire_driver',
     ],
     note: "role.driver='Chauffeur', but every tutorial key that names the hireable role instead says 'conducteur' (5 occurrences). Canonical picked as role.driver's value for the same reason as role_surveyor. Generic narrative uses of 'conducteur' in weather event flavour text (e.g. event.weather_dust_storm.res1, event.weather_sun_glare.*) are not in scope — those describe an anonymous vehicle operator, not the hireable role.",
   },

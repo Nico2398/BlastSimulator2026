@@ -251,14 +251,20 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial step, inserted after 'survey' -- 2 new keys,
     // tutorial.step_overlaytoggle.title and tutorial.step_overlaytoggle, both
     // locales translated.
-    // Baseline is now 3467 (down from 3468): #921 removes player-facing
-    // vehicle driver assignment from the UI -- ui.fleet.assign and
-    // ui.fleet.unassign removed, ui.fleet.unmanned added, both locales
-    // (net -1 key per locale).
+    // Baseline is now 3467 (down from 3468, 2026-09-01): #921 removes the
+    // player-facing vehicle driver assign/unassign controls -- drops
+    // ui.fleet.assign and ui.fleet.unassign (2 keys), adds
+    // ui.fleet.unmanned (1 key) for the display-only "nobody currently
+    // driving" state. Net -1, both locales.
+    // Baseline is now 3466 (down from 3467, 2026-09-01): #921 code review
+    // follow-up removes tutorial.stage.vehicle_assign -- its only hintKey
+    // reference (the assign-click sub-stage of the vehicle-buy-assign
+    // tutorial stage) was deleted along with the assign control itself, so
+    // the key was orphaned. Both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3467);
+    expect(Object.keys(en).length).toBe(3466);
   });
 });
 
