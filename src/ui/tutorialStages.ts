@@ -246,8 +246,21 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: '#bs-blast-panel [data-action="charge-all"]', hintKey: 'tutorial.stage.charge_all' },
   ],
 
+  // #926: `auto-sequence` lives inside the Sequence tab's own body, hidden
+  // (display:none) whenever a different tab is showing -- which the panel's
+  // own auto-advance (BlastWorkshop.ts's suggestStep) can legitimately do
+  // while the crew is still mid-charge. Without a stage in between,
+  // resolveStageIndex (tutorialGuide.ts, "last reachable stage wins") had
+  // nowhere to fall back to but the already-satisfied "open the Blast panel"
+  // hint, with every control on the panel blocked and the Sequence tab
+  // itself un-clickable. The tab button (`data-step`, BlastWorkshop.ts) is
+  // part of the strip, not any one step's body, so it stays reachable
+  // regardless of which tab is active -- this stage lets the player put the
+  // panel on Sequence themselves whenever the panel hasn't gotten there on
+  // its own yet.
   sequence: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
+    { target: '#bs-blast-panel [data-step="3"]', hintKey: 'tutorial.stage.open_sequence_tab' },
     { target: '#bs-blast-panel [data-action="auto-sequence"]', hintKey: 'tutorial.stage.auto_sequence' },
   ],
 

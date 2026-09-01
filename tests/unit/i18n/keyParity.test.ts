@@ -251,10 +251,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial step, inserted after 'survey' -- 2 new keys,
     // tutorial.step_overlaytoggle.title and tutorial.step_overlaytoggle, both
     // locales translated.
+    // Baseline is now 3469 (up from 3468): #926 adds an intermediate
+    // 'sequence' tutorial stage letting the player open the Blast Workshop's
+    // Sequence tab themselves when the panel's own auto-advance hasn't
+    // gotten there yet -- 1 new key, tutorial.stage.open_sequence_tab, both
+    // locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3468);
+    expect(Object.keys(en).length).toBe(3469);
   });
 });
 
