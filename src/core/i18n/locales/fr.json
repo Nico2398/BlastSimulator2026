@@ -2703,6 +2703,8 @@
   "tutorial.step1": "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre du haut !",
   "tutorial.step2": "Embauchez un prospecteur pour scanner le terrain à la recherche de gisements. Ouvrez le panneau Équipe et cliquez sur Embauche.",
   "tutorial.step3": "Effectuez maintenant un sondage sismique pour révéler les emplacements de minerai souterrains.",
+  "tutorial.step_overlaytoggle.title": "Basculer la surcouche de confiance",
+  "tutorial.step_overlaytoggle": "La surcouche colorée indiquant la confiance des sondages n'a pas besoin de rester affichée. Cliquez sur le bouton de bascule dans le panneau Sondage — ou appuyez sur O — pour l'activer ou la désactiver, à votre guise.",
   "tutorial.step4": "Embauchez un foreur pour préparer les trous de mine. Consultez le panneau Équipe.",
   "tutorial.step_livingquarters": "Surveillez le score de bien-être en haut de l'écran — la faim et la fatigue le font chuter, et une équipe qui ne se repose jamais finit par se révolter. Construisez des Logements maintenant, avant le forage et les tirs de mine à venir.",
   "tutorial.step_earlypolicy": "Un bâtiment seul n'envoie personne se reposer — sélectionnez Continu sous Mode de quart et appliquez-le, pour que le personnel fatigué ou affamé soit automatiquement retiré du travail avant de s'effondrer.",

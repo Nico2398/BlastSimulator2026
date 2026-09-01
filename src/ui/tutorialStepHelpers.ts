@@ -285,7 +285,9 @@ export function createEvacuateZoneStep(): TutorialStep {
  * `paintToggleButton` (dom.ts) stamps on it.
  */
 export function isSurveyOverlayToggleOn(): boolean {
-  throw new Error('not implemented');
+  const btn = document.querySelector('#bs-survey-panel [data-role="overlay-toggle"]');
+  if (!btn) return true;
+  return btn.getAttribute('aria-pressed') === 'true';
 }
 
 /**
@@ -295,5 +297,15 @@ export function isSurveyOverlayToggleOn(): boolean {
  * player chose.
  */
 export function createSurveyOverlayToggleStep(): TutorialStep {
-  throw new Error('not implemented');
+  return {
+    id: 'toggle-survey-overlay',
+    titleKey: 'tutorial.step_overlaytoggle.title',
+    textKey: 'tutorial.step_overlaytoggle',
+    highlightTarget: '#bs-survey-panel [data-role="overlay-toggle"]',
+    captureSnapshot: () => ({
+      overlayOn: isSurveyOverlayToggleOn(),
+    }),
+    isComplete: (_state: GameState, snapshot: Record<string, unknown>) =>
+      isSurveyOverlayToggleOn() !== (snapshot.overlayOn as boolean),
+  };
 }
