@@ -17,3 +17,15 @@ lip standing as a dark step beside it. `topdown-boundary` shows it as the site's
 own L etched into open desert. The east and south edges carry the opposite
 error — the two sheets overlap there rather than parting — which shows as a
 blocky staircase silhouette when the boundary is seen from below.
+
+## After a blast at the boundary
+
+`*-blast-crater-topdown` is a real blast — six holes drilled, charged with 8 kg
+of boomite and fired through the game loop at the site's west edge — on
+tutorial_pit's own biome, seed and size, staffed (the campaign start hires
+nobody, so no blast can be fired there) and paused so only the ticks the capture
+asks for pass. Camera `__cameraOrbit(0, 80)`, `__cameraFocus(4, 11, 40)`.
+
+Same crew, same vehicle, same muck pile, same day and same balance in both: the
+only difference is the fix. Before, the bright L runs straight past the crater
+it just opened.
