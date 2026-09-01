@@ -315,9 +315,19 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
   // clockHeld has been observed for CLOCK_HELD_FAIL_AFTER_POLLS consecutive
   // polls turns that into an immediate, diagnostic failure instead.
   describe('waitForTutorialStep fails fast, by name, on a held clock instead of stalling out the full tick budget (#903)', () => {
-    it('throws a distinct "clock held" error once clockHeld has been observed true for CLOCK_HELD_FAIL_AFTER_POLLS consecutive polls, well before maxTicks is ever approached', async () => {
+    // Issue #908: a single held poll used to fail the wait outright, which
+    // does not tolerate a MOMENTARY hold that clears on its own (e.g. a
+    // one-frame pause while a modal opens) — only a SUSTAINED hold (held on
+    // 2 consecutive polls) is a genuine deadlock. 2 is the smallest value
+    // that gives the existing heldWithoutProgress reset-on-clean-poll
+    // debounce counter any real effect.
+    it('requires the hold to persist for 2 consecutive polls before treating it as sustained', () => {
+      expect(CLOCK_HELD_FAIL_AFTER_POLLS).toBe(2);
+    });
+
+    it('throws a distinct "clock held" error once clockHeld has been observed true for CLOCK_HELD_FAIL_AFTER_POLLS consecutive polls, well before maxTicks is ever approached, and the message names the step, stage, live control and tick count', async () => {
       const evaluate = vi.fn().mockResolvedValue({
-        active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true,
+        active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true, stageIndex: 2,
       });
       const page = fakePage({ evaluate });
       const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
@@ -331,13 +341,104 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
       );
 
       expect(failure, 'waitForTutorialStep resolved instead of failing on a held clock').not.toBeNull();
-      expect(failure!.message).toMatch(/clock held/i);
+      const message = failure!.message;
+      // Full diagnosis, matching the level of detail the neighbouring
+      // ordinary-timeout throw two lines below already gives: step id,
+      // stage index, live control, and ticks used — not just "held".
+      expect(message).toMatch(/train-driller/);
+      expect(message).toMatch(/stage\s*2\b/i);
+      expect(message).toMatch(/\.bs-train-btn/);
+      expect(message).toMatch(/2 tick/i);
+      expect(message).toMatch(/held/i);
       // A genuinely distinct failure mode, not the ordinary exhausted-budget
       // message with a suffix tacked on.
-      expect(failure!.message).not.toMatch(/tutorial never reached/);
-      // Fails on the threshold, not by looping all the way to maxTicks —
-      // exactly the wall-clock cost this fix exists to avoid.
-      expect(evaluate).toHaveBeenCalledTimes(CLOCK_HELD_FAIL_AFTER_POLLS);
+      expect(message).not.toMatch(/tutorial never reached/);
+      // Fails on the threshold (2 consecutive held polls), not on the first
+      // held poll, and not by looping all the way to maxTicks — exactly the
+      // wall-clock cost this fix exists to avoid.
+      expect(evaluate).toHaveBeenCalledTimes(2);
+    });
+
+    it('tolerates a MOMENTARY hold that clears within one poll of appearing, without failing the wait', async () => {
+      const evaluate = vi.fn()
+        // poll 1: held, but not yet the wanted step.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true, stageIndex: 1,
+        })
+        // poll 2: hold has cleared on its own; still not the wanted step.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: false, stageIndex: 1,
+        })
+        // poll 3: wanted step reached.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'buy-drill-rig-assign', stageTarget: '#bs-vehicle-panel', clockHeld: false, stageIndex: 2,
+        });
+      const page = fakePage({ evaluate });
+      const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
+      const action = {
+        type: 'waitForTutorialStep' as const, stepId: 'buy-drill-rig-assign', maxTicks: 3000, timeout: 30000,
+      };
+
+      await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+      // A hold that persisted only 1 poll before clearing must not have
+      // fast-failed the wait — it keeps polling normally to the goal.
+      expect(evaluate).toHaveBeenCalledTimes(3);
+    });
+
+    it('reports the state at the moment of failure — not the first poll\'s — when a sustained hold appears mid-wait rather than from poll 1', async () => {
+      const evaluate = vi.fn()
+        // poll 1: clean, not yet the wanted step.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'grid-select', stageTarget: 'grid-tool', clockHeld: false, stageIndex: 0,
+        })
+        // poll 2: hold begins.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true, stageIndex: 2,
+        })
+        // poll 3: 2nd consecutive held poll — sustained, must throw here,
+        // diagnosing THIS poll's step/stage/control, not poll 1's.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'train-digger', stageTarget: '.bs-dig-btn', clockHeld: true, stageIndex: 3,
+        });
+      const page = fakePage({ evaluate });
+      const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
+      const action = {
+        type: 'waitForTutorialStep' as const, stepId: 'buy-drill-rig-assign', maxTicks: 3000, timeout: 30000,
+      };
+
+      const failure = await executeActionOnPage(page, action, step).then(
+        () => null,
+        (err: Error) => err,
+      );
+
+      expect(failure, 'waitForTutorialStep resolved instead of failing on the sustained hold').not.toBeNull();
+      const message = failure!.message;
+      expect(message).toMatch(/train-digger/);
+      expect(message).not.toMatch(/grid-select/);
+      expect(message).toMatch(/stage\s*3\b/i);
+      expect(message).toMatch(/\.bs-dig-btn/);
+      expect(message).toMatch(/3 tick/i);
+      expect(evaluate).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not throw when the hold clears exactly on the poll the wanted step is reached, even after one prior held poll', async () => {
+      const evaluate = vi.fn()
+        // poll 1: held, not yet the wanted step — 1st consecutive held poll.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'train-driller', stageTarget: '.bs-train-btn', clockHeld: true, stageIndex: 2,
+        })
+        // poll 2: hold clears AND the wanted step is reached in the same poll.
+        .mockResolvedValueOnce({
+          active: true, stepId: 'buy-drill-rig-assign', stageTarget: '#bs-vehicle-panel', clockHeld: false, stageIndex: 3,
+        });
+      const page = fakePage({ evaluate });
+      const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:buy-drill-rig-assign', role: 'setup' };
+      const action = {
+        type: 'waitForTutorialStep' as const, stepId: 'buy-drill-rig-assign', maxTicks: 3000, timeout: 30000,
+      };
+
+      await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+      expect(evaluate).toHaveBeenCalledTimes(2);
     });
 
     it('does not throw the clock-held error when clockHeld is true on the exact same poll the wanted step is already reached', async () => {
