@@ -1,8 +1,13 @@
+// @vitest-environment jsdom
 // BlastSimulator2026 — Integration tests for survey confidence overlay (4.11)
 // Tests the end-to-end pipeline: GameState with survey results → SurveyConfidencePoint[]
 // → SurveyConfidenceOverlay rendering. All tests must FAIL before implementation.
+//
+// #905 appends a second describe block below exercising the toggle-survey-overlay
+// tutorial step against this same real render pipeline (jsdom pragma added for it —
+// the #4.11 tests above ran fine under plain Node and stay that way under jsdom too).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
@@ -24,6 +29,9 @@ import {
 import { isSurveyStale } from '../../src/core/mining/SurveyCalc.js';
 
 import { SURVEY_STALE_TICKS } from '../../src/core/config/balance.js';
+import { syncSurveyOverlay, buildSurveyOverlayOptions } from '../../src/renderer/GameRendererSync.js';
+import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../src/ui/tutorialStepHelpers.js';
+import type { GameState } from '../../src/core/state/GameState.js';
 
 // ─── Fixture helpers ──────────────────────────────────────────────────────────
 
@@ -1050,5 +1058,112 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     const centerPoints = points.filter(p => p.x === 5 && p.z === 5);
     // Two surveys at same position = two confidence points
     expect(centerPoints.length).toBe(2);
+  });
+});
+
+// ─── toggle-survey-overlay — tutorial path (#905) ──────────────────────────
+
+describe('toggle-survey-overlay — tutorial path drives the render pipeline (#905)', () => {
+  const SELECTOR = '#bs-survey-panel [data-role="overlay-toggle"]';
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function mountToggleButton(pressed: boolean): HTMLElement {
+    document.body.innerHTML =
+      `<div id="bs-survey-panel"><button data-role="overlay-toggle" aria-pressed="${pressed}"></button></div>`;
+    return document.querySelector(SELECTOR)!;
+  }
+
+  function makeSurveyedGridAndState(): { scene: THREE.Scene; grid: VoxelGrid; state: GameState } {
+    const scene = new THREE.Scene();
+    const grid = new VoxelGrid(20, 8, 20);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    state.surveyResults.push({
+      id: 1,
+      method: 'seismic',
+      centerX: 5,
+      centerZ: 5,
+      completedTick: 0,
+      surveyorId: 1,
+      estimates: { '5,5': { gold: 0.5 } },
+      confidence: 0.9,
+    });
+    return { scene, grid, state };
+  }
+
+  // RED: createSurveyOverlayToggleStep throws 'not implemented' in the skeleton.
+  it("the tutorial step (from createSurveyOverlayToggleStep()) targets the Survey panel's own overlay-toggle button", () => {
+    const step = createSurveyOverlayToggleStep();
+    expect(step.highlightTarget).toBe(SELECTOR);
+  });
+
+  // RED: same reason — createSurveyOverlayToggleStep/isSurveyOverlayToggleOn throw.
+  it("clicking the toggle (flipping aria-pressed the way SurveyPanel's own click handler does via paintToggleButton) completes the tutorial step", () => {
+    const btn = mountToggleButton(true);
+    const step = createSurveyOverlayToggleStep();
+    const dummyState = {} as unknown as GameState;
+    const snap = step.captureSnapshot!(dummyState);
+
+    // Faithful simulation of SurveyPanel.handleOverlayToggleClick(): it flips
+    // overlayVisible and repaints via paintToggleButton (dom.ts), which is
+    // what stamps the new aria-pressed value onto the button.
+    btn.setAttribute('aria-pressed', 'false');
+
+    expect(step.isComplete(dummyState, snap)).toBe(true);
+    expect(isSurveyOverlayToggleOn()).toBe(false);
+  });
+
+  // Regression guard — the #496 mechanism itself. May already PASS; that's fine.
+  it('syncSurveyOverlay hides the overlay once the toggled-off preference reaches the render pipeline', () => {
+    const { scene, grid, state } = makeSurveyedGridAndState();
+    const tm = new TerrainMesh(scene, grid);
+    const options = buildSurveyOverlayOptions(state, grid);
+    expect(options).not.toBeNull();
+
+    syncSurveyOverlay(tm, options, true);
+    const group = scene.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    expect(group).toBeDefined();
+    expect(group.visible).toBe(true);
+
+    syncSurveyOverlay(tm, options, false);
+    expect(group.visible).toBe(false);
+
+    tm.dispose();
+  });
+
+  // Regression guard — the #496 mechanism itself. May already PASS; that's fine.
+  it('syncSurveyOverlay shows the overlay again once toggled back on', () => {
+    const { scene, grid, state } = makeSurveyedGridAndState();
+    const tm = new TerrainMesh(scene, grid);
+    const options = buildSurveyOverlayOptions(state, grid);
+
+    syncSurveyOverlay(tm, options, false);
+    const group = scene.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    expect(group.visible).toBe(false);
+
+    syncSurveyOverlay(tm, options, true);
+    expect(group.visible).toBe(true);
+
+    tm.dispose();
+  });
+
+  // Regression guard against the wrong fix: hiding the overlay must never
+  // delete survey data out of GameState.
+  it('toggling the overlay off does NOT remove anything from GameState.surveyResults', () => {
+    const { scene, grid, state } = makeSurveyedGridAndState();
+    const before = state.surveyResults.length;
+    const survey = state.surveyResults[0];
+
+    const tm = new TerrainMesh(scene, grid);
+    const options = buildSurveyOverlayOptions(state, grid);
+    syncSurveyOverlay(tm, options, false);
+
+    expect(state.surveyResults.length).toBe(before);
+    expect(state.surveyResults[0]).toBe(survey);
+
+    tm.dispose();
   });
 });

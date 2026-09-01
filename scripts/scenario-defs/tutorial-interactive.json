@@ -189,6 +189,29 @@
         },
         {
           "type": "waitForTutorialStep",
+          "stepId": "toggle-survey-overlay",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "toggle-survey-overlay"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "toggle-survey-overlay (#905): clicking the Survey panel's own overlay-toggle button (#496) clears the confidence quads and the tutorial card advances. Panel is already open from the survey step above.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-role=\"overlay-toggle\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "waitForTutorialStep",
           "stepId": "hire-driller",
           "timeout": 60000
         }

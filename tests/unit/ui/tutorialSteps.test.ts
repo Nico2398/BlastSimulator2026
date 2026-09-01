@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 32 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(32);
+  it('has exactly 33 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(33);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -95,6 +96,10 @@ describe('tutorialSteps', () => {
       'hire-surveyor',
       'time-speed',
       'survey',
+      // #905: teaches the Survey panel's existing overlay-toggle button
+      // (#496) right after the first survey lands, while the panel is
+      // already open from the 'survey' step above.
+      'toggle-survey-overlay',
       'hire-driller',
       'build-living-quarters',
       'set-early-policy',
@@ -341,7 +346,7 @@ describe('tutorialSteps', () => {
   it('steps with meaningful UI target have a highlightTarget defined', () => {
     // Steps that should definitely have highlight targets
     const stepsWithTarget = new Set([
-      'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
+      'time-speed', 'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
       'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
       'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
@@ -390,8 +395,12 @@ describe('tutorialSteps', () => {
   // ── 18 ───────────────────────────────────────────────────────────────────
   it('every highlightTarget points at a control that stays on screen', () => {
     // Panels are display:none until the player opens them, so a step may only
-    // highlight the always-present HUD, score panel or toolbar buttons.
-    const allowed = /^#bs-hud-top |^#bs-hud-scores$|^#bs-toolbar \[data-panel="[a-z]+"\]$/;
+    // highlight the always-present HUD, score panel or toolbar buttons — with
+    // one exception: #905's toggle-survey-overlay sits immediately after
+    // 'survey', so the Survey panel is guaranteed already open from that
+    // preceding step, making its own overlay-toggle button a legitimate
+    // highlight target too.
+    const allowed = /^#bs-hud-top |^#bs-hud-scores$|^#bs-toolbar \[data-panel="[a-z]+"\]$|^#bs-survey-panel \[data-role="overlay-toggle"\]$/;
     for (const step of TUTORIAL_STEPS) {
       if (!step.highlightTarget) continue;
       expect(step.highlightTarget).toMatch(allowed);
@@ -633,6 +642,90 @@ describe('tutorialSteps', () => {
         vehicles: { vehicles: [] },
       } as unknown as GameState;
       expect(step.isComplete(state, {})).toBe(true);
+    });
+  });
+
+  // ── toggle-survey-overlay (#905) ─────────────────────────────────────────
+  // Teaches that the survey confidence overlay (#496) can be toggled off/on
+  // via the Survey panel's existing button — no new control, just a lesson
+  // on the one that already exists. Completes on ONE click in EITHER
+  // direction: the tutorial does not force the player back to a specific
+  // overlay state.
+  describe('toggle-survey-overlay (#905)', () => {
+    const SELECTOR = '#bs-survey-panel [data-role="overlay-toggle"]';
+
+    afterEach(() => {
+      document.body.innerHTML = '';
+    });
+
+    function mountToggleButton(pressed: boolean): HTMLElement {
+      document.body.innerHTML =
+        `<div id="bs-survey-panel"><button data-role="overlay-toggle" aria-pressed="${pressed}"></button></div>`;
+      return document.querySelector(SELECTOR)!;
+    }
+
+    const dummyState = {} as unknown as GameState;
+
+    describe('isSurveyOverlayToggleOn', () => {
+      it('reads true when the toggle button is aria-pressed="true"', () => {
+        mountToggleButton(true);
+        expect(isSurveyOverlayToggleOn()).toBe(true);
+      });
+
+      it('reads false when the toggle button is aria-pressed="false"', () => {
+        mountToggleButton(false);
+        expect(isSurveyOverlayToggleOn()).toBe(false);
+      });
+
+      it('defaults to true when the toggle button is not rendered in the DOM, matching SurveyPanel\'s own default overlayVisible = true', () => {
+        expect(document.querySelector(SELECTOR)).toBeNull();
+        expect(() => isSurveyOverlayToggleOn()).not.toThrow();
+        expect(isSurveyOverlayToggleOn()).toBe(true);
+      });
+    });
+
+    describe('createSurveyOverlayToggleStep', () => {
+      it('highlightTarget targets the Survey panel\'s own overlay-toggle button', () => {
+        const step = createSurveyOverlayToggleStep();
+        expect(step.highlightTarget).toBe(SELECTOR);
+      });
+
+      it('id is "toggle-survey-overlay"', () => {
+        const step = createSurveyOverlayToggleStep();
+        expect(step.id).toBe('toggle-survey-overlay');
+      });
+
+      it('isComplete is false when the toggle state is unchanged since captureSnapshot', () => {
+        mountToggleButton(true);
+        const step = createSurveyOverlayToggleStep();
+        const snap = step.captureSnapshot!(dummyState);
+        expect(step.isComplete(dummyState, snap)).toBe(false);
+      });
+
+      it('isComplete is true once the toggle switches off (aria-pressed flips true -> false)', () => {
+        const btn = mountToggleButton(true);
+        const step = createSurveyOverlayToggleStep();
+        const snap = step.captureSnapshot!(dummyState);
+        btn.setAttribute('aria-pressed', 'false');
+        expect(step.isComplete(dummyState, snap)).toBe(true);
+      });
+
+      it('isComplete is true once the toggle switches back on (aria-pressed flips false -> true)', () => {
+        const btn = mountToggleButton(false);
+        const step = createSurveyOverlayToggleStep();
+        const snap = step.captureSnapshot!(dummyState);
+        btn.setAttribute('aria-pressed', 'true');
+        expect(step.isComplete(dummyState, snap)).toBe(true);
+      });
+
+      it('captureSnapshot and isComplete never throw when the toggle button is not rendered in the DOM', () => {
+        const step = createSurveyOverlayToggleStep();
+        let snap: Record<string, unknown> = {};
+        expect(() => { snap = step.captureSnapshot!(dummyState); }).not.toThrow();
+        expect(() => step.isComplete(dummyState, snap)).not.toThrow();
+        // Both reads default to true (button absent), so nothing "changed".
+        expect(step.isComplete(dummyState, snap)).toBe(false);
+      });
     });
   });
 });

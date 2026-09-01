@@ -203,6 +203,23 @@ describe('haul-debris stage list (#552 — self-dispatching, no manual Haul butt
   });
 });
 
+describe('toggle-survey-overlay stage fallback (#905)', () => {
+  // Genuinely one click — no explicit TUTORIAL_STAGES entry needed.
+  // stagesFor()'s own fallback (a single stage built from the step's
+  // highlightTarget) already covers it.
+  const TARGET = '#bs-survey-panel [data-role="overlay-toggle"]';
+
+  it('has no explicit TUTORIAL_STAGES entry', () => {
+    expect(TUTORIAL_STAGES['toggle-survey-overlay']).toBeUndefined();
+  });
+
+  it('stagesFor falls back to a single stage targeting the Survey panel\'s overlay-toggle button', () => {
+    const stages = stagesFor('toggle-survey-overlay', TARGET);
+    expect(stages).toHaveLength(1);
+    expect(stages[0]!.target).toBe(TARGET);
+  });
+});
+
 describe('stagesFor', () => {
   it('falls back to the step highlight target when no stages are keyed', () => {
     const stages = stagesFor('not-a-step', '#bs-toolbar [data-panel="blast"]');

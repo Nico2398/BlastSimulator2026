@@ -202,6 +202,28 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-role=\"overlay-toggle\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-driller"
+        }
+      ],
+      "role": "player",
+      "description": "toggle-survey-overlay complete (#905): clicking the Survey panel's own overlay-toggle button (#496) — panel is already open from the survey step above — clears the confidence quads and the tutorial card advances to hire-driller.",
+      "expect": {
+        "tutorialStep": "hire-driller"
+      }
+    },
+    {
       "command": "employee hire role:driller",
       "timeout": 30,
       "interaction": [
