@@ -3,7 +3,7 @@ import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../
 import { buildStructureSet, type StructureSet } from '../../../src/core/world/Structures.js';
 import { buildLandscapeMap, sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
 import { getBiome, biomeIndexOf } from '../../../src/core/world/BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY } from '../../../src/core/world/WorldGen.js';
+import { createWorldGenContext, sampleSurfaceVoxelY, sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { StrataSampler } from '../../../src/core/world/Strata.js';
 import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
@@ -143,6 +143,51 @@ describe('buildLandscapeMap — boundary agreement (#458 T2.1 accept criterion)'
       // check, not a tight bound — local noise alone can vary run to run.
       expect(seamStep).toBeLessThanOrEqual(localStep * 4 + 1.5);
       expect(sOut.biomeId).toBe(sIn.biomeId);
+    }
+  });
+
+  it('sampleLandscapeColumn agrees with the unrounded sampleSurfaceHeightY at seed 2378 (#913 regression)', () => {
+    // Reproduced on `main`: at seed 2378, alpine_granite, a lake-terminated
+    // river's carve reaches ~0.59m inside this playable rect while every
+    // traced centreline point still tests outside the river exclusion
+    // margin — sampleLandscapeColumn (which applies structure overlays)
+    // then disagrees with sampleSurfaceHeightY (which does not) near the
+    // claim edge. Measured disagreement on `main`: (0,0)->0.37m,
+    // (-1,-1)->1.03m, (-2,-2)->1.65m — all far past the 1e-9 float
+    // tolerance below. Must FAIL on today's exclusion logic and PASS once
+    // Structures.ts keeps every structure's carved footprint clear of the
+    // claim rect.
+    const regressionConfig: TerrainConfig = {
+      sizeX: 40, sizeY: 200, sizeZ: 40, seed: 2378, climateBias: getBiome('alpine_granite')!.climateCenter,
+    };
+    // 1600m extentHalf (Structures.ts's own DEFAULT_LANDSCAPE_EXTENT_HALF),
+    // not the 300m this file uses elsewhere for speed: the offending river in
+    // this fixture only turns up within the full landscape search radius —
+    // buildAll's own default parameter is 300, unrelated to that constant, so
+    // it must be passed explicitly here (#913).
+    const { grid: rGrid, worldGen: rWorldGen, strata: rStrata, structureSet: rStructureSet } = buildAll(regressionConfig, 1600);
+
+    // Ring of columns within 1-2m of every claim edge: a diagonal sweep
+    // through each of the 4 corners (d=-2..2, inside to outside), plus a
+    // perpendicular sweep through each of the 4 edge midpoints.
+    const ring: Array<[number, number]> = [];
+    const corners: Array<[number, number, number, number]> = [
+      [0, 0, -1, -1], [40, 0, 1, -1], [0, 40, -1, 1], [40, 40, 1, 1], // [cx, cz, outward-x, outward-z]
+    ];
+    for (const [cx, cz, ox, oz] of corners) {
+      for (let d = -2; d <= 2; d++) ring.push([cx + d * ox, cz + d * oz]);
+    }
+    const edges: Array<[number, number, number, number]> = [
+      [20, 0, 0, -1], [20, 40, 0, 1], [0, 20, -1, 0], [40, 20, 1, 0], // [mx, mz, outward-x, outward-z]
+    ];
+    for (const [mx, mz, ox, oz] of edges) {
+      for (let d = -2; d <= 2; d++) ring.push([mx + d * ox, mz + d * oz]);
+    }
+
+    for (const [x, z] of ring) {
+      const landscapeSample = sampleLandscapeColumn(rWorldGen, regressionConfig.climateBias, rStructureSet, rStrata, rGrid.palette, x, z);
+      const voxelSample = sampleSurfaceHeightY(rWorldGen, x, z);
+      expect(Math.abs(landscapeSample.height - voxelSample)).toBeLessThanOrEqual(1e-9);
     }
   });
 });

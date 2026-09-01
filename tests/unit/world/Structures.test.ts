@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import { DEFAULT_SHAPING, type Rect, type ShapingAtFn } from '../../../src/core/world/WorldGen.js';
+import { getBiome, selectBiomeWeights, biomeShaping } from '../../../src/core/world/BiomeCatalog.js';
 import {
   traceRivers,
   placeLandmarks,
@@ -13,6 +14,10 @@ import {
   buildRiverOverlay,
   buildLandmarkOverlay,
   buildVillageOverlay,
+  riverChannelNearRect,
+  PLAYABLE_RIVER_MARGIN,
+  PLAYABLE_VILLAGE_MARGIN,
+  LANDMARK_MIN_DIST_FROM_PLAYABLE,
   type RiverPath,
   type Village,
   type Landmark,
@@ -29,6 +34,52 @@ function insideRect(rect: Rect, x: number, z: number): boolean {
   return x >= rect.minX && x <= rect.maxX && z >= rect.minZ && z <= rect.maxZ;
 }
 
+/** Shortest distance from (x, z) to an axis-aligned rect. 0 when inside. */
+function pointRectDist(rect: Rect, x: number, z: number): number {
+  const dx = Math.max(rect.minX - x, 0, x - rect.maxX);
+  const dz = Math.max(rect.minZ - z, 0, z - rect.maxZ);
+  return Math.hypot(dx, dz);
+}
+
+/**
+ * Brute-force, finely-sampled (every ~0.1m along each segment) channel-vs-rect
+ * proximity check. Deliberately a SEPARATE, independent implementation from
+ * the source's own `riverChannelNearRect` — used only to verify `traceRivers`'
+ * exclusion invariant, so the check isn't tautological against the very
+ * function issue #913 introduces.
+ */
+function channelComesWithin(river: Pick<RiverPath, 'points' | 'widths'>, rect: Rect, margin: number, stepM = 0.1): boolean {
+  const { points, widths } = river;
+  if (points.length === 0) return false;
+  if (points.length === 1) {
+    const w = widths[0] ?? 0;
+    return pointRectDist(rect, points[0]!.x, points[0]!.z) < margin + w;
+  }
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i]!, p1 = points[i + 1]!;
+    const w0 = widths[i] ?? 0, w1 = widths[i + 1] ?? 0;
+    const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    const steps = Math.max(1, Math.ceil(segLen / stepM));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const x = p0.x + t * (p1.x - p0.x);
+      const z = p0.z + t * (p1.z - p0.z);
+      const w = w0 + t * (w1 - w0);
+      if (pointRectDist(rect, x, z) < margin + w) return true;
+    }
+  }
+  return false;
+}
+
+/** Builds an alpine_granite-biased shapingAt exactly like TerrainGen's buildTerrainContext does, for the seed-2378 regression fixture (#913). */
+function alpineShapingAt(fields: WorldNoiseFields): ShapingAtFn {
+  const climateBias = getBiome('alpine_granite')!.climateCenter;
+  return (x, z) => {
+    const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
+    return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Rivers
 // ---------------------------------------------------------------------------
@@ -41,15 +92,17 @@ describe('traceRivers', () => {
     expect(a).toEqual(b);
   });
 
-  it('never traces a point inside the playable rect expanded by 32m, across several seeds', () => {
-    const excludeRect = expandRect(TINY_RECT, 32);
-    for (const seed of [1, 2, 3, 4, 5]) {
+  it('never carves a channel within PLAYABLE_RIVER_MARGIN of the playable rect, across several seeds (#913: footprint, not just centreline points)', () => {
+    // Footprint-based invariant: unlike a centreline-point-only check at
+    // RIVER_STEP (8m) spacing, this samples finely along the FULL carved
+    // channel (width-aware) with an independent local implementation
+    // (channelComesWithin), so a channel dipping toward the rect between two
+    // traced points cannot slip through undetected (#913).
+    for (const seed of [1, 2, 3, 4, 5, 2378]) {
       const fields = new WorldNoiseFields(seed);
       const rivers = traceRivers(seed, fields, flatShapingAt, TINY_RECT);
       for (const river of rivers) {
-        for (const p of river.points) {
-          expect(insideRect(excludeRect, p.x, p.z)).toBe(false);
-        }
+        expect(channelComesWithin(river, TINY_RECT, PLAYABLE_RIVER_MARGIN)).toBe(false);
       }
     }
   });
@@ -87,6 +140,50 @@ describe('traceRivers', () => {
       const rivers = traceRivers(seed, fields, flatShapingAt, TINY_RECT);
       expect(rivers.length).toBeLessThanOrEqual(6);
     }
+  });
+});
+
+describe('traceRivers — seed 2378 regression (#913)', () => {
+  // Reproduced on `main`: at seed 2378, alpine_granite, playable rect
+  // 0..40, a lake-terminated river's carve reaches ~0.59m inside this rect
+  // while every traced centreline point still tests outside
+  // expandRect(rect, PLAYABLE_RIVER_MARGIN) — the exact seam #913 describes.
+  // Must FAIL on today's exclusion logic (the offending river survives) and
+  // PASS once traceRivers is made footprint-aware.
+  it('never carves a channel within PLAYABLE_RIVER_MARGIN of the claim rect', () => {
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 40, maxZ: 40 };
+    const seed = 2378;
+    const fields = new WorldNoiseFields(seed);
+    const rivers = traceRivers(seed, fields, alpineShapingAt(fields), rect);
+    expect(rivers.length).toBeGreaterThan(0); // otherwise this would be vacuously true
+    for (const river of rivers) {
+      expect(channelComesWithin(river, rect, PLAYABLE_RIVER_MARGIN)).toBe(false);
+    }
+  });
+});
+
+describe('riverChannelNearRect', () => {
+  it('detects a channel straddling a rect even when both traced endpoints are individually far from it', () => {
+    // Both endpoints (20,-4) and (-4,20) sit several metres outside the
+    // rect, but the straight segment between them passes through (8,8) —
+    // inside the rect. A sparse point-only test (traced points every
+    // RIVER_STEP=8m) would miss this; the per-segment closest-approach
+    // check must not.
+    const straddling = { points: [{ x: 20, z: -4 }, { x: -4, z: 20 }], widths: [2, 2] };
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 16, maxZ: 16 };
+    expect(riverChannelNearRect(straddling, rect, 0)).toBe(true);
+  });
+
+  it('returns false for a channel genuinely far from the rect', () => {
+    const farAway = { points: [{ x: 500, z: 500 }, { x: 600, z: 500 }], widths: [4, 4] };
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 16, maxZ: 16 };
+    expect(riverChannelNearRect(farAway, rect, 0)).toBe(false);
+  });
+
+  it('returns false without throwing for a degenerate single-point river (no segment to measure against)', () => {
+    const single = { points: [{ x: 5, z: 5 }], widths: [4] };
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 16, maxZ: 16 };
+    expect(riverChannelNearRect(single, rect, 0)).toBe(false);
   });
 });
 
@@ -137,7 +234,11 @@ describe('placeLandmarks', () => {
 
   it('places at most 2 landmarks, all >=400m from the playable rect and >=500m apart', () => {
     let landmarkCount = 0;
-    for (const seed of [1, 2, 3, 4, 5]) {
+    // A wider sweep than the original 5-seed check (#913): the radius-aware
+    // margin assertion below is violated only occasionally (e.g. seeds 29,
+    // 32) by today's point-only exclusion, so a narrow seed set could pass
+    // vacuously without ever exercising the failure.
+    for (let seed = 1; seed <= 50; seed++) {
       const fields = new WorldNoiseFields(seed);
       const landmarks = placeLandmarks(seed, fields, flatShapingAt, TINY_RECT);
       landmarkCount += landmarks.length;
@@ -146,6 +247,10 @@ describe('placeLandmarks', () => {
       const excludeRect = expandRect(TINY_RECT, 400);
       for (const l of landmarks) {
         expect(insideRect(excludeRect, l.x, l.z)).toBe(false);
+        // Footprint-aware (#913): the whole landmark disc, not just its centre
+        // point, must clear LANDMARK_MIN_DIST_FROM_PLAYABLE — the margin must
+        // scale with the landmark's own radius.
+        expect(pointRectDist(TINY_RECT, l.x, l.z)).toBeGreaterThanOrEqual(LANDMARK_MIN_DIST_FROM_PLAYABLE + l.radius);
       }
       for (let i = 0; i < landmarks.length; i++) {
         for (let j = i + 1; j < landmarks.length; j++) {
@@ -227,6 +332,10 @@ describe('placeVillages', () => {
       villageCount += villages.length;
       for (const v of villages) {
         expect(insideRect(excludeRect, v.x, v.z)).toBe(false);
+        // Footprint-aware (#913): the village pad disc itself, not just its
+        // centre point, must clear PLAYABLE_VILLAGE_MARGIN — the margin must
+        // scale with the village's own radius.
+        expect(pointRectDist(TINY_RECT, v.x, v.z)).toBeGreaterThanOrEqual(PLAYABLE_VILLAGE_MARGIN + v.radius);
       }
     }
     // Confirm the sweep actually produced villages somewhere — otherwise the
