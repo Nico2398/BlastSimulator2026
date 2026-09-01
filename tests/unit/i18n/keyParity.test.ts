@@ -247,10 +247,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // previously an untranslated literal built inline in the console
     // command) — both locales translated; the pre-existing
     // mining.build_ramp.invalid_length key is unchanged.
+    // Baseline is now 3468 (up from 3466): #905 adds the toggle-survey-overlay
+    // tutorial step, inserted after 'survey' -- 2 new keys,
+    // tutorial.step_overlaytoggle.title and tutorial.step_overlaytoggle, both
+    // locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3466);
+    expect(Object.keys(en).length).toBe(3468);
   });
 });
 

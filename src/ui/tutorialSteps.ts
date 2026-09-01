@@ -13,6 +13,7 @@ import {
   countBuildingsOfType,
   isBlastReportOutstanding,
   createEvacuateZoneStep,
+  createSurveyOverlayToggleStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
@@ -90,6 +91,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 2: survey ──
   createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:23 z:23'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),
+
+  // ── Step 2b: toggle-survey-overlay (#905) ──
+  createSurveyOverlayToggleStep(),
 
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),

@@ -181,12 +181,13 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 32" at step 0 and has progress bar fill', () => {
-      // 32, not 24: #553 inserts build-driving-center/train-driller/
+    it('shows step counter "1 / 33" at step 0 and has progress bar fill', () => {
+      // 33, not 24: #553 inserts build-driving-center/train-driller/
       // buy-drill-rig-assign right after hire-driller, #555 inserts
       // train-digger/buy-rock-digger-assign right after that trio, #681
       // inserts build-living-quarters/set-early-policy right after
-      // hire-driller too, and #557 inserts evacuate-zone right before blast.
+      // hire-driller too, #557 inserts evacuate-zone right before blast, and
+      // #905 inserts toggle-survey-overlay right after survey.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -194,7 +195,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*32/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*33/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -510,14 +511,15 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 17/18 after #553's tutorial fix added three drill-rig-licensing
+      // (index 18/19 after #553's tutorial fix added three drill-rig-licensing
       // steps, #555 added two more rock-digger-licensing steps, #681 added
-      // build-living-quarters/set-early-policy earlier in the sequence, and
-      // #557 inserted evacuate-zone right before blast).
-      tut.stepIndex = 17;
+      // build-living-quarters/set-early-policy earlier in the sequence, #557
+      // inserted evacuate-zone right before blast, and #905 inserted
+      // toggle-survey-overlay right after survey.
+      tut.stepIndex = 18;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(18);
+      expect(tut.stepIndex).toBe(19);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -530,7 +532,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createGame() defaults events.pendingEvent to null
-      tut.stepIndex = 17;
+      tut.stepIndex = 18;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -575,12 +577,13 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 31 after
+      // Directly set to congratulations step (last step, index 32 after
       // #553's tutorial fix added three drill-rig-licensing steps, #555
       // added two more rock-digger-licensing steps, #681 added
-      // build-living-quarters/set-early-policy, and #557 inserted
-      // evacuate-zone right before blast) and render
-      tut.stepIndex = 31;
+      // build-living-quarters/set-early-policy, #557 inserted evacuate-zone
+      // right before blast, and #905 inserted toggle-survey-overlay right
+      // after survey) and render
+      tut.stepIndex = 32;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;

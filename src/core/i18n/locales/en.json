@@ -2703,6 +2703,8 @@
   "tutorial.step1": "You're about to run your first survey — it takes a few in-game ticks to complete. Speed up the clock now so you're not watching it in real time. Try 2× or 4× speed using the controls on the left side of the top bar!",
   "tutorial.step2": "Hire a Surveyor to scan the terrain for ore deposits. Open the Crew panel and click Hire.",
   "tutorial.step3": "Now perform a seismic survey to reveal ore locations underground.",
+  "tutorial.step_overlaytoggle.title": "Toggle the Confidence Overlay",
+  "tutorial.step_overlaytoggle": "The colored overlay showing survey confidence doesn't have to stay on. Click the toggle in the Survey panel — or press O — to switch it off, or back on, whenever you like.",
   "tutorial.step4": "Hire a Driller to prepare blast holes for mining. Check the Crew panel.",
   "tutorial.step_livingquarters": "Watch the well-being score up top — hunger and fatigue drag it down, and a crew that never rests eventually revolts. Build Living Quarters now, before the drilling and blasting ahead wears your crew down.",
   "tutorial.step_earlypolicy": "A building alone won't send anyone to rest — select Continuous under Shift Mode and apply it, so tired or hungry crew get pulled off the line automatically before they collapse.",
