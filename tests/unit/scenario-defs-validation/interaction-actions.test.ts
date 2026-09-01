@@ -507,3 +507,89 @@ describe('tutorial-interactive.json — every post-blast step has a declared tim
     });
   }
 });
+
+// ──────────────────────────────────────────────
+// 15. tutorial-steps-visual.json — a batch of pre-blast/mid-file steps also
+// declares a 90s timeout floor (issue #914).
+//
+// Distinct from block 14 above: that block covers this file's post-blast
+// window (from the `blast` step to EOF) via a dynamically-located range.
+// This block covers an earlier, non-contiguous set of steps scattered
+// through the pre-blast portion of the file (hiring, training, building,
+// drilling, charging) whose declared `timeout` (30s, or 40s for the
+// drill_plan step at index 25) is too tight for this file's own 3-shot
+// `shots` array (["overview","closeup","birdseye"]) capture cost under
+// `--screenshots` interaction mode. Two of these steps have already
+// produced deterministic timeout failures in production runs — step 2
+// ("time resume") reproduced twice — even though the underlying action
+// completed successfully in-browser before the outer deadline fired, the
+// same "formula-correct budget, too tight in practice" shape #776/#740
+// already documented for this file's post-blast stretch.
+//
+// Located by literal index (not by command-shape search like the #776
+// blocks above, matching this file's own #816 caution about index drift)
+// AND cross-checked against the step's own `command` string, so a future
+// reorder in the JSON fails this test loudly by naming the exact index/
+// command mismatch rather than silently validating the wrong step.
+// ──────────────────────────────────────────────
+describe('tutorial-steps-visual.json — additional pre-blast steps have a declared timeout floor of 90s (#914)', () => {
+  const scenario = loadScenarioDef('tutorial-steps-visual', SCENARIO_DIR);
+
+  // Index -> expected `command` string, read directly off the current JSON.
+  const EXPECTED_COMMANDS_BY_INDEX: Record<number, string> = {
+    1: 'tutorial_start',
+    2: 'time resume',
+    3: 'employee hire role:surveyor',
+    4: 'time speed 2',
+    5: 'employee assign_skill 1 skill:geology level:3',
+    6: 'survey seismic x:23 z:23',
+    7: 'wait_until field:surveyCount equals:1 max_ticks:30',
+    8: 'state',
+    9: 'employee hire role:driller',
+    10: 'employee assign_skill 2 skill:blasting level:3',
+    11: 'build living_quarters at:18,14',
+    14: 'build driving_center at:10,8',
+    16: 'employee train 2 skill:driving.drill_rig',
+    17: 'tick 25',
+    18: 'vehicle buy drill_rig',
+    20: 'employee train 1 skill:driving.excavator',
+    21: 'tick 25',
+    22: 'vehicle buy rock_digger',
+    24: 'build_ramp start:16,19 end:16,31 depth:8',
+    25: 'drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089',
+    35: 'charge hole:* explosive:boomite amount:5 stemming:2',
+    39: 'sequence auto delay_step:25',
+  };
+
+  for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {
+    const i = Number(indexStr);
+
+    it(`step[${i}] is still "${expectedCommand}" and declares a timeout >= 90`, () => {
+      const step = scenario.steps[i];
+      expect(
+        step,
+        `step[${i}] does not exist — tutorial-steps-visual.json may have changed shape`,
+      ).toBeDefined();
+      expect(
+        typeof step,
+        `step[${i}] is a bare string, not an object with a declared timeout`,
+      ).not.toBe('string');
+
+      const stepObj = step as ScenarioStepDef;
+
+      expect(
+        stepObj.command,
+        `step[${i}]'s command is "${stepObj.command}", expected "${expectedCommand}" — ` +
+          `tutorial-steps-visual.json has been reordered; re-locate this step before trusting its timeout.`,
+      ).toBe(expectedCommand);
+
+      expect(
+        stepObj.timeout,
+        `step[${i}] ("${stepObj.description ?? stepObj.command}") must declare a timeout >= 90s — this ` +
+          `file's 3-shot "shots" array (["overview","closeup","birdseye"]) capture cost under --screenshots ` +
+          `interaction mode makes its current tight timeout deterministically fail (issue #914; step 2 ` +
+          `"time resume" reproduced twice in production even though the underlying action succeeded).`,
+      ).toBeGreaterThanOrEqual(90);
+    });
+  }
+});
