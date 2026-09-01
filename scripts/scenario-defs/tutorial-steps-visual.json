@@ -55,7 +55,7 @@
         }
       ],
       "role": "setup",
-      "description": "issue #585: tutorial_start now has a real command-mode implementation too (createRunner.ts), pausing the game the same way the browser boot path (main.ts) always did -- command mode used to report \"Unknown command\" here and never start anything; now both modes genuinely set state.isPaused = true. The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode has no DOM to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json. #904: opening step is hire-surveyor, not time-speed -- suggesting a faster clock made no sense as the very first card, with an empty site and nothing queued a faster clock would deliver sooner.",
+      "description": "issue #585: tutorial_start now has a real command-mode implementation too (createRunner.ts), pausing the game the same way the browser boot path (main.ts) always did -- command mode used to report \"Unknown command\" here and never start anything; now both modes genuinely set state.isPaused = true. The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode has no DOM to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json. #904: the tutorial now opens on hiring (completable immediately, no ticks required) instead of time-speed -- suggesting a faster clock made no sense as the very first card, with an empty site and nothing queued a faster clock would deliver sooner.",
       "expect": {
         "tutorialStep": "hire-surveyor"
       }
@@ -90,7 +90,7 @@
         }
       ],
       "role": "player",
-      "description": "hire-surveyor complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #904: card advances to time-speed next, not survey.",
+      "description": "hire-surveyor complete: Crew panel opened, Hire clicked, card advances to Game Speed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #904: this step now releases the clock held by tutorial_start's own pause (#585) via advanceToNextStep -- the same generic step-0-completion mechanism that used to fire on time-speed.",
       "expect": {
         "equals": {
           "employeeCount": 1
@@ -119,7 +119,7 @@
         }
       ],
       "role": "player",
-      "description": "#904: time-speed moved to sit right before the first step the player has to wait on (survey) instead of opening the tutorial. Real click on the 2x speed button (the exact button #489 fixed the rail to point at). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "time-speed complete: real click on the 2x speed button (the exact button #489 fixed the rail to point at). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #904: relocated here, right before the survey step's own wait, so the lesson lands immediately before the tutorial's first genuine wait instead of before the player has done anything.",
       "expect": {
         "equals": {
           "timeScale": 2

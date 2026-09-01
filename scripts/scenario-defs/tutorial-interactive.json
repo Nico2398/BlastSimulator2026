@@ -35,7 +35,7 @@
     {
       "command": "tutorial_start",
       "timeout": 30,
-      "description": "#904: opening step is hire-surveyor, not time-speed — suggesting a faster clock made no sense as the very first card, with an empty site and nothing queued a faster clock would deliver sooner. Coach mark docked bottom-centre, Crew toolbar button glowing, mine still visible.",
+      "description": "Step hire-surveyor: coach mark docked bottom-centre, Crew button glowing, mine still visible. #904: the tutorial now opens on hiring (completable immediately, no ticks required) instead of time-speed — suggesting a faster clock made no sense as the very first card, with an empty site and nothing queued a faster clock would deliver sooner.",
       "role": "setup",
       "interaction": [
         {
@@ -86,7 +86,7 @@
     {
       "command": "employee hire role:surveyor",
       "timeout": 30,
-      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site. #904: card advances to time-speed next, not survey.",
+      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site, card advances to Game Speed. #904: this step now leaves isPaused (tutorial_start's own pause, #585) by releasing the clock via advanceToNextStep -- the same generic step-0-completion mechanism that used to fire on time-speed.",
       "role": "player",
       "interaction": [
         {
@@ -110,7 +110,7 @@
     {
       "command": "time speed:2",
       "timeout": 30,
-      "description": "#904: time-speed moved to sit right before the first step the player has to wait on (survey) instead of opening the tutorial. Real click on the speed button cycles 1x to 2x, card advances to Survey.",
+      "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Survey Terrain. #904: relocated here, right before the survey step's own wait, so the lesson lands immediately before the tutorial's first genuine wait instead of before the player has done anything, rather than opening the tutorial before anything on site needed speeding up.",
       "role": "player",
       "interaction": [
         {
