@@ -895,16 +895,12 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "sequence"
         }
       ],
       "role": "player",
-      "description": "charge complete: Charge All Holes clicked. This step's own explosive/amount/stemming already match the Charge panel's real defaults (boomite/5kg/2m, confirmed throughout this suite's Finding #10 audit) so the click reproduces the declared command exactly, unlike most other files' charge steps. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "charge ordered: Charge All Holes clicked. This step's own explosive/amount/stemming already match the Charge panel's real defaults (boomite/5kg/2m, confirmed throughout this suite's Finding #10 audit) so the click reproduces the declared command exactly, unlike most other files' charge steps. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after is what drains it and is where the tutorial step advance is now asserted, not here (a plain 'value increased' comparison used to complete this step, and the assertion here, on the very first hole -- see that step's own note).",
       "expect": {
-        "tutorialStep": "sequence",
+        "tutorialStep": "charge",
         "increased": [
           "orderedChargeCount"
         ]
@@ -930,8 +926,9 @@
         }
       ],
       "role": "setup",
-      "description": "#689-followup: converted from a fixed `tick 225` block to `waitUntil` on chargedCount itself, same reasoning as the drill-wait chunks above -- direct trace shows all 9 holes charge by tick 363 (147 ticks from when charging starts), ~78 ticks short of the fixed 225-tick budget this step used to always spend regardless. Combined with the drill-wait fix above, the full drill+charge stretch now finishes at tick 363 instead of 715, comfortably clear of worker_revolt's own wellBeing-driven countdown.",
+      "description": "#689-followup: converted from a fixed `tick 225` block to `waitUntil` on chargedCount itself, same reasoning as the drill-wait chunks above -- direct trace shows all 9 holes charge by tick 363 (147 ticks from when charging starts), ~78 ticks short of the fixed 225-tick budget this step used to always spend regardless. Combined with the drill-wait fix above, the full drill+charge stretch now finishes at tick 363 instead of 715, comfortably clear of worker_revolt's own wellBeing-driven countdown. #926: the tutorial step only advances to 'sequence' once every hole is genuinely charged (tutorialSteps.ts's 'charge' step no longer completes on the first hole alone), which is also exactly when the panel's own auto-advance (BlastWorkshop.ts's suggestStep) moves the Blast Workshop to its Sequence tab -- so the tutorialStep assertion belongs here, at the drain's own completion, not on the charge-all click above.",
       "expect": {
+        "tutorialStep": "sequence",
         "equals": {
           "chargedCount": 9,
           "orderedChargeCount": 0

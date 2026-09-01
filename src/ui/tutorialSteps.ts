@@ -293,7 +293,30 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // which a 16-hole charge order never finishes that fast. Matches the same
   // fix already applied to every other real-queued-work step (survey,
   // contract-deliver, etc.) above.
-  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['charge hole:* explosive:boomite amount:5 stemming:2'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
+  //
+  // #926: not a createComparisonStep any more -- its generic "value
+  // increased" fired the instant the FIRST of nine holes charged, moving the
+  // tutorial on to 'sequence' while the crew was still mid-charge. The panel
+  // (suggestStep, BlastWorkshop.ts) rightly keeps showing the Charge tab
+  // until every hole is charged, so the 'sequence' rail -- whose target
+  // lives inside the Sequence tab body -- had nothing reachable and nothing
+  // to fall back to but an already-satisfied "open the Blast panel" hint.
+  // Completion now matches suggestStep's own criterion exactly, so the step
+  // and the panel never disagree about which one is current.
+  {
+    id: 'charge',
+    titleKey: 'tutorial.step6.title',
+    textKey: 'tutorial.step6',
+    commands: ['charge hole:* explosive:boomite amount:5 stemming:2'],
+    highlightTarget: TOOLBAR_TARGET.blast,
+    tickBudget: 20,
+    waitsOnWork: true,
+    isComplete: (state: GameState) => {
+      const holes = state.drillHoles ?? [];
+      const chargesByHole = state.chargesByHole ?? {};
+      return holes.length > 0 && holes.every((h) => chargesByHole[h.id]);
+    },
+  },
 
   // ── Step 6: sequence ──
   // #554: `createComparisonStep`'s own isComplete fires the instant its

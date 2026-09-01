@@ -384,6 +384,29 @@ describe('tutorialSteps', () => {
     expect(timeSpeedStep.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
   });
 
+  // ── 16b (#926) ───────────────────────────────────────────────────────────
+  it('charge does not complete on a partially charged plan', () => {
+    const chargeStep = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
+    const holes = [{ id: 'H1' }, { id: 'H2' }, { id: 'H3' }];
+    const charge = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+
+    // No holes charged yet.
+    expect(chargeStep.isComplete({
+      drillHoles: holes, chargesByHole: {},
+    } as unknown as GameState, {})).toBe(false);
+
+    // Only the first of three holes charged — the bug this step used to have:
+    // a plain "value increased" comparison completes here already.
+    expect(chargeStep.isComplete({
+      drillHoles: holes, chargesByHole: { H1: charge },
+    } as unknown as GameState, {})).toBe(false);
+
+    // Every hole charged.
+    expect(chargeStep.isComplete({
+      drillHoles: holes, chargesByHole: { H1: charge, H2: charge, H3: charge },
+    } as unknown as GameState, {})).toBe(true);
+  });
+
   // ── 17 ───────────────────────────────────────────────────────────────────
   it('only the scripted event step carries autoCommands', () => {
     for (const step of TUTORIAL_STEPS) {

@@ -261,10 +261,17 @@ describe('en.json / fr.json — key-set parity', () => {
     // reference (the assign-click sub-stage of the vehicle-buy-assign
     // tutorial stage) was deleted along with the assign control itself, so
     // the key was orphaned. Both locales.
+    // Baseline is now 3467 (up from 3466, 2026-09-01): #926 landed
+    // concurrently on a separate branch, off the pre-#921 3468 baseline, and
+    // is merged in here -- adds an intermediate 'sequence' tutorial stage
+    // letting the player open the Blast Workshop's Sequence tab themselves
+    // when the panel's own auto-advance hasn't gotten there yet -- 1 new
+    // key, tutorial.stage.open_sequence_tab, both locales translated. Net
+    // effect of #921 + #926 together: 3468 -2 +1 = 3467.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3466);
+    expect(Object.keys(en).length).toBe(3467);
   });
 });
 

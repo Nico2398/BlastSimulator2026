@@ -248,6 +248,71 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
 // false-match into, and the bug class this test guarded against is
 // structurally impossible. Removed rather than trimmed.
 
+describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
+  // Reproduces the dead end the player hit: the Blast Workshop stayed on its
+  // Charge tab (the crew still mid-charge), the tutorial's own step had
+  // already moved to 'sequence', and the Sequence tab's `auto-sequence`
+  // button lived in a hidden body -- unreachable, with the rail's only
+  // fallback an already-satisfied "open the Blast panel" hint and every
+  // other control on the page blocked. No stage may resolve to that
+  // already-satisfied hint while the panel is genuinely open on some tab:
+  // there must always be a real, reachable control to click next.
+  const stages = TUTORIAL_STAGES['sequence']!;
+
+  function withBox(el: HTMLElement): HTMLElement {
+    el.getBoundingClientRect = () => ({
+      width: 40, height: 20, top: 0, left: 0, right: 40, bottom: 20, x: 0, y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+    return el;
+  }
+
+  function makeButton(attrs: Record<string, string>, parent: HTMLElement): HTMLButtonElement {
+    const btn = document.createElement('button');
+    for (const [k, v] of Object.entries(attrs)) btn.setAttribute(k, v);
+    parent.appendChild(btn);
+    return withBox(btn) as HTMLButtonElement;
+  }
+
+  /** Builds the panel with one tab body visible and the rest hidden, mirroring BlastWorkshop.ts's setActiveStep. */
+  function openPanelOnTab(activeStep: 2 | 3): void {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    makeButton({ 'data-panel': 'blast' }, toolbar);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    document.body.appendChild(panel);
+    const strip = document.createElement('div');
+    panel.appendChild(strip);
+    makeButton({ 'data-step': '2' }, strip);
+    makeButton({ 'data-step': '3' }, strip);
+
+    const chargeBody = document.createElement('div');
+    chargeBody.style.display = activeStep === 2 ? '' : 'none';
+    panel.appendChild(chargeBody);
+    makeButton({ 'data-action': 'charge-all' }, chargeBody);
+
+    const sequenceBody = document.createElement('div');
+    sequenceBody.style.display = activeStep === 3 ? '' : 'none';
+    panel.appendChild(sequenceBody);
+    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
+  }
+
+  for (const activeStep of [2, 3] as const) {
+    it(`never falls back to the already-satisfied "open panel" hint while the panel is open on tab ${activeStep}`, () => {
+      openPanelOnTab(activeStep);
+      const index = resolveStageIndex(stages);
+      expect(
+        index,
+        `resolved to stage 0 ("${stages[0]!.hintKey}") — already done, with nothing left to click`,
+      ).toBeGreaterThan(0);
+      expect(isReachable(stages[index]!.target)).toBe(true);
+    });
+  }
+});
+
 describe('allowedSelectors', () => {
   it('is just the target when a stage has no helpers', () => {
     expect(allowedSelectors({ target: '#a', hintKey: 'k' })).toEqual(['#a']);
