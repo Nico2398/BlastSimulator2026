@@ -199,11 +199,16 @@ export function getEmployees(state: GameState): { role: string; hunger: number; 
 }
 
 /** Safe access to vehicles array from mock-friendly state. */
-export function getVehicles(state: GameState): { id: number; driverId: number | null }[] {
+export function getVehicles(state: GameState): { id: number; driverId: number | null; type: string }[] {
   const v = getGameStateDict(state).vehicles;
-  if (Array.isArray(v)) return v as unknown as { id: number; driverId: number | null }[];
+  if (Array.isArray(v)) return v as unknown as { id: number; driverId: number | null; type: string }[];
   const vObj = v as Record<string, unknown> | undefined;
-  return (vObj?.vehicles ?? []) as { id: number; driverId: number | null }[];
+  return (vObj?.vehicles ?? []) as { id: number; driverId: number | null; type: string }[];
+}
+
+/** Count vehicles of a given role/type — used by purchase-completing tutorial steps. */
+export function countVehiclesOfType(state: GameState, vehicleType: string): number {
+  return getVehicles(state).filter(v => v.type === vehicleType).length;
 }
 
 /** Safe access to buildings array. */

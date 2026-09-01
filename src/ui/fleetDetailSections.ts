@@ -4,10 +4,10 @@
 // file-size guideline, mirroring the CrewPanel/crewDetailSections split.
 
 import { t } from '../core/i18n/I18n.js';
-import { el, chip, gauge, type ChipTone } from './dom.js';
+import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier } from '../core/entities/Vehicle.js';
+import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
@@ -77,7 +77,6 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
  * is gone (#921) — a vehicle's driver is now claimed automatically by
  * ArrivalGate/VehicleReservation, so there is no unassign control here
  * anymore.
- * TODO(#921): drop the unassign-button remnants once implementer lands.
  */
 export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
@@ -110,14 +109,33 @@ export function makePendingDriverRow(employee: Employee): HTMLElement {
  * No driver yet: replaces the old eligible-crew picker (#921) — a vehicle's
  * driver is now claimed automatically by a qualified employee's own queued
  * task (VehicleReservation/ArrivalGate), so there is nothing left for the
- * player to click here. `onGoToCrew` is kept on the signature for the
- * nobody-licensed case (cross-link to Crew), wired up by implementer.
- * TODO(#921): render the unmanned/no-licensed-crew states (ui.fleet.unmanned,
- * ui.fleet.no_licensed) instead of this placeholder.
+ * player to click here. Two display-only sub-states:
+ *  - nobody on the roster holds the required licence at all: warning +
+ *    cross-link to Crew (`onGoToCrew`);
+ *  - somebody is licensed but nobody is currently driving/walking to this
+ *    vehicle: a neutral "unmanned" label.
+ * The check is roster-wide licence ownership, not claim state — there is no
+ * picker left to keep honest, unlike the old canBoardVehicle-based filter.
  */
 export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void): HTMLElement {
-  void v;
-  void state;
-  void onGoToCrew;
-  return el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
+  const licence = ROLE_LICENCE_REQUIRED[v.type];
+  const anyLicensed = state.employees.employees.some(e => e.alive && e.qualifications.some(q => q.category === licence));
+
+  if (!anyLicensed) {
+    const warn = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;padding:9px;border-radius:4px;background:var(--bsx-well)' } });
+    const line = el('div', { attrs: { style: 'display:flex;gap:6px;align-items:center;color:var(--bsx-amber)' } });
+    line.append(iconEl('warn', 11), el('span', { text: t('ui.fleet.no_licensed', { licence: t(`skill.${licence}`) }), attrs: { style: 'font:500 10px/1.3 var(--bsx-font-ui)' } }));
+    const trainBtn = button('ghost', t('ui.fleet.train_someone'));
+    trainBtn.style.cssText = 'height:26px;font-size:10px';
+    trainBtn.addEventListener('click', onGoToCrew);
+    warn.append(line, trainBtn);
+    return warn;
+  }
+
+  const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
+  wrap.append(
+    iconEl('drive', 12, 0.6),
+    el('span', { text: t('ui.fleet.unmanned'), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+  );
+  return wrap;
 }
