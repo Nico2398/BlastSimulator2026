@@ -86,11 +86,11 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "survey"
         }
       ],
       "role": "player",
-      "description": "hire-surveyor complete: Crew panel opened, Hire clicked, card advances to Game Speed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #904: this step now releases the clock held by tutorial_start's own pause (#585) via advanceToNextStep -- the same generic step-0-completion mechanism that used to fire on time-speed.",
+      "description": "hire-surveyor complete: Crew panel opened, Hire clicked, card advances straight to Survey Terrain. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #923: the speed-control lesson no longer sits here at all -- it moved off this stretch entirely into the box-cut ramp-dig wait further down, so this releases the clock held by tutorial_start's own pause (#585) via advanceToNextStep straight into 'survey'.",
       "expect": {
         "equals": {
           "employeeCount": 1
@@ -98,34 +98,7 @@
         "changedBy": {
           "cash": -1200
         },
-        "tutorialStep": "time-speed"
-      }
-    },
-    {
-      "command": "time speed 2",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "survey"
-        }
-      ],
-      "role": "player",
-      "description": "time-speed complete: real click on the 2x speed button (the exact button #489 fixed the rail to point at). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #904: relocated here, right before the survey step's own wait, so the lesson lands immediately before the tutorial's first genuine wait instead of before the player has done anything.",
-      "expect": {
-        "equals": {
-          "timeScale": 2
-        },
-        "tutorialStep": "survey",
-        "note": "proves the time-speed control itself works, independent of the tutorial overlay"
+        "tutorialStep": "survey"
       }
     },
     {
@@ -596,17 +569,90 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "drill-plan"
+          "stepId": "speed-up-for-dig"
         }
       ],
       "role": "player",
-      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure.",
+      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923: box-cut's own isComplete fires on the FIRST ramp segment landing, not the whole 12m corridor -- the card advances to 'speed-up-for-dig' next, while the rest of the dig is still genuinely in flight.",
       "expect": {
         "decreased": [
           "cash"
         ],
-        "tutorialStep": "drill-plan",
+        "tutorialStep": "speed-up-for-dig",
         "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
+      }
+    },
+    {
+      "command": "time speed:8",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "speed-normal-after-dig"
+        }
+      ],
+      "role": "player",
+      "description": "speed-up-for-dig complete (#923): real click on the ×8 speed button while the box-cut ramp is still genuinely mid-dig -- the wait step above only drove the clock to the FIRST segment landing, so most of the 12m corridor is still queued work here. Teaches the fast-forward lesson exactly where it pays off: the longest wait the tutorial has asked for yet.",
+      "expect": {
+        "equals": {
+          "timeScale": 8
+        },
+        "tutorialStep": "speed-normal-after-dig"
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
+      "timeout": 180,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "description": "#923: drains the rest of the box-cut ramp at ×8 -- the tutorial card stays on 'speed-normal-after-dig' throughout (its own isComplete needs the ramp fully dug AND the speed back at ×1, neither of which is true until the next step).",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "tutorialStep": "speed-normal-after-dig"
+      }
+    },
+    {
+      "command": "time speed:1",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "drill-plan"
+        }
+      ],
+      "role": "player",
+      "description": "speed-normal-after-dig complete (#923): real click on the ×1 speed button now that the box-cut dig has genuinely finished (orderedRampSegmentCount reached 0 in the wait step above) -- the card advances to 'drill-plan'. Every speed button stays clickable from here on, but no later step in this file completes on, or requires, a specific timeScale.",
+      "expect": {
+        "equals": {
+          "timeScale": 1
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {

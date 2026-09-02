@@ -6,8 +6,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 33 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(33);
+  it('has exactly 34 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removes time-speed and adds speed-up-for-dig/speed-normal-after-dig)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(34);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -89,12 +89,13 @@ describe('tutorialSteps', () => {
   // ── 11 ───────────────────────────────────────────────────────────────────
   it('step IDs follow the issue-specified sequence', () => {
     const expectedIds: string[] = [
-      // #904: time-speed moved from index 0 to right before the first step
-      // the player has to wait on (survey, waitsOnWork:true) — hire-surveyor
-      // is now first, since it completes on the hire alone and does not
-      // need the clock running.
+      // #904: hire-surveyor is first, since it completes on the hire alone
+      // and does not need the clock running. #923: the old 'time-speed' step
+      // that used to sit right after it is gone — the speed-control lesson
+      // moved into the box-cut ramp-dig wait further down (see
+      // 'speed-up-for-dig'/'speed-normal-after-dig' below), so hiring now
+      // advances straight into 'survey'.
       'hire-surveyor',
-      'time-speed',
       'survey',
       // #905: teaches the Survey panel's existing overlay-toggle button
       // (#496) right after the first survey lands, while the panel is
@@ -109,6 +110,11 @@ describe('tutorialSteps', () => {
       'train-digger',
       'buy-rock-digger-assign',
       'box-cut',
+      // #923: taught inside the box-cut wait — ×8 while the ramp-dig is
+      // still in progress, ×1 once it's done — replacing the old standalone
+      // 'time-speed' step that used to sit right after hire-surveyor.
+      'speed-up-for-dig',
+      'speed-normal-after-dig',
       'drill-plan',
       'charge',
       'sequence',
@@ -142,35 +148,113 @@ describe('tutorialSteps', () => {
     expect(actualIds).toEqual(expectedIds);
   });
 
-  // ── #904: time-speed suggested at the first wait, not as the opening step ─
-  describe('time-speed lesson sits at the first wait, not at the tutorial opening (#904)', () => {
-    it('opens on hire-surveyor, not time-speed', () => {
+  // ── #923: speed-control lesson relocated into the box-cut ramp-dig wait ──
+  describe('the speed-control lesson sits inside the box-cut ramp-dig wait, not at the tutorial opening (#923)', () => {
+    it('opens on hire-surveyor', () => {
       expect(TUTORIAL_STEPS[0]!.id).toBe('hire-surveyor');
     });
 
-    it('time-speed is the second step', () => {
-      expect(TUTORIAL_STEPS[1]!.id).toBe('time-speed');
+    it('no step is called "time-speed" any more — the standalone step is gone', () => {
+      expect(TUTORIAL_STEPS.find((s) => s.id === 'time-speed')).toBeUndefined();
     });
 
-    it('no step earlier than immediately before the first waitsOnWork step is time-speed', () => {
-      // General invariant, not hardcoded to an index: whatever the first
-      // genuinely-waited-on step is, time-speed may sit immediately before
-      // it (the approved position) but nothing earlier than that.
-      const firstWaitIdx = TUTORIAL_STEPS.findIndex((s) => s.waitsOnWork === true);
-      expect(firstWaitIdx).toBeGreaterThan(-1);
-      for (let i = 0; i < firstWaitIdx - 1; i++) {
-        expect(TUTORIAL_STEPS[i]!.id, `step at index ${i} is time-speed, more than one step before the first wait (index ${firstWaitIdx})`).not.toBe('time-speed');
+    it('box-cut is immediately followed by speed-up-for-dig then speed-normal-after-dig, both before drill-plan', () => {
+      const ids = TUTORIAL_STEPS.map((s) => s.id);
+      const boxCutIdx = ids.indexOf('box-cut');
+      expect(boxCutIdx).toBeGreaterThan(-1);
+      expect(ids[boxCutIdx + 1]).toBe('speed-up-for-dig');
+      expect(ids[boxCutIdx + 2]).toBe('speed-normal-after-dig');
+      expect(ids[boxCutIdx + 3]).toBe('drill-plan');
+    });
+  });
+
+  // ── #923: speed-up-for-dig / speed-normal-after-dig completion mechanics ──
+  describe('speed-up-for-dig (#923)', () => {
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'speed-up-for-dig')!;
+
+    it('does not complete while timeScale is below 8', () => {
+      expect(step.isComplete({ timeScale: 1 } as unknown as GameState, {})).toBe(false);
+      expect(step.isComplete({ timeScale: 2 } as unknown as GameState, {})).toBe(false);
+      expect(step.isComplete({ timeScale: 4 } as unknown as GameState, {})).toBe(false);
+    });
+
+    it('completes once timeScale reaches 8', () => {
+      expect(step.isComplete({ timeScale: 8 } as unknown as GameState, {})).toBe(true);
+    });
+
+    it('highlightTarget targets the ×8 speed button', () => {
+      expect(step.highlightTarget).toBe('#bs-hud-top .bs-speed-btn button[data-speed="8"]');
+    });
+  });
+
+  describe('speed-normal-after-dig (#923): captured-snapshot mechanism mirrors box-cut\'s own ramp-tracking', () => {
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'speed-normal-after-dig')!;
+
+    function stateWithRamp(rampId: number, timeScale: number): GameState {
+      return {
+        timeScale,
+        plannedRamps: [{ id: rampId, def: {}, footprint: {}, segments: [] }],
+      } as unknown as GameState;
+    }
+
+    function stateWithoutRamp(timeScale: number): GameState {
+      return { timeScale, plannedRamps: [] } as unknown as GameState;
+    }
+
+    it('highlightTarget targets the ×1 speed button', () => {
+      expect(step.highlightTarget).toBe('#bs-hud-top .bs-speed-btn button[data-speed="1"]');
+    });
+
+    it('stays incomplete while the ramp captured at step start is still present in plannedRamps, even once timeScale is already back to 1', () => {
+      const atOpen = stateWithRamp(1, 8);
+      const snap = step.captureSnapshot!(atOpen);
+      const stillDiggingButSlow = stateWithRamp(1, 1);
+      expect(step.isComplete(stillDiggingButSlow, snap)).toBe(false);
+    });
+
+    it('stays incomplete once the captured ramp is gone but timeScale has not been brought back down', () => {
+      const atOpen = stateWithRamp(1, 8);
+      const snap = step.captureSnapshot!(atOpen);
+      const rampDoneStillFast = stateWithoutRamp(8);
+      expect(step.isComplete(rampDoneStillFast, snap)).toBe(false);
+    });
+
+    it('completes once the captured ramp is absent from plannedRamps AND timeScale is back to 1', () => {
+      const atOpen = stateWithRamp(1, 8);
+      const snap = step.captureSnapshot!(atOpen);
+      const done = stateWithoutRamp(1);
+      expect(step.isComplete(done, snap)).toBe(true);
+    });
+
+    it('does not falsely complete on a DIFFERENT ramp appearing in plannedRamps once the captured one is gone', () => {
+      const atOpen = stateWithRamp(1, 8);
+      const snap = step.captureSnapshot!(atOpen);
+      // A different ramp (id 2) now occupies plannedRamps — the captured
+      // ramp (id 1) is genuinely gone, and speed is back to 1, so this
+      // should read complete regardless of the new unrelated ramp.
+      const differentRamp = stateWithRamp(2, 1);
+      expect(step.isComplete(differentRamp, snap)).toBe(true);
+    });
+  });
+
+  // ── #923: no step after the speed lesson may read state.timeScale ────────
+  it('no step after speed-normal-after-dig completes on, or reads, state.timeScale', () => {
+    const ids = TUTORIAL_STEPS.map((s) => s.id);
+    const idx = ids.indexOf('speed-normal-after-dig');
+    expect(idx).toBeGreaterThan(-1);
+    for (let i = idx + 1; i < TUTORIAL_STEPS.length; i++) {
+      const step = TUTORIAL_STEPS[i]!;
+      expect(
+        step.isComplete.toString(),
+        `step "${step.id}" (index ${i}) reads state.timeScale in isComplete`,
+      ).not.toMatch(/timeScale/);
+      if (step.captureSnapshot) {
+        expect(
+          step.captureSnapshot.toString(),
+          `step "${step.id}" (index ${i}) reads state.timeScale in captureSnapshot`,
+        ).not.toMatch(/timeScale/);
       }
-    });
-
-    it("time-speed's index sits at, or immediately before, the first waitsOnWork step's index", () => {
-      const firstWaitIdx = TUTORIAL_STEPS.findIndex((s) => s.waitsOnWork === true);
-      const timeSpeedIdx = TUTORIAL_STEPS.findIndex((s) => s.id === 'time-speed');
-      expect(firstWaitIdx).toBeGreaterThan(-1);
-      expect(timeSpeedIdx).toBeGreaterThan(-1);
-      expect(timeSpeedIdx).toBeLessThanOrEqual(firstWaitIdx);
-      expect(firstWaitIdx - timeSpeedIdx).toBeLessThanOrEqual(1);
-    });
+    }
   });
 
   // ── 12 ───────────────────────────────────────────────────────────────────
@@ -346,13 +430,15 @@ describe('tutorialSteps', () => {
   it('steps with meaningful UI target have a highlightTarget defined', () => {
     // Steps that should definitely have highlight targets
     const stepsWithTarget = new Set([
-      'time-speed', 'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
+      'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
       'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
       'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'contract-deliver',
       'finances', 'box-cut', 'needs', 'tick-advance',
+      // #923
+      'speed-up-for-dig', 'speed-normal-after-dig',
     ]);
     for (const step of TUTORIAL_STEPS) {
       if (stepsWithTarget.has(step.id)) {
@@ -372,16 +458,6 @@ describe('tutorialSteps', () => {
         ).toBe(true);
       }
     }
-  });
-
-  // ── 16 ───────────────────────────────────────────────────────────────────
-  it('time-speed only completes on a genuine speed increase', () => {
-    // Looked up by id, not index (#904 reorder moves time-speed off index 0).
-    const timeSpeedStep = TUTORIAL_STEPS.find((s) => s.id === 'time-speed')!;
-    const snap = timeSpeedStep.captureSnapshot!({ timeScale: 1 } as GameState);
-    // Same speed as when the step opened — the player has not acted yet.
-    expect(timeSpeedStep.isComplete({ timeScale: 1 } as GameState, snap)).toBe(false);
-    expect(timeSpeedStep.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
   });
 
   // ── 16b (#926) ───────────────────────────────────────────────────────────

@@ -91,8 +91,13 @@ describe('command-mode runSteps checks a step\'s expect, not just whether the co
   });
 
   it('a goal with only usable/blocked/tutorialStep is a no-op in command mode (no page to check against)', () => {
+    // #923: 'time-speed' no longer exists as a tutorial step id — using
+    // TUTORIAL_STEPS[0]'s own id here instead (still 'hire-surveyor',
+    // unaffected by this change). The literal value is inert either way
+    // (this goal has no page to check tutorialStep against in command mode),
+    // but a real step id keeps the fixture honest.
     const results = run([
-      { command: 'new_game seed:42', expect: { usable: '#bs-survey-run', tutorialStep: 'time-speed' } },
+      { command: 'new_game seed:42', expect: { usable: '#bs-survey-run', tutorialStep: 'hire-surveyor' } },
     ]);
     expect(results[0]!.error).toBeUndefined();
   });

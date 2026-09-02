@@ -7,6 +7,7 @@ import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS }
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
+import { SPEED_BUTTON_GROUP } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
@@ -98,16 +99,22 @@ describe('TutorialRails', () => {
   });
 
   it('omits the counter for a single-stage step', () => {
+    // #923: 'time-speed' no longer exists — 'speed-up-for-dig' is the
+    // single-stage step exercising the same shape now (one stage, targeting
+    // a speed button nested inside the .bs-speed-btn group container).
     const bar = document.createElement('div');
     bar.id = 'bs-hud-top';
+    const group = document.createElement('div');
+    group.className = 'bs-speed-btn';
     const btn = document.createElement('button');
-    btn.className = 'bs-speed-btn';
-    bar.appendChild(btn);
+    btn.dataset['speed'] = '8';
+    group.appendChild(btn);
+    bar.appendChild(group);
     document.body.appendChild(bar);
     withBox(btn);
 
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'time-speed' }, state());
+    rails.beginStep({ id: 'speed-up-for-dig' }, state());
     expect(rails.refresh().hint).not.toContain('/');
   });
 
@@ -276,6 +283,90 @@ describe('TutorialRails', () => {
     expect(open.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     expect(rails.progress.total).toBe(0);
     expect(rails.clockHeld).toBe(false);
+  });
+});
+
+// #923: once the speed-lesson pair completes, the speed controls are left
+// permanently player-controlled for the rest of the tutorial — a step
+// declares that via RailsStep.permanentlyUnlocks, and TutorialRails is
+// responsible for accumulating it across beginStep calls and applying it on
+// every refresh(), regardless of the active stage's own target.
+describe('permanentlyUnlocks (#923)', () => {
+  /** All four HUD speed buttons, nested inside the .bs-speed-btn group container. */
+  function speedButtons(): HTMLButtonElement[] {
+    const bar = document.createElement('div');
+    bar.id = 'bs-hud-top';
+    const group = document.createElement('div');
+    group.className = 'bs-speed-btn';
+    bar.appendChild(group);
+    document.body.appendChild(bar);
+
+    const buttons = ['1', '2', '4', '8'].map((speed) => {
+      const btn = document.createElement('button');
+      btn.dataset['speed'] = speed;
+      group.appendChild(btn);
+      return withBox(btn) as HTMLButtonElement;
+    });
+    return buttons;
+  }
+
+  it('marks all four speed buttons allowed once a step with permanentlyUnlocks begins, regardless of the active stage\'s own target', () => {
+    const buttons = speedButtons();
+    // Active stage target is the Crew toolbar button — nothing to do with
+    // the speed buttons — proving the unlock is independent of the stage.
+    toolbarCrew();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
+    rails.refresh();
+
+    for (const btn of buttons) {
+      expect(btn.classList.contains(ALLOWED_CLASS), `data-speed="${btn.dataset['speed']}" should be allowed`).toBe(true);
+    }
+  });
+
+  it('does not unlock the speed buttons for a step that carries no permanentlyUnlocks', () => {
+    const buttons = speedButtons();
+    toolbarCrew();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    for (const btn of buttons) {
+      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(false);
+    }
+  });
+
+  it('the unlock persists across subsequent beginStep calls for later steps, even when those steps carry no permanentlyUnlocks of their own', () => {
+    const buttons = speedButtons();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'speed-up-for-dig', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
+    rails.refresh();
+
+    rails.beginStep({ id: 'drill-plan' }, state());
+    rails.refresh();
+
+    for (const btn of buttons) {
+      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+    }
+  });
+
+  it('clear() resets the permanent unlock — a fresh tutorial run does not start pre-unlocked', () => {
+    const buttons = speedButtons();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'speed-up-for-dig', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
+    rails.refresh();
+    rails.clear();
+
+    rails.beginStep({ id: 'drill-plan' }, state());
+    rails.refresh();
+
+    for (const btn of buttons) {
+      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(false);
+    }
   });
 });
 

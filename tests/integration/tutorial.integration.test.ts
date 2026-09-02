@@ -130,7 +130,7 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 26th of 33 tutorial steps (0-based index 25), between contract-accept and contract-deliver', () => {
+  it('is the 27th of 34 tutorial steps (0-based index 26), between contract-accept and contract-deliver', () => {
     // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
     // right after hire-driller, shifting every later step (including this
     // one) up by 3 from their pre-#553 positions. #555 inserts
@@ -147,10 +147,13 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // complete. #557 inserts evacuate-zone between 'sequence' and 'blast' —
     // both well before this step — shifting it up 1 more (23 -> 24). #905
     // inserts toggle-survey-overlay right after 'survey' — also well before
-    // this step — shifting it up 1 more (24 -> 25).
+    // this step — shifting it up 1 more (24 -> 25). #923 removes the
+    // standalone 'time-speed' step (was right after hire-surveyor) and adds
+    // speed-up-for-dig/speed-normal-after-dig right after box-cut instead —
+    // both well before this step — net +1, shifting it up 1 more (25 -> 26).
     const ids = TUTORIAL_STEPS.map(s => s.id);
     const idx = ids.indexOf('haul-debris');
-    expect(idx).toBe(25);
+    expect(idx).toBe(26);
     expect(ids[idx - 1]).toBe('contract-accept');
     expect(ids[idx - 2]).toBe('build-storage');
     expect(ids[idx + 1]).toBe('contract-deliver');
@@ -532,6 +535,78 @@ function stillOnChargeTab(state: GameState): boolean {
   const holes = state.drillHoles;
   return !holes.every(h => state.chargesByHole[h.id]);
 }
+
+// ── speed-up-for-dig / speed-normal-after-dig (#923) ─────────────────────
+//
+// The speed-control lesson used to be a standalone 'time-speed' step,
+// completing on any timeScale increase. #923 moves it into the box-cut
+// ramp-dig wait instead: box-cut's own isComplete fires on the FIRST ramp
+// segment landing (navGrid ramp-cell count ticking up), well before the rest
+// of the (12m/8-deep) corridor is dug — so 'speed-up-for-dig' opens while the
+// dig is still genuinely in flight, teaches ×8, and 'speed-normal-after-dig'
+// only completes once the whole ramp is actually done (spliced out of
+// state.plannedRamps, mirroring 'orderedRampSegmentCount' in console-api.ts)
+// AND the speed is back at ×1.
+describe('speed-up-for-dig / speed-normal-after-dig (#923): taught inside the box-cut ramp-dig wait', () => {
+  it('speed-up-for-dig completes while the ramp is still mid-dig, and speed-normal-after-dig completes only once the dig is fully done and the speed is back to ×1', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+
+    const state = ctx.state!;
+    expect(state.plannedRamps.length).toBeGreaterThan(0);
+    const totalSegments = state.plannedRamps.reduce((sum, r) => sum + r.segments.length, 0);
+    // A 12m/8-deep ramp genuinely produces more than one segment — otherwise
+    // this test would not exercise "still mid-dig" at all.
+    expect(totalSegments).toBeGreaterThan(1);
+
+    const speedUpStep = TUTORIAL_STEPS.find((s) => s.id === 'speed-up-for-dig')!;
+    const speedDownStep = TUTORIAL_STEPS.find((s) => s.id === 'speed-normal-after-dig')!;
+
+    // Drain a handful of ticks — enough for the first segment or two to land
+    // (mirroring box-cut's own isComplete), but nowhere near the whole ramp.
+    for (let i = 0; i < 15 && state.plannedRamps.length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      run('tick 1');
+      if (state.plannedRamps[0] && state.plannedRamps[0].segments.some((seg) => seg.done)) break;
+    }
+    expect(state.plannedRamps.length, 'the ramp finished digging before the mid-dig window could be exercised — the test setup no longer produces a multi-segment ramp').toBeGreaterThan(0);
+
+    expect(speedUpStep.isComplete(state, {})).toBe(false);
+    expect(run('time speed:8').success).toBe(true);
+    expect(state.timeScale).toBe(8);
+    expect(speedUpStep.isComplete(state, {})).toBe(true);
+
+    // speed-normal-after-dig's own step opens right about here — capture its
+    // snapshot while the ramp is still genuinely mid-dig.
+    const speedDownSnapshot = speedDownStep.captureSnapshot ? speedDownStep.captureSnapshot(state) : {};
+    expect(speedDownStep.isComplete(state, speedDownSnapshot)).toBe(false);
+
+    // Drain the rest of the dig at ×8.
+    for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      run('tick 1');
+    }
+    expect(state.plannedRamps.length).toBe(0);
+
+    // Ramp fully dug, but still at ×8 — must not complete on the ramp alone.
+    expect(speedDownStep.isComplete(state, speedDownSnapshot)).toBe(false);
+
+    expect(run('time speed:1').success).toBe(true);
+    expect(state.timeScale).toBe(1);
+    expect(speedDownStep.isComplete(state, speedDownSnapshot)).toBe(true);
+  });
+});
 
 describe('charge (#926): completion never runs ahead of the panel\'s own Charge tab', () => {
   it('stays incomplete on every partially-charged tick, and completes exactly when the panel would also move on', () => {

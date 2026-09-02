@@ -7,6 +7,11 @@
 // 50 keys exist from merged #318 (title, skip, next, step1–23, step1–23.title, done).
 // 3 keys will be added by #319 (progress, complete_title, complete_text).
 // Total: 53 keys across 2 locales.
+// #923: tutorial.step1/.title (the old standalone 'time-speed' step's copy)
+// no longer exist — the step moved into the box-cut wait and split into two
+// new named keys (tutorial.step_speedupdig/tutorial.step_speeddowndig, plus
+// their own .title and stage keys), the same box-cut-style naming already
+// used for tutorial.step_boxcut below.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
@@ -21,16 +26,23 @@ function generateAllTutorialKeys(): string[] {
     'tutorial.progress',
   ];
   // Step 18 (the late ramp step) was replaced by the box-cut step, which sits
-  // early in the flow and has its own named key.
+  // early in the flow and has its own named key. Step 1 (#923) was replaced
+  // by the speed-up-for-dig/speed-normal-after-dig pair, which also sit
+  // elsewhere in the flow (inside the box-cut wait) and have their own named
+  // keys.
   for (let i = 1; i <= 23; i++) {
-    if (i === 18) continue;
+    if (i === 1 || i === 18) continue;
     keys.push(`tutorial.step${i}`);
   }
   for (let i = 1; i <= 23; i++) {
-    if (i === 18) continue;
+    if (i === 1 || i === 18) continue;
     keys.push(`tutorial.step${i}.title`);
   }
   keys.push('tutorial.step_boxcut', 'tutorial.step_boxcut.title', 'tutorial.stage.boxcut_area');
+  keys.push(
+    'tutorial.step_speedupdig', 'tutorial.step_speedupdig.title', 'tutorial.stage.speed_up_dig',
+    'tutorial.step_speeddowndig', 'tutorial.step_speeddowndig.title', 'tutorial.stage.speed_down_dig',
+  );
   keys.push(
     'tutorial.done',
     'tutorial.complete_title',
@@ -110,13 +122,25 @@ describe('tutorial keys — en and fr translations differ', () => {
     expect(en, 'en and fr translations for tutorial.complete_text must differ').not.toBe(fr);
   });
 
-  it('tutorial.step1.title is translated differently in en vs fr', () => {
+  // #923: tutorial.step1.title no longer exists — replaced by the
+  // speed-up-for-dig/speed-normal-after-dig pair's own title keys.
+  it('tutorial.step_speedupdig.title is translated differently in en vs fr', () => {
     setLocale('en');
-    const en = t('tutorial.step1.title');
+    const en = t('tutorial.step_speedupdig.title');
     setLocale('fr');
-    const fr = t('tutorial.step1.title');
-    expect(en, 'tutorial.step1.title must resolve in en').not.toBe('tutorial.step1.title');
-    expect(fr, 'tutorial.step1.title must resolve in fr').not.toBe('tutorial.step1.title');
-    expect(en, 'en and fr translations for tutorial.step1.title must differ').not.toBe(fr);
+    const fr = t('tutorial.step_speedupdig.title');
+    expect(en, 'tutorial.step_speedupdig.title must resolve in en').not.toBe('tutorial.step_speedupdig.title');
+    expect(fr, 'tutorial.step_speedupdig.title must resolve in fr').not.toBe('tutorial.step_speedupdig.title');
+    expect(en, 'en and fr translations for tutorial.step_speedupdig.title must differ').not.toBe(fr);
+  });
+
+  it('tutorial.step_speeddowndig.title is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('tutorial.step_speeddowndig.title');
+    setLocale('fr');
+    const fr = t('tutorial.step_speeddowndig.title');
+    expect(en, 'tutorial.step_speeddowndig.title must resolve in en').not.toBe('tutorial.step_speeddowndig.title');
+    expect(fr, 'tutorial.step_speeddowndig.title must resolve in fr').not.toBe('tutorial.step_speeddowndig.title');
+    expect(en, 'en and fr translations for tutorial.step_speeddowndig.title must differ').not.toBe(fr);
   });
 });
