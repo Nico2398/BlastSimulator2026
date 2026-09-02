@@ -1,0 +1,17 @@
+{
+  "path": ["src", "scripts"],
+  "format": ["typescript"],
+  "ignore": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/report/**"
+  ],
+  "gitignore": true,
+  "threshold": 1.5,
+  "exitCode": 1,
+  "reporters": ["consoleFull"],
+  "output": "./report/"
+}

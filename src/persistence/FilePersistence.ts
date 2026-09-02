@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { SaveBackend, SaveMeta, SaveSlot } from '../core/state/SaveBackend.js';
-import { SAVE_VERSION } from '../core/state/GameState.js';
+import { buildSaveSlot } from './SaveSlotBuilder.js';
 
 export class FilePersistence implements SaveBackend {
   private readonly dir: string;
@@ -23,15 +23,7 @@ export class FilePersistence implements SaveBackend {
   }
 
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
-    const meta: SaveMeta = {
-      slotId,
-      name,
-      timestamp: Date.now(),
-      version: SAVE_VERSION,
-      campaignSummary,
-      levelId,
-    };
-    const slot: SaveSlot = { meta, data };
+    const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     fs.writeFileSync(this.slotPath(slotId), JSON.stringify(slot), 'utf-8');
   }
 

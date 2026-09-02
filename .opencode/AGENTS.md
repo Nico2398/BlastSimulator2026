@@ -39,6 +39,7 @@ npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
 npm run dev             # dev server on :5173, required by the visual channel
 npm run console         # interactive gameplay REPL, no browser
+npm run qualimetry      # jscpd syntactic duplication check (src/, scripts/ — threshold in .jscpd.json)
 ```
 
 Full command reference: `dev-testing-strategy` and `dev-visual-testing` skills.

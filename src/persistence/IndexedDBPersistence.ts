@@ -2,7 +2,7 @@
 // Uses IndexedDB for web persistence. Lives OUTSIDE src/core/.
 
 import type { SaveBackend, SaveMeta, SaveSlot } from '../core/state/SaveBackend.js';
-import { SAVE_VERSION } from '../core/state/GameState.js';
+import { buildSaveSlot } from './SaveSlotBuilder.js';
 
 const DB_NAME = 'BlastSimulator2026';
 const STORE_NAME = 'saves';
@@ -28,15 +28,7 @@ function txn(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
 
 export class IndexedDBPersistence implements SaveBackend {
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
-    const meta: SaveMeta = {
-      slotId,
-      name,
-      timestamp: Date.now(),
-      version: SAVE_VERSION,
-      campaignSummary,
-      levelId,
-    };
-    const slot: SaveSlot = { meta, data };
+    const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const req = txn(db, 'readwrite').put(slot);

@@ -47,9 +47,12 @@ npm run test:scenarios    # Validates scenario definition files (not the scenari
 npm run scenarios         # Runs all scenarios, command mode
 npm run scenarios:interaction  # Runs all scenarios, interaction mode (real clicks)
 npm run console           # Interactive gameplay testing (no browser)
+npm run qualimetry        # jscpd syntactic duplication check (src/, scripts/)
 ```
 
 `npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
+
+`npm run qualimetry` is not a fifth verification channel — it proves the codebase stays unduplicated, not that a change works. Its gate lives in `.jscpd.json` (threshold, ignore globs, `src`/`scripts` scope — test files are excluded, their arrange/setup boilerplate isn't the duplication this gate targets). It runs as its own CI job on every push and PR, independent of the four channels above.
 
 ## Unit Test Conventions
 

@@ -3,7 +3,7 @@
 // Lives OUTSIDE src/core/ — uses DOM APIs.
 
 import type { SaveBackend, SaveMeta, SaveSlot } from '../core/state/SaveBackend.js';
-import { SAVE_VERSION } from '../core/state/GameState.js';
+import { buildSaveSlot } from './SaveSlotBuilder.js';
 
 /**
  * Download-based persistence: saves trigger a file download,
@@ -13,15 +13,7 @@ export class DownloadPersistence implements SaveBackend {
   private readonly slots = new Map<string, SaveSlot>();
 
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
-    const meta: SaveMeta = {
-      slotId,
-      name,
-      timestamp: Date.now(),
-      version: SAVE_VERSION,
-      campaignSummary,
-      levelId,
-    };
-    const slot: SaveSlot = { meta, data };
+    const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     this.slots.set(slotId, slot);
 
     // Trigger browser download

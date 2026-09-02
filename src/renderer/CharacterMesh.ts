@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
 import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { disposeGroup } from './MeshUtils.js';
 
 // ---------- Role colors (bright, distinct) ----------
 // Exported for the Crew panel's roster avatars (redesign P6) — same hue as
@@ -194,13 +195,3 @@ export class CharacterMesh {
   }
 }
 
-// ---------- Helpers ----------
-
-function disposeGroup(group: THREE.Group): void {
-  for (const child of group.children) {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      (child.material as THREE.Material).dispose();
-    }
-  }
-}
