@@ -17,6 +17,13 @@ export interface RailsStep {
   highlightTarget?: string;
   tickBudget?: number;
   waitsOnWork?: boolean;
+  /**
+   * Selectors this step leaves permanently clickable from here on, even once
+   * the rail has moved past it — e.g. the speed controls, left fully
+   * player-controlled for the rest of the tutorial after the speed-lesson
+   * pair (#923).
+   */
+  permanentlyUnlocks?: string[];
 }
 
 /** What the card should show about the current stage and the clock. */
@@ -40,6 +47,12 @@ export class TutorialRails {
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
   private lastProgressTrainingActive = false;
+  /**
+   * Selectors accumulated from every step's `permanentlyUnlocks` seen so far
+   * this tutorial run (#923). Stub only — accumulate/apply/reset left to the
+   * implementer.
+   */
+  private permanentlyAllowed = new Set<string>();
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
@@ -72,7 +85,9 @@ export class TutorialRails {
 
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
-    applyRails(stage);
+    // TODO: implement — accumulate each step's permanentlyUnlocks into
+    // this.permanentlyAllowed in beginStep, once that logic lands (#923).
+    applyRails(stage, document, Array.from(this.permanentlyAllowed));
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`

@@ -202,13 +202,6 @@ export interface TextDefect {
 
 export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
   {
-    key: 'tutorial.step1',
-    locale: 'both',
-    problem:
-      "Says the speed controls are 'in the top-right corner' (en) / 'en haut à droite' (fr). src/ui/shell/TopBar.ts appends them as the 3rd element from the left (`this.root.append(this.balanceWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap)`), left of center in the top HUD bar, not the right.",
-    expectedFix: "Reword both locales to describe the speed controls as being toward the left of the top bar (or 'near the balance/day display'), matching TopBar.ts's actual DOM order.",
-  },
-  {
     key: 'tutorial.step2',
     locale: 'fr',
     problem: "Uses 'Emboutez' (to dent/stamp) where 'Embauchez' (to hire) is meant.",

@@ -24,6 +24,15 @@ export const TOOLBAR_TARGET = {
   settings: '#bs-toolbar [data-panel="settings"]',
 } as const;
 
+/** Selector for the ×8 speed button — the target of the speed-up-for-dig step (#923). */
+export const SPEED_UP_TO_MAX_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="8"]';
+
+/** Selector for the ×1 speed button — the target of the speed-down-after-dig step (#923). */
+export const SPEED_BACK_TO_NORMAL_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="1"]';
+
+/** Selector for the whole speed button group — used once speed controls are left player-controlled (#923). */
+export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]';
+
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the
  * target role at capture time. Completion requires an employee with that
@@ -315,5 +324,40 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
     }),
     isComplete: (_state: GameState, snapshot: Record<string, unknown>) =>
       isSurveyOverlayToggleOn() !== (snapshot.overlayOn as boolean),
+  };
+}
+
+/**
+ * Helper: create the speed-up-for-dig step (#923) — taught inside the
+ * 'box-cut' wait, teaching ×8 while the long ramp-dig is in progress.
+ *
+ * Stub only: isComplete/commands wiring left to the implementer.
+ */
+export function createSpeedUpForDigStep(): TutorialStep {
+  return {
+    id: 'speed-up-for-dig',
+    titleKey: 'tutorial.step_speedupdig.title',
+    textKey: 'tutorial.step_speedupdig',
+    highlightTarget: SPEED_UP_TO_MAX_BUTTON,
+    // TODO: implement
+    isComplete: () => false,
+  };
+}
+
+/**
+ * Helper: create the speed-down-after-dig step (#923) — teaches ×1 once the
+ * box-cut dig has finished, before speed controls are left player-controlled
+ * for the rest of the tutorial.
+ *
+ * Stub only: isComplete/commands wiring left to the implementer.
+ */
+export function createSpeedDownAfterDigStep(): TutorialStep {
+  return {
+    id: 'speed-normal-after-dig',
+    titleKey: 'tutorial.step_speeddowndig.title',
+    textKey: 'tutorial.step_speeddowndig',
+    highlightTarget: SPEED_BACK_TO_NORMAL_BUTTON,
+    // TODO: implement
+    isComplete: () => false,
   };
 }

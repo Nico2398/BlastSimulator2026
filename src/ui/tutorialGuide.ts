@@ -121,7 +121,13 @@ function visibleModalControls(root: ParentNode): Element[] {
  * two passes is inert from the moment it is rendered rather than briefly
  * clickable.
  */
-export function applyRails(stage: TutorialStage | undefined, root: ParentNode = document): void {
+export function applyRails(
+  stage: TutorialStage | undefined,
+  root: ParentNode = document,
+  // TODO: implement — wire into allowedSelectors so a permanently-unlocked
+  // control (#923's speed buttons) stays clickable across a stage change.
+  _extraAllowed: string[] = [],
+): void {
   for (const el of Array.from(root.querySelectorAll(`.${ALLOWED_CLASS}`))) {
     el.classList.remove(ALLOWED_CLASS);
   }
