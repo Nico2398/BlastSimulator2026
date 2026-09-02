@@ -244,7 +244,7 @@ export function tickCommand(
     // one into their active timers/effects once the entity has actually
     // arrived, and drives hauling vehicles (move → load → move → unload) end
     // to end (#437).
-    const arrivalResult = tickArrivalGate(state, emitter);
+    const arrivalResult = tickArrivalGate(state, emitter, ctx.grid ?? undefined);
     for (const cancelled of arrivalResult.boardingCancelled) {
       const emp = state.employees.employees.find(e => e.id === cancelled.employeeId);
       lines.push(`[tick ${state.tickCount}] BOARDING CANCELLED: ${emp?.name ?? `employee #${cancelled.employeeId}`} (${cancelled.reason}).`);

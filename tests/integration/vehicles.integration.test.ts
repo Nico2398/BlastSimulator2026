@@ -967,3 +967,101 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
     expect(sawUnescalatedOverThreshold).toBe(false);
   });
 });
+
+// ── #924: dig_ramp_segment work duration scales with live voxel count ──────
+//
+// The full tickArrivalGate -> seedTaskTimerFields -> computeActionWorkTicks
+// chain, driven entirely through the console (new_game/build_ramp/tick),
+// mirrors what a real playthrough exercises. Two identical ramp orders (same
+// seed, same origin/direction/length/depth, so the order-time
+// segment.cells.length is identical for both) diverge only in that one has
+// half its first segment's own cells cleared directly in the live grid AFTER
+// ordering — simulating an overlapping blast or ramp having already carved
+// part of the segment before the digger starts. Today's stub (#924 skeleton)
+// ignores `grid` for dig_ramp_segment entirely, so it seeds the identical
+// work-timer duration for both; the fix must seed a shorter one for the
+// partly-cleared segment.
+
+describe('dig_ramp_segment work duration scales with live voxel count (#924)', () => {
+  it('a segment with half its own cells already cleared externally seeds a shorter work timer than the same segment fully solid', () => {
+    // A length-8/depth-8 ramp's last segment (deepest, index 7) carves ~28
+    // cells — well clear of the floor(1-tick) case a shallow single-layer
+    // segment would hit, so halving its live voxel count actually moves the
+    // tick count (confirmed against real seed:42/size:32 terrain: segment
+    // cell counts step from 6 at index 0 up to 28 at index 7).
+    const RAMP_ARGS = 'origin:16,19 direction:south length:8 depth:8';
+    const SEGMENT_INDEX = 7;
+
+    // Scenario A — baseline: every one of the segment's cells is still solid
+    // when the digger arrives.
+    const a = createRunner();
+    expect(runCommand(a, 'new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(runCommand(a, `build_ramp ${RAMP_ARGS}`).success).toBe(true);
+    const rampA = a.ctx.state!.plannedRamps[0]!;
+    const segmentA = rampA.segments[SEGMENT_INDEX]!;
+    expect(segmentA.cells.length).toBeGreaterThan(10);
+
+    // Scenario B — identical order (same stale order-time cells.length), but
+    // half of the segment's own cells are cleared directly in the live grid
+    // right after ordering, before any tick runs.
+    const b = createRunner();
+    expect(runCommand(b, 'new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(runCommand(b, `build_ramp ${RAMP_ARGS}`).success).toBe(true);
+    const rampB = b.ctx.state!.plannedRamps[0]!;
+    const segmentB = rampB.segments[SEGMENT_INDEX]!;
+    // Same seed, same order -> identical order-time footprint.
+    expect(segmentB.cells).toEqual(segmentA.cells);
+
+    const half = Math.ceil(segmentB.cells.length / 2);
+    for (const cell of segmentB.cells.slice(0, half)) {
+      b.ctx.grid!.clearVoxel(cell.x, cell.y, cell.z);
+    }
+    const liveVoxelCountB = segmentB.cells.filter(c => b.ctx.grid!.densityAt(c.x, c.y, c.z) > 0).length;
+    expect(liveVoxelCountB).toBeLessThan(segmentB.cells.length);
+
+    // Drive each simulation tick-by-tick, pinning every employee's needs at
+    // full each tick (mirrors the #923 box-cut test's own pattern above) so
+    // getNeedMultiplier can never confound the voxel-count comparison, until
+    // the digger's work timer is seeded — employee.taskTicksRemaining flips
+    // from null to a number the instant tickArrivalGate calls
+    // seedTaskTimerFields on arrival, and that seeded value IS
+    // computeActionWorkTicks's return, read before any tick spends it down.
+    // Only one rock_digger vehicle exists in the staffed roster, so it may
+    // work other (shallower) segments first before reaching SEGMENT_INDEX —
+    // budget generously for that.
+    function captureSeededWorkTicks(engine: ReturnType<typeof createRunner>, actionId: number): number {
+      for (let i = 0; i < 800; i++) {
+        for (const emp of engine.ctx.state!.employees.employees) {
+          emp.hunger = 100;
+          emp.fatigue = 100;
+          emp.breakNeed = 100;
+        }
+        const action = engine.ctx.state!.pendingActions.find(act => act.id === actionId);
+        const holder = action && action.holderId !== null
+          ? engine.ctx.state!.employees.employees.find(e => e.id === action.holderId)
+          : undefined;
+        if (holder && holder.taskTicksRemaining !== null) return holder.taskTicksRemaining;
+        expect(runCommand(engine, 'tick 1').success).toBe(true);
+      }
+      throw new Error('digger never started working on the ramp segment within 800 ticks');
+    }
+
+    const workTicksA = captureSeededWorkTicks(a, segmentA.actionId);
+    const workTicksB = captureSeededWorkTicks(b, segmentB.actionId);
+
+    // Must fail against the #924 stub: it ignores `grid` for dig_ramp_segment
+    // entirely, so clearing half of segment B's cells externally has no
+    // effect and both seed the identical (stale cells.length-based) duration.
+    expect(workTicksB).toBeLessThan(workTicksA);
+
+    // Roughly proportional to the live voxel count actually dug, not the
+    // stale order-time cells.length (which is identical for A and B) — kept
+    // loose (not pinned to an exact formula) since travel time is not part
+    // of this measurement but the exact tier/proficiency/need/lq wiring is
+    // an implementation detail of #924, not of this integration test.
+    const expectedRatio = liveVoxelCountB / segmentA.cells.length;
+    const actualRatio = workTicksB / workTicksA;
+    expect(actualRatio).toBeGreaterThan(expectedRatio - 0.15);
+    expect(actualRatio).toBeLessThan(expectedRatio + 0.15);
+  });
+});

@@ -15,6 +15,7 @@ import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATIO
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -29,6 +30,27 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
 }
 
 /**
+ * Proficiency level (for `action.requiredSkill`, default 1) plus the need and
+ * living-quarters wellbeing multipliers for `employee` — the three inputs
+ * `computeActionWorkTicks`'s `dig_ramp_segment` branch and generic fallback
+ * both feed into their respective duration formulas. Single source of truth
+ * for that lookup so the two branches can't drift.
+ */
+function resolveEmployeeProductivityInputs(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+): { level: 1 | 2 | 3 | 4 | 5; needMult: number; lqMult: number } {
+  const qual = action.requiredSkill !== null
+    ? employee.qualifications.find(q => q.category === action.requiredSkill)
+    : undefined;
+  const level = qual?.proficiencyLevel ?? 1;
+  const needMult = getNeedMultiplier(employee);
+  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+  return { level, needMult, lqMult };
+}
+
+/**
  * Work-duration ticks for `employee` performing `action` — the same
  * computation EmployeeDispatch.ts's tickEmployees used to do inline at claim time.
  * Single source of truth for both the cost estimate/resolution below and the
@@ -38,8 +60,13 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
  * runSurvey) and a rest action's own restDuration override the generic
  * proficiency-scaled duration — both already appear directly in the action's
  * payload rather than being derived here.
+ *
+ * `grid`, when provided, lets the `dig_ramp_segment` branch read the live
+ * voxel count instead of the stale one captured in the action's payload at
+ * queue time (#924) — omitted (ranking/ETA call sites) keeps today's
+ * stale-count behavior unchanged.
  */
-export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction): number {
+export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): number {
   if (action.type === 'rest') {
     if (typeof action.payload['restDuration'] === 'number') {
       return action.payload['restDuration'] as number;
@@ -49,21 +76,20 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   }
 
   if (action.type === 'dig_ramp_segment') {
-    const voxelCount = (action.payload['cells'] as unknown[] | undefined)?.length ?? 0;
+    const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
+    const voxelCount = grid !== undefined
+      ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
+      : cells.length;
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier);
+    const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
+    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
   }
 
   if (typeof action.payload['durationTicks'] === 'number') {
     return action.payload['durationTicks'] as number;
   }
 
-  const qual = action.requiredSkill !== null
-    ? employee.qualifications.find(q => q.category === action.requiredSkill)
-    : undefined;
-  const level = qual?.proficiencyLevel ?? 1;
-  const needMult = getNeedMultiplier(employee);
-  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+  const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
   return computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
 }
 
@@ -76,9 +102,11 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
  * promoteActionToActive (on-foot claim, unchanged behavior) and
  * ArrivalGate.ts's vehicle-arrival transition, so both start work identically
  * instead of duplicating the same four-field assignment in two places.
+ *
+ * `grid` is threaded straight through to `computeActionWorkTicks` (#924).
  */
-export function seedTaskTimerFields(state: GameState, employee: Employee, action: PendingAction): void {
-  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action);
+export function seedTaskTimerFields(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): void {
+  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action, grid);
   employee.activeTaskSkill = action.requiredSkill;
   employee.pendingActionType = action.type;
   employee.pendingActionPayload = action.payload;
