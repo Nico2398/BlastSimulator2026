@@ -124,9 +124,10 @@ function visibleModalControls(root: ParentNode): Element[] {
 export function applyRails(
   stage: TutorialStage | undefined,
   root: ParentNode = document,
-  // TODO: implement — wire into allowedSelectors so a permanently-unlocked
-  // control (#923's speed buttons) stays clickable across a stage change.
-  _extraAllowed: string[] = [],
+  // Selectors a past step (#923's speed buttons, once its lesson pair is
+  // done) left permanently clickable — stay live across every later stage,
+  // stage present or not.
+  extraAllowed: string[] = [],
 ): void {
   for (const el of Array.from(root.querySelectorAll(`.${ALLOWED_CLASS}`))) {
     el.classList.remove(ALLOWED_CLASS);
@@ -136,6 +137,12 @@ export function applyRails(
   }
   // An open modal is always operable, even mid-stage.
   for (const el of visibleModalControls(root)) el.classList.add(ALLOWED_CLASS);
+
+  for (const selector of extraAllowed) {
+    for (const el of Array.from(root.querySelectorAll(selector))) {
+      el.classList.add(ALLOWED_CLASS);
+    }
+  }
 
   if (!stage) return;
 

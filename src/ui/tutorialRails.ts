@@ -49,8 +49,8 @@ export class TutorialRails {
   private lastProgressTrainingActive = false;
   /**
    * Selectors accumulated from every step's `permanentlyUnlocks` seen so far
-   * this tutorial run (#923). Stub only — accumulate/apply/reset left to the
-   * implementer.
+   * this tutorial run (#923). Never cleared by `beginStep`'s per-step reset —
+   * once a step unlocks a control, it stays unlocked for the rest of the run.
    */
   private permanentlyAllowed = new Set<string>();
 
@@ -64,6 +64,9 @@ export class TutorialRails {
     this.lastProgressSignature = null;
     this.lastProgressTick = this.stepStartTick;
     this.lastProgressTrainingActive = false;
+    for (const selector of step.permanentlyUnlocks ?? []) {
+      this.permanentlyAllowed.add(selector);
+    }
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
@@ -85,8 +88,6 @@ export class TutorialRails {
 
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
-    // TODO: implement — accumulate each step's permanentlyUnlocks into
-    // this.permanentlyAllowed in beginStep, once that logic lands (#923).
     applyRails(stage, document, Array.from(this.permanentlyAllowed));
 
     const counter = this.stages.length > 1
@@ -166,12 +167,13 @@ export class TutorialRails {
     };
   }
 
-  /** Take every mark off the DOM — used when the tutorial ends. */
+  /** Take every mark off the DOM — used when the tutorial ends or restarts. */
   clear(): void {
     clearRails();
     setPickerRegion(null);
     this.stages = [];
     this.stageIndex = 0;
     this.held = false;
+    this.permanentlyAllowed = new Set();
   }
 }

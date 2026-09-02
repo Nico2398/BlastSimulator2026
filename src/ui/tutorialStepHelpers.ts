@@ -331,7 +331,10 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
  * Helper: create the speed-up-for-dig step (#923) — taught inside the
  * 'box-cut' wait, teaching ×8 while the long ramp-dig is in progress.
  *
- * Stub only: isComplete/commands wiring left to the implementer.
+ * waitsOnWork: true for the same reason box-cut itself carries it — the dig
+ * is genuinely still running while this step is open, so without it the
+ * rail's clock-hold (tutorialGuide.ts's decideClock) would pause the game
+ * before the player ever reaches the speed button.
  */
 export function createSpeedUpForDigStep(): TutorialStep {
   return {
@@ -339,17 +342,30 @@ export function createSpeedUpForDigStep(): TutorialStep {
     titleKey: 'tutorial.step_speedupdig.title',
     textKey: 'tutorial.step_speedupdig',
     highlightTarget: SPEED_UP_TO_MAX_BUTTON,
-    // TODO: implement
-    isComplete: () => false,
+    commands: ['time speed 8'],
+    waitsOnWork: true,
+    isComplete: (state: GameState) => state.timeScale >= 8,
   };
+}
+
+/**
+ * Snapshot for the speed-down-after-dig step: the id of the ramp being dug
+ * when the step opened, so completion can tell "this ramp finished" from
+ * "no ramp was ever planned" (a mock/minimal state).
+ */
+interface SpeedDownAfterDigSnapshot {
+  rampId: number | null;
 }
 
 /**
  * Helper: create the speed-down-after-dig step (#923) — teaches ×1 once the
  * box-cut dig has finished, before speed controls are left player-controlled
- * for the rest of the tutorial.
+ * for the rest of the tutorial (`permanentlyUnlocks`).
  *
- * Stub only: isComplete/commands wiring left to the implementer.
+ * Completion needs the ramp to be genuinely done digging, not just "some
+ * ramp is gone" — `tickTaskCompletion.ts` only splices a `PlannedRamp` out of
+ * `state.plannedRamps` once every one of its segments is `done`, which is
+ * the authoritative "ramp fully dug" signal this step waits on.
  */
 export function createSpeedDownAfterDigStep(): TutorialStep {
   return {
@@ -357,7 +373,19 @@ export function createSpeedDownAfterDigStep(): TutorialStep {
     titleKey: 'tutorial.step_speeddowndig.title',
     textKey: 'tutorial.step_speeddowndig',
     highlightTarget: SPEED_BACK_TO_NORMAL_BUTTON,
-    // TODO: implement
-    isComplete: () => false,
+    commands: ['time speed 1'],
+    waitsOnWork: true,
+    permanentlyUnlocks: [SPEED_BUTTON_GROUP],
+    captureSnapshot: (state: GameState): Record<string, unknown> => ({
+      // state.plannedRamps may be absent on a minimal/mock GameState (same
+      // defensive fallback as isEvacuationZoneClear's state.drillHoles above).
+      rampId: (state.plannedRamps ?? [])[0]?.id ?? null,
+    } satisfies SpeedDownAfterDigSnapshot),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const { rampId } = snapshot as unknown as SpeedDownAfterDigSnapshot;
+      const stillDigging = rampId != null
+        && (state.plannedRamps ?? []).some((ramp) => ramp.id === rampId);
+      return !stillDigging && state.timeScale <= 1;
+    },
   };
 }

@@ -61,6 +61,13 @@ export interface TutorialStep {
    * closed panel glows nothing.
    */
   highlightTarget?: string;
+  /**
+   * Selectors this step leaves permanently clickable from here on, even once
+   * the rail has moved past it — mirrors `RailsStep.permanentlyUnlocks`
+   * (`tutorialRails.ts`), which `TutorialRails.beginStep` reads off the step
+   * passed to it.
+   */
+  permanentlyUnlocks?: string[];
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
