@@ -81,8 +81,8 @@ export function taskProgressFraction(activity: EmployeeActivity): number | null 
 
 /**
  * The vehicle `employeeId` is currently driving, or null when they aren't
- * driving any — the shared lookup `syncDriverPosition` and dismount handling
- * both need instead of re-scanning `vehicles` inline (#922).
+ * driving any. Used by `computeEmployeeActivity` above to report the
+ * 'driving'/'driving_to_task' activity kinds.
  */
 export function findDrivenVehicle(employeeId: number, vehicles: readonly Vehicle[]): Vehicle | null {
   return vehicles.find(v => v.driverId === employeeId) ?? null;

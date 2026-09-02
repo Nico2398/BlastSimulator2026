@@ -210,9 +210,11 @@ export function tickVehicleTaskState(vehicle: Vehicle): void {
 
 /**
  * Keeps a driven employee's logical x/z glued to their vehicle's, every tick
- * the vehicle moves — no-op while `vehicle.driverId` is null. Called from
- * `tickVehicle`'s NavGrid/direct-line steppers so the driver never renders or
- * navigates from the cell they boarded at (#922).
+ * the vehicle moves — no-op while `vehicle.driverId` is null. Called
+ * unconditionally from `tickVehicle` itself, after its internal movement step
+ * (`tickVehicleMovement`, covering both the NavGrid and direct-line steppers)
+ * returns, so the driver never renders or navigates from the cell they
+ * boarded at regardless of which branch moved the vehicle (#922).
  */
 export function syncDriverPosition(state: GameState, vehicle: Vehicle): void {
   if (vehicle.driverId === null) return;
