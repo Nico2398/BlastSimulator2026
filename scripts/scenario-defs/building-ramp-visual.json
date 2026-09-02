@@ -1,10 +1,10 @@
 {
   "name": "building-ramp-visual",
-  "description": "#555: ordering a ramp queues progressive dig_ramp_segment excavation work instead of carving the whole corridor instantly. A staffed, excavator-crewed rock_digger digs a 6-segment ramp one segment at a time — this scenario screenshots the corridor half-dug (orderedRampSegmentCount:3) and again once every segment has landed (orderedRampSegmentCount:0), proving the dig happens incrementally rather than in one synchronous burst.",
+  "description": "#555/#925: ordering a ramp queues progressive dig_ramp_segment excavation work instead of carving the whole corridor instantly, and each segment is now one horizontal Y-layer (bench) spanning the whole footprint, top to bottom, rather than one full-depth column at a time (#925) — a staffed, excavator-crewed rock_digger clears the topmost bench across the whole corridor before starting the next bench down. For this map/seed the origin:20,20 south length:6 depth:6 order carves surface Y=35 down to Y=30 (clearanceHeight 3 + max per-column depth 5), producing 8 layers. This scenario screenshots the corridor half-dug (orderedRampSegmentCount:4 — top 4 benches cleared across the full corridor, not one column dug to full depth) and again once every layer has landed (orderedRampSegmentCount:0), proving the dig happens bench-by-bench rather than column-by-column or in one synchronous burst.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
-      "timeout": 20,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -33,7 +33,7 @@
     },
     {
       "command": "build_ramp origin:20,20 direction:south length:6 depth:6",
-      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per segment (#555) instead of carving anything yet.",
+      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per horizontal Y-layer (#925, reworking #555's one-per-column split) instead of carving anything yet. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -46,6 +46,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
@@ -63,20 +71,26 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "orderedRampSegmentCount": 6
+          "orderedRampSegmentCount": 8
         },
-        "note": "6 segments ordered (one per length-step, entrance-first), none carved yet."
+        "note": "8 layers ordered (one per absolute Y row spanned by the corridor, topmost bench first — #925), none carved yet. Not 6 (the old one-per-column count): clearanceHeight (3) plus the deepest column's own target depth (5) span 8 distinct Y rows."
       }
     },
     {
-      "command": "wait_until field:orderedRampSegmentCount equals:3 max_ticks:400",
+      "command": "wait_until field:orderedRampSegmentCount equals:4 max_ticks:400",
       "timeout": 95,
-      "description": "Drain half the ordered segments — the crewed rock_digger digs one dig_ramp_segment action at a time, nearest/entrance-first (mirrors #553's drill_hole landing order). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor is carved partway down, not the whole length.",
+      "description": "Drain half the ordered layers — the crewed rock_digger clears one dig_ramp_segment bench at a time, topmost first (isRampSegmentClaimable still gates strictly by index, now a layer index rather than a column index). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor should show a flat bench across its full width and length at the current depth, not a single deep notch at one column while its neighbours sit untouched at the original surface. cameraFocus targets (20,23) — the corridor's midpoint (RAMP_WIDTH=3 centred on x:20, length 6 spanning z:20-26) — at a close distance so the excavated cross-section actually fills the frame instead of sitting as a small distant patch at the default orbiting camera (#925 visual-loop finding); it is re-issued here rather than relying on a prior step's framing because the shots loop below resets the camera (`__cameraReset`) after every step that has any shots.",
       "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 23,
+          "distance": 16
+        },
         {
           "type": "waitUntil",
           "field": "orderedRampSegmentCount",
-          "equals": 3,
+          "equals": 4,
           "maxTicks": 400,
           "timeoutMs": 90000
         }
@@ -84,16 +98,22 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "orderedRampSegmentCount": 3
+          "orderedRampSegmentCount": 4
         },
-        "note": "Mid-dig: half of the ramp's 6 segments have landed, half remain queued."
+        "note": "Mid-dig: the top 4 of the ramp's 8 layers have landed across the whole corridor footprint, the bottom 4 remain queued."
       }
     },
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
       "timeout": 125,
-      "description": "Drain the remaining segments. This step's own auto-captured screenshot is the full-completion checkpoint: every segment carved, the ramp corridor complete end to end.",
+      "description": "Drain the remaining layers. This step's own auto-captured screenshot is the full-completion checkpoint: every layer carved, the ramp corridor complete end to end. cameraFocus re-issued (see the mid-dig step's note) so this checkpoint is framed the same as the mid-dig one, close enough to compare the finished smooth slope against the earlier bench.",
       "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 23,
+          "distance": 16
+        },
         {
           "type": "waitUntil",
           "field": "orderedRampSegmentCount",
@@ -125,12 +145,23 @@
     {
       "name": "overview",
       "yaw": 0,
-      "pitch": 45
+      "pitch": 45,
+      "target": [20, 23],
+      "distance": 18
     },
     {
       "name": "closeup",
       "yaw": 90,
-      "pitch": 15
+      "pitch": 15,
+      "target": [20, 23],
+      "distance": 14
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80,
+      "target": [20, 23],
+      "distance": 18
     }
   ]
 }
