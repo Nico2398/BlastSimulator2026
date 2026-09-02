@@ -305,7 +305,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
 }
 
 /** The subset of {@link RampSegmentDef} {@link carveRampSegment} actually reads — it never touches `index`/`targetX`/`targetZ`/`targetY`, so callers that only have cells/region (e.g. a completed segment's own tracker) don't need to fabricate the rest. */
-export type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
+type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
 
 /**
  * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
