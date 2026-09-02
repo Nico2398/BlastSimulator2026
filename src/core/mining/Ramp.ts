@@ -108,7 +108,7 @@ function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   return computeVoxelColumnSurfaceY(grid, x, z);
 }
 
-export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };
+export { RAMP_COST_PER_METER, RAMP_WIDTH };
 
 // ── Ordered ramp excavation (#555 — order-then-work, mirrors #554) ──
 
@@ -218,7 +218,14 @@ interface RampColumn {
  * before) is checked for solid cells at that `y`. `region` is the bounding
  * box of actual solid cells (null if none); `targetX`/`targetZ` are the
  * center of the *band* of contributing column positions (regardless of
- * solidity) so they're always finite, even for an already-flat layer.
+ * solidity), so they're finite for every EMITTED segment — but on uneven
+ * terrain (e.g. a footprint crossing a plateau/canyon/plateau) different
+ * columns can have disjoint `[floorY, ceilingY)` ranges, so a `y` in
+ * `[globalMinY, globalMaxY]` is not guaranteed to have any contributing
+ * column. A `y` with zero contributors has nothing carve-able anywhere in
+ * the footprint and is skipped — not emitted with a null/invalid band —
+ * so `index` still increases 0..N-1 with no gaps across emitted segments,
+ * and `targetY` still strictly decreases across them.
  */
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
   const offset = DIR_OFFSETS[ramp.direction];
@@ -273,14 +280,21 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
       }
     }
 
+    // No column contributes at this y — a true gap between disjoint
+    // per-column [floorY, ceilingY) ranges (possible on uneven terrain,
+    // e.g. a footprint crossing a plateau/canyon/plateau). bandMinX etc.
+    // are still at their Infinity/-Infinity sentinels, so there is no
+    // finite band to derive targetX/targetZ from. Nothing carve-able
+    // exists at this y for any column, so skip emitting a segment for it
+    // entirely rather than pushing one with NaN target coordinates.
+    if (bandMinX === Infinity) continue;
+
     segments.push({
       index: segments.length,
       cells,
       region: cells.length > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null,
-      // bandMinX/bandMaxX/bandMinZ/bandMaxZ are always finite here — at
-      // least one column contributes at every y in [globalMinY, globalMaxY]
-      // by construction (each column's own [floorY, ceilingY) is non-empty
-      // and globalMinY/globalMaxY are its extremes across all columns).
+      // bandMinX/bandMaxX/bandMinZ/bandMaxZ are finite here — this y was
+      // skipped above unless at least one column contributed.
       targetX: Math.round((bandMinX + bandMaxX) / 2),
       targetZ: Math.round((bandMinZ + bandMaxZ) / 2),
       targetY: y,
@@ -290,6 +304,9 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
   return segments;
 }
 
+/** The subset of {@link RampSegmentDef} {@link carveRampSegment} actually reads — it never touches `index`/`targetX`/`targetZ`/`targetY`, so callers that only have cells/region (e.g. a completed segment's own tracker) don't need to fabricate the rest. */
+export type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
+
 /**
  * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
  * the affected region. Density is re-checked per cell at carve time — a cell
@@ -297,7 +314,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
  * `defineRampSegments` ran is silently skipped, not double-counted, not an
  * error.
  */
-export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentDef, emitter?: EventEmitter): { voxelsCleared: number } {
+export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number } {
   let voxelsCleared = 0;
 
   for (const cell of segment.cells) {

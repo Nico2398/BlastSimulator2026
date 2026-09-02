@@ -1667,16 +1667,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
   function completeSegment(ctx: MiningContext, rampId: number, index: number): void {
     const ramp = ctx.state!.plannedRamps.find(r => r.id === rampId)!;
     const tracker = ramp.segments.find(s => s.index === index)!;
-    // targetX/targetZ/targetY are ghost/dispatch anchor metadata only —
-    // carveRampSegment reads solely `cells`/`region` — so deriving them from
-    // the region (or the first tracked cell, when the layer carved nothing)
-    // is a faithful stand-in for RampSegmentTracker not persisting them.
-    const anchor = tracker.region
-      ? { targetX: tracker.region.minX, targetZ: tracker.region.minZ, targetY: tracker.region.minY }
-      : tracker.cells[0]
-        ? { targetX: tracker.cells[0].x, targetZ: tracker.cells[0].z, targetY: tracker.cells[0].y }
-        : { targetX: 0, targetZ: 0, targetY: 0 };
-    carveRampSegment(ctx.grid!, { index, cells: tracker.cells, region: tracker.region, ...anchor });
+    carveRampSegment(ctx.grid!, { cells: tracker.cells, region: tracker.region });
     completePendingAction(ctx.state!, tracker.actionId);
     tracker.done = true;
   }
@@ -1798,6 +1789,47 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     // The cancelled segment's own action/ghost are gone.
     expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
     expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
+  });
+
+  it('refunds exactly the cost actually charged at order time when every segment is cancelled before any work is done (#925 code review)', () => {
+    // The two tests above compute their expected refund with the same
+    // segmentCost = validation.cost / segments.length formula ramp.ts uses,
+    // so they can't catch a bug in that formula itself. This test instead
+    // ties the refund to two things the production formula never touches
+    // directly: the actual cash delta at order time, and the actual
+    // segmentCost value each PendingAction's payload was dispatched with.
+    const ctx = makeMiningContext();
+
+    const cashBeforeOrder = ctx.state!.cash;
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    expect(buildResult.success).toBe(true);
+    const chargedCost = cashBeforeOrder - ctx.state!.cash;
+
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    expect(ramp.segments.length).toBeGreaterThan(1);
+    expect(ramp.segments.every(s => !s.done)).toBe(true);
+
+    // Sum every segment's own dispatched segmentCost — the real per-segment
+    // refund amount cancelAction will credit — read from the actual
+    // PendingAction payloads rather than re-derived from validation.cost.
+    const totalSegmentCost = ramp.segments.reduce((sum, seg) => {
+      const action = ctx.state!.pendingActions.find(a => a.id === seg.actionId)!;
+      return sum + (action.payload['segmentCost'] as number);
+    }, 0);
+
+    const cashBeforeCancel = ctx.state!.cash;
+    const result = cancelRampCommand(ctx, rampId);
+    expect(result.success).toBe(true);
+
+    const actualRefund = ctx.state!.cash - cashBeforeCancel;
+    expect(actualRefund).toBeCloseTo(totalSegmentCost, 6);
+    // The invariant under test: nothing was carved, so the total refund
+    // equals the amount actually charged at order time — not merely "does
+    // not exceed" it.
+    expect(actualRefund).toBeCloseTo(chargedCost, 6);
+    expect(ctx.state!.cash).toBeCloseTo(cashBeforeOrder, 6);
+    expect(ctx.state!.finances.cash).toBeCloseTo(ctx.state!.cash, 6);
   });
 });
 
