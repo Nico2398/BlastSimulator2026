@@ -15,6 +15,7 @@ import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATIO
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -38,8 +39,13 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
  * runSurvey) and a rest action's own restDuration override the generic
  * proficiency-scaled duration — both already appear directly in the action's
  * payload rather than being derived here.
+ *
+ * `grid`, when provided, lets the `dig_ramp_segment` branch read the live
+ * voxel count instead of the stale one captured in the action's payload at
+ * queue time (#924) — optional and currently unused (TODO: implement) so
+ * every existing caller that omits it keeps today's behavior.
  */
-export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction): number {
+export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): number {
   if (action.type === 'rest') {
     if (typeof action.payload['restDuration'] === 'number') {
       return action.payload['restDuration'] as number;
@@ -49,6 +55,13 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   }
 
   if (action.type === 'dig_ramp_segment') {
+    // TODO: implement (#924) — read live voxel count from `grid` when
+    // provided (filter cells where grid.densityAt(x,y,z) > 0), and thread
+    // the employee's driving.excavator proficiency level, getNeedMultiplier,
+    // and getLivingQuartersWellbeingMultiplier through to
+    // computeRampSegmentDurationTicks. Stale cells.length + tier-only kept
+    // below so this branch's behavior is unchanged until then.
+    void grid;
     const voxelCount = (action.payload['cells'] as unknown[] | undefined)?.length ?? 0;
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
     return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier);
@@ -76,9 +89,11 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
  * promoteActionToActive (on-foot claim, unchanged behavior) and
  * ArrivalGate.ts's vehicle-arrival transition, so both start work identically
  * instead of duplicating the same four-field assignment in two places.
+ *
+ * `grid` is threaded straight through to `computeActionWorkTicks` (#924).
  */
-export function seedTaskTimerFields(state: GameState, employee: Employee, action: PendingAction): void {
-  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action);
+export function seedTaskTimerFields(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): void {
+  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action, grid);
   employee.activeTaskSkill = action.requiredSkill;
   employee.pendingActionType = action.type;
   employee.pendingActionPayload = action.payload;

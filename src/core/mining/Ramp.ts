@@ -6,6 +6,7 @@ import { formatMoney } from '../economy/formatMoney.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
 
 // ── Config ──
@@ -277,8 +278,21 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentDef, emitt
  * multiplier (VEHICLE_TIER_MULTIPLIERS) against the tier-1 baseline rate
  * (RAMP_DIG_VOXELS_PER_TICK_TIER1), always at least 1 tick — a zero-voxel
  * segment (row already flat) still takes a tick to "dig".
+ *
+ * `proficiencyLevel`/`needMultiplier`/`lqMultiplier` feed the same
+ * `computeTaskDuration` formula every other skill-gated task duration uses
+ * (#924) — defaults of `1, 1, 1` reproduce the pre-#924 baseline
+ * (`Math.max(1, Math.ceil(voxelCount/(rate*tierMult)))`) exactly for any
+ * caller that doesn't pass them.
  */
-export function computeRampSegmentDurationTicks(voxelCount: number, tier: VehicleTier): number {
+export function computeRampSegmentDurationTicks(
+  voxelCount: number,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier: number = 1,
+  lqMultiplier: number = 1,
+): number {
   const tierWorkRateMultiplier = VEHICLE_TIER_MULTIPLIERS[tier].workRate;
-  return Math.max(1, Math.ceil(voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier)));
+  const baseTicks = voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier);
+  return computeTaskDuration(baseTicks, proficiencyLevel, needMultiplier, lqMultiplier, 1);
 }
