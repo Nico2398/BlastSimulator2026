@@ -42,8 +42,8 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
  *
  * `grid`, when provided, lets the `dig_ramp_segment` branch read the live
  * voxel count instead of the stale one captured in the action's payload at
- * queue time (#924) — optional and currently unused (TODO: implement) so
- * every existing caller that omits it keeps today's behavior.
+ * queue time (#924) — omitted (ranking/ETA call sites) keeps today's
+ * stale-count behavior unchanged.
  */
 export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): number {
   if (action.type === 'rest') {
@@ -55,16 +55,18 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   }
 
   if (action.type === 'dig_ramp_segment') {
-    // TODO: implement (#924) — read live voxel count from `grid` when
-    // provided (filter cells where grid.densityAt(x,y,z) > 0), and thread
-    // the employee's driving.excavator proficiency level, getNeedMultiplier,
-    // and getLivingQuartersWellbeingMultiplier through to
-    // computeRampSegmentDurationTicks. Stale cells.length + tier-only kept
-    // below so this branch's behavior is unchanged until then.
-    void grid;
-    const voxelCount = (action.payload['cells'] as unknown[] | undefined)?.length ?? 0;
+    const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
+    const voxelCount = grid !== undefined
+      ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
+      : cells.length;
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier);
+    const qual = action.requiredSkill !== null
+      ? employee.qualifications.find(q => q.category === action.requiredSkill)
+      : undefined;
+    const level = qual?.proficiencyLevel ?? 1;
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
   }
 
   if (typeof action.payload['durationTicks'] === 'number') {
