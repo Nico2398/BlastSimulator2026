@@ -304,6 +304,30 @@
       "role": "setup"
     },
     {
+      "command": "state full",
+      "description": "#922 visual evidence: mid-drive, wide-framed shot centred between the fleet's spawn/boarding cell and the dispatch target (37,33) the drill_rig is still driving toward. Before the fix, the driller's character mesh stayed parked at the boarding cell for the whole drive (EntitySync.syncEntitySets never suppressed it) while the drill_rig — with the driller supposedly aboard — drove off toward (37,33) alone; correct behaviour draws no separate character mesh at all here, only the vehicle. CAMERA RETARGETED after running this scenario through a real browser (#922 visual-tester pass): the debris_hauler's actual NavGrid-snapped spawn came back at (82,34) (dusty_hollow's world-centre raw spawn point gets pushed there by the corner-anchored reachability snap, not the raw baseX/baseZ formula), and by the tick this step runs the drill_rig has driven to roughly x∈[55,68] — the original x:43/distance:40 framing put the spawn cell just past the right edge of the canvas (occluded by the minimap widget), so it never actually proved the boarding cell was empty. x:60 z:34 distance:55 keeps both the (82,34) spawn cluster and the drill_rig's current position comfortably inside the frame with margin for further real-time drift during capture (sim keeps running in real time while the screenshot/orbit shots are taken).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 60,
+          "z": 34,
+          "distance": 55
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee list",
       "description": "Crew panel's task line should now read 'driving_to_task' (EmployeeActivityKind, EmployeeActivity.ts) rather than 'working' — the work timer only starts once the vehicle itself arrives at the target, not the employee boarding it. Reopens the Crew panel (same pattern as crew-fleet-panels-visual.json's observe steps): step 14's `vehicle buy drill_rig` switched the toolbar to the Fleet panel and nothing since has switched it back, so without this click the driving-to-task-state shot below would keep showing Fleet, never the Crew panel this file exists to demonstrate.",
       "interaction": [
