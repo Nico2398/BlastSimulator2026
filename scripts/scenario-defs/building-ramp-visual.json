@@ -33,7 +33,7 @@
     },
     {
       "command": "build_ramp origin:20,20 direction:south length:6 depth:6",
-      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per horizontal Y-layer (#925, reworking #555's one-per-column split) instead of carving anything yet.",
+      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per horizontal Y-layer (#925, reworking #555's one-per-column split) instead of carving anything yet. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -46,6 +46,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
