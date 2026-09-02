@@ -1061,7 +1061,7 @@ describe('dig_ramp_segment work duration scales with live voxel count (#924)', (
     // an implementation detail of #924, not of this integration test.
     const expectedRatio = liveVoxelCountB / segmentA.cells.length;
     const actualRatio = workTicksB / workTicksA;
-    expect(actualRatio).toBeGreaterThan(expectedRatio - 0.35);
-    expect(actualRatio).toBeLessThan(expectedRatio + 0.35);
+    expect(actualRatio).toBeGreaterThan(expectedRatio - 0.15);
+    expect(actualRatio).toBeLessThan(expectedRatio + 0.15);
   });
 });
