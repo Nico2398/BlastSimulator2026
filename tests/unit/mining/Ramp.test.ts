@@ -311,6 +311,63 @@ describe('computeRampSegmentDurationTicks (#555)', () => {
   });
 });
 
+// ── #924: computeRampSegmentDurationTicks routes proficiency/need/
+// living-quarters multipliers through computeTaskDuration, the same formula
+// every other skill-gated task duration uses. The skeleton commit already
+// wires this passthrough correctly (default args 1,1,1 reproduce the old
+// formula exactly), so these assertions largely PASS today already — they
+// lock in the correct direction/magnitude of each multiplier rather than
+// exercising a still-stubbed branch (that's ActionSelection.test.ts below).
+
+describe('computeRampSegmentDurationTicks — proficiency/need/lq scaling (#924)', () => {
+  it('scales linearly with voxel count: doubling voxelCount doubles the ticks (all else equal)', () => {
+    // Both reduce to a clean integer (1600/8=200, 800/8=100 at tier 1), so
+    // ceil() rounding cannot mask a non-linear relationship here.
+    const half = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const full = computeRampSegmentDurationTicks(1600, 1, 1, 1, 1);
+
+    expect(half).toBe(100);
+    expect(full).toBe(200);
+    expect(full).toBe(2 * half);
+  });
+
+  it('a Master (level 5) proficiency produces fewer ticks than a Rookie (level 1), in the exact ratio of PROFICIENCY_MULTIPLIERS[5]/[1]', () => {
+    // voxelCount=800, tier=1 -> baseTicks = 800 / (8 * 1.0) = 100 exactly, so
+    // the proficiency multiplier alone determines the result with no
+    // rounding noise.
+    const rookieTicks = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const masterTicks = computeRampSegmentDurationTicks(800, 1, 5, 1, 1);
+
+    expect(rookieTicks).toBe(100);
+    expect(masterTicks).toBe(40); // 100 * (0.40 / 1.00)
+    expect(masterTicks).toBeLessThan(rookieTicks);
+  });
+
+  it('a lower needMultiplier (e.g. a hungry/exhausted digger) raises ticks — computeTaskDuration divides by it, so productivity below 1.0 costs more time', () => {
+    const fullNeeds = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const lowNeeds = computeRampSegmentDurationTicks(800, 1, 1, 0.5, 1);
+
+    expect(fullNeeds).toBe(100);
+    expect(lowNeeds).toBe(200); // 100 / 0.5
+    expect(lowNeeds).toBeGreaterThan(fullNeeds);
+  });
+
+  it('a lower lqMultiplier (e.g. no living quarters / overcrowded) raises ticks the same way needMultiplier does', () => {
+    const goodLq = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const poorLq = computeRampSegmentDurationTicks(800, 1, 1, 1, 0.8);
+
+    expect(goodLq).toBe(100);
+    expect(poorLq).toBe(125); // ceil(100 / 0.8)
+    expect(poorLq).toBeGreaterThan(goodLq);
+  });
+
+  it('a zero (or near-zero) voxelCount floors to 1 tick regardless of tier, proficiency, or need/lq multipliers', () => {
+    expect(computeRampSegmentDurationTicks(0, 1, 1, 1, 1)).toBe(1);
+    expect(computeRampSegmentDurationTicks(0, 3, 5, 0.5, 0.5)).toBe(1);
+    expect(computeRampSegmentDurationTicks(0, 1, 5, 1, 1)).toBe(1);
+  });
+});
+
 describe('validateRampOrder (#555)', () => {
   const BASE_RAMP: RampDef = { originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8 };
 
