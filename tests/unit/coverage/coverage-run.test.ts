@@ -27,6 +27,15 @@ describe('npm run test:coverage execution (8.1)', () => {
         '--coverage.thresholds.functions=0 --coverage.thresholds.lines=0 ' +
         `--coverage.reportsDirectory="${coverageDir}" ` +
         '--coverage.thresholds.perFile=false ' +
+        // Scoped to what these two tests actually cover. The four
+        // --coverage.thresholds.* flags above zero the *global* floor, but
+        // vitest.config.ts also carries per-glob thresholds (the coverage-debt
+        // list), and no CLI flag can clear those — under a two-file subset run
+        // every one of those files sits at 0% and fails. Narrowing the
+        // measured set leaves those globs matching nothing, which is what lets
+        // this smoke test say something about the tooling rather than about
+        // the repo's gate.
+        '--coverage.include="src/core/entities/**" ' +
         'tests/unit/entities/Employee.test.ts tests/unit/entities/Building.test.ts ' +
         '--reporter=verbose ' +
         '--exclude tests/unit/coverage/coverage-run.test.ts',

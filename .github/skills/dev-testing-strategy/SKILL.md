@@ -86,6 +86,36 @@ coverage). Excluding those two took the measurement from 48 minutes to ~6 with t
 unchanged and still passing. Both directories still run, unexcluded, in `npm run test` — the `logic`
 channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
 
+### What the coverage gate actually holds
+
+Thresholds live in `vitest.config.ts` and are **`perFile`**: they apply to each file on its own, so
+one neglected file fails the run while the total still reads healthy. Four numbers per file —
+`statements`, `branches`, `functions`, `lines` — and each is a *minimum*, the share of that file the
+suite must execute.
+
+The gate has three layers, and reading it in this order is the point:
+
+1. **The floor** — `statements 85 / branches 75 / functions 65 / lines 85` for every measured file
+   not named below.
+2. **`src/core/events/**`** — statements and branches stay high (95/88); `functions` is 0 because
+   there it counts whether each event's own handler fired, and those fire through the `scenario`
+   channel, not the unit suite.
+3. **The coverage-debt list** — one entry per file that cannot meet the floor today, pinned just
+   under where it actually sits. These are *not* exemptions: the entry stops the file getting worse
+   while its tests are written, and deleting the entry puts the file back under the floor. A file
+   leaving that list is the ratchet turning; a file joining it needs a reason.
+
+`coverage.exclude` is short by design and every entry earns its place: the two entry points
+(`main.ts`, `console.ts`) and the host-API wrappers (`SceneManager`, `PostPipeline`, `AudioHooks`,
+the IndexedDB and download backends), which a Node run can only exercise against a mock of the
+browser API rather than against our own behaviour — the `scenario` and `visual` channels are what
+prove those. Plus `core/i18n/keys.ts`, a constants table with no executable code.
+
+**Coverage measures execution, not verification.** A test that calls a function and asserts nothing
+scores 100%. These floors catch code the suite never reaches; they say nothing about whether the
+assertions are any good. That gap is what mutation testing measures, and this project does not run
+one today.
+
 ## Unit Test Conventions
 
 **Location:** `tests/unit/` — mirrors `src/core/` structure.
