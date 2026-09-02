@@ -10,7 +10,9 @@
 // open yet has no reachable control, so the stage before it stays lit; opening
 // it makes the next stage reachable at once. Closing the panel falls back.
 
-import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
+import {
+  TOOLBAR_TARGET, SPEED_UP_TO_MAX_BUTTON, SPEED_BACK_TO_NORMAL_BUTTON,
+} from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 
@@ -52,20 +54,6 @@ export interface TutorialStage {
 // signal for when to advance past "open the panel" / "press Run".
 const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
-
-/**
- * The 2× speed button, not "the first speed button in the group".
- *
- * `button[data-speed]` matched 1×, which is the speed the game already runs
- * at — so the glow sat on a control that could not complete the step it was
- * pointing at, and step 1 of the tutorial was unfinishable for anyone who
- * clicked exactly what they were told to (#489). The playtest missed it by
- * clicking the group's centre, which lands on 2×.
- */
-const SPEED_UP_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="2"]';
-
-/** 4× for the "let time run" step, which the player reaches already at 2×: a control that is already in the state it asks for teaches nothing. */
-const SPEED_FASTER_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="4"]';
 
 /** Pick a tile, then confirm — the shared tail of every placement step. */
 function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] {
@@ -164,10 +152,6 @@ function hireStages(role: string, hintKey: string): TutorialStage[] {
  * `highlightTarget`, so a step that is genuinely one click needs nothing here.
  */
 export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
-  'time-speed': [
-    { target: SPEED_UP_BUTTON, hintKey: 'tutorial.stage.speed' },
-  ],
-
   'hire-surveyor': hireStages('surveyor', 'tutorial.stage.hire_surveyor'),
 
   survey: [
@@ -340,6 +324,17 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut),
   ],
 
+  // #923: taught inside the box-cut wait — ×8 while the ramp-dig is still in
+  // progress, ×1 once it's done. One stage each: a single button press, no
+  // panel to open first.
+  'speed-up-for-dig': [
+    { target: SPEED_UP_TO_MAX_BUTTON, hintKey: 'tutorial.stage.speed_up_dig' },
+  ],
+
+  'speed-normal-after-dig': [
+    { target: SPEED_BACK_TO_NORMAL_BUTTON, hintKey: 'tutorial.stage.speed_normal_after_dig' },
+  ],
+
   'set-policy': [
     { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
     {
@@ -350,7 +345,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'tick-advance': [
-    { target: SPEED_FASTER_BUTTON, hintKey: 'tutorial.stage.let_time_run' },
+    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.let_time_run' },
   ],
 };
 

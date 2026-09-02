@@ -4,12 +4,13 @@
 // simply wrong relative to the actual UI, or a straight typo — distinct from
 // the "many names, one concept" terminology drift covered by
 // glossaryConformance.test.ts. One assertion target per defect:
-//   - tutorial.step1 (both locales): says the speed controls are in the
-//     top-right corner of the top HUD bar; src/ui/shell/TopBar.ts appends
-//     them 3rd from the left (`balanceWrap, dayWrap, speedWrap, ...`), i.e.
-//     left of center, not the right.
 //   - tutorial.step2 / step4 / step11 / step13 (fr): "Emboutez" (to
 //     dent/stamp) where "Embauchez" (to hire) is meant.
+//
+// #923: the tutorial.step1 defect (speed controls said to be in the
+// top-right corner) is gone along with the standalone 'time-speed' step it
+// belonged to — the key no longer exists in either locale, and
+// KNOWN_TEXT_DEFECTS no longer records it.
 //
 // Every case below is fixed and green; this suite guards against a
 // regression reintroducing any of these defects.
@@ -23,35 +24,17 @@ const en: Record<string, string> = enLocale as Record<string, string>;
 const fr: Record<string, string> = frLocale as Record<string, string>;
 
 describe('KNOWN_TEXT_DEFECTS — sanity', () => {
-  it('lists tutorial.step1 as a both-locale defect and the 4 Emboutez typos as fr defects', () => {
-    const step1 = KNOWN_TEXT_DEFECTS.find((d) => d.key === 'tutorial.step1');
-    expect(step1, 'glossary.ts must record a tutorial.step1 defect').toBeTruthy();
-    expect(step1?.locale).toBe('both');
+  it('lists the 4 Emboutez typos as fr defects', () => {
+    // #923: tutorial.step1 (the old speed-controls-location text) no longer
+    // exists — the standalone 'time-speed' step it belonged to is gone, and
+    // KNOWN_TEXT_DEFECTS no longer records it (glossary.ts).
+    expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === 'tutorial.step1')).toBeUndefined();
 
     const typoKeys = ['tutorial.step2', 'tutorial.step4', 'tutorial.step11', 'tutorial.step13'];
     for (const key of typoKeys) {
       const defect = KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr');
       expect(defect, `glossary.ts must record a fr Emboutez defect for ${key}`).toBeTruthy();
     }
-  });
-});
-
-describe('tutorial.step1 — names the actual (left) location of the speed controls', () => {
-  it('en.json no longer claims the speed controls are in the top-right corner', () => {
-    expect(en['tutorial.step1']).not.toMatch(/top[- ]right/i);
-  });
-
-  it('en.json describes the speed controls as being toward the left of the top bar', () => {
-    expect(en['tutorial.step1']).toMatch(/left/i);
-  });
-
-  it('fr.json no longer claims the speed controls are "en haut à droite"', () => {
-    expect(fr['tutorial.step1']).not.toMatch(/en haut à droite/i);
-    expect(fr['tutorial.step1']).not.toMatch(/à droite/i);
-  });
-
-  it('fr.json describes the speed controls as being toward the left ("gauche") of the top bar', () => {
-    expect(fr['tutorial.step1']).toMatch(/gauche/i);
   });
 });
 

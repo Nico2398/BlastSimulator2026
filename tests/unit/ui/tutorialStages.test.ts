@@ -124,15 +124,36 @@ describe('tutorial stage table', () => {
     }
   });
 
-  it('the speed stages point at a speed the game is not already running at', () => {
+  it('the speed-up-for-dig stage points at a speed the game is not already running at (#923)', () => {
     // `button[data-speed]` matched 1×, the speed the game starts on — pressing
     // exactly what was highlighted changed nothing and the step never completed.
-    for (const stepId of ['time-speed', 'tick-advance']) {
-      const target = TUTORIAL_STAGES[stepId]![0]!.target;
-      expect(target, `${stepId} highlights whichever speed button comes first`).toMatch(/data-speed="\d+"/);
-      const speed = Number(/data-speed="(\d+)"/.exec(target)![1]);
-      expect(speed, `${stepId} points at ${speed}×`).toBeGreaterThan(1);
-    }
+    const target = TUTORIAL_STAGES['speed-up-for-dig']![0]!.target;
+    expect(target, 'speed-up-for-dig highlights whichever speed button comes first').toMatch(/data-speed="\d+"/);
+    const speed = Number(/data-speed="(\d+)"/.exec(target)![1]);
+    expect(speed, `speed-up-for-dig points at ${speed}×`).toBeGreaterThan(1);
+  });
+
+  // ── #923: speed-control lesson relocated into the box-cut ramp-dig wait ──
+  describe('speed-control stage targets (#923)', () => {
+    it('speed-up-for-dig targets the ×8 speed button', () => {
+      const target = TUTORIAL_STAGES['speed-up-for-dig']![0]!.target;
+      expect(target).toBe('#bs-hud-top .bs-speed-btn button[data-speed="8"]');
+    });
+
+    it('speed-normal-after-dig targets the ×1 speed button', () => {
+      const target = TUTORIAL_STAGES['speed-normal-after-dig']![0]!.target;
+      expect(target).toBe('#bs-hud-top .bs-speed-btn button[data-speed="1"]');
+    });
+
+    it('no "time-speed" entry exists in TUTORIAL_STAGES any more', () => {
+      expect(TUTORIAL_STAGES['time-speed']).toBeUndefined();
+    });
+
+    it('tick-advance no longer targets a single specific data-speed button — it targets the group container', () => {
+      const target = TUTORIAL_STAGES['tick-advance']![0]!.target;
+      expect(target).not.toMatch(/data-speed="\d+"/);
+      expect(target).toBe('#bs-hud-top .bs-speed-btn');
+    });
   });
 
   it('a region is a well-formed rectangle', () => {
