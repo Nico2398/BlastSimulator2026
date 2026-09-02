@@ -710,6 +710,49 @@ describe('tickVehicle — keeps a driver glued to the vehicle every tick (#922)'
     expect(employee.x).toBe(20);
     expect(employee.z).toBe(20);
   });
+
+  it('does not clobber an on-foot employee\'s own movement when they still hold a stale driverId on a parked (non-moving) vehicle', () => {
+    // Regression shape for #922: vehicle.task !== 'moving' (parked/idle) but
+    // vehicle.driverId is still set to an employee who is independently
+    // walking toward their own destinationX/Z (nothing clears driverId when
+    // a driver is dispatched to an unrelated on-foot task — see
+    // ActionSelection/EmployeeDispatch). Under the old unconditional-sync
+    // behavior, syncDriverPosition ran every tick regardless of whether the
+    // vehicle actually drove, snapping the employee's x/z back to the
+    // stationary vehicle's position and cancelling out tickEmployeeMovement's
+    // own advance before it ever accumulated. Ticks vehicle then employee
+    // movement in the same order the real game loop does (tick.ts 8f then 8g).
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.task = 'idle';
+    vehicle.state = 'idle';
+    vehicle.targetX = vehicle.x;
+    vehicle.targetZ = vehicle.z;
+
+    // Far enough that 3 ticks at AGENT_WALK_SPEED never reach it — accumulated
+    // progress (not a single step re-taken from x=0 each tick) is what this
+    // test needs to observe.
+    employee.destinationX = 20;
+    employee.destinationZ = 0;
+
+    for (let i = 0; i < 3; i++) {
+      tickVehicle(state, vehicle);
+      tickEmployeeMovement(state);
+    }
+
+    // Vehicle never moved (parked, task !== 'moving').
+    expect(vehicle.x).toBe(0);
+    expect(vehicle.z).toBe(0);
+    // 3 ticks of accumulated walking, not 1 tick's worth re-taken from x=0
+    // every time (the old bug: syncDriverPosition ran unconditionally and
+    // reset the employee back to the parked vehicle's x=0 before each tick's
+    // walk step, so x would plateau at AGENT_WALK_SPEED instead of growing).
+    expect(employee.x).toBe(3 * AGENT_WALK_SPEED);
+    expect(employee.x).not.toBe(vehicle.x);
+  });
 });
 
 // ── tickEmployeeMovement (issue #407) ────────────────────────────────────────
