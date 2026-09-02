@@ -349,16 +349,16 @@ export function createSpeedUpForDigStep(): TutorialStep {
 }
 
 /**
- * Snapshot for the speed-down-after-dig step: the id of the ramp being dug
+ * Snapshot for the speed-normal-after-dig step: the id of the ramp being dug
  * when the step opened, so completion can tell "this ramp finished" from
  * "no ramp was ever planned" (a mock/minimal state).
  */
-interface SpeedDownAfterDigSnapshot {
+interface SpeedNormalAfterDigSnapshot {
   rampId: number | null;
 }
 
 /**
- * Helper: create the speed-down-after-dig step (#923) — teaches ×1 once the
+ * Helper: create the speed-normal-after-dig step (#923) — teaches ×1 once the
  * box-cut dig has finished, before speed controls are left player-controlled
  * for the rest of the tutorial (`permanentlyUnlocks`).
  *
@@ -367,11 +367,11 @@ interface SpeedDownAfterDigSnapshot {
  * `state.plannedRamps` once every one of its segments is `done`, which is
  * the authoritative "ramp fully dug" signal this step waits on.
  */
-export function createSpeedDownAfterDigStep(): TutorialStep {
+export function createSpeedNormalAfterDigStep(): TutorialStep {
   return {
     id: 'speed-normal-after-dig',
-    titleKey: 'tutorial.step_speeddowndig.title',
-    textKey: 'tutorial.step_speeddowndig',
+    titleKey: 'tutorial.step_speednormalafterdig.title',
+    textKey: 'tutorial.step_speednormalafterdig',
     highlightTarget: SPEED_BACK_TO_NORMAL_BUTTON,
     commands: ['time speed 1'],
     waitsOnWork: true,
@@ -380,9 +380,9 @@ export function createSpeedDownAfterDigStep(): TutorialStep {
       // state.plannedRamps may be absent on a minimal/mock GameState (same
       // defensive fallback as isEvacuationZoneClear's state.drillHoles above).
       rampId: (state.plannedRamps ?? [])[0]?.id ?? null,
-    } satisfies SpeedDownAfterDigSnapshot),
+    } satisfies SpeedNormalAfterDigSnapshot),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const { rampId } = snapshot as unknown as SpeedDownAfterDigSnapshot;
+      const { rampId } = snapshot as unknown as SpeedNormalAfterDigSnapshot;
       const stillDigging = rampId != null
         && (state.plannedRamps ?? []).some((ramp) => ramp.id === rampId);
       return !stillDigging && state.timeScale <= 1;

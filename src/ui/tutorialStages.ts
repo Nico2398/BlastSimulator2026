@@ -332,7 +332,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'speed-normal-after-dig': [
-    { target: SPEED_BACK_TO_NORMAL_BUTTON, hintKey: 'tutorial.stage.speed_down_dig' },
+    { target: SPEED_BACK_TO_NORMAL_BUTTON, hintKey: 'tutorial.stage.speed_normal_after_dig' },
   ],
 
   'set-policy': [

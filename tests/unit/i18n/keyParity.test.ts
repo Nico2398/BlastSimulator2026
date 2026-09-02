@@ -273,8 +273,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.stage.speed -- 3 keys) and replaces it with the
     // speed-up-for-dig/speed-normal-after-dig pair taught inside the box-cut
     // ramp-dig wait instead (tutorial.step_speedupdig(.title),
-    // tutorial.step_speeddowndig(.title), tutorial.stage.speed_up_dig,
-    // tutorial.stage.speed_down_dig -- 6 keys). Net +3, both locales.
+    // tutorial.step_speednormalafterdig(.title), tutorial.stage.speed_up_dig,
+    // tutorial.stage.speed_normal_after_dig -- 6 keys). Net +3, both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);

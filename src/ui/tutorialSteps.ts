@@ -15,7 +15,7 @@ import {
   createEvacuateZoneStep,
   createSurveyOverlayToggleStep,
   createSpeedUpForDigStep,
-  createSpeedDownAfterDigStep,
+  createSpeedNormalAfterDigStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
@@ -271,7 +271,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // speed-control lesson pays off — before this, the tutorial left speed
   // fully player-controlled for the rest of the run.
   createSpeedUpForDigStep(),
-  createSpeedDownAfterDigStep(),
+  createSpeedNormalAfterDigStep(),
 
   // ── Step 5: drill-plan ──
   // #554-followup: drilling is real, queued work (was instant pre-#553) --

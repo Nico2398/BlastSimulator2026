@@ -9,7 +9,7 @@
 // Total: 53 keys across 2 locales.
 // #923: tutorial.step1/.title (the old standalone 'time-speed' step's copy)
 // no longer exist — the step moved into the box-cut wait and split into two
-// new named keys (tutorial.step_speedupdig/tutorial.step_speeddowndig, plus
+// new named keys (tutorial.step_speedupdig/tutorial.step_speednormalafterdig, plus
 // their own .title and stage keys), the same box-cut-style naming already
 // used for tutorial.step_boxcut below.
 
@@ -41,7 +41,7 @@ function generateAllTutorialKeys(): string[] {
   keys.push('tutorial.step_boxcut', 'tutorial.step_boxcut.title', 'tutorial.stage.boxcut_area');
   keys.push(
     'tutorial.step_speedupdig', 'tutorial.step_speedupdig.title', 'tutorial.stage.speed_up_dig',
-    'tutorial.step_speeddowndig', 'tutorial.step_speeddowndig.title', 'tutorial.stage.speed_down_dig',
+    'tutorial.step_speednormalafterdig', 'tutorial.step_speednormalafterdig.title', 'tutorial.stage.speed_normal_after_dig',
   );
   keys.push(
     'tutorial.done',
@@ -134,13 +134,13 @@ describe('tutorial keys — en and fr translations differ', () => {
     expect(en, 'en and fr translations for tutorial.step_speedupdig.title must differ').not.toBe(fr);
   });
 
-  it('tutorial.step_speeddowndig.title is translated differently in en vs fr', () => {
+  it('tutorial.step_speednormalafterdig.title is translated differently in en vs fr', () => {
     setLocale('en');
-    const en = t('tutorial.step_speeddowndig.title');
+    const en = t('tutorial.step_speednormalafterdig.title');
     setLocale('fr');
-    const fr = t('tutorial.step_speeddowndig.title');
-    expect(en, 'tutorial.step_speeddowndig.title must resolve in en').not.toBe('tutorial.step_speeddowndig.title');
-    expect(fr, 'tutorial.step_speeddowndig.title must resolve in fr').not.toBe('tutorial.step_speeddowndig.title');
-    expect(en, 'en and fr translations for tutorial.step_speeddowndig.title must differ').not.toBe(fr);
+    const fr = t('tutorial.step_speednormalafterdig.title');
+    expect(en, 'tutorial.step_speednormalafterdig.title must resolve in en').not.toBe('tutorial.step_speednormalafterdig.title');
+    expect(fr, 'tutorial.step_speednormalafterdig.title must resolve in fr').not.toBe('tutorial.step_speednormalafterdig.title');
+    expect(en, 'en and fr translations for tutorial.step_speednormalafterdig.title must differ').not.toBe(fr);
   });
 });
