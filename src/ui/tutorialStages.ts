@@ -325,8 +325,8 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   // #923: taught inside the box-cut wait — ×8 while the ramp-dig is still in
-  // progress, ×1 once it's done. Placeholder single-stage lists; real rail
-  // wiring (region/also, if any) is left to the implementer.
+  // progress, ×1 once it's done. One stage each: a single button press, no
+  // panel to open first.
   'speed-up-for-dig': [
     { target: SPEED_UP_TO_MAX_BUTTON, hintKey: 'tutorial.stage.speed_up_dig' },
   ],
