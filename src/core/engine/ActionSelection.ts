@@ -30,6 +30,27 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
 }
 
 /**
+ * Proficiency level (for `action.requiredSkill`, default 1) plus the need and
+ * living-quarters wellbeing multipliers for `employee` — the three inputs
+ * `computeActionWorkTicks`'s `dig_ramp_segment` branch and generic fallback
+ * both feed into their respective duration formulas. Single source of truth
+ * for that lookup so the two branches can't drift.
+ */
+function resolveEmployeeProductivityInputs(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+): { level: 1 | 2 | 3 | 4 | 5; needMult: number; lqMult: number } {
+  const qual = action.requiredSkill !== null
+    ? employee.qualifications.find(q => q.category === action.requiredSkill)
+    : undefined;
+  const level = qual?.proficiencyLevel ?? 1;
+  const needMult = getNeedMultiplier(employee);
+  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+  return { level, needMult, lqMult };
+}
+
+/**
  * Work-duration ticks for `employee` performing `action` — the same
  * computation EmployeeDispatch.ts's tickEmployees used to do inline at claim time.
  * Single source of truth for both the cost estimate/resolution below and the
@@ -60,12 +81,7 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
       ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
       : cells.length;
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-    const qual = action.requiredSkill !== null
-      ? employee.qualifications.find(q => q.category === action.requiredSkill)
-      : undefined;
-    const level = qual?.proficiencyLevel ?? 1;
-    const needMult = getNeedMultiplier(employee);
-    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
     return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
   }
 
@@ -73,12 +89,7 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     return action.payload['durationTicks'] as number;
   }
 
-  const qual = action.requiredSkill !== null
-    ? employee.qualifications.find(q => q.category === action.requiredSkill)
-    : undefined;
-  const level = qual?.proficiencyLevel ?? 1;
-  const needMult = getNeedMultiplier(employee);
-  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+  const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
   return computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
 }
 
