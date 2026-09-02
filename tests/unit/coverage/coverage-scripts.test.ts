@@ -35,14 +35,16 @@ describe('coverage npm scripts (8.1)', () => {
       expect(script).toContain('npm run test:coverage');
     });
 
-    it('includes npm run test:integration', () => {
-      const script = pkg.scripts['validate'];
-      expect(script).toContain('npm run test:integration');
-    });
-
-    it('includes npm run test:scenarios', () => {
-      const script = pkg.scripts['validate'];
-      expect(script).toContain('npm run test:scenarios');
+    // `validate` used to name test:integration and test:scenarios one by one,
+    // on top of a test:coverage run that had already executed both. It runs
+    // the whole suite once instead — a superset of the two, and of the lint
+    // and benchmark directories the coverage config excludes. The guarantee is
+    // unchanged, so it is asserted against the new shape: `test` must stay
+    // unfiltered, or a future path filter there would quietly shrink what
+    // `validate` covers while still reading as "npm run test".
+    it('runs the whole suite, which subsumes the integration and scenario-def tests', () => {
+      expect(pkg.scripts['validate']).toContain('npm run test ');
+      expect(pkg.scripts['test']).toBe('vitest run');
     });
 
     it('includes tsc type-check', () => {
