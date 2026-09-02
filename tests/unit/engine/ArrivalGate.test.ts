@@ -435,6 +435,12 @@ describe("tickArrivalGate — a driver's x/z tracks the vehicle continuously acr
     vehicle.driverId = employee.id;
     vehicle.targetX = 20;
     vehicle.targetZ = 0;
+    // Mid-drive, already boarded: a real boarding (ArrivalGate.resolveBoarding)
+    // always flips task to 'moving' the instant the driver mounts — mirror
+    // that here, or canTickVehicle (EntityMovementTick.ts) blocks the vehicle
+    // from moving at all and the "off the boarding cell" assertion below
+    // would trivially never fire.
+    vehicle.task = 'moving';
 
     const action = makeVehicleGatedAction({ id: 5, holderId: employee.id, targetX: 20, targetZ: 0, status: 'in_progress' });
     state.pendingActions.push(action);

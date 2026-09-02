@@ -23,6 +23,7 @@ import {
   assignSkill,
   killEmployee,
 } from '../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
 import { tickVehicle } from '../../src/core/engine/GameLoop.js';
 import { Random } from '../../src/core/math/Random.js';
 import {
@@ -777,6 +778,15 @@ describe('Vehicle fleet', () => {
   // back to — or through — the cell they originally boarded at.
   describe("driver position invariant — never frozen at the boarding cell, never revisits it on interruption/resume (#922)", () => {
     it('walks to the vehicle, boards, drives (tracked every tick), gets interrupted for shift rest mid-drive, and resumes — no leg of the walk ever returns to or targets the original boarding cell', () => {
+      // processShiftCycle (ForceShiftRest.ts's dismount path) is a no-op with
+      // neither a site policy nor a tier>=2 living_quarters on site (its own
+      // `!policyApplied && !hasBunkhouse` early return) — a tier-2 bunkhouse
+      // tucked in the far corner (well clear of hire/vehicle-spawn near grid
+      // centre and the (25,25) dispatch target) is what actually arms the
+      // WORK_DURATION_TICKS-triggered interruption this test forces below.
+      ctx.state!.buildings.unlockedTiers.living_quarters = 3;
+      placeBuilding(ctx.state!.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
       const eid = hireOne(ctx, 'driller');
       employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
