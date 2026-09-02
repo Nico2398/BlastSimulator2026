@@ -43,11 +43,36 @@ export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
  * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD on a blocked next cell (#591).
  */
 export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
-  if (!canTickVehicle(vehicle)) return;
+  // tickVehicleMovement reports (via its return value) whether the vehicle
+  // was actually driving this tick — syncing must NOT run when it wasn't
+  // (task !== 'moving' on entry, e.g. a driver assigned to a vehicle that
+  // hasn't been dispatched anywhere yet): an employee who holds driverId of
+  // a parked vehicle is free to be dispatched to an unrelated on-foot task
+  // (nothing clears driverId when that happens — see
+  // ActionSelection/EmployeeDispatch, which never consult it), and syncing
+  // unconditionally every tick regardless of whether the vehicle actually
+  // moved snapped that employee's x/z back to the stationary vehicle's
+  // position on every single tick, cancelling out their own
+  // tickEmployeeMovement step before it ever accumulated (#922 regression —
+  // buildings/holes/hauls stalled indefinitely whenever a driver had a
+  // second, on-foot task queued against a not-yet-dispatched vehicle).
+  const wasDriving = tickVehicleMovement(state, vehicle, emitter);
+  if (wasDriving) syncDriverPosition(state, vehicle);
+}
+
+/**
+ * Actual movement logic for tickVehicle, split out so tickVehicle can wrap it
+ * with a syncDriverPosition call regardless of which internal branch/early-
+ * return fired, as long as the vehicle was actually driving this tick (#922).
+ * Returns whether the vehicle was actually driving (canTickVehicle passed) —
+ * tickVehicle uses this instead of re-checking canTickVehicle itself.
+ */
+function tickVehicleMovement(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
+  if (!canTickVehicle(vehicle)) return false;
 
   if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
     setVehicleIdle(vehicle);
-    return;
+    return true;
   }
 
   if (state.navGrid) {
@@ -55,6 +80,7 @@ export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventE
   } else {
     tickVehicleDirectLine(state, vehicle);
   }
+  return true;
 }
 
 /** Original pre-#407 stepper: one grid cell per tick in a straight line, ignoring terrain. */
@@ -196,6 +222,22 @@ export function tickVehicleTaskState(vehicle: Vehicle): void {
   } else if (vehicle.task === 'idle') {
     vehicle.state = 'idle';
   }
+}
+
+/**
+ * Keeps a driven employee's logical x/z glued to their vehicle's, every tick
+ * the vehicle moves — no-op while `vehicle.driverId` is null. Called
+ * unconditionally from `tickVehicle` itself, after its internal movement step
+ * (`tickVehicleMovement`, covering both the NavGrid and direct-line steppers)
+ * returns, so the driver never renders or navigates from the cell they
+ * boarded at regardless of which branch moved the vehicle (#922).
+ */
+export function syncDriverPosition(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.driverId === null) return;
+  const driver = state.employees.employees.find(emp => emp.id === vehicle.driverId);
+  if (!driver) return;
+  driver.x = vehicle.x;
+  driver.z = vehicle.z;
 }
 
 // ── Employee movement ──

@@ -381,7 +381,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#552: replaces the old manual 'vehicle haul <id> fragment:<id>' step -- there is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happens automatically at claim time, the same selection the old Haul button used to make on click), and no button to wait for or click. Just letting the clock run is the whole action; automatic dispatch does the rest.",
+      "description": "#552: replaces the old manual 'vehicle haul <id> fragment:<id>' step -- there is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happens automatically at claim time, the same selection the old Haul button used to make on click), and no button to wait for or click. Just letting the clock run is the whole action; automatic dispatch does the rest. #922: storedMassKg no longer climbs off 0 inside this window -- accurate driver-position tracking (the vehicle's employee no longer freezes at its boarding cell for the whole drive) means an event fires mid-block and the tick command stops early (sandbox-measured: advances only 4 of the 20 requested ticks here on seed 42), before the hauler's round trip finishes. The haul itself still happens; it now lands one event-interrupt cycle later, asserted on the tick-60 block below instead.",
       "interaction": [
         {
           "type": "command",
@@ -392,11 +392,7 @@
       "expect": {
         "decreased": [
           "cash"
-        ],
-        "increased": [
-          "storedMassKg"
-        ],
-        "note": "This is the block where the gate this file is named for actually opens: the warehouse ordered at the top is standing, so the hauler has somewhere to put the blasted rock and storedMassKg climbs off 0. It moved up from the tick-60 block below (#556): ordering the warehouse rather than placing it puts a builder out on the pad, the blast catches them, and the surviving crew hauls what the blast produced inside this window instead of spilling into the next."
+        ]
       }
     },
     {
@@ -412,7 +408,7 @@
     },
     {
       "command": "tick 60",
-      "description": "#554: the real wait for automatic hauling to make progress, now that the tick 20 + event choose 0 pair above guarantees a clear run (no pending event can still be blocking tickCommand from the very first tick).",
+      "description": "#554: the real wait for automatic hauling to make progress, now that the tick 20 + event choose 0 pair above guarantees a clear run (no pending event can still be blocking tickCommand from the very first tick). #922: this is now the block where the gate this file is named for actually opens -- accurate driver-position tracking pushed the haul's completion past the interrupted tick-20 window above (see that step's own description), so storedMassKg climbs off 0 here instead.",
       "interaction": [
         {
           "type": "command",
@@ -424,7 +420,10 @@
         "decreased": [
           "cash"
         ],
-        "note": "storedMassKg holds at its post-haul figure here rather than climbing again (#556) — everything the blast produced was already delivered in the block above. The gate itself is asserted there."
+        "increased": [
+          "storedMassKg"
+        ],
+        "note": "The warehouse ordered at the top is standing, so the hauler has somewhere to put the blasted rock and storedMassKg climbs off 0 inside this window."
       }
     },
     {

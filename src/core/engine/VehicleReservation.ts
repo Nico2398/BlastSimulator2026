@@ -23,7 +23,7 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
-import { setVehicleIdle } from './EntityMovementTick.js';
+import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
@@ -157,21 +157,17 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
 
   vehicle.reservedForActionId = null;
   if (vehicle.driverId !== null) {
-    // #593: the driver dismounts wherever the vehicle currently sits, not
-    // wherever they boarded it. Driving never updates the employee's own
-    // x/z — EntityMovementTick.tickVehicle only ever advances the vehicle —
-    // so without this, a needs-interruption mid-drive (a collapse, most
-    // visibly) leaves the employee's logical position frozen at the
-    // boarding point, potentially many tiles from where the vehicle actually
-    // is when it's released. Every distance-based decision that follows
-    // (nearest living_quarters, the walk back to reboard) used that stale
-    // position, compounding worse the farther the vehicle had driven since
-    // boarding.
-    const driver = state.employees.employees.find(e => e.id === vehicle.driverId);
-    if (driver) {
-      driver.x = vehicle.x;
-      driver.z = vehicle.z;
-    }
+    // #593/#922: EntityMovementTick.tickVehicle already calls
+    // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
+    // continuously throughout the drive — this call is a defensive,
+    // idempotent re-assertion at release time, not what establishes the
+    // invariant. It covers any release path that could otherwise run off the
+    // normal tick cycle: without it, a release landing between ticks would
+    // risk reading the employee's position as stale (frozen at the boarding
+    // point) instead of wherever the vehicle currently sits, which every
+    // distance-based decision that follows (nearest living_quarters, the walk
+    // back to reboard) relies on being current.
+    syncDriverPosition(state, vehicle);
     unassignDriver(state.vehicles, vehicle.id);
     setVehicleIdle(vehicle);
   }

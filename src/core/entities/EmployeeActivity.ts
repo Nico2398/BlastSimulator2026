@@ -48,7 +48,7 @@ export function computeEmployeeActivity(employee: Employee, vehicles: readonly V
     };
   }
 
-  const drivenVehicle = vehicles.find(v => v.driverId === employee.id);
+  const drivenVehicle = findDrivenVehicle(employee.id, vehicles);
   // `?? null`: a fixture/old-save Vehicle predating reservedForActionId
   // (#550) carries it as undefined, not null — treated the same as
   // "unreserved" rather than misreported as vehicle-gated.
@@ -77,4 +77,13 @@ export function taskProgressFraction(activity: EmployeeActivity): number | null 
   if (activity.kind !== 'working' || activity.totalTicks === null || activity.totalTicks <= 0) return null;
   const ticksRemaining = activity.ticksRemaining ?? 0;
   return Math.min(1, Math.max(0, (activity.totalTicks - ticksRemaining) / activity.totalTicks));
+}
+
+/**
+ * The vehicle `employeeId` is currently driving, or null when they aren't
+ * driving any. Used by `computeEmployeeActivity` above to report the
+ * 'driving'/'driving_to_task' activity kinds.
+ */
+export function findDrivenVehicle(employeeId: number, vehicles: readonly Vehicle[]): Vehicle | null {
+  return vehicles.find(v => v.driverId === employeeId) ?? null;
 }

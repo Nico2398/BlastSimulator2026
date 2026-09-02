@@ -78,7 +78,24 @@ export function syncEntitySets(
   }
 
   if (characters) {
+    // Built once per call (not once per employee) so suppressing a seated
+    // driver's mesh stays O(vehicles + employees), not O(vehicles ×
+    // employees) — every employee currently seated as any vehicle's driver
+    // gets no character mesh; x/z tracks the vehicle's own via
+    // syncDriverPosition (#922).
+    const seatedDriverIds = new Set<number>();
+    for (const v of state.vehicles.vehicles) {
+      if (v.driverId !== null) seatedDriverIds.add(v.driverId);
+    }
+
     for (const e of state.employees.employees) {
+      if (seatedDriverIds.has(e.id)) {
+        if (renderedEmployeeIds.has(e.id)) {
+          characters.removeEmployee(e.id);
+          renderedEmployeeIds.delete(e.id);
+        }
+        continue;
+      }
       if (!renderedEmployeeIds.has(e.id)) {
         characters.addEmployee(e);
         renderedEmployeeIds.add(e.id);

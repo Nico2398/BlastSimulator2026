@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
+import { computeEmployeeActivity, findDrivenVehicle } from '../../../src/core/entities/EmployeeActivity.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
@@ -111,5 +111,43 @@ describe('computeEmployeeActivity', () => {
     const activity = computeEmployeeActivity(emp, []);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBeNull();
+  });
+});
+
+// ── findDrivenVehicle (issue #922) ───────────────────────────────────────────
+// Used by computeEmployeeActivity (its only real caller) to find the vehicle
+// `employeeId` is currently driving, or null when they aren't driving any.
+
+describe('findDrivenVehicle', () => {
+  it('returns the vehicle whose driverId matches the given employee id', () => {
+    const vehicles = [
+      makeVehicle({ id: 1, driverId: null }),
+      makeVehicle({ id: 2, driverId: 6 }),
+      makeVehicle({ id: 3, driverId: null }),
+    ];
+
+    const driven = findDrivenVehicle(6, vehicles);
+
+    expect(driven).not.toBeNull();
+    expect(driven!.id).toBe(2);
+  });
+
+  it('returns null when the employee is not driving any vehicle', () => {
+    const vehicles = [
+      makeVehicle({ id: 1, driverId: null }),
+      makeVehicle({ id: 2, driverId: 6 }),
+    ];
+
+    expect(findDrivenVehicle(7, vehicles)).toBeNull();
+  });
+
+  it('returns null for an empty vehicle list (boundary)', () => {
+    expect(findDrivenVehicle(1, [])).toBeNull();
+  });
+
+  it('never matches another employee\'s driven vehicle (rejection: wrong id)', () => {
+    const vehicles = [makeVehicle({ id: 1, driverId: 5 })];
+
+    expect(findDrivenVehicle(6, vehicles)).toBeNull();
   });
 });
