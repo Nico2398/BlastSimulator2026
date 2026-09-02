@@ -190,9 +190,16 @@ export function rampStepColumn(ramp: RampDef, step: number): { x: number; z: num
 
 /** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
 export interface RampSegmentDef {
+  /** Layer index, 0 = topmost/shallowest, increasing = deeper (#925). */
   index: number;
   cells: { x: number; y: number; z: number }[];
   region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
+  /** Anchor X for ghost/dispatch, valid even when `region` is null. */
+  targetX: number;
+  /** Anchor Z for ghost/dispatch, valid even when `region` is null. */
+  targetZ: number;
+  /** Anchor Y — the layer's absolute world Y — valid even when `region` is null. */
+  targetY: number;
 }
 
 /**
@@ -242,6 +249,10 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
       index: step,
       cells,
       region: cells.length > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null,
+      // TODO(#925): placeholder anchor — implementer wires the real per-layer target.
+      targetX: cx,
+      targetZ: cz,
+      targetY: floorY,
     });
   }
 

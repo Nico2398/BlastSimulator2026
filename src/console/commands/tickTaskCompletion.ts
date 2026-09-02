@@ -130,7 +130,7 @@ export function resolveTaskCompletion(
       const tracker = ramp?.segments.find(s => s.index === segmentIndex);
 
       if (ramp && tracker) {
-        const carveResult = carveRampSegment(ctx.grid, { index: segmentIndex, cells, region }, emitter);
+        const carveResult = carveRampSegment(ctx.grid, { index: segmentIndex, cells, region, targetX: 0, targetZ: 0, targetY: 0 }, emitter);
         if (carveResult.voxelsCleared > 0 && region && state.navGrid) {
           NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
         }
