@@ -121,15 +121,13 @@ function hireDrillerAndRig(ctx: GameContext): void {
  * Ticks until every hole ordered by the last drill_plan grid has landed in
  * state.drillHoles (#553). Tops up employee need gauges each tick — a solo
  * drill_rig/driller multi-hole drive can otherwise run long enough for
- * hunger/fatigue/breakNeed to cross a collapse threshold mid-drive, an
+ * fatigue to cross a collapse threshold mid-drive, an
  * unrelated needs mechanic this test isn't exercising.
  */
 function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -142,9 +140,7 @@ function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
 function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -159,9 +155,7 @@ function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
 function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }

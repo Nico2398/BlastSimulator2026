@@ -31,10 +31,10 @@ describe('set_policy', () => {
   it('bumps the revision even when nothing changes', () => {
     // The reported case: the settings form mirrors the policy in force, so
     // pressing Apply without touching anything is the common path.
-    setPolicyCommand(ctx, [], { mode: 'shift_12h', hunger: '40', fatigue: '25' });
+    setPolicyCommand(ctx, [], { mode: 'shift_12h', fatigue: '25' });
     const after = ctx.state!.sitePolicy.revision;
 
-    setPolicyCommand(ctx, [], { mode: 'shift_12h', hunger: '40', fatigue: '25' });
+    setPolicyCommand(ctx, [], { mode: 'shift_12h', fatigue: '25' });
 
     expect(ctx.state!.sitePolicy.revision).toBe(after + 1);
   });
@@ -65,7 +65,6 @@ describe('the tutorial Site Policy step', () => {
 
     setPolicyCommand(ctx, [], {
       mode: current.shiftMode,
-      hunger: String(current.hungerRestThreshold),
       fatigue: String(current.fatigueRestThreshold),
     });
 
@@ -76,7 +75,7 @@ describe('the tutorial Site Policy step', () => {
     const ctx = makeCtx();
     const snapshot = step.captureSnapshot!(ctx.state!);
 
-    setPolicyCommand(ctx, [], { mode: 'shift_12h', hunger: '40', fatigue: '25' });
+    setPolicyCommand(ctx, [], { mode: 'shift_12h', fatigue: '25' });
 
     expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
   });

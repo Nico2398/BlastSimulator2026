@@ -124,7 +124,7 @@ describe('NotificationCenter (redesign P1)', () => {
       state.employees.employees.push({
         id: 1, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
         injured: false, alive: true, x: 0, z: 0, qualifications: [], trainingState: null,
-        activeActionId: null, hunger: 50, fatigue: 50, breakNeed: 50, collapsing: true,
+        activeActionId: null, fatigue: 50, collapsing: true,
         interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
         taskTicksRemaining: null, activeSkillCategory: null,
       } as never);

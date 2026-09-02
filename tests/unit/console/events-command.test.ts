@@ -83,25 +83,22 @@ describe('employee morale clamp boundaries (#732 — shared clampScore helper)',
   // is mathematically identical — these tests pin the observable behavior at
   // both ends of the 0–100 range so the swap can't silently change it.
   //
-  // tickCommand's needs loop runs tickNeedGauges (which drains hunger/
-  // fatigue/breakNeed for this tick) BEFORE computing needsMoraleEffect off
-  // the now-drained gauge values, both within the same tick (events.ts lines
-  // 184–185). Gauge values below are set with enough margin that one tick's
-  // drain cannot cross a needsMoraleEffect threshold bucket.
+  // tickCommand's needs loop runs tickNeedGauges (which drains the fatigue
+  // gauge for this tick) BEFORE computing needsMoraleEffect off the
+  // now-drained gauge value, both within the same tick (events.ts lines
+  // 184–185). The gauge value below is set with enough margin that one
+  // tick's drain cannot cross a needsMoraleEffect threshold bucket.
 
-  it('floor: morale cannot drop below 0 even when all three need gauges are critical', () => {
+  it('floor: morale cannot drop below 0 even when fatigue is critical', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game mine_type:desert seed:42');
     runner.run('employee hire role:driller');
 
     const emp = ctx.state!.employees.employees[0]!;
     emp.morale = 0;
-    // Below NEED_MORALE_EFFECT_THRESHOLDS.suffering (15) on all three gauges
-    // → needsMoraleEffect's most negative per-gauge bucket (critical, -3.0
-    // each) fires for hunger, fatigue, and breakNeed simultaneously.
-    emp.hunger = 5;
+    // Below NEED_MORALE_EFFECT_THRESHOLDS.suffering (15) → needsMoraleEffect's
+    // most negative bucket (critical, -9.0 post-#928 rescale) fires.
     emp.fatigue = 5;
-    emp.breakNeed = 5;
 
     tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {
@@ -113,22 +110,20 @@ describe('employee morale clamp boundaries (#732 — shared clampScore helper)',
     expect(emp.morale).toBeGreaterThanOrEqual(0);
   });
 
-  it('ceiling: morale cannot rise above 100 when all three need gauges are well-rested', () => {
+  it('ceiling: morale cannot rise above 100 when fatigue is well-rested', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game mine_type:desert seed:42');
     runner.run('employee hire role:driller');
 
     const emp = ctx.state!.employees.employees[0]!;
     emp.morale = 100;
-    // Well above NEED_WELL_RESTED_THRESHOLD (80) on all three gauges, with
-    // enough margin that one tick's drain (idle: <=0.5/gauge, further scaled
-    // by the morale drain multiplier) cannot pull any gauge back down to the
-    // threshold — needsMoraleEffect awards the "comfortable" bucket (0 each)
-    // plus the +1 well-rested bonus, for a net of +1.
+    // Well above NEED_WELL_RESTED_THRESHOLD (80), with enough margin that one
+    // tick's drain (idle: <=0.5, further scaled by the morale drain
+    // multiplier) cannot pull the gauge back down to the threshold —
+    // needsMoraleEffect awards the "comfortable" bucket (0) plus the +1
+    // well-rested bonus, for a net of +1.
     const wellRestedValue = NEED_WELL_RESTED_THRESHOLD + 10;
-    emp.hunger = wellRestedValue;
     emp.fatigue = wellRestedValue;
-    emp.breakNeed = wellRestedValue;
 
     tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {

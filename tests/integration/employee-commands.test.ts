@@ -200,12 +200,12 @@ describe('Console — set_policy', () => {
     ctx = makeCtx();
   });
 
-  it('updates policy to shift_8h mode with default thresholds', () => {
+  it('updates policy to shift_8h mode with default threshold', () => {
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
 
     expect(result.success).toBe(true);
-    // Default thresholds from balance.ts: hunger=60 fatigue=60 social=60 (#867)
-    expect(result.output).toBe('Policy updated: mode=shift_8h hunger=60 fatigue=60 social=60');
+    // Default threshold from balance.ts: fatigue=60 (#928 — single gauge)
+    expect(result.output).toBe('Policy updated: mode=shift_8h fatigue=60');
   });
 
   it('updates policy to shift_12h mode', () => {
@@ -229,26 +229,23 @@ describe('Console — set_policy', () => {
     expect(result.output).toContain('mode=custom');
   });
 
-  it('applies a hunger threshold override', () => {
-    const result = setPolicyCommand(ctx, [], { mode: 'shift_8h', hunger: '55' });
+  it('applies a fatigue threshold override', () => {
+    const result = setPolicyCommand(ctx, [], { mode: 'shift_8h', fatigue: '55' });
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('hunger=55');
-    expect(ctx.state!.sitePolicy.hungerRestThreshold).toBe(55);
+    expect(result.output).toContain('fatigue=55');
+    expect(ctx.state!.sitePolicy.fatigueRestThreshold).toBe(55);
   });
 
-  it('applies fatigue and social threshold overrides simultaneously', () => {
+  it('applies a fatigue threshold override under continuous mode', () => {
     const result = setPolicyCommand(ctx, [], {
       mode: 'continuous',
       fatigue: '30',
-      social: '15',
     });
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('fatigue=30');
-    expect(result.output).toContain('social=15');
     expect(ctx.state!.sitePolicy.fatigueRestThreshold).toBe(30);
-    expect(ctx.state!.sitePolicy.socialBreakThreshold).toBe(15);
   });
 
   it('persists the chosen shift mode on the state', () => {
@@ -262,7 +259,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [hunger:N] [fatigue:N] [social:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
     );
   });
 
@@ -271,7 +268,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [hunger:N] [fatigue:N] [social:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
     );
   });
 
@@ -300,9 +297,7 @@ describe('Console — needs command', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('Employee Needs:');
-    expect(result.output).toContain('hunger');
     expect(result.output).toContain('fatigue');
-    expect(result.output).toContain('break:');
   });
 
   it('shows needs for multiple employees', () => {
@@ -314,7 +309,7 @@ describe('Console — needs command', () => {
 
     expect(result.success).toBe(true);
     // Each employee should produce a line with their gauge values
-    const lines = result.output.split('\n').filter(l => l.includes('hunger'));
+    const lines = result.output.split('\n').filter(l => l.includes('fatigue'));
     expect(lines).toHaveLength(3);
   });
 
@@ -322,17 +317,13 @@ describe('Console — needs command', () => {
     const empId = hireOne(ctx);
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
 
-    // Set specific gauge values
-    emp.hunger = 42;
+    // Set specific gauge value
     emp.fatigue = 58;
-    emp.breakNeed = 73;
 
     const result = needsCommand(ctx, [], {});
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('hunger: 42');
     expect(result.output).toContain('fatigue: 58');
-    expect(result.output).toContain('break: 73');
   });
 
   it('handles no employees', () => {

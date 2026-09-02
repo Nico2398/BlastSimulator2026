@@ -12,16 +12,14 @@ import type { GameContext } from '../../src/console/commands/world.js';
  * Ticks until every hole ordered by the last drill_plan grid has landed in
  * state.drillHoles (#553). Tops up employee need gauges each tick — this
  * file's staffed site is a single drill_rig/driller, and a multi-hole plan
- * can run long enough for hunger/fatigue/breakNeed to cross a collapse
+ * can run long enough for fatigue to cross a collapse
  * threshold mid-drive, an unrelated needs mechanic these tests aren't
  * exercising.
  */
 function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     runner.run('tick 1');
   }
@@ -34,9 +32,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
 function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     runner.run('tick 1');
   }

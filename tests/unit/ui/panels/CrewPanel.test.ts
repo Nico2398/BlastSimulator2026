@@ -16,7 +16,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     qualifications: [],
     trainingState: null,
     activeActionId: null,
-    hunger: 100, fatigue: 100, breakNeed: 100,
+    fatigue: 100,
     collapsing: false,
     interruptedActionPayload: null,
     ticksWorked: 0,
@@ -159,12 +159,10 @@ describe('CrewPanel', () => {
 
   it('detail shows real needs gauges', () => {
     const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, hunger: 22, fatigue: 80, breakNeed: 50 })]));
+    panel.update(makeState([makeEmployee({ id: 1, fatigue: 80 })]));
     toggle(panel, 1);
     const detail = panel.root.querySelector('.bs-crew-needs')!;
-    expect(detail.textContent).toContain('22');
     expect(detail.textContent).toContain('80');
-    expect(detail.textContent).toContain('50');
   });
 
   it('current task shows Idle for an employee with nothing assigned', () => {

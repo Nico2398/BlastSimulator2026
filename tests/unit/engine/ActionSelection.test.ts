@@ -543,7 +543,7 @@ function makeWorkAction(overrides: Partial<PendingAction>): PendingAction {
 describe('computeActionWorkTicks (#549)', () => {
   it('happy path: non-rest action with no durationTicks override scales BASE_TASK_DURATION_TICKS by proficiency and need/living-quarters multipliers', () => {
     const state = makeGame();
-    // Rookie (level 1) proficiency, full needs (hunger/fatigue = 100 → needMult 1.0),
+    // Rookie (level 1) proficiency, full needs (fatigue = 100 → needMult 1.0),
     // no living_quarters building present (lqMult = LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent = 0.85).
     // ticks = max(1, ceil(20 * 1.00 / (1.0 * 0.85 * 1))) = ceil(23.529...) = 24
     const employee = addQualifiedEmployee(state, 'blasting', 1);
@@ -581,7 +581,7 @@ describe('computeActionWorkTicks (#549)', () => {
     const action = makeWorkAction({
       type: 'rest',
       requiredSkill: null,
-      payload: { restDuration: 15, needKey: 'hunger' },
+      payload: { restDuration: 15, needKey: 'fatigue' },
     });
 
     const ticks = computeActionWorkTicks(state, employee, action);
@@ -717,7 +717,7 @@ describe('computeActionWorkTicks — dig_ramp_segment scaling (#924)', () => {
     const state = makeGame();
     const rested = addQualifiedEmployee(state, 'driving.excavator', 1);
     const starving = addQualifiedEmployee(state, 'driving.excavator', 1);
-    starving.hunger = 0; // well under NEED_THRESHOLDS.hunger.critical
+    starving.fatigue = 0; // well under NEED_THRESHOLDS.fatigue.critical
     const action = makeRampSegmentAction(makeRampCells(CELL_COUNT));
 
     const restedTicks = computeActionWorkTicks(state, rested, action);
@@ -779,16 +779,20 @@ describe('computeActionWorkTicks — dig_ramp_segment scaling (#924)', () => {
 });
 
 describe('resolveRestNeedKey (#549)', () => {
-  it('returns "hunger" when payload.needKey is "hunger"', () => {
-    expect(resolveRestNeedKey({ needKey: 'hunger' })).toBe('hunger');
-  });
-
   it('returns "fatigue" when payload.needKey is "fatigue"', () => {
     expect(resolveRestNeedKey({ needKey: 'fatigue' })).toBe('fatigue');
   });
 
-  it('returns "breakNeed" when payload.needKey is "breakNeed"', () => {
-    expect(resolveRestNeedKey({ needKey: 'breakNeed' })).toBe('breakNeed');
+  // #928: hunger/breakNeed removed from NeedKey — a payload naming either
+  // (e.g. surviving from a pre-#928 code path, or a stale save mid-migration)
+  // must resolve to null rather than being echoed back as a no-longer-valid
+  // NeedKey.
+  it('returns null when payload.needKey is "hunger" (removed gauge, #928)', () => {
+    expect(resolveRestNeedKey({ needKey: 'hunger' })).toBeNull();
+  });
+
+  it('returns null when payload.needKey is "breakNeed" (removed gauge, #928)', () => {
+    expect(resolveRestNeedKey({ needKey: 'breakNeed' })).toBeNull();
   });
 
   it('returns null for an unrecognized needKey value', () => {

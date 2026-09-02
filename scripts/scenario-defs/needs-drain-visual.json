@@ -1,6 +1,6 @@
 {
   "name": "needs-drain-visual",
-  "description": "Visual check of need drain rates while idle: after 80 ticks, hunger drains at 0.5/tick and fatigue at 0.5/tick (same idle rate) while breakNeed does not drain when idle (0/tick); all three gauges should show different values compared to working rates",
+  "description": "Visual check of the four fatigue drain tiers (#928 — fatigue is the sole gauge): idle (0.5/tick), traveling (1/tick, a claimed job or a rest destination not yet reached), working (2/tick), and resting (0/tick, holds steady). Deterministic replay (seed:42, no player-random choices) with exact expected fatigue deltas at each checkpoint.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -53,7 +53,111 @@
           "command": "needs"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "description": "Freshly hired: fatigue starts at 100."
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "minFatigue": -0.5
+        },
+        "note": "idle tier: nothing claimed, nothing pending -> employeeWorkState 'idle' -> NEED_DRAIN_RATES.fatigue.idle (0.5) x normal-morale multiplier (1.0) = -0.5 exactly."
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:150 z:150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:150 z:150"
+        }
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one\" -- a test hook by design, same class as `employee assign_skill`. Targets a point far enough away (150,150) that several ticks of pure travel happen before arrival, isolating the 'traveling' tier's own drain rate from the 'working' tier that follows it.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 1
+        },
+        "note": "the dispatched work claimed but not yet promoted -- the employee has not moved yet this tick"
+      }
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "minFatigue": -0.5
+        },
+        "note": "Transition tick: the needs-drain step reads employeeWorkState BEFORE this same tick's dispatch-claim step promotes pendingTaskDuration, so this one tick still bills at the idle rate (-0.5) even though the employee is claimed as of this tick's end. The very next tick onward is the first to read 'traveling'."
+      }
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "minFatigue": -8
+        },
+        "note": "traveling tier, isolated: 8 ticks at exactly -1.0/tick (NEED_DRAIN_RATES.fatigue.traveling x normal-morale multiplier 1.0), before the crew's rising morale later shifts the multiplier. This is the #928 fix under test -- pre-fix, this same outbound walk to a claimed job billed at the WORKING rate (2/tick, i.e. -16 over these 8 ticks), not this traveling rate."
+      }
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ],
+      "role": "observe",
+      "description": "fatigue reads 91 here -- 9 below the post-hire 100, all drained at idle/traveling rates so far; the driller has not started any WORK yet (still walking toward (150,150))."
+    },
+    {
+      "command": "tick 65",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 65"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "minFatigue": 24.474999999999994
+        },
+        "note": "Over these 65 ticks the driller finishes travelling (traveling tier), arrives and completes the dispatched general_work task (working tier, the fastest drain), then goes idle again (idle tier) once the task completes -- fatigue falls from 91 to exactly 24.475, low enough to trip the proactive-queue routing (NEED_WARNING_THRESHOLDS.fatigue = 25) and start a claimed rest the very tick this batch ends (restTicksRemaining becomes non-null). Exact value pinned because this whole replay is deterministic (seed:42, no player-random choices)."
+      }
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ],
+      "role": "observe",
+      "description": "fatigue reads ~24.475 -- the proactive rest has just been claimed and the employee is walking to (or already resting at) a living_quarters."
     },
     {
       "command": "tick 10",
@@ -65,22 +169,11 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash",
-          "minFatigue"
-        ]
+        "changedBy": {
+          "minFatigue": 0
+        },
+        "note": "resting tier: fatigue holds exactly flat across these 10 ticks (NEED_DRAIN_RATES.fatigue.resting = 0) -- restTicksRemaining counts down from 16 to 6 while the gauge itself never moves, confirming the rest doesn't keep leaking the way the pre-#680 idle-rate misclassification did."
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "needs",
@@ -90,119 +183,8 @@
           "command": "needs"
         }
       ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash",
-          "minFatigue"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "needs",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "needs"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash",
-          "minFatigue"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "needs",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "needs"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 80",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 80"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash",
-          "minFatigue"
-        ],
-        "note": "confirms the file's claim: over 160 total idle ticks, fatigue drains steadily (100→~30) while breakNeed stays flat at 100 the whole time (per `needs`'s own output) — hunger and fatigue diverge too by this point (67.5 vs 30.05), consistent with the file's own stated per-gauge idle rates"
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "needs",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "needs"
-        }
-      ],
-      "role": "observe"
+      "role": "observe",
+      "description": "fatigue is still ~24.475 -- flat, mid-rest."
     },
     {
       "command": "state full",

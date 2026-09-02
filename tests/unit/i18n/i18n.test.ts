@@ -24,7 +24,7 @@ const PROFICIENCY_LEVELS = [1, 2, 3, 4, 5] as const;
 
 const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
 
-const NEED_KEYS: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+const NEED_KEYS: NeedKey[] = ['fatigue'];
 
 const SKILL_KEYS = [
   'skill.blasting',
@@ -125,7 +125,12 @@ describe('policy name keys — en and fr translations differ', () => {
   });
 });
 
-// ── Need labels (need.hunger, need.fatigue, need.breakNeed) ───────────────────
+// ── Need labels (need.fatigue — #928: the sole remaining gauge) ──────────────
+//
+// need.fatigue resolves to the identical word "Fatigue" in both en and fr
+// (a cognate) — unlike every other key group in this file, there is no
+// same-key en/fr "differ" assertion to make here; that would be asserting a
+// false thing about this specific string, not a gap in translation coverage.
 
 describe('need label keys resolve in both locales', () => {
   for (const locale of LOCALES) {
@@ -139,28 +144,6 @@ describe('need label keys resolve in both locales', () => {
       }
     });
   }
-});
-
-describe('need label keys — en and fr translations differ', () => {
-  it('need.hunger is translated differently in en vs fr', () => {
-    setLocale('en');
-    const en = t('need.hunger');
-    setLocale('fr');
-    const fr = t('need.hunger');
-    expect(en, 'need.hunger must resolve in en').not.toBe('need.hunger');
-    expect(fr, 'need.hunger must resolve in fr').not.toBe('need.hunger');
-    expect(en, 'en and fr translations for need.hunger must differ').not.toBe(fr);
-  });
-
-  it('need.breakNeed is translated differently in en vs fr', () => {
-    setLocale('en');
-    const en = t('need.breakNeed');
-    setLocale('fr');
-    const fr = t('need.breakNeed');
-    expect(en, 'need.breakNeed must resolve in en').not.toBe('need.breakNeed');
-    expect(fr, 'need.breakNeed must resolve in fr').not.toBe('need.breakNeed');
-    expect(en, 'en and fr translations for need.breakNeed must differ').not.toBe(fr);
-  });
 });
 
 // ── Skill keys (already exist — these should PASS immediately) ────────────────
@@ -393,13 +376,9 @@ describe('nav.* keys — en and fr translations differ', () => {
 
 const NEED_EVENT_KEYS = [
   'event.need_warning.title',
-  'event.need_warning.hunger.desc',
   'event.need_warning.fatigue.desc',
-  'event.need_warning.breakNeed.desc',
   'event.employee_collapsed.title',
-  'event.employee_collapsed.hunger.desc',
   'event.employee_collapsed.fatigue.desc',
-  'event.employee_collapsed.breakNeed.desc',
   'event.employee_shift_change.title',
   'event.employee_shift_change.desc',
 ] as const;
@@ -418,14 +397,14 @@ describe('need event keys resolve in both locales', () => {
 });
 
 describe('need event keys — en and fr translations differ', () => {
-  it('event.need_warning.hunger.desc is translated differently in en vs fr', () => {
+  it('event.need_warning.fatigue.desc is translated differently in en vs fr', () => {
     setLocale('en');
-    const en = t('event.need_warning.hunger.desc');
+    const en = t('event.need_warning.fatigue.desc');
     setLocale('fr');
-    const fr = t('event.need_warning.hunger.desc');
-    expect(en, 'event.need_warning.hunger.desc must resolve in en').not.toBe('event.need_warning.hunger.desc');
-    expect(fr, 'event.need_warning.hunger.desc must resolve in fr').not.toBe('event.need_warning.hunger.desc');
-    expect(en, 'en and fr translations for event.need_warning.hunger.desc must differ').not.toBe(fr);
+    const fr = t('event.need_warning.fatigue.desc');
+    expect(en, 'event.need_warning.fatigue.desc must resolve in en').not.toBe('event.need_warning.fatigue.desc');
+    expect(fr, 'event.need_warning.fatigue.desc must resolve in fr').not.toBe('event.need_warning.fatigue.desc');
+    expect(en, 'en and fr translations for event.need_warning.fatigue.desc must differ').not.toBe(fr);
   });
 
   it('event.employee_collapsed.fatigue.desc is translated differently in en vs fr', () => {

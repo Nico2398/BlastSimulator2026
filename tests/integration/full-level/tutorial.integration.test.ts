@@ -22,6 +22,9 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { pickupFragment, deliverToDepot } from '../../../src/core/economy/Logistics.js';
+import { createGameEngine } from '../../../scripts/shared/command-runner.js';
+import { runCommand } from '../../../src/console/createRunner.js';
+import { countNavCellsByType } from '../../../src/ui/tutorialStepHelpers.js';
 
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
@@ -290,5 +293,57 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(completeResult.success).toBe(true);
     expect(completeResult.output).toContain('force-completed');
     assertStateSummaryCompletion(ctx);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #928: single-gauge (fatigue) model — travel-drain fix performance pin.
+//
+// Before the fix, an employee walking to a claimed job billed the outbound
+// leg at the 'working' tier and the walk back to rest at the 'idle' tier —
+// asymmetric drain that (combined with ForceShiftRest.ts's proactive rest
+// trigger firing mid-walk to an already-claimed job) produced extra
+// interrupted walks and repeated re-claims during the box-cut ramp dig.
+// Issue #928 measured the pre-fix box-cut completing in 114 ticks for this
+// exact repro. With both fixes in place (symmetric 'traveling' tier +
+// walk-survives-proactive-trigger guard), the same repro must complete in
+// fewer ticks — no claimed segment gets interrupted and re-walked mid-dig.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
+  const PRE_FIX_BASELINE_TICKS = 114;
+  // Generous ceiling so a genuine regression (or a stall) fails loudly by
+  // name ("did not complete") rather than by silently exhausting the loop
+  // and asserting on a sentinel value that happens to look like a pass.
+  const MAX_TICKS = 300;
+
+  it('completes the box-cut ramp segment in fewer ticks than the pre-fix 114-tick baseline', () => {
+    const engine = createGameEngine();
+
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    const prevRampCount = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;
+
+    let ticksToComplete = -1;
+    for (let i = 0; i < MAX_TICKS; i++) {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) {
+        runCommand(engine, 'event choose 0');
+      }
+      const current = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;
+      if (current > prevRampCount) {
+        ticksToComplete = i + 1;
+        break;
+      }
+    }
+
+    // The box-cut must actually complete within the budget — a stall is a
+    // distinct failure from "too slow", and this assertion names it.
+    expect(ticksToComplete).toBeGreaterThan(0);
+    expect(ticksToComplete).toBeLessThan(PRE_FIX_BASELINE_TICKS);
   });
 });

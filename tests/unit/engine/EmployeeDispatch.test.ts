@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
+import { tickEmployees, employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
 import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
 import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
@@ -560,10 +560,8 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     employee.taskTicksRemaining = 5;
     employee.taskQueue = [queuedA.id, queuedB.id];
 
-    // Trigger collapse via hunger below the collapse threshold.
-    employee.hunger = 1;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    // Trigger collapse via fatigue below the collapse threshold.
+    employee.fatigue = 1;
 
     tickCollapse(state);
 
@@ -695,22 +693,22 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     expect(master.taskTicksRemaining).toBe(computeTaskDuration(BASE_TASK_DURATION_TICKS, 5, needMult, lqMult, 1));
   });
 
-  it('a hungry employee is seeded a longer duration than a well-fed one — combined modifiers apply', () => {
+  it('an exhausted employee is seeded a longer duration than a well-rested one — combined modifiers apply', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
     const { employee: fed } = hireEmployee(state.employees, 'blaster', rng);
-    const { employee: hungry } = hireEmployee(state.employees, 'blaster', rng);
-    hungry.hunger = 20; // below NEED_THRESHOLDS.hunger.low (30) → productivity penalty
+    const { employee: exhausted } = hireEmployee(state.employees, 'blaster', rng);
+    exhausted.fatigue = 20; // below NEED_THRESHOLDS.fatigue.low (40) → productivity penalty
 
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: fed.id }));
-    state.pendingActions.push(makeSkillAction({ id: 2, targetEmployeeId: hungry.id }));
+    state.pendingActions.push(makeSkillAction({ id: 2, targetEmployeeId: exhausted.id }));
     tickEmployees(state);
     resolveArrival(state);
 
     expect(fed.taskTicksRemaining).not.toBeNull();
-    expect(hungry.taskTicksRemaining).not.toBeNull();
-    expect(hungry.taskTicksRemaining!).toBeGreaterThan(fed.taskTicksRemaining!);
+    expect(exhausted.taskTicksRemaining).not.toBeNull();
+    expect(exhausted.taskTicksRemaining!).toBeGreaterThan(fed.taskTicksRemaining!);
   });
 
   it('rest actions remain seeded through restTicksRemaining, never taskTicksRemaining (regression)', () => {
@@ -721,7 +719,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     state.pendingActions.push({
       id: 1, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0,
-      payload: { needKey: 'hunger', restDuration: 5 },
+      payload: { needKey: 'fatigue', restDuration: 5 },
       targetEmployeeId: employee.id,
       status: 'queued', holderId: null,
     });
@@ -1367,5 +1365,90 @@ describe('isRampSegmentClaimable (#555, relabelled for layer semantics — #925)
     const action = makeAction({ id: 12, payload: { rampId: 1, segmentIndex: 2 } });
 
     expect(isRampSegmentClaimable(state, action)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// employeeWorkState (#680, extended to 'traveling' by #928)
+//
+// The travel-drain fix (#928): walking a fixed distance to a claimed job
+// (pendingTaskDuration !== null) and walking the same distance back to rest
+// (pendingRestDuration !== null) must drain fatigue by the SAME amount — both
+// now bill at the 'traveling' tier, rather than 'working' for the outbound
+// leg and 'idle' for the return leg. employeeWorkState is the single
+// function NEED_DRAIN_RATES tier selection reads, so pinning its four
+// branches here is what proves the fix rather than merely proving intent.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('employeeWorkState (#680, #928)', () => {
+  const SEED = 42;
+
+  function makeIdleEmployee(state: GameState) {
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    return employee;
+  }
+
+  it('returns "resting" whenever restTicksRemaining is set, regardless of any other field', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.restTicksRemaining = 3;
+    employee.activeActionId = 7; // must not override — resting takes priority
+
+    expect(employeeWorkState(employee)).toBe('resting');
+  });
+
+  it('returns "traveling" when pendingTaskDuration is set (outbound walk to a claimed job)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.activeActionId = 7;
+    employee.pendingTaskDuration = 12; // walking to the job, not yet arrived
+
+    expect(employeeWorkState(employee)).toBe('traveling');
+  });
+
+  it('returns "traveling" when pendingRestDuration is set (return-to-rest walk)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.pendingRestDuration = 8; // walking to living_quarters, not yet arrived
+
+    expect(employeeWorkState(employee)).toBe('traveling');
+  });
+
+  it('returns "working" only once activeActionId is set with no pending duration (arrived, timer seeded)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.activeActionId = 7;
+    employee.taskTicksRemaining = 12; // ArrivalGate already promoted the timer
+    // pendingTaskDuration/pendingRestDuration both null — the arrived state.
+
+    expect(employeeWorkState(employee)).toBe('working');
+  });
+
+  it('returns "idle" when nothing is claimed and nothing is pending', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+
+    expect(employeeWorkState(employee)).toBe('idle');
+  });
+
+  // A vehicle-gated action's pendingTaskDuration is set-and-immediately-
+  // promoted atomically at vehicle arrival (ArrivalGate.ts's vehicle-drive
+  // loop: seedTaskTimerFields followed in the same tick, same block, by
+  // taskTicksRemaining = duration; pendingTaskDuration = null — never
+  // observably left non-null across a tick boundary for this action family).
+  // So a vehicle-gated action's own claim never reads as 'traveling' at any
+  // phase — walking to board, mid-drive, or working — only ever 'working'
+  // once activeActionId is set (boarding is itself gated on
+  // pendingDriverVehicleId, a field employeeWorkState does not consult at
+  // all) or 'idle' before a vehicle is even reserved.
+  it('a vehicle-gated action never observably reads "traveling" — activeActionId alone yields "working"', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.activeActionId = 9; // claimed a vehicle-gated action
+    employee.pendingDriverVehicleId = 3; // mid-walk to board — not consulted by employeeWorkState
+    // pendingTaskDuration is never set for this family until the vehicle
+    // arrives, and is cleared in the very same step that seeds it.
+
+    expect(employeeWorkState(employee)).toBe('working');
   });
 });

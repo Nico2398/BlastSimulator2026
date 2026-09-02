@@ -146,7 +146,7 @@
         "changedBy": {
           "cash": 0
         },
-        "note": "the policy applies for real (confirmed via a real dump: 'Policy updated: mode=shift_8h hunger=40 fatigue=25 social=20'), but has no shift-cycle effect to observe since the tier-2 bunkhouse gate is never met (Finding #27)"
+        "note": "the policy applies for real (confirmed via a real dump: 'Policy updated: mode=shift_8h fatigue=60'), but has no shift-cycle effect to observe since the tier-2 bunkhouse gate is never met (Finding #27)"
       }
     },
     {

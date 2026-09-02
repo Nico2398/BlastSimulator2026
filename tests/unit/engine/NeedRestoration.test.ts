@@ -1,6 +1,9 @@
 // BlastSimulator2026 — Tests for tickNeedRestoration (auto-routing employees
-// whose need gauges drop below warning thresholds to a living_quarters
+// whose fatigue gauge drops below the warning threshold to a living_quarters
 // building) and tickCollapse (relocated from GameLoop.test.ts, #759).
+//
+// #928: hunger and breakNeed removed — fatigue is the sole gauge every
+// routing/collapse decision reads.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -22,40 +25,11 @@ describe('tickNeedRestoration (Task 3.11)', () => {
   const SEED = 42;
 
   // ── Test 1 ──────────────────────────────────────────────────────────────────
-  it('routes a hungry employee (hunger < 35) to rest when a living_quarters is active', () => {
-    const state = createGame({ seed: SEED });
-    const rng   = new Random(SEED);
-
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    // Hunger 30 is below the NEED_RESTORATION_THRESHOLDS.hunger = 35 threshold.
-    employee.hunger  = 30;
-    employee.fatigue = 80; // well above the fatigue threshold of 25
-
-    // Place one active living_quarters on the grid.
-    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
-
-    const result = tickNeedRestoration(state);
-
-    // Employee must be added to the routed list.
-    expect(result.routed).toContain(employee.id);
-
-    // Employee must have been assigned an action (no longer idle).
-    expect(employee.activeActionId).not.toBeNull();
-
-    // A rest action targeting this employee must exist in pendingActions.
-    const restAction = state.pendingActions.find(
-      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
-    );
-    expect(restAction).toBeDefined();
-  });
-
-  // ── Test 2 ──────────────────────────────────────────────────────────────────
   it('routes a fatigued employee (fatigue < 25) to rest when a living_quarters is active', () => {
     const state = createGame({ seed: SEED });
     const rng   = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    employee.hunger  = 80; // well above the hunger threshold of 35
     // Fatigue 20 is below the NEED_RESTORATION_THRESHOLDS.fatigue = 25 threshold.
     employee.fatigue = 20;
 
@@ -72,14 +46,13 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(restAction).toBeDefined();
   });
 
-  // ── Test 3 ──────────────────────────────────────────────────────────────────
-  it('does NOT route an employee whose gauges are comfortably above both thresholds', () => {
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('does NOT route an employee whose fatigue is comfortably above threshold', () => {
     const state = createGame({ seed: SEED });
     const rng   = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    // Both gauges well above their respective thresholds (35 / 25).
-    employee.hunger  = 80;
+    // Well above the threshold (25).
     employee.fatigue = 80;
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
@@ -89,14 +62,14 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(employee.activeActionId).toBeNull();
   });
 
-  // ── Test 4 ──────────────────────────────────────────────────────────────────
-  it('does NOT route an already-busy employee even when they are hungry', () => {
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('does NOT route an already-busy employee even when they are exhausted', () => {
     const state = createGame({ seed: SEED });
     const rng   = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    // Employee is critically hungry but already claimed a different action.
-    employee.hunger        = 10; // far below hunger threshold of 35
+    // Employee is critically exhausted but already claimed a different action.
+    employee.fatigue        = 5; // far below the threshold of 25
     employee.activeActionId = 99; // already busy
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
@@ -109,13 +82,13 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(employee.activeActionId).toBe(99);
   });
 
-  // ── Test 5 ──────────────────────────────────────────────────────────────────
-  it('adds employee to noBuilding when need is below threshold but no living_quarters exists', () => {
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('adds employee to noBuilding when fatigue is below threshold but no living_quarters exists', () => {
     const state = createGame({ seed: SEED });
     const rng   = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 20; // below hunger threshold of 35
+    employee.fatigue = 20; // below the threshold of 25
     // No buildings placed — living_quarters is absent.
 
     const result = tickNeedRestoration(state);
@@ -128,7 +101,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(result.routed).toHaveLength(0);
   });
 
-  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
   it('tickEmployees does not reassign an employee who is currently resting', () => {
     // An employee already holding a rest action (activeActionId != null) must be
     // treated as "busy" by tickEmployees — work actions must stay in pendingActions.
@@ -169,7 +142,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(employee.activeActionId).toBe(REST_ACTION_ID);
   });
 
-  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
   it('selects the nearest active living_quarters by Euclidean distance', () => {
     // Employee is at (0, 0).
     // Two living_quarters buildings are placed:
@@ -185,7 +158,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.x       = 0;
     employee.z       = 0;
-    employee.hunger  = 20; // below hunger threshold of 35
+    employee.fatigue  = 20; // below the threshold of 25
 
     // Near building: origin (5, 0)
     const nearResult = placeBuilding(state.buildings, 'living_quarters', 5, 0, 100, 100);
@@ -218,9 +191,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 0;
     employee.z = 0;
 
@@ -239,8 +210,8 @@ describe('tickCollapse (7.6)', () => {
       (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
     );
     expect(restAction).toBeDefined();
-    // The collapsed need must be 'hunger' (hunger=5 triggered the collapse)
-    expect(restAction!.payload.collapsedNeed).toBe('hunger');
+    // The collapsed need must be 'fatigue' — the sole gauge (#928)
+    expect(restAction!.payload.collapsedNeed).toBe('fatigue');
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────────
@@ -249,9 +220,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 0;
     employee.z = 0;
 
@@ -279,9 +248,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 0;
     employee.z = 0;
 
@@ -294,8 +261,8 @@ describe('tickCollapse (7.6)', () => {
       (a: PendingAction) => a.type === 'rest',
     );
     expect(restAction).toBeDefined();
-    // restDuration must be doubled (base 2 × 2 = 4 for hunger)
-    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.hunger * 2);
+    // restDuration must be doubled (base 8 × 2 = 16 for fatigue)
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue * 2);
   });
 
   // ── Test 4 ──────────────────────────────────────────────────────────────────
@@ -304,9 +271,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 7;
     employee.z = 13;
 
@@ -322,18 +287,16 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction!.targetX).toBe(7);
     expect(restAction!.targetZ).toBe(13);
     // restDuration must be doubled
-    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.hunger * 2);
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue * 2);
   });
 
   // ── Test 5 ──────────────────────────────────────────────────────────────────
-  it('all gauges above thresholds → no action created', () => {
+  it('fatigue above threshold → no action created', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 50;
     employee.fatigue = 50;
-    employee.breakNeed = 50;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -350,7 +313,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.collapsing = true;
-    employee.hunger = 5;
+    employee.fatigue = 3;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -367,7 +330,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.alive = false;
-    employee.hunger = 5;
+    employee.fatigue = 3;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -383,7 +346,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.injured = true;
-    employee.hunger = 5;
+    employee.fatigue = 3;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -398,9 +361,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -415,9 +376,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 100;    // Above hunger threshold (10)
     employee.fatigue = 3;     // Below fatigue threshold (5)
-    employee.breakNeed = 100;
     employee.x = 0;
     employee.z = 0;
 
@@ -445,9 +404,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 0;
     employee.z = 0;
 
@@ -467,9 +424,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 100;
-    employee.breakNeed = 100;
+    employee.fatigue = 3;
     employee.x = 0;
     employee.z = 0;
 
@@ -490,9 +445,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 50;
     employee.fatigue = 50;
-    employee.breakNeed = 50;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -508,16 +461,12 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee: emp1 } = hireEmployee(state.employees, 'driller', rng);
-    emp1.hunger = 5;
-    emp1.fatigue = 100;
-    emp1.breakNeed = 100;
+    emp1.fatigue = 3;
     emp1.x = 0;
     emp1.z = 0;
 
     const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng);
-    emp2.hunger = 5;
-    emp2.fatigue = 100;
-    emp2.breakNeed = 100;
+    emp2.fatigue = 3;
     emp2.x = 0;
     emp2.z = 0;
 
@@ -565,6 +514,40 @@ describe('tickCollapse (7.6)', () => {
     // employee has walked to the building — restNeedKey stays queued as
     // pendingRestNeedKey until then (#437).
     expect(employee.pendingRestNeedKey).toBe('fatigue');
+  });
+
+  // ── NEW (#928) ──────────────────────────────────────────────────────────────
+  // The walk-to-claimed-job survival guard added to ForceShiftRest.ts's two
+  // proactive functions does NOT apply here: tickCollapse/checkCollapse is a
+  // genuinely different code path (a real collapse, not a proactive nudge)
+  // and must keep interrupting an employee in ANY state — including
+  // mid-walk to an already-claimed job (pendingTaskDuration !== null) — the
+  // instant fatigue crosses the collapse threshold. This path is untouched
+  // by #928 and must not regress.
+  it('interrupts an employee mid-walk to a claimed job (pendingTaskDuration !== null) when fatigue collapses', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold (5)
+    employee.activeActionId = 42; // claimed a job
+    employee.pendingTaskDuration = 20; // walking to it, not yet arrived — 'traveling' state
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    expect(employee.collapsing).toBe(true);
+    // The prior claim is released — collapse interrupts unconditionally,
+    // regardless of the employee's travel state.
+    expect(employee.activeActionId).not.toBe(42);
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
   });
 
 });

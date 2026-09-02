@@ -330,9 +330,7 @@ describe('console-api', () => {
         // run long enough to trip an unrelated needs collapse mid-task (out of
         // scope for this test; see mining-commands.test.ts's equivalent helper).
         for (const emp of runner.ctx.state!.employees.employees) {
-          emp.hunger = 100;
           emp.fatigue = 100;
-          emp.breakNeed = 100;
         }
         runner.runner.run('tick 1');
       }
@@ -341,9 +339,7 @@ describe('console-api', () => {
       // way the drill plan above was drained before blasting.
       for (let i = 0; i < 600 && Object.keys(runner.ctx.state!.plannedChargesByHole).length > 0; i++) {
         for (const emp of runner.ctx.state!.employees.employees) {
-          emp.hunger = 100;
           emp.fatigue = 100;
-          emp.breakNeed = 100;
         }
         runner.runner.run('tick 1');
       }
@@ -484,9 +480,7 @@ describe('console-api', () => {
         // long enough to trip an unrelated needs collapse mid-task (out of
         // scope here; see mining-commands.test.ts's equivalent helper).
         for (const emp of runner.ctx.state!.employees.employees) {
-          emp.hunger = 100;
           emp.fatigue = 100;
-          emp.breakNeed = 100;
         }
         runner.runner.run('tick 1');
       }

@@ -24,12 +24,12 @@ describe('tickGeneralRestCompletion', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 10;
+    employee.fatigue = 10;
     employee.collapsing = true;
     employee.restTicksRemaining = 1; // one more tick → completes this call
     const actionId = state.nextPendingActionId++;
     employee.activeActionId = actionId;
-    employee.restNeedKey = 'hunger';
+    employee.restNeedKey = 'fatigue';
     state.pendingActions.push({
       id: actionId,
       type: 'rest',
@@ -38,7 +38,7 @@ describe('tickGeneralRestCompletion', () => {
       targetX: 5,
       targetZ: 5,
       targetY: 0,
-      payload: { needKey: 'hunger' },
+      payload: { needKey: 'fatigue' },
       targetEmployeeId: employee.id,
       status: 'in_progress',
       holderId: employee.id,
@@ -48,13 +48,13 @@ describe('tickGeneralRestCompletion', () => {
 
     const result: GeneralRestCompletionResult = tickGeneralRestCompletion(state);
 
-    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
-    expect(employee.hunger).toBeGreaterThan(10);
+    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'fatigue' }]);
+    expect(employee.fatigue).toBeGreaterThan(10);
     expect(employee.collapsing).toBe(false);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.activeActionId).toBeNull();
     expect(employee.restNeedKey).toBeNull();
-    expect(state.cash).toBe(1000 - NEED_REST_COSTS.hunger);
+    expect(state.cash).toBe(1000 - NEED_REST_COSTS.fatigue);
     expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
   });
 
@@ -119,17 +119,17 @@ describe('tickGeneralRestCompletion', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.injured = true;
-    employee.hunger = 10;
+    employee.fatigue = 10;
     employee.restTicksRemaining = 1;
     const actionId = state.nextPendingActionId++;
     employee.activeActionId = actionId;
-    employee.restNeedKey = 'hunger';
+    employee.restNeedKey = 'fatigue';
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
 
     const result = tickGeneralRestCompletion(state);
 
-    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
+    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'fatigue' }]);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.activeActionId).toBeNull();
   });
@@ -145,11 +145,11 @@ describe('tickGeneralRestCompletion', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.hunger = 10;
+    employee.fatigue = 10;
     employee.restTicksRemaining = 1;
     const actionId = state.nextPendingActionId++;
     employee.activeActionId = actionId;
-    employee.restNeedKey = 'hunger';
+    employee.restNeedKey = 'fatigue';
     state.pendingActions.push({
       id: actionId,
       type: 'rest',
@@ -158,7 +158,7 @@ describe('tickGeneralRestCompletion', () => {
       targetX: 5,
       targetZ: 5,
       targetY: 0,
-      payload: { needKey: 'hunger' },
+      payload: { needKey: 'fatigue' },
       targetEmployeeId: employee.id,
       status: 'in_progress',
       holderId: employee.id,

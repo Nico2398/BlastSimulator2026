@@ -17,9 +17,7 @@ import {
 /** Default fields for hand-built Employee test fixtures below (mirrors hireEmployee's defaults). */
 const EMPLOYEE_DEFAULTS = {
   activeActionId: null,
-  hunger: 100,
   fatigue: 100,
-  breakNeed: 100,
   collapsing: false,
   interruptedActionPayload: null,
   ticksWorked: 0,

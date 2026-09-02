@@ -1,6 +1,6 @@
 {
   "name": "needs-gauges-visual",
-  "description": "Visual check of need gauge display: hire 3 employees, advance ticks to drain gauges, then verify needs command shows decreasing hunger/fatigue/breakNeed values per employee with color-coding thresholds (green >50, yellow 30-50, red <30)",
+  "description": "Visual check of need gauge display: hire 3 employees, advance ticks to drain the fatigue gauge, then verify needs command shows a decreasing fatigue value per employee with color-coding thresholds (green >50, yellow 30-50, red <30) (#928 — fatigue is the sole gauge; hunger and breakNeed were removed)",
   "steps": [
     {
       "command": "new_game seed:42",

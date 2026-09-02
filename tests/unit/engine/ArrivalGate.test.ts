@@ -36,14 +36,14 @@ describe('tickArrivalGate — mid-transit employees are untouched', () => {
     employee.destinationX = 10;
     employee.destinationZ = 10;
     employee.pendingRestDuration = 5;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestNeedKey = 'fatigue';
 
     const result = tickArrivalGate(state);
 
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.restNeedKey).toBeNull();
     expect(employee.pendingRestDuration).toBe(5);
-    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(result.restStarted).toEqual([]);
   });
 
@@ -267,7 +267,7 @@ describe('tickArrivalGate — dead employees are skipped entirely', () => {
     employee.destinationX = null;
     employee.destinationZ = null;
     employee.pendingRestDuration = 3;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestNeedKey = 'fatigue';
     employee.pendingTaskDuration = 4;
     employee.pendingDriverVehicleId = vehicle.id;
 
@@ -297,7 +297,7 @@ describe('tickArrivalGate — combined multi-employee tick', () => {
     resting.x = 1; resting.z = 1;
     resting.destinationX = null; resting.destinationZ = null;
     resting.pendingRestDuration = 2;
-    resting.pendingRestNeedKey = 'hunger';
+    resting.pendingRestNeedKey = 'fatigue';
 
     tasked.x = 2; tasked.z = 2;
     tasked.destinationX = null; tasked.destinationZ = null;
