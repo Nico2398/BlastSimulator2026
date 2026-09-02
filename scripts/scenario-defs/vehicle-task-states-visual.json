@@ -304,6 +304,30 @@
       "role": "setup"
     },
     {
+      "command": "state full",
+      "description": "#922 visual evidence: mid-drive, wide-framed shot deliberately centred between the fleet's spawn point (~world centre — see vehicle.ts's `baseX/baseZ` spawn calc, the boarding cell every bought vehicle including this drill_rig starts from) and the dispatch target (37,33) the drill_rig is still driving toward. Before the fix, the driller's character mesh stayed parked at the boarding cell for the whole drive (EntitySync.syncEntitySets never suppressed it) while the drill_rig — with the driller supposedly aboard — drove off toward (37,33) alone; correct behaviour draws no separate character mesh at all here, only the vehicle. Framing/coordinates are an authoring-time estimate from the spawn formula, not a value read from a live run — needs confirming against the actual captured PNG once the visual channel runs for real (this test-writer pass cannot run a browser).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 43,
+          "z": 40,
+          "distance": 40
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee list",
       "description": "Crew panel's task line should now read 'driving_to_task' (EmployeeActivityKind, EmployeeActivity.ts) rather than 'working' — the work timer only starts once the vehicle itself arrives at the target, not the employee boarding it. Reopens the Crew panel (same pattern as crew-fleet-panels-visual.json's observe steps): step 14's `vehicle buy drill_rig` switched the toolbar to the Fleet panel and nothing since has switched it back, so without this click the driving-to-task-state shot below would keep showing Fleet, never the Crew panel this file exists to demonstrate.",
       "interaction": [

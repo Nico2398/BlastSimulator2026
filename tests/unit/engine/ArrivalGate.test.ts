@@ -418,6 +418,55 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
   });
 });
 
+// ── issue #922: a driver's position tracks the vehicle continuously, every
+// tick of the drive — not just once at the end (arrival) or at dismount.
+// tickArrivalGate's own vehicle-drive loop is the one place a boarded,
+// reserved vehicle's x/z is advanced (tickVehicle), so this is the level
+// that proves the fix reaches the full vehicle-gated drive, not just a bare
+// tickVehicle call.
+
+describe("tickArrivalGate — a driver's x/z tracks the vehicle continuously across a multi-tick drive (#922)", () => {
+  it('updates employee.x/z to match the vehicle on every single tick of the drive, not only at arrival', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 0;
+
+    const action = makeVehicleGatedAction({ id: 5, holderId: employee.id, targetX: 20, targetZ: 0, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+
+    // Already boarded: no destination of their own, but the work timer
+    // hasn't started because the vehicle hasn't arrived yet.
+    employee.x = vehicle.x;
+    employee.z = vehicle.z;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.taskTicksRemaining = null;
+    employee.pendingTaskDuration = 6;
+
+    let sawEmployeeOffOriginalBoardingCell = false;
+    for (let i = 0; i < 15 && (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ); i++) {
+      tickArrivalGate(state);
+      // The driver must track the vehicle exactly, every single tick —
+      // never lag a tick behind and never stay frozen at the boarding cell
+      // while the vehicle drives on ahead of them.
+      expect(employee.x).toBe(vehicle.x);
+      expect(employee.z).toBe(vehicle.z);
+      if (employee.x !== 0) sawEmployeeOffOriginalBoardingCell = true;
+    }
+
+    // The drive actually covered ground — otherwise the "every tick" check
+    // above would trivially hold without ever exercising it.
+    expect(sawEmployeeOffOriginalBoardingCell).toBe(true);
+  });
+});
+
 describe('reconcileVehicleReservations — mid-drive holder death / vehicle destruction (#550)', () => {
   it('releases the reservation and dismounts the driver when the holder dies mid-drive', () => {
     const state = createGame({ seed: SEED });

@@ -29,8 +29,15 @@ import {
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+  WORK_DURATION_TICKS,
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
+// #922: driver-position invariant — no console command drives this directly,
+// so the assertions below read the same core-level lookup EntitySync's mesh
+// suppression relies on (mesh suppression itself is proven at the renderer
+// level by tests/unit/renderer/EntitySync.test.ts — this integration suite
+// has no DOM/Three.js per this file's own header comment).
+import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -762,6 +769,76 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawQueued).toBe(true);
+    });
+  });
+
+  // ── #922: a driven employee's position tracks the vehicle continuously,
+  // and dismount (interruption for shift rest, then resume) never sends them
+  // back to — or through — the cell they originally boarded at.
+  describe("driver position invariant — never frozen at the boarding cell, never revisits it on interruption/resume (#922)", () => {
+    it('walks to the vehicle, boards, drives (tracked every tick), gets interrupted for shift rest mid-drive, and resumes — no leg of the walk ever returns to or targets the original boarding cell', () => {
+      const eid = hireOne(ctx, 'driller');
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      const dispatch = employeeCommand(ctx, ['dispatch', String(eid)], { x: '25', z: '25', skill: 'blasting', vehicle: 'drill_rig' });
+      expect(dispatch.success).toBe(true);
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Drive to boarding, sampling every tick until aboard.
+      let boardingX: number | null = null;
+      let boardingZ: number | null = null;
+      for (let i = 0; i < 200 && boardingX === null; i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId === eid) {
+          boardingX = vehicle.x;
+          boardingZ = vehicle.z;
+        }
+      }
+      expect(boardingX).not.toBeNull();
+
+      // Mid-drive: the driver's logical position must track the vehicle
+      // every tick — no console command stands in for this; findDrivenVehicle
+      // (EmployeeActivity.ts, #922) is the same lookup EntitySync's mesh
+      // suppression uses to decide whether to draw a mesh for this employee.
+      let sawOffBoardingCell = false;
+      for (let i = 0; i < 6; i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId !== eid) break; // arrived/dismounted early — handled below
+        const driven = findDrivenVehicle(eid, ctx.state!.vehicles.vehicles);
+        expect(driven).not.toBeNull();
+        expect(driven!.id).toBe(vehicle.id);
+        expect(emp.x).toBe(vehicle.x);
+        expect(emp.z).toBe(vehicle.z);
+        if (emp.x !== boardingX || emp.z !== boardingZ) sawOffBoardingCell = true;
+      }
+      expect(sawOffBoardingCell).toBe(true);
+
+      // Force a shift-rest interruption right now, mid-drive — mirrors a
+      // genuine WORK_DURATION_TICKS-triggered interruption (ForceShiftRest.ts)
+      // without needing to time the drive to it exactly.
+      emp.ticksWorked = WORK_DURATION_TICKS;
+      tickCommand(ctx, ['1'], {});
+
+      // Dismounted — and never at the original boarding cell, since the
+      // vehicle had already moved on by the time the interruption landed.
+      expect(vehicle.driverId).toBeNull();
+      expect(emp.x === boardingX && emp.z === boardingZ).toBe(false);
+
+      // Resume: rest completes, the driller reclaims the same action, and
+      // drives on to finish it. Across every remaining tick, neither the
+      // employee's live position nor their walk destination ever equals the
+      // original boarding cell.
+      let sawBoardingCellRevisited = false;
+      for (let i = 0; i < 400 && ctx.state!.pendingActions.some(a => a.id === actionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (emp.x === boardingX && emp.z === boardingZ) sawBoardingCellRevisited = true;
+        if (emp.destinationX === boardingX && emp.destinationZ === boardingZ) sawBoardingCellRevisited = true;
+      }
+
+      expect(sawBoardingCellRevisited).toBe(false);
     });
   });
 

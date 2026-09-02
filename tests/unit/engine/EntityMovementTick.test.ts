@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { purchaseVehicle, type VehicleTask } from '../../../src/core/entities/Vehicle.js';
@@ -576,6 +576,139 @@ describe('tickVehicleTaskState (#411)', () => {
     tickVehicleTaskState(vehicle);
 
     expect(vehicle.state).toBe('waiting');
+  });
+});
+
+// ── syncDriverPosition (issue #922) ──────────────────────────────────────────
+// While `vehicle.driverId === employee.id`, the employee is logically inside
+// the vehicle — no mesh drawn for them (EntitySync.test.ts), and their x/z
+// tracks the vehicle's continuously, tick by tick, not just at dismount.
+// Before this fix, a driven employee's x/z stayed frozen at the boarding
+// cell for the entire drive (only the dismount snap in
+// VehicleReservation.releaseVehicleReservation ever updated it) — the driver
+// mesh appeared parked at the boarding cell while the vehicle drove off.
+
+describe('syncDriverPosition (#922)', () => {
+  it('is a no-op when the vehicle has no driver', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 3, 4);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 9, 9);
+    vehicle.driverId = null;
+
+    syncDriverPosition(state, vehicle);
+
+    expect(employee.x).toBe(3);
+    expect(employee.z).toBe(4);
+  });
+
+  it("sets the driver employee's x/z to the vehicle's x/z", () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 7, 3);
+    vehicle.driverId = employee.id;
+
+    syncDriverPosition(state, vehicle);
+
+    expect(employee.x).toBe(7);
+    expect(employee.z).toBe(3);
+  });
+
+  it('tracks the vehicle continuously across repeated calls as it advances, not just once', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+
+    syncDriverPosition(state, vehicle);
+    expect(employee.x).toBe(0);
+    expect(employee.z).toBe(0);
+
+    vehicle.x = 4;
+    vehicle.z = 1;
+    syncDriverPosition(state, vehicle);
+    expect(employee.x).toBe(4);
+    expect(employee.z).toBe(1);
+
+    vehicle.x = 9;
+    vehicle.z = 6;
+    syncDriverPosition(state, vehicle);
+    expect(employee.x).toBe(9);
+    expect(employee.z).toBe(6);
+  });
+
+  it('never touches an employee who is not this vehicle\'s driver (boundary: another employee exists)', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { employee: bystander } = hireEmployee(state.employees, 'surveyor', new Random(VEHICLE_TICK_SEED + 1), 5, 5);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 12, 12);
+    vehicle.driverId = driver.id;
+
+    syncDriverPosition(state, vehicle);
+
+    expect(driver.x).toBe(12);
+    expect(driver.z).toBe(12);
+    expect(bystander.x).toBe(5);
+    expect(bystander.z).toBe(5);
+  });
+
+  it('is a no-op (never throws) when driverId names an employee that no longer exists (boundary: dangling id)', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 8, 8);
+    vehicle.driverId = 999999;
+
+    expect(() => syncDriverPosition(state, vehicle)).not.toThrow();
+  });
+});
+
+// ── tickVehicle wires syncDriverPosition in on every tick (issue #922) ──────
+// tickVehicle is the sole place a reserved vehicle's x/z is ever advanced
+// (EntityMovementTick.ts's own header comment) — syncDriverPosition must run
+// at the end of every tickVehicle call so a driver's logical position never
+// lags behind the vehicle mid-drive.
+
+describe('tickVehicle — keeps a driver glued to the vehicle every tick (#922)', () => {
+  it('updates the driver x/z on every tick as a direct-line vehicle (no NavGrid) advances toward its target', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 0;
+
+    for (let i = 0; i < 3; i++) {
+      tickVehicle(state, vehicle);
+      expect(employee.x).toBe(vehicle.x);
+      expect(employee.z).toBe(vehicle.z);
+    }
+
+    expect(vehicle.x).toBe(3);
+    // Reached the target — the driver must have moved off the original (0,0)
+    // boarding cell along with the vehicle, not stayed pinned there.
+    expect(employee.x).not.toBe(0);
+  });
+
+  it('leaves a driverless vehicle\'s tick with no effect on any employee (boundary: driverId null)', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 20, 20);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.driverId = null;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 0;
+
+    tickVehicle(state, vehicle);
+
+    expect(employee.x).toBe(20);
+    expect(employee.z).toBe(20);
   });
 });
 

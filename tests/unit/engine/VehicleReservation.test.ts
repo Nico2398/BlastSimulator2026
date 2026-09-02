@@ -25,6 +25,16 @@ import {
 // interruption the way ArrivalGate.tickArrivalGate now does, so the
 // end-to-end effect can still be asserted at this level.
 import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
+// #922: real call chains that release a vehicle-gated reservation mid-drive
+// — cancellation and forced shift rest — both eventually call
+// releaseVehicleReservation above, but the tests below drive them through
+// their actual entry points rather than calling it directly, so a future
+// regression in either chain (e.g. skipping the release, or snapping to a
+// stale position) is caught here too.
+import { cancelAction } from '../../../src/core/engine/TaskCancellation.js';
+import { forceShiftRestIfNeeded } from '../../../src/core/engine/ForceShiftRest.js';
+import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
+import { WORK_DURATION_TICKS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
 
@@ -171,6 +181,92 @@ describe('releaseVehicleReservation', () => {
     expect(() => releaseVehicleReservation(state, 123)).not.toThrow();
     expect(vehicle.reservedForActionId).toBeNull();
     expect(vehicle.driverId).toBeNull();
+  });
+});
+
+// ── issue #922: dismount always lands at the vehicle's CURRENT cell, never
+// the boarding cell — traced through the real call chains a player actually
+// triggers (cancellation, forced shift rest), not just releaseVehicleReservation
+// called directly. Drives the vehicle several cells with the real tickVehicle
+// stepper first, so "the vehicle has moved since boarding" is genuine.
+
+/** Vehicle-gated PendingAction fixture matching makeAction, with a fixed holder. */
+function makeVehicleGatedHeldAction(id: number, holderId: number): PendingAction {
+  return makeAction({} as GameState, {
+    id, holderId, status: 'in_progress', targetX: 30, targetZ: 0, requiredVehicleRole: 'drill_rig',
+  });
+}
+
+describe("releaseVehicleReservation's real call chains land the driver at the vehicle's current cell, not the boarding cell (#922)", () => {
+  it('cancelAction (TaskCancellation.ts) snaps the driver to where the vehicle now sits after several cells of real driving', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 30;
+    vehicle.targetZ = 0;
+
+    const action = makeVehicleGatedHeldAction(30, employee.id);
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Real driving — several cells, no NavGrid (state.navGrid is null on a
+    // freshly-created game), so tickVehicleDirectLine advances one cell/tick.
+    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    expect(vehicle.x).toBeGreaterThan(0); // sanity: it actually moved
+
+    const vehicleXAtCancel = vehicle.x;
+    const vehicleZAtCancel = vehicle.z;
+
+    const result = cancelAction(state, action.id);
+
+    expect(result.success).toBe(true);
+    expect(vehicle.driverId).toBeNull();
+    expect(employee.x).toBe(vehicleXAtCancel);
+    expect(employee.z).toBe(vehicleZAtCancel);
+    // Never the original boarding cell — the vehicle demonstrably moved.
+    expect(employee.x).not.toBe(0);
+  });
+
+  it('forceShiftRestIfNeeded (ForceShiftRest.ts) snaps the driver to where the vehicle now sits, not the boarding cell', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 30;
+    vehicle.targetZ = 0;
+
+    const action = makeVehicleGatedHeldAction(31, employee.id);
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    employee.x = 0;
+    employee.z = 0;
+
+    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    expect(vehicle.x).toBeGreaterThan(0);
+
+    const vehicleXAtRest = vehicle.x;
+    const vehicleZAtRest = vehicle.z;
+
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(employee.x).toBe(vehicleXAtRest);
+    expect(employee.z).toBe(vehicleZAtRest);
+    expect(employee.x).not.toBe(0);
   });
 });
 
