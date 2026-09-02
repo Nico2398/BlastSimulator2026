@@ -221,12 +221,15 @@ export interface SelectedAction {
 /**
  * Claim-time gate for a `dig_ramp_segment` PendingAction — mirrors the shape
  * of EmployeeDispatchSteps.ts's vehicle-availability `isClaimable` predicate passed into
- * `selectBestActionForEmployee` (see its doc above). Enforces entrance-first
- * excavation order: segment 0 is always claimable, and any later segment
- * only once its immediate predecessor in the same `PlannedRamp` is `done`.
- * Any non-`dig_ramp_segment` action, or a segment whose owning `PlannedRamp`
- * can't be found (defensive — should never happen), is claimable — fail-open
- * rather than stranding work nobody can ever pick up.
+ * `selectBestActionForEmployee` (see its doc above). Enforces top-down
+ * (bench-by-bench) excavation order: each segment is one horizontal layer
+ * across the whole ramp footprint (#925), `index` 0 = topmost. Segment 0 is
+ * always claimable, and any later segment only once its immediate
+ * predecessor layer (`index - 1`, the layer directly above it) in the same
+ * `PlannedRamp` is `done` — a layer can't be started until the layer above
+ * it is fully cleared. Any non-`dig_ramp_segment` action, or a segment whose
+ * owning `PlannedRamp` can't be found (defensive — should never happen), is
+ * claimable — fail-open rather than stranding work nobody can ever pick up.
  */
 export function isRampSegmentClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'dig_ramp_segment') return true;

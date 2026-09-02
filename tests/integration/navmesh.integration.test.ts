@@ -351,8 +351,13 @@ describe('NavMesh and pathfinding', () => {
 
     for (const segment of segments) {
       carveRampSegment(grid, segment);
-      expect(segment.region).not.toBeNull();
-      const region = segment.region!;
+      // Layer-based excavation (#925): the topmost layer(s) are pure
+      // clearance headroom above the (flat) plateau surface and carve
+      // nothing — region is legitimately null there, mirroring the
+      // production guard (tickTaskCompletion.ts only patches the NavGrid
+      // when a segment's region is non-null).
+      if (!segment.region) continue;
+      const region = segment.region;
       NavGrid.patchNavGrid(nav, grid, [], [], region);
 
       for (let z = region.minZ; z <= region.maxZ; z++) {
@@ -478,10 +483,17 @@ describe('NavMesh and pathfinding', () => {
     expect(prefixSurfaceY).toBeGreaterThan(fullyDugSurfaceY);
 
     // The full-depth connector discovered once the ramp is complete is not
-    // yet present while the deepest layer remains undug.
+    // yet present while the last segment remains undug. Matching on
+    // upperLevel too (not just the lower/native-ground side) matters under
+    // layer-based excavation (#925): the ramp's deepest column is carved
+    // incrementally across many earlier layer segments, so a shallower
+    // (partial-depth) connector at the same lower cell already exists before
+    // the last segment lands — only the full-depth bench level (upperLevel)
+    // distinguishes "fully excavated" from "partially excavated".
     const connectionsPrefix = findRampConnections(navPrefix);
     const hasFullConnector = connectionsPrefix.some(
-      c => c.lowerX === fullConn!.lowerX && c.lowerZ === fullConn!.lowerZ && c.lowerLevel === fullConn!.lowerLevel,
+      c => c.lowerX === fullConn!.lowerX && c.lowerZ === fullConn!.lowerZ && c.lowerLevel === fullConn!.lowerLevel
+        && c.upperLevel === fullConn!.upperLevel,
     );
     expect(hasFullConnector).toBe(false);
   });

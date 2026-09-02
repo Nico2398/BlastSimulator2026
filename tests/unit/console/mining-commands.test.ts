@@ -1667,7 +1667,16 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
   function completeSegment(ctx: MiningContext, rampId: number, index: number): void {
     const ramp = ctx.state!.plannedRamps.find(r => r.id === rampId)!;
     const tracker = ramp.segments.find(s => s.index === index)!;
-    carveRampSegment(ctx.grid!, { index, cells: tracker.cells, region: tracker.region });
+    // targetX/targetZ/targetY are ghost/dispatch anchor metadata only —
+    // carveRampSegment reads solely `cells`/`region` — so deriving them from
+    // the region (or the first tracked cell, when the layer carved nothing)
+    // is a faithful stand-in for RampSegmentTracker not persisting them.
+    const anchor = tracker.region
+      ? { targetX: tracker.region.minX, targetZ: tracker.region.minZ, targetY: tracker.region.minY }
+      : tracker.cells[0]
+        ? { targetX: tracker.cells[0].x, targetZ: tracker.cells[0].z, targetY: tracker.cells[0].y }
+        : { targetX: 0, targetZ: 0, targetY: 0 };
+    carveRampSegment(ctx.grid!, { index, cells: tracker.cells, region: tracker.region, ...anchor });
     completePendingAction(ctx.state!, tracker.actionId);
     tracker.done = true;
   }
@@ -1692,13 +1701,21 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
 
     const cashBeforeCancel = ctx.state!.cash;
     const undoneCount = totalSegments - 1;
+    // Segment cost is the order's total cost split evenly across every
+    // layer (#925 — segment count is now depth-derived, not ramp.length, so
+    // a flat RAMP_COST_PER_METER per segment no longer applies). Mirror
+    // cancelRampCommand's own per-segment `state.cash +=` accumulation
+    // (TaskCancellation.ts's cancelAction) so float rounding matches exactly.
+    const segmentCost = (5 * RAMP_COST_PER_METER) / totalSegments;
+    let expectedCash = cashBeforeCancel;
+    for (let i = 0; i < undoneCount; i++) expectedCash += segmentCost;
 
     const result = cancelRampCommand(ctx, rampId);
 
     expect(result.success).toBe(true);
     // Only the undone segments' cost comes back — the done segment's share
     // was already spent on real, carved terrain.
-    expect(ctx.state!.cash).toBe(cashBeforeCancel + undoneCount * RAMP_COST_PER_METER);
+    expect(ctx.state!.cash).toBe(expectedCash);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
 
     // Already-carved terrain is untouched by the cancel.
@@ -1752,12 +1769,16 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     const targetTracker = ramp.segments.find(s => s.index === 1)!;
     const otherTrackers = ramp.segments.filter(s => s.index !== 1);
     const cashBefore = ctx.state!.cash;
+    // Segment cost is the order's total cost split evenly across every
+    // layer (#925) — see the cancel test above for why a flat
+    // RAMP_COST_PER_METER no longer applies.
+    const segmentCost = (5 * RAMP_COST_PER_METER) / totalSegments;
 
     const result = employeeCommand(ctx, ['cancel', String(targetTracker.actionId)], {});
 
     expect(result.success).toBe(true);
     // Only that one segment's cost is refunded.
-    expect(ctx.state!.cash).toBe(cashBefore + RAMP_COST_PER_METER);
+    expect(ctx.state!.cash).toBe(cashBefore + segmentCost);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
 
     // The PlannedRamp survives — other segments remain outstanding.

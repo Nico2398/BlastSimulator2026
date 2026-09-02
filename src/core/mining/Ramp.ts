@@ -175,19 +175,6 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
   return { success: true, message: '', cost: totalCost };
 }
 
-/**
- * The column (x, z) ramp step `step` (0-indexed from the entrance) passes
- * through, before width is applied — the same column `defineRampSegments`
- * derives internally per iteration. Exposed so `buildRampCommand` can target
- * a dispatched `dig_ramp_segment` PendingAction's ghost at the same place
- * (row center, at the column's own surface Y via `computeColumnSurfaceY`)
- * without duplicating the direction-offset math.
- */
-export function rampStepColumn(ramp: RampDef, step: number): { x: number; z: number } {
-  const offset = DIR_OFFSETS[ramp.direction];
-  return { x: ramp.originX + offset.dx * step, z: ramp.originZ + offset.dz * step };
-}
-
 /** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
 export interface RampSegmentDef {
   /** Layer index, 0 = topmost/shallowest, increasing = deeper (#925). */
@@ -202,13 +189,36 @@ export interface RampSegmentDef {
   targetY: number;
 }
 
+/** One column's per-step floor/ceiling geometry — Pass 1 of {@link defineRampSegments}. */
+interface RampColumn {
+  cx: number;
+  cz: number;
+  floorY: number;
+  ceilingY: number;
+}
+
 /**
- * Split `ramp` into per-segment excavation work, one segment per
- * `dig_ramp_segment` PendingAction — one entry per `step` of `buildRamp`'s
- * original loop (0-indexed from the entrance), using the exact same
- * column/width/depth math, but only reading density (never mutating) and
- * partitioning cells per step instead of accumulating across all of them.
- * `region` is null when a step's footprint is already entirely clear.
+ * Split `ramp` into per-layer (bench) excavation work, one segment per
+ * `dig_ramp_segment` PendingAction (#925 — reworked from one segment per
+ * column/step to one segment per horizontal layer, so a half-dug ramp is a
+ * flat surface at some intermediate depth across the whole footprint,
+ * instead of a full-depth notch at the entrance).
+ *
+ * Two passes, using the exact same per-column floor/ceiling/width math the
+ * original column-grouped version used (so the final voxel set carved is
+ * identical — only the grouping/order changes):
+ *
+ * Pass 1 computes, for every column `step` along the ramp's length, the same
+ * `cx`/`cz`/`surfaceY`/`floorY`/`ceilingY` the old per-step loop computed.
+ *
+ * Pass 2 walks `y` from the highest ceiling down to the lowest floor across
+ * all columns, one segment per `y`. A column contributes at `y` when
+ * `floorY <= y < ceilingY`; every contributing column's width band
+ * (`-halfWidth..halfWidth` perpendicular to the ramp direction, same as
+ * before) is checked for solid cells at that `y`. `region` is the bounding
+ * box of actual solid cells (null if none); `targetX`/`targetZ` are the
+ * center of the *band* of contributing column positions (regardless of
+ * solidity) so they're always finite, even for an already-flat layer.
  */
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
   const offset = DIR_OFFSETS[ramp.direction];
@@ -217,7 +227,10 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
   const halfWidth = Math.floor(RAMP_WIDTH / 2);
   const clearanceHeight = 3;
 
-  const segments: RampSegmentDef[] = [];
+  // Pass 1 — per-column floor/ceiling geometry, unchanged from the original.
+  const columns: RampColumn[] = [];
+  let globalMinY = Infinity;
+  let globalMaxY = -Infinity;
 
   for (let step = 0; step < ramp.length; step++) {
     const currentDepth = Math.floor((step / ramp.length) * ramp.targetDepth);
@@ -228,14 +241,29 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     const floorY = surfaceY - currentDepth;
     const ceilingY = surfaceY + clearanceHeight;
 
+    columns.push({ cx, cz, floorY, ceilingY });
+    globalMinY = Math.min(globalMinY, floorY);
+    globalMaxY = Math.max(globalMaxY, ceilingY - 1);
+  }
+
+  // Pass 2 — one segment per y, top (globalMaxY) to bottom (globalMinY).
+  const segments: RampSegmentDef[] = [];
+
+  for (let y = globalMaxY; y >= globalMinY; y--) {
     const cells: { x: number; y: number; z: number }[] = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let bandMinX = Infinity, bandMaxX = -Infinity, bandMinZ = Infinity, bandMaxZ = -Infinity;
 
-    for (let w = -halfWidth; w <= halfWidth; w++) {
-      const wx = cx + perpDx * w;
-      const wz = cz + perpDz * w;
+    for (const col of columns) {
+      if (y < col.floorY || y >= col.ceilingY) continue;
 
-      for (let y = floorY; y < ceilingY; y++) {
+      bandMinX = Math.min(bandMinX, col.cx); bandMaxX = Math.max(bandMaxX, col.cx);
+      bandMinZ = Math.min(bandMinZ, col.cz); bandMaxZ = Math.max(bandMaxZ, col.cz);
+
+      for (let w = -halfWidth; w <= halfWidth; w++) {
+        const wx = col.cx + perpDx * w;
+        const wz = col.cz + perpDz * w;
+
         if (grid.densityAt(wx, y, wz) > 0) {
           cells.push({ x: wx, y, z: wz });
           minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
@@ -246,13 +274,16 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     }
 
     segments.push({
-      index: step,
+      index: segments.length,
       cells,
       region: cells.length > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null,
-      // TODO(#925): placeholder anchor — implementer wires the real per-layer target.
-      targetX: cx,
-      targetZ: cz,
-      targetY: floorY,
+      // bandMinX/bandMaxX/bandMinZ/bandMaxZ are always finite here — at
+      // least one column contributes at every y in [globalMinY, globalMaxY]
+      // by construction (each column's own [floorY, ceilingY) is non-empty
+      // and globalMinY/globalMaxY are its extremes across all columns).
+      targetX: Math.round((bandMinX + bandMaxX) / 2),
+      targetZ: Math.round((bandMinZ + bandMaxZ) / 2),
+      targetY: y,
     });
   }
 

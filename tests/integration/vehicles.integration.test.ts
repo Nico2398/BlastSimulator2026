@@ -984,13 +984,15 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
 
 describe('dig_ramp_segment work duration scales with live voxel count (#924)', () => {
   it('a segment with half its own cells already cleared externally seeds a shorter work timer than the same segment fully solid', () => {
-    // A length-8/depth-8 ramp's last segment (deepest, index 7) carves ~28
+    // A length-8/depth-8 ramp's segment index 2 (one of its widest layers —
+    // #925 segments are now per-depth-layer, not per-column) carves ~24
     // cells — well clear of the floor(1-tick) case a shallow single-layer
     // segment would hit, so halving its live voxel count actually moves the
     // tick count (confirmed against real seed:42/size:32 terrain: segment
-    // cell counts step from 6 at index 0 up to 28 at index 7).
+    // cell counts run 0, 22, 24, 21, 18, 15, 12, 9, 6, 3, 3 across its 11
+    // layers, topmost to deepest).
     const RAMP_ARGS = 'origin:16,19 direction:south length:8 depth:8';
-    const SEGMENT_INDEX = 7;
+    const SEGMENT_INDEX = 2;
 
     // Scenario A — baseline: every one of the segment's cells is still solid
     // when the digger arrives.

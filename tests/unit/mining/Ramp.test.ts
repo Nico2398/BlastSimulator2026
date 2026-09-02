@@ -258,7 +258,12 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
     const segments = defineRampSegments(grid, ramp);
     expect(segments.length).toBeGreaterThan(0);
 
-    const segment = segments[0]!;
+    // Layer-based grouping (#925): the topmost layer(s) are pure clearance
+    // headroom above the (flat) surface and carve zero voxels — pick the
+    // first layer that actually has solid cells rather than assuming
+    // segments[0] does.
+    const segment = segments.find(s => s.cells.length > 0)!;
+    expect(segment).toBeDefined();
     const firstCarve = carveRampSegment(grid, segment);
     expect(firstCarve.voxelsCleared).toBeGreaterThan(0);
 

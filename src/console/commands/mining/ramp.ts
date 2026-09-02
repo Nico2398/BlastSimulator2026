@@ -5,8 +5,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  RAMP_WIDTH, RAMP_COST_PER_METER, validateRampOrder, defineRampSegments,
-  computeColumnSurfaceY, rampStepColumn,
+  RAMP_WIDTH, validateRampOrder, defineRampSegments,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import type { PlannedRamp } from '../../../core/state/GameState.js';
@@ -95,25 +94,34 @@ export function buildRampCommand(
   const rampId = ctx.state!.nextPlannedRampId++;
   const plannedRamp: PlannedRamp = { id: rampId, def: rampDef, footprint, segments: [] };
 
+  // Segment count is now the number of excavation layers (#925), not
+  // ramp.length (one per column/meter, pre-#925) — a flat RAMP_COST_PER_METER
+  // per segment no longer sums to validation.cost. Split the charged cost
+  // evenly across segments instead, so the total refundable across every
+  // still-undone segment (actionOrderCost/cancelAction) can never exceed what
+  // was actually charged at order time.
+  const segmentCost = validation.cost / segments.length;
+
   for (const segment of segments) {
-    const { x: cx, z: cz } = rampStepColumn(rampDef, segment.index);
-    const surfaceY = computeColumnSurfaceY(ctx.grid!, cx, cz);
     const actionId = ctx.state!.nextPendingActionId++;
 
     // skipQualificationCheck (#555, mirrors drill_hole/charge_hole's #553/
     // #554 dispatch): a ramp order must queue silently even when nobody on
     // the roster currently holds driving.excavator or a rock_digger yet.
+    // targetX/targetZ/targetY (#925) are the segment's own layer anchor —
+    // the footprint-band center at the layer's absolute world Y — computed
+    // once by defineRampSegments rather than re-derived per column here.
     dispatchPendingAction(ctx.state!, {
       id: actionId,
       type: 'dig_ramp_segment',
       requiredSkill: 'driving.excavator',
       requiredVehicleRole: 'rock_digger',
-      targetX: cx,
-      targetZ: cz,
-      targetY: surfaceY,
+      targetX: segment.targetX,
+      targetZ: segment.targetZ,
+      targetY: segment.targetY,
       payload: {
         rampId, segmentIndex: segment.index, cells: segment.cells, region: segment.region,
-        segmentCost: RAMP_COST_PER_METER,
+        segmentCost,
       } satisfies RampSegmentActionPayload,
       targetEmployeeId: null,
     }, { skipQualificationCheck: true });
