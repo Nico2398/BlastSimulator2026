@@ -23,7 +23,7 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
-import { setVehicleIdle } from './EntityMovementTick.js';
+import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
@@ -167,11 +167,7 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
     // (nearest living_quarters, the walk back to reboard) used that stale
     // position, compounding worse the farther the vehicle had driven since
     // boarding.
-    const driver = state.employees.employees.find(e => e.id === vehicle.driverId);
-    if (driver) {
-      driver.x = vehicle.x;
-      driver.z = vehicle.z;
-    }
+    syncDriverPosition(state, vehicle);
     unassignDriver(state.vehicles, vehicle.id);
     setVehicleIdle(vehicle);
   }

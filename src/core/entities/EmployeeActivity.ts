@@ -48,7 +48,7 @@ export function computeEmployeeActivity(employee: Employee, vehicles: readonly V
     };
   }
 
-  const drivenVehicle = vehicles.find(v => v.driverId === employee.id);
+  const drivenVehicle = findDrivenVehicle(employee.id, vehicles);
   // `?? null`: a fixture/old-save Vehicle predating reservedForActionId
   // (#550) carries it as undefined, not null — treated the same as
   // "unreserved" rather than misreported as vehicle-gated.
@@ -85,8 +85,5 @@ export function taskProgressFraction(activity: EmployeeActivity): number | null 
  * both need instead of re-scanning `vehicles` inline (#922).
  */
 export function findDrivenVehicle(employeeId: number, vehicles: readonly Vehicle[]): Vehicle | null {
-  // TODO: implement
-  void employeeId;
-  void vehicles;
-  return null;
+  return vehicles.find(v => v.driverId === employeeId) ?? null;
 }

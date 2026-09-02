@@ -5,6 +5,7 @@ import type { VehicleState } from './Vehicle.js';
 import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
+import { findDrivenVehicle } from './EmployeeActivity.js';
 
 // ── Zone bounds ──
 
@@ -79,12 +80,15 @@ export function clearZone(
     strandedEmployeeIds: [],
   };
 
+  const orderedVehicleIdSet = new Set<number>();
+
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
     const dest = findSafeDestination(v.x, v.z, zone);
     if (dest) {
       moveVehicle(vehicles, v.id, dest.x, dest.z);
       result.orderedVehicleIds.push(v.id);
+      orderedVehicleIdSet.add(v.id);
     } else {
       result.strandedVehicleIds.push(v.id);
     }
@@ -93,6 +97,22 @@ export function clearZone(
   for (const emp of employees.employees) {
     if (!emp.alive) continue;
     if (!isInZone(emp.x, emp.z, zone)) continue;
+
+    // A seated driver's vehicle-loop outcome above already carries them (the
+    // driver-position invariant, #922) — an independent walking destination
+    // here would fight the vehicle's own evacuation move. Still counted, per
+    // whichever outcome their vehicle got, so they aren't silently dropped
+    // from evacuation accounting.
+    const drivenVehicle = findDrivenVehicle(emp.id, vehicles.vehicles);
+    if (drivenVehicle) {
+      if (orderedVehicleIdSet.has(drivenVehicle.id)) {
+        result.orderedEmployeeIds.push(emp.id);
+      } else {
+        result.strandedEmployeeIds.push(emp.id);
+      }
+      continue;
+    }
+
     const dest = findSafeDestination(emp.x, emp.z, zone);
     if (dest) {
       emp.destinationX = dest.x;

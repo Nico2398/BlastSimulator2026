@@ -43,6 +43,16 @@ export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
  * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD on a blocked next cell (#591).
  */
 export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  tickVehicleMovement(state, vehicle, emitter);
+  syncDriverPosition(state, vehicle);
+}
+
+/**
+ * Actual movement logic for tickVehicle, split out so tickVehicle can wrap it
+ * with an unconditional syncDriverPosition call regardless of which internal
+ * branch/early-return fired (#922).
+ */
+function tickVehicleMovement(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   if (!canTickVehicle(vehicle)) return;
 
   if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
@@ -205,9 +215,11 @@ export function tickVehicleTaskState(vehicle: Vehicle): void {
  * navigates from the cell they boarded at (#922).
  */
 export function syncDriverPosition(state: GameState, vehicle: Vehicle): void {
-  // TODO: implement
-  void state;
-  void vehicle;
+  if (vehicle.driverId === null) return;
+  const driver = state.employees.employees.find(emp => emp.id === vehicle.driverId);
+  if (!driver) return;
+  driver.x = vehicle.x;
+  driver.z = vehicle.z;
 }
 
 // ── Employee movement ──
