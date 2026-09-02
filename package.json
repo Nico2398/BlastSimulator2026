@@ -20,6 +20,7 @@
     "ci:await": "tsx scripts/await-pr-ci.ts",
     "validate:context": "tsx scripts/validate-context.ts",
     "check:i18n": "tsx scripts/check-i18n-parity.ts",
+    "check:dead-code": "tsx scripts/dead-code.ts",
     "qualimetry": "jscpd",
     "qualimetry:diff": "tsx scripts/qualimetry-diff.ts",
     "scenario": "tsx scripts/scenario-test.ts",

@@ -43,10 +43,6 @@ export default defineConfig({
         'src/persistence/IndexedDBPersistence.ts',
         'src/persistence/DownloadPersistence.ts',
 
-        // A constants table — string keys, no functions, no branches. Nothing
-        // imports it today either, so it is a candidate for deletion rather
-        // than for tests.
-        'src/core/i18n/keys.ts',
       ],
       thresholds: {
         // Applied to every file individually, not to the codebase average:

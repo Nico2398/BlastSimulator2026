@@ -43,6 +43,7 @@ npm run qualimetry      # jscpd duplication across src/, scripts/ — ceiling in
 npm run qualimetry:diff # duplication introduced by this branch's own diff (10% ceiling)
 npm run test:coverage   # per-file coverage thresholds (vitest.coverage.config.ts)
 npm run check:i18n      # en.json / fr.json parity
+npm run check:dead-code # files and exports nothing imports
 ```
 
 Full command reference: `dev-testing-strategy` and `dev-visual-testing` skills.

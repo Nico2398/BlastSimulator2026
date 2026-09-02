@@ -65,6 +65,7 @@ None is a substitute for a channel, and all four run in CI on every push and pul
 | Diff duplication | `npm run qualimetry:diff` | At most 10% of the lines a branch adds may sit inside a clone | same job, second step |
 | Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | job `Coverage thresholds` |
 | i18n parity | `npm run check:i18n` | Every non-allowlisted key differs between `en.json` and `fr.json`, and both key sets match | a step in the `TypeScript type check` job |
+| Dead code | `npm run check:dead-code` | No file under `src/`/`scripts/` goes unimported; no new unused export | `tests/unit/lint/NoDeadCode.test.ts`, so the `test` job |
 
 **The two duplication gates measure different things and neither implies the other.** The repo-wide
 one divides by ~70k lines, so a 40-line copy-paste moves it by 0.06% and sails through. The diff gate
@@ -115,6 +116,28 @@ prove those. Plus `core/i18n/keys.ts`, a constants table with no executable code
 scores 100%. These floors catch code the suite never reaches; they say nothing about whether the
 assertions are any good. That gap is what mutation testing measures, and this project does not run
 one today.
+
+### Dead code
+
+`tsc` already refuses unused locals, parameters and imports (`noUnusedLocals`,
+`noUnusedParameters`), so dead code *inside* a file cannot survive a typecheck. The module graph
+above it is what `scripts/dead-code.ts` covers: a file nobody imports, an export nobody imports —
+both typecheck perfectly, and a 46-line table of typed i18n key constants lived there, imported by
+nothing, until the check was written.
+
+It runs as a lint test rather than a CI job of its own, so it costs the `logic` channel a second and
+needs no new runner. Two gates, because the findings differ in kind:
+
+- **Unused files: zero, always.** A file nothing imports is not partly dead.
+- **Unused exports: against a baseline** in `tests/unit/lint/dead-code-baseline.json`. The 248
+  entries there are mostly types and constants used inside their own file and exported out of habit
+  — the code is alive, only the `export` is not. The list may shrink and never grow, and a stale
+  entry fails too, so removing an export means removing its line.
+
+The analysis errs toward silence: a namespace import (`import * as x`) or a star re-export marks the
+whole module used, because it cannot honestly say which members a namespace object touches. Where
+something genuinely reaches code outside the module graph — a `window` assignment the scenario
+harness reads — `ALWAYS_LIVE`/`LIVE_EXPORTS` in the script carry it, with the reason.
 
 ## Unit Test Conventions
 

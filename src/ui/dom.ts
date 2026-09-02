@@ -190,7 +190,7 @@ export function statGrid(items: { key: string; value: string; color?: string }[]
 // body's gap differ, so the shell is built here and the panels supply those.
 
 /** Accent tint of a panel's header icon chip. */
-export type PanelAccent = 'amber' | 'info' | 'critical' | 'ore';
+type PanelAccent = 'amber' | 'info' | 'critical' | 'ore';
 
 const PANEL_ACCENT: Record<PanelAccent, string> = {
   amber: 'background:rgba(255,176,46,.14);color:var(--bsx-amber)',
@@ -229,7 +229,7 @@ export function panelHeaderButton(icon: IconName, onClick?: () => void): HTMLBut
   return btn;
 }
 
-export interface PanelHeaderOptions {
+interface PanelHeaderOptions {
   icon: IconName;
   accent: PanelAccent;
   /**
@@ -242,7 +242,7 @@ export interface PanelHeaderOptions {
   onClose?: () => void;
 }
 
-export interface PanelHeaderParts {
+interface PanelHeaderParts {
   header: HTMLElement;
   /** The title line — bind its text through the panel's own LocaleTextRegistry. */
   titleEl: HTMLElement;
