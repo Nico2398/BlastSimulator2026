@@ -26,7 +26,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
  */
 export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | null {
   const candidate = payload['needKey'];
-  return candidate === 'hunger' || candidate === 'fatigue' || candidate === 'breakNeed' ? candidate : null;
+  return candidate === 'fatigue' ? candidate : null;
 }
 
 /**

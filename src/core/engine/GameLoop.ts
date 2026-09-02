@@ -52,7 +52,7 @@ export { autoInsertNeedTasks, type NeedInsertionResult } from './NeedTaskInserti
 // RestActionHelpers.ts (#759's file-size split) — re-exported here.
 export { deductRestCost } from './RestActionHelpers.js';
 
-// General rest completion (hunger / breakNeed / Tier-1 fatigue) lives in
+// General rest completion (fatigue) lives in
 // RestCompletion.ts (#759's file-size split) — re-exported here.
 export { tickGeneralRestCompletion, type GeneralRestCompletionResult } from './RestCompletion.js';
 

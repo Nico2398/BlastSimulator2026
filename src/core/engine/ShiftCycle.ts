@@ -101,8 +101,8 @@ export function completeRestTick(
   restCompleted: number[],
 ): void {
   if (emp.restTicksRemaining === null) return;
-  // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
-  // breakNeed, or Tier-1 living_quarters fatigue), or — once a site policy has
+  // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks
+  // (Tier-1 living_quarters fatigue), or — once a site policy has
   // been applied (#678) — by forceShiftRestIfNeededByPolicy, all carry a
   // restNeedKey and are owned by tickGeneralRestCompletion instead — skip
   // them here to avoid double-processing. This function only ever runs the

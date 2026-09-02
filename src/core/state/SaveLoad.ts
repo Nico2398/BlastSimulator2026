@@ -183,6 +183,70 @@ function migrateV13ToV14(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * A pre-v15 need-gauge value ('hunger' or 'breakNeed') remapped to the
+ * survivor gauge ('fatigue') — both removed gauges collapse onto the one
+ * gauge that still exists (#928), rather than being dropped, so a save that
+ * was mid-rest-for-hunger (say) still resolves to a valid, recognized key
+ * instead of a dangling reference to a need that no longer exists.
+ */
+function remapRemovedNeedKey(value: unknown): unknown {
+  return value === 'hunger' || value === 'breakNeed' ? 'fatigue' : value;
+}
+
+/**
+ * v14 -> v15: Employee.hunger and Employee.breakNeed removed — fatigue is the
+ * sole need gauge (#928 — three-gauge well-being simplified to one). A pre-v15
+ * save's employees carry both stale fields (stripped below; nothing reads
+ * them anymore) and a `restNeedKey`/`pendingRestNeedKey` that may reference
+ * either removed gauge (remapped to 'fatigue' via remapRemovedNeedKey rather
+ * than nulled, since a genuinely in-flight rest still deserves to resolve
+ * through the one completion path that exists after migration).
+ * PendingAction payloads carry the same 'hunger'/'breakNeed' values under
+ * `needKey`/`collapsedNeed` — remapped identically. SitePolicy lost
+ * `hungerRestThreshold`/`socialBreakThreshold` (SitePolicy.ts) — stripped
+ * from both the top-level policy object and every per-employee
+ * `customThresholds` override. Mutates `obj` in place, matching every other
+ * migration block in `deserialize` below.
+ */
+function migrateV14ToV15(obj: Record<string, unknown>): Record<string, unknown> {
+  const employeesContainer = obj['employees'] as Record<string, unknown> | undefined;
+  const employeesList = employeesContainer?.['employees'] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(employeesList)) {
+    for (const emp of employeesList) {
+      delete emp['hunger'];
+      delete emp['breakNeed'];
+      if ('restNeedKey' in emp) emp['restNeedKey'] = remapRemovedNeedKey(emp['restNeedKey']);
+      if ('pendingRestNeedKey' in emp) emp['pendingRestNeedKey'] = remapRemovedNeedKey(emp['pendingRestNeedKey']);
+    }
+  }
+
+  const pendingActions = obj['pendingActions'] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(pendingActions)) {
+    for (const action of pendingActions) {
+      const payload = action['payload'] as Record<string, unknown> | undefined;
+      if (!payload) continue;
+      if ('needKey' in payload) payload['needKey'] = remapRemovedNeedKey(payload['needKey']);
+      if ('collapsedNeed' in payload) payload['collapsedNeed'] = remapRemovedNeedKey(payload['collapsedNeed']);
+    }
+  }
+
+  const sitePolicy = obj['sitePolicy'] as Record<string, unknown> | undefined;
+  if (sitePolicy) {
+    delete sitePolicy['hungerRestThreshold'];
+    delete sitePolicy['socialBreakThreshold'];
+    const customThresholds = sitePolicy['customThresholds'] as Record<string, Record<string, unknown>> | undefined;
+    if (customThresholds) {
+      for (const override of Object.values(customThresholds)) {
+        delete override['hunger'];
+        delete override['social'];
+      }
+    }
+  }
+
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -372,6 +436,11 @@ export function deserialize(json: string): GameState {
   // v13 -> v14: GameState.plannedBuildings / nextPlannedBuildingId (#556).
   if ((obj['version'] as number) < 14) {
     migrateV13ToV14(obj);
+  }
+
+  // v14 -> v15: Employee.hunger/breakNeed removed, fatigue-only (#928).
+  if ((obj['version'] as number) < 15) {
+    migrateV14ToV15(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

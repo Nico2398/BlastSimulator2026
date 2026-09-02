@@ -31,7 +31,7 @@ export interface NeedRestorationResult {
 
 /**
  * Auto-routes idle employees to the nearest active living_quarters building
- * when hunger or fatigue drops below its warning threshold.
+ * when fatigue drops below its warning threshold.
  * Busy (activeActionId set), injured, and dead employees are skipped;
  * unreachable employees (no living_quarters available) are recorded in result.noBuilding.
  */
@@ -48,14 +48,11 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // comment (Evacuation.ts) for the shared reasoning across all four call
     // sites (#557).
     if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuationWalk(emp)) continue;
-    const needsRest =
-      emp.hunger  < NEED_WARNING_THRESHOLDS.hunger ||
-      emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
+    const needsRest = emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
 
-    // Hunger is checked first, matching the order used above and in autoInsertNeedTasks.
-    const needKey: NeedKey = emp.hunger < NEED_WARNING_THRESHOLDS.hunger ? 'hunger' : 'fatigue';
+    const needKey: NeedKey = 'fatigue';
     const restDuration = NEED_REST_DURATIONS[needKey];
 
     const building = findNearestLivingQuarters(state, emp.x, emp.z);

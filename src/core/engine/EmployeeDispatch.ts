@@ -136,11 +136,12 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 }
 
 /**
- * Work-state classification for NEED_DRAIN_RATES purposes (#680).
- * See EmployeeWorkState for the three states.
+ * Work-state classification for NEED_DRAIN_RATES purposes (#680, extended to
+ * 'traveling' by #928). See EmployeeWorkState for the four states.
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
   if (emp.restTicksRemaining !== null) return 'resting';
-  if (emp.activeActionId !== null && emp.pendingRestDuration === null) return 'working';
+  if (emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null) return 'traveling';
+  if (emp.activeActionId !== null) return 'working';
   return 'idle';
 }

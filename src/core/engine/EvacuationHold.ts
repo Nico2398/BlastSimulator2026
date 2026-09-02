@@ -137,7 +137,7 @@ export function clearResolvedEvacuationHolds(state: GameState): void {
  * tick(s) before the zone was ever drawn.
  *
  * Discarding is safe specifically for 'rest': the need that requested it
- * (hunger/fatigue) is untouched by any of this — clearing pendingRestDuration/
+ * (fatigue) is untouched by any of this — clearing pendingRestDuration/
  * pendingRestNeedKey/restTicksRemaining below (none of which
  * interruptActiveAction's clearHolderWalkFields/clearActiveTaskFields ever
  * touch, since those predate rest-mode fields entirely) just makes the

@@ -1,5 +1,4 @@
-// BlastSimulator2026 — General rest completion (hunger / breakNeed / Tier-1
-// fatigue)
+// BlastSimulator2026 — General rest completion (fatigue)
 //
 // Completion path for 'rest' PendingActions created by NeedRestoration.ts's
 // tickCollapse/tickNeedRestoration, NeedTaskInsertion.ts's autoInsertNeedTasks,
@@ -20,8 +19,8 @@ export interface GeneralRestCompletionResult {
 
 /**
  * Completion path for 'rest' PendingActions created by tickCollapse,
- * tickNeedRestoration, and autoInsertNeedTasks — every hunger and breakNeed
- * rest, plus fatigue rest when no Bunkhouse Tier 2+ living_quarters exists to
+ * tickNeedRestoration, and autoInsertNeedTasks — every fatigue rest, when no
+ * Bunkhouse Tier 2+ living_quarters exists to
  * service it via processShiftCycle. Mirrors completeRestTick's structure:
  * decrement restTicksRemaining, and on completion replenish the resting need
  * gauge, deduct its NEED_REST_COSTS entry, then clear activeActionId/
