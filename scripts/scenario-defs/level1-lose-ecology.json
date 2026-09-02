@@ -37,6 +37,10 @@
       "command": "vehicle scrap 2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
         },
@@ -50,7 +54,7 @@
         }
       ],
       "role": "player",
-      "description": "Only vehicle #1 (drill_rig) is used this round -- the staffed roster's debris_hauler/rock_digger/rock_fragmenter would otherwise sit parked in the drill site's path: NavGrid pathing has no notion of \"move aside\", so a vehicle idling on a cell a drilling driller's route crosses blocks that route forever (isCellOccupiedByOtherVehicle, EntityMovementTick.ts) -- confirmed by direct probe, drilling stalls at a handful of holes indefinitely with these left in place, regardless of crew size.",
+      "description": "Only vehicle #1 (drill_rig) is used this round -- the staffed roster's debris_hauler/rock_digger/rock_fragmenter would otherwise sit parked in the drill site's path: NavGrid pathing has no notion of \"move aside\", so a vehicle idling on a cell a drilling driller's route crosses blocks that route forever (isCellOccupiedByOtherVehicle, EntityMovementTick.ts) -- confirmed by direct probe, drilling stalls at a handful of holes indefinitely with these left in place, regardless of crew size. #929: opens the Fleet panel itself. The step that used to open it with a real toolbar click became a bootstrap command under #921, and UIManager only updates a visible panel -- a Fleet panel nobody opened renders no vehicle cards at all, so this click had nothing to land on.",
       "expect": {
         "changedBy": {
           "cash": 10000
@@ -60,6 +64,10 @@
     {
       "command": "vehicle scrap 3",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
@@ -83,6 +91,10 @@
     {
       "command": "vehicle scrap 4",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"

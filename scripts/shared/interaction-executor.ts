@@ -90,8 +90,18 @@ async function inspectSelector(page: Page, selector: string): Promise<Unclickabl
   }, selector);
 }
 
-/** Turn an inspection into one line a human can act on. */
-function describeUnclickable(r: UnclickableReport): string {
+/**
+ * Turn an inspection into one line a human can act on.
+ *
+ * `neverAppeared` separates the two ways an absent element gets here, which
+ * read identically in the report and mean opposite things: a control that was
+ * there and went away mid-click is a race, while one the whole wait never saw
+ * once is simply not rendered — the panel holding it was never opened, or the
+ * row does not exist. Reporting the first for the second cost #929 a full CI
+ * cycle chasing a re-render race that was really three scenario files clicking
+ * into a Fleet panel nothing had opened.
+ */
+function describeUnclickable(r: UnclickableReport, neverAppeared = false): string {
   const context = [
     r.matchCount !== undefined && r.matchCount > 1
       ? `selector is ambiguous (${r.matchCount} matches, first one used)`
@@ -99,12 +109,16 @@ function describeUnclickable(r: UnclickableReport): string {
     r.tutorial !== undefined ? `tutorial on ${r.tutorial}` : '',
   ].filter(s => s !== '');
   const suffix = context.length > 0 ? ` [${context.join('; ')}]` : '';
-  return `${describeReason(r)}${suffix}`;
+  return `${describeReason(r, neverAppeared)}${suffix}`;
 }
 
 /** The primary reason, before context is appended. */
-function describeReason(r: UnclickableReport): string {
-  if (!r.found) return 'element vanished from the DOM between the wait and the click';
+function describeReason(r: UnclickableReport, neverAppeared = false): string {
+  if (!r.found) {
+    return neverAppeared
+      ? 'element never appeared in the DOM — nothing renders it (a panel no step opened, or a row that does not exist)'
+      : 'element vanished from the DOM between the wait and the click';
+  }
   if (r.pointerEvents === 'none') {
     return 'element is inert (pointer-events: none) — a tutorial rail or overlay is blocking it, '
       + 'so no player could click it either';
@@ -376,7 +390,10 @@ export function checkStepActionAllowed(
 // "settings" rejected in the `ensurePanel` case below. Module scope (not
 // case-local) so both `ensurePanel` and `ensureStep` can reference the same
 // map instead of hardcoding a panel element id a second time (#652).
-const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
+// Exported for `tests/unit/lint/ScenarioPanelSelectorsAreOpened.test.ts`, the
+// lint that holds every panel-scoped selector in scripts/scenario-defs/ to an
+// `ensurePanel` for the panel that renders it (#929).
+export const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
   blast: 'bs-blast-panel',
   contracts: 'bs-contract-panel',
   ops: 'bs-operations-panel',
@@ -451,68 +468,53 @@ export async function executeActionOnPage(
       // immediately (#699). Bounded to exactly one retry so a selector
       // genuinely covered by something else (a tutorial rail, a real layout
       // bug) still fails loudly with today's exact error.
-      //
-      // A panel that rebuilds its whole card list on any signature change
-      // (FleetPanel's computeSignature, e.g.) can also swap the probed node
-      // for an identically-selected replacement in the gap between the probe
-      // resolving "usable" and page.click actually landing — a background
-      // `tick`/bootstrap command elsewhere on the page, not this action's own
-      // target, triggered the rebuild. That reads as "found: false" on the
-      // immediate re-inspect even though the control never stopped existing.
-      // One bounded retry of the whole probe-then-click cycle covers it,
-      // mirroring the 'covered' retry above — a selector that never appears
-      // at all still exhausts its real budget and fails loudly.
-      let vanishedRetried = false;
-      clickAttempt: for (;;) {
-        let deadline = Date.now() + timeoutMs;
-        let retriedCoveredOnce = false;
-        for (;;) {
-          const reason = await page.evaluate((sel: string) => {
-            const probe = (window as unknown as {
-              __probeSelector?: (s: string) => string | null;
-            }).__probeSelector;
-            if (probe === undefined) return null;
-            // Scroll into view before probing, exactly as page.click will before
-            // clicking: a row below a panel's fold has its centre over the game
-            // canvas until scrolled, and probing that reads as covered-forever.
-            document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
-            return probe(sel);
-          }, action.selector);
-          if (reason === null) break;
-          if (Date.now() > deadline) {
-            if (!retriedCoveredOnce && reason === 'covered') {
-              retriedCoveredOnce = true;
-              const resolved = await resolveEventIfPendingOnPage(page, 8000);
-              if (resolved) {
-                deadline += 5000;
-                continue;
-              }
+      let deadline = Date.now() + timeoutMs;
+      let retriedCoveredOnce = false;
+      // 'absent' every single poll means the control was never rendered at
+      // all, which `inspectSelector` alone cannot tell apart from one that
+      // was swapped out mid-click — see `describeUnclickable`.
+      let everPresent = false;
+      for (;;) {
+        const reason = await page.evaluate((sel: string) => {
+          const probe = (window as unknown as {
+            __probeSelector?: (s: string) => string | null;
+          }).__probeSelector;
+          if (probe === undefined) return null;
+          // Scroll into view before probing, exactly as page.click will before
+          // clicking: a row below a panel's fold has its centre over the game
+          // canvas until scrolled, and probing that reads as covered-forever.
+          document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+          return probe(sel);
+        }, action.selector);
+        if (reason === null) break;
+        if (reason !== 'absent') everPresent = true;
+        if (Date.now() > deadline) {
+          if (!retriedCoveredOnce && reason === 'covered') {
+            retriedCoveredOnce = true;
+            const resolved = await resolveEventIfPendingOnPage(page, 8000);
+            if (resolved) {
+              deadline += 5000;
+              continue;
             }
-            throw new Error(
-              `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
-            );
           }
-          await new Promise((r) => setTimeout(r, 150));
-        }
-        try {
-          await page.click(action.selector, { button: btn });
-        } catch (err) {
-          const report = await inspectSelector(page, action.selector);
-          if (!vanishedRetried && !report.found) {
-            vanishedRetried = true;
-            continue clickAttempt;
-          }
-          // Puppeteer's own message ("Node is either not clickable or not an
-          // Element") names nothing, so a failure reports only that *something*
-          // on the page could not be clicked. Name the selector and say why it
-          // was refused — inert almost always means a `pointer-events: none`
-          // rail, which is a real player-facing block, not a test flake.
           throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(report)}`,
-            { cause: err },
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector), !everPresent)}`,
           );
         }
-        break;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      try {
+        await page.click(action.selector, { button: btn });
+      } catch (err) {
+        // Puppeteer's own message ("Node is either not clickable or not an
+        // Element") names nothing, so a failure reports only that *something*
+        // on the page could not be clicked. Name the selector and say why it
+        // was refused — inert almost always means a `pointer-events: none`
+        // rail, which is a real player-facing block, not a test flake.
+        throw new Error(
+          `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
+          { cause: err },
+        );
       }
       break;
     }
