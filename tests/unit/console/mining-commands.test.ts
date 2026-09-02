@@ -1667,7 +1667,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
   function completeSegment(ctx: MiningContext, rampId: number, index: number): void {
     const ramp = ctx.state!.plannedRamps.find(r => r.id === rampId)!;
     const tracker = ramp.segments.find(s => s.index === index)!;
-    carveRampSegment(ctx.grid!, { index, cells: tracker.cells, region: tracker.region });
+    carveRampSegment(ctx.grid!, { cells: tracker.cells, region: tracker.region });
     completePendingAction(ctx.state!, tracker.actionId);
     tracker.done = true;
   }
@@ -1692,13 +1692,21 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
 
     const cashBeforeCancel = ctx.state!.cash;
     const undoneCount = totalSegments - 1;
+    // Segment cost is the order's total cost split evenly across every
+    // layer (#925 — segment count is now depth-derived, not ramp.length, so
+    // a flat RAMP_COST_PER_METER per segment no longer applies). Mirror
+    // cancelRampCommand's own per-segment `state.cash +=` accumulation
+    // (TaskCancellation.ts's cancelAction) so float rounding matches exactly.
+    const segmentCost = (5 * RAMP_COST_PER_METER) / totalSegments;
+    let expectedCash = cashBeforeCancel;
+    for (let i = 0; i < undoneCount; i++) expectedCash += segmentCost;
 
     const result = cancelRampCommand(ctx, rampId);
 
     expect(result.success).toBe(true);
     // Only the undone segments' cost comes back — the done segment's share
     // was already spent on real, carved terrain.
-    expect(ctx.state!.cash).toBe(cashBeforeCancel + undoneCount * RAMP_COST_PER_METER);
+    expect(ctx.state!.cash).toBe(expectedCash);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
 
     // Already-carved terrain is untouched by the cancel.
@@ -1752,12 +1760,16 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     const targetTracker = ramp.segments.find(s => s.index === 1)!;
     const otherTrackers = ramp.segments.filter(s => s.index !== 1);
     const cashBefore = ctx.state!.cash;
+    // Segment cost is the order's total cost split evenly across every
+    // layer (#925) — see the cancel test above for why a flat
+    // RAMP_COST_PER_METER no longer applies.
+    const segmentCost = (5 * RAMP_COST_PER_METER) / totalSegments;
 
     const result = employeeCommand(ctx, ['cancel', String(targetTracker.actionId)], {});
 
     expect(result.success).toBe(true);
     // Only that one segment's cost is refunded.
-    expect(ctx.state!.cash).toBe(cashBefore + RAMP_COST_PER_METER);
+    expect(ctx.state!.cash).toBe(cashBefore + segmentCost);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
 
     // The PlannedRamp survives — other segments remain outstanding.
@@ -1777,6 +1789,47 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     // The cancelled segment's own action/ghost are gone.
     expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
     expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
+  });
+
+  it('refunds exactly the cost actually charged at order time when every segment is cancelled before any work is done (#925 code review)', () => {
+    // The two tests above compute their expected refund with the same
+    // segmentCost = validation.cost / segments.length formula ramp.ts uses,
+    // so they can't catch a bug in that formula itself. This test instead
+    // ties the refund to two things the production formula never touches
+    // directly: the actual cash delta at order time, and the actual
+    // segmentCost value each PendingAction's payload was dispatched with.
+    const ctx = makeMiningContext();
+
+    const cashBeforeOrder = ctx.state!.cash;
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    expect(buildResult.success).toBe(true);
+    const chargedCost = cashBeforeOrder - ctx.state!.cash;
+
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    expect(ramp.segments.length).toBeGreaterThan(1);
+    expect(ramp.segments.every(s => !s.done)).toBe(true);
+
+    // Sum every segment's own dispatched segmentCost — the real per-segment
+    // refund amount cancelAction will credit — read from the actual
+    // PendingAction payloads rather than re-derived from validation.cost.
+    const totalSegmentCost = ramp.segments.reduce((sum, seg) => {
+      const action = ctx.state!.pendingActions.find(a => a.id === seg.actionId)!;
+      return sum + (action.payload['segmentCost'] as number);
+    }, 0);
+
+    const cashBeforeCancel = ctx.state!.cash;
+    const result = cancelRampCommand(ctx, rampId);
+    expect(result.success).toBe(true);
+
+    const actualRefund = ctx.state!.cash - cashBeforeCancel;
+    expect(actualRefund).toBeCloseTo(totalSegmentCost, 6);
+    // The invariant under test: nothing was carved, so the total refund
+    // equals the amount actually charged at order time — not merely "does
+    // not exceed" it.
+    expect(actualRefund).toBeCloseTo(chargedCost, 6);
+    expect(ctx.state!.cash).toBeCloseTo(cashBeforeOrder, 6);
+    expect(ctx.state!.finances.cash).toBeCloseTo(ctx.state!.cash, 6);
   });
 });
 

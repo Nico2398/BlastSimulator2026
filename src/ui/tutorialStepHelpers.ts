@@ -24,6 +24,15 @@ export const TOOLBAR_TARGET = {
   settings: '#bs-toolbar [data-panel="settings"]',
 } as const;
 
+/** Selector for the ×8 speed button — the target of the speed-up-for-dig step (#923). */
+export const SPEED_UP_TO_MAX_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="8"]';
+
+/** Selector for the ×1 speed button — the target of the speed-down-after-dig step (#923). */
+export const SPEED_BACK_TO_NORMAL_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="1"]';
+
+/** Selector for the whole speed button group — used once speed controls are left player-controlled (#923). */
+export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]';
+
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the
  * target role at capture time. Completion requires an employee with that
@@ -315,5 +324,68 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
     }),
     isComplete: (_state: GameState, snapshot: Record<string, unknown>) =>
       isSurveyOverlayToggleOn() !== (snapshot.overlayOn as boolean),
+  };
+}
+
+/**
+ * Helper: create the speed-up-for-dig step (#923) — taught inside the
+ * 'box-cut' wait, teaching ×8 while the long ramp-dig is in progress.
+ *
+ * waitsOnWork: true for the same reason box-cut itself carries it — the dig
+ * is genuinely still running while this step is open, so without it the
+ * rail's clock-hold (tutorialGuide.ts's decideClock) would pause the game
+ * before the player ever reaches the speed button.
+ */
+export function createSpeedUpForDigStep(): TutorialStep {
+  return {
+    id: 'speed-up-for-dig',
+    titleKey: 'tutorial.step_speedupdig.title',
+    textKey: 'tutorial.step_speedupdig',
+    highlightTarget: SPEED_UP_TO_MAX_BUTTON,
+    commands: ['time speed 8'],
+    waitsOnWork: true,
+    isComplete: (state: GameState) => state.timeScale >= 8,
+  };
+}
+
+/**
+ * Snapshot for the speed-normal-after-dig step: the id of the ramp being dug
+ * when the step opened, so completion can tell "this ramp finished" from
+ * "no ramp was ever planned" (a mock/minimal state).
+ */
+interface SpeedNormalAfterDigSnapshot {
+  rampId: number | null;
+}
+
+/**
+ * Helper: create the speed-normal-after-dig step (#923) — teaches ×1 once the
+ * box-cut dig has finished, before speed controls are left player-controlled
+ * for the rest of the tutorial (`permanentlyUnlocks`).
+ *
+ * Completion needs the ramp to be genuinely done digging, not just "some
+ * ramp is gone" — `tickTaskCompletion.ts` only splices a `PlannedRamp` out of
+ * `state.plannedRamps` once every one of its segments is `done`, which is
+ * the authoritative "ramp fully dug" signal this step waits on.
+ */
+export function createSpeedNormalAfterDigStep(): TutorialStep {
+  return {
+    id: 'speed-normal-after-dig',
+    titleKey: 'tutorial.step_speednormalafterdig.title',
+    textKey: 'tutorial.step_speednormalafterdig',
+    highlightTarget: SPEED_BACK_TO_NORMAL_BUTTON,
+    commands: ['time speed 1'],
+    waitsOnWork: true,
+    permanentlyUnlocks: [SPEED_BUTTON_GROUP],
+    captureSnapshot: (state: GameState): Record<string, unknown> => ({
+      // state.plannedRamps may be absent on a minimal/mock GameState (same
+      // defensive fallback as isEvacuationZoneClear's state.drillHoles above).
+      rampId: (state.plannedRamps ?? [])[0]?.id ?? null,
+    } satisfies SpeedNormalAfterDigSnapshot),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const { rampId } = snapshot as unknown as SpeedNormalAfterDigSnapshot;
+      const stillDigging = rampId != null
+        && (state.plannedRamps ?? []).some((ramp) => ramp.id === rampId);
+      return !stillDigging && state.timeScale <= 1;
+    },
   };
 }

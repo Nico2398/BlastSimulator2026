@@ -226,7 +226,7 @@
     },
     {
       "command": "tutorial_start",
-      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out. #904: the tutorial now opens on hire-surveyor instead of time-speed (see tutorialSteps.ts), so this waits for that step and checks its own French title instead.",
+      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out. #904/#923: the tutorial now opens on hire-surveyor, with no standalone speed-control step anywhere near the opening any more (that lesson moved into the box-cut ramp-dig wait, well past where this file's own coverage ends), so this waits for hire-surveyor and checks its own French title instead.",
       "interaction": [
         {
           "type": "command",
@@ -267,7 +267,7 @@
     },
     {
       "command": "employee hire role:surveyor",
-      "description": "#904: hire-surveyor is now the tutorial's opening step, completable immediately (no ticks required). Open the Crew panel — a second panel, open at the same time as the tutorial card — and hire through its own Hire button. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch. Advances the coach card to the time-speed step, whose title is asserted in French.",
+      "description": "#904/#923: hire-surveyor is the tutorial's opening step, completable immediately (no ticks required), and advances straight to 'survey' now -- no standalone speed-control step sits in between any more. Open the Crew panel — a second panel, open at the same time as the tutorial card — and hire through its own Hire button. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch. Advances the coach card to the survey step, whose title is asserted in French.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -283,28 +283,13 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "survey"
         },
         {
           "type": "assert",
           "selector": ".bs-tutorial-box .bs-panel-title",
           "property": "textContent",
-          "expectedValue": "Vitesse de Jeu"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "time speed:2",
-      "description": "Advance past the time-speed step (its own target, always reachable) so the tutorial reaches survey — its first genuine wait — proving the locale switch made earlier is still in effect this late into the tutorial. No title assertion needed past this point (the file's own locale-regression purpose is already proven by the two coach-card titles and the Crew panel above); confirming the wait itself succeeds is enough.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "survey"
+          "expectedValue": "Étude du Terrain"
         }
       ],
       "role": "player"

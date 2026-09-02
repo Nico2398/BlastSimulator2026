@@ -161,7 +161,13 @@ export interface PendingAction {
   holderId: number | null;
 }
 
-/** Tracks one ordered ramp's per-segment excavation progress (#555). */
+/**
+ * Tracks one ordered ramp's per-segment excavation progress (#555). Each
+ * segment is one horizontal layer (bench) across the whole ramp footprint
+ * (#925) — `index` 0 is the topmost layer, increasing = deeper. Excavation
+ * order is top-down: `ActionSelection.ts`'s `isRampSegmentClaimable` gates a
+ * layer on `index - 1` (the layer above it) being `done`.
+ */
 export interface RampSegmentTracker {
   index: number;
   actionId: number;

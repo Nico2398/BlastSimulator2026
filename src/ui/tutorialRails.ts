@@ -17,6 +17,13 @@ export interface RailsStep {
   highlightTarget?: string;
   tickBudget?: number;
   waitsOnWork?: boolean;
+  /**
+   * Selectors this step leaves permanently clickable from here on, even once
+   * the rail has moved past it — e.g. the speed controls, left fully
+   * player-controlled for the rest of the tutorial after the speed-lesson
+   * pair (#923).
+   */
+  permanentlyUnlocks?: string[];
 }
 
 /** What the card should show about the current stage and the clock. */
@@ -40,6 +47,12 @@ export class TutorialRails {
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
   private lastProgressTrainingActive = false;
+  /**
+   * Selectors accumulated from every step's `permanentlyUnlocks` seen so far
+   * this tutorial run (#923). Never cleared by `beginStep`'s per-step reset —
+   * once a step unlocks a control, it stays unlocked for the rest of the run.
+   */
+  private permanentlyAllowed = new Set<string>();
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
@@ -51,6 +64,9 @@ export class TutorialRails {
     this.lastProgressSignature = null;
     this.lastProgressTick = this.stepStartTick;
     this.lastProgressTrainingActive = false;
+    for (const selector of step.permanentlyUnlocks ?? []) {
+      this.permanentlyAllowed.add(selector);
+    }
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
@@ -72,7 +88,7 @@ export class TutorialRails {
 
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
-    applyRails(stage);
+    applyRails(stage, document, Array.from(this.permanentlyAllowed));
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
@@ -151,12 +167,13 @@ export class TutorialRails {
     };
   }
 
-  /** Take every mark off the DOM — used when the tutorial ends. */
+  /** Take every mark off the DOM — used when the tutorial ends or restarts. */
   clear(): void {
     clearRails();
     setPickerRegion(null);
     this.stages = [];
     this.stageIndex = 0;
     this.held = false;
+    this.permanentlyAllowed = new Set();
   }
 }

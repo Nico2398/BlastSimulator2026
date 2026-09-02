@@ -24,10 +24,14 @@ import {
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
-import { createEmployeeState, hireEmployee, killEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
+import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
+import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -644,6 +648,133 @@ describe('computeActionWorkTicks (#549)', () => {
     // compute ceil(20 / 0.80) = 25.
     const expectedTicks = Math.max(1, Math.ceil(BASE_TASK_DURATION_TICKS / LIVING_QUARTERS_WELLBEING_MULTIPLIERS.t1));
     expect(ticks).toBe(expectedTicks);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// computeActionWorkTicks — dig_ramp_segment duration scaling (#924)
+//
+// The dig_ramp_segment branch is still a stub (skeleton commit 262802c):
+// it always uses the stale action.payload.cells.length as voxel count, always
+// ignores the employee's driving.excavator proficiency, and always ignores
+// `grid` entirely. These tests assert the intended fix — live voxel count via
+// `grid`, and the same proficiency/needMultiplier/lqMultiplier threading
+// every other branch of computeActionWorkTicks already does (see the branch
+// right below dig_ramp_segment in ActionSelection.ts) — so they fail against
+// today's stub and must pass once #924 lands.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function makeRampCells(n: number): { x: number; y: number; z: number }[] {
+  return Array.from({ length: n }, (_, i) => ({ x: i, y: 0, z: 0 }));
+}
+
+function makeRampSegmentAction(cells: { x: number; y: number; z: number }[]): PendingAction {
+  return makeWorkAction({
+    type: 'dig_ramp_segment',
+    requiredSkill: 'driving.excavator',
+    payload: { rampId: 1, segmentIndex: 0, cells, region: null, segmentCost: 0 },
+  });
+}
+
+/** Fresh solid VoxelGrid, large enough to hold every cell makeRampCells(n) produces. */
+function makeSolidGridForCells(cells: { x: number; y: number; z: number }[]): VoxelGrid {
+  const grid = new VoxelGrid(Math.max(20, cells.length + 2), 5, 5);
+  for (const cell of cells) {
+    grid.setVoxel(cell.x, cell.y, cell.z, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+    });
+  }
+  return grid;
+}
+
+describe('computeActionWorkTicks — dig_ramp_segment scaling (#924)', () => {
+  const CELL_COUNT = 800; // baseTicks = 800 / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tier1 workRate) = 100, exactly.
+
+  it('a level-5 driving.excavator digger gets measurably fewer ticks than a level-1 digger for the same segment', () => {
+    const state = makeGame();
+    const rookie = addQualifiedEmployee(state, 'driving.excavator', 1);
+    const master = addQualifiedEmployee(state, 'driving.excavator', 5);
+    const action = makeRampSegmentAction(makeRampCells(CELL_COUNT));
+
+    const rookieTicks = computeActionWorkTicks(state, rookie, action);
+    const masterTicks = computeActionWorkTicks(state, master, action);
+
+    // Must fail against the #924 stub, which always resolves both to the same
+    // value (proficiency ignored for dig_ramp_segment).
+    expect(masterTicks).toBeLessThan(rookieTicks);
+
+    // Exact figures — same computeTaskDuration formula every other branch of
+    // computeActionWorkTicks already uses (needMult=1.0: freshly hired,
+    // full needs; lqMult=absent since no living_quarters exists in makeGame()).
+    const needMult = getNeedMultiplier(rookie);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    expect(rookieTicks).toBe(computeRampSegmentDurationTicks(CELL_COUNT, 1, 1, needMult, lqMult));
+    expect(masterTicks).toBe(computeRampSegmentDurationTicks(CELL_COUNT, 1, 5, needMult, lqMult));
+  });
+
+  it('a starving digger gets measurably more ticks than a rested digger, same proficiency and segment', () => {
+    const state = makeGame();
+    const rested = addQualifiedEmployee(state, 'driving.excavator', 1);
+    const starving = addQualifiedEmployee(state, 'driving.excavator', 1);
+    starving.hunger = 0; // well under NEED_THRESHOLDS.hunger.critical
+    const action = makeRampSegmentAction(makeRampCells(CELL_COUNT));
+
+    const restedTicks = computeActionWorkTicks(state, rested, action);
+    const starvingTicks = computeActionWorkTicks(state, starving, action);
+
+    // Must fail against the #924 stub, which always resolves both to the
+    // same value (employee needs ignored for dig_ramp_segment).
+    expect(starvingTicks).toBeGreaterThan(restedTicks);
+
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    expect(restedTicks).toBe(computeRampSegmentDurationTicks(CELL_COUNT, 1, 1, getNeedMultiplier(rested), lqMult));
+    expect(starvingTicks).toBe(computeRampSegmentDurationTicks(CELL_COUNT, 1, 1, getNeedMultiplier(starving), lqMult));
+  });
+
+  it('a grid with some of the segment\'s own cells already cleared produces fewer ticks than the same segment with every cell still solid', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 1);
+    const cells = makeRampCells(10);
+    const action = makeRampSegmentAction(cells);
+
+    const grid = makeSolidGridForCells(cells);
+    // Half the segment's own cells already cleared in the live grid — e.g. an
+    // overlapping blast or ramp carved them between order time (when
+    // payload.cells was captured) and now.
+    for (const cell of cells.slice(0, 5)) {
+      grid.clearVoxel(cell.x, cell.y, cell.z);
+    }
+
+    const ticksWithPartlyCleared = computeActionWorkTicks(state, employee, action, grid);
+    const ticksWithNoGrid = computeActionWorkTicks(state, employee, action);
+
+    // Must fail against the #924 stub, which ignores `grid` entirely and
+    // always returns the stale cells.length-based duration for both calls.
+    expect(ticksWithPartlyCleared).toBeLessThan(ticksWithNoGrid);
+
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    expect(ticksWithPartlyCleared).toBe(computeRampSegmentDurationTicks(5, 1, 1, needMult, lqMult));
+    expect(ticksWithNoGrid).toBe(computeRampSegmentDurationTicks(10, 1, 1, needMult, lqMult));
+  });
+
+  it('passing a grid where every segment cell is still solid matches the stale no-grid fallback (regression guard — currently PASSES, since the stub ignores grid either way)', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 3);
+    const cells = makeRampCells(16);
+    const action = makeRampSegmentAction(cells);
+
+    const grid = makeSolidGridForCells(cells);
+
+    const ticksWithFullGrid = computeActionWorkTicks(state, employee, action, grid);
+    const ticksWithNoGrid = computeActionWorkTicks(state, employee, action);
+
+    // A grid where nothing was externally cleared must resolve to the same
+    // voxel count (and therefore the same ticks) as omitting the grid
+    // entirely — true both before #924 (grid ignored outright) and after
+    // (live count == stale count when nothing diverged).
+    expect(ticksWithFullGrid).toBe(ticksWithNoGrid);
   });
 });
 

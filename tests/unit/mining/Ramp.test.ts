@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
-  buildRamp, RAMP_COST_PER_METER,
+  buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   type RampDef, type RampDirection,
 } from '../../../src/core/mining/Ramp.js';
@@ -258,7 +258,12 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
     const segments = defineRampSegments(grid, ramp);
     expect(segments.length).toBeGreaterThan(0);
 
-    const segment = segments[0]!;
+    // Layer-based grouping (#925): the topmost layer(s) are pure clearance
+    // headroom above the (flat) surface and carve zero voxels — pick the
+    // first layer that actually has solid cells rather than assuming
+    // segments[0] does.
+    const segment = segments.find(s => s.cells.length > 0)!;
+    expect(segment).toBeDefined();
     const firstCarve = carveRampSegment(grid, segment);
     expect(firstCarve.voxelsCleared).toBeGreaterThan(0);
 
@@ -279,6 +284,121 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
     const result = carveRampSegment(grid, segment);
     expect(result.voxelsCleared).toBe(0);
+  });
+});
+
+// ── #925: layered (bench) excavation order ────────────────────────────────
+//
+// defineRampSegments used to split the corridor into one segment per COLUMN
+// (full depth carved at one (x,z) position before moving to the next),
+// which mid-dig leaves a single deep notch at the column currently being
+// worked while its neighbours sit untouched at the original surface height
+// — "a half-dug ramp is a row of pits". This rework groups cells by
+// absolute world Y instead: one segment per horizontal LAYER (bench),
+// topmost first, each spanning every column in the footprint that still has
+// a solid cell at that Y. Final geometry (the union of every segment's
+// cells) is unchanged — only the grouping/order changes, which the
+// "sequentially carving every segment reaches an identical final grid to
+// buildRamp" tests above already lock in for all 4 directions.
+
+describe('defineRampSegments — layered (bench) excavation order (#925)', () => {
+  const RAMP: Omit<RampDef, 'direction'> = { originX: 20, originZ: 20, length: 8, targetDepth: 6 };
+
+  it('orders segments index 0..N-1 strictly from the topmost Y (globalMaxY) to the bottommost Y (globalMinY) — targetY strictly decreases across adjacent segments', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    expect(segments.length).toBeGreaterThan(1);
+
+    for (let i = 0; i < segments.length; i++) {
+      expect(segments[i]!.index).toBe(i);
+    }
+    for (let i = 0; i + 1 < segments.length; i++) {
+      expect(segments[i]!.targetY).toBeGreaterThan(segments[i + 1]!.targetY);
+    }
+  });
+
+  it('each segment spans exactly one absolute Y row — region.minY === region.maxY === targetY when non-null (a layer, not a column)', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    const withRegion = segments.filter(s => s.region !== null);
+    expect(withRegion.length).toBeGreaterThan(0);
+
+    for (const segment of withRegion) {
+      expect(segment.region!.minY).toBe(segment.region!.maxY);
+      expect(segment.region!.minY).toBe(segment.targetY);
+      for (const cell of segment.cells) {
+        expect(cell.y).toBe(segment.targetY);
+      }
+    }
+  });
+
+  it('every cell in a deeper segment sits strictly below every cell in the segment immediately above it', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    expect(segments.length).toBeGreaterThan(1);
+
+    for (let i = 0; i + 1 < segments.length; i++) {
+      const upperCells = segments[i]!.cells;
+      const lowerCells = segments[i + 1]!.cells;
+      if (upperCells.length === 0 || lowerCells.length === 0) continue; // covered by the targetY-ordering test above
+      const minUpperY = Math.min(...upperCells.map(c => c.y));
+      const maxLowerY = Math.max(...lowerCells.map(c => c.y));
+      expect(maxLowerY).toBeLessThan(minUpperY);
+    }
+  });
+
+  it('a layer with zero solid cells (already cleared before defineRampSegments runs) still returns a segment with finite, in-range targetX/targetZ/targetY — region is null, the anchor is not', () => {
+    const surfaceY = 15;
+    const grid = makeElevatedGrid(40, 30, 40, surfaceY);
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+
+    // The topmost row every column in the footprint could contribute
+    // (clearanceHeight=3 → ceilingY=surfaceY+3, so y=surfaceY+2 is within
+    // every column's [floorY, ceilingY) band regardless of step) — clear it
+    // for the whole footprint up front so defineRampSegments finds zero
+    // solid cells there, forcing a null-region layer at the very top.
+    const halfWidth = Math.floor(RAMP_WIDTH / 2);
+    for (let w = -halfWidth; w <= halfWidth; w++) {
+      for (let step = 0; step < ramp.length; step++) {
+        grid.clearVoxel(ramp.originX + w, surfaceY + 2, ramp.originZ + step);
+      }
+    }
+
+    const segments = defineRampSegments(grid, ramp);
+    const emptyLayer = segments.find(s => s.region === null);
+    expect(emptyLayer).toBeDefined();
+    expect(emptyLayer!.index).toBe(0);
+    expect(emptyLayer!.cells).toEqual([]);
+    expect(Number.isFinite(emptyLayer!.targetX)).toBe(true);
+    expect(Number.isFinite(emptyLayer!.targetZ)).toBe(true);
+    expect(Number.isFinite(emptyLayer!.targetY)).toBe(true);
+    expect(emptyLayer!.targetY).toBe(surfaceY + 2);
+    // The anchor X/Z must still land within the ramp's own footprint, not
+    // some arbitrary/default coordinate.
+    expect(emptyLayer!.targetX).toBeGreaterThanOrEqual(ramp.originX - halfWidth);
+    expect(emptyLayer!.targetX).toBeLessThanOrEqual(ramp.originX + halfWidth);
+    expect(emptyLayer!.targetZ).toBeGreaterThanOrEqual(ramp.originZ);
+    expect(emptyLayer!.targetZ).toBeLessThanOrEqual(ramp.originZ + ramp.length - 1);
+  });
+
+  it('the total cell count summed across all segments equals buildRamp\'s own voxelsCleared count for the same RampDef (final geometry is unchanged by the regrouping)', () => {
+    const gridDirect = makeElevatedGrid(40, 30, 40, 15);
+    const gridSegmented = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const buildResult = buildRamp(gridDirect, ramp, 100000);
+    expect(buildResult.success).toBe(true);
+    expect(buildResult.voxelsCleared).toBeGreaterThan(0);
+
+    const segments = defineRampSegments(gridSegmented, ramp);
+    const totalCells = segments.reduce((sum, s) => sum + s.cells.length, 0);
+    expect(totalCells).toBe(buildResult.voxelsCleared);
   });
 });
 
@@ -308,6 +428,63 @@ describe('computeRampSegmentDurationTicks (#555)', () => {
 
   it('returns at least 1 tick for a tiny voxel count that would otherwise round to 0', () => {
     expect(computeRampSegmentDurationTicks(1, 3)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── #924: computeRampSegmentDurationTicks routes proficiency/need/
+// living-quarters multipliers through computeTaskDuration, the same formula
+// every other skill-gated task duration uses. The skeleton commit already
+// wires this passthrough correctly (default args 1,1,1 reproduce the old
+// formula exactly), so these assertions largely PASS today already — they
+// lock in the correct direction/magnitude of each multiplier rather than
+// exercising a still-stubbed branch (that's ActionSelection.test.ts below).
+
+describe('computeRampSegmentDurationTicks — proficiency/need/lq scaling (#924)', () => {
+  it('scales linearly with voxel count: doubling voxelCount doubles the ticks (all else equal)', () => {
+    // Both reduce to a clean integer (1600/8=200, 800/8=100 at tier 1), so
+    // ceil() rounding cannot mask a non-linear relationship here.
+    const half = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const full = computeRampSegmentDurationTicks(1600, 1, 1, 1, 1);
+
+    expect(half).toBe(100);
+    expect(full).toBe(200);
+    expect(full).toBe(2 * half);
+  });
+
+  it('a Master (level 5) proficiency produces fewer ticks than a Rookie (level 1), in the exact ratio of PROFICIENCY_MULTIPLIERS[5]/[1]', () => {
+    // voxelCount=800, tier=1 -> baseTicks = 800 / (8 * 1.0) = 100 exactly, so
+    // the proficiency multiplier alone determines the result with no
+    // rounding noise.
+    const rookieTicks = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const masterTicks = computeRampSegmentDurationTicks(800, 1, 5, 1, 1);
+
+    expect(rookieTicks).toBe(100);
+    expect(masterTicks).toBe(40); // 100 * (0.40 / 1.00)
+    expect(masterTicks).toBeLessThan(rookieTicks);
+  });
+
+  it('a lower needMultiplier (e.g. a hungry/exhausted digger) raises ticks — computeTaskDuration divides by it, so productivity below 1.0 costs more time', () => {
+    const fullNeeds = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const lowNeeds = computeRampSegmentDurationTicks(800, 1, 1, 0.5, 1);
+
+    expect(fullNeeds).toBe(100);
+    expect(lowNeeds).toBe(200); // 100 / 0.5
+    expect(lowNeeds).toBeGreaterThan(fullNeeds);
+  });
+
+  it('a lower lqMultiplier (e.g. no living quarters / overcrowded) raises ticks the same way needMultiplier does', () => {
+    const goodLq = computeRampSegmentDurationTicks(800, 1, 1, 1, 1);
+    const poorLq = computeRampSegmentDurationTicks(800, 1, 1, 1, 0.8);
+
+    expect(goodLq).toBe(100);
+    expect(poorLq).toBe(125); // ceil(100 / 0.8)
+    expect(poorLq).toBeGreaterThan(goodLq);
+  });
+
+  it('a zero (or near-zero) voxelCount floors to 1 tick regardless of tier, proficiency, or need/lq multipliers', () => {
+    expect(computeRampSegmentDurationTicks(0, 1, 1, 1, 1)).toBe(1);
+    expect(computeRampSegmentDurationTicks(0, 3, 5, 0.5, 0.5)).toBe(1);
+    expect(computeRampSegmentDurationTicks(0, 1, 5, 1, 1)).toBe(1);
   });
 });
 

@@ -220,7 +220,10 @@ describe('checkGoal — multiple fields, first violation wins', () => {
   it('checks tutorialStep before increased/equals (source order in checkGoal)', async () => {
     const page = fakePage({
       tutorialStep: undefined,
-      tutorialState: { active: true, stepIndex: 0, stepId: 'time-speed', title: '', total: 20 },
+      // 'speed-up-for-dig' — an arbitrary real step id, standing in for
+      // "whichever step the tutorial actually reports" (#923: the old
+      // 'time-speed' id this fixture used to carry no longer exists).
+      tutorialState: { active: true, stepIndex: 0, stepId: 'speed-up-for-dig', title: '', total: 20 },
       gameState: { employeeCount: 99 },
     } as never);
     let caught: unknown;
@@ -231,6 +234,6 @@ describe('checkGoal — multiple fields, first violation wins', () => {
     }
     expect(caught).toBeInstanceOf(InteractionFailure);
     // The tutorialStep mismatch, not the (satisfied) increased check, is reported.
-    expect((caught as Error).message).toContain('time-speed');
+    expect((caught as Error).message).toContain('speed-up-for-dig');
   });
 });

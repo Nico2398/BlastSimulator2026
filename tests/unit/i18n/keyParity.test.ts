@@ -268,10 +268,17 @@ describe('en.json / fr.json — key-set parity', () => {
     // when the panel's own auto-advance hasn't gotten there yet -- 1 new
     // key, tutorial.stage.open_sequence_tab, both locales translated. Net
     // effect of #921 + #926 together: 3468 -2 +1 = 3467.
+    // Baseline is now 3470 (up from 3467): #923 removes the standalone
+    // 'time-speed' tutorial step's copy (tutorial.step1, tutorial.step1.title,
+    // tutorial.stage.speed -- 3 keys) and replaces it with the
+    // speed-up-for-dig/speed-normal-after-dig pair taught inside the box-cut
+    // ramp-dig wait instead (tutorial.step_speedupdig(.title),
+    // tutorial.step_speednormalafterdig(.title), tutorial.stage.speed_up_dig,
+    // tutorial.stage.speed_normal_after_dig -- 6 keys). Net +3, both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3467);
+    expect(Object.keys(en).length).toBe(3470);
   });
 });
 

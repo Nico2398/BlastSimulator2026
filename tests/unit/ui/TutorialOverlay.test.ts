@@ -195,7 +195,8 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*33/);
+      // #923 removes 'time-speed' and adds speed-up-for-dig/speed-normal-after-dig -- net +1 (33 -> 34).
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*34/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -244,7 +245,7 @@ describe('TutorialOverlay (12.4)', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
-      // Step 0 (time-speed) has no autoAdvanceMs → timer stays null
+      // Step 0 (hire-surveyor, #923: no longer 'time-speed') has no autoAdvanceMs → timer stays null
       expect(tut.autoAdvanceTimer).toBeNull();
       vi.useRealTimers();
     });
@@ -511,15 +512,17 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 18/19 after #553's tutorial fix added three drill-rig-licensing
+      // (index 19/20 after #553's tutorial fix added three drill-rig-licensing
       // steps, #555 added two more rock-digger-licensing steps, #681 added
       // build-living-quarters/set-early-policy earlier in the sequence, #557
-      // inserted evacuate-zone right before blast, and #905 inserted
-      // toggle-survey-overlay right after survey.
-      tut.stepIndex = 18;
+      // inserted evacuate-zone right before blast, #905 inserted
+      // toggle-survey-overlay right after survey, and #923 removes 'time-speed'
+      // and adds speed-up-for-dig/speed-normal-after-dig inside the box-cut
+      // wait (net +1, shifting this pair up one more from 18/19 to 19/20).
+      tut.stepIndex = 19;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(19);
+      expect(tut.stepIndex).toBe(20);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -532,7 +535,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createGame() defaults events.pendingEvent to null
-      tut.stepIndex = 18;
+      tut.stepIndex = 19;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -577,13 +580,15 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 32 after
+      // Directly set to congratulations step (last step, index 33 after
       // #553's tutorial fix added three drill-rig-licensing steps, #555
       // added two more rock-digger-licensing steps, #681 added
       // build-living-quarters/set-early-policy, #557 inserted evacuate-zone
-      // right before blast, and #905 inserted toggle-survey-overlay right
-      // after survey) and render
-      tut.stepIndex = 32;
+      // right before blast, #905 inserted toggle-survey-overlay right
+      // after survey, and #923 removes 'time-speed' and adds
+      // speed-up-for-dig/speed-normal-after-dig inside the box-cut wait
+      // (net +1, shifting this index up one more from 32 to 33)) and render
+      tut.stepIndex = 33;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
@@ -717,21 +722,23 @@ describe('TutorialOverlay (12.4)', () => {
       const state = createMockState();
       tut.start(state);
       // Step 0 is 'hire-surveyor' (#904 reorder); advance to step 1
-      // ('time-speed', 'tutorial.step1.title' / 'tutorial.step1'), rendered
+      // ('survey', 'tutorial.step3.title' / 'tutorial.step3'), rendered
       // in EN, to exercise the same locale-re-application behaviour this
-      // test has always targeted.
+      // test has always targeted. #923: step 1 is no longer 'time-speed' —
+      // that standalone step is gone, and hire-surveyor now advances
+      // straight into 'survey'.
       (tut as unknown as { advanceToNextStep(): void }).advanceToNextStep();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
-      expect(titleEl.textContent).toBe('Game Speed');
+      expect(titleEl.textContent).toBe('Survey Terrain');
 
       setLocale('fr');
       tut.refreshLocale();
 
-      expect(titleEl.textContent).toBe('Vitesse de Jeu');
+      expect(titleEl.textContent).toBe('Étude du Terrain');
       expect(textEl.textContent).toBe(
-        "Vous êtes sur le point de lancer votre premier sondage — cela prend quelques ticks de jeu pour se terminer. Accélérez l'horloge dès maintenant pour ne pas attendre en temps réel. Essayez la vitesse 2× ou 4× avec les commandes situées à gauche de la barre du haut !",
+        'Effectuez maintenant un sondage sismique pour révéler les emplacements de minerai souterrains.',
       );
     });
 

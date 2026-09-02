@@ -16,19 +16,19 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:340000",
+      "command": "campaign start level:tutorial_pit cash:700000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered. #557: bumped again to $340,000 -- evacuateZone (Evacuation.ts) now genuinely routes the crew out to a reachable safe cell and back, instead of the previous no-op teleport, so the drill/charge/blast sequence spends real additional ticks (and payroll) on the walk; by build-storage this file's own `build freight_warehouse at:6,6` step was landing $9,182 short of the $15,000 cost (direct-traced, command mode) at the old $320,000 headroom.",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered. #557: bumped again to $340,000 -- evacuateZone (Evacuation.ts) now genuinely routes the crew out to a reachable safe cell and back, instead of the previous no-op teleport, so the drill/charge/blast sequence spends real additional ticks (and payroll) on the walk; by build-storage this file's own `build freight_warehouse at:6,6` step was landing $9,182 short of the $15,000 cost (direct-traced, command mode) at the old $320,000 headroom. #923: bumped again to $700,000 -- the speed-up-for-dig/speed-normal-after-dig pair waits for the box-cut ramp's remaining 11 segments to finish digging (previously left running in the background, concurrent with drilling; now genuinely serialized in front of it, since speed-normal-after-dig's own isComplete needs the ramp gone from state.plannedRamps), adding ~560 real ticks of payroll/fuel/maintenance drain before drilling ever starts. Direct-traced (command mode) at the prior $340,000 headroom: `vehicle buy debris_hauler` failed outright (insufficient funds, $12,025 on hand against $25,000), cascading into a failed warehouse purchase and an empty haul with nothing to deliver. $700,000 clears the whole run end-to-end with ~$286,000 to spare.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:340000"
+          "command": "campaign start level:tutorial_pit cash:700000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 340000
+          "cash": 700000
         }
       }
     },
@@ -86,7 +86,7 @@
     {
       "command": "employee hire role:surveyor",
       "timeout": 30,
-      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site, card advances to Game Speed. #904: this step now leaves isPaused (tutorial_start's own pause, #585) by releasing the clock via advanceToNextStep -- the same generic step-0-completion mechanism that used to fire on time-speed.",
+      "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site, card advances straight to Survey Terrain. #923: the speed-control lesson no longer sits here at all -- it moved off this stretch entirely into the box-cut ramp-dig wait further down, so hiring advances directly to 'survey' now instead of by way of a standalone time-speed step.",
       "role": "player",
       "interaction": [
         {
@@ -95,39 +95,16 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "time-speed"
+          "stepId": "survey"
         }
       ],
       "expect": {
-        "tutorialStep": "time-speed",
+        "tutorialStep": "survey",
         "increased": [
           "employeeCount"
         ],
         "blocked": ".bs-return-map",
         "note": "The tutorial is on rails: leaving for the world map mid-step is how a player loses it, so that button must be inert while the tutorial is up (mirrors tutorial.json's hire-surveyor beat)."
-      }
-    },
-    {
-      "command": "time speed:2",
-      "timeout": 30,
-      "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Survey Terrain. #904: relocated here, right before the survey step's own wait, so the lesson lands immediately before the tutorial's first genuine wait instead of before the player has done anything, rather than opening the tutorial before anything on site needed speeding up.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "survey"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "survey"
       }
     },
     {
@@ -535,7 +512,7 @@
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock — no scripted `tick` needed.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923: box-cut's own isComplete fires the instant the FIRST ramp segment lands (navGrid ramp-cell count ticks up), well before the whole 12m corridor is carved -- the card advances to 'speed-up-for-dig' next, not straight to 'drill-plan', so the speed-control lesson lands while the rest of the dig is still genuinely in flight.",
       "role": "player",
       "interaction": [
         {
@@ -571,13 +548,89 @@
         },
         {
           "type": "waitForTutorialStep",
+          "stepId": "speed-up-for-dig",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "speed-up-for-dig",
+        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into (mirrors tutorial.json's box-cut beat). The ramp is a 12m/8-deep corridor -- one segment landing is nowhere near the whole job, so orderedRampSegmentCount is still well above 0 here (proven by the wait step below, which drains the rest of it)."
+      }
+    },
+    {
+      "command": "time speed:8",
+      "timeout": 30,
+      "description": "speed-up-for-dig complete (#923): real click on the ×8 speed button while the ramp is still genuinely mid-dig -- box-cut's own completion above fires on the FIRST segment landing, so most of the 12m corridor is still queued work at this point. Teaches the fast-forward lesson exactly where it pays off: the longest wait the tutorial has asked for yet.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "speed-normal-after-dig"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "speed-normal-after-dig",
+        "equals": {
+          "timeScale": 8
+        },
+        "note": "Clicked while orderedRampSegmentCount is still above 0 (box-cut only waited for the first of many segments) -- the lesson is taught mid-dig, not before the dig starts and not after it finishes."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "timeout": 320,
+      "description": "#923: drains the rest of the box-cut ramp at ×8 -- the tutorial card stays on 'speed-normal-after-dig' the whole time (its own isComplete needs the ramp fully dug AND the speed back at ×1, neither of which is true yet). max_ticks 800 (up from an initial 400): a lone driving.excavator-licensed employee digging all 12 segments of this 12m/8-deep corridor solo, with rest breaks under the continuous policy applied earlier, direct-traced (command mode) landing at tick 658 -- 400 stalled 3 segments short; 800 keeps a real margin over the observed landing rather than a bare tie.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 320000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "speed-normal-after-dig",
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully carved but still at ×8 -- speed-normal-after-dig must not complete on the ramp finishing alone."
+      }
+    },
+    {
+      "command": "time speed:1",
+      "timeout": 30,
+      "description": "speed-normal-after-dig complete (#923): real click on the ×1 speed button after the box-cut dig has genuinely finished (orderedRampSegmentCount reached 0 in the wait step above) -- the card advances to 'drill-plan'. From here on every speed button stays clickable but no later step ever completes on, or requires, a specific timeScale.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
           "stepId": "drill-plan",
           "timeout": 30000
         }
       ],
       "expect": {
         "tutorialStep": "drill-plan",
-        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into (mirrors tutorial.json's box-cut beat)."
+        "equals": {
+          "timeScale": 1
+        }
       }
     },
     {

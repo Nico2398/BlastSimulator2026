@@ -14,6 +14,8 @@ import {
   isBlastReportOutstanding,
   createEvacuateZoneStep,
   createSurveyOverlayToggleStep,
+  createSpeedUpForDigStep,
+  createSpeedNormalAfterDigStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
@@ -59,6 +61,13 @@ export interface TutorialStep {
    * closed panel glows nothing.
    */
   highlightTarget?: string;
+  /**
+   * Selectors this step leaves permanently clickable from here on, even once
+   * the rail has moved past it — mirrors `RailsStep.permanentlyUnlocks`
+   * (`tutorialRails.ts`), which `TutorialRails.beginStep` reads off the step
+   * passed to it.
+   */
+  permanentlyUnlocks?: string[];
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
@@ -66,28 +75,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // Opens the tutorial: hiring is completable immediately (isComplete reads
   // only state.employees), unlike the old opener (time-speed), which asked
   // the player to try a speed control before anything was on the site to
-  // speed up. #904 moved time-speed to sit right before the first real wait
-  // (survey) instead.
+  // speed up. #923 moved the speed-control lesson again, off this stretch
+  // entirely and into the box-cut wait further down (the ramp-dig), where a
+  // player has a genuinely long wait to speed through.
   createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
-
-  // ── Step 1: time-speed ──
-  // #904: relocated here, immediately before 'survey' — the tutorial's first
-  // genuine wait (a surveyor walks to the target, the result lands ticks
-  // later). Teaching the speed controls right before the first wait, instead
-  // of before the player has done anything, is when the lesson pays off.
-  {
-    id: 'time-speed',
-    titleKey: 'tutorial.step1.title',
-    textKey: 'tutorial.step1',
-    highlightTarget: '#bs-hud-top .bs-speed-btn',
-    captureSnapshot: (state: GameState) => ({
-      prevTimeScale: state.timeScale,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevTimeScale as number;
-      return state.timeScale > prev;
-    },
-  },
 
   // ── Step 2: survey ──
   createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:23 z:23'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),
@@ -273,6 +264,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       return current > prev;
     },
   },
+
+  // ── Step 4b/4c: speed-up-for-dig / speed-down-after-dig (#923) ──
+  // box-cut above is the tutorial's first genuinely long wait (the ramp-dig).
+  // Teaching ×8 while it's in progress, then ×1 once it's done, is when the
+  // speed-control lesson pays off — before this, the tutorial left speed
+  // fully player-controlled for the rest of the run.
+  createSpeedUpForDigStep(),
+  createSpeedNormalAfterDigStep(),
 
   // ── Step 5: drill-plan ──
   // #554-followup: drilling is real, queued work (was instant pre-#553) --

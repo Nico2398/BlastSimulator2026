@@ -198,8 +198,12 @@ describe('Tutorial pause behaviour (#371)', () => {
   // The tutorial's opening step moves from 'time-speed' to 'hire-surveyor':
   // suggesting a faster clock made no sense as the very first card, with an
   // empty site and nothing queued that a faster clock would deliver sooner.
-  // The first place the player genuinely waits is 'survey' (waitsOnWork:true) —
-  // time-speed now sits immediately before it instead.
+  // The first place the player genuinely waits is 'survey' (waitsOnWork:true).
+  // #923: the speed-control lesson no longer sits anywhere near the opening
+  // any more — it moved off this stretch entirely into the box-cut ramp-dig
+  // wait, much further down the tutorial (the genuinely longest wait, not
+  // the very first one), so 'hire-surveyor' now advances straight to
+  // 'survey' with nothing standalone in between.
   //
   // Two hard constraints from #904 apply to whichever step ends up first:
   //   1. tutorial_start leaves the game paused (#585) — the opening step must
@@ -252,8 +256,10 @@ describe('Tutorial pause behaviour (#371)', () => {
         // run it for real, the same way a player's click would.
         expect(runner.run(step0.commands[0]!).success).toBe(true);
       } else {
-        // time-speed (today's opening step) carries no command hint; its
-        // completion is a direct speed increase.
+        // Fallback kept for a future opening step with no command hint of
+        // its own (#923: the old 'time-speed' step this branch used to
+        // cover no longer exists anywhere near the opening — the current
+        // opening step, hire-surveyor, always takes the branch above).
         ctx.state!.timeScale = (ctx.state!.timeScale ?? 1) + 1;
       }
 

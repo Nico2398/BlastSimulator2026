@@ -8,6 +8,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { assignDriver } from '../entities/Vehicle.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
@@ -48,8 +49,12 @@ export interface ArrivalGateResult {
  * tickEmployeeMovement on arrival is the same signal EntityMovementTick.ts
  * already uses; this module reuses it rather than tracking arrival a second
  * way).
+ *
+ * `grid`, when provided, is threaded through to `seedTaskTimerFields` so a
+ * `dig_ramp_segment` action's duration can be computed off the live voxel
+ * count (#924).
  */
-export function tickArrivalGate(state: GameState, emitter?: EventEmitter): ArrivalGateResult {
+export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
   const result: ArrivalGateResult = {
     restStarted: [],
     taskStarted: [],
@@ -223,7 +228,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     // staged it already, then promote in the same step so the work timer
     // starts the very tick the vehicle arrives, not one tick later.
     if (holder.pendingTaskDuration === null) {
-      seedTaskTimerFields(state, holder, action);
+      seedTaskTimerFields(state, holder, action, grid);
     }
     const duration = holder.pendingTaskDuration!;
     holder.taskTicksRemaining = duration;

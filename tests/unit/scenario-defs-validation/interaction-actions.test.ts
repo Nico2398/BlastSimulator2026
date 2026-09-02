@@ -541,28 +541,34 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     1: 'tutorial_start',
     2: 'time resume',
     3: 'employee hire role:surveyor',
-    4: 'time speed 2',
-    5: 'employee assign_skill 1 skill:geology level:3',
-    6: 'survey seismic x:23 z:23',
-    7: 'wait_until field:surveyCount equals:1 max_ticks:30',
-    8: 'state',
-    9: 'employee hire role:driller',
-    10: 'employee assign_skill 2 skill:blasting level:3',
-    11: 'build living_quarters at:18,14',
-    14: 'build driving_center at:10,8',
-    16: 'employee train 2 skill:driving.drill_rig',
-    17: 'tick 25',
-    18: 'vehicle buy drill_rig',
-    // #921 removed the `vehicle driver` assign-click steps (merged into their
-    // preceding purchase steps), shifting every index below down by 1-3 from
-    // this test's original #914 numbering.
-    19: 'employee train 1 skill:driving.excavator',
-    20: 'tick 25',
-    21: 'vehicle buy rock_digger',
-    22: 'build_ramp start:16,19 end:16,31 depth:8',
-    23: 'drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089',
-    33: 'charge hole:* explosive:boomite amount:5 stemming:2',
-    37: 'sequence auto delay_step:25',
+    // #923 removes the standalone 'time speed 2' step that used to sit here
+    // (index 4) — the speed-control lesson moved into the box-cut ramp-dig
+    // wait further down, so hire-surveyor now advances straight to
+    // 'survey', shifting every index below down by 1 from this test's
+    // previous (#921) numbering.
+    4: 'employee assign_skill 1 skill:geology level:3',
+    5: 'survey seismic x:23 z:23',
+    6: 'wait_until field:surveyCount equals:1 max_ticks:30',
+    7: 'state',
+    8: 'employee hire role:driller',
+    9: 'employee assign_skill 2 skill:blasting level:3',
+    10: 'build living_quarters at:18,14',
+    13: 'build driving_center at:10,8',
+    15: 'employee train 2 skill:driving.drill_rig',
+    16: 'tick 25',
+    17: 'vehicle buy drill_rig',
+    18: 'employee train 1 skill:driving.excavator',
+    19: 'tick 25',
+    20: 'vehicle buy rock_digger',
+    21: 'build_ramp start:16,19 end:16,31 depth:8',
+    // #923 inserts three new steps here (time speed:8, wait_until
+    // orderedRampSegmentCount, time speed:1 — indices 22-24, each already
+    // declaring its own timeout >= 90) between box-cut and drill_plan,
+    // shifting every index below down further (net +2 from the #921
+    // numbering: -1 for the removed 'time speed 2' step, +3 for these three).
+    25: 'drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089',
+    35: 'charge hole:* explosive:boomite amount:5 stemming:2',
+    39: 'sequence auto delay_step:25',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {
