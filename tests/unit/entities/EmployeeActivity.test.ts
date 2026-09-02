@@ -115,9 +115,8 @@ describe('computeEmployeeActivity', () => {
 });
 
 // ── findDrivenVehicle (issue #922) ───────────────────────────────────────────
-// The shared lookup syncDriverPosition (EntityMovementTick.ts) and dismount
-// handling both need instead of re-scanning `vehicles` inline: the vehicle
-// `employeeId` currently drives, or null when they aren't driving any.
+// Used by computeEmployeeActivity (its only real caller) to find the vehicle
+// `employeeId` is currently driving, or null when they aren't driving any.
 
 describe('findDrivenVehicle', () => {
   it('returns the vehicle whose driverId matches the given employee id', () => {

@@ -34,10 +34,12 @@ import {
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 // #922: driver-position invariant — no console command drives this directly,
-// so the assertions below read the same core-level lookup EntitySync's mesh
-// suppression relies on (mesh suppression itself is proven at the renderer
-// level by tests/unit/renderer/EntitySync.test.ts — this integration suite
-// has no DOM/Three.js per this file's own header comment).
+// so the assertions below read findDrivenVehicle, the core-level lookup
+// computeEmployeeActivity uses to report the driving/driving_to_task activity
+// kinds (mesh suppression is a separate, independent lookup in EntitySync,
+// proven at the renderer level by tests/unit/renderer/EntitySync.test.ts —
+// this integration suite has no DOM/Three.js per this file's own header
+// comment).
 import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -811,8 +813,8 @@ describe('Vehicle fleet', () => {
 
       // Mid-drive: the driver's logical position must track the vehicle
       // every tick — no console command stands in for this; findDrivenVehicle
-      // (EmployeeActivity.ts, #922) is the same lookup EntitySync's mesh
-      // suppression uses to decide whether to draw a mesh for this employee.
+      // (EmployeeActivity.ts, #922) is the lookup computeEmployeeActivity
+      // uses to report this employee as driving.
       let sawOffBoardingCell = false;
       for (let i = 0; i < 6; i++) {
         tickCommand(ctx, ['1'], {});
