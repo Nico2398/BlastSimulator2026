@@ -711,12 +711,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 25",
-      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown and bankruptcy grace period. Bumped from 20 to 25 (#596/#597): the event pool/cooldown fixes changed which tick a pending event halts a chunk on, so the last hole now lands 5 ticks later than before -- re-measured directly (command-mode engine probe): orderedHoleCount hits 0 at tick 300, still well inside the worker-revolt/bankruptcy margin.",
+      "command": "tick 30",
+      "description": "Fifth and final chunk. Bumped from 20 to 25 (#596/#597: event pool/cooldown fixes moved the last hole 5 ticks later), and from 25 to 30 (#922: accurate driver-position tracking (syncDriverPosition, EntityMovementTick.ts) makes selectBestActionForEmployee's per-tick cost ranking (ActionSelection.ts) sensitive to a driller's real, continuously-updated position instead of the pre-#922 position frozen at boarding -- so which of the two drillers claims which remaining hole next can now tip a few ticks either way between two runs of the same command sequence, something command mode's own tick-for-tick identical replay never surfaces but interaction mode's real browser pacing does. Re-measured directly (interaction-mode engine probe): last hole lands at tick ~302 (was tick 300, a 2-tick shift) -- BUT well-being here is already pinned at 0 by tick 275 (both modes), and the worker-revolt countdown that starts from that moment fires at a near-fixed tick regardless of how this chunk's own size changes anything, measured directly at tick ~382 in-probe. A generous +40 bump (tried first) left only ~5 ticks between the charge/sequence/blast steps finishing and that fixed revolt tick and reliably lost the race -- the fix is NOT more headroom here (every extra tick spent finishing drilling is an extra tick of well-being-zero decay eating the SAME fixed budget the charge/blast steps need after it), it's the smallest bump that reliably clears 302 (a 5-tick margin over the measured landing tick, re-verified stable across repeated runs) so the charge/sequence/blast steps downstream keep their own share of the fixed pre-revolt window.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 25"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
