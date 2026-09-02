@@ -1262,7 +1262,15 @@ describe('dig_ramp_segment actions — vehicle-gated dispatch and driving.excava
   });
 });
 
-describe('isRampSegmentClaimable (#555)', () => {
+// #925: RampSegmentDef's `index` became a LAYER index (0 = topmost bench,
+// increasing = deeper), not a column index — defineRampSegments now groups
+// cells by absolute Y instead of by (x,z) column. isRampSegmentClaimable's
+// own logic is unchanged (it only ever compared `index` values, generically
+// "is the previous segment done"), so these tests still pass unmodified —
+// they're re-read/relabelled here per #925's own instruction, since "segment
+// N-1" now concretely means "the bench immediately above", not "the
+// previous column along the ramp's length".
+describe('isRampSegmentClaimable (#555, relabelled for layer semantics — #925)', () => {
   function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
     return {
       type: 'dig_ramp_segment',
@@ -1307,14 +1315,14 @@ describe('isRampSegmentClaimable (#555)', () => {
     expect(isRampSegmentClaimable(state, action)).toBe(true);
   });
 
-  it('segment index N > 0 is NOT claimable while segment N - 1 is not yet done', () => {
+  it('segment index N > 0 is NOT claimable while segment N - 1 is not yet done — a lower bench is not claimable while the layer above it has unfinished work', () => {
     const state = createGame({ seed: 1 });
     const plannedRamp: PlannedRamp = {
       id: 1,
       def: { originX: 0, originZ: 0, direction: 'south', length: 3, targetDepth: 6 },
       footprint: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
       segments: [
-        makeTracker(0, 10, false), // segment 0 not yet done
+        makeTracker(0, 10, false), // topmost bench (layer 0) not yet done
         makeTracker(1, 11, false),
         makeTracker(2, 12, false),
       ],
