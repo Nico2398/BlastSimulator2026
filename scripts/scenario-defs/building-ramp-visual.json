@@ -79,8 +79,14 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:4 max_ticks:400",
       "timeout": 95,
-      "description": "Drain half the ordered layers — the crewed rock_digger clears one dig_ramp_segment bench at a time, topmost first (isRampSegmentClaimable still gates strictly by index, now a layer index rather than a column index). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor should show a flat bench across its full width and length at the current depth, not a single deep notch at one column while its neighbours sit untouched at the original surface.",
+      "description": "Drain half the ordered layers — the crewed rock_digger clears one dig_ramp_segment bench at a time, topmost first (isRampSegmentClaimable still gates strictly by index, now a layer index rather than a column index). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor should show a flat bench across its full width and length at the current depth, not a single deep notch at one column while its neighbours sit untouched at the original surface. cameraFocus targets (20,23) — the corridor's midpoint (RAMP_WIDTH=3 centred on x:20, length 6 spanning z:20-26) — at a close distance so the excavated cross-section actually fills the frame instead of sitting as a small distant patch at the default orbiting camera (#925 visual-loop finding); it is re-issued here rather than relying on a prior step's framing because the shots loop below resets the camera (`__cameraReset`) after every step that has any shots.",
       "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 23,
+          "distance": 16
+        },
         {
           "type": "waitUntil",
           "field": "orderedRampSegmentCount",
@@ -100,8 +106,14 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
       "timeout": 125,
-      "description": "Drain the remaining layers. This step's own auto-captured screenshot is the full-completion checkpoint: every layer carved, the ramp corridor complete end to end.",
+      "description": "Drain the remaining layers. This step's own auto-captured screenshot is the full-completion checkpoint: every layer carved, the ramp corridor complete end to end. cameraFocus re-issued (see the mid-dig step's note) so this checkpoint is framed the same as the mid-dig one, close enough to compare the finished smooth slope against the earlier bench.",
       "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 23,
+          "distance": 16
+        },
         {
           "type": "waitUntil",
           "field": "orderedRampSegmentCount",
@@ -133,17 +145,23 @@
     {
       "name": "overview",
       "yaw": 0,
-      "pitch": 45
+      "pitch": 45,
+      "target": [20, 23],
+      "distance": 18
     },
     {
       "name": "closeup",
       "yaw": 90,
-      "pitch": 15
+      "pitch": 15,
+      "target": [20, 23],
+      "distance": 14
     },
     {
       "name": "birdseye",
       "yaw": 0,
-      "pitch": 80
+      "pitch": 80,
+      "target": [20, 23],
+      "distance": 18
     }
   ]
 }
