@@ -78,3 +78,15 @@ export function taskProgressFraction(activity: EmployeeActivity): number | null 
   const ticksRemaining = activity.ticksRemaining ?? 0;
   return Math.min(1, Math.max(0, (activity.totalTicks - ticksRemaining) / activity.totalTicks));
 }
+
+/**
+ * The vehicle `employeeId` is currently driving, or null when they aren't
+ * driving any — the shared lookup `syncDriverPosition` and dismount handling
+ * both need instead of re-scanning `vehicles` inline (#922).
+ */
+export function findDrivenVehicle(employeeId: number, vehicles: readonly Vehicle[]): Vehicle | null {
+  // TODO: implement
+  void employeeId;
+  void vehicles;
+  return null;
+}

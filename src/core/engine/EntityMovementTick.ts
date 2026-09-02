@@ -198,6 +198,18 @@ export function tickVehicleTaskState(vehicle: Vehicle): void {
   }
 }
 
+/**
+ * Keeps a driven employee's logical x/z glued to their vehicle's, every tick
+ * the vehicle moves — no-op while `vehicle.driverId` is null. Called from
+ * `tickVehicle`'s NavGrid/direct-line steppers so the driver never renders or
+ * navigates from the cell they boarded at (#922).
+ */
+export function syncDriverPosition(state: GameState, vehicle: Vehicle): void {
+  // TODO: implement
+  void state;
+  void vehicle;
+}
+
 // ── Employee movement ──
 
 export interface EmployeeMovementResult {
