@@ -29,9 +29,8 @@ import { SOFTWARE_TIER_COSTS, MAX_SOFTWARE_TIER, type BlastPreviewSummary } from
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import type { CommandResult } from '../../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const TIER_NAME_KEYS = [
   'ui.blast_workshop.preview.tier_1',

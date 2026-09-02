@@ -25,9 +25,8 @@ import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 interface Warning { ok: boolean; text: string }
 

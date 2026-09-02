@@ -26,8 +26,9 @@
 // convention (46px header with icon chip + title + close button,
 // scrollable body) that every other panel already uses.
 
+import { PanelBase } from './panels/PanelBase.js';
 import { t } from '../core/i18n/I18n.js';
-import { el, button, emptyState } from './dom.js';
+import { el, button, emptyState, panelRoot, panelHeader, panelBody } from './dom.js';
 import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -45,12 +46,10 @@ import {
 } from '../core/entities/Building.js';
 import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
 
-import type { CommandResult } from '../console/ConsoleRunner.js';
+import type { GameConsoleFn } from './gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
-export class BuildMenu {
-  private readonly el: HTMLElement;
+export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly catalogEl: HTMLElement;
   private readonly placedEl: HTMLElement;
@@ -58,7 +57,6 @@ export class BuildMenu {
   private placementKit: PlacementKit | null = null;
   private rampDepth = 8;
   private gameConsole?: GameConsoleFn;
-  private onCloseCb?: () => void;
   /** Latest state, for tier-unlock checks before arming the placement tool. */
   private lastState: GameState | null = null;
   /** Selected placement tier per building type. */
@@ -85,29 +83,16 @@ export class BuildMenu {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-build-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-build-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('build', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.build.title',
-    );
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'build',
+      accent: 'amber',
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.build.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px';
+    this.bodyEl = panelBody(10);
 
     this.catalogEl = el('div');
     this.catalogEl.id = 'bs-build-catalog';
@@ -134,8 +119,6 @@ export class BuildMenu {
     this.buildCatalog();
   }
 
-  get root(): HTMLElement { return this.el; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
@@ -149,9 +132,6 @@ export class BuildMenu {
     this.refreshPlacedList(this.lastState?.buildings.buildings ?? []);
   }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
     this.lastState = state;
@@ -193,7 +173,6 @@ export class BuildMenu {
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
   }
 
-  dispose(): void { this.el.remove(); }
 
   /**
    * Queue a Research Center task for `type` tier `tier` and report progress.

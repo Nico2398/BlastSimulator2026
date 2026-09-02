@@ -16,9 +16,8 @@ import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
-import type { CommandResult } from '../../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const DEFAULT_SPACING_M = 3;
 const DEFAULT_DEPTH_M = 6;

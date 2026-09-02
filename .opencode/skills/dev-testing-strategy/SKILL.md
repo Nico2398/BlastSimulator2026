@@ -47,12 +47,44 @@ npm run test:scenarios    # Validates scenario definition files (not the scenari
 npm run scenarios         # Runs all scenarios, command mode
 npm run scenarios:interaction  # Runs all scenarios, interaction mode (real clicks)
 npm run console           # Interactive gameplay testing (no browser)
-npm run qualimetry        # jscpd syntactic duplication check (src/, scripts/)
+npm run qualimetry        # jscpd duplication across src/, scripts/ (repo-wide ceiling)
+npm run qualimetry:diff   # duplication introduced by this branch's diff
+npm run check:i18n        # en.json / fr.json parity
 ```
 
 `npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
 
-`npm run qualimetry` is not a fifth verification channel — it proves the codebase stays unduplicated, not that a change works. Its gate lives in `.jscpd.json` (threshold, ignore globs, `src`/`scripts` scope — test files are excluded, their arrange/setup boilerplate isn't the duplication this gate targets). It runs as its own CI job on every push and PR, independent of the four channels above.
+## Quality gates (not verification channels)
+
+Four channels prove a change *works*. These four prove the codebase stays healthy while it does.
+None is a substitute for a channel, and all four run in CI on every push and pull request.
+
+| Gate | Command | Ceiling / rule | Where it runs in CI |
+|------|---------|----------------|---------------------|
+| Repo-wide duplication | `npm run qualimetry` | Duplicated **lines** across `src/` + `scripts/` stay under `.jscpd.json`'s `threshold` | job `Syntactic duplication check (jscpd)` |
+| Diff duplication | `npm run qualimetry:diff` | At most 10% of the lines a branch adds may sit inside a clone | same job, second step |
+| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | job `Coverage thresholds` |
+| i18n parity | `npm run check:i18n` | Every non-allowlisted key differs between `en.json` and `fr.json`, and both key sets match | a step in the `TypeScript type check` job |
+
+**The two duplication gates measure different things and neither implies the other.** The repo-wide
+one divides by ~70k lines, so a 40-line copy-paste moves it by 0.06% and sails through. The diff gate
+divides by the lines the branch actually added, so that same copy-paste is most of the change and
+fails. It detects clones across the whole tree and then attributes them against the diff — scanning
+only the changed files (what the pipeline's own qualimetry step does) would miss the common case, a
+new file that duplicates an existing untouched one.
+
+`.jscpd.json` scopes both to `src/` and `scripts/`, TypeScript only. Tests are out of scope
+deliberately: their arrange/setup boilerplate is not the duplication these gates exist to catch.
+Scenario-definition JSON is out for the same reason — it is fixture data, ~49% self-similar by
+nature.
+
+**Coverage is measured through `vitest.coverage.config.ts`, not the plain config.** It excludes
+`tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
+budgets) and `tests/unit/lint/` (drives every scenario definition through the console — 2486s of a
+2880s coverage run, 86% of the wall clock, for rules about scenario JSON rather than `src/`
+coverage). Excluding those two took the measurement from 48 minutes to ~6 with the thresholds
+unchanged and still passing. Both directories still run, unexcluded, in `npm run test` — the `logic`
+channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
 
 ## Unit Test Conventions
 

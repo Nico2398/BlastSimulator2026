@@ -14,8 +14,9 @@
 // tutorial/scenario defs keep resolving unchanged — same convention
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader } from '../dom.js';
+import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -26,14 +27,11 @@ import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
-export class FleetPanel {
-  private readonly el: HTMLElement;
+export class FleetPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
-  private onCloseCb?: () => void;
   private onNavigateCb?: (panel: 'crew') => void;
   private gameConsole?: GameConsoleFn;
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
@@ -43,36 +41,21 @@ export class FleetPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-vehicle-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-vehicle-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('vehicle', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(85,168,255,.14);color:var(--bsx-info)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.fleet.title',
-    );
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'vehicle',
+      accent: 'info',
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.fleet.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px';
+    this.bodyEl = panelBody(9);
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
   }
 
-  get root(): HTMLElement { return this.el; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigateCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
@@ -80,9 +63,6 @@ export class FleetPanel {
   /** Register a callback fired when a vehicle's Fleet panel row is clicked to select it. */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void { this.onSelectVehicleCb = cb; }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
     this.lastState = state;
@@ -104,7 +84,6 @@ export class FleetPanel {
     if (this.lastState) this.update(this.lastState);
   }
 
-  dispose(): void { this.el.remove(); }
 
   /**
    * Structural facts only: which cards exist, whether each has a driver

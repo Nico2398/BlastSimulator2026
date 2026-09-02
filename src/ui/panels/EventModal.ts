@@ -20,9 +20,8 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { getEventById, getOptionEffectHints, type EventCategory, type EventDef, type EventOptionEffectHint } from '../../core/events/EventPool.js';
 import type { EventEffect } from '../../core/events/EventSystem.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const CATEGORY_ICON: Record<EventCategory, IconName> = {
   union: 'union',

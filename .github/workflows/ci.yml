@@ -70,6 +70,12 @@ jobs:
       - name: Validate agent context files
         run: npm run validate:context
 
+      # Two locales drift silently: a key added to en.json and forgotten in
+      # fr.json renders as its own raw key at runtime, and no test notices.
+      # Seconds to run, so it rides along here rather than claiming a runner.
+      - name: Check i18n parity (en.json / fr.json)
+        run: npm run check:i18n
+
   test:
     name: Unit & integration tests
     runs-on: ubuntu-latest
@@ -112,6 +118,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # The diff gate below needs the base branch to compare against, and
+          # `merge-base` needs real history to find. A shallow clone resolves
+          # neither, and the script fails closed rather than passing on a base
+          # it could not read.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -131,6 +143,46 @@ jobs:
 
       - name: Run jscpd (fails over the threshold in .jscpd.json)
         run: npm run qualimetry
+
+      # The repo-wide gate above cannot see a copy-paste inside one pull
+      # request: a whole-tree budget absorbs 40 duplicated lines without
+      # moving. This one measures the change itself — what share of the lines
+      # this branch added sit inside a clone, anywhere in the tree.
+      - name: Run the diff duplication gate
+        run: npm run qualimetry:diff
+
+  coverage:
+    name: Coverage thresholds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
+      # Enforces the per-file thresholds in vitest.config.ts, which nothing
+      # ran until now — the `test` job runs the suite without --coverage.
+      # vitest.coverage.config.ts holds the two directories this measurement
+      # excludes and why; they still run, unexcluded, in that `test` job.
+      - name: Run tests with coverage thresholds
+        run: npm run test:coverage
 
   # Runs the production build check. Runs only on:
   #   - Push to main (catches build breakage after merge)

@@ -18,8 +18,9 @@
 // real, a closed set of 14 values, and fully localizable, so that carries
 // the row instead.
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, progressBar } from '../dom.js';
+import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -29,48 +30,28 @@ import type { GameState } from '../../core/state/GameState.js';
 
 const RECENT_TRANSACTIONS = 15;
 
-export class FinancesPanel {
-  private readonly el: HTMLElement;
+export class FinancesPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
-  private onCloseCb?: () => void;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-finances-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-finances-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('finance', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.finances.title',
-    );
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'finance',
+      accent: 'amber',
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.finances.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px';
+    this.bodyEl = panelBody(10);
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
   }
 
-  get root(): HTMLElement { return this.el; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
     const signature = JSON.stringify({
@@ -90,7 +71,6 @@ export class FinancesPanel {
     this.lastSignature = '';
   }
 
-  dispose(): void { this.el.remove(); }
 
   private render(state: GameState): void {
     const report = getFinancialReport(state.finances, state.tickCount, 0);

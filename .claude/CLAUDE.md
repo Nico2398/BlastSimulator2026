@@ -142,12 +142,15 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 ```bash
 npm run verify:env      # which verification channels are live
-npm run validate        # TypeScript → coverage → integration → scenario defs → build
+npm run validate        # TypeScript → coverage (thresholds) → full suite → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
 npm run dev             # dev server on :5173, required by the visual channel
 npm run console         # interactive gameplay REPL, no browser
-npm run qualimetry      # jscpd syntactic duplication check (src/, scripts/ — threshold in .jscpd.json)
+npm run qualimetry      # jscpd duplication across src/, scripts/ — ceiling in .jscpd.json
+npm run qualimetry:diff # duplication introduced by this branch's own diff (10% ceiling)
+npm run test:coverage   # per-file coverage thresholds (vitest.coverage.config.ts)
+npm run check:i18n      # en.json / fr.json parity
 ```
 
 Full command reference: `dev-testing-strategy` and `dev-visual-testing` skills.

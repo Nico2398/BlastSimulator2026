@@ -35,9 +35,8 @@ import { MIN_STEMMING_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
-import type { CommandResult } from '../../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const DEFAULT_EXPLOSIVE = 'boomite';
 const DEFAULT_AMOUNT_KG = 5;
