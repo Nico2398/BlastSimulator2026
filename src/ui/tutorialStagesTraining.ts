@@ -36,12 +36,11 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
     },
   ],
 
+  // #921: dropped the third (assign-driver) stage — a vehicle's driver is
+  // claimed automatically now, so the step completes on purchase alone.
   'buy-drill-rig-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="drill_rig"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
-    // Scoped to a drill_rig ROW specifically — see 'vehicle-buy-assign''s own
-    // (tutorialStages.ts) comment on the identical fix, #557 follow-up.
-    { target: '#bs-vehicle-panel [data-vtype="drill_rig"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 
   'train-digger': [
@@ -69,11 +68,10 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
     },
   ],
 
+  // #921: dropped the third (assign-driver) stage — see buy-drill-rig-assign
+  // above for why.
   'buy-rock-digger-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="rock_digger"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
-    // Scoped to a rock_digger ROW specifically — see 'vehicle-buy-assign''s
-    // own (tutorialStages.ts) comment on the identical fix, #557 follow-up.
-    { target: '#bs-vehicle-panel [data-vtype="rock_digger"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 };

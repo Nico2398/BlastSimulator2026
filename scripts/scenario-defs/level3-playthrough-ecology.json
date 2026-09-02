@@ -26,20 +26,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: staffed:true's four vehicles all come unmanned (driverId:null) -- this crews the free drill_rig with the staffed driller (employee #1) before anything can drill. Panel opened once here; every later vehicle step in this file reuses it already open.",
-      "role": "player",
+      "description": "#553: staffed:true's four vehicles all come unmanned (driverId:null) -- this crews the free drill_rig with the staffed driller (employee #1) before anything can drill. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 0,
@@ -57,6 +49,10 @@
       "command": "vehicle scrap 2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
         },
@@ -69,7 +65,7 @@
           "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
-      "description": "Finding: this file is pure blast-only (no contracts, no hauling, no rock clearing anywhere in it, per the pre-#553 pass's own note) -- the debris_hauler/rock_digger/rock_fragmenter staffed:true grants are dead weight the moment the game opens, and under #553 that weight is no longer free: drill_hole is now a queued action a driller spends real ticks on, and this file's 6 patterns (156 holes total, the largest in this batch) need a very long drilling window before their first blast can even fire. VEHICLE_SCRAP_RESIDUAL_FRACTION is 0.4 (balance.ts) and these three are still at full HP, so scrapping them back for $10,000 + $20,000 + $12,800 = $42,800 turns three idle maintenance drains into the cash cushion that keeps the mine solvent through that window -- explored and required; see the tick-block notes below for the arithmetic.",
+      "description": "Finding: this file is pure blast-only (no contracts, no hauling, no rock clearing anywhere in it, per the pre-#553 pass's own note) -- the debris_hauler/rock_digger/rock_fragmenter staffed:true grants are dead weight the moment the game opens, and under #553 that weight is no longer free: drill_hole is now a queued action a driller spends real ticks on, and this file's 6 patterns (156 holes total, the largest in this batch) need a very long drilling window before their first blast can even fire. VEHICLE_SCRAP_RESIDUAL_FRACTION is 0.4 (balance.ts) and these three are still at full HP, so scrapping them back for $10,000 + $20,000 + $12,800 = $42,800 turns three idle maintenance drains into the cash cushion that keeps the mine solvent through that window -- explored and required; see the tick-block notes below for the arithmetic. #929: opens the Fleet panel itself. The step that used to open it with a real toolbar click became a bootstrap command under #921, and UIManager only updates a visible panel -- a Fleet panel nobody opened renders no vehicle cards at all, so this click had nothing to land on.",
       "role": "player",
       "expect": {
         "equals": {
@@ -87,6 +83,10 @@
     {
       "command": "vehicle scrap 3",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
@@ -118,6 +118,10 @@
     {
       "command": "vehicle scrap 4",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"

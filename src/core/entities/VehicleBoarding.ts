@@ -14,14 +14,12 @@ import { canAssignDriver } from './Vehicle.js';
  * Whether `employeeId` may start walking to board `vehicleId`: `canAssignDriver`'s
  * licence/availability checks, plus not already walking to board some other
  * vehicle. The single source of truth for boarding eligibility — `requestBoardVehicle`
- * enforces it before recording an employee's boarding intent, and the Fleet
- * panel's assign picker (`makeAssignRow`, `fleetDetailSections.ts`) calls this
- * directly instead of re-deriving its own eligibility rule, so the two can
- * never drift apart the way they did before #715: the picker used to filter
- * only on `vehicle.driverId`, which stays null for the whole walk, so it kept
- * offering an employee already en route to a different vehicle — clicking
- * Assign for them there just silently failed this function's own
- * already-walking check, with no feedback in the UI.
+ * enforces it before recording an employee's boarding intent, so every caller
+ * of that function inherits the same rule instead of re-deriving it. Since
+ * #921 removed the player-facing driver picker, that means
+ * `VehicleReservation.ts`'s automatic claim-and-walk flow and the console
+ * `vehicle board` command (`console/commands/vehicle.ts`) — there is no UI
+ * caller left.
  */
 export function canBoardVehicle(
   state: GameState,

@@ -238,118 +238,16 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
   });
 });
 
-describe('resolveStageIndex — vehicle-buy-assign regression (#858)', () => {
-  // Sub-stage 3 of the vehicle-buy-assign tutorial stage targets
-  // `#bs-vehicle-panel [data-vtype="debris_hauler"] .bs-vehicle-assign-btn`
-  // (scoped by #877/#557). Before that fix the bare `.bs-vehicle-assign-btn`
-  // selector also matched an unrelated undriven vehicle (drill_rig /
-  // rock_digger) left over from the evacuation flow, so the rail advanced to
-  // Assign before a debris_hauler had even been bought.
-  //
-  // Fixtures below mirror the real FleetPanel DOM (src/ui/panels/FleetPanel.ts):
-  // a `#bs-vehicle-panel` root holding dealership tier buttons
-  // (`.bs-fleet-tier-btn[data-vtype]`) and, once owned, one card per vehicle
-  // (`[data-vtype]` on the card, `.bs-vehicle-assign-btn` inside when undriven).
-  const stages = TUTORIAL_STAGES['vehicle-buy-assign']!;
-
-  function toolbarVehiclesButton(): HTMLElement {
-    const toolbar = document.createElement('div');
-    toolbar.id = 'bs-toolbar';
-    document.body.appendChild(toolbar);
-    const btn = document.createElement('button');
-    btn.setAttribute('data-panel', 'vehicles');
-    toolbar.appendChild(btn);
-    return withBox(btn);
-  }
-
-  function vehiclePanel(): HTMLElement {
-    const panel = document.createElement('div');
-    panel.id = 'bs-vehicle-panel';
-    document.body.appendChild(panel);
-    return panel;
-  }
-
-  function dealershipTierButton(panel: HTMLElement, vtype: string): HTMLElement {
-    const btn = document.createElement('button');
-    btn.className = 'bs-fleet-tier-btn';
-    btn.setAttribute('data-vtype', vtype);
-    panel.appendChild(btn);
-    return withBox(btn);
-  }
-
-  /** An owned vehicle's card. Undriven cards render a reachable Assign button. */
-  function ownedVehicleCard(panel: HTMLElement, vtype: string, opts: { driven?: boolean } = {}): HTMLElement {
-    const card = document.createElement('div');
-    card.setAttribute('data-vtype', vtype);
-    panel.appendChild(card);
-    withBox(card);
-    if (!opts.driven) {
-      const assignBtn = document.createElement('button');
-      assignBtn.className = 'bs-vehicle-assign-btn';
-      card.appendChild(assignBtn);
-      withBox(assignBtn);
-    }
-    return card;
-  }
-
-  // Regression lock for #858: this is the only test of the four below that
-  // actually fails against the pre-#877 bare `.bs-vehicle-assign-btn`
-  // selector (it would wrongly resolve to 2, matching the unrelated
-  // drill_rig card, instead of 1). The other three tests in this block pass
-  // identically under the old buggy selector and the fixed scoped one — they
-  // are supporting boundary-condition coverage for `resolveStageIndex` on
-  // `vehicle-buy-assign`, not additional regression detectors.
-  it('resolves to Buy sub-stage when only dealership buttons and an unrelated undriven vehicle are present', () => {
-    toolbarVehiclesButton();
-    const panel = vehiclePanel();
-    // Dealership: every role has a live tier button, including debris_hauler.
-    dealershipTierButton(panel, 'debris_hauler');
-    dealershipTierButton(panel, 'rock_digger');
-    dealershipTierButton(panel, 'drill_rig');
-    // An unrelated, already-owned, undriven vehicle survives an earlier
-    // evacuation (#557) and has its own reachable Assign button — the exact
-    // shape that used to false-match the bare `.bs-vehicle-assign-btn` selector.
-    ownedVehicleCard(panel, 'drill_rig');
-
-    expect(resolveStageIndex(stages)).toBe(1);
-  });
-
-  it('resolves to Assign sub-stage once a debris_hauler is actually owned and undriven', () => {
-    toolbarVehiclesButton();
-    const panel = vehiclePanel();
-    dealershipTierButton(panel, 'debris_hauler');
-    dealershipTierButton(panel, 'rock_digger');
-    dealershipTierButton(panel, 'drill_rig');
-    ownedVehicleCard(panel, 'drill_rig');
-    // The debris_hauler purchase has now happened and it is still undriven.
-    ownedVehicleCard(panel, 'debris_hauler');
-
-    expect(resolveStageIndex(stages)).toBe(2);
-  });
-
-  it('resolves to Buy sub-stage when no vehicles are owned at all (starting condition)', () => {
-    toolbarVehiclesButton();
-    const panel = vehiclePanel();
-    dealershipTierButton(panel, 'debris_hauler');
-    dealershipTierButton(panel, 'rock_digger');
-    dealershipTierButton(panel, 'drill_rig');
-
-    expect(resolveStageIndex(stages)).toBe(1);
-  });
-
-  it('falls back to an earlier sub-stage when the Vehicles panel closes after the debris_hauler purchase, instead of staying stuck on Assign', () => {
-    toolbarVehiclesButton();
-    const panel = vehiclePanel();
-    dealershipTierButton(panel, 'debris_hauler');
-    ownedVehicleCard(panel, 'debris_hauler');
-    expect(resolveStageIndex(stages)).toBe(2);
-
-    // Player closes the Vehicles panel — its whole subtree (dealership
-    // buttons and owned-vehicle cards alike) stops being reachable.
-    panel.style.display = 'none';
-    expect(resolveStageIndex(stages)).toBe(0);
-  });
-});
+// #858's regression block ("resolveStageIndex — vehicle-buy-assign
+// regression") lived here: `.bs-vehicle-assign-btn` was a bare, unscoped
+// selector that could false-match an unrelated, already-owned undriven
+// vehicle card (e.g. a leftover drill_rig) instead of the debris_hauler
+// actually just bought, so the rail advanced to an Assign sub-stage no
+// purchase had earned. #921 deletes the Assign button and its stage
+// entirely — `vehicle-buy-assign` is now just [open panel, buy
+// debris_hauler] — so there is no later stage left for anything to
+// false-match into, and the bug class this test guarded against is
+// structurally impossible. Removed rather than trimmed.
 
 describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
   // Reproduces the dead end the player hit: the Blast Workshop stayed on its

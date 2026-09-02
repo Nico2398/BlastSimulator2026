@@ -472,38 +472,20 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "role": "player",
-      "description": "#553: buy-drill-rig-assign, first half. Vehicle #1 -- the rock_digger bought below is #2 and the debris_hauler bought further down is #3, and the `vehicle driver` reference below is renumbered to match.",
-      "expect": {
-        "equals": {
-          "vehicleCount": 1
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 1 2",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "train-digger",
           "timeout": 60000
         }
       ],
       "role": "player",
-      "description": "#553: buy-drill-rig-assign complete -- the newly-licensed driller walks to the rig and boards. The drill-plan step below can only land a hole once this has happened. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#553: buy-drill-rig-assign, first half. Vehicle #1 -- the rock_digger bought below is #2 and the debris_hauler bought further down is #3. #921: a vehicle's driver is claimed automatically now (VehicleReservation/ArrivalGate) -- there is no Assign click and no `vehicle driver` command left to issue, so the purchase itself is the whole step and the tutorial rail advances straight to 'train-digger' on the purchase alone; the newly-licensed driller (employee #2) boards the rig on their own once drill-plan below queues vehicle-gated work, with no further player input.",
       "expect": {
+        "equals": {
+          "vehicleCount": 1
+        },
+        "decreased": [
+          "cash"
+        ],
         "tutorialStep": "train-digger"
       }
     },
@@ -565,38 +547,20 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "role": "player",
-      "description": "#555: buy-rock-digger-assign, first half. Vehicle #2 -- the drill_rig bought above is #1, and the debris_hauler bought further down is therefore #3.",
-      "expect": {
-        "equals": {
-          "vehicleCount": 2
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 2 1",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "box-cut",
           "timeout": 60000
         }
       ],
       "role": "player",
-      "description": "#555: buy-rock-digger-assign complete -- the newly-licensed digger walks to the rock_digger and boards. box-cut's own dig_ramp_segment work can only land a segment once this has happened. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#555: buy-rock-digger-assign, first half. Vehicle #2 -- the drill_rig bought above is #1, and the debris_hauler bought further down is therefore #3. #921: a vehicle's driver is claimed automatically now (VehicleReservation/ArrivalGate) -- there is no Assign click and no `vehicle driver` command left to issue, so the purchase itself is the whole step and the tutorial rail advances straight to 'box-cut' on the purchase alone; the newly-licensed digger (employee #1) boards the rock_digger on their own once box-cut's dig_ramp_segment work queues below, with no further player input.",
       "expect": {
+        "equals": {
+          "vehicleCount": 2
+        },
+        "decreased": [
+          "cash"
+        ],
         "tutorialStep": "box-cut"
       }
     },
@@ -1292,38 +1256,19 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "role": "player",
-      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "Step-local: the drill_rig and rock_digger bought earlier survive the blast above (evacuateZone genuinely evacuates them clear of it, #557), so the standing fleet count here is 3, not 1 -- not the number of vehicles this file has bought MINUS what the blast destroyed, since nothing did. What this step owns is that the purchase itself lands — one more vehicle, $25,000 gone. cash is asserted directionally, not to the exact figure: interaction mode accrues real-time payroll between the clicks of a step, so an exact changedBy drifts by a few dollars against command mode (this file’s own #553/#586 history documents the same class)."
-      }
-    },
-    {
-      "command": "vehicle driver 3 4",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "build-storage",
           "timeout": 60000
         }
       ],
       "role": "player",
-      "description": "Fix (CI regression): selector scoped to the debris_hauler row specifically (FleetPanel.ts's own per-vehicle [data-vtype], #557 follow-up), matching the same fix on this stage's own rail target (tutorialStages.ts's 'vehicle-buy-assign'). The bare '.bs-vehicle-assign-btn' this used to be matched whichever vehicle's Assign button came first in the DOM -- ambiguous now that evacuateZone (Evacuation.ts) genuinely evacuates instead of teleporting (#557): the drill_rig and rock_digger bought earlier in this file survive the blast (evacuated clear of it) rather than being destroyed, undriven since their own drivers dismounted once drilling/digging finished, so the Fleet panel already lists a live, licensed-crew-eligible Assign control for each of them ahead of debris_hauler's own row. vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. #553/#555 (issue #585, confirmed via direct trace): vehicle #3, not #2 -- the drill_rig and rock_digger bought earlier take vehicle slots #1 and #2; ids are never reused regardless of whether those two survive this file's blast or not. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again. #921: a vehicle's driver is claimed automatically now (VehicleReservation/ArrivalGate) -- there is no Assign click and no `vehicle driver` command left to issue, so the purchase itself is the whole step and the tutorial rail advances straight to 'build-storage' on the purchase alone; the driver hired and licensed above (employee #4) boards the hauler on their own once haul-debris queues vehicle-gated work further down, with no further player input.",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "tutorialStep": "build-storage",
-        "note": "No cash claim here (#556): assigning a driver is free, but the tutorial’s own clock runs while the driver walks to the vehicle and boards, so real-time payroll accrues across the step and `changedBy: {cash: 0}` is not true in interaction mode. The boarding itself is what this step owns, and the card advancing to build-storage is what proves it."
+        "note": "Step-local: the drill_rig and rock_digger bought earlier survive the blast above (evacuateZone genuinely evacuates them clear of it, #557), so the standing fleet count here is 3, not 1 -- not the number of vehicles this file has bought MINUS what the blast destroyed, since nothing did. What this step owns is that the purchase itself lands — one more vehicle, $25,000 gone. cash is asserted directionally, not to the exact figure: interaction mode accrues real-time payroll between the clicks of a step, so an exact changedBy drifts by a few dollars against command mode (this file’s own #553/#586 history documents the same class)."
       }
     },
     {

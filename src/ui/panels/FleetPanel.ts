@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
 // Traffic advisory banner, then one card per vehicle: name/id/role, status
-// chip, HP gauge, LOAD gauge (haulers only), driver row or licensed-crew
-// picker, SCRAP (confirm, real residual value). Both Haul and Break are
+// chip, HP gauge, LOAD gauge (haulers only), driver row or no-driver status
+// (licence warning or "unmanned" — display-only since #921), SCRAP (confirm,
+// real residual value). Both Haul and Break are
 // self-dispatching now (#552, #618) — there is no button for either; a
 // qualified idle employee/driver auto-claims the free vehicle and does the
 // work on its own.
@@ -23,7 +24,7 @@ import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier } fr
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow, makePendingDriverRow } from '../fleetDetailSections.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
@@ -107,20 +108,20 @@ export class FleetPanel {
 
   /**
    * Structural facts only: which cards exist, whether each has a driver
-   * (swaps the driver row for the assign picker), and who is eligible to
-   * drive (changes the assign picker's own options). HP, load, status, and
-   * the traffic banner all drift on their own — refreshDynamic patches
-   * those in place so an in-flight driver pick or Haul/Scrap click survives.
+   * (swaps the driver row for the no-driver row), and who is eligible to
+   * drive (changes the no-driver row's licence warning). HP, load, status,
+   * and the traffic banner all drift on their own — refreshDynamic patches
+   * those in place so an in-progress board-walk or Haul/Scrap click survives.
    */
   private computeSignature(state: GameState): string {
     const rows = state.vehicles.vehicles.map(v => `${v.id}:${v.type}:${v.tier}:${v.driverId ?? '-'}`).join('|');
-    // pendingDriverVehicleId, not just driverId: an assign click sets it
-    // immediately, but driverId itself stays null for the whole walk to the
-    // vehicle (ArrivalGate.ts only sets it on arrival). Omitting it here let
-    // every OTHER vehicle's already-rendered assign picker (and its `<select>`'s
-    // default option) go stale the moment one assignment claimed an
-    // employee, until some unrelated structural change (a further purchase)
-    // happened to force a fresh render — #715.
+    // pendingDriverVehicleId, not just driverId: VehicleReservation's
+    // automatic claim sets it immediately, but driverId itself stays null
+    // for the whole walk to the vehicle (ArrivalGate.ts only sets it on
+    // arrival). Omitting it here let every OTHER vehicle's already-rendered
+    // no-driver row go stale the moment one claim took an employee, until
+    // some unrelated structural change (a further purchase) happened to
+    // force a fresh render — #715.
     const quals = state.employees.employees.filter(e => e.alive)
       .map(e => `${e.id}:${e.qualifications.map(q => q.category).join(',')}:${e.pendingDriverVehicleId ?? '-'}`).join('|');
     return `${rows}#${quals}`;
@@ -247,17 +248,17 @@ export class FleetPanel {
 
     // v.driverId stays null for a driver's whole walk to the vehicle
     // (ArrivalGate.ts sets it only on arrival), so a pending claim needs its
-    // own row — falling through to makeAssignRow would re-offer the vehicle
+    // own row — falling through to makeNoDriverRow would re-offer the vehicle
     // as driverless even though someone's already en route to it (#715).
     const pendingDriver = v.driverId === null
       ? state.employees.employees.find(e => e.pendingDriverVehicleId === v.id)
       : undefined;
     rows.push(
       v.driverId !== null
-        ? makeDriverRow(v, state, () => this.gameConsole?.(`vehicle driver ${v.id} none`))
+        ? makeDriverRow(v, state)
         : pendingDriver
           ? makePendingDriverRow(pendingDriver)
-          : makeAssignRow(v, state, employeeId => this.gameConsole?.(`vehicle driver ${v.id} ${employeeId}`), () => this.onNavigateCb?.('crew')),
+          : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
     );
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
@@ -271,12 +272,12 @@ export class FleetPanel {
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
     // Mirrors the dealership buy buttons' own [data-vtype] (this file's
-    // header comment) so a tutorial stage can scope an owned-vehicle control
-    // (e.g. .bs-vehicle-assign-btn below) to a specific vehicle TYPE, not just
-    // "the first matching element in the DOM" — see tutorialStages.ts's
-    // 'vehicle-buy-assign' (and tutorialStagesTraining.ts's
-    // 'buy-drill-rig-assign'/'buy-rock-digger-assign') for why that
-    // distinction matters (#557 follow-up).
+    // header comment) so a tutorial stage can scope its purchase target to a
+    // specific vehicle TYPE, not just "the first matching element in the
+    // DOM" — see tutorialStages.ts's 'vehicle-buy-assign' (and
+    // tutorialStagesTraining.ts's 'buy-drill-rig-assign'/
+    // 'buy-rock-digger-assign') for why that distinction matters (#557
+    // follow-up).
     wrap.dataset['vtype'] = v.type;
     wrap.style.cursor = 'pointer';
     wrap.addEventListener('click', (e) => {

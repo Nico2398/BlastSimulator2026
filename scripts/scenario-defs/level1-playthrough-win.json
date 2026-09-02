@@ -194,16 +194,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: staffed:true's free driller (employee #1, already licensed blasting lvl1 + driving.drill_rig lvl1) boards the free drill_rig (vehicle #1). Without a driver the rig is a mesh and no drill_hole action ever starts.",
-      "role": "player",
+      "description": "#553: staffed:true's free driller (employee #1, already licensed blasting lvl1 + driving.drill_rig lvl1) boards the free drill_rig (vehicle #1). Without a driver the rig is a mesh and no drill_hole action ever starts. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -252,25 +248,12 @@
       "command": "vehicle driver 2 3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] select",
-          "value": "3"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 2 3"
         }
       ],
-      "description": "#552/#557: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare a manual purchase on top of everything else. #557: this file no longer hires its own driver (see the hire step's own finding) -- staffed:true's own free driver #3 (already licensed driving.truck lvl1 from the free roster) boards it instead. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor hire and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut. `.bs-vehicle-assign-btn` (`makeAssignRow`, fleetDetailSections.ts) reads a `<select>` next to it, not a fixed target -- clicking Assign without first choosing an option in that select just assigns whoever the browser's default selection lands on (its first eligible option). Fixed with a `set` action on the row's own `select` (scoped by `[data-vehicle-id=\"2\"]`, matching the file's other dropdown-driven steps) before the Assign click, mirroring the Charge step's own real-control convention (issue #515) rather than relying on whatever the dropdown defaulted to -- here that default happens to already be employee #3, but the explicit `set` keeps this step's own intent (\"employee #3 boards\") true regardless of roster order.",
-      "role": "player",
+      "description": "#552/#557: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare a manual purchase on top of everything else. #557: this file no longer hires its own driver (see the hire step's own finding) -- staffed:true's own free driver #3 (already licensed driving.truck lvl1 from the free roster) boards it instead. #921: the Fleet panel's Assign/Unassign controls (and the driver-picker select this step used to steer) are gone entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0

@@ -1,26 +1,26 @@
 {
   "name": "vehicle-driver-assignment-visual",
-  "description": "Visual check: assign a qualified driver to a vehicle via a real click, and verify the driver info that renders afterward. One-driver-per-vehicle is enforced at the core layer (canAssignDriver, VehicleDriverAssignment.ts) and covered by unit/integration tests (Vehicle.test.ts, VehicleBoarding.test.ts, vehicle-commands.test.ts, vehicles.integration.test.ts) -- not re-proven here, because the Fleet panel never offers a control to attempt a double-assignment in the first place: an occupied vehicle's row swaps the assign picker for a driver-name/unassign row (makeDriverRow, fleetDetailSections.ts) instead of disabling it, so there is no live control left for a guard step to point at.",
+  "description": "Visual check (#921 retarget): a vehicle's driver is claimed automatically now — a qualified, idle employee boards a free vehicle of the right role on their own the moment a vehicle-gated task needs one (VehicleReservation.ts / ArrivalGate.resolveBoarding / VehicleBoarding.ts's requestBoardVehicle). Player-facing driver assignment/unassignment is gone: no click anywhere in this file's own role:'player' steps targets an Assign/Unassign control, and no step issues the console-only `vehicle driver` command (that command still exists — assignDriver/unassignDriver are called directly by the automatic reservation/boarding path itself — but nothing here calls it manually). Buys a drill_rig, hires and licenses a driller, orders a drill plan (drill_hole is a vehicle-gated PendingAction requiring the drill_rig role, same gate #553 put on drilling), and watches the vehicle get itself a driver as the holes actually land.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:75000",
+      "command": "campaign start level:dusty_hollow cash:100000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:75000"
+          "command": "campaign start level:dusty_hollow cash:100000"
         }
       ],
-      "description": "cash:75000 (dusty_hollow's own $50,000 + one extra debris_hauler's $25,000) funds the second vehicle bought below (issue #585) -- it is spent in full at that step, so every cash figure from there through the rest of the file is unchanged from before this override.",
+      "description": "cash:100000 funds the drill_rig ($35,000) and the driller hire ($1,000) bought/hired below, with headroom left over for payroll/fuel/maintenance while the automatic claim-and-drill sequence runs its real course.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 75000,
+          "cash": 100000,
           "vehicleCount": 0
         }
       }
     },
     {
-      "command": "vehicle buy debris_hauler",
+      "command": "vehicle buy drill_rig",
       "interaction": [
         {
           "type": "clickSelector",
@@ -28,17 +28,18 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
+      "description": "drill_rig, not debris_hauler: drill_plan's own PendingActions carry requiredVehicleRole:'drill_rig' (Drill.ts), so this is the role the automatic claim below actually needs to exercise.",
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -25000
+          "cash": -35000
         },
         "equals": {
           "vehicleCount": 1
@@ -46,7 +47,7 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:driller",
       "interaction": [
         {
           "type": "clickSelector",
@@ -54,17 +55,17 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -800
+          "cash": -1000
         },
         "equals": {
           "employeeCount": 1
@@ -72,25 +73,25 @@
       }
     },
     {
-      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:driving.truck level:1"
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- hiring a driller only grants the 'blasting' starting qualification (ROLE_STARTING_QUALIFICATION, Employee.ts), never the driving.drill_rig licence a drill_rig needs. This grants it directly so the scenario doesn't also have to build and staff a driving_center just to reach the licence -- the player-facing path for a real game is `employee train` at a driving_center, exercised elsewhere (tutorial-interactive.json's own train-driller step).",
       "expect": {
         "equals": {
-          "proficiencyTotal": 1
+          "proficiencyTotal": 2
         },
-        "note": "unchanged from before — driving.truck was already the driver role's Rookie starting qualification at level 1; this command reproduces the same level, not a change"
+        "note": "employee #1's starting blasting(1) + this grant's driving.drill_rig(1) = 2"
       },
       "role": "bootstrap"
     },
     {
       "command": "vehicle list",
-      "description": "Opens the Vehicles panel via a real UI click so the after-qualified/after-unqualified shots capture the .bs-vehicle-driver-name indicator instead of a 3D orbit — the panel stays open for every later step once opened here (#411).",
+      "description": "Vehicles panel is already open from the buy step above (#411) -- this is a pure observation beat, capturing the baseline before-claim state: one drill_rig, driver:none.",
       "interaction": [
         {
           "type": "command",
@@ -100,44 +101,57 @@
       "role": "observe"
     },
     {
-      "command": "vehicle driver 1 1",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:10,10",
+      "description": "Queues the vehicle-gated task: drill_plan orders 9 drill_hole PendingActions, each with requiredVehicleRole:'drill_rig' (Drill.ts) -- none are drilled yet, so holeCount stays 0 right after this confirms. 10,10 to 16,16 at the tool's own default 3m spacing (DEFAULT_SPACING_M, Drill.ts) computes exactly the declared 3x3 grid (round(6/3)+1 = 3 per side), so no spacing-stepper click is needed before dragging.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 10,
+          "x2": 16,
+          "z2": 16
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "vehicleCount": 1
-        },
-        "note": "arrival-gated like surveys — the driver walks to the vehicle before boarding, `vehicle list` still shows driver:none right after this click"
+        "increased": [
+          "orderedHoleCount"
+        ]
       }
     },
     {
-      "command": "tick 5",
+      "command": "tick 30",
+      "description": "No pollable summary field exposes a vehicle's driverId (state-schema-definitions.ts only tracks counts, never a specific vehicle's own fields), so this is a fixed pad rather than a wait_until, same tradeoff blast-drill-plan-ui.json's own 'tick 40' partial-drilling step makes for the same reason. Sandbox-measured: by tick 30 the driller has already claimed drill_rig #1, walked to it, and boarded (driver:#1), still short of the first hole landing -- the very next observe step's `vehicle list` output is expected to show driver:#1, proving the automatic claim already happened well before any hole completes.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 30"
         }
       ],
       "role": "setup"
     },
     {
       "command": "vehicle list",
+      "description": "Mid-course state: driver:#1 -- the driller has claimed and boarded drill_rig #1 entirely on their own, before the first hole has even landed. No summary field carries a specific vehicle's driverId for `expect` to check programmatically (state-schema-definitions.ts), so this step's proof is the command output and screenshot themselves, for the visual channel to inspect.",
       "interaction": [
         {
           "type": "command",
@@ -147,107 +161,28 @@
       "role": "observe"
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "wait_until field:holeCount equals:9 max_ticks:400",
+      "description": "No click, no `vehicle driver` command -- the driller (licensed above) claims and reserves the free drill_rig, walks to it, boards, drives to each ordered hole, and drills it entirely on their own (VehicleReservation.ts / ArrivalGate.resolveBoarding). holeCount can only ever reach 9 once every hole has actually been drilled by a driver who genuinely boarded the vehicle -- there is no other path that lands a hole, so this is itself the proof the automatic claim worked, not just that ticking didn't crash.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
-        "changedBy": {
-          "cash": -1500
-        },
         "equals": {
-          "employeeCount": 2
+          "holeCount": 9,
+          "orderedHoleCount": 0
         }
       }
-    },
-    {
-      "command": "vehicle buy debris_hauler",
-      "description": "Second vehicle, bought so employee #2 can be assigned a driver seat that isn't already taken (issue #585) -- vehicle #1 already has employee #1 as its driver, and canAssignDriver (VehicleDriverAssignment.ts) checks the target vehicle's own driver slot, not employee #1's assignment, so this needs its own free vehicle rather than a second attempt on #1.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -25000
-        },
-        "equals": {
-          "vehicleCount": 2
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 2 skill:driving.truck level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 2 skill:driving.truck level:1"
-        }
-      ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- grants employee #2 (a blaster) the driving.truck licence needed to crew the second vehicle below; the player-facing path is `employee train` (issue #585, mirrors the assign_skill step above for employee #1).",
-      "expect": {
-        "equals": {
-          "proficiencyTotal": 3
-        },
-        "note": "employee #1's driving.truck(1) + employee #2's own starting blasting(1) + this grant's driving.truck(1) = 3"
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "vehicle driver 2 2",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        }
-      ],
-      "description": "Retargeted to vehicle #2 (issue #585): the original `vehicle driver 1 2` failed no matter what, because canAssignDriver checks the requested employee's licence before it ever checks whether the target vehicle already has a driver -- vehicle #1 keeps the assignment proven above untouched, and employee #2, now licenced, genuinely takes vehicle #2's open seat. Real click (mirrors step 5's `vehicle driver 1 1`), not a bootstrap command -- the panel opened at step 4 stays open (#411), so vehicle #2's own assign button is already reachable.",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "employeeCount": 2,
-          "vehicleCount": 2
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup"
     },
     {
       "command": "vehicle list",
+      "description": "Final state: driver:none again -- releaseVehicleOnCompletion (VehicleReservation.ts) dismounts the driver and frees the vehicle once the last hole's PendingAction completes and nothing else claims it, the same release the fully-automatic vehicles.integration.test.ts coverage already pins at the unit/integration layer. All 9 holes landing (holeCount:9, checked by the wait_until step above) is what actually proves the automatic claim worked all the way through -- not this step, which only shows the far side of the same cycle.",
       "interaction": [
         {
           "type": "command",
@@ -269,19 +204,14 @@
   ],
   "shots": [
     {
-      "name": "before-assignment",
+      "name": "before-claim",
       "yaw": 0,
       "pitch": 45
     },
     {
-      "name": "after-qualified",
+      "name": "mid-claim",
       "yaw": 45,
       "pitch": 30
-    },
-    {
-      "name": "after-unqualified",
-      "yaw": 90,
-      "pitch": 15
     }
   ]
 }

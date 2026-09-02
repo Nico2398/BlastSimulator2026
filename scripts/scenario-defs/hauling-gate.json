@@ -328,27 +328,14 @@
     },
     {
       "command": "vehicle driver 5 6",
-      "description": "#553: vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. The assign row's <select> (fleetDetailSections.ts's makeAssignRow) lists every eligible, untaken driving.truck-licensed employee in roster order, not just the one this file means to pick -- staffed:true's own drivers (#3 Gus Pickaxe, #5 Pete Crater) already hold that licence and sit untaken (their original drill_rig/rock_digger mounts are gone or never filled), so they sort ahead of #6 in the <select>'s option list and the browser's default-selected first option is #3, not #6. Clicking Assign without first setting the dropdown silently boards Gus instead of Lars Bedrock -- same console command text, different employee, and Gus's own position/availability made the resulting board-and-haul timeline miss this file's tick budget (#553 finding, sandbox-confirmed against a live interaction run: vehicle 5 still read driver:none tick after tick with the unset dropdown). The explicit 'set' step below picks option value \"6\" before the click, matching the console command's own explicit employee id.",
+      "description": "#553: vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one. `vehicle driver` survives as a scenario/console-only primitive, so this step now runs as a bootstrap command rather than a UI click.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
-          "value": "6"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 5 6"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0

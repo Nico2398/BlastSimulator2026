@@ -21,25 +21,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] select",
-          "value": "1"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "role": "player",
-      "description": "staffed:true does NOT auto-assign a driver -- crews the free drill_rig (vehicle #1) with employee #1, the only qualified driller already on the roster.",
+      "role": "bootstrap",
+      "description": "staffed:true does NOT auto-assign a driver -- crews the free drill_rig (vehicle #1) with employee #1, the only qualified driller already on the roster. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -49,6 +36,10 @@
     {
       "command": "vehicle scrap 2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
@@ -63,7 +54,7 @@
         }
       ],
       "role": "player",
-      "description": "Only vehicle #1 (drill_rig) is used this round -- the staffed roster's debris_hauler/rock_digger/rock_fragmenter would otherwise sit parked in the drill site's path: NavGrid pathing has no notion of \"move aside\", so a vehicle idling on a cell a drilling driller's route crosses blocks that route forever (isCellOccupiedByOtherVehicle, EntityMovementTick.ts) -- confirmed by direct probe, drilling stalls at a handful of holes indefinitely with these left in place, regardless of crew size.",
+      "description": "Only vehicle #1 (drill_rig) is used this round -- the staffed roster's debris_hauler/rock_digger/rock_fragmenter would otherwise sit parked in the drill site's path: NavGrid pathing has no notion of \"move aside\", so a vehicle idling on a cell a drilling driller's route crosses blocks that route forever (isCellOccupiedByOtherVehicle, EntityMovementTick.ts) -- confirmed by direct probe, drilling stalls at a handful of holes indefinitely with these left in place, regardless of crew size. #929: opens the Fleet panel itself. The step that used to open it with a real toolbar click became a bootstrap command under #921, and UIManager only updates a visible panel -- a Fleet panel nobody opened renders no vehicle cards at all, so this click had nothing to land on.",
       "expect": {
         "changedBy": {
           "cash": 10000
@@ -73,6 +64,10 @@
     {
       "command": "vehicle scrap 3",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
@@ -96,6 +91,10 @@
     {
       "command": "vehicle scrap 4",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
@@ -292,21 +291,12 @@
       "command": "vehicle driver 5 6",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
-          "value": "6"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 5 6"
         }
       ],
-      "role": "player",
-      "description": "The assign row's own <select> (fleetDetailSections.ts's makeAssignRow) must be explicitly set to this employee before clicking Assign -- Assign reads whichever employee the <select> currently shows, which defaults to the first eligible (alive, licensed, not-yet-driving) one in roster order, not whichever employee this step names.",
+      "role": "bootstrap",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -379,20 +369,12 @@
       "command": "vehicle driver 6 7",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] select",
-          "value": "7"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 6 7"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -465,20 +447,12 @@
       "command": "vehicle driver 7 8",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] select",
-          "value": "8"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 7 8"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
+      "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "expect": {
         "changedBy": {
           "cash": 0

@@ -9,7 +9,7 @@ import {
   createAutoAdvanceStep,
   countNavCellsByType,
   getEmployees,
-  getVehicles,
+  countVehiclesOfType,
   countBuildingsOfType,
   isBlastReportOutstanding,
   createEvacuateZoneStep,
@@ -199,35 +199,19 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 3d: buy-drill-rig-assign ──
-  // Same naive count-increased + existence-check shape as vehicle-buy-assign
-  // below, but that shape is only safe for a step buying the tutorial's
-  // first-ever vehicle (see that step's own comment) -- which, now that this
-  // step exists, is THIS one, not that one. Snapshotting which vehicle ids
-  // already had a driver and requiring a driven vehicle outside that set
-  // keeps this step from false-completing on some other already-driven
-  // vehicle, the same guard vehicle-buy-assign now needs for the same reason.
-  {
-    id: 'buy-drill-rig-assign',
-    titleKey: 'tutorial.step_buydrillrig.title',
-    textKey: 'tutorial.step_buydrillrig',
-    highlightTarget: TOOLBAR_TARGET.vehicles,
-    // The driller trained one step earlier is employee #2.
-    commands: ['vehicle buy drill_rig', 'vehicle driver 1 2'],
-    tickBudget: 20,
-    waitsOnWork: true,
-    captureSnapshot: (state: GameState) => ({
-      prevVehicleCount: getVehicles(state).length,
-      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prevCount = snapshot.prevVehicleCount as number;
-      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
-      return (
-        getVehicles(state).length > prevCount &&
-        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
-      );
-    },
-  },
+  // Driver assignment is automatic now (VehicleReservation/ArrivalGate, #921)
+  // — completion is purchase alone, the same synchronous "value increased"
+  // shape as contract-accept above (tickBudget: 1, no waitsOnWork: buying a
+  // vehicle is instant, nothing to wait on).
+  createComparisonStep(
+    'buy-drill-rig-assign',
+    'tutorial.step_buydrillrig.title',
+    'tutorial.step_buydrillrig',
+    (s) => countVehiclesOfType(s, 'drill_rig'),
+    ['vehicle buy drill_rig'],
+    TOOLBAR_TARGET.vehicles,
+    { tickBudget: 1 },
+  ),
 
   // ── Step 3e: train-digger ──
   // #555: dig_ramp_segment work (the box-cut step below) now requires a
@@ -251,32 +235,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 3f: buy-rock-digger-assign ──
-  // Same guarded count-increased + newly-driven-vehicle shape as
-  // buy-drill-rig-assign above, and for the same reason: the drill_rig
-  // bought there already has a driver, so a naive "some vehicle has a
-  // driver" check would false-complete instantly.
-  {
-    id: 'buy-rock-digger-assign',
-    titleKey: 'tutorial.step_buyrockdigger.title',
-    textKey: 'tutorial.step_buyrockdigger',
-    highlightTarget: TOOLBAR_TARGET.vehicles,
-    // The digger trained one step earlier is employee #1.
-    commands: ['vehicle buy rock_digger', 'vehicle driver 2 1'],
-    tickBudget: 20,
-    waitsOnWork: true,
-    captureSnapshot: (state: GameState) => ({
-      prevVehicleCount: getVehicles(state).length,
-      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prevCount = snapshot.prevVehicleCount as number;
-      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
-      return (
-        getVehicles(state).length > prevCount &&
-        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
-      );
-    },
-  },
+  // Same purchase-completes-alone shape as buy-drill-rig-assign above (#921).
+  createComparisonStep(
+    'buy-rock-digger-assign',
+    'tutorial.step_buyrockdigger.title',
+    'tutorial.step_buyrockdigger',
+    (s) => countVehiclesOfType(s, 'rock_digger'),
+    ['vehicle buy rock_digger'],
+    TOOLBAR_TARGET.vehicles,
+    { tickBudget: 1 },
+  ),
 
   // ── Step 4: box-cut ──
   // Real pits start the way this step does: an access ramp and a starter cut
@@ -442,43 +410,19 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 13: vehicle-buy-assign ──
   // #553: no longer the tutorial's first-ever vehicle purchase -- the
   // build-driving-center/train-driller/buy-drill-rig-assign trio above buys
-  // and crews a drill_rig long before this step, and that driller keeps
-  // driving it (or, if the blast destroyed the rig, simply keeps the
-  // driving.drill_rig licence) the whole time in between. The naive
-  // count-increased + "some vehicle has a driver" check #409 used for hire
-  // steps would false-complete the instant this step opened, since the
-  // drill_rig's own driver already satisfies "some vehicle has a driver".
-  // Snapshotting which vehicle ids already had a driver and requiring a
-  // driven vehicle outside that set (the same guard buy-drill-rig-assign
-  // above needs, for the same reason) keeps this step honest again.
-  {
-    id: 'vehicle-buy-assign',
-    titleKey: 'tutorial.step14.title',
-    textKey: 'tutorial.step14',
-    highlightTarget: TOOLBAR_TARGET.vehicles,
-    // The driver hired one step earlier is employee #4.
-    commands: ['vehicle buy debris_hauler', 'vehicle driver 1 4'],
-    // Assigning a driver does not seat them: it sends them walking to the
-    // vehicle, and ArrivalGate makes them the driver on arrival. That walk
-    // needs the clock, so this step must wait on the simulation — without it
-    // the allowance ran out while the player was still shopping, the clock
-    // held for good, and the driver never took a step. The player saw an
-    // Assign button that did nothing and the tutorial never advanced.
-    tickBudget: 20,
-    waitsOnWork: true,
-    captureSnapshot: (state: GameState) => ({
-      prevVehicleCount: getVehicles(state).length,
-      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prevCount = snapshot.prevVehicleCount as number;
-      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
-      return (
-        getVehicles(state).length > prevCount &&
-        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
-      );
-    },
-  },
+  // and crews a drill_rig long before this step. Driver assignment is
+  // automatic now (VehicleReservation/ArrivalGate, #921) — completion is
+  // purchase alone, the same synchronous shape as buy-drill-rig-assign
+  // above, so the drill_rig's own driver has no bearing on this check.
+  createComparisonStep(
+    'vehicle-buy-assign',
+    'tutorial.step14.title',
+    'tutorial.step14',
+    (s) => countVehiclesOfType(s, 'debris_hauler'),
+    ['vehicle buy debris_hauler'],
+    TOOLBAR_TARGET.vehicles,
+    { tickBudget: 1 },
+  ),
 
   // ── Step 14: build-storage ──
   // #556: placing a building is no longer instant -- confirming the order

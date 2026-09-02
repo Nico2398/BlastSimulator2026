@@ -251,15 +251,27 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial step, inserted after 'survey' -- 2 new keys,
     // tutorial.step_overlaytoggle.title and tutorial.step_overlaytoggle, both
     // locales translated.
-    // Baseline is now 3469 (up from 3468): #926 adds an intermediate
-    // 'sequence' tutorial stage letting the player open the Blast Workshop's
-    // Sequence tab themselves when the panel's own auto-advance hasn't
-    // gotten there yet -- 1 new key, tutorial.stage.open_sequence_tab, both
-    // locales translated.
+    // Baseline is now 3467 (down from 3468, 2026-09-01): #921 removes the
+    // player-facing vehicle driver assign/unassign controls -- drops
+    // ui.fleet.assign and ui.fleet.unassign (2 keys), adds
+    // ui.fleet.unmanned (1 key) for the display-only "nobody currently
+    // driving" state. Net -1, both locales.
+    // Baseline is now 3466 (down from 3467, 2026-09-01): #921 code review
+    // follow-up removes tutorial.stage.vehicle_assign -- its only hintKey
+    // reference (the assign-click sub-stage of the vehicle-buy-assign
+    // tutorial stage) was deleted along with the assign control itself, so
+    // the key was orphaned. Both locales.
+    // Baseline is now 3467 (up from 3466, 2026-09-01): #926 landed
+    // concurrently on a separate branch, off the pre-#921 3468 baseline, and
+    // is merged in here -- adds an intermediate 'sequence' tutorial stage
+    // letting the player open the Blast Workshop's Sequence tab themselves
+    // when the panel's own auto-advance hasn't gotten there yet -- 1 new
+    // key, tutorial.stage.open_sequence_tab, both locales translated. Net
+    // effect of #921 + #926 together: 3468 -2 +1 = 3467.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3469);
+    expect(Object.keys(en).length).toBe(3467);
   });
 });
 

@@ -435,8 +435,8 @@
     },
     {
       "command": "vehicle buy drill_rig",
-      "timeout": 30,
-      "description": "buy-drill-rig-assign, first half: Vehicles panel open, tier-1 drill_rig bought and placed on the terrain surface",
+      "timeout": 90,
+      "description": "buy-drill-rig-assign complete (#921): a vehicle's driver is claimed automatically now (VehicleReservation/ArrivalGate) -- there is no Assign click and no `vehicle driver` command left to issue, so the purchase itself is the whole step. Vehicles panel open, tier-1 drill_rig bought and placed on the terrain surface; the tutorial rail advances straight to 'train-digger' on the purchase alone -- the newly-licensed driller (employee #2) boards it on their own once drill-plan below queues vehicle-gated work, with no further player input.",
       "role": "player",
       "interaction": [
         {
@@ -448,34 +448,16 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 1 2",
-      "timeout": 90,
-      "description": "#553: buy-drill-rig-assign complete: Assign clicked, then the tutorial's own clock runs while the newly-licensed driller (employee #2) walks to the drill_rig and boards -- the drill-plan step right after this one can only ever land a hole once this actually completes. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center completes for real (wait_until step above) and place_building's root-cause livelock is fixed (tickTaskCompletion.ts), so this succeeds genuinely.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "train-digger",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "train-digger"
+        "tutorialStep": "train-digger",
+        "increased": [
+          "vehicleCount"
+        ]
       }
     },
     {
@@ -525,8 +507,8 @@
     },
     {
       "command": "vehicle buy rock_digger",
-      "timeout": 30,
-      "description": "buy-rock-digger-assign, first half: Vehicles panel open, tier-1 rock_digger bought and placed on the terrain surface",
+      "timeout": 90,
+      "description": "buy-rock-digger-assign complete (#921): same retarget as buy-drill-rig-assign above -- a vehicle's driver is claimed automatically now, so the purchase alone is the whole step. Vehicles panel open, tier-1 rock_digger bought and placed on the terrain surface; the tutorial rail advances straight to 'box-cut' on the purchase alone -- the newly-licensed digger (employee #1) boards it on their own once box-cut's dig_ramp_segment work queues below, with no further player input.",
       "role": "player",
       "interaction": [
         {
@@ -538,34 +520,16 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 2 1",
-      "timeout": 90,
-      "description": "#555: buy-rock-digger-assign complete: Assign clicked, then the tutorial's own clock runs while the newly-licensed digger (employee #1) walks to the rock_digger and boards -- box-cut's own dig_ramp_segment work can only ever land a segment once this actually completes. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center completes for real and place_building's root-cause livelock is fixed, so this succeeds genuinely.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "box-cut",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "box-cut"
+        "tutorialStep": "box-cut",
+        "increased": [
+          "vehicleCount"
+        ]
       }
     },
     {
@@ -972,7 +936,7 @@
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 90,
-      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically. #776: raised to 90s -- confirmed the actual command succeeded and only the shot-capture cost (this scenario's shots:[\"overview\",\"birdseye\"]) exceeded the tight 30s default on this and the surrounding post-blast steps; floored to the file's own established 90s precedent (steps 31/39/41/42) instead of retuning each step individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root (tickTaskCompletion.ts), so this succeeds genuinely.",
+      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level so the driver hired above is unambiguously the best-qualified candidate the automatic claim path (VehicleReservation/ArrivalGate) picks up once the debris_hauler is bought below (#921: no manual `vehicle driver` command exists in this file's own player-facing path anymore). #776: raised to 90s -- confirmed the actual command succeeded and only the shot-capture cost (this scenario's shots:[\"overview\",\"birdseye\"]) exceeded the tight 30s default on this and the surrounding post-blast steps; floored to the file's own established 90s precedent (steps 31/39/41/42) instead of retuning each step individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root (tickTaskCompletion.ts), so this succeeds genuinely.",
       "interaction": [
         {
           "type": "command",
@@ -984,7 +948,7 @@
     {
       "command": "vehicle buy debris_hauler",
       "timeout": 90,
-      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely.",
+      "description": "vehicle-buy-assign complete (#921): the purchase is the whole step now — a vehicle's driver is claimed automatically (VehicleReservation/ArrivalGate), so there is no Assign click and no `vehicle driver` command left to issue. Vehicles panel open, tier-1 hauler bought and placed on the terrain surface; the tutorial rail advances straight to 'build-storage' on the purchase alone. The driver hired and licensed above (employee #4) boards it on their own once haul-debris queues vehicle-gated work further down, with no further player input — the #478 deadlock path is exercised through the automatic claim path instead of a manual Assign click. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely.",
       "role": "player",
       "interaction": [
         {
@@ -996,34 +960,16 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 3 4",
-      "timeout": 90,
-      "description": "Fix (CI regression): selector scoped to the debris_hauler row specifically (FleetPanel.ts's own per-vehicle [data-vtype], #557 follow-up), matching the same fix on this stage's own rail target (tutorialStages.ts's 'vehicle-buy-assign'). The bare '.bs-vehicle-assign-btn' this used to be matched whichever vehicle's Assign button came first in the DOM -- ambiguous now that evacuateZone (Evacuation.ts) genuinely evacuates instead of teleporting (#557): the drill_rig and rock_digger bought earlier in this file survive the blast (evacuated clear of it) rather than being destroyed as the #653 note below assumed, undriven since their own drivers dismounted once drilling/digging finished, so the Fleet panel already lists a live, licensed-crew-eligible Assign control for each of them ahead of debris_hauler's own row. vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1. #653 (vehicle-numbering conclusion still holds; its own \"destroyed\" premise does not, now that evacuation genuinely works): vehicle #3, not #2 -- ids are never reused regardless of whether the drill_rig/rock_digger bought earlier in this run survive this file's blast or not, so the debris_hauler bought in the previous step is vehicle #3 either way. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root, so this succeeds genuinely.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] .bs-vehicle-assign-btn"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "build-storage",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "build-storage"
+        "tutorialStep": "build-storage",
+        "increased": [
+          "vehicleCount"
+        ]
       }
     },
     {

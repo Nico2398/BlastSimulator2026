@@ -161,81 +161,39 @@ describe('FleetPanel', () => {
     expect(rigPanel.root.querySelector('.bs-fleet-load')).toBeNull();
   });
 
-  it('shows the real driver name and Unassign dispatches vehicle driver none', () => {
+  // #921: player-facing driver assignment/unassignment is gone — a vehicle's
+  // driver is claimed automatically (VehicleReservation/ArrivalGate). Only
+  // the "shows the real driver name" half of this test survives; the
+  // Unassign-click assertions are deleted along with the control.
+  it('shows the real driver name', () => {
     const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
     panel.update(makeState(
       [makeVehicle({ id: 2, driverId: 6 })],
       [makeEmployee({ id: 6, name: 'Dorian Kask' })],
     ));
     expect(panel.root.textContent).toContain('Dorian Kask');
-
-    const unassignBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Unassign')!;
-    unassignBtn.click();
-    expect(calls).toContain('vehicle driver 2 none');
   });
 
-  it('offers only licensed, unclaimed crew in the assign picker, and Assign dispatches the real ids', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    const eligible = makeEmployee({ id: 6, name: 'Dorian Kask', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
-    const unqualified = makeEmployee({ id: 7, name: 'Bev Nunnally', qualifications: [] });
-    panel.update(makeState([makeVehicle({ id: 2, type: 'debris_hauler' })], [eligible, unqualified]));
+  // #921: the assign-picker (`<select>` of eligible crew + Assign button) is
+  // gone — the two tests that used to cover it ("offers only licensed,
+  // unclaimed crew in the assign picker" and "excludes an employee already
+  // walking to board a different vehicle from the picker") are deleted along
+  // with the picker itself. The eligibility logic those tests exercised
+  // (licence-filtering, excluding an employee already walking to board a
+  // different vehicle) is not orphaned: it lives in the automatic claim path
+  // (VehicleReservation.ts / ArrivalGate.resolveBoarding / VehicleBoarding.ts's
+  // requestBoardVehicle), which already has its own coverage in
+  // tests/unit/entities/Vehicle.test.ts and tests/unit/entities/
+  // VehicleBoarding.test.ts — this file only ever exercised it through the now-
+  // retired UI picker, not as the licence check's own source of truth.
 
-    const select = panel.root.querySelector('select') as HTMLSelectElement;
-    const optionNames = [...select.options].map(o => o.textContent);
-    expect(optionNames).toEqual(['Dorian Kask']);
-
-    const assignBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Assign')!;
-    assignBtn.click();
-    expect(calls).toContain('vehicle driver 2 6');
-  });
-
-  // #715: `driverId` stays null for a vehicle's whole assign-then-walk
-  // window (ArrivalGate.ts sets it only on arrival), so a picker that
-  // filtered on driverId alone kept offering an employee already walking to
-  // board a *different* vehicle — the click then silently failed
-  // requestBoardVehicle's own already-walking guard, with no feedback. Two
-  // cards rendered from one `update()` call (no purchase in between to force
-  // a second render) is the scenario that most directly exercises this: both
-  // pickers must reflect the claim the other one just made.
-  it('excludes an employee already walking to board a different vehicle from the picker, even before that vehicle has a confirmed driverId', () => {
-    const { panel } = makePanel();
-    panel.setGameConsole(() => ({ success: true, output: '' }));
-    const dorian = makeEmployee({ id: 6, name: 'Dorian Kask', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
-    const bev = makeEmployee({ id: 7, name: 'Bev Nunnally', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
-    const vehicleA = makeVehicle({ id: 2, type: 'debris_hauler' });
-    const vehicleB = makeVehicle({ id: 3, type: 'debris_hauler' });
-
-    panel.update(makeState([vehicleA, vehicleB], [dorian, bev]));
-    const [selectA, selectB] = [...panel.root.querySelectorAll('select')] as HTMLSelectElement[];
-    expect([...selectA!.options].map(o => o.textContent)).toEqual(['Dorian Kask', 'Bev Nunnally']);
-    expect([...selectB!.options].map(o => o.textContent)).toEqual(['Dorian Kask', 'Bev Nunnally']);
-
-    // Dorian claims vehicle A — vehicle.driverId stays null (walking, not
-    // yet arrived); only the employee's pendingDriverVehicleId changes.
-    dorian.pendingDriverVehicleId = vehicleA.id;
-    panel.update(makeState([vehicleA, vehicleB], [dorian, bev]));
-
-    const selectBAfter = panel.root.querySelector(`[data-vehicle-id="${vehicleB.id}"] select`) as HTMLSelectElement;
-    expect([...selectBAfter.options].map(o => o.textContent)).toEqual(['Bev Nunnally']);
-
-    const assignBtnB = panel.root.querySelector<HTMLButtonElement>(`[data-vehicle-id="${vehicleB.id}"] .bs-vehicle-assign-btn`)!;
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    assignBtnB.click();
-    expect(calls).toEqual(['vehicle driver 3 7']);
-  });
-
-  // #715 follow-up: excluding a pending driver from every OTHER vehicle's
-  // picker (the test above) must not also hide them from their OWN
-  // vehicle's card — v.driverId stays null for the whole walk, so without a
-  // dedicated pending row that card fell through to makeAssignRow and, once
-  // the only licensed employee was excluded, showed the misleading
-  // "Nobody is licensed" warning for a vehicle that already has someone
-  // walking to it.
+  // #715 follow-up, retargeted for #921: excluding a pending driver from every
+  // OTHER vehicle's card is proven by the "unmanned, auto-crews" test below,
+  // which now covers what the old no-licensed-warning-vs-pending-row
+  // distinction proved. This test keeps only the still-true half: a pending
+  // claim renders its own row and never mentions "Nobody is licensed" — the
+  // select/Assign-button assertions are stripped since neither ever renders
+  // anywhere in this panel anymore.
   it('shows a pending-driver row, not the no-licensed warning, for a vehicle its only licensed employee is already walking to', () => {
     const { panel } = makePanel();
     const dorian = makeEmployee({
@@ -249,8 +207,32 @@ describe('FleetPanel', () => {
 
     expect(panel.root.textContent).toContain('Dorian Kask');
     expect(panel.root.textContent).not.toContain('Nobody is licensed');
-    expect(panel.root.querySelector('select')).toBeNull();
-    expect([...panel.root.querySelectorAll('button')].some(b => b.textContent === 'Assign')).toBe(false);
+  });
+
+  // #921: a vehicle with no driver, no pending claim, and at least one
+  // roster employee who holds the required licence renders the "unmanned,
+  // auto-crews" row — not the no-licensed warning, and with no button or
+  // <select> for the player to click, since claiming is fully automatic now.
+  it('shows an "unmanned, auto-crews" row (no button, no select) when a licensed employee exists on the roster', () => {
+    const { panel } = makePanel();
+    const licensed = makeEmployee({
+      id: 6, name: 'Dorian Kask',
+      qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
+    });
+    const vehicle = makeVehicle({ id: 2, type: 'debris_hauler', driverId: null });
+
+    panel.update(makeState([vehicle], [licensed]));
+
+    const card = panel.root.querySelector('[data-vehicle-id="2"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('Unmanned');
+    expect(card.querySelector('select')).toBeNull();
+    // The only buttons on the card are the always-present per-vehicle actions
+    // (locate, scrap) — none of them named Assign/Train, since a licensed
+    // driver exists and will claim the vehicle on their own.
+    const buttonLabels = [...card.querySelectorAll('button')].map(b => b.textContent);
+    expect(buttonLabels).not.toContain('Assign');
+    expect(buttonLabels).not.toContain('Train someone in Crew');
   });
 
   it('shows a no-licensed warning and the TRAIN button navigates to Crew', () => {
@@ -388,19 +370,11 @@ describe('FleetPanel', () => {
     expect(selectedId).toBeNull();
   });
 
-  it('clicking the driver-assign select control does not fire the select handler', () => {
-    const { panel } = makePanel();
-    let selectedId: number | null = null;
-    panel.setSelectVehicleHandler(id => { selectedId = id; });
-    const eligible = makeEmployee({ id: 6, name: 'Dorian Kask', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
-    panel.update(makeState([makeVehicle({ id: 2, type: 'debris_hauler' })], [eligible]));
-
-    const select = panel.root.querySelector('select') as HTMLSelectElement;
-    expect(select).not.toBeNull();
-    select.click();
-
-    expect(selectedId).toBeNull();
-  });
+  // #921: the driver-assign <select> this test exercised is gone — no
+  // control of that kind renders anywhere in the panel anymore. Deleted
+  // rather than retargeted: there is no remaining nested-select scenario to
+  // guard, and the sibling "nested interactive control" test above (scrap
+  // button) already covers the same click-propagation contract.
 
   it('clicking a vehicle card does not throw when no select handler is registered', () => {
     const { panel } = makePanel();

@@ -27,19 +27,11 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -52,7 +44,7 @@
           "surveyCount": 0
         }
       },
-      "description": "#553: crews the free drill_rig (vehicle #1) with the free driller (employee #1) staffed:true just hired -- unmanned, the rig is a mesh no queued drill_hole action can ever start against. Panel opened once here; every later vehicle step in this file reuses it already open."
+      "description": "#553: crews the free drill_rig (vehicle #1) with the free driller (employee #1) staffed:true just hired -- unmanned, the rig is a mesh no queued drill_hole action can ever start against. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click."
     },
     {
       "command": "campaign start level:treranium_depths",
@@ -1156,15 +1148,11 @@
       "command": "vehicle driver 7 8",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 7 8"
         }
       ],
-      "role": "player",
+      "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -1177,7 +1165,7 @@
           "surveyCount": 3
         }
       },
-      "description": "#553: Frank Dusty (employee #8) boards this file's own drill_rig (vehicle #7, bought above) -- the 2nd concurrent driller/drill_rig pair, alongside the free staffed rig (vehicle #1, driven by employee #1) crewed at the top of this file."
+      "description": "#553: Frank Dusty (employee #8) boards this file's own drill_rig (vehicle #7, bought above) -- the 2nd concurrent driller/drill_rig pair, alongside the free staffed rig (vehicle #1, driven by employee #1) crewed at the top of this file. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click."
     },
     {
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:25,25",

@@ -90,8 +90,18 @@ async function inspectSelector(page: Page, selector: string): Promise<Unclickabl
   }, selector);
 }
 
-/** Turn an inspection into one line a human can act on. */
-function describeUnclickable(r: UnclickableReport): string {
+/**
+ * Turn an inspection into one line a human can act on.
+ *
+ * `neverAppeared` separates the two ways an absent element gets here, which
+ * read identically in the report and mean opposite things: a control that was
+ * there and went away mid-click is a race, while one the whole wait never saw
+ * once is simply not rendered — the panel holding it was never opened, or the
+ * row does not exist. Reporting the first for the second cost #929 a full CI
+ * cycle chasing a re-render race that was really three scenario files clicking
+ * into a Fleet panel nothing had opened.
+ */
+function describeUnclickable(r: UnclickableReport, neverAppeared = false): string {
   const context = [
     r.matchCount !== undefined && r.matchCount > 1
       ? `selector is ambiguous (${r.matchCount} matches, first one used)`
@@ -99,12 +109,16 @@ function describeUnclickable(r: UnclickableReport): string {
     r.tutorial !== undefined ? `tutorial on ${r.tutorial}` : '',
   ].filter(s => s !== '');
   const suffix = context.length > 0 ? ` [${context.join('; ')}]` : '';
-  return `${describeReason(r)}${suffix}`;
+  return `${describeReason(r, neverAppeared)}${suffix}`;
 }
 
 /** The primary reason, before context is appended. */
-function describeReason(r: UnclickableReport): string {
-  if (!r.found) return 'element vanished from the DOM between the wait and the click';
+function describeReason(r: UnclickableReport, neverAppeared = false): string {
+  if (!r.found) {
+    return neverAppeared
+      ? 'element never appeared in the DOM — nothing renders it (a panel no step opened, or a row that does not exist)'
+      : 'element vanished from the DOM between the wait and the click';
+  }
   if (r.pointerEvents === 'none') {
     return 'element is inert (pointer-events: none) — a tutorial rail or overlay is blocking it, '
       + 'so no player could click it either';
@@ -376,7 +390,10 @@ export function checkStepActionAllowed(
 // "settings" rejected in the `ensurePanel` case below. Module scope (not
 // case-local) so both `ensurePanel` and `ensureStep` can reference the same
 // map instead of hardcoding a panel element id a second time (#652).
-const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
+// Exported for `tests/unit/lint/ScenarioPanelSelectorsAreOpened.test.ts`, the
+// lint that holds every panel-scoped selector in scripts/scenario-defs/ to an
+// `ensurePanel` for the panel that renders it (#929).
+export const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
   blast: 'bs-blast-panel',
   contracts: 'bs-contract-panel',
   ops: 'bs-operations-panel',
@@ -453,6 +470,10 @@ export async function executeActionOnPage(
       // bug) still fails loudly with today's exact error.
       let deadline = Date.now() + timeoutMs;
       let retriedCoveredOnce = false;
+      // 'absent' every single poll means the control was never rendered at
+      // all, which `inspectSelector` alone cannot tell apart from one that
+      // was swapped out mid-click — see `describeUnclickable`.
+      let everPresent = false;
       for (;;) {
         const reason = await page.evaluate((sel: string) => {
           const probe = (window as unknown as {
@@ -466,6 +487,7 @@ export async function executeActionOnPage(
           return probe(sel);
         }, action.selector);
         if (reason === null) break;
+        if (reason !== 'absent') everPresent = true;
         if (Date.now() > deadline) {
           if (!retriedCoveredOnce && reason === 'covered') {
             retriedCoveredOnce = true;
@@ -476,7 +498,7 @@ export async function executeActionOnPage(
             }
           }
           throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector), !everPresent)}`,
           );
         }
         await new Promise((r) => setTimeout(r, 150));

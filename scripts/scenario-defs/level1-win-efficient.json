@@ -958,15 +958,12 @@
       "command": "vehicle driver 1 2",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 2"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 72,
@@ -1011,15 +1008,12 @@
       "command": "vehicle driver 2 3",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 2 3"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 72,
@@ -1064,15 +1058,12 @@
       "command": "vehicle driver 3 4",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 3 4"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 72,
@@ -1871,15 +1862,12 @@
       "command": "vehicle driver 4 5",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 4 5"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "deathCount": 4,
@@ -1922,15 +1910,12 @@
       "command": "vehicle driver 5 6",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 5 6"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "deathCount": 4,
@@ -1973,15 +1958,12 @@
       "command": "vehicle driver 6 7",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 6 7"
         }
       ],
-      "role": "player",
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "deathCount": 4,

@@ -146,16 +146,12 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+          "type": "command",
+          "command": "vehicle driver 1 1"
         }
       ],
-      "description": "#553: the driller (employee #1) boards the drill_rig (vehicle #1). Without a driver the rig is inert and no queued drill_hole action ever starts.",
-      "role": "player",
+      "description": "#553: the driller (employee #1) boards the drill_rig (vehicle #1). Without a driver the rig is inert and no queued drill_hole action ever starts. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "tickCount": 0,
