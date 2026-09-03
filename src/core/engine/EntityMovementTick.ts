@@ -11,8 +11,9 @@ import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { advanceAlongPath } from '../nav/AgentAdvance.js';
-import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY } from '../config/balance.js';
+import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY, MOVE_STUCK_ABANDON_TICKS } from '../config/balance.js';
 import { applyAdvanceOutcome, handleVehicleOccupancyBlock } from './VehicleOccupancyReroute.js';
+import { interruptActiveAction } from './TaskDispatch.js';
 
 export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
 
@@ -323,6 +324,22 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
           emitter?.emit('agent:stuck', { employeeId: emp.id });
         }
         emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
+
+        // Sustained-stuck release (#938): a destination that has become
+        // permanently unreachable (e.g. boxed in by a building placed after
+        // the walk was claimed) otherwise pins isMoveStuck true and
+        // moveConsecutiveFailures growing forever, with the employee's claim
+        // never released back to the pool for another employee to pick up.
+        // interruptActiveAction handles both the vehicle-gated case
+        // (actionId names a real PendingAction) and the manual `vehicle
+        // driver` boarding case (actionId null, no underlying PendingAction)
+        // — see its own doc comment (TaskCancellation.ts).
+        if (emp.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
+          const actionId = emp.activeActionId;
+          interruptActiveAction(state, emp, actionId);
+          result.abandoned.push({ employeeId: emp.id, actionId });
+          emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
+        }
       }
       continue;
     }
