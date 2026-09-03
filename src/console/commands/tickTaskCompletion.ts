@@ -14,6 +14,7 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../../core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../../core/mining/Ramp.js';
+import { patchNavGridForRegion } from '../../core/engine/TaskProgress.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../../core/entities/Building.js';
 import { addIncome } from '../../core/economy/Finance.js';
@@ -61,12 +62,18 @@ export function resolveTaskCompletion(
 
       if (ramp && tracker) {
         const carveResult = carveRampSegment(ctx.grid, { cells, region }, emitter);
-        if (carveResult.voxelsCleared > 0 && region && state.navGrid) {
-          NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
+        if (carveResult.voxelsCleared > 0) {
+          patchNavGridForRegion(state, ctx.grid, region);
         }
         tracker.done = true;
         tracker.carvedCount = tracker.cells.length;
-        lines.push(`[tick ${state.tickCount}] Ramp #${rampId} segment ${segmentIndex} excavated: ${carveResult.voxelsCleared} voxels cleared.`);
+        // Progressive carving (#946) clears a segment's cells over the
+        // preceding ticks via TaskProgress.ts's per-tick slice carve, so by
+        // the time this completion tick runs every cell in the segment is
+        // already carved — carveRampSegment's own idempotent density
+        // recheck genuinely returns 0 here, not a bug. tracker.cells.length
+        // is the segment's true total, which is what actually got cleared.
+        lines.push(`[tick ${state.tickCount}] Ramp #${rampId} segment ${segmentIndex} excavated: ${tracker.cells.length} voxels cleared.`);
 
         if (ramp.segments.every(s => s.done)) {
           const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);

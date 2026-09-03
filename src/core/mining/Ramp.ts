@@ -308,6 +308,22 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
 type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
 
 /**
+ * Clear one cell into `grid` if still solid, counting it. Shared per-cell
+ * step for {@link carveRampSegment} (which clears every cell of a segment
+ * and already has a precomputed `region`) and {@link carveRampSegmentSlice}
+ * (which clears a sub-range and derives `region` from the cells it actually
+ * cleared) — the only two carve loops in this file, and the only thing they
+ * duplicated (#946 review finding 1).
+ */
+function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: number }): boolean {
+  if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
+    grid.clearVoxel(cell.x, cell.y, cell.z);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
  * the affected region. Density is re-checked per cell at carve time — a cell
  * already cleared by something else (a blast, another ramp) since
@@ -318,10 +334,7 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
   let voxelsCleared = 0;
 
   for (const cell of segment.cells) {
-    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
-      grid.clearVoxel(cell.x, cell.y, cell.z);
-      voxelsCleared++;
-    }
+    if (carveCellIfSolid(grid, cell)) voxelsCleared++;
   }
 
   if (voxelsCleared > 0 && segment.region) {
@@ -364,8 +377,7 @@ export function carveRampSegmentSlice(
   for (let i = fromIndex; i < toIndex; i++) {
     const cell = cells[i];
     if (!cell) continue;
-    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
-      grid.clearVoxel(cell.x, cell.y, cell.z);
+    if (carveCellIfSolid(grid, cell)) {
       voxelsCleared++;
       minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
       minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
