@@ -121,11 +121,23 @@ export function vehicleCommand(
       const task = (named['task'] ?? 'idle') as VehicleTask;
       const toCoords = (named['to'] ?? '').split(',').map(Number);
       if (isNaN(id)) return { success: false, output: t('vehicle.assign_usage') };
-      const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
-      const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
-      if (!assignVehicle(state.vehicles, id, task, targetX, targetZ)) {
+      const target = state.vehicles.vehicles.find(v => v.id === id);
+      if (!target) {
         return { success: false, output: t('vehicle.not_found', { id }) };
       }
+      // Same rationale as `move` (#947): canTickVehicle never advances a
+      // driverless vehicle, so staging task='moving' here would silently
+      // no-op instead of walking. Refuse instead of accepting it quietly.
+      if (task === 'moving' && target.driverId === null) {
+        return { success: false, output: t('vehicle.move_no_driver', { id }) };
+      }
+      const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
+      const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
+      // `target` above already confirmed a vehicle with `id` exists, and
+      // nothing mutates `state.vehicles` between that lookup and here, so
+      // assignVehicle cannot fail its own not-found check — its boolean
+      // return is not re-checked (same reasoning as `move`'s fix, #947).
+      assignVehicle(state.vehicles, id, task, targetX, targetZ);
       return { success: true, output: t('vehicle.assign_success', { id, task }) };
     }
     case 'move': {
@@ -145,9 +157,11 @@ export function vehicleCommand(
       if (target.driverId === null) {
         return { success: false, output: t('vehicle.move_no_driver', { id }) };
       }
-      if (!moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!)) {
-        return { success: false, output: t('vehicle.not_found', { id }) };
-      }
+      // `target` above already confirmed a vehicle with `id` exists, and
+      // nothing mutates `state.vehicles` between that lookup and here, so
+      // moveVehicle cannot fail its own not-found check — its boolean return
+      // is not re-checked.
+      moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!);
       return { success: true, output: t('vehicle.move_success', { id, x: toCoords[0]!, z: toCoords[1]! }) };
     }
     case 'driver': {
