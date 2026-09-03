@@ -129,7 +129,7 @@ It runs as a lint test rather than a CI job of its own, so it costs the `logic` 
 needs no new runner. Two gates, because the findings differ in kind:
 
 - **Unused files: zero, always.** A file nothing imports is not partly dead.
-- **Unused exports: against a baseline** in `tests/unit/lint/dead-code-baseline.json`. The 248
+- **Unused exports: against a baseline** in `tests/unit/lint/dead-code-baseline.json`. The 246
   entries there are mostly types and constants used inside their own file and exported out of habit
   — the code is alive, only the `export` is not. The list may shrink and never grow, and a stale
   entry fails too, so removing an export means removing its line.

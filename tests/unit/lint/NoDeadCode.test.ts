@@ -13,10 +13,10 @@
 //   Unused files are held at zero. A file nothing imports is not partly dead,
 //   and there is no version of the codebase where keeping one is right.
 //
-//   Unused exports are held against a baseline. There are 248 of them, mostly
+//   Unused exports are held against a baseline. There are 246 of them, mostly
 //   types and constants used inside their own file and exported out of habit,
 //   so the code behind them is alive and only the `export` is not. Fixing all
-//   248 is its own job; what must not happen meanwhile is a 249th. The
+//   246 is its own job; what must not happen meanwhile is a 247th. The
 //   baseline shrinks and never grows, and a stale entry fails too — so
 //   removing an export means removing its line.
 //
@@ -80,6 +80,6 @@ describe('repo-wide — no dead code', () => {
   it('keeps the baseline shrinking, never growing', () => {
     // Pins the count so a bulk re-generation of the baseline cannot quietly
     // raise the ceiling: lowering this number is the only allowed edit.
-    expect(baseline.unusedExports.length).toBeLessThanOrEqual(248);
+    expect(baseline.unusedExports.length).toBeLessThanOrEqual(246);
   });
 });

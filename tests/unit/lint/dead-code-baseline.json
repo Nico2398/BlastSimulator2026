@@ -214,8 +214,6 @@
     "src/ui/SandboxPanel.ts:OnSandboxStart",
     "src/ui/accidentLookup.ts:AccidentStyle",
     "src/ui/crewDetailSections.ts:RAISE_PRESETS",
-    "src/ui/crewDetailSections.ts:bandColor",
-    "src/ui/crewDetailSections.ts:describeActivity",
     "src/ui/dom.ts:ButtonOptions",
     "src/ui/dom.ts:ButtonVariant",
     "src/ui/dom.ts:ElOptions",
