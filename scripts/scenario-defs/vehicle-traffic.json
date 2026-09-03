@@ -219,6 +219,58 @@
       }
     },
     {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so each hauler needs its own driver boarded before the move commands below can succeed. The Fleet panel's own Assign/Unassign controls were removed in #921 -- `vehicle driver` survives as a scenario/console-only primitive, run as a bootstrap command rather than a UI click (same pattern as hauling-gate.json)."
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 3 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 4 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "description": "All four drivers spawn on the same tile as their haulers (#512), so 10 ticks is enough for every one of them to walk over and board -- confirmed live: `vehicle list` afterward shows driver:#1..#4 on all four."
+    },
+    {
       "command": "vehicle move 2 to:21,20",
       "interaction": [
         {
@@ -455,7 +507,7 @@
         "equals": {
           "vehicleCount": 4
         },
-        "note": "Finding #21 still holds now that all 4 haulers are bought with real money: the step's own console output at tick 25 is \"Advanced 20 tick(s). Now at tick 25. No events fired.\" — no TrafficJamEvent, for the reasons in the file's top-level description. No scalar field exists to assert the negative directly (pendingEvent isn't in SerializableGameState), so this anchors on the one thing that IS externally checkable: the fleet stays at 4, undisturbed."
+        "note": "Finding #21 still holds now that all 4 haulers are bought with real money: the step's own console output at tick 35 (10 driver-boarding ticks added by #947, +5, +20) is \"Advanced 20 tick(s). Now at tick 35. No events fired.\" — no TrafficJamEvent, for the reasons in the file's top-level description. No scalar field exists to assert the negative directly (pendingEvent isn't in SerializableGameState), so this anchors on the one thing that IS externally checkable: the fleet stays at 4, undisturbed."
       }
     },
     {

@@ -1,6 +1,6 @@
 {
   "name": "vehicle-traffic-routing-visual",
-  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 25 once the tick budget was corrected — see the tick 26 step for detail.",
+  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 35 (10 driver-boarding ticks added ahead of the move commands by #947, +25) once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow cash:150000",
@@ -219,6 +219,58 @@
       "role": "observe"
     },
     {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so each hauler needs its own driver boarded before the move commands below can succeed. The Fleet panel's own Assign/Unassign controls were removed in #921 -- `vehicle driver` survives as a scenario/console-only primitive, run as a bootstrap command rather than a UI click (same pattern as hauling-gate.json)."
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 3 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 4 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "description": "All four drivers spawn on the same tile as their haulers (#512), so 10 ticks is enough for every one of them to walk over and board -- confirmed live: `vehicle list` afterward shows driver:#1..#4 on all four. Shifts every absolute tick number the rest of this file's Finding #22 timing analysis depends on by +10 -- see the tick 6/tick 26 steps below."
+    },
+    {
       "command": "vehicle move 1 to:37,33",
       "description": "Real click path for the one hauler a mouse can actually pick: select #1 in the 3D scene, rest the cursor on (37,33), press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre, measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`. The three steps below stay console commands for a reason recorded there.",
       "interaction": [
@@ -369,7 +421,7 @@
         "equals": {
           "vehicleCount": 4
         },
-        "note": "all 4 vehicles still converging on (37,33) — real jam confirmed at tick 25, see the tick 26 step below (Finding #22)"
+        "note": "all 4 vehicles still converging on (37,33) — real jam confirmed at tick 35 (shifted +10 by #947's driver-boarding ticks), see the tick 26 step below (Finding #22)"
       }
     },
     {
@@ -384,7 +436,7 @@
     },
     {
       "command": "tick 26",
-      "description": "Finding #22: a direct engine trace (sampling state.events.pendingEvent tick by tick) found the jam actually fires at absolute tick 25, not tick 20 as this step previously assumed — the previous 6+16=22 tick budget was 3 ticks short and left the event unfired every run. Extended to 6+26=32 for real margin past the confirmed tick-25 fire point (verified: all 4 vehicles converge on (37,33), vehicle #1 occupies it, #2/#3/#4 all enter the waiting state simultaneously and cross TRAFFIC_JAM_MIN_TICKS=10 together, satisfying TRAFFIC_JAM_MIN_VEHICLES=3 — unlike vehicle-traffic.json's Finding #21, converging all 4 purchased vehicles rather than 3 is exactly what makes this one work).",
+      "description": "Finding #22: a direct engine trace (sampling state.events.pendingEvent tick by tick) found the jam actually fires at absolute tick 25, not tick 20 as this step previously assumed — the previous 6+16=22 tick budget was 3 ticks short and left the event unfired every run. Extended to 6+26=32 for real margin past the confirmed tick-25 fire point (verified: all 4 vehicles converge on (37,33), vehicle #1 occupies it, #2/#3/#4 all enter the waiting state simultaneously and cross TRAFFIC_JAM_MIN_TICKS=10 together, satisfying TRAFFIC_JAM_MIN_VEHICLES=3 — unlike vehicle-traffic.json's Finding #21, converging all 4 purchased vehicles rather than 3 is exactly what makes this one work). #947 added 10 driver-boarding ticks ahead of the move commands, shifting every absolute tick number in this analysis by +10 — the jam now fires at tick 35, confirmed live: 16+26=42 tick budget still lands with the same margin past it.",
       "interaction": [
         {
           "type": "command",
@@ -396,7 +448,7 @@
         "equals": {
           "vehicleCount": 4
         },
-        "note": "the step's own console output is the direct evidence: \"[tick 25] EVENT: Traffic Jam ... (Advanced 19 of 26 requested ticks)\" — the tick loop stops on the pending event, which is why tickCount lands on 25 rather than 32. No scalar field exists in SerializableGameState to assert the event directly, so this anchors on the fleet staying intact at 4 while the jam condition is met."
+        "note": "the step's own console output is the direct evidence: \"[tick 35] EVENT: Traffic Jam ... (Advanced 19 of 26 requested ticks)\" — the tick loop stops on the pending event, which is why tickCount lands on 35 rather than 42 (both shifted +10 from the pre-#947 25/32 by the driver-boarding ticks added ahead of the move commands). No scalar field exists in SerializableGameState to assert the event directly, so this anchors on the fleet staying intact at 4 while the jam condition is met."
       }
     },
     {

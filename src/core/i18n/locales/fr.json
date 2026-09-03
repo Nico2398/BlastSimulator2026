@@ -3239,7 +3239,7 @@
   "ui.blast_workshop.fire.zone_clear": "La zone dangereuse est dégagée. Personne ne s'y trouve.",
   "ui.blast_workshop.fire.no_plan": "Forez d'abord un plan.",
   "ui.blast_workshop.fire.sound_horn": "Sonner la corne",
-  "ui.blast_workshop.fire.sound_horn_note": "Obligatoire par la loi, et ça marche vraiment : déplace chaque employé et véhicule hors de la zone avant le tir.",
+  "ui.blast_workshop.fire.sound_horn_note": "Obligatoire par la loi, et ça marche vraiment : déplace chaque employé et chaque véhicule avec un chauffeur à bord hors de la zone avant le tir.",
   "ui.blast_workshop.fire.tag_in_zone": "DANS LA ZONE",
   "ui.blast_workshop.fire.tag_stranded": "BLOQUÉ - SANS CHAUFFEUR",
   "ui.blast_workshop.fire.preflight_section": "Contrôle avant tir",

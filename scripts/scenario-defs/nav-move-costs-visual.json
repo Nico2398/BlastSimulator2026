@@ -166,6 +166,28 @@
       }
     },
     {
+      "command": "vehicle driver 5 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 5 3"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #5 needs a driver boarded before the move step below can succeed. Employee #3 (staffed:true's driving.truck driver) is free -- the driller and the other two drivers never touch this vehicle."
+    },
+    {
+      "command": "tick 60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "role": "setup",
+      "description": "60 ticks is enough for employee #3 to walk from the staffed fleet's spawn cluster over to hauler #5's own spawn point and board it -- same margin confirmed live for the same staffed:true fleet layout in nav-dynamic-updates-visual.json."
+    },
+    {
       "command": "vehicle move 5 to:5,9",
       "interaction": [
         {

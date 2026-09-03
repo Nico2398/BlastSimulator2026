@@ -85,16 +85,18 @@ export function handleVehicleOccupancyBlock(
   // #689: every route to the target is blocked by a live vehicle, including
   // the destination cell itself — a permanent deadlock (a driver reassigned
   // mid-drilling can leave a vehicle idle on exactly the tile a *different*
-  // pending action needs). Driving a vehicle has never actually required its
-  // role licence — isLicensedForRole/findFreeVehicleForRole only gate
-  // *claiming a vehicle-gated task* (drilling, digging, hauling), and
-  // canTickVehicle below moves a vehicle on task alone, no driver required —
-  // so any employee can already move one out of the way. Relocate an idle,
-  // unreserved blocker sitting on the target rather than escalate to stuck:
-  // once it clears, this same reroute attempt succeeds on a later tick. A
-  // blocker that is reserved, mid-task, or has nowhere free to go will never
-  // clear on its own — fall through to the same stuck escalation as any
-  // other deadlock rather than wait on it forever.
+  // pending action needs). isLicensedForRole/findFreeVehicleForRole only gate
+  // *claiming a vehicle-gated task* (drilling, digging, hauling) — driving
+  // itself has never required the role licence, so any employee's vehicle
+  // can relocate one out of the way. But canTickVehicle (#947) now requires
+  // driverId !== null to advance on tick at all: relocating a driverless
+  // blocker would stage task='moving' on it and then never advance it,
+  // trading a visible deadlock for a silent, permanent one. Relocate an
+  // idle, unreserved blocker sitting on the target ONLY when it has a driver
+  // aboard — once it clears, this same reroute attempt succeeds on a later
+  // tick. A blocker that is reserved, mid-task, driverless, or has nowhere
+  // free to go will never clear on its own — fall through to the same stuck
+  // escalation as any other deadlock rather than wait on it forever.
   const blocker = state.vehicles.vehicles.find(
     v => v.id !== vehicle.id && v.x === vehicle.targetX && v.z === vehicle.targetZ,
   );
@@ -104,7 +106,7 @@ export function handleVehicleOccupancyBlock(
       // to clear rather than escalate mid-relocation.
       return;
     }
-    if (blocker.task === 'idle' && blocker.reservedForActionId === null) {
+    if (blocker.task === 'idle' && blocker.reservedForActionId === null && blocker.driverId !== null) {
       const freeCell = findNearestFreeCellForVehicle(state, blocker);
       if (freeCell) {
         moveVehicle(state.vehicles, blocker.id, freeCell.x, freeCell.z);

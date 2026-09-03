@@ -134,6 +134,17 @@ export function vehicleCommand(
       if (isNaN(id) || toCoords.length < 2 || toCoords.some(isNaN)) {
         return { success: false, output: t('vehicle.move_usage') };
       }
+      const target = state.vehicles.vehicles.find(v => v.id === id);
+      if (!target) {
+        return { success: false, output: t('vehicle.not_found', { id }) };
+      }
+      // canTickVehicle (EntityMovementTick.ts, #947) never advances a
+      // driverless vehicle — staging task='moving' here would silently
+      // no-op instead of walking, which is worse than today's (wrong, but
+      // visible) unmanned drive. Refuse instead.
+      if (target.driverId === null) {
+        return { success: false, output: t('vehicle.move_no_driver', { id }) };
+      }
       if (!moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!)) {
         return { success: false, output: t('vehicle.not_found', { id }) };
       }

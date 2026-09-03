@@ -3239,7 +3239,7 @@
   "ui.blast_workshop.fire.zone_clear": "Danger zone is clear. Nobody is standing in it.",
   "ui.blast_workshop.fire.no_plan": "Drill a plan first.",
   "ui.blast_workshop.fire.sound_horn": "Sound the Horn",
-  "ui.blast_workshop.fire.sound_horn_note": "Legally required, and it actually works: moves every worker and vehicle out of the zone before you fire.",
+  "ui.blast_workshop.fire.sound_horn_note": "Legally required, and it actually works: moves every worker and every vehicle with a driver aboard out of the zone before you fire.",
   "ui.blast_workshop.fire.tag_in_zone": "IN ZONE",
   "ui.blast_workshop.fire.tag_stranded": "STRANDED - NO DRIVER",
   "ui.blast_workshop.fire.preflight_section": "Pre-Flight",

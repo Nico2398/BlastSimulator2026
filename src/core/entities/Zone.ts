@@ -81,6 +81,15 @@ export function clearZone(
 
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
+    // A driverless vehicle can never advance on tick (canTickVehicle,
+    // EntityMovementTick.ts, #947) — order it out anyway and it just sits
+    // there with task='moving' forever. Check driverId before even looking
+    // for a destination, so a valid safe cell existing makes no difference:
+    // report it stranded either way.
+    if (v.driverId === null) {
+      result.strandedVehicleIds.push(v.id);
+      continue;
+    }
     const dest = findSafeDestination(v.x, v.z, zone);
     if (dest) {
       moveVehicle(vehicles, v.id, dest.x, dest.z);
