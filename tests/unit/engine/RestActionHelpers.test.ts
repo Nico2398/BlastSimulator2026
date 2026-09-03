@@ -7,8 +7,10 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
-import { deductRestCost, findNearestBuildingOfType } from '../../../src/core/engine/RestActionHelpers.js';
-import { NEED_REST_COSTS } from '../../../src/core/config/balance.js';
+import {
+  deductRestCost, findNearestBuildingOfType, completeRestForEmployee,
+} from '../../../src/core/engine/RestActionHelpers.js';
+import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
 
 const DEDUCT_SEED = 42;
 
@@ -115,5 +117,120 @@ describe('findNearestBuildingOfType — active-zone exclusion (#557)', () => {
     const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
 
     expect(found?.id).toBe(near.building!.id);
+  });
+});
+
+// #945: completeRestForEmployee's with-building path used to apply
+// BUILDING_REPLENISH_RATES.fatigue[tier] once per tick of NEED_REST_DURATIONS
+// (a flat, tier-scaled total), rather than landing the gauge at the fixed
+// ceiling MAX_NEED_GAUGE (100) the way the no-building path already does via
+// NEED_REST_NO_BUILDING_CAP. At Tier 1 (rate 8 × duration 8 = 64), a rest
+// starting from 25 fatigue lands at ~89, not 100 — the driver in the
+// tutorial box-cut repro (#945) never leaves a rest fully rested, so it
+// re-triggers a proactive/collapse rest again a few ticks later, forcing
+// repeated dismount/reboard cycles on whatever vehicle it was driving.
+// Tier 2 (rate 14) and Tier 3 (rate 20) already reach 100 through
+// replenishNeed's own internal Math.min(100, ...) clamp before the loop of 8
+// iterations finishes, so only Tier 1 is actually under — but the fix (set
+// emp[needKey] = MAX_NEED_GAUGE directly) must land all three tiers at
+// exactly 100, not above.
+describe('completeRestForEmployee (#945 — with-building rest lands exactly at MAX_NEED_GAUGE, every tier)', () => {
+  const SEED = 42;
+
+  it('Tier 1 living_quarters rest leaves fatigue at MAX_NEED_GAUGE (100), not the ~89 the old per-tick-rate accumulation produced', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
+  });
+
+  it('Tier 2 living_quarters rest lands exactly at MAX_NEED_GAUGE, not above it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+
+    state.buildings.unlockedTiers.living_quarters = 3; // tier 2+ requires research unlock
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
+  });
+
+  it('Tier 3 living_quarters rest lands exactly at MAX_NEED_GAUGE, not above it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+
+    state.buildings.unlockedTiers.living_quarters = 3;
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 3);
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
+  });
+
+  it('an employee already at MAX_NEED_GAUGE stays there after a building rest (boundary — no overshoot)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = MAX_NEED_GAUGE;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
+  });
+
+  it('no-building rest still caps at NEED_REST_NO_BUILDING_CAP (70) — unchanged regression', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+    // No living_quarters placed at all.
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+  });
+
+  it('no-building rest leaves a gauge already above the cap alone, rather than pulling it down (boundary — unchanged regression)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 90; // already above NEED_REST_NO_BUILDING_CAP (70)
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.fatigue).toBe(90);
+  });
+
+  it('clears collapsing/restTicksRemaining/restNeedKey/activeActionId after a building rest completes (unchanged regression)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+    employee.collapsing = true;
+    employee.restTicksRemaining = 3;
+    employee.restNeedKey = 'fatigue';
+    employee.activeActionId = 777;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+
+    completeRestForEmployee(state, employee, 'fatigue');
+
+    expect(employee.collapsing).toBe(false);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.restNeedKey).toBeNull();
+    expect(employee.activeActionId).toBeNull();
   });
 });

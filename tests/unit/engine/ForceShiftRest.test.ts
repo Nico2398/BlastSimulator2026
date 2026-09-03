@@ -178,6 +178,32 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBe(600);
   });
+
+  // NEW (#945): an employee already arrived and mid-execution of a claimed
+  // task (taskTicksRemaining !== null) must not be pulled into a forced
+  // shift rest — distinct from the pendingTaskDuration guard above, which
+  // only covers the WALK to a claimed job, not the work itself once arrived.
+  // Without this guard, a rock-digger driver mid dig_ramp_segment gets
+  // yanked off its vehicle the instant WORK_DURATION_TICKS is crossed,
+  // dismounting and re-boarding repeatedly (#945's tutorial box-cut repro).
+  it('#945: no-op when taskTicksRemaining is set (mid-execution of a claimed, arrived task)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 650);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution — not just walking to it
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.taskTicksRemaining).toBe(4); // untouched
+    expect(employee.activeActionId).toBe(650); // claim survives, not released
+    const claim = state.pendingActions.find(a => a.id === 650)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
+  });
 });
 
 describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
@@ -383,5 +409,33 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(released.holderId).toBeNull();
     expect(employee.activeActionId).not.toBe(1000);
     expect(employee.activeActionId).not.toBeNull();
+  });
+
+  // NEW (#945): mirrors forceShiftRestIfNeeded's own taskTicksRemaining
+  // guard (see its own comment) — a policy-forced rest must not preempt an
+  // employee already arrived and mid-execution of a claimed task either,
+  // even with fatigue deep below any threshold and the shift boundary long
+  // since passed. Only a genuine collapse (tickCollapse, NeedRestoration.ts)
+  // is still allowed to interrupt mid-task — that path is untouched by #945.
+  it('#945: no-op when taskTicksRemaining is set (mid-execution of a claimed, arrived task), even with fatigue deep below threshold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1100);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10; // well past the shift boundary
+    employee.fatigue = 1; // well below any threshold
+    employee.taskTicksRemaining = 3; // arrived, mid-execution — not just walking to it
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.taskTicksRemaining).toBe(3); // untouched
+    expect(employee.activeActionId).toBe(1100); // claim survives, not released
+    const claim = state.pendingActions.find(a => a.id === 1100)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
   });
 });

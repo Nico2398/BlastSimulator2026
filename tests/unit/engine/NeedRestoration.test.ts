@@ -550,4 +550,39 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction).toBeDefined();
   });
 
+  // ── NEW (#945) ──────────────────────────────────────────────────────────────
+  // #945 adds a taskTicksRemaining !== null guard to forceShiftRestIfNeeded,
+  // forceShiftRestIfNeededByPolicy, and autoInsertNeedTasks — but explicitly
+  // does NOT touch tickCollapse/checkCollapse. This is the hard floor
+  // (NEED_COLLAPSE_THRESHOLDS.fatigue = 5) that keeps the fix from making a
+  // worker immortal: a genuinely collapsing employee must still be
+  // interrupted unconditionally, even mid-execution of a claimed, already-
+  // arrived task (e.g. mid dig_ramp_segment) — not just mid-walk to one
+  // (already covered by the #928 pendingTaskDuration regression test above).
+  it('#945: interrupts an employee mid-execution of a claimed task (taskTicksRemaining !== null) when fatigue collapses — tickCollapse is deliberately unguarded', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold (5)
+    employee.activeActionId = 42; // claimed a job
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of it — not just walking
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    expect(employee.collapsing).toBe(true);
+    // The prior claim is released — collapse interrupts unconditionally,
+    // regardless of the employee's task-execution state.
+    expect(employee.activeActionId).not.toBe(42);
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
 });

@@ -829,3 +829,66 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
     expect(interruptedWhileTravelingToClaim).toBe(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #945 — same tutorial box-cut repro as the #928 suite above, but proving the
+// tighter, additive fix: #928 only stopped a proactive rest from preempting
+// an employee mid-WALK to a claimed job (pendingTaskDuration !== null). It
+// left a gap for an employee already arrived and mid-EXECUTION of that job
+// (taskTicksRemaining !== null, e.g. mid dig_ramp_segment) — still
+// preemptable once WORK_DURATION_TICKS/the site policy's threshold was
+// crossed. On the box-cut ramp order, that gap repeatedly knocks the
+// rock-digger driver off its vehicle mid-segment, forcing it to dismount,
+// walk to rest, and re-board over and over.
+//
+// This test drives the identical order sequence used above and counts
+// 'vehicle:driver_boarded' events (ArrivalGate.ts) against the rock_digger
+// vehicle specifically, rather than a fixed employee id: the bug is a
+// per-vehicle dismount/reboard cycle, and gating on vehicleId (stable for
+// the whole run) is robust to a different qualified driver picking up the
+// same vehicle after a legitimate handoff, whereas a fixed employee id is
+// not. Bounded by polling until no dig_ramp_segment PendingActions remain
+// (max 200 ticks) rather than a fixed tick count, per dev-testing-strategy's
+// wait-on-condition rule.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most twice for the whole order', () => {
+  const MAX_TICKS = 200;
+  // At most an initial boarding plus one legitimate re-board (e.g. after a
+  // driver-qualified handoff) — NOT the 3+ dismount/reboard cycles the
+  // under-restoration + mid-task-preemption bug produces.
+  const MAX_EXPECTED_BOARDINGS = 2;
+
+  it('boards the rock_digger vehicle no more than twice while carving the whole box-cut ramp', () => {
+    const engine = createGameEngine();
+
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    const rockDigger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
+    if (!rockDigger) throw new Error('Setup: no rock_digger vehicle in the staffed starting fleet');
+    const rockDiggerVehicleId = rockDigger.id;
+
+    let boardingCount = 0;
+    engine.ctx.emitter.on('vehicle:driver_boarded', (payload: unknown) => {
+      const { vehicleId } = payload as { employeeId: number; vehicleId: number };
+      if (vehicleId === rockDiggerVehicleId) boardingCount++;
+    });
+
+    let ticks = 0;
+    while (
+      ticks < MAX_TICKS
+      && state.pendingActions.some(a => a.type === 'dig_ramp_segment')
+    ) {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      ticks++;
+    }
+
+    expect(ticks).toBeLessThan(MAX_TICKS); // the box-cut must actually finish within the bound
+    expect(boardingCount).toBeLessThanOrEqual(MAX_EXPECTED_BOARDINGS);
+  });
+});
