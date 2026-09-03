@@ -32,6 +32,8 @@ interface Occupant {
   icon: IconName;
   name: string;
   sub: string;
+  /** True for a vehicle stranded in the zone with no driver aboard — clearZone/evacuateZone report it via strandedVehicleIds rather than moving it. */
+  strandedNoDriver: boolean;
 }
 
 export class FireStep {
@@ -101,7 +103,7 @@ export class FireStep {
     const occupants = zone ? this.occupants(state, zone) : [];
     this.hornBtn.disabled = occupants.length === 0;
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, occupants.length);
+    this.renderChecklist(state.drillHoles.length, wet.length, occupants);
   }
 
   refreshLocale(): void {
@@ -119,11 +121,12 @@ export class FireStep {
         icon: e.collapsing ? 'collapse' : 'crew',
         name: e.name,
         sub: t(`role.${e.role}`),
+        strandedNoDriver: false, // TODO: implement
       });
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}` });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: false }); // TODO: implement
     }
     return result;
   }
@@ -172,12 +175,12 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, occupantCount: number): void {
+  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[]): void {
     const dryOk = wetCount === 0;
-    const zoneOk = occupantCount === 0;
+    const zoneOk = occupants.length === 0;
     this.checklistEl.replaceChildren(
       this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount })),
-      this.makeCheckRow(zoneOk, zoneOk ? t('ui.blast_workshop.fire.check_zone_clear') : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
+      this.makeCheckRow(zoneOk, zoneOk ? t('ui.blast_workshop.fire.check_zone_clear') : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupants.length })),
     );
   }
 
