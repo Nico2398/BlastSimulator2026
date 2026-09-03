@@ -1,10 +1,11 @@
-// BlastSimulator2026 — Tests for releaseDeadEmployeeActions
-// (src/core/engine/TaskCancellation.ts, #557 review).
+// BlastSimulator2026 — Tests for releaseDeadEmployeeActions and
+// cancelAction's holder-scoping behavior (src/core/engine/TaskCancellation.ts).
 //
-// interruptActiveAction and cancelAction from the same module predate this
-// file and are covered in tests/unit/engine/TaskDispatch.test.ts (their
-// original home before TaskCancellation.ts was split out) — this file covers
-// only releaseDeadEmployeeActions, added alongside this review's fixes.
+// interruptActiveAction and the rest of cancelAction's coverage predate this
+// file and remain in tests/unit/engine/TaskDispatch.test.ts (their original
+// home before TaskCancellation.ts was split out) — this file adds
+// releaseDeadEmployeeActions (#557 review) and cancelAction's fix to not
+// clear a different active action's holder fields (#939).
 
 import { describe, it, expect } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
