@@ -13,6 +13,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -335,5 +336,214 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
 
     expect(progress?.skill).toBeNull();
     expect(employee.qualifications).toEqual(qualsBefore);
+  });
+});
+
+// ── #946: progressive dig_ramp_segment carving ────────────────────────────
+//
+// A segment used to carve all at once on completion (a visual "slab
+// vanishes" jump). tickTaskProgress's widened (grid?: VoxelGrid) signature
+// is meant to carve a proportional slice of the segment's own cells (in
+// their existing nearest-to-entrance-first array order) on every tick that
+// makes progress, tracked via the segment's own RampSegmentTracker.carvedCount.
+// These tests are Red today because the body still has `void grid; // TODO`
+// and never reads plannedRamps/carves anything.
+
+describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () => {
+  const SEED = 42;
+
+  function makeCells(n: number, baseX = 5, y = 3, z = 5): { x: number; y: number; z: number }[] {
+    return Array.from({ length: n }, (_, i) => ({ x: baseX + i, y, z }));
+  }
+
+  function fillCells(grid: VoxelGrid, cells: { x: number; y: number; z: number }[]): void {
+    for (const cell of cells) {
+      grid.setVoxel(cell.x, cell.y, cell.z, {
+        composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+        density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+      });
+    }
+  }
+
+  /**
+   * Wires `emp` up as mid-way through a dig_ramp_segment action — sets
+   * exactly the fields the ramp-carving branch of tickTaskProgress reads
+   * (activeActionId/taskTicksRemaining/activeTaskTotalTicks/pendingActionType/
+   * pendingActionPayload), plus a matching PendingAction and PlannedRamp
+   * tracker in state, bypassing the full claim/arrival flow (dispatchPendingAction
+   * requires a rock_digger vehicle for dig_ramp_segment — orthogonal to what
+   * this carving logic itself needs to be exercised).
+   */
+  function wireDigRampSegment(
+    state: GameState,
+    emp: GameState['employees']['employees'][number],
+    rampId: number,
+    actionId: number,
+    cells: { x: number; y: number; z: number }[],
+    totalTicks: number,
+  ): void {
+    const region = cells.length > 0 ? {
+      minX: Math.min(...cells.map(c => c.x)), maxX: Math.max(...cells.map(c => c.x)),
+      minY: Math.min(...cells.map(c => c.y)), maxY: Math.max(...cells.map(c => c.y)),
+      minZ: Math.min(...cells.map(c => c.z)), maxZ: Math.max(...cells.map(c => c.z)),
+    } : null;
+
+    state.plannedRamps.push({
+      id: rampId,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 1, targetDepth: 1 },
+      footprint: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
+      segments: [{ index: 0, actionId, cells, region, done: false, carvedCount: 0 }],
+    });
+
+    state.pendingActions.push({
+      id: actionId, type: 'dig_ramp_segment', requiredSkill: null, requiredVehicleRole: null,
+      targetX: cells[0]?.x ?? 0, targetZ: cells[0]?.z ?? 0, targetY: cells[0]?.y ?? 0,
+      payload: { rampId, segmentIndex: 0, cells, region, segmentCost: 0 },
+      targetEmployeeId: emp.id, status: 'assigned', holderId: emp.id,
+    });
+
+    emp.activeActionId = actionId;
+    emp.taskTicksRemaining = totalTicks;
+    emp.activeTaskTotalTicks = totalTicks;
+    emp.activeTaskSkill = null;
+    emp.pendingActionType = 'dig_ramp_segment';
+    emp.pendingActionPayload = { rampId, segmentIndex: 0, cells, region, segmentCost: 0 };
+  }
+
+  it('carves cells progressively (nearest-entrance-first) as ticks advance, reaching carvedCount === cells.length on the completing tick', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const grid = new VoxelGrid(20, 10, 20);
+    const cells = makeCells(8);
+    fillCells(grid, cells);
+
+    const rampId = state.nextPlannedRampId++;
+    const actionId = 1;
+    const totalTicks = 4;
+    wireDigRampSegment(state, employee, rampId, actionId, cells, totalTicks);
+
+    const tracker = () => state.plannedRamps.find(r => r.id === rampId)!.segments[0]!;
+    expect(tracker().carvedCount).toBe(0);
+
+    let previousCarved = 0;
+    for (let tick = 1; tick <= totalTicks; tick++) {
+      tickTaskProgress(state, employee, undefined, grid);
+      const carved = tracker().carvedCount ?? 0;
+      expect(carved).toBeGreaterThanOrEqual(previousCarved);
+
+      // Ordered nearest-to-entrance first: exactly the first `carved` cells
+      // (in the segment's own array order) are cleared; the rest stay solid.
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i]!;
+        if (i < carved) expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        else expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+      }
+      previousCarved = carved;
+    }
+
+    expect(tracker().carvedCount).toBe(cells.length);
+    expect(employee.taskTicksRemaining).toBeNull();
+  });
+
+  it('at least one tick before completion carves a strict subset — progress is not deferred to a single lump on completion', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const grid = new VoxelGrid(20, 10, 20);
+    const cells = makeCells(8);
+    fillCells(grid, cells);
+
+    const rampId = state.nextPlannedRampId++;
+    wireDigRampSegment(state, employee, rampId, 1, cells, 4);
+    const tracker = () => state.plannedRamps.find(r => r.id === rampId)!.segments[0]!;
+
+    tickTaskProgress(state, employee, undefined, grid);
+
+    const carvedAfterOneTick = tracker().carvedCount ?? 0;
+    expect(carvedAfterOneTick).toBeGreaterThan(0);
+    expect(carvedAfterOneTick).toBeLessThan(cells.length);
+  });
+
+  it('grid omitted: no crash, no carve attempted, and taskTicksRemaining still counts down normally', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const cells = makeCells(4);
+    const rampId = state.nextPlannedRampId++;
+    wireDigRampSegment(state, employee, rampId, 1, cells, 4);
+
+    expect(() => tickTaskProgress(state, employee)).not.toThrow();
+
+    const tracker = state.plannedRamps.find(r => r.id === rampId)!.segments[0]!;
+    expect(tracker.carvedCount).toBe(0); // no grid -> no carve attempted
+    expect(employee.taskTicksRemaining).toBe(3); // ordinary countdown, unaffected
+  });
+
+  it('a non-dig_ramp_segment action does not look up plannedRamps or attempt a carve, even when a same-id tracker exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const grid = new VoxelGrid(20, 10, 20);
+    const cells = makeCells(4);
+    fillCells(grid, cells);
+
+    // A ramp tracker exists, but the employee's OWN active action is a plain
+    // general_work task, not dig_ramp_segment.
+    const rampId = state.nextPlannedRampId++;
+    state.plannedRamps.push({
+      id: rampId,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 1, targetDepth: 1 },
+      footprint: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
+      segments: [{ index: 0, actionId: 1, cells, region: null, done: false, carvedCount: 0 }],
+    });
+
+    state.pendingActions.push({
+      id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
+      status: 'assigned', holderId: employee.id,
+    });
+    employee.activeActionId = 1;
+    employee.taskTicksRemaining = 4;
+    employee.activeTaskTotalTicks = 4;
+    employee.pendingActionType = 'general_work';
+    employee.pendingActionPayload = {};
+
+    tickTaskProgress(state, employee, undefined, grid);
+
+    const tracker = state.plannedRamps.find(r => r.id === rampId)!.segments[0]!;
+    expect(tracker.carvedCount).toBe(0);
+    for (const cell of cells) {
+      expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+    }
+  });
+
+  it("a tracker not found for the payload's rampId/segmentIndex (e.g. the ramp was cancelled mid-dig) is a no-op — no throw", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const grid = new VoxelGrid(20, 10, 20);
+    const cells = makeCells(4);
+    fillCells(grid, cells);
+
+    // No matching PlannedRamp/segment in state.plannedRamps at all —
+    // simulates the ramp having been cancelled out from under the digger.
+    state.pendingActions.push({
+      id: 1, type: 'dig_ramp_segment', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { rampId: 999, segmentIndex: 0, cells, region: null, segmentCost: 0 },
+      targetEmployeeId: employee.id, status: 'assigned', holderId: employee.id,
+    });
+    employee.activeActionId = 1;
+    employee.taskTicksRemaining = 4;
+    employee.activeTaskTotalTicks = 4;
+    employee.pendingActionType = 'dig_ramp_segment';
+    employee.pendingActionPayload = { rampId: 999, segmentIndex: 0, cells, region: null, segmentCost: 0 };
+
+    expect(() => tickTaskProgress(state, employee, undefined, grid)).not.toThrow();
+    for (const cell of cells) {
+      expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+    }
+    expect(employee.taskTicksRemaining).toBe(3);
   });
 });

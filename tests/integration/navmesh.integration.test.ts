@@ -6,7 +6,11 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath, findRampConnections, octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
-import { buildRamp, defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
+import {
+  buildRamp, defineRampSegments, carveRampSegment,
+  computeRampSegmentCarveTarget, carveRampSegmentSlice,
+  type RampDef,
+} from '../../src/core/mining/Ramp.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -496,6 +500,111 @@ describe('NavMesh and pathfinding', () => {
         && c.upperLevel === fullConn!.upperLevel,
     );
     expect(hasFullConnector).toBe(false);
+  });
+
+  // ── #946: progressive within-segment carving ──────────────────────────────
+  // A segment used to carve as one atomic slab (carveRampSegment, called once
+  // on task completion). computeRampSegmentCarveTarget + carveRampSegmentSlice
+  // split that same segment into per-tick slices, in the segment's own
+  // nearest-to-entrance-first cell order — this is the single-LAYER analogue
+  // of the multi-SEGMENT "prefix" tests above. Red today: both functions are
+  // stubs (Ramp.ts).
+
+  describe('progressive within-segment carving via carveRampSegmentSlice (#946)', () => {
+    it('after each partial slice of a segment, the NavGrid has no blocked/void cell inside the cumulative carved region', () => {
+      const grid = buildElevatedPlateau();
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
+      const segment = segments.find(s => s.cells.length >= 8)!;
+      expect(segment).toBeDefined();
+
+      const totalCells = segment.cells.length;
+      const totalTicks = 4;
+      let carvedSoFar = 0;
+
+      for (let ticksElapsed = 1; ticksElapsed <= totalTicks; ticksElapsed++) {
+        const target = computeRampSegmentCarveTarget(totalCells, ticksElapsed, totalTicks);
+        expect(Number.isFinite(target)).toBe(true);
+        expect(target).toBeGreaterThanOrEqual(carvedSoFar);
+
+        const carvedCells = segment.cells.slice(0, target);
+        carveRampSegmentSlice(grid, segment.cells, carvedSoFar, target);
+        carvedSoFar = target;
+
+        if (carvedCells.length === 0) continue;
+        const region = {
+          minX: Math.min(...carvedCells.map(c => c.x)), maxX: Math.max(...carvedCells.map(c => c.x)),
+          minY: Math.min(...carvedCells.map(c => c.y)), maxY: Math.max(...carvedCells.map(c => c.y)),
+          minZ: Math.min(...carvedCells.map(c => c.z)), maxZ: Math.max(...carvedCells.map(c => c.z)),
+        };
+        NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+        for (let z = region.minZ; z <= region.maxZ; z++) {
+          for (let x = region.minX; x <= region.maxX; x++) {
+            const cell = nav.cellAt(x, z);
+            expect(cell).toBeDefined();
+            expect(cell!.type).not.toBe('blocked');
+            expect(cell!.type).not.toBe('void');
+          }
+        }
+      }
+
+      expect(carvedSoFar).toBe(totalCells);
+    });
+
+    it("a path to the already-carved (entrance-ordered) prefix of a segment's cells succeeds, while a not-yet-carved cell of that same segment keeps its pre-dig surface height until carveRampSegmentSlice's own bound reaches it", () => {
+      const grid = buildElevatedPlateau();
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+      const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
+      expect(segments.length).toBeGreaterThan(1);
+      // Every segment but the last carved fully — mirrors the existing
+      // "prefix of layers" test above.
+      for (const segment of segments.slice(0, -1)) {
+        carveRampSegment(grid, segment);
+        if (segment.region) NavGrid.patchNavGrid(nav, grid, [], [], segment.region);
+      }
+
+      const lastSegment = segments[segments.length - 1]!;
+      expect(lastSegment.cells.length).toBeGreaterThanOrEqual(2);
+      const carvedCell = lastSegment.cells[0]!; // nearest-entrance: carved first
+      const notYetCarvedCell = lastSegment.cells[lastSegment.cells.length - 1]!; // carved last
+
+      const surfaceBeforeCarved = NavGrid.computeSurfaceY(grid, carvedCell.x, carvedCell.z);
+      const surfaceBeforeNotYet = NavGrid.computeSurfaceY(grid, notYetCarvedCell.x, notYetCarvedCell.z);
+
+      // Carve only the LAST segment's own entrance-ordered prefix — up to,
+      // but not including, its own last cell — via carveRampSegmentSlice.
+      // This is the single-layer analogue of carving only a prefix of whole
+      // segments: the same array-order, "nearest-entrance-first" bound, just
+      // scoped to one segment's own cells instead of the whole segment list.
+      const prefixCount = lastSegment.cells.length - 1;
+      const sliceResult = carveRampSegmentSlice(grid, lastSegment.cells, 0, prefixCount);
+      expect(sliceResult.voxelsCleared).toBeGreaterThan(0);
+      if (sliceResult.region) NavGrid.patchNavGrid(nav, grid, [], [], sliceResult.region);
+
+      // The carved prefix's own column has dropped below its pre-dig height;
+      // the not-yet-carved cell's column is untouched — carveRampSegmentSlice's
+      // own [from, to) bound, not the whole segment, gates what's carved.
+      expect(NavGrid.computeSurfaceY(grid, carvedCell.x, carvedCell.z)).toBeLessThan(surfaceBeforeCarved);
+      expect(NavGrid.computeSurfaceY(grid, notYetCarvedCell.x, notYetCarvedCell.z)).toBe(surfaceBeforeNotYet);
+
+      // A path reaching the already-carved column succeeds.
+      const pathToCarved = findPath(nav, {
+        agentId: 1, fromX: PROGRESSIVE_RAMP.originX, fromZ: PROGRESSIVE_RAMP.originZ,
+        toX: carvedCell.x, toZ: carvedCell.z, avoidVehicles: false,
+      });
+      expect(pathToCarved.found).toBe(true);
+
+      // Carving the remaining (previously not-yet-carved) cell too, via a
+      // second slice call, is what finally drops ITS column — confirming
+      // the earlier "unchanged" reading above was caused specifically by
+      // carveRampSegmentSlice's own toIndex bound, not some other effect.
+      const finalResult = carveRampSegmentSlice(grid, lastSegment.cells, prefixCount, lastSegment.cells.length);
+      expect(finalResult.voxelsCleared).toBeGreaterThan(0);
+      if (finalResult.region) NavGrid.patchNavGrid(nav, grid, [], [], finalResult.region);
+      expect(NavGrid.computeSurfaceY(grid, notYetCarvedCell.x, notYetCarvedCell.z)).toBeLessThan(surfaceBeforeNotYet);
+    });
   });
 
 });
