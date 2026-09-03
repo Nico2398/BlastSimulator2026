@@ -73,7 +73,17 @@ export function forceShiftRestIfNeeded(
   // — mirrors the pendingTaskDuration guard above for the already-arrived
   // case (#945): interrupting a task the employee is actively ticking through
   // forces a walk-back-and-redo once the rest ends, instead of letting the
-  // in-progress task finish first.
+  // in-progress task finish first. Deliberately a blanket guard (any
+  // in-progress task, not scoped to vehicle-gated work like
+  // forceShiftRestIfNeededByPolicy's own isMidVehicleGatedWork-scoped
+  // version below) — safe unscoped here because this legacy, duration-only
+  // path doesn't fire nearly as aggressively as the policy path (only once
+  // ticksWorked crosses WORK_DURATION_TICKS, not on every tick a fatigue
+  // threshold is crossed), and tickCollapse's own hard floor still backstops
+  // fatigue regardless of how long this guard defers a forced rest. A
+  // blanket guard on the *policy* path specifically regressed a long-run
+  // wellbeing test (see that function's own comment on its narrower guard)
+  // — this path was never shown to have the same problem.
   if (emp.taskTicksRemaining !== null) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
@@ -161,9 +171,10 @@ export function forceShiftRestIfNeeded(
  * (findNearestLivingQuarters is already tier-unfiltered), and sets
  * pendingRestNeedKey so
  * completion routes through the general tickGeneralRestCompletion /
- * completeRestForEmployee path (NEED_REST_DURATIONS-based duration,
- * BUILDING_REPLENISH_RATES-based replenishment, NEED_REST_NO_BUILDING_CAP
- * when resting in place) instead of processShiftCycle's own completeRestTick.
+ * completeRestForEmployee path (NEED_REST_DURATIONS-based duration, a direct
+ * emp[needKey] = MAX_NEED_GAUGE at an active living_quarters of any tier, or
+ * NEED_REST_NO_BUILDING_CAP when resting in place) instead of
+ * processShiftCycle's own completeRestTick.
  */
 export function forceShiftRestIfNeededByPolicy(
   state: GameState,

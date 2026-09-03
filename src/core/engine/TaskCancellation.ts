@@ -9,7 +9,7 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation, releaseVehicleReservationKeepDriver } from './VehicleReservation.js';
+import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
 
@@ -208,19 +208,43 @@ export function interruptActiveAction(
         action.payload = { ...action.payload, durationTicks: employee.taskTicksRemaining };
       } else if (
         action.type !== 'rest'
-        && employee.pendingTaskDuration !== null
         && employee.taskTicksRemaining === null
+        && (
+          employee.pendingTaskDuration !== null
+          // #945 follow-up: a vehicle-gated action's own mid-drive phase
+          // (boarded, driving toward the target, taskTicksRemaining not yet
+          // seeded — seedTaskTimerFields only runs once the VEHICLE reaches
+          // it) never sets pendingTaskDuration at all, so it fell through
+          // this whole branch untouched and went straight to an unpinned
+          // open-pool release below. That let the cost-cheapest OTHER
+          // qualified driver claim it — even one much farther from the
+          // target than the interrupted driver's own already-covered
+          // distance — for a handoff too short to survive its own drive,
+          // wasting a full dismount/reboard cycle on zero net progress
+          // (traced live on #945's own tutorial box-cut repro: the
+          // rock-digger's only other licensed driver picked up the vehicle
+          // from much farther away than the interrupted driver's current
+          // position, drove 3 ticks, and was pulled off again before ever
+          // reaching the segment). isMidVehicleGatedWork (VehicleReservation.ts)
+          // covers both the drive and mid-execution phases; the
+          // taskTicksRemaining === null guard above already narrows this to
+          // the drive phase specifically — mid-execution is separately
+          // protected upstream (ForceShiftRest.ts's own isMidVehicleGatedWork
+          // guard) and never reaches here with taskTicksRemaining === null.
+          || (action.requiredVehicleRole !== null && isMidVehicleGatedWork(state, employee))
+        )
       ) {
-        // First mid-walk interruption of this action for this employee: pin
-        // it to them (see this function's own doc comment / #556) so their
-        // walk progress isn't discarded by a different, still-at-base
-        // employee relaying it next tick. Marked with walkOnlyPinnedBy (in
-        // payload, not just targetEmployeeId) specifically so this is
-        // distinguishable from an action that arrived here ALREADY targeted
-        // at this employee for an unrelated reason (a manual `employee
-        // dispatch` order, say) — that kind of targeting is permanent by
-        // design and must never be released; only a pin THIS branch itself
-        // created is ever a candidate for release below.
+        // First mid-walk (or, per the vehicle branch just above, mid-drive)
+        // interruption of this action for this employee: pin it to them (see
+        // this function's own doc comment / #556) so their walk/drive
+        // progress isn't discarded by a different, still-at-base employee
+        // relaying it next tick. Marked with walkOnlyPinnedBy (in payload,
+        // not just targetEmployeeId) specifically so this is distinguishable
+        // from an action that arrived here ALREADY targeted at this employee
+        // for an unrelated reason (a manual `employee dispatch` order, say)
+        // — that kind of targeting is permanent by design and must never be
+        // released; only a pin THIS branch itself created is ever a
+        // candidate for release below.
         //
         // A REPEAT walk-only interruption of a pin THIS branch set —
         // walkOnlyPinnedBy already reads this employee's own id, meaning

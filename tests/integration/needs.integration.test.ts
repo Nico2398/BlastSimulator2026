@@ -851,11 +851,12 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
 // (max 200 ticks) rather than a fixed tick count, per dev-testing-strategy's
 // wait-on-condition rule.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 3 times for the whole order', () => {
+describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 2 times for the whole order', () => {
   const MAX_TICKS = 200;
-  // An initial boarding, plus at most two legitimate policy-forced handoffs
+  // The initial boarding, plus at most one legitimate policy-forced handoff
   // (fixer follow-up) — NOT the 12 dismount/reboard cycles the pre-fix bug
-  // produced. Two root causes were fixed:
+  // produced, and not the 3 an earlier fixer round settled for. Three root
+  // causes were fixed:
   //  1. tickTaskCompletion.ts's dig_ramp_segment completion marked the
   //     segment's own tracker.done AFTER the same-tick vehicle-continuity
   //     attempt (tryContinueVehicleGatedAction) already ran — so
@@ -873,23 +874,36 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 3 ti
   //     every work cycle (needs.integration.test.ts's own pre-existing
   //     "#678" long-run wellBeing/revolt acceptance cases, regressed by an
   //     earlier, broader version of this same guard).
-  // With both fixed, every one of the ramp's 12 segments hands off to the
-  // next with zero reboarding (confirmed directly — the only boardings left
-  // happen during the ONE long, unavoidable initial approach drive to the
-  // first segment, a real travel distance from the staffed fleet's rock_digger
-  // spawn point on this map). That drive is deliberately left interruptible
-  // (see forceShiftRestIfNeededByPolicy's own inline comment: protecting the
-  // mid-drive phase too just trades an equal boarding count for the driver's
-  // fatigue crashing all the way to tickCollapse's floor instead of resting
-  // at the policy's own higher threshold — confirmed empirically against
-  // this exact scenario) — and at this map's travel distance and the
-  // policy's default fatigueRestThreshold, one relay's full rest-to-100
-  // doesn't cover the rest of that single drive before the threshold is
-  // crossed again, so two proactive handoffs during it (three boardings
-  // total) are the genuine floor under today's numbers, not a regression.
-  const MAX_EXPECTED_BOARDINGS = 3;
+  //  3. TaskCancellation.ts's interruptActiveAction pinned a mid-INTERRUPTED
+  //     action back to the same employee (the #556/#867 walk-only pin) only
+  //     when employee.pendingTaskDuration !== null — which a vehicle-gated
+  //     action's own mid-drive phase never sets (seedTaskTimerFields is
+  //     deferred until the VEHICLE, not the employee, reaches the target),
+  //     so an interrupted driver's own action fell straight through to an
+  //     unpinned open-pool release. On this map the rock_digger's only other
+  //     licensed driver was farther from the segment target than the
+  //     interrupted driver's own already-covered position, so cost-ranking
+  //     alone (estimateActionCost) should never have preferred them — but
+  //     with no pin at all, the open pool offered the action to them anyway,
+  //     and they drove only 3 ticks before their own fatigue forced them off
+  //     again too: an aborted takeover, a wasted dismount/reboard cycle, and
+  //     the 3rd boarding an earlier fixer round wrongly accepted as an
+  //     unavoidable floor. Extending the existing pin to also cover a
+  //     vehicle-gated mid-drive interruption (isMidVehicleGatedWork,
+  //     narrowed to taskTicksRemaining === null so mid-execution — already
+  //     separately protected — is untouched) reuses hasCloserIdleCandidate's
+  //     existing distance comparison to decide whether releasing the pin is
+  //     even worth it, exactly as #556/#867 already do for an on-foot walk.
+  // With all three fixed, every one of the ramp's 12 segments hands off to
+  // the next with zero reboarding, and the ONE long initial approach drive to
+  // the first segment (a real travel distance from the staffed fleet's
+  // rock_digger spawn point on this map) produces exactly one proactive
+  // handoff back to the SAME interrupted driver once their own forced rest
+  // completes — never a different, farther-away one — for 2 boardings total,
+  // confirmed directly against this exact scenario.
+  const MAX_EXPECTED_BOARDINGS = 2;
 
-  it('boards the rock_digger vehicle no more than 3 times while carving the whole box-cut ramp', () => {
+  it('boards the rock_digger vehicle no more than 2 times while carving the whole box-cut ramp', () => {
     const engine = createGameEngine();
 
     expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);

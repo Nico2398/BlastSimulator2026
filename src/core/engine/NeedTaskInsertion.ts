@@ -119,6 +119,14 @@ export function autoInsertNeedTasks(
     // dig_ramp_segment) — wait for it to finish rather than queuing a rest
     // that would preempt it mid-way (#945). No result.skipped entry, matching
     // how the other transient-state skips in this function are handled.
+    // Deliberately a blanket guard (any in-progress task, not scoped to
+    // vehicle-gated work like ForceShiftRest.ts's own
+    // isMidVehicleGatedWork-scoped policy guard) — safe unscoped here for the
+    // same reason forceShiftRestIfNeeded's own identical blanket guard is
+    // (see its comment): this reactive, low-threshold insertion path doesn't
+    // fire as aggressively as the policy path, and tickCollapse's hard floor
+    // still backstops fatigue regardless of how long this guard defers a
+    // queued rest.
     if (emp.taskTicksRemaining !== null) continue;
 
     // Determine which gauges are below warning thresholds

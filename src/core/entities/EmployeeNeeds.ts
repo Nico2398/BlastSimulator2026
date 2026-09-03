@@ -77,6 +77,13 @@ export function needsMoraleEffect(employee: Employee): number {
  *
  * @returns `true` if capacity was available and replenishment was attempted;
  *          `false` if capacity was insufficient.
+ *
+ * Currently has no production caller — completeRestForEmployee
+ * (RestActionHelpers.ts, #945) switched rest completion to a direct
+ * `emp[needKey] = MAX_NEED_GAUGE`/NEED_REST_NO_BUILDING_CAP assignment
+ * instead of this per-tick, tier-rate-based path. Kept as tested public API
+ * (own unit coverage still exercises it) in case a future per-tick
+ * replenishment need reintroduces a caller.
  */
 export function replenishNeed(
   employee: Employee,
