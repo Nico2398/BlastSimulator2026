@@ -367,16 +367,24 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
 
   it('relocates an idle, unreserved blocker parked on the target cell itself instead of escalating to stuck, and the vehicle then reaches its target (#689)', () => {
     const state = buildCorridorState();
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee: mainDriver } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: blockerDriver } = hireEmployee(state.employees, 'surveyor', new Random(VEHICLE_TICK_SEED + 1));
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 2;
     vehicle.targetZ = 1;
+    vehicle.driverId = mainDriver.id; // #947: canTickVehicle now requires a driver aboard to move at all
 
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
     blocker.task = 'idle';
     blocker.state = 'idle';
+    // #947: the blocker also needs a driver — once relocated via moveVehicle
+    // (task flips to 'moving'), it must still tick itself off the target cell
+    // on a later iteration of this test's own tick loop below.
+    blocker.driverId = blockerDriver.id;
 
     const emitter = new EventEmitter();
     const stuckEvents: number[] = [];
@@ -403,12 +411,15 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
 
   it('does not relocate a blocker reserved for a pending action, and still escalates to stuck (#689 guard)', () => {
     const state = buildCorridorState();
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee: mainDriver } = hireEmployee(state.employees, 'driller', rng);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 2;
     vehicle.targetZ = 1;
+    vehicle.driverId = mainDriver.id; // #947: needs a driver aboard to attempt movement at all
 
     // Idle but reserved for a pending action — a driver is about to claim it,
     // so it must not be shoved aside as if it were free to move.
@@ -429,6 +440,149 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     expect(stuckEvents).toEqual([vehicle.id]);
     expect(blocker.x).toBe(2); // never relocated
     expect(blocker.z).toBe(1);
+  });
+
+  // #947: a blocker with no driver aboard can never actually drive itself off
+  // the target cell even if moveVehicle relocates it — so the relocation
+  // branch must not attempt it at all, and must fall through to the same
+  // stuck escalation the reserved-blocker guard above proves, rather than
+  // silently leaving the mover permanently deadlocked against a blocker that
+  // "moved" on paper but never actually vacates the cell.
+  it('does not relocate a driverless idle unreserved blocker, and still escalates to stuck (#947 guard)', () => {
+    const state = buildCorridorState();
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee: mainDriver } = hireEmployee(state.employees, 'driller', rng);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 1;
+    vehicle.driverId = mainDriver.id;
+
+    // Idle, unreserved — the exact shape #689's relocation branch targets —
+    // but with no driver aboard.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+    blocker.reservedForActionId = null;
+    blocker.driverId = null;
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(stuckEvents).toEqual([vehicle.id]);
+    expect(blocker.x).toBe(2); // never relocated
+    expect(blocker.z).toBe(1);
+  });
+});
+
+// ── tickVehicle — requires a driver aboard to move (issue #947) ────────────
+// canTickVehicle previously gated only on vehicle.task === 'moving', never
+// checking driverId — a driverless vehicle given a target (e.g. via Zone.ts's
+// clearZone/moveVehicle during a zone-clear evacuation) advanced exactly like
+// a driven one. Fix: canTickVehicle also requires vehicle.driverId !== null.
+// Covers both tickVehicleMovement branches — tickVehicleDirectLine (no
+// NavGrid) and tickVehicleOnNavGrid (NavGrid built) — since each is a
+// separate code path reached only after canTickVehicle passes.
+
+describe('tickVehicle — requires a driver aboard to move (issue #947)', () => {
+  /** Solid rock voxel — same fixture shape used by the describe blocks above. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /** Open, fully walkable 5×3 NavGrid (x:0..4, z:0..2). */
+  function buildOpenNavGridState() {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 2, 3);
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 5; x++) {
+        vg.setVoxel(x, 0, z, solidVoxel());
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  it('never advances a driverless vehicle toward its target — direct-line fallback, no NavGrid', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    expect(state.navGrid).toBeNull();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 0;
+    vehicle.driverId = null;
+
+    tickVehicle(state, vehicle);
+    tickVehicle(state, vehicle);
+    tickVehicle(state, vehicle);
+
+    expect(vehicle.x).toBe(0);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.task).toBe('moving'); // still queued to move — just never ticks
+  });
+
+  it('advances a vehicle with a driver aboard toward its target — direct-line fallback, no NavGrid (regression guard)', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 0;
+    vehicle.driverId = employee.id;
+
+    tickVehicle(state, vehicle);
+    expect(vehicle.x).toBe(1);
+    expect(vehicle.z).toBe(0);
+
+    tickVehicle(state, vehicle);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.task).toBe('idle');
+  });
+
+  it('never advances a driverless vehicle toward its target — NavGrid-routed path', () => {
+    const state = buildOpenNavGridState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+    vehicle.driverId = null;
+
+    tickVehicle(state, vehicle);
+    tickVehicle(state, vehicle);
+    tickVehicle(state, vehicle);
+
+    expect(vehicle.x).toBe(0);
+    expect(vehicle.z).toBe(1);
+    expect(vehicle.task).toBe('moving');
+  });
+
+  it('advances a vehicle with a driver aboard toward its target — NavGrid-routed path (regression guard)', () => {
+    const state = buildOpenNavGridState();
+    const rng = new Random(VEHICLE_TICK_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+    vehicle.driverId = employee.id;
+
+    tickVehicle(state, vehicle);
+
+    expect(vehicle.x).not.toBe(0);
   });
 });
 

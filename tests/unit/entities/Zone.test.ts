@@ -44,6 +44,7 @@ describe('Zone clearing and evacuation', () => {
   it('clearZone routes entities inside the zone to a destination instead of teleporting them', () => {
     const vehicles = createVehicleState();
     const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    vehicle.driverId = 999; // driver aboard — this test proves the "ordered" path, not the #947 driver gate
     const employees = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(employees, 'driller', rng, 20, 20);
@@ -145,6 +146,49 @@ describe('Zone clearing and evacuation', () => {
     expect(vehicle.task).not.toBe('moving');
     expect(result.strandedVehicleIds).toContain(vehicle.id);
     expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('a driverless vehicle in the zone is stranded, not ordered, even when a safe destination is available (#947)', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    vehicle.driverId = null; // no driver aboard — must strand even though findSafeDestination succeeds
+    const beforeX = vehicle.x;
+    const beforeZ = vehicle.z;
+    const beforeTask = vehicle.task;
+
+    // findSafeDestination here (unlike noSafeDestination) DOES find somewhere
+    // safe — the driverless check must short-circuit before the destination
+    // lookup ever runs, not merely happen to agree with a "no destination"
+    // outcome.
+    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+    // moveVehicle never effectively applied — position and task genuinely unchanged.
+    expect(vehicle.x).toBe(beforeX);
+    expect(vehicle.z).toBe(beforeZ);
+    expect(vehicle.task).toBe(beforeTask);
+  });
+
+  it('a mixed zone orders the driver-equipped vehicle out while stranding the driverless one, in the same clearZone call (#947)', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const { vehicle: driven } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    driven.driverId = 42; // driver aboard
+    const { vehicle: driverless } = purchaseVehicle(vehicles, 'rock_digger', 20, 20);
+    driverless.driverId = null;
+
+    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+
+    expect(result.orderedVehicleIds).toContain(driven.id);
+    expect(result.orderedVehicleIds).not.toContain(driverless.id);
+    expect(driven.task).toBe('moving');
+    expect(driven.targetX).toBeGreaterThan(zone.x2);
+
+    expect(result.strandedVehicleIds).toContain(driverless.id);
+    expect(result.strandedVehicleIds).not.toContain(driven.id);
+    expect(driverless.task).not.toBe('moving');
   });
 
   it('the zone is still reported occupied while a stranded entity remains inside it', () => {

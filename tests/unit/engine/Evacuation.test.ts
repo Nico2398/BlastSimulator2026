@@ -7,6 +7,7 @@ import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
+import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
 import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
 import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -92,6 +93,7 @@ describe('evacuateZone', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
     hireEmployee(state.employees, 'driller', rng, 35, 35); // outside the zone
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
+    vehicle.driverId = 999; // driver aboard — this test proves the "ordered" path, not the #947 driver gate
 
     const beforeEmployeeX = employee.x;
     const beforeVehicleX = vehicle.x;
@@ -159,6 +161,51 @@ describe('evacuateZone', () => {
     expect(employee.destinationX).toBeNull();
     expect(result.strandedEmployeeIds).toContain(employee.id);
     expect(result.orderedEmployeeIds).not.toContain(employee.id);
+  });
+
+  it('strands a driverless vehicle standing in-zone, and a subsequent tickVehicle tick leaves it exactly where it stands (#947)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
+    vehicle.driverId = null;
+    const beforeX = vehicle.x;
+    const beforeZ = vehicle.z;
+
+    const result = evacuateZone(state, zone);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+    expect(vehicle.x).toBe(beforeX);
+    expect(vehicle.z).toBe(beforeZ);
+
+    // End-to-end: a driverless, stranded vehicle never actually moves on a
+    // subsequent tick either, not just at the moment evacuateZone returns.
+    tickVehicle(state, vehicle);
+
+    expect(vehicle.x).toBe(beforeX);
+    expect(vehicle.z).toBe(beforeZ);
+  });
+
+  it('a mixed zone orders employees out while stranding the driverless vehicle, in the same evacuateZone call (#947)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
+    vehicle.driverId = null;
+
+    const result = evacuateZone(state, zone);
+
+    expect(result.orderedEmployeeIds).toContain(employee.id);
+    expect(employee.destinationX).not.toBeNull();
+    expect(isInZone(employee.destinationX!, employee.destinationZ!, zone)).toBe(false);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
   });
 });
 
