@@ -147,9 +147,15 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * physically are instead of restarting it. Never applied to a 'rest' action
  * itself (self-claimed by its own creator, already targeted or immediately
  * reclaimed — see this function's own "never used for rest actions" note
- * above) or to a vehicle-gated action (`employee.pendingTaskDuration` is only
- * ever set by the non-vehicle branch of `promoteActionToActive`, so this
- * condition never matches one).
+ * above). Applies to two distinct in-flight phases, both gated on
+ * `taskTicksRemaining === null` (no seeded work-in-progress tick count yet):
+ * the plain walk-only phase, detected via `employee.pendingTaskDuration`
+ * (set by the non-vehicle branch of `promoteActionToActive`), and — since
+ * #945 — a vehicle-gated action's own mid-drive phase, detected via
+ * `isMidVehicleGatedWork` (VehicleReservation.ts) for actions with
+ * `requiredVehicleRole !== null`, so a driver's already-covered driving
+ * progress gets the same pin instead of being handed to a farther-away
+ * driver mid-trip.
  *
  * options.forceOpenPool (#938): the one exception to the pin above. A caller
  * that already knows — before calling — that the destination is a sustained,
