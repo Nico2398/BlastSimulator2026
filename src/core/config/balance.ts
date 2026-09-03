@@ -604,7 +604,7 @@ export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 
-/** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_PENALTIES for the analogous need-driven table). */
+/** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_EFFECT_PENALTIES for the analogous need-driven table). */
 export const STUCK_MORALE_PENALTY = 2;
 
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
@@ -914,40 +914,36 @@ export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTas
 }
 
 // ─── Employee Needs ────────────────────────────────────────────────────────────
+// Hunger and breakNeed were removed (#928) — fatigue is the sole gauge.
 
-/** Drain rates per tick for each need gauge. */
+/**
+ * Drain rates per tick for the fatigue gauge.
+ *
+ * `resting` tier (#680): drain rate while actively resting
+ * (restTicksRemaining !== null). The gauge holds steady during the rest — it
+ * doesn't keep draining — so the accrued drain can't outpace and undermine
+ * the completion-time replenishment the rest itself delivers.
+ *
+ * `traveling` tier (#928): drain rate while walking toward a claimed task or
+ * rest destination, not yet arrived (pendingTaskDuration/pendingRestDuration
+ * !== null) — distinct from plain `idle` (nothing claimed at all).
+ */
 export const NEED_DRAIN_RATES = {
-  // `resting` tier (#680): drain rate while actively resting
-  // (restTicksRemaining !== null). Needs hold steady during the rest — they
-  // don't keep draining — so the accrued drain can't outpace and undermine
-  // the completion-time replenishment the rest itself delivers.
-  hunger:  { working: 1,   idle: 0.5,  resting: 0 },
-  fatigue: { working: 2,   idle: 0.5,  resting: 0 },
-  breakNeed: { working: 0.8, idle: 0,  resting: 0 },
+  fatigue: { working: 2, idle: 0.5, traveling: 1, resting: 0 },
 } as const;
 
 /** Threshold values for productivity/morale effects. */
 export const NEED_THRESHOLDS = {
-  hunger:  { low: 30, critical: 10 },
   fatigue: { low: 40, critical: 15 },
-  breakNeed: { low: 30, critical: 15 },
 } as const;
 
 /**
- * Productivity multipliers applied when a need gauge falls below a threshold.
- * `low` = uncomfortable but functioning; `critical` = severe impairment.
- * Multipliers are applied to the base effectiveness value.
+ * Productivity multipliers applied when the fatigue gauge falls below a
+ * threshold. `low` = uncomfortable but functioning; `critical` = severe
+ * impairment. Multipliers are applied to the base effectiveness value.
  */
 export const NEED_PRODUCTIVITY_MULTIPLIERS = {
-  hunger:  { low: 0.80, critical: 0.60 },
   fatigue: { low: 0.75, critical: 0.50 },
-} as const;
-
-/**
- * Morale penalty (per tick) applied when breakNeed falls below its low threshold.
- */
-export const NEED_MORALE_PENALTIES = {
-  breakNeed: -2,
 } as const;
 
 /** Morale thresholds for drain-rate adjustment in tickNeedGauges. */
@@ -973,22 +969,24 @@ export const NEED_MORALE_EFFECT_THRESHOLDS = {
 } as const;
 
 /**
- * Per-tick morale penalties applied per gauge in needsMoraleEffect().
+ * Per-tick morale penalties applied in needsMoraleEffect() — rescaled 3x
+ * (#928) now that fatigue is the only gauge contributing, so the total
+ * per-tick range stays comparable to the old three-gauge sum.
  */
 export const NEED_MORALE_EFFECT_PENALTIES = {
   comfortable: 0,
-  uncomfortable: -0.5,
-  suffering: -1.5,
-  critical: -3.0,
+  uncomfortable: -1.5,
+  suffering: -4.5,
+  critical: -9.0,
 } as const;
 
 /**
- * If ALL three gauges (hunger, fatigue, breakNeed) are simultaneously above this
- * threshold, the employee receives a well-rested morale bonus per tick.
+ * If fatigue is above this threshold, the employee receives a well-rested
+ * morale bonus per tick.
  */
 export const NEED_WELL_RESTED_THRESHOLD = 80;
 
-/** The well-rested morale bonus applied per tick when all gauges are above the threshold. */
+/** The well-rested morale bonus applied per tick when fatigue is above the threshold. */
 export const NEED_WELL_RESTED_BONUS = 1;
 
 /**
@@ -997,41 +995,31 @@ export const NEED_WELL_RESTED_BONUS = 1;
  *             and is kept only for backward compatibility.
  */
 export const NEED_RESTORATION_THRESHOLDS = {
-  hunger:  35,
   fatigue: 25,
-  breakNeed: 30,
 } as const;
 
 /** Warning thresholds that trigger proactive need routing. */
 export const NEED_WARNING_THRESHOLDS = {
-  hunger:  35,
   fatigue: 25,
-  breakNeed: 30,
 } as const;
 
-/** Collapse thresholds for each need gauge. */
+/** Collapse thresholds for the fatigue gauge. */
 export const NEED_COLLAPSE_THRESHOLDS = {
-  hunger:  10,
   fatigue: 5,
-  breakNeed: 15,
 } as const;
 
-/** Rest duration in ticks per need gauge when an employee collapses. */
+/** Rest duration in ticks for the fatigue gauge when an employee collapses. */
 export const NEED_REST_DURATIONS = {
-  hunger: 2,
   fatigue: 8,
-  breakNeed: 3,
 } as const;
 
 /**
- * Building type that services each need gauge during collapse rest.
- * All map to 'living_quarters' until dedicated canteen/bunkhouse/break_room
- * building types are added (future Chapter 1 expansion).
+ * Building type that services the fatigue gauge during collapse rest. Maps
+ * to 'living_quarters' until a dedicated bunkhouse building type is added
+ * (future Chapter 1 expansion).
  */
 export const NEED_REST_BUILDING_TYPES = {
-  hunger: 'living_quarters',
   fatigue: 'living_quarters',
-  breakNeed: 'living_quarters',
 } as const satisfies Record<string, BuildingType>;
 
 /**
@@ -1049,15 +1037,13 @@ export function needRestSearchRadius(gridWidth: number): number {
 }
 
 /**
- * Per-tick replenishment rates for each need gauge by building tier.
+ * Per-tick replenishment rate for the fatigue gauge by building tier.
  * Keyed by need gauge (not building type) because the caller already knows
  * which need to replenish; the building-to-need mapping is handled upstream.
  * Tier 1 is the baseline; higher tiers improve replenishment rates.
  */
 export const BUILDING_REPLENISH_RATES = {
-  hunger:   { 1: 12, 2: 18, 3: 25 },
-  fatigue:  { 1: 8,  2: 14, 3: 20 },
-  breakNeed: { 1: 10, 2: 16, 3: 22 },
+  fatigue: { 1: 8, 2: 14, 3: 20 },
 } as const;
 
 /**
@@ -1075,11 +1061,9 @@ export const NEED_REST_NO_BUILDING_CAP = 70;
  */
 export const NEED_REST_NO_BUILDING_DURATION_MULTIPLIER = 2;
 
-/** Per-visit cost deducted from cash for each need gauge. Fatigue has no cost (0). */
+/** Per-visit cost deducted from cash for the fatigue gauge. No cost (0) — unlike the removed hunger/breakNeed gauges, fatigue rest was never charged. */
 export const NEED_REST_COSTS = {
-  hunger: 50,
   fatigue: 0,
-  breakNeed: 20,
 } as const;
 
 // ─── General ───────────────────────────────────────────────────────────────────
@@ -1096,71 +1080,20 @@ export const SHIFT_DURATIONS_TICKS = {
 } as const;
 
 /**
- * Default rest/break thresholds used by createSitePolicy(). All gauges are 0–100.
+ * Default fatigue rest threshold used by createSitePolicy(). Gauge is 0–100.
  *
- * hungerRest/fatigueRest sit above NEED_MORALE_EFFECT_THRESHOLDS.comfortable (50,
- * see above) rather than below it (#678 follow-up). shouldForceRest only fires
- * once a gauge crosses its threshold, so any threshold inside the 0-49 penalty
- * band guarantees the gauge spends real time being penalized by
- * needsMoraleEffect on every single work/rest cycle — this was harmless while
- * SITE_POLICY_DEFAULT_THRESHOLDS was dead code, but forceShiftRestIfNeededByPolicy
- * (#678) made it live. +10 above 50 gives enough margin that a gauge draining
- * at its normal per-tick rate (fatigue's 2/tick working being the fastest) is
- * caught before it can fall back below the comfortable line most of the time.
- * The shipped 300-tick integration test scenario still shows hunger/fatigue
- * dipping into the 30-49 mild-penalty band (observed minimums: hunger ~46.5,
- * fatigue ~46.5) — travel time during forced-rest dispatch (the walk to
- * living_quarters, before restTicksRemaining starts counting down) keeps
- * draining the gauge and can eat past the +10 buffer. That's tolerated
- * because needsMoraleEffect's penalty in that band is a gradual -0.5/tick,
- * not a cliff: wellBeing stays comfortably above 0 for the acceptance
- * criterion's full run. These thresholds keep gauges out of the *severe*
- * penalty band, not out of the mild one entirely.
- *
- * socialBreak raised 20 -> 60 (#867): SitePolicy.shouldForceRest never
- * actually read socialBreakThreshold until #867 wired it up — this value was
- * chosen while the field was dead config, so it was never checked against
- * the same "stay above comfortable" reasoning the paragraph above documents
- * for hunger/fatigue. 20 sits inside needsMoraleEffect's "suffering" band
- * (<30, -1.5/tick) and just above its "critical" floor (<15, -3.0/tick) —
- * wiring shouldForceRest up to the old default meant breakNeed was already
- * deep in morale-penalty territory before a policy-forced rest ever
- * triggered. 60 matches hungerRest/fatigueRest's own margin above the 50
- * comfortable line — direct-traced against vibration-budget.json (#867's own
- * motivating case, a multi-thousand-tick, work-heavy multi-employee file):
- * wellBeing never drops below 50 for the file's entire run at 60 (was pinned
- * at 0 from partway through grid 1 onward pre-fix); 40 and 50 were both
- * tried and both still end the same file in a real worker_revolt — breakNeed
- * drains slower than fatigue (NEED_DRAIN_RATES.breakNeed.working = 0.8/tick
- * vs 2/tick, and not at all while idle) but this file's own sustained
- * working stretches are long enough that only the full 60 margin actually
- * closes the gap with real headroom, not a razor's-edge pass.
- *
- * Three independent proactive triggers (hunger, fatigue, breakNeed) all
- * armed at 60 does cost something: any ONE of the three tripping mid-walk is
- * enough to interrupt, so an employee crossing real distance — not just
- * working in place — gets interrupted more often than when only two gauges
- * could trip. Direct-traced against tutorial-steps-visual.json: at 60 (and
- * still at 50), a freight_warehouse construction order sat at
- * `orderedBuildingCount:1` for 2000+ ticks straight, the claiming employee
- * repeatedly yanked back into a rest before ever completing the walk from
- * living_quarters to the site — a genuine, deterministic livelock for that
- * file's own seed, not just a slow convergence (2000 ticks never once
- * succeeded). Lowering the global default to 40 does clear that file, but
- * reopens vibration-budget's own revolt — the two files pull the one shared
- * threshold in opposite directions, and neither is a coincidence: each was
- * already living close to its own margin before #867 (vibration-budget's
- * multi-cycle length, tutorial-steps-visual's cross-map commute — see #816's
- * own construction-livelock history on the latter). The fix that holds both
- * is on the scenario side, not the threshold: tutorial-steps-visual.json
- * shortens the walk (see its own `build freight_warehouse` step's note)
- * rather than this default trading vibration-budget's margin away.
+ * Collapsed from the old three-key SITE_POLICY_DEFAULT_THRESHOLDS record
+ * (#928 — hunger and breakNeed removed) into a single number; value carried
+ * over unchanged from fatigueRest's own prior default. Sits above
+ * NEED_MORALE_EFFECT_THRESHOLDS.comfortable (50, see above) rather than below
+ * it (#678 follow-up). shouldForceRest only fires once the gauge crosses its
+ * threshold, so a threshold inside the 0-49 penalty band would guarantee the
+ * gauge spends real time being penalized by needsMoraleEffect on every single
+ * work/rest cycle. +10 above 50 gives enough margin that a gauge draining at
+ * its normal per-tick rate (fatigue's 2/tick working) is caught before it can
+ * fall back below the comfortable line most of the time.
  */
-export const SITE_POLICY_DEFAULT_THRESHOLDS = {
-  hungerRest:  60,
-  fatigueRest: 60,
-  socialBreak: 60,
-} as const;
+export const SITE_POLICY_DEFAULT_THRESHOLD = 60;
 
 /** Number of ticks an employee works before shift cycle rest is forced. */
 export const WORK_DURATION_TICKS = 6;

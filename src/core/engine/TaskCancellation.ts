@@ -69,7 +69,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
 /**
  * Release `employee`'s ONE active PendingAction (`actionId`, the value of
  * `employee.activeActionId` before a needs-driven interruption — collapse,
- * hunger/fatigue forcing a rest — preempted it) back to the pool instead of
+ * fatigue forcing a rest — preempted it) back to the pool instead of
  * removing it (#549). Unlike cancelAction:
  *  - the record is NOT completed/removed — status returns to 'queued' and
  *    holderId/ghost.claimed clear, so any qualified employee (including this

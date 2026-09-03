@@ -275,10 +275,21 @@ describe('en.json / fr.json — key-set parity', () => {
     // ramp-dig wait instead (tutorial.step_speedupdig(.title),
     // tutorial.step_speednormalafterdig(.title), tutorial.stage.speed_up_dig,
     // tutorial.stage.speed_normal_after_dig -- 6 keys). Net +3, both locales.
+    // Baseline is now 3461 (down from 3470): #928 removes the hunger and
+    // breakNeed employee needs, keeping only fatigue -- drops 9 keys with
+    // no replacement (ui.crew.need_hunger, ui.crew.need_break,
+    // ui.policy.hunger, need.breakNeed, need.hunger,
+    // event.employee_collapsed.breakNeed.desc,
+    // event.employee_collapsed.hunger.desc,
+    // event.need_warning.breakNeed.desc, event.need_warning.hunger.desc).
+    // Several other keys keep their names but had hunger/breakNeed prose
+    // stripped from their values (e.g. ui.policy.note_shift_8h,
+    // tutorial.step19) -- those are edits, not removals, and don't affect
+    // the count. Net -9, both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3470);
+    expect(Object.keys(en).length).toBe(3461);
   });
 });
 

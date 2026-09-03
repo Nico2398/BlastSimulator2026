@@ -423,14 +423,14 @@ describe('deserialize — Employee.restNeedKey / activeTaskSkill defaults', () =
     const state = createGame({ seed: 42 });
     const rng = new Random(42);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.restNeedKey = 'hunger';
+    employee.restNeedKey = 'fatigue';
     employee.activeTaskSkill = 'blasting';
 
     const json = serialize(state);
     const restored = deserialize(json);
 
     const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
-    expect(restoredEmployee.restNeedKey).toBe('hunger');
+    expect(restoredEmployee.restNeedKey).toBe('fatigue');
     expect(restoredEmployee.activeTaskSkill).toBe('blasting');
   });
 });
@@ -931,6 +931,98 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
     const restored = deserialize(json);
 
     expect(restored.nextPlannedBuildingId).toBe(9);
+  });
+});
+
+// ── v14→v15 migration for the single-gauge (fatigue) need model (#928) ──────
+// SAVE_VERSION bumped 14→15 when Employee.hunger/breakNeed were removed —
+// fatigue is now the sole need gauge. A pre-v15 save's employees may still
+// carry the stale hunger/breakNeed fields (stripped) and a
+// restNeedKey/pendingRestNeedKey/pending-action needKey/collapsedNeed naming
+// a removed gauge (remapped to 'fatigue' rather than nulled). SitePolicy's
+// hungerRestThreshold/socialBreakThreshold (top-level and per-employee
+// customThresholds overrides) are stripped too.
+
+describe('deserialize — v14→v15 migration for the single-gauge (fatigue) need model (#928)', () => {
+  it('a v14 employee with hunger/breakNeed fields and restNeedKey: "hunger" migrates cleanly to v15', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    hireEmployee(state.employees, 'driller', rng);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 14;
+    const employeesRaw = parsed['employees'] as Record<string, unknown>;
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>>;
+    expect(employeeList).toHaveLength(1);
+    employeeList[0]!['hunger'] = 42;
+    employeeList[0]!['breakNeed'] = 17;
+    employeeList[0]!['restNeedKey'] = 'hunger';
+    employeeList[0]!['pendingRestNeedKey'] = 'breakNeed';
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.employees.employees).toHaveLength(1);
+    const restoredEmployee = restored.employees.employees[0]!;
+    expect('hunger' in restoredEmployee).toBe(false);
+    expect('breakNeed' in restoredEmployee).toBe(false);
+    expect(restoredEmployee.restNeedKey).toBe('fatigue');
+    expect(restoredEmployee.pendingRestNeedKey).toBe('fatigue');
+  });
+
+  it('a v14 pending-action payload with needKey/collapsedNeed naming a removed gauge remaps both to "fatigue"', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    state.pendingActions.push({
+      id: 1, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { needKey: 'hunger', collapsedNeed: 'breakNeed' },
+      targetEmployeeId: null, status: 'assigned', holderId: employee.id,
+    });
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 14;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredAction = restored.pendingActions.find(a => a.id === 1)!;
+    expect(restoredAction.payload).toEqual({ needKey: 'fatigue', collapsedNeed: 'fatigue' });
+  });
+
+  it('a v14 sitePolicy with hungerRestThreshold/socialBreakThreshold (top-level and per-employee overrides) migrates cleanly', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 14;
+    const sitePolicy = parsed['sitePolicy'] as Record<string, unknown>;
+    sitePolicy['hungerRestThreshold'] = 60;
+    sitePolicy['socialBreakThreshold'] = 60;
+    sitePolicy['customThresholds'] = {
+      '7': { hunger: 70, fatigue: 10, social: 10 },
+    };
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect('hungerRestThreshold' in restored.sitePolicy).toBe(false);
+    expect('socialBreakThreshold' in restored.sitePolicy).toBe(false);
+    expect(restored.sitePolicy.customThresholds[7]).toEqual({ fatigue: 10 });
+  });
+
+  it('a v15+ save with only fatigue is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 73;
+    employee.restNeedKey = 'fatigue';
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.fatigue).toBe(73);
+    expect(restoredEmployee.restNeedKey).toBe('fatigue');
   });
 });
 

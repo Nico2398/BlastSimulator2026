@@ -534,7 +534,7 @@ describe('promoteActionToActive', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
 
     const action = makeAction({
-      id: 3, type: 'rest', targetX: 2, targetZ: 3, payload: { needKey: 'hunger' },
+      id: 3, type: 'rest', targetX: 2, targetZ: 3, payload: { needKey: 'fatigue' },
     });
 
     promoteActionToActive(state, employee, action);
@@ -542,8 +542,8 @@ describe('promoteActionToActive', () => {
     expect(employee.activeActionId).toBe(3);
     expect(employee.destinationX).toBe(2);
     expect(employee.destinationZ).toBe(3);
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
-    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.pendingTaskDuration).toBeNull();
   });
 

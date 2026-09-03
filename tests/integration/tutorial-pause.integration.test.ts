@@ -142,9 +142,7 @@ describe('Tutorial pause behaviour (#371)', () => {
     // derailed by an unrelated needs collapse mid-drive.
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runner.run('tick 1');
     }
@@ -153,9 +151,7 @@ describe('Tutorial pause behaviour (#371)', () => {
     // way the drill plan above was drained before blasting.
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runner.run('tick 1');
     }

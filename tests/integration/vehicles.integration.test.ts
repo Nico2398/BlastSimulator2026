@@ -1034,9 +1034,7 @@ describe('dig_ramp_segment work duration scales with live voxel count (#924)', (
     function captureSeededWorkTicks(engine: ReturnType<typeof createRunner>, actionId: number): number {
       for (let i = 0; i < 800; i++) {
         for (const emp of engine.ctx.state!.employees.employees) {
-          emp.hunger = 100;
           emp.fatigue = 100;
-          emp.breakNeed = 100;
         }
         const action = engine.ctx.state!.pendingActions.find(act => act.id === actionId);
         const holder = action && action.holderId !== null

@@ -1,99 +1,55 @@
 // BlastSimulator2026 — Need-meter logic for employees.
-// Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
+// Tracks the single fatigue gauge (0–100). Hunger and breakNeed were removed
+// (#928) — fatigue alone is the well-being lever the rest of the game reacts
+// to (rest routing, morale, collapse).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_COLLAPSE_THRESHOLDS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_COLLAPSE_THRESHOLDS } from '../config/balance.js';
 
-/** The three need gauges tracked on every Employee. */
-export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
+/** The single need gauge tracked on every Employee. */
+export type NeedKey = 'fatigue';
 
 /**
  * Work-state classification used to select the correct NEED_DRAIN_RATES tier
- * for {@link tickNeedGauges} (#680).
+ * for {@link tickNeedGauges} (#680, extended to 'traveling' by #928).
  * - 'working': actively performing a task (drains fastest).
  * - 'idle': not working and not resting (e.g. routed toward a rest destination
  *   but not yet arrived).
  * - 'resting': actively resting (restTicksRemaining !== null).
+ * - 'traveling': walking toward a claimed task or rest destination, not yet
+ *   arrived (pendingTaskDuration or pendingRestDuration !== null).
  */
-export type EmployeeWorkState = 'working' | 'idle' | 'resting';
+export type EmployeeWorkState = 'working' | 'idle' | 'resting' | 'traveling';
 
 /**
- * Drain all need gauges by one tick.
+ * Returns a productivity multiplier (0.0–1.0) based on fatigue level.
  *
- * Hunger and fatigue drain faster while working than while idle.
- * breakNeed drains while working but does not drain while idle — employees
- * recover breakNeed automatically when not working.
- *
- * All gauges are clamped to a minimum of 0.
- *
- * @deprecated Superseded by {@link tickNeedGauges} which applies a morale-based
- *             drain multiplier. This function lacks the morale adjustment.
- */
-export function tickNeeds(employee: Employee, isWorking: boolean): void {
-  employee.hunger    = Math.max(0, employee.hunger    - (isWorking ? NEED_DRAIN_RATES.hunger.working    : NEED_DRAIN_RATES.hunger.idle));
-  employee.fatigue   = Math.max(0, employee.fatigue   - (isWorking ? NEED_DRAIN_RATES.fatigue.working   : NEED_DRAIN_RATES.fatigue.idle));
-  employee.breakNeed = Math.max(0, employee.breakNeed - (isWorking ? NEED_DRAIN_RATES.breakNeed.working : NEED_DRAIN_RATES.breakNeed.idle));
-}
-
-/**
- * Returns a productivity multiplier (0.0–1.0) based on hunger and fatigue levels.
- *
- * Each gauge independently applies a tier penalty once it falls below a threshold:
- *   - Hunger  < low      → ×0.80 | < critical → ×0.60
- *   - Fatigue < low      → ×0.75 | < critical → ×0.50
- *
- * Penalties are multiplicative: a hungry and exhausted worker suffers both.
- * breakNeed does not affect productivity (it affects morale — see tickNeedMorale).
+ * Fatigue < low → ×0.75 | < critical → ×0.50
  */
 export function getNeedMultiplier(employee: Employee): number {
-  const hungerMult  = employee.hunger  < NEED_THRESHOLDS.hunger.critical  ? NEED_PRODUCTIVITY_MULTIPLIERS.hunger.critical
-                    : employee.hunger  < NEED_THRESHOLDS.hunger.low        ? NEED_PRODUCTIVITY_MULTIPLIERS.hunger.low
-                    : 1.0;
   const fatigueMult = employee.fatigue < NEED_THRESHOLDS.fatigue.critical ? NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.critical
                     : employee.fatigue < NEED_THRESHOLDS.fatigue.low       ? NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.low
                     : 1.0;
-  return hungerMult * fatigueMult;
+  return fatigueMult;
 }
 
 /**
- * Pure function. Returns the morale delta (≤ 0) caused by unmet breakNeed.
+ * Pure function. Computes the tick-level morale delta from the fatigue gauge.
  *
- * This function does NOT mutate employee.morale — it returns a delta that the
- * caller must apply to `employee.morale` each tick:
- *   - breakNeed < low → −2/tick
+ * The gauge contributes 0 (≥50), −0.5 (30–49), −1.5 (15–29), or −3.0 (<15).
  *
- * Example:
- *   employee.morale = Math.max(0, employee.morale + tickNeedMorale(employee));
- *
- * @deprecated Superseded by {@link needsMoraleEffect} which accounts for ALL
- *             three need gauges (hunger, fatigue, breakNeed) instead of only breakNeed.
- */
-export function tickNeedMorale(employee: Employee): number {
-  let delta = 0;
-  if (employee.breakNeed < NEED_THRESHOLDS.breakNeed.low) delta += NEED_MORALE_PENALTIES.breakNeed;
-  return delta;
-}
-
-/**
- * Pure function. Computes the tick-level morale delta from ALL need gauges
- * (hunger, fatigue, breakNeed).
- *
- * Each gauge contributes 0 (≥50), −0.5 (30–49), −1.5 (15–29), or −3.0 (<15),
- * yielding a per-tick range of −9.0 to +0.0 from penalties alone.
- *
- * If ALL three gauges are simultaneously above {@link NEED_WELL_RESTED_THRESHOLD}
- * (currently 80), a well-rested bonus of +1 (NEED_WELL_RESTED_BONUS) is applied,
- * bringing the total return range to **−9.0 to +1.0**.
+ * If fatigue is above {@link NEED_WELL_RESTED_THRESHOLD} (currently 80), a
+ * well-rested bonus of +1 (NEED_WELL_RESTED_BONUS) is applied.
  *
  * This function does NOT mutate employee.morale — it returns a delta that the
  * caller must apply each tick.
  *
- * @returns The morale delta for this tick, ranging from −9.0 to +1.0.
+ * @returns The morale delta for this tick.
  */
 export function needsMoraleEffect(employee: Employee): number {
   let delta = 0;
 
-  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  const gauges: NeedKey[] = ['fatigue'];
   for (const gauge of gauges) {
     const value = employee[gauge];
     if (value >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable) {
@@ -107,10 +63,8 @@ export function needsMoraleEffect(employee: Employee): number {
     }
   }
 
-  // Well-rested bonus: all three gauges strictly above threshold
-  if (employee.hunger > NEED_WELL_RESTED_THRESHOLD
-      && employee.fatigue > NEED_WELL_RESTED_THRESHOLD
-      && employee.breakNeed > NEED_WELL_RESTED_THRESHOLD) {
+  // Well-rested bonus: fatigue strictly above threshold.
+  if (employee.fatigue > NEED_WELL_RESTED_THRESHOLD) {
     delta += NEED_WELL_RESTED_BONUS;
   }
 
@@ -157,7 +111,7 @@ function getMoraleDrainMultiplier(morale: number): number {
 export function checkCollapse(employee: Employee): NeedKey | null {
   if (employee.collapsing) return null;
 
-  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  const gauges: NeedKey[] = ['fatigue'];
   for (const gauge of gauges) {
     if (employee[gauge] <= NEED_COLLAPSE_THRESHOLDS[gauge]) {
       employee.collapsing = true;
@@ -176,13 +130,13 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  * Call this each tick for each employee.
  * All gauges are clamped to a minimum of 0.
  *
- * @param workState Tri-state work classification (#680) selecting the
- *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting'.
+ * @param workState Four-state work classification (#680, #928) selecting the
+ *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling'.
  */
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
   const multiplier = getMoraleDrainMultiplier(employee.morale);
 
-  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  const gauges: NeedKey[] = ['fatigue'];
   for (const gauge of gauges) {
     const baseRate = NEED_DRAIN_RATES[gauge][workState];
     const actualDrain = baseRate * multiplier;

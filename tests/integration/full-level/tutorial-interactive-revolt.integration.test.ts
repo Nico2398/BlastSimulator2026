@@ -109,9 +109,7 @@ function dropInstantBuildingCountCheck(steps: ScenarioStepDef[]): ScenarioStepDe
 function driveTutorialBuildingsToCompletion(engine: RunnerWithContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && engine.ctx.state!.plannedBuildings.length > 0; i++) {
     for (const emp of engine.ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     runCommand(engine, 'tick 1');
     if (engine.ctx.state!.events.pendingEvent) {

@@ -200,11 +200,11 @@ function getGameStateDict(state: GameState): Record<string, unknown> {
 }
 
 /** Safe access to employees array from mock-friendly state. */
-export function getEmployees(state: GameState): { role: string; hunger: number; fatigue: number; breakNeed: number; id: number }[] {
+export function getEmployees(state: GameState): { role: string; fatigue: number; id: number }[] {
   const e = getGameStateDict(state).employees;
-  if (Array.isArray(e)) return e as unknown as { role: string; hunger: number; fatigue: number; breakNeed: number; id: number }[];
+  if (Array.isArray(e)) return e as unknown as { role: string; fatigue: number; id: number }[];
   const eObj = e as Record<string, unknown> | undefined;
-  return (eObj?.employees ?? []) as { role: string; hunger: number; fatigue: number; breakNeed: number; id: number }[];
+  return (eObj?.employees ?? []) as { role: string; fatigue: number; id: number }[];
 }
 
 /** Safe access to vehicles array from mock-friendly state. */

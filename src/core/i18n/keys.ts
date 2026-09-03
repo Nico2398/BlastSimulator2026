@@ -26,9 +26,7 @@ export const I18nKeys = {
   event: {
     employeeCollapsed: {
       title: 'event.employee_collapsed.title',
-      hungerDesc: 'event.employee_collapsed.hunger.desc',
       fatigueDesc: 'event.employee_collapsed.fatigue.desc',
-      breakNeedDesc: 'event.employee_collapsed.breakNeed.desc',
     },
     employeeShiftChange: {
       title: 'event.employee_shift_change.title',
@@ -36,9 +34,7 @@ export const I18nKeys = {
     },
     needWarning: {
       title: 'event.need_warning.title',
-      hungerDesc: 'event.need_warning.hunger.desc',
       fatigueDesc: 'event.need_warning.fatigue.desc',
-      breakNeedDesc: 'event.need_warning.breakNeed.desc',
     },
   },
 } as const;

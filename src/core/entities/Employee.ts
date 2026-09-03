@@ -98,9 +98,7 @@ export interface Employee {
   trainingState: TrainingState | null;
   /** ID of the PendingAction currently claimed by this employee, or null if idle. */
   activeActionId: number | null;
-  hunger: number;    // 0-100
   fatigue: number;   // 0-100
-  breakNeed: number; // 0-100
   collapsing: boolean;
   interruptedActionPayload: Record<string, unknown> | null;
   /** Number of ticks the employee has worked in the current shift. */
@@ -231,9 +229,7 @@ export function hireEmployee(
     qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
     activeActionId: null,
-    hunger: 100,
     fatigue: 100,
-    breakNeed: 100,
     collapsing: false,
     interruptedActionPayload: null,
     ticksWorked: 0,
@@ -411,7 +407,7 @@ export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export type { EmployeeWorkState } from './EmployeeNeeds.js';
-export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
+export { tickNeedGauges, getNeedMultiplier, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
 export { computeXpPerTick } from './EmployeeXpRules.js';
 export type {

@@ -1,93 +1,98 @@
 ---
 name: gameplay-employee-needs
 description: >
-  Employee needs system for BlastSimulator2026: 3 need gauges (hunger, fatigue, break pressure),
-  morale effects, collapse and interruption, proactive queue insertion, building replenishment
-  and shift cycles. Use when implementing or modifying employee
-  well-being, rest mechanics, living quarters replenishment, or shift systems.
+  Employee needs system for BlastSimulator2026: single fatigue gauge, morale effects, collapse
+  and interruption, proactive queue insertion, building replenishment and shift cycles. Use when
+  implementing or modifying employee well-being, rest mechanics, living quarters replenishment,
+  or shift systems.
 ---
 
 ## Design Goals
 
-3 biological needs modelled as gauges — fill over time, satisfied by visiting buildings. Unmet needs drain morale, reduce effectiveness, cause collapse. Connects to Buildings (Ch.1) + Task Queue (Ch.3).
+One biological need — fatigue — modelled as a gauge that drains over time and is satisfied by resting, ideally at a building. Unmet need drains morale, reduces effectiveness, causes collapse. Connects to Buildings (Ch.1) + Task Queue (Ch.3).
 
-## Need Gauges
+Hunger and break pressure were removed as separate gauges (#928) — fatigue is the sole gauge, and its own drain/threshold/penalty constants were rescaled so the single gauge carries the well-being weight the old three-gauge sum used to.
 
-Each employee has three gauges (0–100; 100 = fully satisfied):
+## Need Gauge
 
-| Gauge | Fills at | Drains at | Collapse Threshold |
-|-------|----------|------------|-------------------|
-| `hunger` | Eating at Living Quarters | −1/tick (working) / −0.5/tick (idle) | ≤ 10 |
-| `fatigue` | Sleeping at Living Quarters | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 |
-| `breakNeed` | Taking break at Living Quarters | −0.8/tick (working) | ≤ 15 |
+The employee has one gauge, `fatigue` (0–100; 100 = fully rested), on `Employee` in `src/core/entities/Employee.ts`. It fills by resting (at Living Quarters, or in place with a penalty — see below) and drains every tick at a rate selected by the employee's current work state (`NEED_DRAIN_RATES.fatigue` in `src/core/config/balance.ts`):
 
-**Rate modifiers:**
-- High morale (>70): drain rate ×0.85
-- Low morale (<30): drain rate ×1.20
+| Work state | Drain/tick | When it applies |
+|-----------|-----------|------------------|
+| `working` | −2 | Actively performing a task |
+| `idle` | −0.5 | Not working, not resting, not traveling toward anything claimed |
+| `traveling` | −1 | Walking toward a claimed task or rest destination, not yet arrived (`pendingTaskDuration` or `pendingRestDuration` !== null) |
+| `resting` | 0 | Actively resting (`restTicksRemaining` !== null) — holds steady so accrued drain can't outpace the completion-time replenishment |
+
+`tickNeedGauges` (`src/core/entities/EmployeeNeeds.ts`) selects the tier via the `EmployeeWorkState` union (`'working' | 'idle' | 'resting' | 'traveling'`, also exported from `Employee.ts`). The `traveling` tier (#928) is symmetric in both directions — it applies identically whether the employee is walking to start a task or walking to start a rest, and only for the walk itself; once arrived, drain switches to `working` or `resting` respectively.
+
+**Rate modifiers** — applied to the selected tier's base rate (`getMoraleDrainMultiplier`, `NEED_MORALE_DRAIN_MULTIPLIERS`, `MORALE_THRESHOLDS`):
+- Morale > 70: drain rate ×0.85
+- Morale < 30: drain rate ×1.20
+
+Productivity is also reduced directly by low fatigue (`getNeedMultiplier`, `NEED_THRESHOLDS.fatigue`, `NEED_PRODUCTIVITY_MULTIPLIERS.fatigue`): below 40 → ×0.75 effectiveness, below 15 → ×0.50.
 
 ## Morale Effects of Needs
 
 ```
-moraleEffect = Σ_need [ needPenalty(gaugeValue) ]
+moraleEffect = needPenalty(fatigue)
 
 needPenalty(g):
-  g >= 50: 0 (comfortable)
-  g >= 30: −0.5/tick (uncomfortable)
-  g >= 15: −1.5/tick (suffering)
-  g <  15: −3.0/tick (critical — approaching collapse)
+  g >= 50: 0     (comfortable)
+  g >= 30: −1.5  (uncomfortable)
+  g >= 15: −4.5  (suffering)
+  g <  15: −9.0  (critical — approaching collapse)
 ```
 
-All needs above 80 simultaneously → **"well-rested" bonus**: +1 morale/tick (max 100).
+(`needsMoraleEffect`, `NEED_MORALE_EFFECT_THRESHOLDS`, `NEED_MORALE_EFFECT_PENALTIES` — rescaled 3× at #928 so the single gauge's per-tick range stays comparable to the old three-gauge sum.)
+
+Fatigue above 80 (`NEED_WELL_RESTED_THRESHOLD`) → **"well-rested" bonus**: +1 morale/tick (`NEED_WELL_RESTED_BONUS`).
 
 ## Collapse
 
-When any gauge hits its collapse threshold:
+When fatigue hits its collapse threshold (`NEED_COLLAPSE_THRESHOLDS.fatigue` = 5):
 
 1. Current task immediately interrupted — `interruptActiveAction` (`src/core/engine/TaskDispatch.ts`) returns it to the pool as `queued`, not discarded; work-in-progress ticks are preserved, not restarted. Reclaimed later via the normal cost-based dispatch (`gameplay-employee-skills`), by this employee or another qualified one.
-2. `rest` task self-claimed for the employee — targeting nearest available building of the correct type
+2. `rest` task self-claimed for the employee — targeting nearest available Living Quarters
 3. Employee flagged `collapsing: true` — effectiveness drops to 0 until rest completes
 4. On `rest` completion: `collapsing` cleared, interrupted task reclaimable again
 
 | Collapsed Gauge | Rest Building | Rest Duration (ticks) |
 |----------------|--------------|----------------------|
-| `hunger` | Living Quarters | 2 |
-| `fatigue` | Living Quarters | 8 |
-| `breakNeed` | Living Quarters | 3 |
+| `fatigue` | Living Quarters | 8 (`NEED_REST_DURATIONS.fatigue`) |
 
-If no suitable building within 20 cells: employee collapses in place, rest duration doubled.
+If no suitable building within the search radius (`needRestSearchRadius` — `max(20, gridWidth / 4)`, scaling with level size, #458): employee collapses in place, rest duration doubled.
 
 Rest duration itself only starts counting down once the employee physically arrives at the building (or, resting in place, immediately) — walking there is separate travel time on top of the duration, arrival-gated per `dev-architecture`'s arrival-gated-actions convention.
 
 ## Resting With No Building
 
-An employee whose need has no building to service it — none built, or the nearest beyond 20 cells — rests where they stand. Two penalties apply, and together they keep an empty site strictly worse than a Tier 1 one:
+An employee whose need has no building to service it — none built, or the nearest beyond the search radius — rests where they stand. Two penalties apply, and together they keep an empty site strictly worse than a Tier 1 one:
 
 | Penalty | Value | Constant |
 |---------|-------|----------|
 | Gauge ceiling | rest tops the gauge out at 70, never higher | `NEED_REST_NO_BUILDING_CAP` |
 | Duration | ×2 the same rest at a building | `NEED_REST_NO_BUILDING_DURATION_MULTIPLIER` |
 
-A gauge already above the ceiling is left alone, not pulled down to it. Per-visit cost still applies. Without the ceiling, resting in the dirt would restore a full gauge while a Tier 1 living_quarters restores about 11 — building nothing would be the optimal play.
+A gauge already above the ceiling is left alone, not pulled down to it. Per-visit cost still applies (currently $0 — see Cost of Needs below). A rest at a building applies its tier's replenishment rate once per tick of the rest's own duration (`completeRestForEmployee` — Tier 1's 8/tick × the 8-tick fatigue rest duration, capped at `MAX_NEED_GAUGE`); without the no-building ceiling, resting in the dirt for the same (doubled) duration would restore further still — building nothing would be the optimal play.
+
+A policy-forced rest (`forceShiftRestIfNeededByPolicy`, see Shift System below) is the one exception: it never doubles duration for lacking a building — the policy's own premise is that it protects an employee regardless of site infrastructure, and every trigger already costs real, un-doubled ticks against whatever work it interrupts.
 
 ## Building Replenishment Rates
 
 | Building | Tier 1 | Tier 2 | Tier 3 |
 |---------|--------|--------|--------|
-| Living Quarters (hunger) | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick |
 | Living Quarters (fatigue) | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
-| Living Quarters (breakNeed) | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
 
-Building full → employee waits in queue (gauges drain at normal awake rate while waiting). Route to next nearest if no capacity.
+(`BUILDING_REPLENISH_RATES.fatigue`.) Building full → employee waits in queue (gauge drains at normal rate for its current work state while waiting). Route to next nearest if no capacity.
 
 ## Proactive Need Queuing
 
-Auto-insert rest tasks at warning thresholds — don't wait for collapse:
+Auto-insert a rest task at the warning threshold — don't wait for collapse:
 
 | Gauge | Warning Threshold | Auto-Insert Behaviour |
 |-------|------------------|----------------------|
-| `hunger` | 35 | Insert `rest(living_quarters)` after current task if not already queued |
-| `fatigue` | 25 | Insert `rest(living_quarters)` after current task if not already queued |
-| `breakNeed` | 30 | Insert `rest(living_quarters)` after current task if not already queued |
+| `fatigue` | 25 (`NEED_WARNING_THRESHOLDS.fatigue`) | Insert `rest(living_quarters)` after current task if not already queued |
 
 Queue full → skip auto-insert + emit `need_warning` event for player.
 
@@ -97,18 +102,19 @@ Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/bala
 
 | Building | Need Gauge | Cost per Visit |
 |---------|-----------|---------------|
-| Living Quarters | hunger | $50 |
-| Living Quarters | fatigue | $0 (included in salary) |
-| Living Quarters | breakNeed | $20 |
+| Living Quarters | fatigue | $0 (included in salary — fatigue rest was never charged, unlike the removed hunger/breakNeed gauges) |
 
 ## Shift System
 
-If player builds a **Living Quarters Tier 2+**, an 8-tick shift cycle activates:
-- Employees work 6 ticks → automatically enter 8-tick sleep rest at Living Quarters
-- `employee_shift_change` event fired at shift boundaries
-- Without Living Quarters Tier 2+: employees remain awake indefinitely (fatigue accumulates faster)
+Two shift paths exist, selected by whether a site policy has been applied (`state.sitePolicy.revision > 0`):
+
+- **No policy applied (legacy):** gated on a Living Quarters Tier 2+ existing anywhere on site. If so, an 8-tick shift cycle activates: employees work 6 ticks (`WORK_DURATION_TICKS`) → automatically enter an 8-tick sleep rest (`SHIFT_SLEEP_DURATION_TICKS`) at Living Quarters (any tier ≥2). `employee_shift_change` fires at shift boundaries. Without a Tier 2+ Living Quarters, employees remain awake indefinitely (fatigue accumulates faster with no shift-forced rest, though proactive queuing and collapse still apply).
+- **Policy applied:** runs for every alive, non-injured employee regardless of building tier — a Tier 1 Living Quarters, or no building at all, is a valid rest destination under a policy, not a disqualifier (`SitePolicy.ts`, `ForceShiftRest.ts`'s `forceShiftRestIfNeededByPolicy`). `shouldForceRest` (`src/core/entities/SitePolicy.ts`) trips on either of two conditions, evaluated per shift mode (`shift_8h`, `shift_12h`, `continuous`, `custom`): the timed modes force rest once `ticksWorked` reaches the shift duration (8 or 12 ticks — `SHIFT_DURATIONS_TICKS`); every mode also force-rests once fatigue falls to or below the policy's threshold, default 60 (`SITE_POLICY_DEFAULT_THRESHOLD`), overridable per-employee in `custom` mode (`customThresholds`).
+
+### Walk-survival guard (#928)
+
+Both `forceShiftRestIfNeeded` and `forceShiftRestIfNeededByPolicy` (`src/core/engine/ForceShiftRest.ts`) skip an employee who is mid-walk toward an already-claimed task (`pendingTaskDuration !== null`) rather than yanking them into a rest walk instead — a proactive/forced rest never cancels a walk to a job the employee has already committed to. The one exception is a genuinely stuck walk (`emp.isMoveStuck`, set by `EntityMovementTick.ts`): an employee whose claimed destination has become unreachable (e.g. boxed in by a building placed after the walk was claimed) is exempted from the guard, so they remain eligible for this function's own rescue-to-living-quarters path instead of being left defenseless against whatever danger they happen to be stuck in.
 
 ## Types
 
-The three gauges (`hunger`, `fatigue`, `breakNeed`, each 0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.
-
+The single `fatigue` gauge (0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. `NeedKey` (currently just `'fatigue'`) and `EmployeeWorkState` (`'working' | 'idle' | 'resting' | 'traveling'`) are defined in `src/core/entities/EmployeeNeeds.ts` and re-exported from `Employee.ts`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.

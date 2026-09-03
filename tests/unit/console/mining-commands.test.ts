@@ -47,20 +47,18 @@ function makeMiningContext(): MiningContext {
  * immediately charges/sequences/blasts it — those all read `state.drillHoles`,
  * which now only gains a hole once its own `drill_hole` action completes.
  *
- * Tops every employee's need gauges up before each tick: this file's plans
+ * Tops every employee's fatigue gauge up before each tick: this file's plans
  * are driven by a single drill_rig/driller, and a multi-hole plan can run
- * long enough (walking between holes, drilling each one) for hunger/fatigue/
- * breakNeed to cross a collapse threshold mid-drive — an unrelated needs
- * mechanic this test isn't exercising. Keeping the gauges topped up isolates
- * the behavior under test (drill_hole queueing/landing) from needs/rest,
- * which have their own dedicated test coverage elsewhere.
+ * long enough (walking between holes, drilling each one) for fatigue to
+ * cross a collapse threshold mid-drive — an unrelated needs mechanic this
+ * test isn't exercising. Keeping the gauge topped up isolates the behavior
+ * under test (drill_hole queueing/landing) from needs/rest, which have their
+ * own dedicated test coverage elsewhere.
  */
 function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -74,9 +72,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
 function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -94,9 +90,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
 function driveRampToCompletion(ctx: MiningContext, maxTicks = 400): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedRamps.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }

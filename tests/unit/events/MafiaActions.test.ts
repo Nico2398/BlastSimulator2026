@@ -13,7 +13,7 @@ import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const EMPLOYEE_DEFAULTS = {
-  activeActionId: null, hunger: 100, fatigue: 100, breakNeed: 100,
+  activeActionId: null, fatigue: 100,
   collapsing: false, interruptedActionPayload: null, ticksWorked: 0,
   restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
   activeTaskSkill: null, destinationX: null, destinationZ: null,

@@ -182,9 +182,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // derailed by an unrelated needs collapse mid-drive.
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
     }
@@ -193,9 +191,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // way the drill plan above was drained before blasting.
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
     }
@@ -242,18 +238,14 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
     expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runCmd('tick 1');
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runCmd('tick 1');
     }
@@ -315,18 +307,14 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
     const state = ctx.state!;
     for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runCmd('tick 1');
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runCmd('tick 1');
     }
@@ -378,9 +366,7 @@ function makeDrillingCenterReady(
 
   for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     run('tick 1');
   }
@@ -398,9 +384,7 @@ function tickIfUnpaused(
 ): boolean {
   if (state.isPaused) return false;
   state.employees.employees.forEach((emp) => {
-    emp.hunger = 100;
     emp.fatigue = 100;
-    emp.breakNeed = 100;
   });
   run('tick 1');
   return true;
@@ -569,9 +553,7 @@ describe('speed-up-for-dig / speed-normal-after-dig (#923): taught inside the bo
     // (mirroring box-cut's own isComplete), but nowhere near the whole ramp.
     for (let i = 0; i < 15 && state.plannedRamps.length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
       if (state.plannedRamps[0] && state.plannedRamps[0].segments.some((seg) => seg.done)) break;
@@ -591,9 +573,7 @@ describe('speed-up-for-dig / speed-normal-after-dig (#923): taught inside the bo
     // Drain the rest of the dig at ×8.
     for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
     }
@@ -617,9 +597,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
     }
@@ -633,9 +611,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
 
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       run('tick 1');
 

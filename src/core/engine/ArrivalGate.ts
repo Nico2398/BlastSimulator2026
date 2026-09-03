@@ -16,6 +16,7 @@ import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.
 import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
 import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
+import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
 import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
 
@@ -212,6 +213,29 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
 
     const holder = action.holderId !== null ? state.employees.employees.find(e => e.id === action.holderId) : undefined;
     if (!holder) continue;
+
+    // #928: the holder must still actively consider THIS action their
+    // current one before the vehicle's own arrival re-arms a work timer for
+    // them. Without this, a vehicle that keeps driving/arriving under its
+    // own steam (this loop drives it regardless of the holder's own state)
+    // can resurrect a stale claim on an employee who has since moved on —
+    // interrupted into a rest, or reassigned to something else entirely —
+    // re-seeding taskTicksRemaining on someone who is, e.g., simultaneously
+    // resting (restTicksRemaining !== null). That phantom task's own later,
+    // perfectly normal completion (tickTaskProgress) then overwrites
+    // activeActionId out from under the employee's own real, concurrent
+    // rest — direct-traced (blast-execution-visual.json, #928) to
+    // permanently stall a handful of charge_hole actions' own
+    // orderedChargeCount once RestCompletion.ts's/ShiftCycle.ts's own rest-
+    // completion handlers (correctly, separately guarded — see their own
+    // #928 notes) stopped trusting that stale activeActionId enough to
+    // delete whatever it named. Release the stale claim back to the open
+    // pool instead of leaving the vehicle permanently parked on a target
+    // nobody is coming back to finish.
+    if (holder.activeActionId !== action.id) {
+      releaseActionToOpenPool(state, action);
+      continue;
+    }
 
     // Gate on the holder's own work timer rather than action.status — status
     // already flips 'assigned' -> 'in_progress' at boarding time (mirroring

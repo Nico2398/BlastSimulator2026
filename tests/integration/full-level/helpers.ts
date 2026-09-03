@@ -73,8 +73,9 @@ export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
  * driveChargePlanToCompletion/driveConstructionToCompletion: ticks up to
  * `maxIterations` times (or until `continueCondition` returns false),
  * resolving pending events and clearing the pause flag each tick. When
- * `topUpNeeds` is set, tops up every employee's hunger/fatigue/breakNeed
- * before each tick — see driveDrillPlanToCompletion's doc comment for why.
+ * `topUpNeeds` is set, tops up every employee's fatigue gauge (#928 — the
+ * sole remaining gauge) before each tick — see driveDrillPlanToCompletion's
+ * doc comment for why.
  */
 function runTickLoop(
   ctx: GameContext,
@@ -85,9 +86,7 @@ function runTickLoop(
   for (let i = 0; i < maxIterations && (continueCondition ? continueCondition() : true); i++) {
     if (topUpNeeds) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
     }
     tickCommand(ctx, ['1'], {});
@@ -114,9 +113,9 @@ export function tickWithEvents(ctx: GameContext, n: number): void {
  * Ticks until every hole ordered by the most recent drill_plan grid/add has
  * landed in state.drillHoles (#553) — a 'blasting'-qualified employee and a
  * drill_rig vehicle must already exist for any hole to ever land. Resolves
- * pending events the same way tickWithEvents does, and tops up employee need
- * gauges each tick: a solo drill_rig/driller multi-hole drive can otherwise
- * run long enough for hunger/fatigue/breakNeed to cross a collapse threshold
+ * pending events the same way tickWithEvents does, and tops up the employee
+ * fatigue gauge each tick: a solo drill_rig/driller multi-hole drive can
+ * otherwise run long enough for fatigue to cross a collapse threshold
  * mid-drive, an unrelated needs mechanic these tests aren't exercising.
  */
 export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {

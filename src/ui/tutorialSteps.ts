@@ -124,7 +124,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // this early forces a shift-end interruption before the queued
   // vehicle-gated work below could ever finish landing a hole (confirmed
   // live pre-#700). 'continuous' has no shift-length cap (getShiftDurationTicks
-  // returns Infinity) but shouldForceRest's hunger/fatigue-threshold check
+  // returns Infinity) but shouldForceRest's fatigue-threshold check
   // still applies in every mode — exactly the protection this step exists
   // to add, without capping how long a single queued task may run. The
   // later set-policy step (unchanged) still teaches shift_8h once the grind
@@ -480,9 +480,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state: GameState) => ({
     employees: getEmployees(state).map(e => ({
       id: (e as unknown as Record<string, unknown>).id as number ?? 0,
-      hunger: (e as unknown as Record<string, unknown>).hunger as number ?? 0,
       fatigue: (e as unknown as Record<string, unknown>).fatigue as number ?? 0,
-      breakNeed: (e as unknown as Record<string, unknown>).breakNeed as number ?? 0,
     })),
   }), TOOLBAR_TARGET.employees),
 

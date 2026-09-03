@@ -162,12 +162,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2
+          "deathCount": 3
         },
         "decreased": [
           "vehicleCount"
         ],
-        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood, and the drill_rig they drove out on is destroyed too (vehicleCount drops from 4 to 3). Nobody was evacuated — that's the whole point of this file."
+        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood, and the drill_rig they drove out on is destroyed too (vehicleCount drops from 4 to 3). #928: deathCount re-pinned 2 -> 3 -- the single-gauge fatigue model shifted how many ticks drilling/charging took before this step's own fire, which shifts this seed's own RNG draw sequence downstream (fragment ejection is randomized per fragment, not positional-only) enough that a projectile now also kills one of the two idle drivers standing well outside the drill grid (Pete Crater, driver, at (8,0) — ~17m from the nearest hole), on top of the driller/blaster who died in both versions. Furthest recorded throw this run: 29.9m, comfortably past that distance -- a bystander death at this range is exactly the flyrock hazard the tutorial's evacuate-zone step exists to prevent (this file deliberately never runs it), not a new failure mode. Nobody was evacuated — that's the whole point of this file."
       }
     },
     {
@@ -181,7 +181,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2
+          "deathCount": 3
         }
       }
     }
