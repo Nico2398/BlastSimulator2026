@@ -250,7 +250,7 @@ export interface EmployeeMovementResult {
   arrived: number[];
   /** Employee IDs that newly entered the stuck state this tick. */
   stuck: number[];
-  /** Employee IDs whose claim was released back to the pending-action pool this tick because isMoveStuck sustained for MOVE_STUCK_ABANDON_TICKS consecutive ticks (#938). */
+  /** Employee IDs whose claim was released back to the pending-action pool this tick because isMoveStuck sustained for MOVE_STUCK_ABANDON_TICKS consecutive ticks (#938). "Released" means genuinely open-pool — targetEmployeeId cleared/pool-visible, claimable by any qualified employee, not just re-queued to this same one (interruptActiveAction's forceOpenPool option). */
   abandoned: Array<{ employeeId: number; actionId: number | null }>;
 }
 
@@ -334,9 +334,20 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
         // (actionId names a real PendingAction) and the manual `vehicle
         // driver` boarding case (actionId null, no underlying PendingAction)
         // — see its own doc comment (TaskCancellation.ts).
+        //
+        // forceOpenPool: true — by the time 30 consecutive ticks have failed
+        // to move this employee, the destination is a confirmed, sustained
+        // impasse, not a transient one. interruptActiveAction's default
+        // walk-only pin (which re-targets a mid-walk claim at the SAME
+        // employee, for a caller that expects the destination might still
+        // resolve) would otherwise hand the action straight back to this
+        // employee via claimActionsTargetedAtEmployee next tick, who walks
+        // back into the same unreachable spot and re-abandons ~30 ticks
+        // later — an infinite cycle on a roster with no closer qualified
+        // employee to trigger the softer release path.
         if (emp.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
           const actionId = emp.activeActionId;
-          interruptActiveAction(state, emp, actionId);
+          interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
           result.abandoned.push({ employeeId: emp.id, actionId });
           emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
         }

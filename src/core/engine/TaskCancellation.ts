@@ -138,6 +138,23 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * above) or to a vehicle-gated action (`employee.pendingTaskDuration` is only
  * ever set by the non-vehicle branch of `promoteActionToActive`, so this
  * condition never matches one).
+ *
+ * options.forceOpenPool (#938): the one exception to the pin above. A caller
+ * that already knows — before calling — that the destination is a sustained,
+ * confirmed impasse rather than one that might still resolve (today, only
+ * EntityMovementTick.ts's abandon-after-MOVE_STUCK_ABANDON_TICKS path) skips
+ * the pin entirely, so the action is genuinely released to any qualified
+ * employee instead of re-targeted at the one that just failed. Without this,
+ * that caller's first interruption of a mid-walk claim hits the
+ * `targetEmployeeId === null` branch below exactly like any other caller and
+ * re-pins the action to the same employee, who then walks straight back into
+ * the same unreachable destination and re-abandons ~30 ticks later — an
+ * infinite cycle on a lean roster, where hasCloserIdleCandidate never finds a
+ * strictly-closer idle candidate to trigger the softer release path. Every
+ * other existing caller (ForceShiftRest.ts, ArrivalGate.ts, NeedRestoration.ts)
+ * omits this option and keeps the pin's existing retry-same-employee semantics
+ * unchanged — appropriate for their softer, first-strike interruptions of a
+ * destination that may still resolve.
  */
 /**
  * True when a different alive, uninjured, genuinely idle employee (not mid-
@@ -168,7 +185,7 @@ export function interruptActiveAction(
   state: GameState,
   employee: Employee,
   actionId: number | null,
-  options?: { keepVehicleDriver?: boolean },
+  options?: { keepVehicleDriver?: boolean; forceOpenPool?: boolean },
 ): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
@@ -223,13 +240,26 @@ export function interruptActiveAction(
         // ActionSelection.ts's own estimateActionCost already uses to rank
         // candidates — real pathfinding is not needed just to decide whether
         // reassignment is even worth considering.
+        //
+        // options.forceOpenPool (#938) skips this pin entirely: a caller
+        // that already knows the destination is a sustained, confirmed
+        // impasse (EntityMovementTick.ts's abandon-after-30-stuck-ticks
+        // path) rather than one that might still resolve gets the pin's
+        // opposite — never create it on the first interruption, and always
+        // release it on a repeat one, regardless of hasCloserIdleCandidate.
+        // A pre-existing target this branch did NOT itself pin (permanent,
+        // by-design targeting — a manual `employee dispatch` order) is left
+        // alone either way; only a walkOnlyPinnedBy pin is ever a release
+        // candidate, forced or not.
         if (action.targetEmployeeId === null) {
-          action.targetEmployeeId = employee.id;
-          action.payload = { ...action.payload, walkOnlyPinnedBy: employee.id };
+          if (!options?.forceOpenPool) {
+            action.targetEmployeeId = employee.id;
+            action.payload = { ...action.payload, walkOnlyPinnedBy: employee.id };
+          }
         } else if (
           action.targetEmployeeId === employee.id
           && action.payload['walkOnlyPinnedBy'] === employee.id
-          && hasCloserIdleCandidate(state, employee, action)
+          && (options?.forceOpenPool || hasCloserIdleCandidate(state, employee, action))
         ) {
           action.targetEmployeeId = null;
           const { walkOnlyPinnedBy: _unused, ...rest } = action.payload;
