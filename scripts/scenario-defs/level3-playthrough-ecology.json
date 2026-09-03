@@ -1525,12 +1525,13 @@
         }
       ],
       "role": "observe",
+      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
       "expect": {
         "equals": {
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 3.4608333333333245,
-          "safety": 50.70000000000013,
+          "wellBeing": 3.299166666666658,
+          "safety": 50.600000000000136,
           "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
@@ -1706,12 +1707,13 @@
         }
       ],
       "role": "observe",
+      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
       "expect": {
         "equals": {
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 3.4608333333333245,
-          "safety": 50.70000000000013,
+          "wellBeing": 3.299166666666658,
+          "safety": 50.600000000000136,
           "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
@@ -1731,11 +1733,11 @@
           "command": "tick 20"
         }
       ],
-      "description": "Finding #63 (this pass), rewritten for #554, then again for #586-followup: the file's real ending is no longer set here. #586-followup (this session's own fix): the pre-fix file's own ~100 ticks of dead post-drilling/post-hiring tick padding (see the `tick 15`/`wait_until` steps' own notes above) ate directly into BANKRUPTCY_GRACE_TICKS's margin, flipping levelEnded/levelEndReason to bankruptcy during pattern 1's own charge wait -- before its `sequence`/`blast` steps ever ran, which is what made a real interaction-mode click on the (by-then permanently covered) blast panel fail. Removing that padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's blast for real; this second pattern's own drill_plan (above) still can't be worked (no licensed driller survives the blast), but that is a crew/licensing dead end, not a game-over state. `cash` stays out of every remaining step's equality check for the same host-timing-sensitive reasons as the pre-#554 pass established (see the `move_here` step's own note) -- tick/hole/death/employee counts and level-end state stay exact.",
+      "description": "Finding #63 (this pass), rewritten for #554, then again for #586-followup: the file's real ending is no longer set here. #586-followup (this session's own fix): the pre-fix file's own ~100 ticks of dead post-drilling/post-hiring tick padding (see the `tick 15`/`wait_until` steps' own notes above) ate directly into BANKRUPTCY_GRACE_TICKS's margin, flipping levelEnded/levelEndReason to bankruptcy during pattern 1's own charge wait -- before its `sequence`/`blast` steps ever ran, which is what made a real interaction-mode click on the (by-then permanently covered) blast panel fail. Removing that padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's blast for real; this second pattern's own drill_plan (above) still can't be worked (no licensed driller survives the blast), but that is a crew/licensing dead end, not a game-over state. `cash` stays out of every remaining step's equality check for the same host-timing-sensitive reasons as the pre-#554 pass established (see the `move_here` step's own note) -- tick/hole/death/employee counts and level-end state stay exact. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 -- rest now preempts mid-task/mid-drive more readily and restores fatigue further per session, so this 20-tick block needs 2 more ticks to reach the same landing condition (no pending work left to advance past). holeCount, orderedHoleCount, deathCount, employeeCount, and level-end state reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 331,
+          "tickCount": 333,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 12,
@@ -1752,16 +1754,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "No event pending at this checkpoint post-fix (sandbox-confirmed) -- kept as a no-op resolveEventIfPending for structural consistency with every other event choose 0 step in this file.",
+      "description": "No event pending at this checkpoint post-fix (sandbox-confirmed) -- kept as a no-op resolveEventIfPending for structural consistency with every other event choose 0 step in this file. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 (following the `tick 20` step's own note above), wellBeing 4.460833333333321 -> 4.299166666666655 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest at this exact tick. safety, ecology, deathCount, and employeeCount reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 331,
+          "tickCount": 333,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 4.460833333333321,
+          "wellBeing": 4.299166666666655,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1780,9 +1782,10 @@
         }
       ],
       "role": "observe",
+      "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 331,
+          "tickCount": 333,
           "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1799,12 +1802,13 @@
         }
       ],
       "role": "observe",
+      "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 331,
+          "tickCount": 333,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 4.460833333333321,
+          "wellBeing": 4.299166666666655,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1822,12 +1826,13 @@
         }
       ],
       "role": "setup",
+      "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 331,
+          "tickCount": 333,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 4.460833333333321,
+          "wellBeing": 4.299166666666655,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
