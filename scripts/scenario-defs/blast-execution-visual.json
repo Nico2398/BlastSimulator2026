@@ -1377,7 +1377,7 @@
     },
     {
       "command": "employee fire 3",
-      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #945 follow-up: the fatigue/rest-timing rebalance shifts the RNG draw order enough that employee 3's own hire-time `rng.chance(0.3)` unionization roll (Employee.ts) now lands true on seed:42 (it did not before) -- `commandOutcome: either` documents this as the same already-accepted unionized-refusal outcome the description above and the fire-4 step further down this file already cover, not a new failure mode.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1399,7 +1399,8 @@
           "timeoutMs": 2000
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "inspect 5,45,0",
@@ -3001,6 +3002,21 @@
         {
           "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H59\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H8 explosive:boomite amount:8 stemming:0.5",
+      "description": "#945 follow-up: a 14th straggler, same class as the #707/#867/#928 batches above -- the fatigue/rest-timing rebalance (RestActionHelpers.ts, ForceShiftRest.ts, NeedTaskInsertion.ts) shifts this file's dispatch timing enough that H8 now lands after the main Charge All snapshot under seed:42/command mode (direct-traced: `blast` at step 160 previously succeeded, now refuses with `H8: Missing charge`). Joins, rather than replaces, the existing 13 -- `commandOutcome: either` covers a hole that turns out to not need reissuing (redundant, harmless) or was never drilled (refused, harmless) either way, same reasoning as every other straggler step here.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H8\"] [data-action=\"charge-hole\"]"
         }
       ],
       "role": "player",
