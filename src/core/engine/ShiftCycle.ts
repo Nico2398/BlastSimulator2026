@@ -113,11 +113,23 @@ export function completeRestTick(
 
   if (emp.restTicksRemaining <= 0) {
     const completedActionId = emp.activeActionId;
+    // #928: verify the action activeActionId currently names is actually
+    // this rest before deleting it — mirrors tickGeneralRestCompletion's own
+    // identical guard (RestCompletion.ts) and the same reasoning: a vehicle-
+    // gated action's arrival-promotion race (ArrivalGate.ts) can leave
+    // activeActionId naming an unrelated, still-genuinely-in-progress action
+    // by the time this rest completes, and completePendingAction on that
+    // would delete it outright without ever landing it.
+    const completedAction = completedActionId !== null
+      ? state.pendingActions.find(a => a.id === completedActionId)
+      : undefined;
     completeRestForEmployee(state, emp, 'fatigue');
     // forceShiftRestIfNeeded self-claims this action at creation, so — like
     // tickGeneralRestCompletion's own rest sources — nothing else removes it
     // from pendingActions/ghostPreviews once the rest completes (#547).
-    if (completedActionId !== null) completePendingAction(state, completedActionId);
+    if (completedActionId !== null && completedAction?.type === 'rest') {
+      completePendingAction(state, completedActionId);
+    }
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }
