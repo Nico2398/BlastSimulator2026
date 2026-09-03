@@ -431,7 +431,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
 
   it('on terrain with disjoint per-column floor/ceiling ranges (plateau→canyon→plateau), no segment has NaN/Infinity/undefined targetX/targetY/targetZ, index stays contiguous, and targetY strictly decreases', () => {
     const grid = makeSteppedGrid();
-    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
 
@@ -451,7 +451,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
 
   it('skips exactly the y-band with zero contributing columns instead of emitting an invalid segment for it, and emits segments on both sides of the gap', () => {
     const grid = makeSteppedGrid();
-    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
 
