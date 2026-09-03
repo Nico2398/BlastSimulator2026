@@ -339,9 +339,9 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
  * carved immediately) rather than dividing by zero.
  */
 export function computeRampSegmentCarveTarget(totalCells: number, ticksElapsed: number, totalTicks: number): number {
-  void totalCells; void ticksElapsed; void totalTicks;
-  // TODO: implement
-  return undefined as any;
+  if (totalTicks <= 0) return totalCells;
+  const progress = Math.min(1, Math.max(0, ticksElapsed / totalTicks));
+  return Math.floor(progress * totalCells);
 }
 
 /**
@@ -358,9 +358,28 @@ export function carveRampSegmentSlice(
   toIndex: number,
   emitter?: EventEmitter,
 ): { voxelsCleared: number; region: RampSegmentDef['region'] } {
-  void grid; void cells; void fromIndex; void toIndex; void emitter;
-  // TODO: implement
-  return undefined as any;
+  let voxelsCleared = 0;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+  for (let i = fromIndex; i < toIndex; i++) {
+    const cell = cells[i];
+    if (!cell) continue;
+    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
+      grid.clearVoxel(cell.x, cell.y, cell.z);
+      voxelsCleared++;
+      minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
+      minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
+      minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
+    }
+  }
+
+  const region = voxelsCleared > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null;
+
+  if (voxelsCleared > 0 && region) {
+    emitter?.emit('terrain:updated', { region });
+  }
+
+  return { voxelsCleared, region };
 }
 
 /**

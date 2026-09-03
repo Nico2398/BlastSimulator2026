@@ -11,6 +11,8 @@ import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
+import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
+import { NavGrid } from '../nav/NavGrid.js';
 
 /** One skill category's level-up, reported when a single tick's XP gain crosses a proficiency threshold. */
 export interface TaskProgressLevelUp {
@@ -57,10 +59,36 @@ export interface TaskProgressResult {
  * (still walking to the target).
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter, grid?: VoxelGrid): TaskProgressResult | null {
-  void grid; // TODO: implement — progressive ramp carving (#946) will read this
   if (emp.taskTicksRemaining === null) return null;
 
   emp.taskTicksRemaining -= 1;
+
+  // Progressive ramp carving (#946) — carve a bite of the segment's cells
+  // each tick, in step with the digger's own tick progress, instead of
+  // leaving the whole layer intact until the action completes. No-op for
+  // any other action type or when no grid was supplied (grid?: VoxelGrid
+  // is undefined outside GameLoop's tick.ts call site).
+  if (grid && emp.pendingActionType === 'dig_ramp_segment' && emp.pendingActionPayload) {
+    const rampId = emp.pendingActionPayload['rampId'] as number;
+    const segmentIndex = emp.pendingActionPayload['segmentIndex'] as number;
+    const ramp = state.plannedRamps.find(r => r.id === rampId);
+    const tracker = ramp?.segments.find(s => s.index === segmentIndex);
+
+    if (tracker && !tracker.done) {
+      const totalTicks = emp.activeTaskTotalTicks ?? 0;
+      const ticksElapsed = totalTicks - emp.taskTicksRemaining;
+      const carvedCount = tracker.carvedCount ?? 0;
+      const target = computeRampSegmentCarveTarget(tracker.cells.length, ticksElapsed, totalTicks);
+
+      if (target > carvedCount) {
+        const sliceResult = carveRampSegmentSlice(grid, tracker.cells, carvedCount, target, emitter);
+        tracker.carvedCount = target;
+        if (sliceResult.region && state.navGrid) {
+          NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, sliceResult.region);
+        }
+      }
+    }
+  }
 
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);
   const xpAwards = action ? computeTaskXpAwards(emp, action) : [];

@@ -65,6 +65,7 @@ export function resolveTaskCompletion(
           NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
         }
         tracker.done = true;
+        tracker.carvedCount = tracker.cells.length;
         lines.push(`[tick ${state.tickCount}] Ramp #${rampId} segment ${segmentIndex} excavated: ${carveResult.voxelsCleared} voxels cleared.`);
 
         if (ramp.segments.every(s => s.done)) {
