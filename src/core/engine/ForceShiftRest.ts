@@ -57,8 +57,17 @@ export function forceShiftRestIfNeeded(
   // every tick until arrival (#437).
   if (emp.pendingRestDuration !== null) return;
   // Already walking to a claimed task, not yet arrived — mirrors the
-  // pendingRestDuration guard above for the task-travel case (#928).
-  if (emp.pendingTaskDuration !== null) return;
+  // pendingRestDuration guard above for the task-travel case (#928). Exempts
+  // a genuinely stuck walk (isMoveStuck — EntityMovementTick.ts) rather than
+  // blocking unconditionally: an employee whose claimed destination has
+  // become unreachable (e.g. boxed in by a building placed after the walk
+  // was claimed) would otherwise never again be eligible for this function's
+  // own rescue-to-living-quarters path, left defenseless (no proactive rest,
+  // no evacuation reroute) against a danger zone it happens to be standing
+  // in — confirmed live via vibration-budget.json's own grid-2 safety
+  // dispatch, whose target tile was later claimed by a living_quarters
+  // build order.
+  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
@@ -155,8 +164,10 @@ export function forceShiftRestIfNeededByPolicy(
   // comment on the same check (#437).
   if (emp.pendingRestDuration !== null) return;
   // Already walking to a claimed task, not yet arrived — mirrors the
-  // pendingRestDuration guard above for the task-travel case (#928).
-  if (emp.pendingTaskDuration !== null) return;
+  // pendingRestDuration guard above for the task-travel case (#928), and
+  // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
+  // (see its own comment on the same check) for the same reason.
+  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;
