@@ -332,6 +332,38 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
 }
 
 /**
+ * Progressive carve target (#946) — how many of a segment's `totalCells`
+ * should be carved given `ticksElapsed` of `totalTicks` work. 0 at 0%
+ * progress, `totalCells` at 100%, clamped in between. `totalTicks <= 0`
+ * guards against a zero-duration segment by returning `totalCells` (fully
+ * carved immediately) rather than dividing by zero.
+ */
+export function computeRampSegmentCarveTarget(totalCells: number, ticksElapsed: number, totalTicks: number): number {
+  void totalCells; void ticksElapsed; void totalTicks;
+  // TODO: implement
+  return undefined as any;
+}
+
+/**
+ * Carve only `cells[fromIndex, toIndex)` of a ramp segment into `grid`
+ * (#946 — progressive carving in step with the action's own tick progress,
+ * instead of all at once on completion via {@link carveRampSegment}).
+ * Mirrors `carveRampSegment`'s density re-check and `terrain:updated` emit,
+ * scoped to only the region of cells actually cleared by this slice.
+ */
+export function carveRampSegmentSlice(
+  grid: VoxelGrid,
+  cells: RampSegmentDef['cells'],
+  fromIndex: number,
+  toIndex: number,
+  emitter?: EventEmitter,
+): { voxelsCleared: number; region: RampSegmentDef['region'] } {
+  void grid; void cells; void fromIndex; void toIndex; void emitter;
+  // TODO: implement
+  return undefined as any;
+}
+
+/**
  * Work-duration ticks for a `rock_digger` of `tier` to excavate `voxelCount`
  * voxels of a ramp segment. Scales inversely with the tier's workRate
  * multiplier (VEHICLE_TIER_MULTIPLIERS) against the tier-1 baseline rate

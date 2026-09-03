@@ -176,6 +176,8 @@ export interface RampSegmentTracker {
   cells: { x: number; y: number; z: number }[];
   region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
   done: boolean;
+  /** Cells carved so far for this segment's progressive carving (#946) — undefined/0 before any tick has carved. */
+  carvedCount?: number;
 }
 
 /** A ramp order in flight — its footprint is claimed and segments queue `dig_ramp_segment` actions as they're worked (#555). */

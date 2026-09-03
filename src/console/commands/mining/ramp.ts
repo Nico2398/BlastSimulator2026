@@ -127,7 +127,7 @@ export function buildRampCommand(
     }, { skipQualificationCheck: true });
 
     plannedRamp.segments.push({
-      index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false,
+      index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false, carvedCount: 0,
     });
   }
 

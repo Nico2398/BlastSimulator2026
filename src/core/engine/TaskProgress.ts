@@ -9,6 +9,7 @@ import type { GameState, ActionType } from '../state/GameState.js';
 import { gainXp, type Employee, type SkillCategory } from '../entities/Employee.js';
 import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 
 /** One skill category's level-up, reported when a single tick's XP gain crosses a proficiency threshold. */
@@ -55,7 +56,8 @@ export interface TaskProgressResult {
  * any employee not yet promoted out of pendingTaskDuration by ArrivalGate
  * (still walking to the target).
  */
-export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter): TaskProgressResult | null {
+export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter, grid?: VoxelGrid): TaskProgressResult | null {
+  void grid; // TODO: implement — progressive ramp carving (#946) will read this
   if (emp.taskTicksRemaining === null) return null;
 
   emp.taskTicksRemaining -= 1;
