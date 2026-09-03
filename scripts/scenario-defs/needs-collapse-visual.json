@@ -327,55 +327,8 @@
       }
     },
     {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "collapsedCount": 0
-        },
-        "note": "still recovered, no new collapse — Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "needs",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "needs"
-        }
-      ],
-      "role": "observe"
-    },
-    {
       "command": "employee hire role:driller",
-      "description": "A third hire, brought on purely to build the quarters ordered below (#556). Neither Walter nor Stan can: this file works both of them to exhaustion on purpose, and an employee deep in the collapse cycle never claims a construction site. Hired fresh immediately before the order so it is nowhere near its own collapse threshold during the push below — and so the quarters gets built without Walter leaving the rest-in-place he would otherwise hold, which an earlier order cost in an extra collapse this file asserts against on every step. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
+      "description": "#928 follow-up: moved here from right before the build order below (was directly ahead of the old `tick 50` step) -- a third hire, brought on purely to build the quarters ordered below (#556). Neither Walter nor Stan can: this file works both of them to exhaustion on purpose, and an employee deep in the collapse cycle never claims a construction site. Under the single-gauge fatigue model Walter's own natural idle-then-proactive-rest cycle (no explicit dispatch keeps him busy, unlike Stan) leaves him genuinely idle for a long stretch after the `tick 200` step above -- ordering the build there let dispatch's idle-employee scan (which always favours the lowest employee id first, EmployeeDispatchSteps.ts) hand the construction site to Walter instead of this fresh hire, running him down into a second, unintended collapse that landed on top of Stan's own designed one below (sandbox-confirmed: collapsedCount read 2, not 1, at that checkpoint). Hiring and ordering here instead lands while Walter is confirmed genuinely busy (mid-rest, restTicksRemaining still counting down from the `tick 200` step's own recovery, per that step's own note) rather than idle, so this fresh hire is the only eligible candidate again, restoring the file's own premise.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -439,6 +392,53 @@
         },
         "note": "Ordering only queues a construction site (#556). The fresh hire above builds it across the collapse push below and the closing wait; the standing building is asserted there, not here."
       }
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        },
+        "note": "still recovered, no new collapse — Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "employee dispatch 2 x:34 z:32",
@@ -592,9 +592,9 @@
       "expect": {
         "equals": {
           "collapsedCount": 1,
-          "orderedBuildingCount": 1
+          "orderedBuildingCount": 0
         },
-        "note": "#700 follow-up: replenishment now applies its rate for a rest's own full duration, so a completed rest recovers much more than before -- keeping Stan continuously re-dispatched every 5 ticks (rather than the old single 20/30-tick gaps) closes the idle window an auto-claimed rest could otherwise slip into and recover him. Under this tighter cadence he still crosses the collapse threshold from continuous working-rate drain with no rest ever claimed (a real run confirms 'NEED: employee_collapsed' fires within this final batch). This is the collapsing-row visual checkpoint (see 'collapse-state' shot). The quarters ordered above is still a construction site at this beat (#556) — this checkpoint is Stan’s own need drain under continuous re-dispatch, which the site does not touch; the building itself is waited out and asserted immediately below."
+        "note": "#700 follow-up: replenishment now applies its rate for a rest's own full duration, so a completed rest recovers much more than before -- keeping Stan continuously re-dispatched every 5 ticks (rather than the old single 20/30-tick gaps) closes the idle window an auto-claimed rest could otherwise slip into and recover him. Under this tighter cadence he still crosses the collapse threshold from continuous working-rate drain with no rest ever claimed (a real run confirms 'NEED: employee_collapsed' fires within this final batch). This is the collapsing-row visual checkpoint (see 'collapse-state' shot). #928 follow-up: the quarters order was moved earlier (see the hire+build steps above, right after the `tick 200` step) so Walter -- not the fresh hire -- doesn't grab the construction site while genuinely idle under the single-gauge fatigue model; the building now lands as a standing structure (orderedBuildingCount:0) before this checkpoint instead of still being a construction site, which the `wait_until` immediately below re-confirms rather than waiting out."
       }
     },
     {
