@@ -13,6 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach } from './RestActionHelpers.js';
+import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidEvacuationWalk } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
@@ -121,9 +122,13 @@ export function forceShiftRestIfNeeded(
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),
  * already walking to a queued rest (pendingRestDuration !== null), already
- * arrived and mid-execution of a claimed task (taskTicksRemaining !== null —
- * #945, waits for the in-progress task to finish rather than interrupting it
- * mid-way), or mid-walk to board a vehicle from a manual `vehicle driver` command
+ * arrived and mid-execution of a boarded vehicle-gated action
+ * (taskTicksRemaining !== null && isMidVehicleGatedWork — #945, waits for
+ * the driver to naturally dismount, e.g. on segment/task completion with no
+ * same-vehicle follow-up, rather than forcing a dismount-and-reboard
+ * mid-task; deliberately does NOT also cover the mid-drive-to-target phase
+ * or an on-foot task — see the guard's own inline comment for why), or
+ * mid-walk to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
  * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
  * destinationX/Z on that employee here would silently cancel the boarding
@@ -176,10 +181,27 @@ export function forceShiftRestIfNeededByPolicy(
   // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
   // (see its own comment on the same check) for the same reason.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
-  // Already arrived and mid-execution of a claimed task (e.g. dig_ramp_segment)
-  // — mirrors forceShiftRestIfNeeded's own identical already-arrived guard
-  // (see its own comment on the same check) for the same reason (#945).
-  if (emp.taskTicksRemaining !== null) return;
+  // Already arrived and mid-execution of a boarded vehicle-gated action
+  // (e.g. dig_ramp_segment — #945; see isMidVehicleGatedWork's own doc
+  // comment, VehicleReservation.ts, for why this is scoped to vehicle-gated
+  // work rather than every in-progress task). Interrupting mid-execution
+  // forces a dismount and a fresh walk-and-reboard once the rest ends,
+  // instead of letting the driver finish this segment (or hand off cleanly
+  // via same-vehicle continuity to the next one) first.
+  //
+  // Deliberately does NOT also cover the mid-drive-to-target phase (taskTicksRemaining
+  // still null) — unlike the mid-execution case above, a long initial approach
+  // drive protected the same way just defers the same crossing to
+  // tickCollapse's unconditional hard floor instead of this policy's own
+  // proactive one, trading a healthy rest at the policy's threshold for a
+  // drive-to-zero collapse with no net reduction in how many times the
+  // vehicle gets boarded (confirmed empirically against #945's own tutorial
+  // box-cut repro below: identical boardingCount either way, but fatigue
+  // bottoming out at 0 instead of recovering at the policy's own threshold).
+  // #922's own VehicleReservation.test.ts already pins mid-drive
+  // interruption as intended behavior for the legacy (non-policy)
+  // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
+  if (emp.taskTicksRemaining !== null && isMidVehicleGatedWork(state, emp)) return;
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;

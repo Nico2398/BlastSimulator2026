@@ -19,6 +19,7 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
@@ -411,22 +412,29 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).not.toBeNull();
   });
 
-  // NEW (#945): mirrors forceShiftRestIfNeeded's own taskTicksRemaining
-  // guard (see its own comment) — a policy-forced rest must not preempt an
-  // employee already arrived and mid-execution of a claimed task either,
-  // even with fatigue deep below any threshold and the shift boundary long
-  // since passed. Only a genuine collapse (tickCollapse, NeedRestoration.ts)
-  // is still allowed to interrupt mid-task — that path is untouched by #945.
-  it('#945: no-op when taskTicksRemaining is set (mid-execution of a claimed, arrived task), even with fatigue deep below threshold', () => {
+  // NEW (#945, fixer follow-up): mirrors forceShiftRestIfNeeded's own
+  // taskTicksRemaining guard, but scoped to vehicle-gated work
+  // (isMidVehicleGatedWork, VehicleReservation.ts) rather than a blanket
+  // taskTicksRemaining check — a policy-forced rest must not preempt a
+  // driver already boarded and mid-execution of a vehicle-gated action
+  // (e.g. mid dig_ramp_segment), even with fatigue deep below any threshold
+  // and the shift boundary long since passed. Only a genuine collapse
+  // (tickCollapse, NeedRestoration.ts) is still allowed to interrupt
+  // mid-task — that path is untouched by #945.
+  it('#945: no-op when boarded and mid-execution of a vehicle-gated action (taskTicksRemaining set), even with fatigue deep below threshold', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const prior = pushHeldAction(state, employee.id, 1100);
+    prior.requiredVehicleRole = 'rock_digger';
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = prior.id;
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10; // well past the shift boundary
     employee.fatigue = 1; // well below any threshold
-    employee.taskTicksRemaining = 3; // arrived, mid-execution — not just walking to it
+    employee.taskTicksRemaining = 3; // arrived, mid-execution — not just driving to it
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
@@ -437,5 +445,62 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const claim = state.pendingActions.find(a => a.id === 1100)!;
     expect(claim.status).toBe('in_progress');
     expect(claim.holderId).toBe(employee.id);
+  });
+
+  // NEW (#945 fixer follow-up): the mid-execution guard above is
+  // deliberately narrower than "any vehicle-gated action" — a driver still
+  // en route to the target (taskTicksRemaining not yet seeded by
+  // ArrivalGate) stays interruptible, same as #922's own pinned
+  // mid-drive-interruption behavior for the legacy forceShiftRestIfNeeded
+  // (VehicleReservation.test.ts). Protecting the drive phase too was tried
+  // and empirically made things worse on #945's own tutorial box-cut repro
+  // (needs.integration.test.ts): an equal boarding count, but the driver's
+  // fatigue crashing all the way to tickCollapse's floor instead of resting
+  // at the policy's own higher threshold — see forceShiftRestIfNeededByPolicy's
+  // own inline comment on the guard.
+  it('#945 follow-up: DOES interrupt a boarded vehicle-gated action while still mid-drive (taskTicksRemaining still null) — only mid-execution is protected', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1101);
+    prior.requiredVehicleRole = 'rock_digger';
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = prior.id;
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    // taskTicksRemaining stays null — still driving toward the target.
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1101);
+  });
+
+  // NEW (#945 fixer follow-up): the guard is scoped to vehicle-gated work —
+  // an on-foot (non-vehicle) task stays interruptible mid-execution, same as
+  // before #945. A blanket taskTicksRemaining guard (an earlier, broader
+  // version of this fix) also deferred a policy-forced rest for a long-
+  // running on-foot task's entire duration, letting fatigue swing far past
+  // the policy's own threshold every work cycle and crash morale over a long
+  // run — regressing needs.integration.test.ts's own pre-existing "#678"
+  // long-run wellBeing/revolt acceptance cases.
+  it('#945 follow-up: DOES interrupt a non-vehicle task mid-execution (taskTicksRemaining set) — only vehicle-gated work is protected', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1102); // general_work, requiredVehicleRole: null
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1102);
   });
 });

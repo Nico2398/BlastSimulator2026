@@ -19,7 +19,7 @@ import {
   WORK_DURATION_TICKS,
   SHIFT_SLEEP_DURATION_TICKS,
   SHIFT_DURATIONS_TICKS,
-  BUILDING_REPLENISH_RATES,
+  MAX_NEED_GAUGE,
 } from '../../../src/core/config/balance.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 
@@ -449,7 +449,12 @@ describe('processShiftCycle (7.9)', () => {
     };
     state.pendingActions.push(interrupted);
     employee.activeActionId = interrupted.id;
-    employee.taskTicksRemaining = 4; // work already in progress, not merely claimed
+    // taskTicksRemaining deliberately left null (not "arrived, mid-execution")
+    // — #945 added a guard to this same function that withholds a forced
+    // shift rest while taskTicksRemaining !== null (see ForceShiftRest.test.ts's
+    // own "#945: no-op when taskTicksRemaining is set" coverage), so setting
+    // it here would make forceShiftRestIfNeeded return early before ever
+    // reaching the release-to-pool behavior (#684) this test exists to prove.
     employee.ticksWorked = WORK_DURATION_TICKS - 1; // fires this call
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
@@ -458,12 +463,17 @@ describe('processShiftCycle (7.9)', () => {
 
     // Released back to the pool — 'queued', unheld — not left 'assigned'/
     // held by an employee who is now resting and will never tick it again.
+    // (interruptActiveAction's own "remaining in-progress duration is
+    // preserved on the released action's payload" behavior needs
+    // taskTicksRemaining !== null to exercise — which the #945 guard above
+    // now withholds a forced shift rest against — so that sub-behavior is
+    // covered directly by TaskDispatch.test.ts's own interruptActiveAction
+    // coverage instead of here, and by this same describe block's own
+    // ByPolicy counterpart below, which is not vehicle-gated and so isn't
+    // subject to that guard.)
     const released = state.pendingActions.find(a => a.id === interrupted.id)!;
     expect(released.status).toBe('queued');
     expect(released.holderId).toBeNull();
-    // Remaining work is preserved on the action itself so whoever reclaims
-    // it resumes instead of restarting from scratch.
-    expect(released.payload['durationTicks']).toBe(4);
     // The employee's activeActionId now points at the new rest action, not
     // the interrupted one and not null.
     expect(employee.activeActionId).not.toBe(interrupted.id);
@@ -771,9 +781,19 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(events).toContain('employee:shift_change');
   });
 
-  // ── Completion: gauge replenishment differs by building tier ──────────────
+  // ── Completion: gauge replenishment once forced rest completes ────────────
 
-  it('replenishes the resting gauge per BUILDING_REPLENISH_RATES tier once forced rest completes, then returns to normal dispatch', () => {
+  // #945: completeRestForEmployee (RestActionHelpers.ts) now lands a
+  // completed with-building rest at MAX_NEED_GAUGE (100) outright for any
+  // active living_quarters tier, instead of accumulating
+  // BUILDING_REPLENISH_RATES.fatigue[tier] once per tick of
+  // NEED_REST_DURATIONS.fatigue (a flat, tier-scaled total that left tier 1
+  // under the ceiling while tier 2/3 already saturated it) — see
+  // RestActionHelpers.test.ts's own "with-building rest lands exactly at
+  // MAX_NEED_GAUGE, every tier" coverage for the direct-call version of this
+  // same invariant. This is the same rest-completion path exercised
+  // end-to-end through processShiftCycle/tickGeneralRestCompletion.
+  it('replenishes the resting gauge to MAX_NEED_GAUGE once forced rest completes at an active living_quarters, any tier, then returns to normal dispatch', () => {
     function runToCompletion(tier: 1 | 2 | 3): { fatigueAfter: number; activeActionId: number | null } {
       const state = createGame({ seed: SEED });
       const rng = new Random(SEED);
@@ -803,16 +823,8 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const tier1 = runToCompletion(1);
     const tier2 = runToCompletion(2);
 
-    // The rate applies for the rest's own full duration (#700 fix) — a single
-    // tick's worth used to net negative against any real travel to and from
-    // the building, so this now matches BUILDING_REPLENISH_RATES's own
-    // "per-tick" doc comment instead of a flat one-shot bonus. Starting well
-    // below the ceiling (10) so tier 1's smaller total (8 × 8 ticks = 64)
-    // stays under 100 while tier 2's larger one (14 × 8 = 112) saturates —
-    // still two distinct, tier-differentiated outcomes.
-    expect(tier1.fatigueAfter).toBe(Math.min(100, 10 + BUILDING_REPLENISH_RATES.fatigue[1] * NEED_REST_DURATIONS.fatigue));
-    expect(tier2.fatigueAfter).toBe(Math.min(100, 10 + BUILDING_REPLENISH_RATES.fatigue[2] * NEED_REST_DURATIONS.fatigue));
-    expect(tier1.fatigueAfter).not.toBe(tier2.fatigueAfter);
+    expect(tier1.fatigueAfter).toBe(MAX_NEED_GAUGE);
+    expect(tier2.fatigueAfter).toBe(MAX_NEED_GAUGE);
     expect(tier1.activeActionId).toBeNull();
     expect(tier2.activeActionId).toBeNull();
   });
