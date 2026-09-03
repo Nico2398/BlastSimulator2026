@@ -11,6 +11,7 @@
 // default so the pre-game path (where update() never fires) shows nothing
 // it can't act on.
 
+import { PanelBase } from './PanelBase.js';
 import { t, getLocale, setLocale } from '../../core/i18n/I18n.js';
 import { el, button, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -42,14 +43,12 @@ const SHORTCUT_KEYS: readonly string[] = [
   'shortcuts.navgrid', 'shortcuts.survey_overlay', 'shortcuts.saves', 'shortcuts.settings',
 ];
 
-export class SettingsPanel {
-  private readonly el: HTMLElement;
+export class SettingsPanel extends PanelBase {
   private readonly sessionSection: HTMLElement;
   private readonly enLangPill: HTMLElement;
   private readonly frLangPill: HTMLElement;
   private readonly volumeEls: Partial<Record<'master' | AudioCategory, { input: HTMLInputElement; readout: HTMLElement }>> = {};
 
-  private onCloseCb?: () => void;
   private onLanguageChangeCb?: (lang: string) => void;
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private onReplayTutorialCb?: () => void;
@@ -61,7 +60,7 @@ export class SettingsPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: {
+    super(el('div', { className: 'bsx-root', attrs: {
       id: 'bs-settings-panel',
       // Appended to the root container so its z-index beats the main menu
       // (var(--bsx-z-menu)) — inside leftCol's fixed stacking context it
@@ -70,7 +69,7 @@ export class SettingsPanel {
         + 'width:372px;max-height:86vh;display:flex;flex-direction:column;'
         + 'border-radius:9px;background:var(--bsx-panel);border:1px solid var(--bsx-hairline-strong);'
         + `box-shadow:0 30px 80px rgba(0,0,0,.7);overflow:hidden;z-index:var(--bsx-z-menu-settings)`,
-    } });
+    } }));
     this.el.style.display = 'none';
 
     const header = el('div', { attrs: {
@@ -174,9 +173,6 @@ export class SettingsPanel {
     container.appendChild(this.el);
   }
 
-  get root(): HTMLElement { return this.el; }
-
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setLanguageChangeHandler(cb: (lang: string) => void): void { this.onLanguageChangeCb = cb; }
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
   setReplayTutorialHandler(cb: () => void): void { this.onReplayTutorialCb = cb; }
@@ -201,13 +197,7 @@ export class SettingsPanel {
     this.sessionSection.style.display = state ? 'flex' : 'none';
   }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
-
   refreshLocale(): void { this.locale.refresh(); this.updateLangPills(); }
-
-  dispose(): void { this.el.remove(); }
 
   private updateLangPills(): void {
     syncLangPills(this.enLangPill, this.frLangPill, getLocale());

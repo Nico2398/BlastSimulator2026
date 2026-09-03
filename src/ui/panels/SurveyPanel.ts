@@ -11,8 +11,9 @@
 // keep resolving unchanged — same convention FleetPanel/CrewPanel established
 // for their own root ids in P6.
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton } from '../dom.js';
+import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton, panelRoot, panelHeader, panelHeaderButton, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -23,9 +24,8 @@ import {
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { placementRefusalReason, type PlacementKit } from '../scene/PlacementKit.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 /** Qualification a surveyor needs before any survey can be dispatched. */
 const SURVEYOR_SKILL = 'geology';
@@ -46,14 +46,12 @@ const DEPTH_KIND: Record<SurveyMethod, 'full' | 'surface'> = {
   aerial: 'surface',
 };
 
-export class SurveyPanel {
-  private readonly el: HTMLElement;
+export class SurveyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly methodsEl: HTMLElement;
   private readonly runBtn: HTMLButtonElement;
   private readonly statusEl: HTMLElement;
   private readonly resultsEl: HTMLElement;
-  private onCloseCb?: () => void;
   private gameConsole?: GameConsoleFn;
   private readonly overlayToggleBtn: HTMLButtonElement;
   /** Player-facing visibility preference for the survey confidence overlay (#496), mirrored from GameRenderer via UIManager. */
@@ -74,38 +72,24 @@ export class SurveyPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-survey-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-survey-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('survey', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(85,168,255,.14);color:var(--bsx-info)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.survey.title',
-    );
     // Player-facing toggle for the survey confidence overlay (#496) — a
     // view-only preference, wired up (click handler, tooltip, pressed state)
     // by the implementer.
-    this.overlayToggleBtn = el('button', { children: [iconEl('survey', 12)] });
-    this.overlayToggleBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
+    this.overlayToggleBtn = panelHeaderButton('survey', () => this.handleOverlayToggleClick());
     this.overlayToggleBtn.setAttribute('data-role', 'overlay-toggle');
-    this.overlayToggleBtn.addEventListener('click', () => this.handleOverlayToggleClick());
     this.locale.bindTitle(this.overlayToggleBtn, 'ui.survey.overlay_toggle_tip');
 
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, this.overlayToggleBtn, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'survey',
+      accent: 'info',
+      extras: [this.overlayToggleBtn],
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.survey.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px';
+    this.bodyEl = panelBody(9);
 
     this.methodsEl = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px' } });
 
@@ -135,8 +119,6 @@ export class SurveyPanel {
     this.syncOverlayButton();
   }
 
-  get root(): HTMLElement { return this.el; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
@@ -154,9 +136,6 @@ export class SurveyPanel {
     this.syncOverlayButton();
   }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -170,9 +149,9 @@ export class SurveyPanel {
     if (this.lastState) this.update(this.lastState);
   }
 
-  dispose(): void {
+  override dispose(): void {
     if (this.statusTimer) clearTimeout(this.statusTimer);
-    this.el.remove();
+    super.dispose();
   }
 
   update(state: GameState): void {

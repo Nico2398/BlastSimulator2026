@@ -22,9 +22,8 @@ import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
-import type { CommandResult } from '../../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const DEFAULT_DELAY_STEP_MS = 25;
 const MIN_DELAY_STEP_MS = 5;

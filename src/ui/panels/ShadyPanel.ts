@@ -6,8 +6,9 @@
 // corruption-gated reveal — nothing links here before the player has
 // actually made an arrangement.
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader } from '../dom.js';
+import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -16,9 +17,8 @@ import {
   ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS,
 } from '../../core/events/MafiaActions.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const TARGETS: readonly { id: CorruptionTarget; nameKey: string; noteKey: string }[] = [
   { id: 'judge', nameKey: 'ui.shady.target.judge', noteKey: 'ui.shady.target.judge.note' },
@@ -28,8 +28,7 @@ const TARGETS: readonly { id: CorruptionTarget; nameKey: string; noteKey: string
   { id: 'witness', nameKey: 'ui.shady.target.witness', noteKey: 'ui.shady.target.witness.note' },
 ];
 
-export class ShadyPanel {
-  private readonly el: HTMLElement;
+export class ShadyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly influenceValueEl: HTMLElement;
   private readonly influenceBarEl: HTMLElement;
@@ -41,7 +40,6 @@ export class ShadyPanel {
   private readonly exposureBarEl: HTMLElement;
   private readonly statusEl: HTMLElement;
 
-  private onCloseCb?: () => void;
   private gameConsole?: GameConsoleFn;
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private lastSignature = '';
@@ -51,29 +49,16 @@ export class ShadyPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-shady-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-shady-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('shady', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(169,140,255,.14);color:var(--bsx-ore)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.shady.title',
-    );
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'shady',
+      accent: 'ore',
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.shady.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:11px';
+    this.bodyEl = panelBody(11);
 
     const introEl = this.locale.bindText(
       el('span', { attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);font-style:italic' } }),
@@ -127,14 +112,9 @@ export class ShadyPanel {
     container.appendChild(this.el);
   }
 
-  get root(): HTMLElement { return this.el; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   setStatus(msg: string): void {
     this.statusEl.textContent = msg;
@@ -147,7 +127,6 @@ export class ShadyPanel {
     if (this.lastState) this.update(this.lastState);
   }
 
-  dispose(): void { this.el.remove(); }
 
   update(state: GameState): void {
     this.lastState = state;

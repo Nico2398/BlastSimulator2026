@@ -47,9 +47,97 @@ npm run test:scenarios    # Validates scenario definition files (not the scenari
 npm run scenarios         # Runs all scenarios, command mode
 npm run scenarios:interaction  # Runs all scenarios, interaction mode (real clicks)
 npm run console           # Interactive gameplay testing (no browser)
+npm run qualimetry        # jscpd duplication across src/, scripts/ (repo-wide ceiling)
+npm run qualimetry:diff   # duplication introduced by this branch's diff
+npm run check:i18n        # en.json / fr.json parity
 ```
 
 `npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
+
+## Quality gates (not verification channels)
+
+Four channels prove a change *works*. These four prove the codebase stays healthy while it does.
+None is a substitute for a channel, and all four run in CI on every push and pull request.
+
+| Gate | Command | Ceiling / rule | Where it runs in CI |
+|------|---------|----------------|---------------------|
+| Repo-wide duplication | `npm run qualimetry` | Duplicated **lines** across `src/` + `scripts/` stay under `.jscpd.json`'s `threshold` | job `Syntactic duplication check (jscpd)` |
+| Diff duplication | `npm run qualimetry:diff` | At most 10% of the lines a branch adds may sit inside a clone | same job, second step |
+| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | job `Coverage thresholds` |
+| i18n parity | `npm run check:i18n` | Every non-allowlisted key differs between `en.json` and `fr.json`, and both key sets match | a step in the `TypeScript type check` job |
+| Dead code | `npm run check:dead-code` | No file under `src/`/`scripts/` goes unimported; no new unused export | `tests/unit/lint/NoDeadCode.test.ts`, so the `test` job |
+
+**The two duplication gates measure different things and neither implies the other.** The repo-wide
+one divides by ~70k lines, so a 40-line copy-paste moves it by 0.06% and sails through. The diff gate
+divides by the lines the branch actually added, so that same copy-paste is most of the change and
+fails. It detects clones across the whole tree and then attributes them against the diff — scanning
+only the changed files (what the pipeline's own qualimetry step does) would miss the common case, a
+new file that duplicates an existing untouched one.
+
+`.jscpd.json` scopes both to `src/` and `scripts/`, TypeScript only. Tests are out of scope
+deliberately: their arrange/setup boilerplate is not the duplication these gates exist to catch.
+Scenario-definition JSON is out for the same reason — it is fixture data, ~49% self-similar by
+nature.
+
+**Coverage is measured through `vitest.coverage.config.ts`, not the plain config.** It excludes
+`tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
+budgets) and `tests/unit/lint/` (drives every scenario definition through the console — 2486s of a
+2880s coverage run, 86% of the wall clock, for rules about scenario JSON rather than `src/`
+coverage). Excluding those two took the measurement from 48 minutes to ~6 with the thresholds
+unchanged and still passing. Both directories still run, unexcluded, in `npm run test` — the `logic`
+channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
+
+### What the coverage gate actually holds
+
+Thresholds live in `vitest.config.ts` and are **`perFile`**: they apply to each file on its own, so
+one neglected file fails the run while the total still reads healthy. Four numbers per file —
+`statements`, `branches`, `functions`, `lines` — and each is a *minimum*, the share of that file the
+suite must execute.
+
+The gate has three layers, and reading it in this order is the point:
+
+1. **The floor** — `statements 85 / branches 75 / functions 65 / lines 85` for every measured file
+   not named below.
+2. **`src/core/events/**`** — statements and branches stay high (95/88); `functions` is 0 because
+   there it counts whether each event's own handler fired, and those fire through the `scenario`
+   channel, not the unit suite.
+3. **The coverage-debt list** — one entry per file that cannot meet the floor today, pinned just
+   under where it actually sits. These are *not* exemptions: the entry stops the file getting worse
+   while its tests are written, and deleting the entry puts the file back under the floor. A file
+   leaving that list is the ratchet turning; a file joining it needs a reason.
+
+`coverage.exclude` is short by design and every entry earns its place: the two entry points
+(`main.ts`, `console.ts`) and the host-API wrappers (`SceneManager`, `PostPipeline`, `AudioHooks`,
+the IndexedDB and download backends), which a Node run can only exercise against a mock of the
+browser API rather than against our own behaviour — the `scenario` and `visual` channels are what
+prove those. Nothing else under `src/` is exempt.
+
+**Coverage measures execution, not verification.** A test that calls a function and asserts nothing
+scores 100%. These floors catch code the suite never reaches; they say nothing about whether the
+assertions are any good. That gap is what mutation testing measures, and this project does not run
+one today.
+
+### Dead code
+
+`tsc` already refuses unused locals, parameters and imports (`noUnusedLocals`,
+`noUnusedParameters`), so dead code *inside* a file cannot survive a typecheck. The module graph
+above it is what `scripts/dead-code.ts` covers: a file nobody imports, an export nobody imports —
+both typecheck perfectly, and a 46-line table of typed i18n key constants lived there, imported by
+nothing, until the check was written.
+
+It runs as a lint test rather than a CI job of its own, so it costs the `logic` channel a second and
+needs no new runner. Two gates, because the findings differ in kind:
+
+- **Unused files: zero, always.** A file nothing imports is not partly dead.
+- **Unused exports: against a baseline** in `tests/unit/lint/dead-code-baseline.json`. The 246
+  entries there are mostly types and constants used inside their own file and exported out of habit
+  — the code is alive, only the `export` is not. The list may shrink and never grow, and a stale
+  entry fails too, so removing an export means removing its line.
+
+The analysis errs toward silence: a namespace import (`import * as x`) or a star re-export marks the
+whole module used, because it cannot honestly say which members a namespace object touches. Where
+something genuinely reaches code outside the module graph — a `window` assignment the scenario
+harness reads — `ALWAYS_LIVE`/`LIVE_EXPORTS` in the script carry it, with the reason.
 
 ## Unit Test Conventions
 

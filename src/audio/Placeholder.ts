@@ -24,6 +24,11 @@ function createBuffer(ctx: AudioContext, durationS: number, sampleRate = SAMPLE_
   return ctx.createBuffer(1, Math.floor(sampleRate * durationS), sampleRate);
 }
 
+/** Hann-window loop envelope: fades in/out over a `dur`-second loop. */
+function loopEnvelope(t: number, dur: number): number {
+  return 0.5 - 0.5 * Math.cos(2 * Math.PI * t / dur);
+}
+
 function fill(buf: AudioBuffer, fn: (i: number, rate: number) => number): void {
   const data = buf.getChannelData(0);
   const rate = buf.sampleRate;
@@ -92,7 +97,7 @@ function synthesizeAmbient(ctx: AudioContext): AudioBuffer {
   fill(buf, (i, r) => {
     const t = i / r;
     // Gentle fade-in/out for seamless loop
-    const env = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / dur);
+    const env = loopEnvelope(t, dur);
     return env * (
       Math.sin(2 * Math.PI * 60 * t) * 0.4 +
       Math.sin(2 * Math.PI * 120 * t) * 0.2 +
@@ -108,7 +113,7 @@ function synthesizeEngine(ctx: AudioContext): AudioBuffer {
   const buf = createBuffer(ctx, dur);
   fill(buf, (i, r) => {
     const t = i / r;
-    const env = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / dur); // loop envelope
+    const env = loopEnvelope(t, dur);
     // 110 Hz sawtooth-like engine sound
     const saw = (t * 110 % 1) * 2 - 1;
     const noise = (Math.random() * 2 - 1) * 0.15;
@@ -123,7 +128,7 @@ function synthesizeDrill(ctx: AudioContext): AudioBuffer {
   const buf = createBuffer(ctx, dur);
   fill(buf, (i, r) => {
     const t = i / r;
-    const env = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / dur);
+    const env = loopEnvelope(t, dur);
     const freq = 400 + 200 * Math.sin(2 * Math.PI * 3 * t); // wobble 400–600 Hz
     return env * Math.sin(2 * Math.PI * freq * t) * 0.35;
   });
@@ -136,7 +141,7 @@ function synthesizeRain(ctx: AudioContext): AudioBuffer {
   const buf = createBuffer(ctx, dur);
   fill(buf, (i, r) => {
     const t = i / r;
-    const env = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / dur);
+    const env = loopEnvelope(t, dur);
     // Simulated rain drops via noise with slight high-pass character
     const noise = (Math.random() * 2 - 1);
     return env * noise * 0.25;

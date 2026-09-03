@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Building, BuildingType } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
+import { disposeGroup, brightenColor } from './MeshUtils.js';
 
 // ---------- Per-type visual config ----------
 
@@ -182,36 +183,6 @@ export class BuildingMesh {
 }
 
 // ---------- Helpers ----------
-
-function disposeGroup(group: THREE.Group): void {
-  for (const child of group.children) {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      if (Array.isArray(child.material)) {
-        child.material.forEach((m) => m.dispose());
-      } else {
-        (child.material as THREE.Material).dispose();
-      }
-    }
-  }
-}
-
-/**
- * Linearly brighten a packed hex colour toward white.
- * @param hex   - e.g. 0xff6600
- * @param shift - 0 = unchanged, 1 = white
- */
-function brightenColor(hex: number, shift: number): number {
-  if (shift <= 0) return hex;
-  const r = (hex >> 16) & 0xff;
-  const g = (hex >> 8)  & 0xff;
-  const b =  hex        & 0xff;
-  return (
-    (Math.round(r + (0xff - r) * shift) << 16) |
-    (Math.round(g + (0xff - g) * shift) << 8)  |
-     Math.round(b + (0xff - b) * shift)
-  );
-}
 
 /**
  * Small flat cube marking an entry or exit point, sitting on top of the

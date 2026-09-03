@@ -7,14 +7,14 @@
 // child of this panel), and DETONATE there is what actually dispatches
 // `blast`.
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el } from '../dom.js';
-import { iconEl } from '../icons.js';
+import { el, panelRoot, panelHeader } from '../dom.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { BlastFooter } from './blastFooter.js';
 import { DrillStep } from './blastSteps/Drill.js';
@@ -23,7 +23,6 @@ import { SequenceStep } from './blastSteps/Sequence.js';
 import { PreviewStep } from './blastSteps/Preview.js';
 import { FireStep } from './blastSteps/Fire.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export type StepId = 1 | 2 | 3 | 4 | 5;
 const STEP_KEYS: Record<StepId, string> = {
@@ -34,8 +33,7 @@ const STEP_KEYS: Record<StepId, string> = {
   5: 'ui.blast_workshop.step.fire',
 };
 
-export class BlastWorkshop {
-  private readonly el: HTMLElement;
+export class BlastWorkshop extends PanelBase {
   private readonly tabButtons: Record<StepId, HTMLButtonElement>;
   private readonly tabNumberEls: Record<StepId, HTMLElement>;
   private readonly tabStateEls: Record<StepId, HTMLElement>;
@@ -51,36 +49,20 @@ export class BlastWorkshop {
   private activeStep: StepId = 1;
   /** True from the moment the panel opens until the player manually picks a tab — keeps the tutorial's "open panel, click this step's control" flow landing on the right step without locking out manual review of a completed one. */
   private autoAdvance = true;
-  private onCloseCb?: () => void;
   private lastTabSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-blast-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    // Set separately — jsdom's cssText parser can drop this declaration when
-    // it shares a cssText string with a var(...) value (see SelectionBar.ts).
-    this.el.style.display = 'none';
+    super(panelRoot('bs-blast-panel'));
 
     // ── Header ──
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('blast', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
-    const titleCol = el('div');
-    titleCol.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0';
-    titleCol.appendChild(this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.blast_workshop.title',
-    ));
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleCol, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'blast',
+      accent: 'amber',
+      titleColumn: true,
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.blast_workshop.title');
 
     // ── Step strip ──
     const stripWrap = el('div');
@@ -131,7 +113,6 @@ export class BlastWorkshop {
     this.setActiveStep(1, false);
   }
 
-  get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void {
     this.drillStep.setGameConsole(fn);
@@ -145,17 +126,14 @@ export class BlastWorkshop {
     this.drillStep.setPlacementKit(kit);
   }
 
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setFireRequestedHandler(cb: () => void): void { this.footer.setFireRequestedHandler(cb); }
 
-  show(): void {
-    this.el.style.display = 'flex';
+  override show(): void {
+    super.show();
     this.autoAdvance = true;
   }
 
-  hide(): void { this.el.style.display = 'none'; }
 
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   /**
    * Which step tab is currently showing — exposed for the scenario harness's
@@ -196,14 +174,14 @@ export class BlastWorkshop {
     this.lastTabSignature = '';
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.drillStep.dispose();
     this.chargeStep.dispose();
     this.sequenceStep.dispose();
     this.previewStep.dispose();
     this.fireStep.dispose();
     this.footer.dispose();
-    this.el.remove();
+    super.dispose();
   }
 
   private setActiveStep(step: StepId, manual: boolean): void {

@@ -32,9 +32,8 @@ import type { Random } from '../core/math/Random.js';
 import type { AudioManager } from '../audio/AudioManager.js';
 import type { SaveBackend } from '../core/state/SaveBackend.js';
 
-import type { CommandResult } from '../console/ConsoleRunner.js';
+import type { GameConsoleFn } from './gameConsole.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'shady' | 'settings';
 

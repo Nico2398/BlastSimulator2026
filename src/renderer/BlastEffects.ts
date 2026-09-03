@@ -149,10 +149,7 @@ export class BlastEffects {
     if (this.dust) {
       this.dust.remaining -= dt;
       if (this.dust.remaining <= 0) {
-        this.scene.remove(this.dust.points);
-        this.dust.points.geometry.dispose();
-        (this.dust.points.material as THREE.Material).dispose();
-        this.dust = null;
+        this.clearDust();
       } else {
         const t = 1 - this.dust.remaining / DUST_LIFETIME;
         const mat = this.dust.points.material as THREE.PointsMaterial;
@@ -211,10 +208,7 @@ export class BlastEffects {
     this.flashes = [];
 
     if (this.dust) {
-      this.scene.remove(this.dust.points);
-      this.dust.points.geometry.dispose();
-      (this.dust.points.material as THREE.Material).dispose();
-      this.dust = null;
+      this.clearDust();
     }
 
     if (this.shakeRemaining > 0) {
@@ -222,6 +216,14 @@ export class BlastEffects {
     }
     this.shakeRemaining = 0;
     this.isActive = false;
+  }
+
+  private clearDust(): void {
+    if (!this.dust) return;
+    this.scene.remove(this.dust.points);
+    this.dust.points.geometry.dispose();
+    (this.dust.points.material as THREE.Material).dispose();
+    this.dust = null;
   }
 
   dispose(): void {

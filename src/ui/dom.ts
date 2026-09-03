@@ -180,3 +180,107 @@ export function statGrid(items: { key: string; value: string; color?: string }[]
   }
   return grid;
 }
+
+// ── Panel chrome ──
+//
+// Every slide-out panel (Build, Blast, Contracts, Crew, Finances, Fleet,
+// Operations, Shady, Survey) wears the same shell: a 372px rounded card, a
+// 46px header carrying an accent-tinted icon chip, a title and trailing icon
+// buttons, and a scrolling body. Only the id, the icon, the accent and the
+// body's gap differ, so the shell is built here and the panels supply those.
+
+/** Accent tint of a panel's header icon chip. */
+type PanelAccent = 'amber' | 'info' | 'critical' | 'ore';
+
+const PANEL_ACCENT: Record<PanelAccent, string> = {
+  amber: 'background:rgba(255,176,46,.14);color:var(--bsx-amber)',
+  info: 'background:rgba(85,168,255,.14);color:var(--bsx-info)',
+  critical: 'background:rgba(255,91,76,.14);color:var(--bsx-critical-text)',
+  ore: 'background:rgba(169,140,255,.14);color:var(--bsx-ore)',
+};
+
+const TRAILING_BTN_STYLE =
+  'width:28px;height:28px;display:flex;align-items:center;justify-content:center;'
+  + 'border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;'
+  + 'color:var(--bsx-text-muted);cursor:pointer';
+
+/**
+ * A panel's root element: the rounded card itself, hidden until `show()`.
+ * `display` is set on its own line rather than inside the cssText string —
+ * jsdom's parser drops a declaration that shares cssText with a `var(...)`
+ * value (see SelectionBar.ts).
+ */
+export function panelRoot(id: string): HTMLElement {
+  const root = el('div', { className: 'bsx-root', attrs: { id } });
+  root.style.cssText = [
+    'flex-direction:column', 'width:372px', 'max-height:100%',
+    'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
+    'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
+  ].join(';');
+  root.style.display = 'none';
+  return root;
+}
+
+/** A 28×28 icon button for a panel header's trailing controls. */
+export function panelHeaderButton(icon: IconName, onClick?: () => void): HTMLButtonElement {
+  const btn = el('button', { children: [iconEl(icon, 12)] });
+  btn.style.cssText = TRAILING_BTN_STYLE;
+  if (onClick) btn.addEventListener('click', onClick);
+  return btn;
+}
+
+interface PanelHeaderOptions {
+  icon: IconName;
+  accent: PanelAccent;
+  /**
+   * Wrap the title in a flex column, for a panel that hangs a subtitle under
+   * it (BlastWorkshop). The column is returned as `titleSlot`.
+   */
+  titleColumn?: boolean;
+  /** Trailing controls placed before the close button, e.g. an overlay toggle. */
+  extras?: HTMLElement[];
+  onClose?: () => void;
+}
+
+interface PanelHeaderParts {
+  header: HTMLElement;
+  /** The title line — bind its text through the panel's own LocaleTextRegistry. */
+  titleEl: HTMLElement;
+  /** What the header actually holds: the title column when asked for, else the title itself. */
+  titleSlot: HTMLElement;
+  closeBtn: HTMLButtonElement;
+}
+
+/** A panel's header row: accent icon chip, title, trailing controls, close button. */
+export function panelHeader(opts: PanelHeaderOptions): PanelHeaderParts {
+  const header = el('div');
+  header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
+
+  const iconChip = el('div', { children: [iconEl(opts.icon, 15)] });
+  iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;' + PANEL_ACCENT[opts.accent];
+
+  const titleEl = el('div', {
+    attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' },
+  });
+  let titleSlot = titleEl;
+  if (opts.titleColumn) {
+    titleSlot = el('div', { children: [titleEl] });
+    titleSlot.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0';
+  }
+
+  const closeBtn = panelHeaderButton('x', opts.onClose);
+  const trailing = [...(opts.extras ?? []), closeBtn];
+  // The first trailing control carries the margin that pushes the whole
+  // group to the right — the ones after it sit against their neighbour.
+  trailing[0]!.style.cssText = 'margin-left:auto;' + trailing[0]!.style.cssText;
+
+  header.append(iconChip, titleSlot, ...trailing);
+  return { header, titleEl, titleSlot, closeBtn };
+}
+
+/** A panel's scrolling body. `gap` is the vertical rhythm between its cards. */
+export function panelBody(gap: number, className?: string): HTMLElement {
+  const body = className ? el('div', { className }) : el('div');
+  body.style.cssText = `flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:${gap}px`;
+  return body;
+}

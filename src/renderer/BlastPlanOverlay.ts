@@ -6,6 +6,7 @@ import type { DrillHole } from '../core/mining/DrillPlan.js';
 import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
+import { disposeGroup } from './MeshUtils.js';
 
 // ---------- Config ----------
 
@@ -364,11 +365,3 @@ export class BlastPlanOverlay {
   }
 }
 
-function disposeGroup(group: THREE.Group): void {
-  for (const child of group.children) {
-    if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
-      child.geometry.dispose();
-      (child.material as THREE.Material).dispose();
-    }
-  }
-}

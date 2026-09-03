@@ -13,8 +13,9 @@
 // P5-core, since destroyBuilding/destroyVehicle splice the entity out (a plain
 // live lookup after a *_destroyed accident would find nothing).
 
+import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, chip, button } from '../dom.js';
+import { el, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -24,10 +25,9 @@ import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
+import type { GameConsoleFn } from '../gameConsole.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const RECENT_INCIDENTS = 10;
 
@@ -40,8 +40,7 @@ const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   in_progress: 'ui.operations.work_queue_status_in_progress',
 };
 
-export class OperationsPanel {
-  private readonly el: HTMLElement;
+export class OperationsPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly shiftButtons: Record<ShiftMode, HTMLButtonElement>;
   private readonly fatigueInput: HTMLInputElement;
@@ -49,7 +48,6 @@ export class OperationsPanel {
   private readonly policyCard: HTMLElement;
   private readonly policyNoteEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
-  private onCloseCb?: () => void;
   /** True once the player has touched a policy control — stops sync clobbering (mirrors SettingsMenu's old behavior). */
   private policyDirty = false;
   private activeShift: ShiftMode = 'shift_8h';
@@ -57,29 +55,16 @@ export class OperationsPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-operations-panel' } });
-    this.el.style.cssText = [
-      'flex-direction:column', 'width:372px', 'max-height:100%',
-      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
-      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
-    ].join(';');
-    this.el.style.display = 'none';
+    super(panelRoot('bs-operations-panel'));
 
-    const header = el('div');
-    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
-    const iconChip = el('div', { children: [iconEl('ops', 15)] });
-    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
-    const titleEl = this.locale.bindText(
-      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
-      'ui.operations.title',
-    );
-    const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
-    closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    const { header, titleEl } = panelHeader({
+      icon: 'ops',
+      accent: 'amber',
+      onClose: () => this.onCloseCb?.(),
+    });
+    this.locale.bindText(titleEl, 'ui.operations.title');
 
-    this.bodyEl = el('div');
-    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px';
+    this.bodyEl = panelBody(10);
 
     // Site policy controls are built once and reused across re-renders (they
     // carry live edit state — policyDirty, in-progress input values — that a
@@ -125,13 +110,8 @@ export class OperationsPanel {
     container.appendChild(this.el);
   }
 
-  get root(): HTMLElement { return this.el; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
-  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
 
-  show(): void { this.el.style.display = 'flex'; }
-  hide(): void { this.el.style.display = 'none'; }
-  get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
     if (!this.policyDirty) {
@@ -166,7 +146,6 @@ export class OperationsPanel {
     this.lastSignature = '';
   }
 
-  dispose(): void { this.el.remove(); }
 
   private render(state: GameState): void {
     const sections: HTMLElement[] = [

@@ -13,6 +13,7 @@
 // tween each frame (#520 — see MovementInterpolation.ts).
 
 import * as THREE from 'three';
+import { disposeGroup, brightenColor } from './MeshUtils.js';
 import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
@@ -274,32 +275,6 @@ function cylinderMesh(radius: number, height: number, color: number): THREE.Mesh
   const geo = new THREE.CylinderGeometry(radius, radius, height, 8);
   const mat = new THREE.MeshPhongMaterial({ color, shininess: 20 });
   return new THREE.Mesh(geo, mat);
-}
-
-function disposeGroup(group: THREE.Group): void {
-  for (const child of group.children) {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      (child.material as THREE.Material).dispose();
-    }
-  }
-}
-
-/**
- * Linearly brighten a packed hex color toward white.
- * @param hex   - e.g. 0xf5c518
- * @param shift - 0 = unchanged, 1 = white
- */
-function brightenColor(hex: number, shift: number): number {
-  if (shift <= 0) return hex;
-  const r = (hex >> 16) & 0xff;
-  const g = (hex >> 8)  & 0xff;
-  const b =  hex        & 0xff;
-  return (
-    (Math.round(r + (0xff - r) * shift) << 16) |
-    (Math.round(g + (0xff - g) * shift) << 8)  |
-     Math.round(b + (0xff - b) * shift)
-  );
 }
 
 // ---------- State indicator ----------
