@@ -68,6 +68,12 @@ export function forceShiftRestIfNeeded(
   // dispatch, whose target tile was later claimed by a living_quarters
   // build order.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
+  // Already arrived and mid-execution of a claimed task (e.g. dig_ramp_segment)
+  // — mirrors the pendingTaskDuration guard above for the already-arrived
+  // case (#945): interrupting a task the employee is actively ticking through
+  // forces a walk-back-and-redo once the rest ends, instead of letting the
+  // in-progress task finish first.
+  if (emp.taskTicksRemaining !== null) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
@@ -114,8 +120,10 @@ export function forceShiftRestIfNeeded(
  * included) or resting in place if none exists.
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),
- * already walking to a queued rest (pendingRestDuration !== null), or mid-walk
- * to board a vehicle from a manual `vehicle driver` command
+ * already walking to a queued rest (pendingRestDuration !== null), already
+ * arrived and mid-execution of a claimed task (taskTicksRemaining !== null —
+ * #945, waits for the in-progress task to finish rather than interrupting it
+ * mid-way), or mid-walk to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
  * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
  * destinationX/Z on that employee here would silently cancel the boarding
@@ -168,6 +176,10 @@ export function forceShiftRestIfNeededByPolicy(
   // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
   // (see its own comment on the same check) for the same reason.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
+  // Already arrived and mid-execution of a claimed task (e.g. dig_ramp_segment)
+  // — mirrors forceShiftRestIfNeeded's own identical already-arrived guard
+  // (see its own comment on the same check) for the same reason (#945).
+  if (emp.taskTicksRemaining !== null) return;
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;

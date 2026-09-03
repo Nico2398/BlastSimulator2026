@@ -81,9 +81,10 @@ const LEVELS: readonly LevelDef[] = [
     // (the box-cut step, which now takes real ticks to excavate instead of
     // carving instantly) the same way: training a digger on driving.excavator
     // ($2,500) and a rock_digger ($50,000) — $52,500 more, plus the extra
-    // payroll/fuel/maintenance drain of the ~130 ticks box-cut now spends
-    // actually digging instead of completing in the same tick it was
-    // ordered.
+    // payroll/fuel/maintenance drain of the box-cut now spending real ticks
+    // (RAMP_DIG_VOXELS_PER_TICK_TIER1-driven digging cost, plus at most one
+    // rest round-trip for the digger's driver post-#945) actually digging
+    // instead of completing in the same tick it was ordered.
     //
     // The $190,000 this comment used to land on only accounted for box-cut's
     // own completion, not the ~400-tick drill_plan wait and charge order that

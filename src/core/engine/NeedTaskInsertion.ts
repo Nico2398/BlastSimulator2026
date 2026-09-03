@@ -36,7 +36,10 @@ export interface NeedInsertionResult {
  * mid-evacuation-walk (isMidEvacuationWalk — see its own doc comment,
  * Evacuation.ts, #557 follow-up) — this is the fifth call site that guard's
  * doc comment lists.
- * Employees that already have a rest PendingAction in the queue are skipped.
+ * Employees that already have a rest PendingAction in the queue are skipped,
+ * and so is one already arrived and mid-execution of a claimed task
+ * (taskTicksRemaining !== null — #945): the rest waits for the in-progress
+ * task to finish instead of preempting it.
  *
  * `justCompletedRestEmployeeIds` (#593) skips an employee whose rest
  * completed earlier this very tick (tickGeneralRestCompletion, called before
@@ -111,6 +114,12 @@ export function autoInsertNeedTasks(
     // tickEmployees is consumed from the queue, so only restTicksRemaining/
     // pendingRestDuration still mark it.
     if (emp.restTicksRemaining !== null || emp.pendingRestDuration !== null) continue;
+
+    // Already arrived and mid-execution of a claimed task (e.g.
+    // dig_ramp_segment) — wait for it to finish rather than queuing a rest
+    // that would preempt it mid-way (#945). No result.skipped entry, matching
+    // how the other transient-state skips in this function are handled.
+    if (emp.taskTicksRemaining !== null) continue;
 
     // Determine which gauges are below warning thresholds
     const triggeredGauges: NeedKey[] = [];
