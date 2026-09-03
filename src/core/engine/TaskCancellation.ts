@@ -48,7 +48,19 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
 
   if (action.holderId !== null) {
     const holder = state.employees.employees.find(emp => emp.id === action.holderId);
-    if (holder) clearHolderWalkFields(holder);
+    if (holder) {
+      // #939: holderId is also set by reserveOnePoolActionAhead for an
+      // action merely queued one step ahead in holder.taskQueue while the
+      // holder is still busy on a DIFFERENT active action (activeActionId
+      // unchanged). Only clear the holder's active-task fields when this IS
+      // that active action — otherwise just drop it from taskQueue, leaving
+      // the holder's real in-progress work untouched.
+      if (holder.activeActionId === actionId) {
+        clearHolderWalkFields(holder);
+      } else {
+        holder.taskQueue = holder.taskQueue.filter(id => id !== actionId);
+      }
+    }
   }
 
   // releaseVehicleReservation no-ops on its own when nothing is reserved for

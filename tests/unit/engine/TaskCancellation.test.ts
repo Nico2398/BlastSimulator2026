@@ -1,17 +1,20 @@
-// BlastSimulator2026 — Tests for releaseDeadEmployeeActions
-// (src/core/engine/TaskCancellation.ts, #557 review).
+// BlastSimulator2026 — Tests for releaseDeadEmployeeActions and
+// cancelAction's holder-scoping behavior (src/core/engine/TaskCancellation.ts).
 //
-// interruptActiveAction and cancelAction from the same module predate this
-// file and are covered in tests/unit/engine/TaskDispatch.test.ts (their
-// original home before TaskCancellation.ts was split out) — this file covers
-// only releaseDeadEmployeeActions, added alongside this review's fixes.
+// interruptActiveAction and the rest of cancelAction's coverage predate this
+// file and remain in tests/unit/engine/TaskDispatch.test.ts (their original
+// home before TaskCancellation.ts was split out) — this file adds
+// releaseDeadEmployeeActions (#557 review) and cancelAction's fix to not
+// clear a different active action's holder fields (#939).
 
 import { describe, it, expect } from 'vitest';
+import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { releaseDeadEmployeeActions } from '../../../src/core/engine/TaskCancellation.js';
+import { releaseDeadEmployeeActions, cancelAction } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 
 const SEED = 42;
 const DEAD_ID = 7;
@@ -138,5 +141,135 @@ describe('releaseDeadEmployeeActions (#557 review)', () => {
 
     expect(() => releaseDeadEmployeeActions(state, DEAD_ID)).not.toThrow();
     expect(state.pendingActions).toHaveLength(0);
+  });
+});
+
+// ── cancelAction must only touch the fields of the action being cancelled ──
+// (#939) ─────────────────────────────────────────────────────────────────────
+//
+// action.holderId !== null is true both for an employee's real active action
+// (employee.activeActionId === action.id) AND for an action
+// reserveOnePoolActionAhead (EmployeeDispatchSteps.ts) claimed one step ahead
+// into employee.taskQueue while the employee is still busy on a DIFFERENT
+// active action — claimOnePoolCandidate -> claimPendingAction sets
+// action.holderId = employee.id and action.status = 'assigned' without ever
+// touching employee.activeActionId. cancelAction must only clear the holder's
+// walk/task-progress bookkeeping when the action being cancelled IS the
+// employee's genuinely active one (employee.activeActionId === action.id) —
+// never unconditionally, just because holderId is non-null.
+//
+// Uses a real hired Employee (via hireEmployee/createEmployeeState, the same
+// pattern TaskDispatch.test.ts uses) rather than a hand-built object, since
+// the defect is specifically about employee.activeActionId vs. the cancelled
+// action's own id.
+describe('cancelAction — must not clear a DIFFERENT active action\'s holder fields (#939)', () => {
+  /** Hire one real employee into state.employees and return them. */
+  function hireOneEmployee(state: ReturnType<typeof createGame>) {
+    state.employees = createEmployeeState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    return employee;
+  }
+
+  it('cancelling a taskQueue-reserved action (B) leaves the employee\'s genuinely active action (A) and its walk/task fields completely untouched', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireOneEmployee(state);
+
+    const actionA = makeAction({
+      id: 100, status: 'in_progress', holderId: employee.id,
+    });
+    const actionB = makeAction({
+      id: 101, status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(actionA, actionB);
+
+    employee.activeActionId = actionA.id;
+    employee.taskTicksRemaining = 5;
+    employee.taskQueue = [actionB.id];
+
+    const result = cancelAction(state, actionB.id);
+
+    expect(result.success).toBe(true);
+    expect(result.action?.id).toBe(actionB.id);
+
+    // B removed.
+    expect(state.pendingActions.find(a => a.id === actionB.id)).toBeUndefined();
+
+    // A — the employee's REAL active action — is untouched.
+    const storedA = state.pendingActions.find(a => a.id === actionA.id);
+    expect(storedA).toBeDefined();
+    expect(storedA!.status).toBe('in_progress');
+    expect(storedA!.holderId).toBe(employee.id);
+
+    // The defect: cancelAction currently clears these unconditionally
+    // whenever action.holderId !== null, even though A — not B — is the
+    // action these fields actually describe.
+    expect(employee.activeActionId).toBe(actionA.id);
+    expect(employee.taskTicksRemaining).toBe(5);
+
+    // B popped from the queue.
+    expect(employee.taskQueue).not.toContain(actionB.id);
+  });
+
+  it('cancelling the genuinely active action (A) itself still clears the holder\'s active fields, leaving a separately taskQueue-reserved action (B) untouched', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireOneEmployee(state);
+
+    const actionA = makeAction({
+      id: 102, status: 'in_progress', holderId: employee.id,
+    });
+    const actionB = makeAction({
+      id: 103, status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(actionA, actionB);
+
+    employee.activeActionId = actionA.id;
+    employee.taskTicksRemaining = 5;
+    employee.taskQueue = [actionB.id];
+
+    const result = cancelAction(state, actionA.id);
+
+    expect(result.success).toBe(true);
+    expect(result.action?.id).toBe(actionA.id);
+
+    // A removed.
+    expect(state.pendingActions.find(a => a.id === actionA.id)).toBeUndefined();
+
+    // Holder's active fields cleared — this IS the mirror (unchanged) branch.
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.taskTicksRemaining).toBeNull();
+
+    // B — merely reserved ahead — is left completely alone.
+    const storedB = state.pendingActions.find(a => a.id === actionB.id);
+    expect(storedB).toBeDefined();
+    expect(storedB!.status).toBe('assigned');
+    expect(storedB!.holderId).toBe(employee.id);
+    expect(employee.taskQueue).toEqual([actionB.id]);
+  });
+
+  it('cancelling one of several taskQueue-reserved actions removes only its own id, preserving the order of the rest (boundary)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireOneEmployee(state);
+
+    const actionA = makeAction({ id: 104, status: 'in_progress', holderId: employee.id });
+    const actionB = makeAction({ id: 105, status: 'assigned', holderId: employee.id });
+    const actionC = makeAction({ id: 106, status: 'assigned', holderId: employee.id });
+    const actionD = makeAction({ id: 107, status: 'assigned', holderId: employee.id });
+    state.pendingActions.push(actionA, actionB, actionC, actionD);
+
+    employee.activeActionId = actionA.id;
+    employee.taskTicksRemaining = 5;
+    employee.taskQueue = [actionB.id, actionC.id, actionD.id];
+
+    const result = cancelAction(state, actionC.id);
+
+    expect(result.success).toBe(true);
+    expect(employee.taskQueue).toEqual([actionB.id, actionD.id]);
+
+    // A still untouched.
+    expect(employee.activeActionId).toBe(actionA.id);
+    expect(employee.taskTicksRemaining).toBe(5);
+    const storedA = state.pendingActions.find(a => a.id === actionA.id);
+    expect(storedA!.status).toBe('in_progress');
   });
 });
