@@ -1879,6 +1879,53 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     expect(remainingActions).toHaveLength(0);
   });
 
+  // Regression for the #946 fix: this line used to read
+  // `${carveResult.voxelsCleared}` instead of `${tracker.cells.length}`.
+  // Progressive carving (#946) clears every one of a segment's cells over
+  // the preceding ticks, so by the time the completion tick runs,
+  // carveRampSegment's own idempotent density recheck legitimately returns
+  // 0 — the old line always logged "0 voxels cleared" for a fully and
+  // correctly carved segment. Asserting the real, non-zero cell count here
+  // (rather than merely "not 0") fails on the old voxelsCleared-based code
+  // and passes on tracker.cells.length.
+  it('reports the segment\'s true cell count, not 0, in the completion log line', () => {
+    const ctx = makeMiningContext();
+
+    const buildResult = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '1', depth: '3',
+    });
+    expect(buildResult.success).toBe(true);
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    // A ramp's topmost layer can legitimately have zero cells to carve
+    // (already open at the surface), so pin the assertion to a layer that
+    // actually has rock to clear — that's the one the old
+    // `carveResult.voxelsCleared`-based line got wrong.
+    const nonZeroSegment = ramp.segments.find(s => s.cells.length > 0);
+    expect(nonZeroSegment).toBeDefined();
+    const expectedVoxelCount = nonZeroSegment!.cells.length;
+    expect(expectedVoxelCount).toBeGreaterThan(0);
+
+    const excavationLines: string[] = [];
+    for (let i = 0; i < 400 && ctx.state!.plannedRamps.length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.fatigue = 100;
+      }
+      const result = tickCommand(ctx, ['1'], {});
+      for (const line of (result.output ?? '').split('\n')) {
+        if (line.includes('excavated:')) excavationLines.push(line);
+      }
+    }
+
+    expect(ctx.state!.plannedRamps).toHaveLength(0);
+    const nonZeroSegmentLine = excavationLines.find(line =>
+      line.includes(`Ramp #${rampId} segment ${nonZeroSegment!.index} excavated:`),
+    );
+    expect(nonZeroSegmentLine).toContain(
+      `Ramp #${rampId} segment ${nonZeroSegment!.index} excavated: ${expectedVoxelCount} voxels cleared.`,
+    );
+  });
+
   it('completing every segment of a multi-segment ramp patches the NavGrid so the excavated cells are no longer blocked/void', () => {
     const ctx = makeMiningContext();
 

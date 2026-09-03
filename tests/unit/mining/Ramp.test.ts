@@ -1,12 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
+  computeRampSegmentCarveTarget, carveRampSegmentSlice,
   type RampDef, type RampDirection,
 } from '../../../src/core/mining/Ramp.js';
 import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
 function fillGrid(grid: VoxelGrid) {
   for (let z = 0; z < grid.sizeZ; z++)
@@ -611,5 +613,202 @@ describe('validateRampOrder (#555)', () => {
   it('accepts a length exactly at MAX_RAMP_LENGTH (boundary)', () => {
     const result = validateRampOrder({ ...BASE_RAMP, length: MAX_RAMP_LENGTH }, 50_000_000);
     expect(result.success).toBe(true);
+  });
+});
+
+// ── #946: progressive ramp segment carving ────────────────────────────────
+//
+// Box-cut ramp digging used to carve a whole segment (a full horizontal
+// layer) in one shot on completion — visually a slab vanishing at once.
+// computeRampSegmentCarveTarget/carveRampSegmentSlice split that into a
+// per-tick carve, proportional to the action's own tick progress, ordered
+// nearest-to-entrance first (the existing array order defineRampSegments
+// already produces). These tests are Red today only because both functions
+// are stubs.
+
+describe('computeRampSegmentCarveTarget (#946)', () => {
+  it('returns 0 at 0 ticks elapsed', () => {
+    expect(computeRampSegmentCarveTarget(10, 0, 5)).toBe(0);
+  });
+
+  it('returns floor(totalCells/2) at 50% elapsed', () => {
+    // 11 cells, 50% elapsed -> floor(5.5) = 5, exercising the floor/rounding.
+    expect(computeRampSegmentCarveTarget(11, 5, 10)).toBe(5);
+    expect(computeRampSegmentCarveTarget(10, 2, 4)).toBe(5);
+  });
+
+  it('returns totalCells at 100% elapsed', () => {
+    expect(computeRampSegmentCarveTarget(10, 5, 5)).toBe(10);
+  });
+
+  it('clamps to totalCells when ticksElapsed exceeds totalTicks', () => {
+    expect(computeRampSegmentCarveTarget(10, 8, 5)).toBe(10);
+    expect(computeRampSegmentCarveTarget(10, 1000, 5)).toBe(10);
+  });
+
+  it('returns totalCells when totalTicks <= 0, guarding against a divide-by-zero', () => {
+    expect(computeRampSegmentCarveTarget(10, 3, 0)).toBe(10);
+    expect(computeRampSegmentCarveTarget(10, 3, -2)).toBe(10);
+    expect(computeRampSegmentCarveTarget(0, 0, 0)).toBe(0);
+  });
+});
+
+describe('carveRampSegmentSlice (#946)', () => {
+  /** 6 cells at distinct, individually addressable positions, all solid. */
+  function makeSliceFixture(): { grid: VoxelGrid; cells: { x: number; y: number; z: number }[] } {
+    const grid = new VoxelGrid(20, 10, 20);
+    const cells = [0, 1, 2, 3, 4, 5].map(i => ({ x: 5 + i, y: 3, z: 5 }));
+    for (const cell of cells) {
+      grid.setVoxel(cell.x, cell.y, cell.z, {
+        composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+        density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+      });
+    }
+    return { grid, cells };
+  }
+
+  it('carving [from, to) clears only that sub-range of cells', () => {
+    const { grid, cells } = makeSliceFixture();
+
+    const result = carveRampSegmentSlice(grid, cells, 2, 4);
+
+    expect(result.voxelsCleared).toBe(2);
+    // Inside the range: cleared.
+    expect(grid.densityAt(cells[2]!.x, cells[2]!.y, cells[2]!.z)).toBe(0);
+    expect(grid.densityAt(cells[3]!.x, cells[3]!.y, cells[3]!.z)).toBe(0);
+    // Outside the range: untouched.
+    expect(grid.densityAt(cells[0]!.x, cells[0]!.y, cells[0]!.z)).toBeGreaterThan(0);
+    expect(grid.densityAt(cells[1]!.x, cells[1]!.y, cells[1]!.z)).toBeGreaterThan(0);
+    expect(grid.densityAt(cells[4]!.x, cells[4]!.y, cells[4]!.z)).toBeGreaterThan(0);
+    expect(grid.densityAt(cells[5]!.x, cells[5]!.y, cells[5]!.z)).toBeGreaterThan(0);
+  });
+
+  it('a cell already at density 0 within the range is skipped without being double-counted', () => {
+    const { grid, cells } = makeSliceFixture();
+    grid.clearVoxel(cells[3]!.x, cells[3]!.y, cells[3]!.z); // already cleared, e.g. by a blast
+
+    const result = carveRampSegmentSlice(grid, cells, 2, 5); // range covers indices 2,3,4
+
+    // Only indices 2 and 4 were actually cleared by this call — 3 was already gone.
+    expect(result.voxelsCleared).toBe(2);
+  });
+
+  it("the returned region bboxes only the cells this call actually cleared, not the full segment/array", () => {
+    const { grid, cells } = makeSliceFixture(); // cells span x=5..10
+
+    const result = carveRampSegmentSlice(grid, cells, 1, 3); // clears cells[1] (x=6), cells[2] (x=7) only
+
+    expect(result.region).not.toBeNull();
+    expect(result.region!.minX).toBe(6);
+    expect(result.region!.maxX).toBe(7);
+    // Not the full cells array's span (x=5..10).
+    expect(result.region!.minX).toBeGreaterThan(5);
+    expect(result.region!.maxX).toBeLessThan(10);
+  });
+
+  it('emits terrain:updated exactly once when voxelsCleared > 0', () => {
+    const { grid, cells } = makeSliceFixture();
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    carveRampSegmentSlice(grid, cells, 0, 3, emitter);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not emit terrain:updated when the slice clears nothing', () => {
+    const { grid, cells } = makeSliceFixture();
+    for (const cell of cells) grid.clearVoxel(cell.x, cell.y, cell.z); // pre-cleared
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = carveRampSegmentSlice(grid, cells, 0, cells.length, emitter);
+
+    expect(result.voxelsCleared).toBe(0);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('an empty slice (from === to) clears nothing and does not emit', () => {
+    const { grid, cells } = makeSliceFixture();
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = carveRampSegmentSlice(grid, cells, 2, 2, emitter);
+
+    expect(result.voxelsCleared).toBe(0);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('driving a real segment through increasing elapsed fractions clears cells roughly proportionally, and exactly cells.length at 100%', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+    const segments = defineRampSegments(grid, ramp);
+    const segment = segments.find(s => s.cells.length >= 8)!;
+    expect(segment).toBeDefined();
+
+    const totalCells = segment.cells.length;
+    const totalTicks = 4;
+    let carvedSoFar = 0;
+    const targets: number[] = [];
+
+    for (let ticksElapsed = 1; ticksElapsed <= totalTicks; ticksElapsed++) {
+      const target = computeRampSegmentCarveTarget(totalCells, ticksElapsed, totalTicks);
+      expect(Number.isFinite(target)).toBe(true);
+      expect(target).toBeGreaterThanOrEqual(carvedSoFar);
+      expect(target).toBeLessThanOrEqual(totalCells);
+
+      carveRampSegmentSlice(grid, segment.cells, carvedSoFar, target);
+      carvedSoFar = target;
+      targets.push(target);
+
+      // Every cell carved so far is actually cleared; every cell not yet
+      // reached is still solid — carving proceeds in the segment's own
+      // (nearest-to-entrance-first) array order.
+      for (let i = 0; i < totalCells; i++) {
+        const cell = segment.cells[i]!;
+        if (i < carvedSoFar) expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        else expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+      }
+    }
+
+    expect(carvedSoFar).toBe(totalCells);
+    // Roughly proportional: the 50%-elapsed step (index 1, ticksElapsed=2)
+    // should be well short of complete and well past empty.
+    expect(targets[1]!).toBeGreaterThan(0);
+    expect(targets[1]!).toBeLessThan(totalCells);
+  });
+
+  it('a 40+ cell segment worked over 5 ticks emits terrain:updated once per tick that made progress, not once per voxel', () => {
+    // A wide, long footprint so a single (topmost) layer spans the whole
+    // corridor — RAMP_WIDTH(3) * length(20) gives plenty of headroom over 40.
+    const grid = makeElevatedGrid(60, 30, 60, 15);
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 20, targetDepth: 6 };
+    const segments = defineRampSegments(grid, ramp);
+    const segment = segments.find(s => s.cells.length >= 40)!;
+    expect(segment).toBeDefined();
+    expect(segment.cells.length).toBeGreaterThanOrEqual(40);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const totalCells = segment.cells.length;
+    const totalTicks = 5;
+    let carvedSoFar = 0;
+    for (let ticksElapsed = 1; ticksElapsed <= totalTicks; ticksElapsed++) {
+      const target = computeRampSegmentCarveTarget(totalCells, ticksElapsed, totalTicks);
+      carveRampSegmentSlice(grid, segment.cells, carvedSoFar, target, emitter);
+      carvedSoFar = target;
+    }
+
+    expect(carvedSoFar).toBe(totalCells);
+    // Bounded by ticks (5), not by cell count (40+) — the whole point of
+    // slicing instead of emitting per-voxel.
+    expect(handler).toHaveBeenCalledTimes(totalTicks);
+    expect(handler.mock.calls.length).toBeLessThan(totalCells);
   });
 });

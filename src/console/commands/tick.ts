@@ -205,7 +205,7 @@ export function tickCommand(
     // pendingTaskDuration on a prior tick — see tickEmployees (#437).
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
-      const progress = tickTaskProgress(state, emp, emitter);
+      const progress = tickTaskProgress(state, emp, emitter, ctx.grid ?? undefined);
       if (!progress) continue;
       resolveTaskCompletion(ctx, state, emp, progress, emitter, lines);
     }
