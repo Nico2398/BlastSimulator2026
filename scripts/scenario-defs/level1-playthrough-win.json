@@ -70,6 +70,68 @@
       "role": "observe"
     },
     {
+      "command": "vehicle driver 2 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so each of the three corridor-blocking vehicles below needs its own driver boarded before its `vehicle move` can succeed. staffed:true's own free drivers already match each vehicle's required licence one-for-one (driver #3: driving.truck for debris_hauler #2; #4/#5: driving.excavator for rock_digger #3/rock_fragmenter #4) -- boarded here, ahead of the later hauling assignment below, rather than assigned twice. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead (same pattern as vehicle-traffic.json).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 4 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 5"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "description": "All three drivers spawn on the same tile as their vehicles (#512), so 10 ticks is enough for each to walk over and board -- matching vehicle-traffic.json's own identical bootstrap pattern.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 10
+        }
+      }
+    },
+    {
       "command": "vehicle move 2 to:2,6",
       "interaction": [
         {
@@ -245,22 +307,6 @@
       "role": "bootstrap"
     },
     {
-      "command": "vehicle driver 2 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 2 3"
-        }
-      ],
-      "description": "#552/#557: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare a manual purchase on top of everything else. #557: this file no longer hires its own driver (see the hire step's own finding) -- staffed:true's own free driver #3 (already licensed driving.truck lvl1 from the free roster) boards it instead. #921: the Fleet panel's Assign/Unassign controls (and the driver-picker select this step used to steer) are gone entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
       "command": "state full",
       "interaction": [
         {
@@ -268,9 +314,10 @@
           "command": "state full"
         }
       ],
+      "description": "#947: `vehicle driver 2 3` no longer runs here -- driver #3 already boarded debris_hauler #2 in the corridor-clearing bootstrap above (see that step's own finding), and a second `vehicle driver 2 3` against an already-driven vehicle is refused (\"Vehicle already has a driver\"). tickCount reads 10, not 0 (issue #947): the corridor-clearing bootstrap's own boarding wait already advanced the clock by that much before this file's first tick-driven checkpoint.",
       "expect": {
         "equals": {
-          "tickCount": 0,
+          "tickCount": 10,
           "holeCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
@@ -290,9 +337,10 @@
           "command": "tick 6"
         }
       ],
+      "description": "#947: tickCount reads 16, not 6 -- 10 ticks ahead of pre-#947 thanks to the corridor-clearing bootstrap's own driver-boarding wait.",
       "expect": {
         "equals": {
-          "tickCount": 6
+          "tickCount": 16
         },
         "decreased": [
           "cash"
@@ -360,7 +408,7 @@
       ],
       "expect": {
         "equals": {
-          "tickCount": 6,
+          "tickCount": 16,
           "surveyCount": 0
         }
       },
@@ -1034,12 +1082,12 @@
       "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to upstream timing shifting the real-tick total this step starts from.",
       "expect": {
         "changedBy": {
-          "tickCount": 8
+          "tickCount": 10
         },
         "decreased": [
           "cash"
         ],
-        "note": "Advances 8 ticks, not 10 (#556): a random event falls due inside the block and a pending event stops the rest of a `tick`. The event beats around it moved with the warehouse construction this file now spends real ticks on."
+        "note": "#947: advances the full 10 ticks now, not 8 (#556) -- the corridor-clearing bootstrap's own 10-tick driver-boarding wait upstream shifts exactly which real tick the next random event falls due on, and it no longer lands inside this particular window. Sandbox-confirmed via `npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win`."
       },
       "role": "setup"
     },
@@ -1122,11 +1170,11 @@
           "command": "tick 10"
         }
       ],
-      "description": "#557: this `tick 10` runs full (140->150), not interrupted -- with this file's crew down to 6 employees (see the earlier hire step's own finding), no fresh event pends inside this particular window.",
+      "description": "#947: this `tick 10` is now interrupted (169->175, 6 of 10 ticks) where it previously ran full (140->150) -- the corridor-clearing bootstrap's own 10-tick driver-boarding wait upstream shifts exactly which real tick the next random event falls due on, and this window is the one it now lands inside. Same class of interruption the two sibling `tick 10` steps above already document (\"only 1/6 of the 10 requested ticks advances here\") -- takes the same looser `increased` check rather than a pinned `changedBy`, since the exact interruption point is incidental to what this step tests (that the clock keeps moving).",
       "expect": {
-        "changedBy": {
-          "tickCount": 10
-        }
+        "increased": [
+          "tickCount"
+        ]
       },
       "role": "setup"
     },
@@ -1137,11 +1185,11 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `union_nap_room`'s option 0 opens a nap room -- a small, deterministic-under-seed consequence, not a cost the file needs to track precisely. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). #557-followup (real interaction-mode CI finding): `wellBeing` dropped too -- command mode/this sandbox landed 93.3166666666667, real CI read 93.65333333333334, the same real-time-accrual-drift class already documented and resolved this way for level1-win-conservative.json/level1-playthrough-revolt.json (the extra real ticks a charge-wait consumes accrue slightly differently depending on the harness's own render timing, and wellBeing's continuous fatigue decay is sensitive to exactly how many of those ticks land before this checkpoint). `nuisance` stays exact -- it doesn't depend on the charge-wait's own tick accrual.",
+      "description": "Resolved through the event dialog's own buttons. #947: the event that falls due here is now `union_food_trucks`, not `union_nap_room` -- the corridor-clearing bootstrap's own 10-tick driver-boarding wait upstream shifts the whole tail's real-tick timing, and a different event's own due-tick now lands on this window (sandbox-confirmed: `nuisance` moves 50->55, `union_food_trucks`'s own option-0 consequence). `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). #557-followup (real interaction-mode CI finding): `wellBeing` also drifts slightly between command mode and a real browser (the extra real ticks a charge-wait consumes accrue slightly differently depending on the harness's own render timing) -- not hard-asserted for the same reason.",
       "role": "player",
       "expect": {
         "equals": {
-          "nuisance": 50
+          "nuisance": 55
         }
       },
       "commandOutcome": "either"
@@ -1157,7 +1205,7 @@
       "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 170,
+          "tickCount": 175,
           "deathCount": 3,
           "employeeCount": 6,
           "bankrupt": false,
@@ -1168,7 +1216,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0
         },
-        "note": "Closing tickCount re-measured 150 -> 170 (#556): the warehouse is built rather than placed, and the wait that runs its site out costs the run those ticks. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note); the fleet stays at 3 for the rest of the file."
+        "note": "Closing tickCount re-measured 170 -> 175 (#947): the corridor-clearing bootstrap ahead of the three vehicle-move steps (giving each blocking vehicle a driver, per the new driver-gate on vehicle movement) spends 10 real ticks upfront but also shifts the tail's own event-interruption timing (see the two `tick 10` steps above), netting +5 rather than +10. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note); the fleet stays at 3 for the rest of the file."
       },
       "role": "setup"
     }

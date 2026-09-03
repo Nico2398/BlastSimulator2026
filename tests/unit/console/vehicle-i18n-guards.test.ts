@@ -236,6 +236,12 @@ describe('vehicle.ts — move success message', () => {
   it('matches the exact English literal, embedding the real id/x/z with no space after the comma', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless `vehicle move` is refused outright. This test's own
+    // point is the success message's exact text, not the driver gate, so
+    // bypass canAssignDriver directly (same pattern as the driver-unassign
+    // tests below).
+    vehicle.driverId = 42;
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicle.id} moving to (7,9).`);
@@ -244,6 +250,7 @@ describe('vehicle.ts — move success message', () => {
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    vehicle.driverId = 42; // #947: bypass canAssignDriver — see the test above
     setLocale('fr');
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);

@@ -28,6 +28,9 @@ describe('tickVehicle (Task 2.7)', () => {
   it('advances a moving vehicle toward its target cell', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 2;
@@ -50,6 +53,10 @@ describe('tickVehicle (Task 2.7)', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle: left } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const { vehicle: right } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    left.driverId = 1;
+    right.driverId = 2;
 
     left.task = 'moving';
     left.state = 'moving';
@@ -76,6 +83,10 @@ describe('tickVehicle (Task 2.7)', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    blocker.driverId = 1;
+    waiting.driverId = 2;
 
     blocker.task = 'moving';
     blocker.state = 'moving';
@@ -128,6 +139,9 @@ describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', 
     state.navGrid = NavGrid.buildNavGrid(vg, [], []);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 3;
@@ -210,6 +224,9 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const state = buildOpenState();
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 4;
@@ -250,6 +267,9 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const state = buildCorridorState();
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 4;
@@ -285,6 +305,9 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const state = buildCorridorState();
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 4;
@@ -325,6 +348,9 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const state = buildCorridorState();
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 4;
@@ -593,6 +619,10 @@ describe('tickVehicle — waitingTicks (Task 2.8)', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    blocker.driverId = 1;
+    waiting.driverId = 2;
 
     // Both vehicles head for the same cell (1, 0)
     blocker.task = 'moving'; blocker.state = 'moving';
@@ -622,6 +652,10 @@ describe('tickVehicle — waitingTicks (Task 2.8)', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    blocker.driverId = 1;
+    waiting.driverId = 2;
 
     blocker.task = 'moving'; blocker.state = 'moving';
     blocker.targetX = 1;     blocker.targetZ = 0;
@@ -652,6 +686,9 @@ describe('tickVehicle — waitingTicks (Task 2.8)', () => {
   it('resets waitingTicks to 0 when the vehicle reaches its target and becomes idle', () => {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
     const { vehicle: v } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    v.driverId = 1;
 
     // Manually prime waitingTicks to a non-zero value (simulates prior waiting)
     v.waitingTicks = 5;

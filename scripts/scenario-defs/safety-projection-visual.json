@@ -469,24 +469,77 @@
       }
     },
     {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:200",
-      "description": "#557: drain the real walkout the horn button just ordered -- employees #6/#7 have to actually arrive outside the padded zone before dangerZoneClear reports true, not the instant the command above returns. Replaces the old instant-clear assumption with a wait that asserts the evacuation genuinely finished, the same waitUntil convention drill/charge/sequence already use above for their own queued work.",
-      "timeout": 90,
+      "command": "tick 20",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 200,
-          "timeoutMs": 90000
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "#557/#947: drain the real walkout the horn button just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- the driller (employee #1) auto-dismounts drill_rig #1 the instant its drilling task finishes, so the rig is undriven by the time Sound the Horn fires, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with the rig permanently stranded inside the box, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead, split into several `tick`/`event choose 0` pairs (command mode's own tick loop refuses to advance past a pending event -- `resolveEventIfPending`, this step's own interaction entry, is interaction-mode-only and does nothing in command mode's own tick loop). Employees #6/#7 (and #1/#2, also caught in the padded zone) walk out for real across these pairs; their evacuation succeeding is what the blast step's own `deathCount: 0` below actually proves, not `dangerZoneClear`.",
+      "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
         }
       ],
       "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "commandOutcome": "either",
       "expect": {
         "equals": {
-          "dangerZoneClear": true
-        }
+          "dangerZoneClear": false
+        },
+        "note": "#947: dangerZoneClear reads false, not true -- the stranded driverless drill_rig (see the first tick step's own description) keeps the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true."
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "buy_software tier:1",

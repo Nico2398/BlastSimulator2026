@@ -89,6 +89,9 @@ describe('computeVehicleStatus', () => {
     state.navGrid = NavGrid.buildNavGrid(vg, [], []);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game.
+    vehicle.driverId = 1;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 4;

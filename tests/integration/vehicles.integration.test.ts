@@ -193,6 +193,11 @@ describe('Vehicle fleet', () => {
     const v = ctx.state!.vehicles.vehicles[0]!;
     expect(Math.abs(v.targetX - 16)).toBeLessThanOrEqual(1);
     expect(Math.abs(v.targetZ - 16)).toBeLessThanOrEqual(1);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless `vehicle move` is refused outright. This test's own
+    // point is that a driven vehicle's move command sets task/target, so give
+    // it a driver directly rather than exercising the driver-gate refusal.
+    v.driverId = 1;
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
 
@@ -231,6 +236,11 @@ describe('Vehicle fleet', () => {
     v.targetZ = v.z;
     v.task = 'moving';
     v.state = 'idle';
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless vehicle never moves, everywhere in the game. Give
+    // it a driver directly to exercise the driven-movement path this test
+    // means to check.
+    v.driverId = 1;
 
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
     // Pathfinding.findPath and advances at debris_hauler's own speed (3
@@ -592,6 +602,12 @@ describe('Vehicle fleet', () => {
         v.task = 'moving';
         v.state = 'waiting';
         v.waitingTicks = TRAFFIC_JAM_MIN_TICKS - 1;
+        // #947: canTickVehicle now requires a driver aboard to advance on
+        // tick at all -- a driverless vehicle's waitingTicks would never
+        // reach the threshold this tick, since it never ticks in the first
+        // place. Give each waiting hauler a driver so the real tick path
+        // still pushes them over TRAFFIC_JAM_MIN_TICKS.
+        v.driverId = v.id;
       }
 
       const result = tickCommand(ctx, ['1'], {});
