@@ -418,6 +418,47 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
   });
 });
 
+describe('tickArrivalGate — stale-claim guard on vehicle arrival (#928)', () => {
+  it("releases the action to the open pool instead of promoting it, when the holder's own activeActionId no longer names it", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    vehicle.driverId = employee.id;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 20;
+    // The vehicle has already arrived at the action's target this tick.
+    vehicle.x = 20;
+    vehicle.z = 20;
+
+    const action = makeVehicleGatedAction({
+      id: 3, holderId: employee.id, targetX: 20, targetZ: 20, status: 'in_progress',
+    });
+    state.pendingActions.push(action);
+    vehicle.reservedForActionId = action.id;
+
+    // The holder has since moved on — e.g. sent to rest — so activeActionId
+    // no longer names this action, even though the vehicle (driven on its
+    // own steam by this loop) still reached the target.
+    employee.x = 20;
+    employee.z = 20;
+    employee.activeActionId = null;
+    employee.restTicksRemaining = 5;
+    employee.taskTicksRemaining = null;
+    employee.pendingTaskDuration = null;
+
+    tickArrivalGate(state);
+
+    // Stale claim released back to the open pool, not promoted.
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(employee.taskTicksRemaining).toBeNull();
+    // The employee's own, unrelated rest is untouched.
+    expect(employee.restTicksRemaining).toBe(5);
+  });
+});
+
 // ── issue #922: a driver's position tracks the vehicle continuously, every
 // tick of the drive — not just once at the end (arrival) or at dismount.
 // tickArrivalGate's own vehicle-drive loop is the one place a boarded,

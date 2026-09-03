@@ -9,7 +9,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
-import { completePendingAction } from './TaskDispatch.js';
+import { completeIfOwnedRestAction } from './TaskDispatch.js';
 import { completeRestForEmployee } from './RestActionHelpers.js';
 
 export interface GeneralRestCompletionResult {
@@ -72,33 +72,31 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     // action in pendingActions at creation (self-claimed or claimed later via
     // tickEmployees), so nothing else removes it once the rest completes.
     //
-    // #928: gated on completedAction?.type === 'rest', not just
-    // completedActionId !== null. emp.activeActionId is meant to still name
-    // this employee's own rest action at completion time, but a vehicle-gated
-    // action's own arrival-promotion loop (ArrivalGate.ts) re-seeds
-    // taskTicksRemaining for a claimed action's holder keyed only on
-    // taskTicksRemaining === null, with no check that the holder is still
-    // the one actively working it (nor that they aren't ALSO mid-rest) — a
-    // still-driving, still-reserved vehicle can resurrect a stale claim on an
-    // employee who has since been sent to rest, and that phantom task's own
-    // NORMAL completion (tickTaskProgress) then overwrites activeActionId out
-    // from under this employee's own, still-in-progress rest. Direct-traced
-    // (command mode, blast-execution-visual.json): under this file's own
-    // set_policy mode:shift_8h with no living_quarters anywhere (every rest
-    // is in-place, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER-doubled), an
+    // #928: completeIfOwnedRestAction only deletes completedActionId when it
+    // still names a 'rest' PendingAction, rather than assuming
+    // emp.activeActionId always still names this employee's own rest action
+    // at completion time. Before ArrivalGate.ts's stale-claim guard (#928)
+    // was added, a vehicle-gated action's own arrival-promotion loop could
+    // re-seed taskTicksRemaining for a claimed action's holder with no check
+    // that the holder was still the one actively working it (nor that they
+    // weren't ALSO mid-rest) — a still-driving, still-reserved vehicle could
+    // resurrect a stale claim on an employee who had since been sent to
+    // rest, and that phantom task's own NORMAL completion (tickTaskProgress)
+    // would then overwrite activeActionId out from under this employee's
+    // own, still-in-progress rest. Direct-traced (command mode,
+    // blast-execution-visual.json): under this file's own set_policy
+    // mode:shift_8h with no living_quarters anywhere (every rest is
+    // in-place, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER-doubled), an
     // employee this happens to hits this exact race far more often than
-    // pre-#928's three-gauge model ever did — activeActionId ends up naming
-    // an unrelated, still-genuinely-in-progress charge_hole action, and this
-    // line's own unconditional completePendingAction call was deleting that
-    // action's record outright without ever landing its charge, permanently
-    // stalling orderedChargeCount for the holes it touched. The vehicle-gated
-    // arrival-promotion race itself is a separate, general engine gap
-    // (ArrivalGate.ts) reasonably out of this fix's own scope; this guard
-    // only stops rest completion from deleting whatever activeActionId
-    // happens to name when it isn't this rest's own action.
-    if (completedActionId !== null && completedAction?.type === 'rest') {
-      completePendingAction(state, completedActionId);
-    }
+    // pre-#928's three-gauge model ever did — activeActionId ended up
+    // naming an unrelated, still-genuinely-in-progress charge_hole action,
+    // and an unconditional delete here would have removed that action's
+    // record outright without ever landing its charge, permanently stalling
+    // orderedChargeCount for the holes it touched. ArrivalGate.ts's own
+    // stale-claim guard (same PR) fixes the race at its source; this guard
+    // stays as defense-in-depth against rest completion deleting whatever
+    // activeActionId happens to name when it isn't this rest's own action.
+    completeIfOwnedRestAction(state, completedActionId);
 
     // Mirrors completeRestTick's unconditional ticksWorked = 0 on completion —
     // without this, a policy-forced rest never resets the continuous-work
