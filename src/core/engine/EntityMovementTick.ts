@@ -249,6 +249,8 @@ export interface EmployeeMovementResult {
   arrived: number[];
   /** Employee IDs that newly entered the stuck state this tick. */
   stuck: number[];
+  /** Employee IDs whose claim was released back to the pending-action pool this tick because isMoveStuck sustained for MOVE_STUCK_ABANDON_TICKS consecutive ticks (#938). */
+  abandoned: Array<{ employeeId: number; actionId: number | null }>;
 }
 
 /**
@@ -274,7 +276,7 @@ export interface EmployeeMovementResult {
  * pre-navmesh behaviour.
  */
 export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): EmployeeMovementResult {
-  const result: EmployeeMovementResult = { moved: [], arrived: [], stuck: [] };
+  const result: EmployeeMovementResult = { moved: [], arrived: [], stuck: [], abandoned: [] };
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;

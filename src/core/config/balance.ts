@@ -607,6 +607,22 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 /** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_EFFECT_PENALTIES for the analogous need-driven table). */
 export const STUCK_MORALE_PENALTY = 2;
 
+/**
+ * Consecutive ticks (moveConsecutiveFailures, which already grows unboundedly
+ * once isMoveStuck flips true — see AgentMovement.recordStuckFailure) an
+ * employee may stay isMoveStuck before its claimed action/vehicle-boarding
+ * intent is released back to the pending-action pool via
+ * TaskDispatch.interruptActiveAction, instead of staying parked forever
+ * (#938). Generalizes ForceShiftRest.ts's own pendingTaskDuration/isMoveStuck
+ * exemption — that one only rescues an employee who also happens to qualify
+ * for a rest trigger at the moment they get stuck; this rescues every
+ * position-dependent claim. Deliberately well above STUCK_THRESHOLD (3) and
+ * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD/TRAFFIC_JAM_MIN_TICKS's "no longer
+ * transient" order of magnitude (10) — a genuine, sustained impasse only,
+ * not a blast or reroute a few ticks from resolving itself.
+ */
+export const MOVE_STUCK_ABANDON_TICKS = 30;
+
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 
