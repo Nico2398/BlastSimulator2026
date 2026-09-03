@@ -130,9 +130,7 @@ describe('sandbox mode', () => {
       // long enough to trip an unrelated needs collapse mid-task (out of
       // scope for this test).
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runner.run('tick 1');
     }
@@ -141,9 +139,7 @@ describe('sandbox mode', () => {
     // way the drill plan above was drained before blasting.
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.hunger = 100;
         emp.fatigue = 100;
-        emp.breakNeed = 100;
       }
       runner.run('tick 1');
     }

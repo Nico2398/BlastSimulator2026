@@ -221,7 +221,7 @@ export function needsCommand(
   }
   const lines = ['Employee Needs:'];
   for (const e of state.employees.employees) {
-    lines.push(`  [${e.id}] ${e.name.padEnd(20)} — hunger: ${e.hunger}  fatigue: ${e.fatigue}  break: ${e.breakNeed}`);
+    lines.push(`  [${e.id}] ${e.name.padEnd(20)} — fatigue: ${e.fatigue}`);
   }
   return { success: true, output: lines.join('\n') };
 }

@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Integration tests: Employee needs system (Phase 6)
-// Covers hunger/fatigue/breakNeed gauges, morale effects, collapse, and building replenishment.
-// Defines 10 real tests against the core EmployeeNeeds API and the needs console command.
+// Covers the fatigue gauge (#928 — hunger and breakNeed removed), morale
+// effects, collapse, and building replenishment.
+// Defines real tests against the core EmployeeNeeds API and the needs console command.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
@@ -8,6 +9,8 @@ import { employeeCommand, needsCommand, buildCommand } from '../../src/console/c
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { createGameEngine } from '../../scripts/shared/command-runner.js';
+import { runCommand } from '../../src/console/createRunner.js';
 
 import {
   tickNeedGauges,
@@ -64,9 +67,7 @@ function buildLivingQuartersAndComplete(ctx: GameContext, at: string, maxTicks =
 
   for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -93,69 +94,52 @@ describe('Employee needs', () => {
     // Default morale is 60 → drain multiplier is 1.0 (normal range)
     expect(emp.morale).toBe(60);
 
-    // Set all gauges to 100
-    emp.hunger = 100;
     emp.fatigue = 100;
-    emp.breakNeed = 100;
 
     tickNeedGauges(emp, 'working');
 
-    // working drain rates at 1×: hunger=1, fatigue=2, breakNeed=0.8
-    expect(emp.hunger).toBe(99);
+    // working drain rate at 1×: fatigue=2
     expect(emp.fatigue).toBe(98);
-    expect(emp.breakNeed).toBeCloseTo(99.2, 1);
   });
 
   // ── 2. tickNeedGauges drains slower when idle ────────────────────────────
 
   it('tickNeedGauges drains slower when idle', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 100;
     emp.fatigue = 100;
-    emp.breakNeed = 100;
 
-    // Record values after one working tick
+    // Record value after one working tick
     tickNeedGauges(emp, 'working');
-    const workingHunger = emp.hunger;
     const workingFatigue = emp.fatigue;
 
     // Reset and do one idle tick
-    emp.hunger = 100;
     emp.fatigue = 100;
-    emp.breakNeed = 100;
     tickNeedGauges(emp, 'idle');
 
-    // idle drain rates at 1×: hunger=0.5, fatigue=0.5, breakNeed=0
-    // Hunger and fatigue drain less when idle
-    expect(emp.hunger).toBeGreaterThan(workingHunger);
+    // idle drain rate at 1×: fatigue=0.5 — drains less than working (2)
     expect(emp.fatigue).toBeGreaterThan(workingFatigue);
-    // breakNeed does not drain when idle
-    expect(emp.breakNeed).toBe(100);
   });
 
-  // ── 3. Gauges clamped to minimum 0 ───────────────────────────────────────
+  // ── 3. Gauge clamped to minimum 0 ───────────────────────────────────────
 
-  it('gauges clamped to minimum 0', () => {
+  it('gauge clamped to minimum 0', () => {
     const emp = getEmployee(ctx, empId);
-    // Set hunger to a value that would go negative in one working tick
-    emp.hunger = 0.5;
+    // Set fatigue to a value that would go negative in one working tick
+    emp.fatigue = 0.5;
 
     tickNeedGauges(emp, 'working');
 
-    expect(emp.hunger).toBe(0);
+    expect(emp.fatigue).toBe(0);
     // Ensure it never went negative
-    expect(emp.hunger).toBeGreaterThanOrEqual(0);
+    expect(emp.fatigue).toBeGreaterThanOrEqual(0);
   });
 
-  // ── 4. needsMoraleEffect returns negative delta when needs low ───────────
+  // ── 4. needsMoraleEffect returns negative delta when fatigue low ─────────
 
-  it('needsMoraleEffect returns negative delta when needs low', () => {
+  it('needsMoraleEffect returns negative delta when fatigue low', () => {
     const emp = getEmployee(ctx, empId);
-    // All three gauges below suffering threshold (15) = critical tier
-    // Each gauge contributes -3.0 → total delta = -9.0
-    emp.hunger = 10;
+    // Below suffering threshold (15) = critical tier -> -9.0 (#928 rescale)
     emp.fatigue = 10;
-    emp.breakNeed = 10;
 
     const delta = needsMoraleEffect(emp);
 
@@ -167,18 +151,16 @@ describe('Employee needs', () => {
 
   it('checkCollapse sets collapsing and clears action', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 100;
     emp.fatigue = 100;
-    emp.breakNeed = 100;
     emp.activeActionId = 42;
     emp.collapsing = false;
 
-    // Set hunger at or below collapse threshold (hunger ≤ 10)
-    emp.hunger = 10;
+    // Set fatigue at or below collapse threshold (fatigue ≤ 5)
+    emp.fatigue = 5;
 
     const result = checkCollapse(emp);
 
-    expect(result).toBe('hunger');
+    expect(result).toBe('fatigue');
     expect(emp.collapsing).toBe(true);
     expect(emp.activeActionId).toBeNull();
   });
@@ -187,13 +169,13 @@ describe('Employee needs', () => {
 
   it('replenishNeed restores gauge value', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 50;
+    emp.fatigue = 50;
 
-    // Tier-1 building with capacity: replenish rate = 12/tick
-    const success = replenishNeed(emp, 'hunger', 1, 100);
+    // Tier-1 building with capacity: replenish rate = 8/tick
+    const success = replenishNeed(emp, 'fatigue', 1, 100);
 
     expect(success).toBe(true);
-    expect(emp.hunger).toBe(62);
+    expect(emp.fatigue).toBe(58);
   });
 
   // ── 7. replenishNeed with zero capacity returns false ─────────────────────
@@ -213,7 +195,7 @@ describe('Employee needs', () => {
 
   it('checkCollapse returns null if already collapsing', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 5; // Below collapse threshold, would normally trigger collapse
+    emp.fatigue = 3; // Below collapse threshold, would normally trigger collapse
     emp.collapsing = true;
 
     const result = checkCollapse(emp);
@@ -230,9 +212,7 @@ describe('Employee needs', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('Employee Needs');
-    expect(result.output).toContain('hunger:');
     expect(result.output).toContain('fatigue:');
-    expect(result.output).toContain('break:');
     expect(result.output).toContain(`[${empId}]`);
   });
 
@@ -250,24 +230,21 @@ describe('Employee needs', () => {
 
   // ── Bonus: needsMoraleEffect with well-rested bonus ──────────────────────
 
-  it('needsMoraleEffect returns positive delta when all gauges well-rested', () => {
+  it('needsMoraleEffect returns positive delta when fatigue well-rested', () => {
     const emp = getEmployee(ctx, empId);
-    // All three gauges above 80 → well-rested bonus of +1
-    emp.hunger = 85;
+    // Above 80 → well-rested bonus of +1
     emp.fatigue = 85;
-    emp.breakNeed = 85;
 
     const delta = needsMoraleEffect(emp);
 
-    // well-rested bonus (+1) + comfortable (0 × 3) = +1
+    // well-rested bonus (+1) + comfortable (0) = +1
     expect(delta).toBe(1);
   });
 
-  // ── Bonus: getNeedMultiplier returns 1.0 when gauges high ─────────────────
+  // ── Bonus: getNeedMultiplier returns 1.0 when gauge high ─────────────────
 
-  it('getNeedMultiplier returns 1.0 when all gauges are above thresholds', () => {
+  it('getNeedMultiplier returns 1.0 when fatigue is above threshold', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 100;
     emp.fatigue = 100;
 
     const mult = getNeedMultiplier(emp);
@@ -275,29 +252,15 @@ describe('Employee needs', () => {
     expect(mult).toBe(1.0);
   });
 
-  // ── Bonus: getNeedMultiplier penalty when hunger is critically low ────────
-
-  it('getNeedMultiplier returns a penalty when hunger is critically low', () => {
-    const emp = getEmployee(ctx, empId);
-    emp.hunger = 5;  // below critical (10)
-    emp.fatigue = 100; // no fatigue penalty
-
-    const mult = getNeedMultiplier(emp);
-
-    // hunger critical → 0.60, fatigue none → 1.0
-    expect(mult).toBeCloseTo(0.60, 2);
-  });
-
   // ── Bonus: getNeedMultiplier penalty when fatigue is critically low ───────
 
   it('getNeedMultiplier returns a penalty when fatigue is critically low', () => {
     const emp = getEmployee(ctx, empId);
-    emp.hunger = 100;  // no hunger penalty
     emp.fatigue = 10;   // below critical (15)
 
     const mult = getNeedMultiplier(emp);
 
-    // fatigue critical → 0.50, hunger none → 1.0
+    // fatigue critical → 0.50
     expect(mult).toBeCloseTo(0.50, 2);
   });
 });
@@ -306,12 +269,12 @@ describe('Employee needs', () => {
 //
 // #680: the original fix (isWorking now also requires restTicksRemaining ===
 // null) only got a resting employee OUT of the working-rate bucket — it fell
-// into the idle bucket instead, at NEED_DRAIN_RATES.*.idle, which still
-// drains hunger/fatigue. That undermines rest's own completion-time
-// replenishment lump sum: an employee resting for many ticks keeps leaking
-// gauges the whole time. The full fix adds a third 'resting' tier
-// (employeeWorkState classifies restTicksRemaining !== null as 'resting') at
-// drain rate 0 — gauges hold steady during active rest.
+// into the idle bucket instead, at NEED_DRAIN_RATES.fatigue.idle, which still
+// drains fatigue. That undermines rest's own completion-time replenishment
+// lump sum: an employee resting for many ticks keeps leaking the gauge the
+// whole time. The full fix adds a third 'resting' tier (employeeWorkState
+// classifies restTicksRemaining !== null as 'resting') at drain rate 0 —
+// the gauge holds steady during active rest.
 
 describe('tick command — resting employees drain at the resting tier (rate 0), not idle', () => {
   let ctx: GameContext;
@@ -328,37 +291,37 @@ describe('tick command — resting employees drain at the resting tier (rate 0),
     emp.activeActionId = 999;
     emp.restTicksRemaining = 10;
     emp.restNeedKey = null; // not owned by tickGeneralRestCompletion or processShiftCycle
-    emp.hunger = 100;
-    emp.breakNeed = 100;
+    emp.fatigue = 100;
 
     const result = tickCommand(ctx, ['1'], {});
 
     expect(result.success).toBe(true);
-    // resting tier: hunger does not drain at all (0/tick — not 0.5 idle, not 1 working)
-    expect(emp.hunger).toBe(100);
-    // resting tier: breakNeed does not drain at all either (0, same as idle here, but for the resting reason)
-    expect(emp.breakNeed).toBe(100);
+    // resting tier: fatigue does not drain at all (0/tick — not 0.5 idle, not 1 traveling, not 2 working)
+    expect(emp.fatigue).toBe(100);
     // Rest state itself is untouched by the needs-drain step.
     expect(emp.restTicksRemaining).toBe(10);
     expect(emp.activeActionId).toBe(999);
   });
 });
 
-// ── #680 regression: travel-toward-rest misclassified as 'working' ──────────
+// ── #928 (extends #680): travel-toward-rest now bills at its own 'traveling'
+// tier, not 'idle' ──────────────────────────────────────────────────────────
 //
-// Root cause under test: before the fix, isWorking = activeActionId !== null
+// Root cause #680 fixed: before that fix, isWorking = activeActionId !== null
 // && restTicksRemaining === null. An employee routed to rest but still
 // walking there (activeActionId set to the rest action, pendingRestDuration
-// !== null, restTicksRemaining still null because they haven't arrived) has
+// !== null, restTicksRemaining still null because they haven't arrived) had
 // activeActionId !== null and restTicksRemaining === null — so the old check
 // misclassified them as WORKING and drained them at the working rate while
-// they were merely walking. The fix's employeeWorkState() must classify this
-// exact state as 'idle' (pendingRestDuration !== null excludes it from
-// 'working'), not 'resting' (that requires restTicksRemaining !== null) and
-// not 'working'.
+// they were merely walking. #680's own fix reclassified this state as
+// 'idle'. #928 goes one step further: employeeWorkState now has a dedicated
+// 'traveling' tier (pendingTaskDuration !== null || pendingRestDuration !==
+// null) distinct from 'idle' — this walk-to-rest state, and the symmetric
+// walk-to-a-claimed-job state, both bill at 'traveling' (1/tick), not idle
+// (0.5/tick) and not working (2/tick).
 
-describe('#680 regression — an employee walking toward rest drains at the idle rate, not working', () => {
-  it('drains hunger/fatigue at the idle rate (not working) while travelling to a distant living_quarters', () => {
+describe('#928 — an employee walking toward rest drains at the traveling rate, not idle or working', () => {
+  it('drains fatigue at the traveling rate (not idle, not working) while travelling to a distant living_quarters', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
     const empId = hireOne(ctx, 'driller');
@@ -375,9 +338,7 @@ describe('#680 regression — an employee walking toward rest drains at the idle
     emp.activeActionId = null;
     emp.destinationX = null;
     emp.destinationZ = null;
-    emp.hunger = 20; // below warning threshold — triggers routing toward rest
-    emp.fatigue = 100;
-    emp.breakNeed = 100;
+    emp.fatigue = 20; // below warning threshold — triggers routing toward rest
 
     // First tick: routed toward the living_quarters, but not arrived yet.
     tickCommand(ctx, ['1'], {});
@@ -400,20 +361,42 @@ describe('#680 regression — an employee walking toward rest drains at the idle
     expect(emp.x === 20 && emp.z === 20).toBe(false); // still travelling
     expect(emp.restTicksRemaining).toBeNull(); // rest has not started
 
-    // The bug: fatigue (working rate 2/tick) drains far faster than the idle
-    // rate (0.5/tick) predicts, because activeActionId is set (the rest
-    // action) and restTicksRemaining is still null — the old isWorking check
-    // misclassified this as WORKING. Assert a band, not just an upper bound,
-    // so this test is RED against both failure modes: a no-op/unimplemented
-    // tickNeedGauges (drain = 0, fails the lower bound) and the pre-fix
-    // working-rate misclassification (drain ≈ 2/tick × 3 = 6, fails the upper
-    // bound). Only the idle rate (0.5/tick × 3 = 1.5, ±headroom for the
-    // morale multiplier) lands inside the band.
+    // Assert a band, not just an upper bound, so this test is RED against
+    // both failure modes: a no-op/unimplemented tickNeedGauges (drain = 0,
+    // fails the lower bound) and a working-rate misclassification (drain ≈
+    // 2/tick × 3 = 6, fails the upper bound). Only the traveling rate
+    // (1/tick × 3 = 3, ±headroom for the morale multiplier) lands inside the
+    // band — strictly above the idle-rate band (0.5/tick × 3 = 1.5) this
+    // same test asserted pre-#928.
     const fatigueDrainedDuringTravel = fatigueAfterFirstTick - emp.fatigue;
-    const idleRateLowerBound = NEED_DRAIN_RATES.fatigue.idle * TRAVEL_SAMPLE_TICKS * 0.5; // well below even a low-morale idle drain
-    const idleRateUpperBound = NEED_DRAIN_RATES.fatigue.idle * TRAVEL_SAMPLE_TICKS * 1.2; // 1.2 = low-morale multiplier headroom, still « working rate
-    expect(fatigueDrainedDuringTravel).toBeGreaterThan(idleRateLowerBound);
-    expect(fatigueDrainedDuringTravel).toBeLessThanOrEqual(idleRateUpperBound);
+    const travelingRateLowerBound = NEED_DRAIN_RATES.fatigue.traveling * TRAVEL_SAMPLE_TICKS * 0.5; // well below even a low-morale traveling drain
+    const travelingRateUpperBound = NEED_DRAIN_RATES.fatigue.traveling * TRAVEL_SAMPLE_TICKS * 1.2; // 1.2 = low-morale multiplier headroom, still « working rate
+    expect(fatigueDrainedDuringTravel).toBeGreaterThan(travelingRateLowerBound);
+    expect(fatigueDrainedDuringTravel).toBeLessThanOrEqual(travelingRateUpperBound);
+  });
+
+  it('drains the outbound walk to a claimed job and the return walk to rest by the SAME amount (symmetric traveling tier, #928)', () => {
+    // The bug #928 fixes: outbound (to a claimed job) used to bill at
+    // 'working' (2/tick) while the return-to-rest walk billed at 'idle'
+    // (0.5/tick) — an asymmetric drain for the same physical act of walking
+    // a fixed distance. Both now bill at 'traveling' (1/tick).
+    const outboundCtx = makeCtx();
+    const outboundEmpId = hireOne(outboundCtx, 'driller');
+    const outboundEmp = getEmployee(outboundCtx, outboundEmpId);
+    outboundEmp.activeActionId = 7; // claimed a job, walking to it
+    outboundEmp.pendingTaskDuration = 12;
+    outboundEmp.fatigue = 100;
+
+    const returnCtx = makeCtx();
+    const returnEmpId = hireOne(returnCtx, 'driller');
+    const returnEmp = getEmployee(returnCtx, returnEmpId);
+    returnEmp.pendingRestDuration = 8; // walking to living_quarters
+    returnEmp.fatigue = 100;
+
+    tickCommand(outboundCtx, ['1'], {});
+    tickCommand(returnCtx, ['1'], {});
+
+    expect(outboundEmp.fatigue).toBe(returnEmp.fatigue);
   });
 });
 
@@ -426,7 +409,7 @@ describe('#680 regression — an employee walking toward rest drains at the idle
 // NEED_REST_COSTS charges and two rest cycles for a single dip.
 
 describe('tick command — a single threshold dip triggers a single rest', () => {
-  it('charges NEED_REST_COSTS.hunger once and restores the gauge once', () => {
+  it('charges NEED_REST_COSTS.fatigue once and restores the gauge once', () => {
     const ctx = makeCtx();
     const empId = hireOne(ctx, 'driller');
     const state = ctx.state!;
@@ -440,9 +423,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     emp.activeActionId = null;
     emp.destinationX = null;
     emp.destinationZ = null;
-    emp.hunger = 34; // just below the 35 warning threshold
-    emp.fatigue = 100;
-    emp.breakNeed = 100;
+    emp.fatigue = 24; // just below the 25 warning threshold
 
     // The employee is routed toward the living_quarters on the very first
     // tick, but (issue #437) the rest timer must not start until they have
@@ -453,18 +434,21 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.restTicksRemaining).toBeNull();
 
     // Long enough for the walk to (5,5) plus the full rest duration, with slack,
-    // but short of the ~14-tick idle hunger decay (NEED_DRAIN_RATES.hunger.idle)
+    // but short of the ~14-tick idle fatigue decay (NEED_DRAIN_RATES.fatigue.idle)
     // that would otherwise dip the gauge below the warning threshold a second
     // time and start an unrelated second rest cycle — this test is only about
     // the first, deliberately-triggered dip.
     for (let i = 0; i < 12; i++) tickCommand(ctx, ['1'], {});
 
     const restCharges = state.finances.transactions.filter(t => t.category === 'needs');
-    expect(restCharges).toHaveLength(1);
+    // #928: NEED_REST_COSTS.fatigue = 0 — a zero-amount expense is never
+    // recorded (addExpense no-ops on amount <= 0), so the single dip this
+    // test drives produces zero finance transactions, not one.
+    expect(restCharges).toHaveLength(0);
     expect(emp.restTicksRemaining).toBeNull();
     expect(emp.restNeedKey).toBeNull();
     expect(emp.activeActionId).toBeNull();
-    expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
+    expect(emp.fatigue).toBeGreaterThan(NEED_WARNING_THRESHOLDS.fatigue);
     expect(state.pendingActions.filter(a => a.type === 'rest')).toHaveLength(0);
   });
 
@@ -484,9 +468,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     emp.activeActionId = null;
     emp.destinationX = null;
     emp.destinationZ = null;
-    emp.hunger = 20; // below warning threshold — triggers routing
-    emp.fatigue = 100;
-    emp.breakNeed = 100;
+    emp.fatigue = 20; // below warning threshold — triggers routing
 
     tickCommand(ctx, ['1'], {});
 
@@ -503,13 +485,13 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.restTicksRemaining).toBeNull();
 
     // Enough ticks to arrive (distance (0,0)→(20,20) ≈ 28.3 cells / AGENT_WALK_SPEED)
-    // and finish the rest (NEED_REST_DURATIONS.hunger ticks of work once
+    // and finish the rest (NEED_REST_DURATIONS.fatigue ticks of work once
     // arrival gates the timer open), with slack.
     const travelTicks = Math.ceil(Math.hypot(20, 20) / AGENT_WALK_SPEED);
-    for (let i = 0; i < travelTicks + NEED_REST_DURATIONS.hunger + 10; i++) tickCommand(ctx, ['1'], {});
+    for (let i = 0; i < travelTicks + NEED_REST_DURATIONS.fatigue + 10; i++) tickCommand(ctx, ['1'], {});
 
     expect(emp.restTicksRemaining).toBeNull(); // completed and cleared
-    expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
+    expect(emp.fatigue).toBeGreaterThan(NEED_WARNING_THRESHOLDS.fatigue);
   });
 });
 
@@ -521,18 +503,18 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
 // `employee dispatch`, re-issued the moment they go genuinely idle — never
 // while mid-walk or resting) across a multi-hundred-tick stretch, once with
 // a policy applied and once without, to prove the opt-in gate for real: an
-// applied policy keeps the hunger/fatigue gauges themselves off the floor;
-// without one, only the pre-existing (unrelated, unchanged by #678) collapse
-// safety net protects the employee, and it lets the run reach collapse
-// territory that an applied policy's tighter thresholds never approach.
+// applied policy keeps the fatigue gauge itself off the floor; without one,
+// only the pre-existing (unrelated, unchanged by #678) collapse safety net
+// protects the employee, and it lets the run reach collapse territory that
+// an applied policy's tighter threshold never approaches.
 //
 // scores.wellBeing tracks avgMorale (ScoreManager.updateScores), and morale
-// is driven by needsMoraleEffect (EmployeeNeeds.ts), which penalizes any
+// is driven by needsMoraleEffect (EmployeeNeeds.ts), which penalizes the
 // gauge below its own "comfortable" threshold of 50. SITE_POLICY_DEFAULT_
-// THRESHOLDS (src/core/config/balance.ts) now sit at hunger:60/fatigue:60 —
-// at or above that comfortable band — so a policy-protected employee no
-// longer spends the run in morale's penalty zone, and wellBeing stays off
-// the floor alongside hunger/fatigue.
+// THRESHOLD (src/core/config/balance.ts) now sits at fatigue:60 (#928 —
+// single gauge) — at or above that comfortable band — so a policy-protected
+// employee no longer spends the run in morale's penalty zone, and wellBeing
+// stays off the floor alongside fatigue.
 
 describe('forced rest under an applied SitePolicy — driven through the console (#678)', () => {
   /**
@@ -570,7 +552,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
 
   const RUN_TICKS = 300;
 
-  it('keeps hunger, fatigue, and scores.wellBeing above 0 across a long run when a policy is applied', () => {
+  it('keeps fatigue and scores.wellBeing above 0 across a long run when a policy is applied', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
     state.cash = 1_000_000;
@@ -586,18 +568,15 @@ describe('forced rest under an applied SitePolicy — driven through the console
     let sawForcedRestTransition = false;
     ctx.emitter.on('employee:shift_change', () => { sawForcedRestTransition = true; });
 
-    let minHunger = 100;
     let minFatigue = 100;
     let minWellBeing = 100;
 
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
-      minHunger = Math.min(minHunger, emp.hunger);
       minFatigue = Math.min(minFatigue, emp.fatigue);
       minWellBeing = Math.min(minWellBeing, state.scores.wellBeing);
     });
 
     expect(sawForcedRestTransition).toBe(true);
-    expect(minHunger).toBeGreaterThan(0);
     expect(minFatigue).toBeGreaterThan(0);
     expect(minWellBeing).toBeGreaterThan(0);
   });
@@ -615,19 +594,15 @@ describe('forced rest under an applied SitePolicy — driven through the console
     expect(state.sitePolicy.revision).toBe(0);
 
     let sawCollapse = false;
-    let minHunger = 100;
     let minFatigue = 100;
 
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
       sawCollapse = sawCollapse || emp.collapsing;
-      minHunger = Math.min(minHunger, emp.hunger);
       minFatigue = Math.min(minFatigue, emp.fatigue);
     });
 
     expect(sawCollapse).toBe(true);
-    expect(Math.min(minHunger, minFatigue)).toBeLessThanOrEqual(
-      Math.max(NEED_COLLAPSE_THRESHOLDS.hunger, NEED_COLLAPSE_THRESHOLDS.fatigue),
-    );
+    expect(minFatigue).toBeLessThanOrEqual(NEED_COLLAPSE_THRESHOLDS.fatigue);
   });
 });
 
@@ -700,20 +675,17 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
     let revoltFired = false;
     ctx.emitter.on('revolt:triggered', () => { revoltFired = true; });
 
-    let minHunger = 100;
     let minFatigue = 100;
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
-      minHunger = Math.min(minHunger, emp.hunger);
       minFatigue = Math.min(minFatigue, emp.fatigue);
     });
 
     // Sanity check that the run actually exercised the needs-drain/rest
     // machinery rather than trivially never engaging it — a driller working
-    // continuously for 400 ticks must dip its gauges below the starting 100
+    // continuously for 400 ticks must dip its gauge below the starting 100
     // at some point (drained by working, restored by the shift's rest
     // cycles). A frozen tickNeedGauges (needs-drain unimplemented) would
-    // leave both gauges pinned at 100 the entire run and fail this.
-    expect(minHunger).toBeLessThan(100);
+    // leave the gauge pinned at 100 the entire run and fail this.
     expect(minFatigue).toBeLessThan(100);
 
     expect(revoltFired).toBe(false);
@@ -747,5 +719,113 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
     // repeatedly collapses from unmet needs — the punishing mechanism #680
     // does not remove, it only fixes which rate an employee drains at.
     expect(revoltFired || sawCollapse).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #928 — travel-drain fix, measured on the box-cut geometry over a fixed
+// window against the pre-fix baseline.
+//
+// Same repro as the tutorial full-level box-cut performance test
+// (tests/integration/full-level/tutorial.integration.test.ts): a staffed
+// tutorial_pit roster orders a living_quarters, waits 40 ticks, opts into
+// continuous shift mode, then orders the box-cut ramp segment. Over a FIXED
+// window of console ticks starting right after that order (long enough for
+// both the pre- and post-fix box-cut to complete: the pre-fix issue measured
+// 114 ticks to completion, the post-fix run measures 66), this suite proves
+// the two integration-level symptoms the fix addresses:
+//
+//   - "rest visits" (restTicksRemaining transitioning null -> non-null,
+//     i.e. a rest actually starting) fall, because the asymmetric
+//     working/idle drain no longer forces extra trips.
+//   - "cells walked" (summed |dx|+|dz| across every employee, every tick)
+//     falls, because fewer interrupted walks means less backtracking.
+//
+// Baselines below were measured directly against the pre-#928 commit
+// (5a17b28, the parent of the skeleton commit) via a `git worktree` checkout
+// running the identical repro and instrumentation — the same methodology
+// tests/integration/full-level/tutorial.integration.test.ts's own
+// PRE_FIX_BASELINE_TICKS documents.
+//
+// The suite also asserts the walk-survival guard's own integration-level
+// invariant directly: no employee ever has their claimed action's
+// 'employee:shift_change' (ForceShiftRest.ts's own proactive-rest event)
+// fire while `pendingTaskDuration !== null` on that same employee — i.e. a
+// proactive forced rest is never allowed to observably fire against an
+// employee mid-walk to an already-claimed job. tickCollapse's own
+// unconditional interrupt (a genuine collapse) is a distinct code path and
+// is deliberately NOT covered by this invariant — it fires
+// 'employee:collapsed', not 'employee:shift_change', so it can never
+// trigger a false positive here.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. the pre-fix baseline', () => {
+  const FIXED_WINDOW_TICKS = 150;
+  // Measured directly against 5a17b28 (pre-#928) via the same repro/window.
+  const PRE_FIX_CELLS_WALKED = 285.49593120068437;
+  const PRE_FIX_REST_VISITS = 21;
+
+  it('walks fewer cells and starts fewer rests than the pre-fix baseline, with no claimed job dropped mid-walk to it', () => {
+    const engine = createGameEngine();
+
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+
+    const state = engine.ctx.state!;
+
+    let cellsWalked = 0;
+    let restVisits = 0;
+    // Employee ids whose 'employee:shift_change' fired during the tick just
+    // taken — reset every tick, populated by the emitter listener below.
+    let shiftChangedThisTick = new Set<number>();
+    engine.ctx.emitter.on('employee:shift_change', (payload: unknown) => {
+      shiftChangedThisTick.add((payload as { employeeId: number }).employeeId);
+    });
+
+    // The walk-survival guard's own violation counter: an 'employee:shift_change'
+    // firing for an employee who had pendingTaskDuration !== null (mid-walk to
+    // a claimed job) immediately before that same tick.
+    let interruptedWhileTravelingToClaim = 0;
+
+    function snapshotEmployees(): Map<number, { x: number; z: number; restTicksRemaining: number | null; pendingTaskDuration: number | null }> {
+      const m = new Map();
+      for (const e of state.employees.employees) {
+        m.set(e.id, { x: e.x, z: e.z, restTicksRemaining: e.restTicksRemaining, pendingTaskDuration: e.pendingTaskDuration });
+      }
+      return m;
+    }
+
+    for (let i = 0; i < FIXED_WINDOW_TICKS; i++) {
+      const empBefore = snapshotEmployees();
+      shiftChangedThisTick = new Set();
+
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+
+      for (const e of state.employees.employees) {
+        const before = empBefore.get(e.id);
+        if (!before) continue;
+        cellsWalked += Math.abs(e.x - before.x) + Math.abs(e.z - before.z);
+        if (before.restTicksRemaining === null && e.restTicksRemaining !== null) {
+          restVisits++;
+        }
+      }
+
+      for (const empId of shiftChangedThisTick) {
+        const before = empBefore.get(empId);
+        if (before && before.pendingTaskDuration !== null) {
+          interruptedWhileTravelingToClaim++;
+        }
+      }
+    }
+
+    expect(cellsWalked).toBeLessThan(PRE_FIX_CELLS_WALKED);
+    expect(restVisits).toBeLessThan(PRE_FIX_REST_VISITS);
+    // The walk-survival guard's own integration-level invariant: over the
+    // whole window, no claimed job was ever dropped by a proactive forced
+    // rest while its holder was still mid-walk to it.
+    expect(interruptedWhileTravelingToClaim).toBe(0);
   });
 });

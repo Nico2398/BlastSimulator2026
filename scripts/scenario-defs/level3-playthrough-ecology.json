@@ -604,8 +604,8 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
+          "holeCount": 13,
+          "orderedHoleCount": 7,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -628,8 +628,8 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
+          "holeCount": 13,
+          "orderedHoleCount": 7,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -653,8 +653,8 @@
       "expect": {
         "equals": {
           "tickCount": 160,
-          "holeCount": 13,
-          "orderedHoleCount": 7,
+          "holeCount": 14,
+          "orderedHoleCount": 6,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -677,8 +677,8 @@
       "expect": {
         "equals": {
           "tickCount": 160,
-          "holeCount": 13,
-          "orderedHoleCount": 7,
+          "holeCount": 14,
+          "orderedHoleCount": 6,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -800,8 +800,8 @@
       "expect": {
         "equals": {
           "tickCount": 220,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -824,8 +824,8 @@
       "expect": {
         "equals": {
           "tickCount": 220,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -1529,8 +1529,8 @@
         "equals": {
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 22.641333333333485,
-          "safety": 50.55000000000014,
+          "wellBeing": 3.4608333333333245,
+          "safety": 50.70000000000013,
           "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
@@ -1710,8 +1710,8 @@
         "equals": {
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 22.641333333333485,
-          "safety": 50.55000000000014,
+          "wellBeing": 3.4608333333333245,
+          "safety": 50.70000000000013,
           "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
@@ -1735,7 +1735,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 334,
+          "tickCount": 331,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 12,
@@ -1756,12 +1756,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 334,
+          "tickCount": 331,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 23.6413333333335,
+          "wellBeing": 4.460833333333321,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1782,7 +1782,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 334,
+          "tickCount": 331,
           "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1801,10 +1801,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 334,
+          "tickCount": 331,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 23.6413333333335,
+          "wellBeing": 4.460833333333321,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1824,10 +1824,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 334,
+          "tickCount": 331,
           "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 23.6413333333335,
+          "wellBeing": 4.460833333333321,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,

@@ -115,9 +115,7 @@ export function autoInsertNeedTasks(
     // Determine which gauges are below warning thresholds
     const triggeredGauges: NeedKey[] = [];
     const gauges: Array<{ key: NeedKey; value: number }> = [
-      { key: 'hunger', value: emp.hunger },
       { key: 'fatigue', value: emp.fatigue },
-      { key: 'breakNeed', value: emp.breakNeed },
     ];
     for (const { key, value } of gauges) {
       if (value < NEED_WARNING_THRESHOLDS[key]) {

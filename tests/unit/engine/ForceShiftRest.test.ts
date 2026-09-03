@@ -5,6 +5,14 @@
 // indirectly via processShiftCycle in ShiftCycle.test.ts) — this file is the
 // mirrored-path direct coverage core-purity.md requires for every exported
 // src/core/ function.
+//
+// #928: hunger/breakNeed removed — fatigue is the sole gauge, so the old
+// multi-gauge deficit tie-break tests are gone (there is nothing left to
+// tie-break between). New in this file: both functions now also early-return
+// when `pendingTaskDuration !== null` — an employee mid-walk to an
+// already-claimed job is left alone rather than yanked into a proactive
+// rest; a genuine collapse (tickCollapse/checkCollapse, a separate code
+// path) still interrupts unconditionally.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
@@ -123,6 +131,28 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     expect(employee.activeActionId).toBe(500);
   });
 
+  // NEW (#928): mirrors the pendingRestDuration guard immediately above, for
+  // the task-travel case — an employee mid-walk to an already-claimed job
+  // must not be pulled into rest, whatever their fatigue or ticksWorked.
+  it('no-op when pendingTaskDuration is already set (mid-walk to a claimed job)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 550);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    employee.pendingTaskDuration = 12; // walking to the claimed job, not yet arrived
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingTaskDuration).toBe(12); // untouched
+    expect(employee.activeActionId).toBe(550); // claim survives, not released
+    const claim = state.pendingActions.find(a => a.id === 550)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
+  });
+
   it('no-op when activeActionId is null', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
@@ -159,15 +189,14 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
   }
 
-  it('fires on the shift-duration boundary, using NEED_REST_DURATIONS[needKey] (not SHIFT_SLEEP_DURATION_TICKS)', () => {
+  it('fires on the shift-duration boundary, using NEED_REST_DURATIONS.fatigue (not SHIFT_SLEEP_DURATION_TICKS)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = 100;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 100;
-    employee.fatigue = 100; // gauges tied at default thresholds -> tie-break picks 'fatigue'
+    employee.fatigue = 100;
 
     const firedEvents: FiredEvent[] = [];
     const shiftRested: number[] = [];
@@ -179,23 +208,6 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(firedEvents.map(e => e.eventId)).toContain('employee_shift_change');
   });
 
-  it('fires on a hunger-threshold trigger', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const threshold = state.sitePolicy.hungerRestThreshold;
-    employee.activeActionId = 200;
-    employee.ticksWorked = 1; // nowhere near the shift boundary
-    employee.hunger = threshold;
-    employee.fatigue = 100;
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestNeedKey).toBe('hunger');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
-  });
-
   it('fires on a fatigue-threshold trigger', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
@@ -204,78 +216,12 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const threshold = state.sitePolicy.fatigueRestThreshold;
     employee.activeActionId = 210;
     employee.ticksWorked = 1;
-    employee.hunger = 100;
     employee.fatigue = threshold;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
     expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
-  });
-
-  it('picks hunger as the more-overdue gauge when both are past threshold (deficit tie-break)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    employee.activeActionId = 300;
-    employee.ticksWorked = 1;
-    employee.hunger = 30;  // deficit vs. default threshold 60: -30
-    employee.fatigue = 50; // deficit: -10 — less overdue than hunger
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestNeedKey).toBe('hunger');
-  });
-
-  it('picks fatigue as the more-overdue gauge when it is further past threshold than hunger', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    employee.activeActionId = 301;
-    employee.ticksWorked = 1;
-    employee.hunger = 50;  // deficit: -10
-    employee.fatigue = 20; // deficit: -40 — more overdue
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestNeedKey).toBe('fatigue');
-  });
-
-  it('fires on a breakNeed-threshold trigger (#867)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const threshold = state.sitePolicy.socialBreakThreshold;
-    employee.activeActionId = 220;
-    employee.ticksWorked = 1;
-    employee.hunger = 100;
-    employee.fatigue = 100;
-    employee.breakNeed = threshold;
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestNeedKey).toBe('breakNeed');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.breakNeed);
-  });
-
-  it('picks breakNeed as the more-overdue gauge when it is further past its own threshold than hunger or fatigue (#867)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    employee.activeActionId = 302;
-    employee.ticksWorked = 1;
-    employee.hunger = 50;     // deficit vs. default threshold 60: -10
-    employee.fatigue = 50;    // deficit vs. default threshold 60: -10
-    employee.breakNeed = 10;  // deficit vs. default threshold 60: -50 — most overdue
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestNeedKey).toBe('breakNeed');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.breakNeed);
   });
 
   it('no-op when restTicksRemaining is already set', () => {
@@ -286,7 +232,6 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     employee.activeActionId = 700;
     employee.restTicksRemaining = 5;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
@@ -301,17 +246,43 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = 800;
-    employee.pendingRestDuration = NEED_REST_DURATIONS.hunger;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestDuration = NEED_REST_DURATIONS.fatigue;
+    employee.pendingRestNeedKey = 'fatigue';
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
-    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.activeActionId).toBe(800);
+  });
+
+  // NEW (#928): the walk-to-claimed-job survival guard — a proactive
+  // policy-triggered rest must not interrupt an employee already mid-walk to
+  // a claimed job, even when fatigue is deep below threshold and the shift
+  // boundary has long since passed. The claim (and its pending travel) must
+  // still be intact after the call.
+  it('no-op when pendingTaskDuration is already set (mid-walk to a claimed job), even with fatigue deep below threshold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 850);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10; // well past the shift boundary
+    employee.fatigue = 1; // well below any threshold
+    employee.pendingTaskDuration = 9; // walking to the claimed job, not yet arrived
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.pendingTaskDuration).toBe(9); // untouched
+    expect(employee.activeActionId).toBe(850); // claim survives, not released
+    const claim = state.pendingActions.find(a => a.id === 850)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
   });
 
   it('no-op when pendingDriverVehicleId is set (mid-walk to board a vehicle)', () => {
@@ -322,7 +293,6 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     employee.activeActionId = null;
     employee.pendingDriverVehicleId = 9;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
@@ -340,8 +310,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = 900;
     employee.ticksWorked = 9999;
-    employee.hunger = 100;
-    employee.fatigue = 100; // both healthy — nothing to trigger
+    employee.fatigue = 100; // healthy — nothing to trigger
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
@@ -356,7 +325,6 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = null;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
@@ -381,15 +349,14 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.destinationZ).not.toBe(employee.z);
   });
 
-  it('rests in place with no living_quarters at all, at the un-multiplied NEED_REST_DURATIONS[needKey]', () => {
+  it('rests in place with no living_quarters at all, at the un-multiplied NEED_REST_DURATIONS.fatigue', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = 500;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 100;
-    employee.fatigue = 100; // tie -> 'fatigue', matches the shift-duration test above
+    employee.fatigue = 100;
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 

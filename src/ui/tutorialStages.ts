@@ -197,12 +197,12 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       // interrupts the queued drilling/digging work below before it can
       // finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter than a
       // single drill_hole action). Continuous still forces rest on
-      // hunger/fatigue, just without the shift-length cap. Highlighted
+      // fatigue, just without the shift-length cap. Highlighted
       // target stays the Continuous button (not Apply) so the glow points at
       // the one choice this early step actually requires the player to make.
       target: '#bs-policy-shift button[data-shift-mode="continuous"]',
       hintKey: 'tutorial.stage.policy_continuous',
-      also: ['#bs-policy-apply', '#bs-policy-hunger', '#bs-policy-fatigue'],
+      also: ['#bs-policy-apply', '#bs-policy-fatigue'],
     },
   ],
 
@@ -340,7 +340,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     {
       target: '#bs-policy-apply',
       hintKey: 'tutorial.stage.policy_apply',
-      also: ['#bs-policy-shift', '#bs-policy-hunger', '#bs-policy-fatigue'],
+      also: ['#bs-policy-shift', '#bs-policy-fatigue'],
     },
   ],
 

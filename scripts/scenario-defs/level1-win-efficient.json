@@ -606,11 +606,12 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
-        ]
+        ],
+        "note": "#928: surveyCount 1 -> 2 -- the single-gauge fatigue model shifts dispatch timing enough that the seismic survey queued at step 9 now resolves by tick 56 instead of tick 72 (direct trace, command mode)."
       }
     },
     {
@@ -628,7 +629,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "changedBy": {
           "cash": 0
@@ -651,7 +652,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
@@ -673,7 +674,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "changedBy": {
           "cash": 0
@@ -1388,7 +1389,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged.",
       "interaction": [
         {
           "type": "command",
@@ -1404,8 +1405,8 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 50,
-          "ecology": 55.809999999999945,
-          "nuisance": 48.05
+          "ecology": 55.48999999999994,
+          "nuisance": 47.85
         },
         "changedBy": {
           "tickCount": 0
@@ -1414,7 +1415,7 @@
     },
     {
       "command": "stats",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note.",
       "interaction": [
         {
           "type": "command",
@@ -1430,8 +1431,8 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 50,
-          "ecology": 55.809999999999945,
-          "nuisance": 48.05
+          "ecology": 55.48999999999994,
+          "nuisance": 47.85
         },
         "changedBy": {
           "tickCount": 0

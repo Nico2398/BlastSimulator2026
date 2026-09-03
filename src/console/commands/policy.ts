@@ -25,30 +25,20 @@ export function setPolicyCommand(
 
   state.sitePolicy.shiftMode = mode;
 
-  // #539: guards below must reject non-finite parseInt results (NaN and Infinity)
-  if (named['hunger'] !== undefined) {
-    const v = parseInt(named['hunger'], 10);
-    if (Number.isFinite(v)) state.sitePolicy.hungerRestThreshold = v;
-  }
+  // #539: guard below must reject non-finite parseInt results (NaN and Infinity)
   if (named['fatigue'] !== undefined) {
     const v = parseInt(named['fatigue'], 10);
     if (Number.isFinite(v)) state.sitePolicy.fatigueRestThreshold = v;
-  }
-  if (named['social'] !== undefined) {
-    const v = parseInt(named['social'], 10);
-    if (Number.isFinite(v)) state.sitePolicy.socialBreakThreshold = v;
   }
 
   // Bumped even when every value is unchanged: applying the policy already in
   // force is still the player applying a policy.
   state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
 
-  const hunger = state.sitePolicy.hungerRestThreshold;
   const fatigue = state.sitePolicy.fatigueRestThreshold;
-  const social = state.sitePolicy.socialBreakThreshold;
 
   return {
     success: true,
-    output: `Policy updated: mode=${mode} hunger=${hunger} fatigue=${fatigue} social=${social}`,
+    output: `Policy updated: mode=${mode} fatigue=${fatigue}`,
   };
 }

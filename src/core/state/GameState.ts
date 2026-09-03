@@ -81,7 +81,9 @@ import type { RampDef } from '../mining/Ramp.js';
 // `nextPlannedBuildingId: number` (#556 construction sites — placing a
 // building queues one `place_building` action at the target instead of
 // creating the building instantly). See SaveLoad.ts's migrateV13ToV14 stub.
-export const SAVE_VERSION = 14;
+// v14 -> v15: Employee.hunger/breakNeed removed, fatigue is the sole need
+// gauge (#928). See SaveLoad.ts's migrateV14ToV15.
+export const SAVE_VERSION = 15;
 
 export interface GameConfig {
   seed: number;

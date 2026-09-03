@@ -11,7 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { completePendingAction } from './TaskDispatch.js';
+import { completeIfOwnedRestAction } from './TaskDispatch.js';
 import { completeRestForEmployee } from './RestActionHelpers.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from './ForceShiftRest.js';
 
@@ -101,8 +101,8 @@ export function completeRestTick(
   restCompleted: number[],
 ): void {
   if (emp.restTicksRemaining === null) return;
-  // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
-  // breakNeed, or Tier-1 living_quarters fatigue), or — once a site policy has
+  // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks
+  // (Tier-1 living_quarters fatigue), or — once a site policy has
   // been applied (#678) — by forceShiftRestIfNeededByPolicy, all carry a
   // restNeedKey and are owned by tickGeneralRestCompletion instead — skip
   // them here to avoid double-processing. This function only ever runs the
@@ -117,7 +117,18 @@ export function completeRestTick(
     // forceShiftRestIfNeeded self-claims this action at creation, so — like
     // tickGeneralRestCompletion's own rest sources — nothing else removes it
     // from pendingActions/ghostPreviews once the rest completes (#547).
-    if (completedActionId !== null) completePendingAction(state, completedActionId);
+    //
+    // #928: completeIfOwnedRestAction (TaskLifecycleCore.ts) verifies
+    // completedActionId still names a 'rest' PendingAction before deleting
+    // it, rather than assuming activeActionId always still names this
+    // employee's own rest action — mirrors tickGeneralRestCompletion's own
+    // use of the same shared helper (RestCompletion.ts) and the same
+    // reasoning: a vehicle-gated action's arrival-promotion race
+    // (ArrivalGate.ts) could otherwise leave activeActionId naming an
+    // unrelated, still-genuinely-in-progress action by the time this rest
+    // completes, and an unconditional delete would remove it outright
+    // without ever landing it.
+    completeIfOwnedRestAction(state, completedActionId);
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }

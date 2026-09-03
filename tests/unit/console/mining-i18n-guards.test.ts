@@ -41,9 +41,7 @@ function makeMiningContext(): MiningContext {
 function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }
@@ -53,9 +51,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
 function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
       emp.fatigue = 100;
-      emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
   }

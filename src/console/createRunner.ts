@@ -229,10 +229,10 @@ export function createRunner(): RunnerWithContext {
   runner.register('zone', 'Safety zones (clear|status)', (args, named) =>
     zoneCommand(ctx, args, named),
   );
-  runner.register('needs', 'Show all employees need gauges (hunger, fatigue, break)', (args, named) =>
+  runner.register('needs', 'Show all employees need gauges (fatigue)', (args, named) =>
     needsCommand(ctx, args, named),
   );
-  runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [hunger:N] [fatigue:N] [social:N])', (args, named) =>
+  runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [fatigue:N])', (args, named) =>
     setPolicyCommand(ctx, args, named),
   );
   runner.register('research', 'Research Center tasks (queue type:<BuildingType> tier:2|3|status)', (args, named) =>

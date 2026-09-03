@@ -220,7 +220,7 @@ describe('evacuateZone — stale rest targets and taskQueue entries (#557 follow
     state.pendingActions.push(restAction);
     employee.activeActionId = restAction.id;
     employee.pendingRestDuration = 4;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestNeedKey = 'fatigue';
 
     evacuateZone(state, zone);
 

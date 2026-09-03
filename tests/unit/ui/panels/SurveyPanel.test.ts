@@ -12,7 +12,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     id: 1, name: 'Marguerite Pell', role: 'surveyor', salary: 400, morale: 60,
     unionized: false, injured: false, alive: true, x: 0, z: 0,
     qualifications: [], trainingState: null, activeActionId: null,
-    hunger: 100, fatigue: 100, breakNeed: 100, collapsing: false,
+    fatigue: 100, collapsing: false,
     interruptedActionPayload: null, ticksWorked: 0,
     restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
     activeTaskSkill: null, destinationX: null, destinationZ: null,

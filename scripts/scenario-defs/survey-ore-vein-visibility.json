@@ -382,9 +382,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 1
+          "surveyCount": 3
         },
-        "note": "only 1 of the 4 queued seismic surveys has completed by cumulative tick 77 -- the single surveyor's own fatigue/hunger interrupts and resumes work along the way (#549's correct requeue-and-preserve behavior, not a loss), so throughput through this checkpoint is slower than a naive same-type-queue estimate; see file description"
+        "note": "#928: surveyCount 1 -> 3 -- the single-gauge fatigue model means the surveyor's own needs interrupt work less often (#549's requeue-and-preserve behavior still applies, just triggers less), so throughput through this checkpoint (cumulative tick 77) is faster than the pre-#928 3-need model: 3 of the 4 queued seismic surveys have completed, not 1, direct-trace confirmed (command mode)."
       }
     },
     {
@@ -399,7 +399,7 @@
     },
     {
       "command": "survey core_sample x:20 z:20",
-      "description": "Survey 5 -- round 1 has completed only 1 of its 4 by this point (see file description); this one queues behind them.",
+      "description": "Survey 5 -- round 1 has completed 3 of its 4 by this point (see step 21's own #928 note); this one queues behind the rest.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -432,7 +432,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 1
+          "surveyCount": 3
         }
       }
     },
@@ -447,9 +447,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 1
+          "surveyCount": 3
         },
-        "note": "core_sample queued, not yet completed; round 1's 1 completed so far stays put"
+        "note": "#928: surveyCount 1 -> 3, matching step 21's own re-measurement -- core_sample queued, not yet completed; round 1's 3 completed so far stays put"
       }
     },
     {
@@ -557,9 +557,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 4
+          "surveyCount": 5
         },
-        "note": "4 of the 5 total survey PendingActions (4 seismic + 1 core_sample) have completed by cumulative tick 124; the last seismic (targeting 15,15) is still queued, requeued at least once along the way by the surveyor's own needs interruptions -- it does eventually complete too, just past this file's own tick budget (see file description)"
+        "note": "#928: surveyCount 4 -> 5 -- the single-gauge fatigue model means the surveyor's needs interrupt work less often (see step 21's own note), so all 5 total survey PendingActions (4 seismic + 1 core_sample) have completed by cumulative tick 124, not just 4 -- direct-trace confirmed (command mode). This makes the file's later step 53 note (already pinning surveyCount:5, unaffected) true earlier than it used to be."
       }
     },
     {

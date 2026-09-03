@@ -542,38 +542,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
 
   // ── Need-threshold boundaries ───────────────────────────────────────────────
 
-  it('fires on hunger at exactly hungerRestThreshold, and NOT one point above it', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const threshold = state.sitePolicy.hungerRestThreshold;
-
-    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
-
-    const { employee: atThreshold } = hireEmployee(state.employees, 'driller', rng);
-    atThreshold.activeActionId = 301;
-    atThreshold.hunger = threshold;
-    atThreshold.fatigue = 100;
-    atThreshold.ticksWorked = 1; // nowhere near the shift boundary
-
-    processShiftCycle(state, []);
-
-    expect(atThreshold.pendingRestNeedKey).toBe('hunger');
-    expect(atThreshold.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
-
-    const { employee: aboveThreshold } = hireEmployee(state.employees, 'driller', rng);
-    aboveThreshold.activeActionId = 302;
-    aboveThreshold.hunger = threshold + 1;
-    aboveThreshold.fatigue = 100;
-    aboveThreshold.ticksWorked = 1;
-
-    processShiftCycle(state, []);
-
-    expect(aboveThreshold.pendingRestDuration).toBeNull();
-    expect(aboveThreshold.activeActionId).toBe(302);
-  });
-
-  it('fires on fatigue at or below fatigueRestThreshold when hunger is healthy', () => {
+  it('fires on fatigue at exactly fatigueRestThreshold, and NOT one point above it', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
@@ -581,16 +550,25 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
 
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.activeActionId = 400;
-    employee.hunger = 100;
-    employee.fatigue = threshold;
-    employee.ticksWorked = 1;
+    const { employee: atThreshold } = hireEmployee(state.employees, 'driller', rng);
+    atThreshold.activeActionId = 301;
+    atThreshold.fatigue = threshold;
+    atThreshold.ticksWorked = 1; // nowhere near the shift boundary
 
     processShiftCycle(state, []);
 
-    expect(employee.pendingRestNeedKey).toBe('fatigue');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(atThreshold.pendingRestNeedKey).toBe('fatigue');
+    expect(atThreshold.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+
+    const { employee: aboveThreshold } = hireEmployee(state.employees, 'driller', rng);
+    aboveThreshold.activeActionId = 302;
+    aboveThreshold.fatigue = threshold + 1;
+    aboveThreshold.ticksWorked = 1;
+
+    processShiftCycle(state, []);
+
+    expect(aboveThreshold.pendingRestDuration).toBeNull();
+    expect(aboveThreshold.activeActionId).toBe(302);
   });
 
   // ── No living_quarters at all: not gated on building presence ─────────────
@@ -693,7 +671,6 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     employee.alive = false;
     employee.activeActionId = 800;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
@@ -714,7 +691,6 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     employee.injured = true;
     employee.activeActionId = 801;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
@@ -738,18 +714,17 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.activeActionId = 900;
     employee.ticksWorked = 9999; // massive — continuous has no shift-duration boundary
-    employee.hunger = 100;
     employee.fatigue = 100;
 
     processShiftCycle(state, []);
     expect(employee.pendingRestDuration).toBeNull();
 
-    // Now cross a need threshold — this alone must fire under 'continuous'.
-    employee.hunger = state.sitePolicy.hungerRestThreshold - 1;
+    // Now cross the need threshold — this alone must fire under 'continuous'.
+    employee.fatigue = state.sitePolicy.fatigueRestThreshold - 1;
     processShiftCycle(state, []);
 
-    expect(employee.pendingRestNeedKey).toBe('hunger');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
   it("'custom' mode honours per-employee customThresholds", () => {
@@ -760,18 +735,17 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    state.sitePolicy.customThresholds[employee.id] = { hunger: 70, fatigue: 10, social: 10 };
+    state.sitePolicy.customThresholds[employee.id] = { fatigue: 70 };
     employee.activeActionId = 950;
     employee.ticksWorked = 1;
-    // Below the custom hunger threshold (70) but above the policy-level
-    // default (40) — only the per-employee override explains a fire here.
-    employee.hunger = 60;
-    employee.fatigue = 100;
+    // Below the custom fatigue threshold (70) but above the policy-level
+    // default (60) — only the per-employee override explains a fire here.
+    employee.fatigue = 65;
 
     processShiftCycle(state, []);
 
-    expect(employee.pendingRestNeedKey).toBe('hunger');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
   // ── employee_shift_change event still fires under the policy path ─────────
@@ -910,18 +884,17 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const CLAIMED_ACTION_ID = 1200;
     employee.activeActionId = CLAIMED_ACTION_ID;
-    employee.pendingRestDuration = NEED_REST_DURATIONS.hunger;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestDuration = NEED_REST_DURATIONS.fatigue;
+    employee.pendingRestNeedKey = 'fatigue';
     // Every trigger condition is also satisfied, to prove the guard — not
     // the absence of a reason to fire — is what stops a second queue.
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     processShiftCycle(state, []);
 
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
-    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.activeActionId).toBe(CLAIMED_ACTION_ID);
   });
 
@@ -937,7 +910,6 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     employee.restTicksRemaining = 5;
     employee.restNeedKey = 'fatigue'; // owned by tickGeneralRestCompletion, not this pass
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h; // would otherwise refire
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     processShiftCycle(state, []);
@@ -950,7 +922,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
   // #707: previously "never force-rests an idle employee" — an idle employee
   // (nothing claimed yet, not mid-task) has nothing for interruptActiveAction
   // to release, but that is not a reason to skip them: they still have
-  // hunger/fatigue gauges draining, and skipping them here left them to the
+  // the fatigue gauge draining, and skipping them here left them to the
   // much lower reactive NEED_WARNING_THRESHOLDS (autoInsertNeedTasks) instead
   // of this policy's own configured (higher, proactive) thresholds — a long
   // enough idle stretch (waiting for work that doesn't exist yet, e.g. a
@@ -972,7 +944,6 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.activeActionId = null;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     processShiftCycle(state, []);
@@ -1043,7 +1014,6 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     employee.activeActionId = null;
     employee.pendingDriverVehicleId = 7;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
-    employee.hunger = 1;
     employee.fatigue = 1;
 
     processShiftCycle(state, []);

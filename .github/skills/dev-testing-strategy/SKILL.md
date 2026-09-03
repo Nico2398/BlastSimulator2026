@@ -110,7 +110,7 @@ The gate has three layers, and reading it in this order is the point:
 (`main.ts`, `console.ts`) and the host-API wrappers (`SceneManager`, `PostPipeline`, `AudioHooks`,
 the IndexedDB and download backends), which a Node run can only exercise against a mock of the
 browser API rather than against our own behaviour — the `scenario` and `visual` channels are what
-prove those. Plus `core/i18n/keys.ts`, a constants table with no executable code.
+prove those. Nothing else under `src/` is exempt.
 
 **Coverage measures execution, not verification.** A test that calls a function and asserts nothing
 scores 100%. These floors catch code the suite never reaches; they say nothing about whether the

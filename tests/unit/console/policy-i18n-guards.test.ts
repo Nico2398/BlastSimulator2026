@@ -43,7 +43,7 @@ describe('policy.ts requireGame guard', () => {
 
 describe('policy.ts usage string — English literal + fr divergence', () => {
   const USAGE_EN =
-    'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [hunger:N] [fatigue:N] [social:N]';
+    'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]';
 
   it('matches the exact English literal by default when mode is missing/invalid', () => {
     const ctx = makeCtx();

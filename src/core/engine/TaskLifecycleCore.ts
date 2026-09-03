@@ -45,3 +45,26 @@ export function completePendingAction(
 
   return action ?? null;
 }
+
+/**
+ * Complete `actionId` only if it still names a 'rest' PendingAction — a
+ * no-op otherwise. Shared by RestCompletion.ts's tickGeneralRestCompletion
+ * and ShiftCycle.ts's completeRestTick (#928): a vehicle-gated action's own
+ * arrival-promotion loop (ArrivalGate.ts) can leave an employee's
+ * activeActionId naming an unrelated, still-genuinely-in-progress action by
+ * rest-completion time (ArrivalGate.ts's own stale-claim guard closes the
+ * race going forward, but a rest completion still needs to check what
+ * activeActionId names before deleting it, rather than assume it is always
+ * this rest's own action). Both call sites looked up activeActionId,
+ * checked completedAction?.type === 'rest', and only then called
+ * completePendingAction — this centralizes that lookup + check + call.
+ */
+export function completeIfOwnedRestAction(
+  state: GameState,
+  actionId: number | null,
+): PendingAction | null {
+  if (actionId === null) return null;
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (action?.type !== 'rest') return null;
+  return completePendingAction(state, actionId);
+}

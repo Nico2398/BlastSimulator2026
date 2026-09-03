@@ -14,7 +14,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach } from './RestActionHelpers.js';
 import { isMidEvacuationWalk } from './Evacuation.js';
-import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
+import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
 /**
@@ -56,6 +56,18 @@ export function forceShiftRestIfNeeded(
   // reset on rest completion) and this would requeue a duplicate rest action
   // every tick until arrival (#437).
   if (emp.pendingRestDuration !== null) return;
+  // Already walking to a claimed task, not yet arrived — mirrors the
+  // pendingRestDuration guard above for the task-travel case (#928). Exempts
+  // a genuinely stuck walk (isMoveStuck — EntityMovementTick.ts) rather than
+  // blocking unconditionally: an employee whose claimed destination has
+  // become unreachable (e.g. boxed in by a building placed after the walk
+  // was claimed) would otherwise never again be eligible for this function's
+  // own rescue-to-living-quarters path, left defenseless (no proactive rest,
+  // no evacuation reroute) against a danger zone it happens to be standing
+  // in — confirmed live via vibration-budget.json's own grid-2 safety
+  // dispatch, whose target tile was later claimed by a living_quarters
+  // build order.
+  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
@@ -112,9 +124,9 @@ export function forceShiftRestIfNeeded(
  * this function returned early on idle, on the reasoning that "an idle
  * employee has nothing to interrupt and is handled by the other
  * need-restoration paths instead" — but those other paths
- * (autoInsertNeedTasks) fire at the much lower reactive NEED_WARNING_THRESHOLDS
- * (35/25/30), not this policy's own configured (and player-chosen, typically
- * higher) hungerRestThreshold/fatigueRestThreshold. An idle employee — one
+ * (autoInsertNeedTasks) fire at the much lower reactive
+ * NEED_WARNING_THRESHOLDS.fatigue (25), not this policy's own configured (and
+ * player-chosen, typically higher) fatigueRestThreshold. An idle employee — one
  * with no active task to interrupt because none exists yet, not one who
  * chose to slack off — drained on the low reactive threshold instead of the
  * policy's proactive one, so a long enough idle stretch (no work queued for
@@ -127,17 +139,14 @@ export function forceShiftRestIfNeeded(
  * (shift_8h/shift_12h — moot for a genuinely idle employee, since
  * incrementWorkTick only advances ticksWorked while activeActionId !== null,
  * so an idle employee's ticksWorked is whatever it was when they last went
- * idle, not accruing further), or hunger/fatigue at or below its effective
+ * idle, not accruing further), or fatigue at or below its effective
  * threshold (custom-mode per-employee overrides via getEffectiveThresholds)
  * for every mode including continuous/custom.
  *
- * Unlike the legacy function (fatigue-only, fixed SHIFT_SLEEP_DURATION_TICKS,
- * tier>=2 only), this routes to the nearest living_quarters of ANY tier
- * (findNearestLivingQuarters is already tier-unfiltered), replenishes
- * whichever need actually tripped the threshold (hunger if
- * emp.hunger <= thresholds.hunger, else fatigue — covers both a
- * fatigue-threshold trip and a shift-duration trip, matching the legacy
- * function's fatigue-only shift rest), and sets pendingRestNeedKey so
+ * Unlike the legacy function (fixed SHIFT_SLEEP_DURATION_TICKS, tier>=2
+ * only), this routes to the nearest living_quarters of ANY tier
+ * (findNearestLivingQuarters is already tier-unfiltered), and sets
+ * pendingRestNeedKey so
  * completion routes through the general tickGeneralRestCompletion /
  * completeRestForEmployee path (NEED_REST_DURATIONS-based duration,
  * BUILDING_REPLENISH_RATES-based replenishment, NEED_REST_NO_BUILDING_CAP
@@ -154,6 +163,11 @@ export function forceShiftRestIfNeededByPolicy(
   // Already walking to a queued rest — see forceShiftRestIfNeeded's own
   // comment on the same check (#437).
   if (emp.pendingRestDuration !== null) return;
+  // Already walking to a claimed task, not yet arrived — mirrors the
+  // pendingRestDuration guard above for the task-travel case (#928), and
+  // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
+  // (see its own comment on the same check) for the same reason.
+  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;
@@ -165,7 +179,7 @@ export function forceShiftRestIfNeededByPolicy(
   if (isMidEvacuationWalk(emp)) return;
 
   const snapshot = {
-    id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, breakNeed: emp.breakNeed, ticksWorked: emp.ticksWorked,
+    id: emp.id, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked,
   };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
@@ -189,27 +203,10 @@ export function forceShiftRestIfNeededByPolicy(
   const priorActionId = emp.activeActionId;
   interruptActiveAction(state, emp, priorActionId);
 
-  const thresholds = getEffectiveThresholds(state.sitePolicy, emp.id);
-  // Pick whichever gauge is more overdue relative to its OWN threshold, not
-  // always fatigue (#678 follow-up). A flat hunger-first check always resolved
-  // to 'fatigue' for the common shift-duration-triggered rest (fatigue's 2/tick
-  // working drain reliably crosses its threshold first), leaving hunger
-  // unaddressed across multiple shift cycles. Comparing each gauge's distance
-  // below its own threshold — and picking the smaller (more negative / more
-  // overdue) — works uniformly whether the rest was need-triggered (one gauge
-  // already <= its threshold) or shift-duration-triggered (neither has
-  // crossed yet): either way the gauge relatively furthest past due gets
-  // serviced. Extended to breakNeed (#867, chained rather than a flat 3-way
-  // min so the pre-existing hunger-vs-fatigue precedence — fatigue wins ties —
-  // is preserved exactly; breakNeed only displaces the hunger/fatigue winner
-  // on a STRICTLY greater deficit, same "only strictly-worse wins" rule the
-  // original two-way comparison already used).
-  const hungerDeficit = emp.hunger - thresholds.hunger;
-  const fatigueDeficit = emp.fatigue - thresholds.fatigue;
-  const breakNeedDeficit = emp.breakNeed - thresholds.social;
-  let needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
-  const needDeficit = needKey === 'hunger' ? hungerDeficit : fatigueDeficit;
-  if (breakNeedDeficit < needDeficit) needKey = 'breakNeed';
+  // Single gauge now (#928) — fatigue is the only need this policy ever
+  // routes a rest for, whether the rest was need-triggered or shift-
+  // duration-triggered.
+  const needKey: NeedKey = 'fatigue';
 
   // Find nearest living_quarters of any tier for target coordinates.
   const building = findNearestLivingQuarters(state, emp.x, emp.z);

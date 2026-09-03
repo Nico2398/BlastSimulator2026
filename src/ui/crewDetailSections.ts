@@ -112,9 +112,7 @@ export function makeNeedsSection(e: Employee): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px' } });
   wrap.appendChild(microLabel(t('ui.crew.needs')));
   const rows: Array<[string, number, { low: number; critical: number }]> = [
-    [t('ui.crew.need_hunger'), e.hunger, NEED_THRESHOLDS.hunger],
     [t('ui.crew.need_fatigue'), e.fatigue, NEED_THRESHOLDS.fatigue],
-    [t('ui.crew.need_break'), e.breakNeed, NEED_THRESHOLDS.breakNeed],
   ];
   for (const [label, value, thresholds] of rows) {
     const row = gauge(label, value, bandColor(value, thresholds.critical, thresholds.low), { thresholdPct: thresholds.low, labelWidth: 52 });

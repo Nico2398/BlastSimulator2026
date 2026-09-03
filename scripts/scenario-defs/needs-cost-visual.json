@@ -1,6 +1,6 @@
 {
   "name": "needs-cost-visual",
-  "description": "Visual check of need costs: after draining gauges and building living_quarters, advance ticks to trigger rest visits; verify finances output shows cash deductions for rest costs (hunger rest costs $50, break need rest costs $20, fatigue rest is free) and cash decreases accordingly",
+  "description": "Visual check of need costs (#928 — fatigue is the sole gauge, and it has always cost $0 per rest, NEED_REST_COSTS.fatigue): after draining fatigue and building living_quarters, advance ticks to trigger rest visits; verify the finances panel/output NEVER shows a 'needs'-category expense line despite the rest visits happening — cash still decreases from ordinary payroll and building upkeep, but never from a rest itself. See RestActionHelpers.test.ts's own deductRestCost unit coverage for the exact zero-cost/no-transaction assertions this scenario's screenshots visually confirm.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -181,7 +181,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "by 170 total ticks, minFatigue has dropped low enough that rest visits begin — finances shows a real 'needs' expense category (Rest: hunger, $50 each) confirming this file's own claimed premise"
+        "note": "by 170 total ticks, minFatigue has dropped low enough that rest visits begin -- cash still decreases here (payroll + building upkeep), but the finances output must show NO 'needs'-category expense line: NEED_REST_COSTS.fatigue is $0, so a fatigue rest visit costs nothing (#928 — unlike the removed hunger/breakNeed gauges, which used to cost $50/$20 respectively)"
       }
     },
     {

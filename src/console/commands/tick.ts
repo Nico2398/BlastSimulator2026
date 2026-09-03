@@ -238,6 +238,10 @@ export function tickCommand(
       const emp = state.employees.employees.find(e => e.id === empId);
       lines.push(`[tick ${state.tickCount}] STUCK: ${emp?.name ?? `employee #${empId}`} can't find a path — waiting.`);
     }
+    for (const abandoned of movementResult.abandoned) {
+      const emp = state.employees.employees.find(e => e.id === abandoned.employeeId);
+      lines.push(`[tick ${state.tickCount}] ACTION ABANDONED: ${emp?.name ?? `employee #${abandoned.employeeId}`} released a stuck claim back to the pool.`);
+    }
 
     // 8h. Arrival gate — must run after employee/vehicle movement above:
     // promotes rest/task/vehicle-boarding intents queued this tick or a prior

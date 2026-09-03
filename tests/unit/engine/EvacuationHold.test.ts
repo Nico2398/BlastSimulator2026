@@ -161,7 +161,7 @@ describe('discardStaleRestAction', () => {
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
     employee.pendingRestDuration = 4;
-    employee.pendingRestNeedKey = 'hunger';
+    employee.pendingRestNeedKey = 'fatigue';
     const action = makeAction({
       id: 1, type: 'rest', targetEmployeeId: employee.id, holderId: employee.id, status: 'assigned',
     });

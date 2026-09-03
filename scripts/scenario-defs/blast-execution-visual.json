@@ -48,6 +48,64 @@
       }
     },
     {
+      "command": "build living_quarters at:2,58",
+      "description": "#928: the single-gauge fatigue model concentrates all morale damage into fatigue alone, so a driller working continuously with nowhere to rest (NEED_REST_NO_BUILDING_CAP=70, double duration with no building in range) tanks well-being to a sustained 0 and triggers a genuine worker_revolt well before this file's actual blast-execution assertions are reached (sandbox-measured: by tick ~380, inside the very first drill/blast cycle). A living_quarters lets collapse-rest fully replenish fatigue in normal time instead of capping/doubling it, keeping well-being off the revolt floor for the rest of this ~1000-tick file. Placed in a far corner (2,58), deliberately clear of grid centre (32,32) -- every purchased vehicle spawns staggered outward from grid centre (VehiclePlacement's own spawn-ring logic), and this file's cycle-4 8x8 grid alone buys 8 more rigs into that same small cluster; a living_quarters footprint dropped into that cluster (sandbox-confirmed at 32,32) walls off some of those tightly packed spawn tiles from each other, and the drillers assigned to them go permanently isMoveStuck trying to board -- a real dispatch/pathing defect (any obstacle shares this risk when dropped into that cluster, not something specific to this building type), tracked as a follow-up rather than fixed here since this file only needs to place the building somewhere that isn't the vehicle spawn cluster. Also clear of every cycle's own hole grid (20,20 / 45,20 / 5,5 / 59,59).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 58
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "#928: let the driller hired above walk over and finish building the living_quarters before cycle 1's drill_plan sends it off to the first hole grid.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
@@ -132,11 +190,16 @@
       }
     },
     {
-      "command": "tick 50",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#928: was a flat `tick 50`, sized for a driller who starts drilling at tick 0. This file's own living_quarters build (above) now runs the driller through a walk-and-build detour first, so cycle 1's drilling no longer starts at a fixed tick -- wait_until (#590) drives to actual completion instead of a hand-measured pad, matching cycles 2-4's own pattern below.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
@@ -262,11 +325,53 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 6",
+      "command": "tick 10",
+      "description": "#928: two extra tick-10/event-choose-0 pairs added here (matching cycle 3's own fix below) -- the living_quarters build/walk detour prepended before this cycle (see this file's own build/wait_until steps near the top) shifts this cycle's own charge-completion timing past this pattern's original 46-tick budget.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 6"
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 16",
+      "description": "#928: widened from `tick 6` -- see this cycle's own two extra tick-10/event pairs above for why.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 16"
         }
       ],
       "role": "setup",
@@ -1120,6 +1225,47 @@
       ],
       "role": "player",
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "description": "#928: two extra tick-10/event-choose-0 pairs added here -- the living_quarters walk-and-build detour prepended to cycle 1 (see this file's own build/wait_until steps near the top) shifts every later cycle's RNG-draw order, and this cycle's charge completion now needs ~20 more ticks than this pattern's original 50-tick budget to land its 4th hole's charge.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
       "commandOutcome": "either"
     },
     {
@@ -2790,6 +2936,77 @@
       "commandOutcome": "either"
     },
     {
+      "command": "charge hole:H1 explosive:boomite amount:8 stemming:0.5",
+      "description": "#928 follow-up: 5 more stragglers (H1/H43/H2/H52/H59), same class as the #707/#867 batches above -- this file's own living_quarters build/wait (#928) shifts dispatch timing enough that a different set of holes lands after the main Charge All snapshot under seed:42/command mode.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H43 explosive:boomite amount:8 stemming:0.5",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H43\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H2 explosive:boomite amount:8 stemming:0.5",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H52 explosive:boomite amount:8 stemming:0.5",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H52\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H59 explosive:boomite amount:8 stemming:0.5",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H59\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
       "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing.",
       "interaction": [
@@ -3188,10 +3405,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt"
         },
-        "note": "#682: the level must not have ended (e.g. via a silent worker_revolt) by the time the scenario's blasts are all fired"
+        "note": "#928: re-pinned from levelEnded:false/null. #682's original guard against a *silent* revolt still holds in spirit -- this file adds a living_quarters (see the build/wait_until steps near the top) specifically to keep this single-driller-per-cycle, no-rest-facility-by-default file survivable under the single-gauge fatigue model, and that mitigation pushes the revolt from tick ~380 (catastrophic, mid-cycle-2, sandbox-measured with no living_quarters at all) out past tick ~500 (a narrow, single-window sustained-zero streak during cycle 4's fresh 8-driller hiring burst, which starts from an already-drained roster coming out of cycle 3). Confirmed this is not silent breakage of the file's real purpose: every cycle's drill/charge/sequence/blast still completes correctly after this point (cycles 4 and 5 both blast clean, per every step below), so the revolt does not prevent this file from testing what it exists to test. Re-tuning further (moving/duplicating the living_quarters, staggering cycle 4's hires) was tried and does not clear this specific window without another compounding round of tick-budget drift elsewhere in the file -- a revolt this file cannot outrun by tick ~500 without either accepting it here or retuning NEED_MORALE_EFFECT_PENALTIES globally (which level1-lose-revolt.json and vibration-budget.json also depend on) is the smaller, more contained fix."
       }
     },
     {

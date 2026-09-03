@@ -11,7 +11,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     qualifications: [],
     trainingState: null,
     activeActionId: null,
-    hunger: 100, fatigue: 100, breakNeed: 100,
+    fatigue: 100,
     collapsing: false,
     interruptedActionPayload: null,
     ticksWorked: 0,

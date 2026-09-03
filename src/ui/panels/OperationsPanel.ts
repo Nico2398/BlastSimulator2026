@@ -43,7 +43,6 @@ const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
 export class OperationsPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly shiftButtons: Record<ShiftMode, HTMLButtonElement>;
-  private readonly hungerInput: HTMLInputElement;
   private readonly fatigueInput: HTMLInputElement;
   private readonly policyStatusEl: HTMLElement;
   private readonly policyCard: HTMLElement;
@@ -82,7 +81,6 @@ export class OperationsPanel extends PanelBase {
       shiftRow.appendChild(btn);
     }
 
-    this.hungerInput = this.makeThresholdInput('bs-policy-hunger');
     this.fatigueInput = this.makeThresholdInput('bs-policy-fatigue');
     const applyBtn = el('button', { className: 'bsx-btn bsx-btn-primary', attrs: { id: 'bs-policy-apply' } });
     applyBtn.style.cssText = 'width:100%;height:32px;margin-top:2px';
@@ -94,7 +92,6 @@ export class OperationsPanel extends PanelBase {
     const thresholdRow = el('div');
     thresholdRow.style.cssText = 'display:flex;gap:8px';
     thresholdRow.append(
-      this.makeThresholdCol('ui.policy.hunger', this.hungerInput),
       this.makeThresholdCol('ui.policy.fatigue', this.fatigueInput),
     );
 
@@ -119,7 +116,6 @@ export class OperationsPanel extends PanelBase {
   update(state: GameState): void {
     if (!this.policyDirty) {
       this.setActiveShift(state.sitePolicy.shiftMode);
-      this.hungerInput.value = String(state.sitePolicy.hungerRestThreshold);
       this.fatigueInput.value = String(state.sitePolicy.fatigueRestThreshold);
     }
 
@@ -392,7 +388,7 @@ export class OperationsPanel extends PanelBase {
   private applyPolicy(): void {
     const result = this.gameConsole?.(
       `set_policy mode:${this.activeShift}` +
-      ` hunger:${this.hungerInput.value} fatigue:${this.fatigueInput.value}`,
+      ` fatigue:${this.fatigueInput.value}`,
     );
     this.policyDirty = false;
     this.policyStatusEl.textContent = result?.success ? t('ui.policy.applied') : (result?.output ?? '');

@@ -5,9 +5,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
+import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import type { Employee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { purchaseVehicle, type VehicleTask } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
@@ -17,6 +19,7 @@ import {
   STUCK_THRESHOLD,
   STUCK_MORALE_PENALTY,
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+  MOVE_STUCK_ABANDON_TICKS,
 } from '../../../src/core/config/balance.js';
 
 const VEHICLE_TICK_SEED = 42;
@@ -780,7 +783,7 @@ describe('tickEmployeeMovement', () => {
     expect(employee.z).toBe(7);
     expect(employee.destinationX).toBeNull();
     expect(employee.destinationZ).toBeNull();
-    expect(result).toEqual({ moved: [], arrived: [], stuck: [] });
+    expect(result).toEqual({ moved: [], arrived: [], stuck: [], abandoned: [] });
   });
 
   it('falls back to a direct line toward the destination when no NavGrid has been built yet, without crashing', () => {
@@ -857,5 +860,253 @@ describe('tickEmployeeMovement', () => {
     expect(employee.x).toBe(0); // never moved — no path ever resolved
     expect(employee.z).toBe(0);
     expect(employee.morale).toBe(60 - STUCK_MORALE_PENALTY);
+  });
+});
+
+// ── tickEmployeeMovement — sustained-stuck action abandonment (#938) ────────
+// Before this fix, an employee whose claimed destination became permanently
+// unreachable (e.g. a building placed after the walk was claimed walls it
+// off in the NavGrid) got isMoveStuck pinned true forever, with
+// moveConsecutiveFailures growing unboundedly — no rescue, no re-route, and
+// the PendingAction/vehicle reservation the employee held was never released
+// back to the pool for another employee to pick up. It just sat there
+// accruing STUCK_MORALE_PENALTY forever. tickEmployeeMovement now abandons
+// the claim once moveConsecutiveFailures reaches MOVE_STUCK_ABANDON_TICKS,
+// via TaskCancellation.interruptActiveAction, reporting the release on
+// result.abandoned and emitting 'agent:action_abandoned'.
+
+describe('tickEmployeeMovement — sustained-stuck action abandonment (#938)', () => {
+  const SEED = 42;
+
+  /** Solid rock voxel — same fixture shape as the STUCK_THRESHOLD suite above. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /**
+   * A fully walkable 5×5 plane with exactly ONE column, (3,3), deliberately
+   * left void — the "building placed after the walk was claimed walls it
+   * off" shape from the bug report, rather than the STUCK_THRESHOLD suite's
+   * single-walkable-column fixture (which makes the destination unreachable
+   * for a reason unrelated to what this fix targets: there, nowhere near the
+   * destination is walkable at all).
+   */
+  function buildWalledOffDestinationState(): { state: GameState; vg: VoxelGrid } {
+    const state = createGame({ seed: SEED });
+    const vg = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        if (x === 3 && z === 3) continue; // destination column stays void — walled off
+        vg.setVoxel(x, 0, z, solidVoxel());
+        vg.setVoxel(x, 1, z, solidVoxel());
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return { state, vg };
+  }
+
+  /** Reopens the (3,3) destination column on an already-built grid (mutate + rebuild). */
+  function reopenDestinationColumn(state: GameState, vg: VoxelGrid): void {
+    vg.setVoxel(3, 0, 3, solidVoxel());
+    vg.setVoxel(3, 1, 3, solidVoxel());
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+  }
+
+  /** Minimal PendingAction fixture — mirrors TaskCancellation.test.ts's own makeAction helper. */
+  function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 3, targetZ: 3, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'assigned',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  /**
+   * Puts `employee` mid-walk toward the walled-off (3,3) destination, holding
+   * `actionId` (status 'assigned', holderId === employee.id) the way
+   * promoteActionToActive would — pendingTaskDuration set, taskTicksRemaining
+   * still null (still walking, never arrived). Pushes the PendingAction onto
+   * state.pendingActions and returns it.
+   */
+  function primeStuckEmployeeWithAction(state: GameState, employee: Employee, actionId: number): PendingAction {
+    const action = makeAction({ id: actionId, holderId: employee.id });
+    state.pendingActions.push(action);
+    employee.x = 0;
+    employee.z = 0;
+    employee.destinationX = 3;
+    employee.destinationZ = 3;
+    employee.activeActionId = actionId;
+    employee.pendingTaskDuration = 5;
+    return action;
+  }
+
+  it(`stays isMoveStuck without releasing anything through ${MOVE_STUCK_ABANDON_TICKS - 1} consecutive failing ticks`, () => {
+    const { state } = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    primeStuckEmployeeWithAction(state, employee, 501);
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ employeeId: number; actionId: number | null }> = [];
+    emitter.on('agent:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS - 1; i++) {
+      const result = tickEmployeeMovement(state, emitter);
+      expect(result.abandoned).toEqual([]);
+    }
+
+    expect(employee.isMoveStuck).toBe(true);
+    expect(employee.moveConsecutiveFailures).toBe(MOVE_STUCK_ABANDON_TICKS - 1);
+    expect(employee.destinationX).toBe(3);
+    expect(employee.destinationZ).toBe(3);
+    expect(employee.activeActionId).toBe(501);
+    expect(abandonedEvents).toEqual([]);
+
+    const action = state.pendingActions.find(a => a.id === 501)!;
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(employee.id);
+  });
+
+  it(`releases the held action back to the pool on the tick moveConsecutiveFailures reaches MOVE_STUCK_ABANDON_TICKS (${MOVE_STUCK_ABANDON_TICKS})`, () => {
+    const { state } = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    primeStuckEmployeeWithAction(state, employee, 502);
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ employeeId: number; actionId: number | null }> = [];
+    emitter.on('agent:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    let result;
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      result = tickEmployeeMovement(state, emitter);
+    }
+
+    expect(result!.abandoned).toEqual([{ employeeId: employee.id, actionId: 502 }]);
+    expect(abandonedEvents).toEqual([{ employeeId: employee.id, actionId: 502 }]);
+
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.moveConsecutiveFailures).toBe(0);
+    expect(employee.isMoveStuck).toBe(false);
+    expect(employee.pendingTaskDuration).toBeNull();
+    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+
+    const action = state.pendingActions.find(a => a.id === 502)!;
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+  });
+
+  it('clears a vehicle reservation tied to the abandoned action (proves interruptActiveAction ran the full release, not a partial field clear)', () => {
+    const { state } = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    primeStuckEmployeeWithAction(state, employee, 503);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 9, 9);
+    vehicle.reservedForActionId = 503;
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickEmployeeMovement(state);
+    }
+
+    expect(vehicle.reservedForActionId).toBeNull();
+  });
+
+  it('reports actionId: null and clears pendingDriverVehicleId for a manual-boarding stuck walk with no PendingAction', () => {
+    const { state } = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.destinationX = 3;
+    employee.destinationZ = 3;
+    employee.activeActionId = null;
+    employee.pendingDriverVehicleId = 77;
+
+    let result;
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      result = tickEmployeeMovement(state);
+    }
+
+    expect(result!.abandoned).toEqual([{ employeeId: employee.id, actionId: null }]);
+    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+  });
+
+  it('never releases an employee whose destination becomes reachable again strictly before the threshold — resumes walking normally', () => {
+    const { state, vg } = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const action = primeStuckEmployeeWithAction(state, employee, 504);
+
+    for (let i = 0; i < 5; i++) {
+      const result = tickEmployeeMovement(state);
+      expect(result.abandoned).toEqual([]);
+    }
+    expect(employee.isMoveStuck).toBe(true); // sanity: fixture genuinely stuck before the reopen
+
+    reopenDestinationColumn(state, vg);
+
+    for (let i = 5; i < MOVE_STUCK_ABANDON_TICKS + 5; i++) {
+      const result = tickEmployeeMovement(state);
+      expect(result.abandoned).toEqual([]);
+    }
+
+    // Resumed walking normally: arrived, destination cleared, action never
+    // touched by the abandonment path.
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.x).toBe(3);
+    expect(employee.z).toBe(3);
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(employee.id);
+  });
+
+  it('releases two independently stuck employees on the same crossing tick, each their own action, with no cross-employee interference', () => {
+    const { state } = buildWalledOffDestinationState();
+    const rngA = new Random(SEED);
+    const { employee: empA } = hireEmployee(state.employees, 'driller', rngA);
+    const rngB = new Random(SEED + 1);
+    const { employee: empB } = hireEmployee(state.employees, 'surveyor', rngB);
+
+    primeStuckEmployeeWithAction(state, empA, 601);
+
+    empB.x = 0;
+    empB.z = 0;
+    empB.destinationX = 3;
+    empB.destinationZ = 3;
+    const actionB = makeAction({ id: 602, holderId: empB.id });
+    state.pendingActions.push(actionB);
+    empB.activeActionId = 602;
+    empB.pendingTaskDuration = 7;
+
+    let result;
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      result = tickEmployeeMovement(state);
+    }
+
+    expect(result!.abandoned).toHaveLength(2);
+    expect(result!.abandoned).toEqual(expect.arrayContaining([
+      { employeeId: empA.id, actionId: 601 },
+      { employeeId: empB.id, actionId: 602 },
+    ]));
+
+    expect(empA.activeActionId).toBeNull();
+    expect(empB.activeActionId).toBeNull();
+
+    const actionA = state.pendingActions.find(a => a.id === 601)!;
+    expect(actionA.status).toBe('queued');
+    expect(actionA.holderId).toBeNull();
+    expect(actionB.status).toBe('queued');
+    expect(actionB.holderId).toBeNull();
   });
 });
