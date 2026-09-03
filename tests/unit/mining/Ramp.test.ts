@@ -712,7 +712,7 @@ describe('carveRampSegmentSlice (#946)', () => {
     const handler = vi.fn();
     emitter.on('terrain:updated', handler);
 
-    carveRampSegmentSlice(grid, cells, 0, 3);
+    carveRampSegmentSlice(grid, cells, 0, 3, emitter);
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
