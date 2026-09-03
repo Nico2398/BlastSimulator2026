@@ -31,6 +31,7 @@ export interface GameEventMap {
 
   // Phase 9 — Navmesh path-following
   'agent:stuck': { employeeId: number };
+  'agent:action_abandoned': { employeeId: number; actionId: number | null };
   'vehicle:stuck': { vehicleId: number };
 
   // Arrival-gated vehicle actions

@@ -10,12 +10,24 @@
 // economy/FragmentTaskLifecycle.js (startVehicleGatedFragmentWork, shared
 // with ArrivalGate.ts's resolveBoarding), which does not import anything
 // from engine/ that could cycle back here.
-// Deliberately does NOT import TaskDispatch.ts — TaskDispatch.ts imports
-// releaseVehicleReservation from here, so calling into it back would be a
-// cycle. Where reconciliation needs to interrupt an active action (case (c)
-// below), it reports the need to its caller instead of performing the
-// interruption itself — see reconcileVehicleReservations's return type and
-// ArrivalGate.ts, the sole caller, which already imports both modules safely.
+// Deliberately does NOT import TaskDispatch.ts directly — TaskDispatch.ts's
+// own module re-exports from TaskCancellation.ts, which imports
+// releaseVehicleReservation from here, so calling into TaskDispatch.ts
+// directly would double back immediately. Where reconciliation needs to
+// interrupt an active action (case (c) below), it reports the need to its
+// caller instead of performing the interruption itself — see
+// reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
+// caller, which already imports both modules safely.
+// A cycle nonetheless exists through EntityMovementTick.js, which this module
+// already imports one-way: EntityMovementTick.ts itself imports
+// interruptActiveAction from TaskDispatch.ts (#938, for its sustained-stuck
+// abandonment path), closing VehicleReservation -> EntityMovementTick ->
+// TaskDispatch -> TaskCancellation -> VehicleReservation. Safe for the same
+// reason the pre-existing EntityMovementTick.ts <-> VehicleOccupancyReroute.ts
+// cycle is safe: every import here is a function declaration, called only
+// from inside other function bodies, never evaluated at module-load time —
+// ESM resolves the cycle fine as long as nothing at the top level reads a
+// not-yet-initialized binding.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
