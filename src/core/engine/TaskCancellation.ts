@@ -48,6 +48,9 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
 
   if (action.holderId !== null) {
     const holder = state.employees.employees.find(emp => emp.id === action.holderId);
+    // #939: cancelAction must not clear a different, currently-active
+    // action's bookkeeping when cancelling a queued-ahead reservation — see
+    // holder.activeActionId check below (upcoming fix point).
     if (holder) clearHolderWalkFields(holder);
   }
 
