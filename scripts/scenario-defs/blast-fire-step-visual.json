@@ -207,23 +207,21 @@
       }
     },
     {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:200",
+      "command": "tick 20",
       "timeout": 90,
-      "description": "#557: drain the real walkout Sound the Horn just ordered -- both the driller and the drill_rig have to genuinely arrive outside the padded zone before dangerZoneClear reports true.",
+      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- the driller (employee #1) auto-dismounts drill_rig #1 the instant its drilling task finishes, so the rig is undriven by the time Sound the Horn fires, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with the rig permanently stranded on H1, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix). The driller (employee #1) still walks out for real across this pad; only the driverless rig stays behind.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 200,
-          "timeoutMs": 90000
+          "type": "command",
+          "command": "tick 20"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "dangerZoneClear": true
-        }
+          "dangerZoneClear": false
+        },
+        "note": "#947: dangerZoneClear reads false, not true -- the stranded driverless drill_rig keeps the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. FIRE/DETONATE stay usable regardless (already asserted usable before Sound the Horn was even clicked, above), so an uncleared zone is not load-bearing for the rest of this file."
       }
     },
     {

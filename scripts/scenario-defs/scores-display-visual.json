@@ -430,24 +430,78 @@
       }
     },
     {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "command": "tick 100",
       "timeout": 180,
-      "description": "#557: drain the real walkout Sound the Horn just ordered before firing.",
+      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- both drillers (#1, #2) auto-dismount their drill_rigs (#1, #2) the instant each drilling task finishes, so both rigs are undriven by the time Sound the Horn fires here, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with both rigs permanently stranded on their holes, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix), split into tick/event pairs since command mode's own tick loop refuses to advance past a pending event. Both drillers (employees, not gated by #947) still walk out for real across this pad; only the driverless rigs stay behind.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 300,
-          "timeoutMs": 180000
+          "type": "command",
+          "command": "tick 100"
+        },
+        {
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ],
+      "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ],
+      "role": "setup",
+      "commandOutcome": "either",
       "expect": {
         "equals": {
-          "dangerZoneClear": true
-        }
+          "dangerZoneClear": false
+        },
+        "note": "#947: dangerZoneClear reads false, not true -- both stranded driverless drill_rigs keep the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. The blast step's own `deathCount: 0` proof downstream (via decreased ecology/nuisance and continuing cash/wage accrual) is what actually shows the two drillers evacuated for real."
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "blast",
