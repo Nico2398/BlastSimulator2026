@@ -207,6 +207,39 @@ describe('vehicle.ts — move refuses a driverless vehicle', () => {
   });
 });
 
+// ── assign task:moving refuses a driverless vehicle (#947) ─────────────────
+
+describe('vehicle.ts — assign task:moving refuses a driverless vehicle', () => {
+  it('resolves to the exact English literal and does not stage the moving task', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    expect(vehicle.driverId).toBeNull();
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+    expect(vehicle.task).not.toBe('moving');
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+  });
+
+  it('regression: assign task:moving succeeds and stages the task when a driver is aboard', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    vehicle.driverId = 42; // bypass boarding — only driverId matters here (same pattern as move's #947 tests)
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} assigned to moving.`);
+    expect(vehicle.task).toBe('moving');
+  });
+});
+
 // ── buy_success ───────────────────────────────────────────────────────────
 
 describe('vehicle.ts — buy success message', () => {
