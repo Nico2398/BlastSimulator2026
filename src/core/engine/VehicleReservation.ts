@@ -45,6 +45,41 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
 }
 
 /**
+ * True when `employee` currently holds an active, vehicle-gated PendingAction
+ * and is themself the boarded driver of the vehicle reserved for it — whether
+ * still driving toward the target (taskTicksRemaining not yet seeded by
+ * ArrivalGate) or already arrived and mid-execution (taskTicksRemaining set).
+ * Callers combine this with whichever of those two phases they mean to
+ * protect — e.g. ForceShiftRest.ts's forceShiftRestIfNeededByPolicy also
+ * requires `taskTicksRemaining !== null` (mid-execution only; see its own
+ * inline comment for why the mid-drive phase is deliberately left
+ * interruptible).
+ *
+ * Interrupting a boarded, vehicle-gated action forces a full dismount and,
+ * later, a fresh walk-and-reboard of that exact vehicle — the real cost
+ * #945's tutorial box-cut repro measured (a rock-digger driver dismounted/
+ * re-boarded 3+ times over one ramp order). An on-foot (non-vehicle-gated)
+ * task has no such cost — interrupting it only discards in-progress ticks,
+ * which is why this check is scoped to `requiredVehicleRole !== null` rather
+ * than any in-progress task: using this (instead of a blanket
+ * taskTicksRemaining !== null guard, regardless of action type) specifically
+ * keeps a long-running on-foot task interruptible — a blanket guard let a
+ * generic multi-tick `employee dispatch` task defer a policy-forced rest for
+ * its whole duration, letting fatigue swing far past the policy's own
+ * threshold every work cycle and crash morale over a long run (needs.
+ * integration.test.ts's own long-run wellBeing acceptance case, #945
+ * follow-up regression).
+ */
+export function isMidVehicleGatedWork(state: GameState, employee: Employee): boolean {
+  if (employee.activeActionId === null) return false;
+  const action = state.pendingActions.find(a => a.id === employee.activeActionId);
+  if (!action || action.requiredVehicleRole === null) return false;
+  return state.vehicles.vehicles.some(
+    v => v.reservedForActionId === action.id && v.driverId === employee.id,
+  );
+}
+
+/**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
  * (reservedForActionId === null), not `broken`, and either undriven
  * (driverId === null) or already driven by `employee` themself (the

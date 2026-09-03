@@ -537,4 +537,92 @@ describe('autoInsertNeedTasks (7.7)', () => {
     expect(result.inserted).toHaveLength(0);
     expect(state.pendingActions.filter((a: PendingAction) => a.type === 'rest')).toHaveLength(0);
   });
+
+  // ── #945: mid-task-execution guard ───────────────────────────────────────
+  // An employee already arrived and mid-execution of a claimed task (e.g.
+  // mid dig_ramp_segment) is marked by taskTicksRemaining !== null — distinct
+  // from pendingTaskDuration !== null, which only covers the WALK to a
+  // claimed job, not the work itself. Before #945, autoInsertNeedTasks
+  // ignored taskTicksRemaining entirely and queued a proactive rest anyway;
+  // the very next dispatch pass claims that queued rest and yanks the
+  // employee (and, for a vehicle-gated task, its driver) off mid-task —
+  // exactly the repeated dismount/reboard cycle the tutorial box-cut repro
+  // (#945) hits on its rock-digger driver.
+
+  // ── Test 21 ─────────────────────────────────────────────────────────────────
+  it('#945: skips an employee mid-execution of a claimed task (taskTicksRemaining !== null) — no rest queued even with fatigue below threshold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 20; // below the warning threshold (25)
+    employee.activeActionId = 42;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of the claimed task
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(state.pendingActions.filter((a: PendingAction) => a.type === 'rest')).toHaveLength(0);
+    // The in-progress task itself must be untouched.
+    expect(employee.taskTicksRemaining).toBe(4);
+    expect(employee.activeActionId).toBe(42);
+  });
+
+  // ── Test 22 ─────────────────────────────────────────────────────────────────
+  // Additive, not regressive: an employee mid-WALK to a claimed job
+  // (pendingTaskDuration !== null, taskTicksRemaining still null — not yet
+  // arrived) is queued exactly as before #945; only mid-execution is new.
+  it('#945: still queues a rest for an employee mid-walk to a claimed job (pendingTaskDuration set, taskTicksRemaining still null) — additive, not regressive', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 20; // below the warning threshold
+    employee.activeActionId = 42;
+    employee.pendingTaskDuration = 6; // walking to the claimed job, not yet arrived
+    employee.taskTicksRemaining = null;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(employee.id);
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
+  // ── Test 23 ─────────────────────────────────────────────────────────────────
+  it('#945: once taskTicksRemaining returns to null (task complete) and fatigue is still below threshold, rest is inserted normally', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 20; // still below the warning threshold
+    employee.activeActionId = null; // task completed, employee released back to idle
+    employee.taskTicksRemaining = null;
+    employee.pendingTaskDuration = null;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(employee.id);
+    expect(result.inserted[0]!.needKey).toBe('fatigue');
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
 });

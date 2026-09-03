@@ -829,3 +829,111 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
     expect(interruptedWhileTravelingToClaim).toBe(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #945 — same tutorial box-cut repro as the #928 suite above, but proving the
+// tighter, additive fix: #928 only stopped a proactive rest from preempting
+// an employee mid-WALK to a claimed job (pendingTaskDuration !== null). It
+// left a gap for an employee already arrived and mid-EXECUTION of that job
+// (taskTicksRemaining !== null, e.g. mid dig_ramp_segment) — still
+// preemptable once WORK_DURATION_TICKS/the site policy's threshold was
+// crossed. On the box-cut ramp order, that gap repeatedly knocks the
+// rock-digger driver off its vehicle mid-segment, forcing it to dismount,
+// walk to rest, and re-board over and over.
+//
+// This test drives the identical order sequence used above and counts
+// 'vehicle:driver_boarded' events (ArrivalGate.ts) against the rock_digger
+// vehicle specifically, rather than a fixed employee id: the bug is a
+// per-vehicle dismount/reboard cycle, and gating on vehicleId (stable for
+// the whole run) is robust to a different qualified driver picking up the
+// same vehicle after a legitimate handoff, whereas a fixed employee id is
+// not. Bounded by polling until no dig_ramp_segment PendingActions remain
+// (max 200 ticks) rather than a fixed tick count, per dev-testing-strategy's
+// wait-on-condition rule.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 2 times for the whole order', () => {
+  const MAX_TICKS = 200;
+  // The initial boarding, plus at most one legitimate policy-forced handoff
+  // (fixer follow-up) — NOT the 12 dismount/reboard cycles the pre-fix bug
+  // produced, and not the 3 an earlier fixer round settled for. Three root
+  // causes were fixed:
+  //  1. tickTaskCompletion.ts's dig_ramp_segment completion marked the
+  //     segment's own tracker.done AFTER the same-tick vehicle-continuity
+  //     attempt (tryContinueVehicleGatedAction) already ran — so
+  //     isRampSegmentClaimable always saw the just-finished segment as not
+  //     yet done and rejected every same-vehicle follow-up, dismounting the
+  //     driver once per segment regardless of fatigue. Reordered so the
+  //     segment is marked done first.
+  //  2. ForceShiftRest.ts's forceShiftRestIfNeededByPolicy needed a guard
+  //     against preempting a driver already arrived and mid-execution of a
+  //     vehicle-gated segment (isMidVehicleGatedWork, VehicleReservation.ts)
+  //     — but scoped to vehicle-gated work specifically, not a blanket
+  //     taskTicksRemaining check: a blanket guard also deferred a policy-
+  //     forced rest for an unrelated, long-running on-foot task's entire
+  //     duration, letting fatigue swing far past the policy's own threshold
+  //     every work cycle (needs.integration.test.ts's own pre-existing
+  //     "#678" long-run wellBeing/revolt acceptance cases, regressed by an
+  //     earlier, broader version of this same guard).
+  //  3. TaskCancellation.ts's interruptActiveAction pinned a mid-INTERRUPTED
+  //     action back to the same employee (the #556/#867 walk-only pin) only
+  //     when employee.pendingTaskDuration !== null — which a vehicle-gated
+  //     action's own mid-drive phase never sets (seedTaskTimerFields is
+  //     deferred until the VEHICLE, not the employee, reaches the target),
+  //     so an interrupted driver's own action fell straight through to an
+  //     unpinned open-pool release. On this map the rock_digger's only other
+  //     licensed driver was farther from the segment target than the
+  //     interrupted driver's own already-covered position, so cost-ranking
+  //     alone (estimateActionCost) should never have preferred them — but
+  //     with no pin at all, the open pool offered the action to them anyway,
+  //     and they drove only 3 ticks before their own fatigue forced them off
+  //     again too: an aborted takeover, a wasted dismount/reboard cycle, and
+  //     the 3rd boarding an earlier fixer round wrongly accepted as an
+  //     unavoidable floor. Extending the existing pin to also cover a
+  //     vehicle-gated mid-drive interruption (isMidVehicleGatedWork,
+  //     narrowed to taskTicksRemaining === null so mid-execution — already
+  //     separately protected — is untouched) reuses hasCloserIdleCandidate's
+  //     existing distance comparison to decide whether releasing the pin is
+  //     even worth it, exactly as #556/#867 already do for an on-foot walk.
+  // With all three fixed, every one of the ramp's 12 segments hands off to
+  // the next with zero reboarding, and the ONE long initial approach drive to
+  // the first segment (a real travel distance from the staffed fleet's
+  // rock_digger spawn point on this map) produces exactly one proactive
+  // handoff back to the SAME interrupted driver once their own forced rest
+  // completes — never a different, farther-away one — for 2 boardings total,
+  // confirmed directly against this exact scenario.
+  const MAX_EXPECTED_BOARDINGS = 2;
+
+  it('boards the rock_digger vehicle no more than 2 times while carving the whole box-cut ramp', () => {
+    const engine = createGameEngine();
+
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    const rockDigger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
+    if (!rockDigger) throw new Error('Setup: no rock_digger vehicle in the staffed starting fleet');
+    const rockDiggerVehicleId = rockDigger.id;
+
+    let boardingCount = 0;
+    engine.ctx.emitter.on('vehicle:driver_boarded', (payload: unknown) => {
+      const { vehicleId } = payload as { employeeId: number; vehicleId: number };
+      if (vehicleId === rockDiggerVehicleId) boardingCount++;
+    });
+
+    let ticks = 0;
+    while (
+      ticks < MAX_TICKS
+      && state.pendingActions.some(a => a.type === 'dig_ramp_segment')
+    ) {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      ticks++;
+    }
+
+    expect(ticks).toBeLessThan(MAX_TICKS); // the box-cut must actually finish within the bound
+    expect(boardingCount).toBeLessThanOrEqual(MAX_EXPECTED_BOARDINGS);
+  });
+});

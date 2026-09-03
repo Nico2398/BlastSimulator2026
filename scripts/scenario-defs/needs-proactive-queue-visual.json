@@ -176,13 +176,15 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
         "equals": {
           "pendingActionCount": 0
         },
-        "note": "Re-measured for #928: over this 80-tick window (construction work, tick 40 -> 120) fatigue actually dips well below the warning threshold mid-batch (to ~9.4 around tick 60), triggers a proactive/collapse-adjacent rest that is claimed, walked to, and completed (recovering to ~66 by tick 80), then resumes its natural working decline through tick 120 -- landing at ~42.2, net BELOW its tick-40 value (~44.45). At this coarser two-endpoint granularity the net change reads as a decrease, not an increase; pendingActionCount is 0 at both endpoints (nothing left queued or mid-claim by tick 120)."
+        "note": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): net direction corrected decreased -> increased for minFatigue. Over this 80-tick window (construction work, tick 40 -> 120) fatigue still dips below the warning threshold mid-batch and triggers a proactive/collapse-adjacent rest that is claimed, walked to, and completed, but that rest no longer under-restores -- it now brings fatigue up to a genuine recovery level (measured 71.00 at this checkpoint) before the natural working decline through tick 120 resumes, landing net ABOVE its tick-40 value (~44.45) instead of below it. This is the fix's own intended behaviour, not a regression: rest that leaves an employee barely better off than before it started was the #945 bug. pendingActionCount is 0 at both endpoints (nothing left queued or mid-claim by tick 120)."
       }
     },
     {

@@ -18,6 +18,7 @@ import {
   releaseVehicleReservation,
   releaseVehicleOnCompletion,
   reconcileVehicleReservations,
+  isMidVehicleGatedWork,
 } from '../../../src/core/engine/VehicleReservation.js';
 // reconcileVehicleReservations no longer performs the interruption itself
 // (import-cycle fix, #550) — it only reports which actions need it. Unit
@@ -387,5 +388,71 @@ describe('reconcileVehicleReservations', () => {
     expect(untouched.holderId).toBe(employee.id);
     expect(employee.activeActionId).toBe(21);
     expect(employee.taskTicksRemaining).toBe(5);
+  });
+});
+
+// #945 follow-up: isMidVehicleGatedWork previously had no dedicated unit
+// coverage of its own — only indirectly exercised via ForceShiftRest.test.ts's
+// policy-guard cases, which only reached its true-branch and the
+// requiredVehicleRole === null false-branch. Direct coverage here for every
+// branch, including the three TaskCancellation.ts's own #945 follow-up
+// (mid-drive interrupt pinning) now also depends on.
+describe('isMidVehicleGatedWork', () => {
+  it('is true when the employee is the boarded driver of the vehicle reserved for their own active, vehicle-gated action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 1, holderId: employee.id, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    vehicle.driverId = employee.id;
+
+    expect(isMidVehicleGatedWork(state, employee)).toBe(true);
+  });
+
+  it('is false when the employee has no active action (boundary: activeActionId null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = null;
+
+    expect(isMidVehicleGatedWork(state, employee)).toBe(false);
+  });
+
+  it('is false when the active action id no longer names any PendingAction', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 999; // no matching entry in state.pendingActions
+
+    expect(isMidVehicleGatedWork(state, employee)).toBe(false);
+  });
+
+  it('is false when the active action requires no vehicle role', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const action = makeAction(state, { id: 2, holderId: employee.id, status: 'in_progress', requiredVehicleRole: null });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+
+    expect(isMidVehicleGatedWork(state, employee)).toBe(false);
+  });
+
+  it("is false when the vehicle reserved for the action is driven by someone else (rejection: driverId mismatch)", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: otherDriver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 3, holderId: employee.id, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    vehicle.driverId = otherDriver.id; // reservation exists, but this employee never boarded it
+
+    expect(isMidVehicleGatedWork(state, employee)).toBe(false);
   });
 });

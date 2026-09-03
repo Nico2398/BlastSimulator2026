@@ -30,6 +30,50 @@ export function resolveTaskCompletion(
   if (progress.completed) {
     lines.push(`[tick ${state.tickCount}] TASK: ${emp.name} completed task.`);
 
+    // A completed 'dig_ramp_segment' task lands here — one segment of an
+    // ordered ramp is carved into the grid only once a qualified digger
+    // has actually finished excavating it, not the instant the ramp was
+    // ordered (#555, mirrors the 'drill_hole' branch below). A segment
+    // whose cells were already cleared by something else (a blast,
+    // another ramp) carves zero voxels but is still marked done.
+    //
+    // Runs BEFORE the generic vehicle-continuity block below (#945): that
+    // block's tryContinueVehicleGatedAction call looks for a same-role
+    // follow-up already claimable — for a ramp, isRampSegmentClaimable
+    // gates the next segment on THIS segment's own tracker.done. Marking it
+    // done here, first, is what lets the driver's own next-segment
+    // continuity actually find a follow-up the instant this one finishes;
+    // done second (as it used to run, after the continuity attempt already
+    // failed to find anything claimable) meant every single segment
+    // dismounted the driver and forced a fresh walk-and-reboard for the
+    // next one — confirmed live via #945's tutorial box-cut repro
+    // (needs.integration.test.ts's own "boards the rock_digger vehicle no
+    // more than twice" acceptance case), which boarded once per segment
+    // (12 times for a 12-segment ramp) purely from this ordering gap, with
+    // no rest/fatigue interruption involved at all.
+    if (progress.actionType === 'dig_ramp_segment' && progress.actionPayload && ctx.grid) {
+      const rampId = progress.actionPayload['rampId'] as number;
+      const segmentIndex = progress.actionPayload['segmentIndex'] as number;
+      const cells = progress.actionPayload['cells'] as RampSegmentDef['cells'];
+      const region = progress.actionPayload['region'] as RampSegmentDef['region'];
+      const ramp = state.plannedRamps.find(r => r.id === rampId);
+      const tracker = ramp?.segments.find(s => s.index === segmentIndex);
+
+      if (ramp && tracker) {
+        const carveResult = carveRampSegment(ctx.grid, { cells, region }, emitter);
+        if (carveResult.voxelsCleared > 0 && region && state.navGrid) {
+          NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
+        }
+        tracker.done = true;
+        lines.push(`[tick ${state.tickCount}] Ramp #${rampId} segment ${segmentIndex} excavated: ${carveResult.voxelsCleared} voxels cleared.`);
+
+        if (ramp.segments.every(s => s.done)) {
+          const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
+          if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
+        }
+      }
+    }
+
     // Any completed non-rest action — skill-required (survey, etc.) or
     // not (a null-skill general_work dispatch) — routes through
     // tickTaskProgress and carries an actionId here; completePendingAction
@@ -112,35 +156,6 @@ export function resolveTaskCompletion(
         const loaded = landLoadedCharge(planned);
         state.chargesByHole[holeId] = loaded;
         lines.push(`[tick ${state.tickCount}] Charge loaded at ${holeId}: ${loaded.explosiveId} ${loaded.amountKg}kg.`);
-      }
-    }
-
-    // A completed 'dig_ramp_segment' task lands here — one segment of an
-    // ordered ramp is carved into the grid only once a qualified digger
-    // has actually finished excavating it, not the instant the ramp was
-    // ordered (#555, mirrors the 'drill_hole' branch above). A segment
-    // whose cells were already cleared by something else (a blast,
-    // another ramp) carves zero voxels but is still marked done.
-    if (progress.actionType === 'dig_ramp_segment' && progress.actionPayload && ctx.grid) {
-      const rampId = progress.actionPayload['rampId'] as number;
-      const segmentIndex = progress.actionPayload['segmentIndex'] as number;
-      const cells = progress.actionPayload['cells'] as RampSegmentDef['cells'];
-      const region = progress.actionPayload['region'] as RampSegmentDef['region'];
-      const ramp = state.plannedRamps.find(r => r.id === rampId);
-      const tracker = ramp?.segments.find(s => s.index === segmentIndex);
-
-      if (ramp && tracker) {
-        const carveResult = carveRampSegment(ctx.grid, { cells, region }, emitter);
-        if (carveResult.voxelsCleared > 0 && region && state.navGrid) {
-          NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
-        }
-        tracker.done = true;
-        lines.push(`[tick ${state.tickCount}] Ramp #${rampId} segment ${segmentIndex} excavated: ${carveResult.voxelsCleared} voxels cleared.`);
-
-        if (ramp.segments.every(s => s.done)) {
-          const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
-          if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
-        }
       }
     }
 

@@ -11,10 +11,9 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { getBuildingDef, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
-import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
-import { NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS } from '../config/balance.js';
+import { NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE } from '../config/balance.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -164,25 +163,13 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
 export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey): void {
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
   if (building) {
-    const def = getBuildingDef(building.type, building.tier);
-    // BUILDING_REPLENISH_RATES is a per-tick rate (its own doc comment, and
-    // Employee.test.ts's "per-tick fill rate" framing), but this call site
-    // used to apply it exactly once regardless of how many ticks the rest
-    // actually spent — one tick's worth of gain for the whole visit. Against
-    // any real travel distance to and from the building, that one tick is
-    // smaller than what the round trip alone costs in drain, so an employee
-    // whose work site isn't adjacent to their living_quarters nets negative
-    // every cycle: collapse, rest, walk back barely recovered, collapse
-    // again before finishing (or even starting) the next task — confirmed
-    // live, a solo driller stuck oscillating at ~0-10 fatigue for 5000+
-    // ticks with a tier-1 living_quarters two tiles from the drill grid,
-    // never landing a single hole (#700). Scaling by the rest's own
-    // NEED_REST_DURATIONS[needKey] — the same constant that sets how many
-    // ticks the visit takes — applies the full rate for the full stay,
-    // matching the "per-tick" contract the rate was already documented as.
-    for (let i = 0; i < NEED_REST_DURATIONS[needKey]; i++) {
-      replenishNeed(emp, needKey, building.tier, def.capacity);
-    }
+    // A completed rest visit at any active living_quarters (any tier) fully
+    // restores the gauge. The per-tick BUILDING_REPLENISH_RATES loop this
+    // used to run under-restored at Tier 1 (~+64 over NEED_REST_DURATIONS,
+    // landing well short of MAX_NEED_GAUGE) while Tier 2/3 already reached it
+    // via replenishNeed's own clamp — an employee who finished the full stay
+    // should land at the same full gauge regardless of tier (#945).
+    emp[needKey] = MAX_NEED_GAUGE;
   } else {
     // No building services this need — the employee rests where they stand.
     // That keeps them on their feet but never fully satisfies them: the gauge
