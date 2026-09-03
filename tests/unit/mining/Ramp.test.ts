@@ -400,6 +400,72 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     const totalCells = segments.reduce((sum, s) => sum + s.cells.length, 0);
     expect(totalCells).toBe(buildResult.voxelsCleared);
   });
+
+  // ── #937 regression: disjoint per-column [floorY, ceilingY) ranges ────────
+  // Every fixture above uses flat terrain via makeElevatedGrid, so every
+  // column's floor/ceiling band overlaps every other column's and Pass 2
+  // never sees a y with zero contributing columns. This fixture forces that
+  // gap: the footprint crosses a plateau→canyon→plateau step in surface
+  // height, producing disjoint per-column ranges — regression coverage for
+  // the Pass 2 guard (`if (bandMinX === Infinity) continue;`), which used to
+  // instead emit a segment with NaN targetX/targetZ for a y with zero
+  // contributing columns.
+
+  function surfaceYAt(z: number): number {
+    const stepOffset = z - 20; // originZ = 20
+    return (stepOffset <= 1 || stepOffset >= 6) ? 20 : 5; // plateau(20) / canyon(5) / plateau(20)
+  }
+
+  function makeSteppedGrid(): VoxelGrid {
+    const grid = new VoxelGrid(40, 30, 40);
+    for (let z = 0; z < 40; z++) {
+      const s = surfaceYAt(z);
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= s; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+
+  it('on terrain with disjoint per-column floor/ceiling ranges (plateau→canyon→plateau), no segment has NaN/Infinity/undefined targetX/targetY/targetZ, index stays contiguous, and targetY strictly decreases', () => {
+    const grid = makeSteppedGrid();
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+
+    const segments = defineRampSegments(grid, ramp);
+
+    expect(segments.length).toBeGreaterThan(1);
+    for (const segment of segments) {
+      expect(Number.isFinite(segment.targetX)).toBe(true);
+      expect(Number.isFinite(segment.targetY)).toBe(true);
+      expect(Number.isFinite(segment.targetZ)).toBe(true);
+    }
+    for (let i = 0; i < segments.length; i++) {
+      expect(segments[i]!.index).toBe(i);
+    }
+    for (let i = 0; i + 1 < segments.length; i++) {
+      expect(segments[i]!.targetY).toBeGreaterThan(segments[i + 1]!.targetY);
+    }
+  });
+
+  it('skips exactly the y-band with zero contributing columns instead of emitting an invalid segment for it, and emits segments on both sides of the gap', () => {
+    const grid = makeSteppedGrid();
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
+
+    const segments = defineRampSegments(grid, ramp);
+
+    // Hand-traced (clearanceHeight=3, currentDepth(step)=floor((step/8)*6)):
+    // globalMinY=2, globalMaxY=22. Covered y = {2..7} ∪ {15..22}. The band
+    // y=8..14 (7 values) has zero contributing columns and must be skipped
+    // entirely, leaving 21 candidate y values - 7 skipped = 14 segments.
+    expect(segments.length).toBe(14);
+    for (const s of segments) {
+      expect(s.targetY < 8 || s.targetY > 14).toBe(true);
+    }
+    expect(segments.some(s => s.targetY >= 2 && s.targetY <= 7)).toBe(true);
+    expect(segments.some(s => s.targetY >= 15 && s.targetY <= 22)).toBe(true);
+  });
 });
 
 describe('computeRampSegmentDurationTicks (#555)', () => {
