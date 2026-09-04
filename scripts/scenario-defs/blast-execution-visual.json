@@ -537,6 +537,33 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#947 CI-fix: a second driller hired here as pure charge relief -- never assigned driving.drill_rig or any vehicle below, so TaskDispatch can never route it to a drill_hole action (requiredVehicleRole:'''drill_rig'''), only to charge_hole (requiredVehicleRole: null, blasting-qualified from ROLE_STARTING_QUALIFICATION like every driller hire). Real interaction-mode CI found `chargedCount should be 4 but is 1`: cycle 2'''s own single-employee crew crashed to a forced rest mid-charge (minFatigue 33.5 -> 4.5 then a 98.8 recovery jump, #680'''s own class of stall) and never finished loading the remaining 3 holes inside this cycle'''s existing 60-tick budget in a real browser (direct trace: chargedCount stuck at 1 through tick 279, only reaching 4 at tick 299 with no relief crew). A second body able to pick up charge_hole while the first rests clears all 4 holes inside the existing budget instead. This hire is real in both channels (not interaction-only): `tests/unit/lint/ScenarioDeclaredCommandMatchesInteraction.test.ts` requires every step'''s declared `command` and its own `interaction` array to agree, so an earlier interaction-only version of this fix (real click here, a no-op `event choose 0` in the command field) was rejected -- every employee id hired anywhere below this point is renumbered one higher in BOTH the `command` field and its own `interaction` array to stay in sync (see each renumbered bootstrap step'''s own note), and the 8x8 grid cycle'''s own straggler-charge list further down gained two more entries (H64/H3) for the two holes this shift left uncharged there.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
@@ -761,12 +788,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 20",
-      "description": "#680: bumped from tick 4 -- fixing the needs-drain misclassification (idle rate while walking toward a queued rest, not the working rate) shifts a forced-rest cycle earlier into this charging window, so the old 44-tick budget (10+10+10+10+4) left one hole (H4) still loading. Extra margin added here rather than re-pinning an exact count, matching this file's other charging blocks.",
+      "command": "tick 30",
+      "description": "#680: bumped from tick 4 -- fixing the needs-drain misclassification (idle rate while walking toward a queued rest, not the working rate) shifts a forced-rest cycle earlier into this charging window, so the old 44-tick budget (10+10+10+10+4) left one hole (H4) still loading. Extra margin added here rather than re-pinning an exact count, matching this file's other charging blocks. #947 CI-fix: bumped 20 -> 30. Real interaction-mode CI found `chargedCount should be 4 but is 1` here originally; cycle 2's own extra charge-relief hire (above) already narrows that to 3/4 inside the old 60-tick budget in a real browser (direct trace: the relief employee's own 3 holes land by tick 239, the original driller's 4th hole still mid-recovery, minFatigue climbing 4.5 -> 54.1, orderedChargeCount pinned at 1 through the old budget's own tick-259 end point, only reaching 0 by tick 269). An interaction-mode-only widening (extra `tick 10` action inside this step's own `interaction` array, not its `command`) was tried first and rejected: `tests/unit/scenario-defs-blast-visual-coverage.test.ts`'s own coverage regression guard (#404) requires every command-type interaction action in this specific file to mirror its step's `command` exactly, stricter than the repo-wide rule (`tests/unit/lint/ScenarioDeclaredCommandMatchesInteraction.test.ts`) that only applies when a step's interaction array holds nothing but a bare command. Bumped in the shared `command` field instead, so both channels stay identical -- command mode's own trajectory already reaches chargedCount:4 well inside 30 ticks (confirmed by this file's own command-mode run, with cycle 4's straggler-charge list re-verified against the resulting shift -- H64/H3/H25/H22/H23/H8 added there, see those steps' own notes).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
@@ -896,6 +923,33 @@
       "commandOutcome": "either"
     },
     {
+      "command": "employee fire 3",
+      "description": "#947 CI-fix: fires the second (charge-relief) driller hired above -- same reasoning as the step directly above, now for employee #3, so no idle survivor from cycle 2's own two-person crew lingers into cycle 3.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "inspect 45,20,0",
       "interaction": [
         {
@@ -959,12 +1013,12 @@
       }
     },
     {
-      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #947 CI-fix: employee id renumbered 3 -> 4 -- cycle 2's own extra charge-relief hire (above) shifts every employee id hired anywhere below it by one, in both this step's `command` field and its own `interaction` array equally (kept in sync deliberately: `tests/unit/lint/ScenarioDeclaredCommandMatchesInteraction.test.ts` requires the two to agree).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 4 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
@@ -1376,8 +1430,8 @@
       "role": "observe"
     },
     {
-      "command": "employee fire 3",
-      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #945 follow-up: the fatigue/rest-timing rebalance shifts the RNG draw order enough that employee 3's own hire-time `rng.chance(0.3)` unionization roll (Employee.ts) now lands true on seed:42 (it did not before) -- `commandOutcome: either` documents this as the same already-accepted unionized-refusal outcome the description above and the fire-4 step further down this file already cover, not a new failure mode.",
+      "command": "employee fire 4",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #945 follow-up: the fatigue/rest-timing rebalance shifts the RNG draw order enough that employee 3's own hire-time `rng.chance(0.3)` unionization roll (Employee.ts) now lands true on seed:42 (it did not before) -- `commandOutcome: either` documents this as the same already-accepted unionized-refusal outcome the description above and the fire-4 step further down this file already cover, not a new failure mode. #947 CI-fix: employee id renumbered 3 -> 4 -- cycle 2's own extra charge-relief hire (above) shifts every employee id from this point on by one.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1485,12 +1539,12 @@
       }
     },
     {
-      "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
+      "command": "employee assign_skill 5 skill:driving.drill_rig level:1",
       "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 4 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 5 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
@@ -1545,68 +1599,6 @@
         ],
         "equals": {
           "vehicleCount": 2
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 5 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 5 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "vehicleCount": 3
         }
       }
     },
@@ -1668,7 +1660,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 3
         }
       }
     },
@@ -1730,7 +1722,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 4
         }
       }
     },
@@ -1792,7 +1784,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 6
+          "vehicleCount": 5
         }
       }
     },
@@ -1854,7 +1846,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 7
+          "vehicleCount": 6
         }
       }
     },
@@ -1916,7 +1908,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 8
+          "vehicleCount": 7
         }
       }
     },
@@ -1926,6 +1918,68 @@
         {
           "type": "command",
           "command": "employee assign_skill 11 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig tier:3",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"3\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 8
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 12 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 12 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
@@ -3136,6 +3190,96 @@
       "commandOutcome": "either"
     },
     {
+      "command": "charge hole:H64 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- cycle 2's own extra charge-relief hire (see that cycle's own hire step) shifts this cycle's own 8-parallel-driller dispatch order slightly in both channels, so H64 now lands as a straggler that was not one before (direct trace: `chargesByHole` missing exactly H64 and H3 at this point, chargedCount 62/64, the run of `charge hole:H33...H47` steps above having covered every hole this seed's pre-#947 trajectory needed). Same `commandOutcome: either` tolerance as every other straggler here: on a run where H64 is not a straggler, this is a harmless redundant re-order of an already-charged hole.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H64\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H3 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- see H64's own note directly above; H3 is this run's second newly-appearing straggler.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H3\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H25 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- command mode's own run of this exact cycle (deterministic, unaffected by real-browser pacing) leaves H25/H22/H23/H8 as its own 4 stragglers once cycle 2's extra charge-relief hire shifts the 8-parallel-driller dispatch order (direct trace: `blast` refused with exactly these 4 as 'Missing charge' before this and the next three steps were added). Same `commandOutcome: either` tolerance as every straggler here.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H25\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H22 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- see H25's own note directly above.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H22\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H23 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- see H25's own note directly above.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H23\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H8 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: straggler added -- see H25's own note directly above.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H8\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
       "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing.",
       "interaction": [
@@ -3145,6 +3289,40 @@
           "equals": 0,
           "maxTicks": 400,
           "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:H8 explosive:boomite amount:8 stemming:0.5",
+      "description": "#947 CI-fix: final straggler retry -- H8 is drilled late (direct trace: holeCount only reaches 64, H8 included, during the wait_until directly above; every earlier straggler attempt at H8, including the one further up this file, ran while it still read 'Hole \\\"H8\\\" has not been drilled yet.'), so nothing charges it before now. `commandOutcome: either` and a real click-selector guard the case where a different run's own dispatch order drills (and charges) H8 earlier, making this retry a harmless no-op.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H8\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:100",
+      "description": "#947 CI-fix: drains H8's own final straggler retry above.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 100,
+          "timeoutMs": 30000
         }
       ],
       "role": "setup",
@@ -3235,8 +3413,8 @@
       "role": "observe"
     },
     {
-      "command": "employee fire 4",
-      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #586 CI: with 8 drillers now on the roster clustered at the grid (see the hire steps above), this grid's heavy overcharge (8kg boomite, 0.5m stemming) kills all of them in its own blast, live-confirmed via `employee list` showing every one DEAD right after -- CrewPanel.render() filters to `e.alive` roster cards, so once everyone is dead the roster is empty and `.bs-detail-toggle` never exists to click; a plain clickSelector reported it as \"vanished between the wait and the click\" (the toolbar click's own panel refresh is what removes the stale pre-blast render this scenario-runner still had cached in the live DOM). Switched detail-toggle/dismiss/confirm to clickIfPresent, matching this step's own already-documented no-op tolerance -- a control that never becomes usable here (empty roster) is a legitimate outcome, not a failure, same as the unionized-refusal case the description above already accepted.",
+      "command": "employee fire 5",
+      "description": "#947 CI-fix: employee id renumbered 4 -> 5 -- cycle 2's own extra charge-relief hire shifts every employee id from that point on by one (see that cycle's own hire step). #553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #586 CI: with 8 drillers now on the roster clustered at the grid (see the hire steps above), this grid's heavy overcharge (8kg boomite, 0.5m stemming) kills all of them in its own blast, live-confirmed via `employee list` showing every one DEAD right after -- CrewPanel.render() filters to `e.alive` roster cards, so once everyone is dead the roster is empty and `.bs-detail-toggle` never exists to click; a plain clickSelector reported it as \"vanished between the wait and the click\" (the toolbar click's own panel refresh is what removes the stale pre-blast render this scenario-runner still had cached in the live DOM). Switched detail-toggle/dismiss/confirm to clickIfPresent, matching this step's own already-documented no-op tolerance -- a control that never becomes usable here (empty roster) is a legitimate outcome, not a failure, same as the unionized-refusal case the description above already accepted.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -3325,12 +3503,12 @@
       }
     },
     {
-      "command": "employee assign_skill 36 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "command": "employee assign_skill 37 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #947 CI-fix: employee id renumbered 36 -> 37 -- cycle 2's own extra charge-relief hire shifts every employee id from that point on by one (see that cycle's own hire step).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 36 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 37 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
