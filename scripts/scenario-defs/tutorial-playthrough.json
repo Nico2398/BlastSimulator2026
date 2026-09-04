@@ -293,7 +293,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:4 stemming:1.8",
-      "description": "#949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were not re-verified live as part of this test-writing pass (see the TODO on the downstream cash assertion below) -- the implementer/fixer loop verifies and adjusts if the rating still comes up short of good.",
+      "description": "#949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were verified to run clean via the command-mode scenario run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough` -- 59/59 steps OK).",
       "interaction": [
         {
           "type": "clickSelector",
