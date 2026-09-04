@@ -1467,12 +1467,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #554: with charging now real, queued work, 47 more ticks elapse than the pre-#554 file needed. Finding (this pass, superseded by #557): all 12 employees die (deathCount 0 -> 12) -- a prior pass here read 11, with one hand-hired employee surviving as merely 'injured', but that reading depended on a Damage.ts bug (processProjections skipped any already-injured employee from every later fragment in the same blast, so a first, weaker graze made them immune to a subsequent, genuinely lethal one) that #557's fixer pass closed alongside the debris-attenuation work that exposed it -- widening hits from an exact 2m radius out to the full 15m BLAST_DANGER_MARGIN_M made a stray early graze-then-lethal-hit sequence, on the same employee within one blast, actually likely instead of a near-impossible coincidence. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty, unchanged from the pre-#554 figure -- vibration is a function of the charge/pattern, not of who was standing nearby). #947: the drill_rig (vehicle #1) no longer survives -- the relocate step above is now refused (driverless vehicles can't move; see that step's own #947 note), so the rig stays parked among the holes and Damage.ts's fragment-hit check destroys it here, exactly the no-relocate outcome that step's own original description already sandbox-confirmed (vehicleCount 1 -> 0). deathCount/ecology/tickCount are unaffected, per that same finding. #586-followup: `levelEnded`/`levelEndReason` corrected to false/null -- this session's padding fix (see the wait_until step's own note above) means the mine is no longer bankrupt by the time this blast fires.",

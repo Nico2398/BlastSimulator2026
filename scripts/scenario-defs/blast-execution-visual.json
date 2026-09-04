@@ -435,12 +435,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "role": "player",
@@ -857,12 +854,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "role": "player",
@@ -3393,12 +3387,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "role": "player",
@@ -3692,12 +3683,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "role": "player",
