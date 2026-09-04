@@ -51,8 +51,8 @@ describe('tutorial-steps-visual.json descriptions', () => {
 
         expect(step.description).toMatch(/3x3/);
         expect(step.description).toMatch(/9-hole|9 hole/i);
-        expect(step.description).toContain('20,20');
-        expect(step.description).toContain('26,26');
+        expect(step.description).toContain('22,20');
+        expect(step.description).toContain('30,28');
     });
 
     it('step 24 (drill wait, waitUntil-chunked by #689-followup) description describes 9 holes, not 16', () => {
