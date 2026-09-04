@@ -20,8 +20,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15",
-      "description": "3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3) — the (15,15)-(21,21) drag needs no spacing-stepper click first.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 diameter:0.089 start:15,15",
+      "description": "3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3) — the (15,15)-(21,21) drag needs no spacing-stepper click first. #947 CI-fix: `diameter:0.089` added to match Drill.ts's DEFAULT_DIAMETER_M — the grid tool has no diameter stepper, so interaction mode always confirms at the UI's fixed 89mm regardless of clicks, while this command previously fell back to drillPlan.ts's own 0.15 default; that gap fed computeDrillHoleDurationTicks a different diameter per mode (same class of bug as blast-charge-loading-ui.json's #947 fix). Depth also diverged: the grid tool's own DEFAULT_DEPTH_M is 6m, not this command's declared 8m, and nothing below clicked the depth stepper to raise it — so interaction mode drilled shallower/faster holes than command mode simulated. Two increment clicks on the depth stepper (data-field=\"depth\", default 6 -> 8) raise interaction mode's grid depth to match the command's own explicit depth:8 before the drag+confirm, instead of watering the scenario's declared depth down to the UI default.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -34,6 +34,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
         },
         {
           "type": "dragTiles",
@@ -162,12 +170,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3
+          "deathCount": 2
         },
         "decreased": [
           "vehicleCount"
         ],
-        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood, and the drill_rig they drove out on is destroyed too (vehicleCount drops from 4 to 3). #928: deathCount re-pinned 2 -> 3 -- the single-gauge fatigue model shifted how many ticks drilling/charging took before this step's own fire, which shifts this seed's own RNG draw sequence downstream (fragment ejection is randomized per fragment, not positional-only) enough that a projectile now also kills one of the two idle drivers standing well outside the drill grid (Pete Crater, driver, at (8,0) — ~17m from the nearest hole), on top of the driller/blaster who died in both versions. Furthest recorded throw this run: 29.9m, comfortably past that distance -- a bystander death at this range is exactly the flyrock hazard the tutorial's evacuate-zone step exists to prevent (this file deliberately never runs it), not a new failure mode. Nobody was evacuated — that's the whole point of this file."
+        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood; the drill_rig they drove out on (and a second vehicle) is destroyed too. #947 CI-fix: deathCount re-pinned 3 -> 2. The drill_plan step's own diameter/depth parity fix (above) changes how many ticks drilling+charging take before this step's own fire, which shifts this seed's RNG draw sequence downstream (fragment ejection is randomized per fragment, not positional-only) enough that the bystander driver #928 pinned as a third casualty (Pete Crater, ~17m from the nearest hole) is no longer in a projectile's path — confirmed identical (deathCount 2, driller+blaster only, Pete Crater alive) in both command mode and a real interaction-mode run once drilling/charging simulate the same diameter and depth in both channels; previously interaction mode silently drilled shallower (6m not 8m) and narrower (89mm UI default vs the command's unstated 150mm fallback) holes than command mode simulated, so the two channels' own pre-#947 pinned value was never actually reproduced by a real browser session, only by command mode's own now-corrected timing. Nobody was evacuated — that's the whole point of this file."
       }
     },
     {
@@ -181,7 +189,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3
+          "deathCount": 2
         }
       }
     }
