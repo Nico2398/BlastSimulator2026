@@ -155,7 +155,6 @@ export class BlastReportModal {
   }
 
   update(state: GameState, blastPlaybackDurationS: number = 0): void {
-    void blastPlaybackDurationS; // TODO: implement — use as a floor against BLAST_REPORT_DELAY_MS (#950)
     const report = state.lastBlastReport;
 
     // Once the level has ended, LevelEndScreen (z-index var(--bsx-z-menu),
@@ -195,7 +194,8 @@ export class BlastReportModal {
     // arrival time. The first report is never shown.
     if (report && report !== this.lastShownReport && report !== this.pendingReport) {
       this.pendingReport = report;
-      this.pendingDeadlineMs = this.now() + BLAST_REPORT_DELAY_MS;
+      const delayMs = Math.max(BLAST_REPORT_DELAY_MS, blastPlaybackDurationS * 1000);
+      this.pendingDeadlineMs = this.now() + delayMs;
     }
 
     if (this.pendingReport !== null && this.pendingDeadlineMs !== null && this.now() >= this.pendingDeadlineMs) {
