@@ -163,7 +163,14 @@ describe('MovementInterpolation', () => {
       const jump = Math.hypot(pos2.x - renderX, pos2.z - renderZ);
       // One small dt step of gliding should cover only a small fraction of
       // the (now much larger) remaining distance, not pop toward it.
-      expect(jump).toBeLessThan(2);
+      // Linear interpolation (#948) has constant velocity across the whole
+      // tween, unlike the old smoothstep curve whose derivative tapered to 0
+      // near a fresh retarget (elapsedS resets to 0) — so the natural
+      // one-frame jump here is (dt/durationS) * distanceToNewTarget, with no
+      // taper to shrink it. Worst case for this test's dt=0.05/durationS=1
+      // is bounded by MOVE_TELEPORT_DISTANCE (60): any larger distance snaps
+      // instead of gliding, so the ceiling is 0.05 * 60 = 3.
+      expect(jump).toBeLessThan(3);
     });
 
     it('snaps immediately to the target when it is >= MOVE_TELEPORT_DISTANCE away, regardless of dt', () => {

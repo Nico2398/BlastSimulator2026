@@ -153,7 +153,12 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
     vm.update([v], 0.05);
 
     const jump = Math.hypot(group.position.x - beforeX, group.position.z - beforeZ);
-    expect(jump).toBeLessThan(2);
+    // Linear interpolation (#948): no smoothstep taper near a fresh
+    // retarget, so the jump is (dt/durationS) * distanceToNewTarget with
+    // nothing to shrink it. Bounded by MOVE_TELEPORT_DISTANCE (60) — a
+    // larger distance snaps instead of gliding — giving 0.05 * 60 = 3 for
+    // this test's dt/duration.
+    expect(jump).toBeLessThan(3);
     vm.dispose();
   });
 
