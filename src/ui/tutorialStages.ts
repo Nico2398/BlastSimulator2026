@@ -107,7 +107,13 @@ const REGION = {
   // round(6/3)+1=3 holes/side, 3×3=9 -- restoring the region to the
   // originally-intended 3×3 grid for the spacing this tool actually opens
   // at, not the 4×4 the stale 20→30/spacing-5 sizing silently grew it to.
-  drill: { x1: 20, z1: 20, x2: 26, z2: 26, exact: true },
+  // #949: the scripted `drill_plan` command moved to `spacing:4 start:22,20`
+  // (rated-`catastrophic` shot -- overloaded, under-stemmed, too close to the
+  // box-cut face -- needed both a lighter charge and a hole grid stood off
+  // further east from that face). A 3x3 grid at spacing 4 from (22,20) now
+  // spans (22,20)-(30,28); the region widens to match with the same margin
+  // convention as before.
+  drill: { x1: 22, z1: 20, x2: 30, z2: 28, exact: true },
   // One tile: the warehouse is placed by its origin corner, and the footprint
   // ghost shows the rest. In the level's clear north-west quarter, but pulled
   // off the map's own corner: at (4,4) the camera ray through that tile's
