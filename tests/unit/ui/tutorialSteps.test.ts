@@ -871,4 +871,34 @@ describe('tutorialSteps', () => {
       });
     });
   });
+
+  // ── #949: retuned scripted blast plan ─────────────────────────────────────
+  // The tutorial's own drill-plan/charge commands used to overload/under-stem
+  // a too-tight 5m grid (spacing:5 depth:8, amount:5kg stemming:2m) into a
+  // blast that rated CATASTROPHIC — a teaching moment that taught the
+  // opposite of what a tutorial should. #949 retunes both, verified live
+  // against the real engine (build_ramp box-cut first, then this exact plan)
+  // to rate PERFECT with zero casualties/destruction. calculateRating's own
+  // thresholds (BlastExecution.ts) are untouched — only the tutorial's plan
+  // parameters move.
+  describe('retuned scripted blast plan (#949)', () => {
+    it('drill-plan orders a 4m-spacing grid at start:22,20, not the old overloaded 5m-spacing plan', () => {
+      const step = TUTORIAL_STEPS.find((s) => s.id === 'drill-plan')!;
+      expect(step.commands).toEqual([
+        'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20',
+      ]);
+    });
+
+    it('charge orders 4kg with 2.5m stemming, not the old 5kg/2m under-stemmed order', () => {
+      const step = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
+      expect(step.commands).toEqual([
+        'charge hole:* explosive:boomite amount:4 stemming:2.5',
+      ]);
+    });
+
+    it('sequence keeps its existing 25-tick delay step, unchanged by the retune', () => {
+      const step = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
+      expect(step.commands).toEqual(['sequence auto delay_step:25']);
+    });
+  });
 });

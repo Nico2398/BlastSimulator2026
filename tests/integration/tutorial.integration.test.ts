@@ -642,3 +642,116 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     expect(blastResult.success, blastResult.output).toBe(true);
   });
 });
+
+// ── #949: the tutorial's own scripted blast must rate good or better ───────
+//
+// A tutorial exists to teach what a competent shot looks like. Before #949,
+// the tutorial's own drill-plan/charge commands (5m spacing, 5kg charge, 2m
+// stemming against a box-cut free face) rated CATASTROPHIC — overloaded and
+// under-stemmed, with casualties and destroyed buildings. This test runs the
+// tutorial's own step commands, read live off TUTORIAL_STEPS rather than
+// retyped literals so it cannot silently desync from the source of truth
+// again, and asserts the retuned plan produces a clean blast: rating good or
+// better, zero casualties, zero destroyed buildings/vehicles, real rock
+// still broken.
+describe('the tutorial\'s own scripted blast rates good or better (#949)', () => {
+  it('runs drill-plan/charge/sequence exactly as scripted and blasts cleanly', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    // 1. Start campaign on tutorial_pit, staffed — same bootstrap as the
+    // #928 box-cut performance test (full-level/tutorial.integration.test.ts).
+    expect(run('campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    const state = ctx.state!;
+
+    // 2. Build the box-cut ramp the tutorial's own 'box-cut' step builds
+    // before drilling — read live so a future change to that step's own
+    // command is picked up here too.
+    const boxCutStep = TUTORIAL_STEPS.find((s) => s.id === 'box-cut')!;
+    expect(run(boxCutStep.commands![0]!).success).toBe(true);
+    for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.fatigue = 100;
+      }
+      run('tick 1');
+    }
+    expect(state.plannedRamps.length).toBe(0);
+
+    // 3. drill-plan
+    const drillPlanStep = TUTORIAL_STEPS.find((s) => s.id === 'drill-plan')!;
+    expect(run(drillPlanStep.commands![0]!).success).toBe(true);
+    for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.fatigue = 100;
+      }
+      run('tick 1');
+    }
+    expect(state.plannedDrillHoles.length).toBe(0);
+    expect(state.drillHoles.length).toBeGreaterThan(0);
+
+    // 4. charge
+    const chargeStep = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
+    expect(run(chargeStep.commands![0]!).success).toBe(true);
+    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.fatigue = 100;
+      }
+      run('tick 1');
+    }
+    expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
+
+    // 5. sequence
+    const sequenceStep = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
+    expect(run(sequenceStep.commands![0]!).success).toBe(true);
+
+    // 6. Evacuate crew and vehicles beyond the danger zone — mirrors the
+    // 'blast refuses to fire on an occupied zone' tests above, which move
+    // everyone to a corner clear of computeDangerZone(state.drillHoles,
+    // BLAST_DANGER_MARGIN_M). tutorial_pit is a 32x32 grid and the drill
+    // plan's own danger zone (15m margin around a start:22,20 3x3/4m grid)
+    // covers most of it, so (2,2) — well below the zone's own x1/z1 — is the
+    // one corner that stays clear.
+    const preBlastAliveCount = state.employees.employees.filter(e => e.alive).length;
+    const preBlastVehicleCount = state.vehicles.vehicles.length;
+    const preBlastDeathCount = state.damage.deathCount;
+    for (const emp of state.employees.employees) {
+      emp.x = 2;
+      emp.z = 2;
+    }
+    for (const veh of state.vehicles.vehicles) {
+      veh.x = 2;
+      veh.z = 2;
+    }
+
+    // 7. blast
+    const blastResult = run('blast');
+    expect(blastResult.success, blastResult.output).toBe(true);
+
+    // 8. Rating must be good or better — the acceptance bar the issue sets.
+    // Not hardcoded to 'perfect' only: 'good' also satisfies it.
+    const report = state.lastBlastReport;
+    expect(report).not.toBeNull();
+    expect(['good', 'perfect']).toContain(report!.rating);
+
+    // 9. Zero destroyed buildings.
+    expect(report!.destroyedBuildings.length).toBe(0);
+
+    // 10. Zero casualties: no employee death delta across the blast, and no
+    // 'death' accident recorded against this specific blast's own report.
+    const postBlastAliveCount = state.employees.employees.filter(e => e.alive).length;
+    expect(postBlastAliveCount).toBe(preBlastAliveCount);
+    expect(state.damage.deathCount).toBe(preBlastDeathCount);
+    expect((report!.accidents ?? []).some(a => a.type === 'death')).toBe(false);
+
+    // 11. No vehicle destroyed: vehicle count unchanged, and every surviving
+    // vehicle has positive hp (a destroyed vehicle is spliced out of the
+    // array entirely, so the count check catches what an hp-only check
+    // would miss).
+    expect(state.vehicles.vehicles.length).toBe(preBlastVehicleCount);
+    expect(state.vehicles.vehicles.every(v => v.hp > 0)).toBe(true);
+    expect((report!.accidents ?? []).some(a => a.type === 'vehicle_destroyed')).toBe(false);
+
+    // Still teaches a real shot: rock actually broke.
+    expect(report!.clearedVoxels).toBeGreaterThan(0);
+  });
+});

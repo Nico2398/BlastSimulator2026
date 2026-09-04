@@ -566,8 +566,11 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     // declaring its own timeout >= 90) between box-cut and drill_plan,
     // shifting every index below down further (net +2 from the #921
     // numbering: -1 for the removed 'time speed 2' step, +3 for these three).
-    25: 'drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089',
-    35: 'charge hole:* explosive:boomite amount:5 stemming:2',
+    // #949 retunes the tutorial's own scripted plan (spacing:3/depth:6/(20,20)
+    // -> spacing:4/depth:8/(22,20); amount:5/stemming:2 -> amount:4/stemming:2.5)
+    // so the shot rates good-or-better instead of catastrophic.
+    25: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
+    35: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
     39: 'sequence auto delay_step:25',
   };
 

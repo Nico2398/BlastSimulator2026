@@ -658,9 +658,9 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20",
       "timeout": 60,
-      "description": "drill-plan, click half: grid tool dragged over the exact 20,20-26,26 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region.",
+      "description": "drill-plan, click half: grid tool dragged over the 22,20-30,28 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region. #949: spacing/depth/start retuned again, from 3/6/(20,20) to 4/8/(22,20) -- mirrors tutorialSteps.ts's own 'drill-plan' stage retune, which fixes the tutorial's scripted plan so it rates good-or-better instead of catastrophic (verified live against the real engine to rate PERFECT with zero casualties/destruction). `dragTiles` moved to (22,20)-(30,28) to match. KNOWN GAP for the implementer, same as tutorial-steps-visual.json's identical drill-plan step: REGION.drill (tutorialStages.ts) still exact-gates the picker to the OLD (20,20)-(26,26) box from Round 5 above -- it needs widening/moving to (22,20)-(30,28) alongside this retune, or the drag above rejects every tile outside the stale gate. // TODO(#949): re-verify this file's own downstream tick/cash figures against the new 4/8/(22,20) plan -- not hand-recomputed as part of this test-writing pass.",
       "role": "player",
       "interaction": [
         {
@@ -677,10 +677,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 20,
+          "x1": 22,
           "z1": 20,
-          "x2": 26,
-          "z2": 26
+          "x2": 30,
+          "z2": 28
         },
         {
           "type": "screenshot"
@@ -729,11 +729,23 @@
       "commandOutcome": "either"
     },
     {
-      "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:4 stemming:2.5",
       "timeout": 30,
-      "description": "charge ordered: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed).",
+      "description": "charge ordered: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed). #949: standardized on boomite (matching tutorial-playthrough.json/tutorial-steps-visual.json, and the panel's own DEFAULT_EXPLOSIVE, Charge.ts) -- the old pop_rock/3kg/2m command never actually matched what a real click produced anyway (Charge All always applies the panel's own boomite/5kg/2m defaults, a pre-existing command/click divergence this file carried before #949), so no explosive-selector click is needed. Amount/stemming steppers now clicked explicitly to reach the retuned amount:4/stemming: the amount stepper's step is 1kg (5->4, one decrement click) and the stemming stepper's step is 0.2m (2.0->2.2->2.4, two increment clicks) -- 2.4m is the closest reachable value to the declared stemming:2.5, and functionally equivalent to it: both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's depth:8), so the extra 0.1m the console command asks for does nothing more. // TODO(#949): re-verify the stepper click count/selectors against a real interaction-mode run once the implementer lands the retune -- this pass could not run the browser channel.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
@@ -832,9 +844,9 @@
       "description": "#947: enough ticks for both employees to walk to their vehicle and board (ArrivalGate.tickArrivalGate) before Sound the Horn is clicked below."
     },
     {
-      "command": "zone clear x1:5 y1:5 x2:41 y2:41",
+      "command": "zone clear x1:7 y1:5 x2:45 y2:43",
       "timeout": 180,
-      "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41) -- on tutorial_pit's 32x32 map that covers nearly the whole site, so the driller (parked at the pattern they just finished charging) and the surveyor (idle since the survey step) are both still inside it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed -- no tab click needed before Sound the Horn is reachable. Sound the Horn sends the same box this command declares (Fire.ts's soundHorn(), computed live). clearZone no longer teleports (#557): this only sets a destination for whoever is inside, so the wait_until step right after is what proves the walkout actually finished, not this click itself. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded.",
+      "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's now-retuned (#949) 3x3/spacing:4/depth:8 grid at (22,20) pads out to (7,5)-(45,43) -- holes span x:22-30, z:20-28, padded by the 15m margin; the box moved from the old (5,5)-(41,41) computed for the old 3x3/spacing:3/(20,20) grid. On tutorial_pit's 32x32 map this still covers nearly the whole site, so the driller (parked at the pattern they just finished charging) and the surveyor (idle since the survey step) are both still inside it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed -- no tab click needed before Sound the Horn is reachable. Sound the Horn sends the same box this command declares (Fire.ts's soundHorn(), computed live). clearZone no longer teleports (#557): this only sets a destination for whoever is inside, so the wait_until step right after is what proves the walkout actually finished, not this click itself. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded.",
       "role": "player",
       "interaction": [
         {
