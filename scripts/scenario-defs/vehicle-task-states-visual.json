@@ -56,6 +56,56 @@
       "role": "observe"
     },
     {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #1 needs a driver before the idle -> moving transition below. Hired first (employee #1) so the driller hired later (issue #550 section) becomes #2 -- that step and the `employee assign_skill`/`employee dispatch` steps below target #2 accordingly.",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        }
+      ],
+      "role": "setup",
+      "description": "Employee #1 and hauler #1 both spawn at the same default point -- confirmed live 20 ticks is enough to board (`vehicle list` shows driver:#1 afterward). Reopens the Fleet panel #947's own driver-hire step above switched away from -- otherwise the pre-existing `employee hire role:driller` step further down re-clicks the already-open employees tab and toggles it CLOSED instead of open (#929's ScenarioPanelSelectorsAreOpened lint)."
+    },
+    {
       "command": "vehicle move 1 to:37,33",
       "description": "Real click path: select hauler #1 in the 3D scene, rest the cursor on the destination, press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). DESTINATION CHANGED from (2,2) to (37,33): (2,2) sits in dusty_hollow's far corner behind a rise, and no camera-ray aim from the default orbit can land on it -- a focus sweep along x=2.5 jumps straight from tile z=0 to z=3, skipping 1 and 2, so the tile is occluded. This file tests idle -> moving -> transport task transitions, not one particular destination, so it aims at a tile a player can actually point at. (37,33) is the same tile vehicle-traffic-routing-visual drives to on this level, and its focus point was measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`.",
       "interaction": [
@@ -191,7 +241,6 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Issue #550: a driller to claim the vehicle-gated dispatch below. Hired after the debris_hauler section so this file's earlier idle/moving/working coverage is untouched.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -207,27 +256,28 @@
         }
       ],
       "role": "player",
+      "description": "Issue #550: a driller to claim the vehicle-gated dispatch below. Hired after the debris_hauler section so this file's earlier idle/moving/working coverage is untouched. #947's driver hire earlier took employee id #1, so this driller lands as #2.",
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "employeeCount": 1
+          "employeeCount": 2
         }
       }
     },
     {
-      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring grants only the driller's starting 'blasting' qualification (ROLE_STARTING_QUALIFICATION, Employee.ts) -- the drill_rig licence (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts) is a separate grant. The player-facing path is `employee train`; this is the same bootstrap shortcut employee-skills-visual.json uses.",
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring grants only the driller's starting 'blasting' qualification (ROLE_STARTING_QUALIFICATION, Employee.ts) -- the drill_rig licence (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts) is a separate grant. The player-facing path is `employee train`; this is the same bootstrap shortcut employee-skills-visual.json uses. Targets employee #2 (the driller) -- #947's driver hire earlier took id #1.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
         }
       ],
       "expect": {
         "equals": {
-          "qualificationCount": 2
+          "qualificationCount": 3
         },
-        "note": "blasting (from the driller role) + driving.drill_rig (the vehicle's required licence)"
+        "note": "driving.truck (#947's driver hire) + blasting (from the driller role) + driving.drill_rig (the vehicle's required licence)"
       },
       "role": "bootstrap"
     },
@@ -256,12 +306,12 @@
       }
     },
     {
-      "command": "employee dispatch 1 x:37 z:33 skill:blasting vehicle:drill_rig",
-      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist (see employee-skills-visual.json's identical note) -- this is the vehicle-gated dispatch path issue #550 wires up. requiredVehicleRole:drill_rig means the driller must claim a free licensed drill_rig, walk to it, board it, and ride it to (37,33) before the work timer starts -- claim/walk/board/drive/work is exactly the state sequence the driving-to-task-state shot below is meant to catch mid-drive.",
+      "command": "employee dispatch 2 x:37 z:33 skill:blasting vehicle:drill_rig",
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist (see employee-skills-visual.json's identical note) -- this is the vehicle-gated dispatch path issue #550 wires up. requiredVehicleRole:drill_rig means the driller must claim a free licensed drill_rig, walk to it, board it, and ride it to (37,33) before the work timer starts -- claim/walk/board/drive/work is exactly the state sequence the driving-to-task-state shot below is meant to catch mid-drive. Targets employee #2 (the driller) -- #947's driver hire earlier took id #1.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:37 z:33 skill:blasting vehicle:drill_rig"
+          "command": "employee dispatch 2 x:37 z:33 skill:blasting vehicle:drill_rig"
         }
       ],
       "expect": {

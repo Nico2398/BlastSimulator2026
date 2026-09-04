@@ -184,6 +184,62 @@ describe('vehicle.ts — not_found (shared across assign/move/driver/scrap)', ()
   }
 });
 
+// ── move_no_driver — refuses to move a driverless vehicle (#947) ───────────
+
+describe('vehicle.ts — move refuses a driverless vehicle', () => {
+  it('resolves to the exact English literal and does not move the vehicle', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    expect(vehicle.driverId).toBeNull();
+    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+    expect(vehicle.task).not.toBe('moving');
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+  });
+});
+
+// ── assign task:moving refuses a driverless vehicle (#947) ─────────────────
+
+describe('vehicle.ts — assign task:moving refuses a driverless vehicle', () => {
+  it('resolves to the exact English literal and does not stage the moving task', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    expect(vehicle.driverId).toBeNull();
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+    expect(vehicle.task).not.toBe('moving');
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+  });
+
+  it('regression: assign task:moving succeeds and stages the task when a driver is aboard', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    vehicle.driverId = 42; // bypass boarding — only driverId matters here (same pattern as move's #947 tests)
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} assigned to moving.`);
+    expect(vehicle.task).toBe('moving');
+  });
+});
+
 // ── buy_success ───────────────────────────────────────────────────────────
 
 describe('vehicle.ts — buy success message', () => {
@@ -236,6 +292,12 @@ describe('vehicle.ts — move success message', () => {
   it('matches the exact English literal, embedding the real id/x/z with no space after the comma', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless `vehicle move` is refused outright. This test's own
+    // point is the success message's exact text, not the driver gate, so
+    // bypass canAssignDriver directly (same pattern as the driver-unassign
+    // tests below).
+    vehicle.driverId = 42;
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicle.id} moving to (7,9).`);
@@ -244,6 +306,7 @@ describe('vehicle.ts — move success message', () => {
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    vehicle.driverId = 42; // #947: bypass canAssignDriver — see the test above
     setLocale('fr');
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);

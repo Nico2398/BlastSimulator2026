@@ -45,6 +45,55 @@
       }
     },
     {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #1 needs a driver before either `vehicle move` step below can succeed. Hired first (employee #1) so the driller hired later becomes #2 -- see that step and the `employee dispatch` step's own note on the id shift.",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      },
+      "description": "Employee #1 and hauler #1 both spawn at the same default point -- confirmed live 20 ticks is enough to board (`vehicle list` shows driver:#1 afterward)."
+    },
+    {
       "command": "vehicle move 1 to:8,20",
       "description": "Real click path, pre-ramp: select hauler #1 in the 3D scene, rest the cursor on (8,20), press the selection bar's MOVE HERE, then Esc to drop the selection so the bottom-docked bar cannot sit over the ramp placement strip two steps later. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). cameraFocus sits at z=21.5, one tile past the target: at the default orbit the camera ray lands about a tile short of its focus point. Measured in a real browser until the dispatched command read `vehicle move 1 to:8,20`; never adjust it arithmetically.",
       "interaction": [
@@ -211,20 +260,21 @@
         }
       ],
       "role": "player",
+      "description": "#947 hired a driver first (see that step) to board hauler #1, so this driller lands as employee #2, not #1 -- the `employee dispatch` step below targets #2 accordingly.",
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "employeeCount": 1
+          "employeeCount": 2
         }
       }
     },
     {
-      "command": "employee dispatch 1 x:8 z:20",
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
+      "command": "employee dispatch 2 x:8 z:20",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`. Targets employee #2 (the driller) -- #947's driver hire above took id #1.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:8 z:20"
+          "command": "employee dispatch 2 x:8 z:20"
         }
       ],
       "expect": {

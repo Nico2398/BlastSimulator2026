@@ -70,6 +70,68 @@
       "role": "observe"
     },
     {
+      "command": "vehicle driver 2 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so each of the three corridor-blocking vehicles below needs its own driver boarded before its `vehicle move` can succeed. staffed:true's own free drivers already match each vehicle's required licence one-for-one (driver #3: driving.truck for debris_hauler #2; #4/#5: driving.excavator for rock_digger #3/rock_fragmenter #4) -- boarded here, ahead of the later hauling assignment below, rather than assigned twice. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead (same pattern as vehicle-traffic.json).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 4 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 5"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "description": "All three drivers spawn on the same tile as their vehicles (#512), so 10 ticks is enough for each to walk over and board -- matching vehicle-traffic.json's own identical bootstrap pattern.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 10
+        }
+      }
+    },
+    {
       "command": "vehicle move 2 to:2,6",
       "interaction": [
         {
@@ -113,7 +175,7 @@
       }
     },
     {
-      "command": "vehicle move 3 to:4,6",
+      "command": "vehicle move 3 to:10,-2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -143,7 +205,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 · Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle · HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile.",
+      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 · Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle · HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile. #947 CI-fix follow-up: \"nothing else asserts its landing tile\" turned out to be wrong -- this step's own command previously declared `to:4,6` while the real click above always lands at `(10,-2)`, so command mode drove rock_digger on a materially shorter/different route than interaction mode's real click did, and that fuel-cost/arrival-timing gap compounded through the file's later `wait_until`/`tick 10` steps into a 4-tick command-vs-interaction offset by the freight_warehouse build step, which shifted a downstream event's own due-tick enough to flip `nuisance`'s expected value (see that step's own note). Fixed at the root: the command field now declares `to:10,-2`, the same tile the real click has always actually landed on, so both channels drive rock_digger to the identical destination and simulate the identical route/timing from here on.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -152,7 +214,7 @@
       }
     },
     {
-      "command": "vehicle move 4 to:6,6",
+      "command": "vehicle move 4 to:11,1",
       "interaction": [
         {
           "type": "clickSelector",
@@ -182,7 +244,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "The third and last blocker (rock_fragmenter). With all three off the z=2 corridor, drill_rig #1's route east is genuinely clear -- confirmed directly (sandbox trace: 40 ticks door-to-door to (15,15) once unblocked, vs. never before). Kept close (z=6, not far off-site) rather than parked deep off-map, so debris_hauler #2 still has a short trip back once hauling self-dispatches after the blast -- Finding (bankruptcy) below is tight enough that a long hauler commute would cost this file its one contract delivery too. Same two bugs as #3's step above, fixed the same way: the row click is scoped to nameCol (rock_fragmenter has no load gauge either), and `mousemove` targets `x:750` rather than dead-center -- `cameraFocus(6.5,6.5,25)` puts rock_fragmenter's own body (parked at (6,2), same X as its target) directly in the screen-center raycast, same occlusion as rock_digger's. Landing tile ((11,1), confirmed directly) is off in a different direction from rock_digger's and, confirmed the same way (a full scenario run reaching `contract deliver`), does not sit in debris_hauler's hauling route either.",
+      "description": "The third and last blocker (rock_fragmenter). With all three off the z=2 corridor, drill_rig #1's route east is genuinely clear -- confirmed directly (sandbox trace: 40 ticks door-to-door to (15,15) once unblocked, vs. never before). Kept close (z=6, not far off-site) rather than parked deep off-map, so debris_hauler #2 still has a short trip back once hauling self-dispatches after the blast -- Finding (bankruptcy) below is tight enough that a long hauler commute would cost this file its one contract delivery too. Same two bugs as #3's step above, fixed the same way: the row click is scoped to nameCol (rock_fragmenter has no load gauge either), and `mousemove` targets `x:750` rather than dead-center -- `cameraFocus(6.5,6.5,25)` puts rock_fragmenter's own body (parked at (6,2), same X as its target) directly in the screen-center raycast, same occlusion as rock_digger's. Landing tile ((11,1), confirmed directly) is off in a different direction from rock_digger's and, confirmed the same way (a full scenario run reaching `contract deliver`), does not sit in debris_hauler's hauling route either. #947 CI-fix follow-up: same root-cause fix as #3's step above -- the command field previously declared `to:6,6` while the real click always lands at `(11,1)`, and that command-vs-interaction route/timing gap was the actual source of the 4-tick offset that flipped the tail's own `nuisance` expectation (see the freight_warehouse build step and the `union_food_trucks`/`union_nap_room` event step for the full chain). The command field now declares `to:11,1`, matching the real click's own landing tile, so both channels drive rock_fragmenter to the identical destination.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -245,22 +307,6 @@
       "role": "bootstrap"
     },
     {
-      "command": "vehicle driver 2 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 2 3"
-        }
-      ],
-      "description": "#552/#557: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare a manual purchase on top of everything else. #557: this file no longer hires its own driver (see the hire step's own finding) -- staffed:true's own free driver #3 (already licensed driving.truck lvl1 from the free roster) boards it instead. #921: the Fleet panel's Assign/Unassign controls (and the driver-picker select this step used to steer) are gone entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
       "command": "state full",
       "interaction": [
         {
@@ -268,9 +314,10 @@
           "command": "state full"
         }
       ],
+      "description": "#947: `vehicle driver 2 3` no longer runs here -- driver #3 already boarded debris_hauler #2 in the corridor-clearing bootstrap above (see that step's own finding), and a second `vehicle driver 2 3` against an already-driven vehicle is refused (\"Vehicle already has a driver\"). tickCount reads 10, not 0 (issue #947): the corridor-clearing bootstrap's own boarding wait already advanced the clock by that much before this file's first tick-driven checkpoint.",
       "expect": {
         "equals": {
-          "tickCount": 0,
+          "tickCount": 10,
           "holeCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
@@ -290,9 +337,10 @@
           "command": "tick 6"
         }
       ],
+      "description": "#947: tickCount reads 16, not 6 -- 10 ticks ahead of pre-#947 thanks to the corridor-clearing bootstrap's own driver-boarding wait.",
       "expect": {
         "equals": {
-          "tickCount": 6
+          "tickCount": 16
         },
         "decreased": [
           "cash"
@@ -360,7 +408,7 @@
       ],
       "expect": {
         "equals": {
-          "tickCount": 6,
+          "tickCount": 16,
           "surveyCount": 0
         }
       },
@@ -1034,12 +1082,12 @@
       "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to upstream timing shifting the real-tick total this step starts from.",
       "expect": {
         "changedBy": {
-          "tickCount": 8
+          "tickCount": 10
         },
         "decreased": [
           "cash"
         ],
-        "note": "Advances 8 ticks, not 10 (#556): a random event falls due inside the block and a pending event stops the rest of a `tick`. The event beats around it moved with the warehouse construction this file now spends real ticks on."
+        "note": "#947: advances the full 10 ticks now, not 8 (#556) -- the corridor-clearing bootstrap's own 10-tick driver-boarding wait upstream shifts exactly which real tick the next random event falls due on, and it no longer lands inside this particular window. Sandbox-confirmed via `npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win`."
       },
       "role": "setup"
     },
@@ -1122,11 +1170,11 @@
           "command": "tick 10"
         }
       ],
-      "description": "#557: this `tick 10` runs full (140->150), not interrupted -- with this file's crew down to 6 employees (see the earlier hire step's own finding), no fresh event pends inside this particular window.",
+      "description": "#947: this `tick 10` is now interrupted (169->175, 6 of 10 ticks) where it previously ran full (140->150) -- the corridor-clearing bootstrap's own 10-tick driver-boarding wait upstream shifts exactly which real tick the next random event falls due on, and this window is the one it now lands inside. Same class of interruption the two sibling `tick 10` steps above already document (\"only 1/6 of the 10 requested ticks advances here\") -- takes the same looser `increased` check rather than a pinned `changedBy`, since the exact interruption point is incidental to what this step tests (that the clock keeps moving).",
       "expect": {
-        "changedBy": {
-          "tickCount": 10
-        }
+        "increased": [
+          "tickCount"
+        ]
       },
       "role": "setup"
     },
@@ -1137,7 +1185,7 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `union_nap_room`'s option 0 opens a nap room -- a small, deterministic-under-seed consequence, not a cost the file needs to track precisely. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). #557-followup (real interaction-mode CI finding): `wellBeing` dropped too -- command mode/this sandbox landed 93.3166666666667, real CI read 93.65333333333334, the same real-time-accrual-drift class already documented and resolved this way for level1-win-conservative.json/level1-playthrough-revolt.json (the extra real ticks a charge-wait consumes accrue slightly differently depending on the harness's own render timing, and wellBeing's continuous fatigue decay is sensitive to exactly how many of those ticks land before this checkpoint). `nuisance` stays exact -- it doesn't depend on the charge-wait's own tick accrual.",
+      "description": "Resolved through the event dialog's own buttons. #947 CI-fix: the event that falls due here is `union_book_club`, and `nuisance` stays 50 (unchanged) -- re-investigated after real interaction-mode CI reported `nuisance should be 55 but is 50` against this file's prior (command-mode-only sandbox) prediction of `union_food_trucks`/55. Traced with full step-by-step tickCount comparison between command mode and a real interaction-mode run: both channels tracked tick-for-tick identical (0..103) all the way through the blast, right up to the two `vehicle move` steps for rock_digger (#3) and rock_fragmenter (#4) above -- those steps' own `command` field declared `to:4,6`/`to:6,6`, but the real click those steps drive has always actually landed the vehicles at `(10,-2)`/`(11,1)` (raycast self-occlusion workaround, documented in each step's own finding) -- so command mode was simulating a shorter/different route than interaction mode's real one, and that gap compounded through the file's later `wait_until`/`tick 10` steps into a 4-tick command-vs-interaction offset by the freight_warehouse build step, which was enough to shift this window's own due-tick onto a different random event. Fixed at the root by correcting those two steps' own declared targets to the tile the real click has always landed on -- both channels now drive identical routes and reach this event in tick-for-tick lockstep (both land on tick 175's `union_book_club`, confirmed directly in both modes). `safety`/`ecology` remain not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). #557-followup (real interaction-mode CI finding): `wellBeing` also drifts slightly between command mode and a real browser (the extra real ticks a charge-wait consumes accrue slightly differently depending on the harness's own render timing) -- not hard-asserted for the same reason.",
       "role": "player",
       "expect": {
         "equals": {
@@ -1157,7 +1205,7 @@
       "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 170,
+          "tickCount": 175,
           "deathCount": 3,
           "employeeCount": 6,
           "bankrupt": false,
@@ -1168,7 +1216,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0
         },
-        "note": "Closing tickCount re-measured 150 -> 170 (#556): the warehouse is built rather than placed, and the wait that runs its site out costs the run those ticks. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note); the fleet stays at 3 for the rest of the file."
+        "note": "Closing tickCount re-measured 170 -> 175 (#947): the corridor-clearing bootstrap ahead of the three vehicle-move steps (giving each blocking vehicle a driver, per the new driver-gate on vehicle movement) spends 10 real ticks upfront but also shifts the tail's own event-interruption timing (see the two `tick 10` steps above), netting +5 rather than +10. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note); the fleet stays at 3 for the rest of the file."
       },
       "role": "setup"
     }

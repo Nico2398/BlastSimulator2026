@@ -84,14 +84,69 @@ describe('FireStep', () => {
     expect(step.root.textContent).not.toContain('Walt Diggins');
   });
 
-  it('lists a vehicle inside the zone', () => {
+  it('lists a driver-equipped vehicle inside the zone, tagged IN ZONE', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(state.drillHoles, 20, 20, 8, 0.15);
-    purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
+    vehicle.driverId = 1; // driver aboard — not stranded
+
     step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('IN ZONE');
+  });
+
+  it('shows the distinct stranded tag for a driverless vehicle, while a driver-equipped one still shows IN ZONE (#947)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    const { vehicle: driven } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
+    driven.driverId = 1;
+    const { vehicle: driverless } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
+    driverless.driverId = null;
+
+    step.update(state, 'sunny');
+
+    expect(step.root.textContent).toContain('IN ZONE');
+    expect(step.root.textContent).toContain('STRANDED - NO DRIVER'); // ui.blast_workshop.fire.tag_stranded
+  });
+
+  it('checklist shows the stranded-count message when the zone holds only a driverless vehicle (#947)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
+    vehicle.driverId = null;
+
+    step.update(state, 'sunny');
+
+    expect(step.root.textContent).toContain('stranded with no driver');
+  });
+
+  it('checklist shows the stranded-count message for a mix of an employee and a driverless vehicle (#947)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addEmployee(state, 22, 22);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 23, 23);
+    vehicle.driverId = null;
+
+    step.update(state, 'sunny');
+
+    expect(step.root.textContent).toContain('stranded with no driver');
+  });
+
+  it('keeps Sound the Horn clickable when the only occupant is a stranded driverless vehicle (#947)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
+    vehicle.driverId = null;
+
+    step.update(state, 'sunny');
+
+    const hornBtn = step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement;
+    expect(hornBtn.disabled).toBe(false);
   });
 
   it('does not list an employee standing outside the padded box', () => {

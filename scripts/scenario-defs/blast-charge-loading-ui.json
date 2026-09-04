@@ -21,8 +21,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:15,15",
-      "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(19,19) rectangle computes the declared 3x3. #553: confirming the grid queues 9 drill_hole PendingActions and pushes 9 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. Spacing tightened from the original 5m (which needed 2 increment clicks) to 2m (needing 1 decrement) specifically to keep this 9-hole grid's total door-to-door drilling time inside the site's own bankruptcy-grace window (no income anywhere in this file) — sandbox-measured: 9 holes at spacing 5 land around tick 191 with cash already negative, at spacing 2 they land around tick 130 with over $12,000 still in hand.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:15,15 diameter:0.089",
+      "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(19,19) rectangle computes the declared 3x3. #553: confirming the grid queues 9 drill_hole PendingActions and pushes 9 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. Spacing tightened from the original 5m (which needed 2 increment clicks) to 2m (needing 1 decrement) specifically to keep this 9-hole grid's total door-to-door drilling time inside the site's own bankruptcy-grace window (no income anywhere in this file) — sandbox-measured: 9 holes at spacing 5 land around tick 191 with cash already negative, at spacing 2 they land around tick 130 with over $12,000 still in hand. #947 CI-fix follow-up: `diameter:0.089` added to match Drill.ts's own DEFAULT_DIAMETER_M — the grid tool's interaction array below never clicks a diameter stepper, so it always confirms at the UI's 89mm default, not this command's own pre-existing 0.15 fallback (drillPlan.ts). That gap fed computeDrillHoleDurationTicks (DrillPlan.ts) a different diameter per mode, so command mode drilled ~1.7x slower than the real UI — the driller stayed busy on later holes for longer in command mode, dispatching to charge_hole later and never racing the blaster onto simultaneous completions, while interaction mode's faster drilling freed the driller (also blasting-qualified, staffed:true) early enough to land two charge_hole completions on the same tick and skip clean past the wait_until below's exact chargedCount:6 checkpoint (CI: 'stalled at 9 after 9000 tick(s)', never landing on exactly 6). Root cause confirmed by direct comparison of full step-09 state dumps between command and interaction mode (cash/minFatigue/pendingActionCount all diverged despite identical tickCount) and by replaying the identical command sequence directly in-browser (bypassing the panel's clicks) once with the declared 0.15 default (reached exactly 6) and once with 0.089 (skipped it) — unrelated to #947's vehicle driver-gating fix itself, which this scenario's drilling/charging never exercises.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -339,14 +339,14 @@
       "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently order every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on. #554: this orders 9 fresh charge_hole actions (one per hole, cancelling/replacing H1/H2/H3's already-landed entries with a new pending order and queuing H4-H9 for the first time) — none of the 9 lands the instant the button is clicked."
     },
     {
-      "command": "wait_until field:chargedCount equals:6 max_ticks:9000",
+      "command": "wait_until field:chargedCount equals:5 max_ticks:9000",
       "timeout": 305,
-      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead.)",
+      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (5 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead. #947 CI-fix follow-up: checkpoint moved from 6 to 5 — staffed:true's driller is also blasting-qualified and joins the blaster once drilling is done, so the Charge All drain lands two holes on the very same tick at this point in the sequence (deterministically confirmed: 3->4->5->7->9, tick 177 landing both the 6th and 7th charge together). 6 is never observed as a value chargedCount actually holds, so a wait_until pinned to it can only ever exhaust its budget waiting on a value the drain skips straight past. 5 sits on the same landing sequence.)",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
-          "equals": 6,
+          "equals": 5,
           "maxTicks": 9000,
           "timeoutMs": 300000
         },
@@ -357,9 +357,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 6
+          "chargedCount": 5
         },
-        "note": "6 of 9 holes loaded from the Charge All order; the remaining 3 are still ordered-but-unloaded"
+        "note": "5 of 9 holes loaded from the Charge All order; the remaining 4 are still ordered-but-unloaded"
       }
     },
     {

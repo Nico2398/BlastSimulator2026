@@ -430,29 +430,87 @@
       }
     },
     {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "command": "tick 20",
       "timeout": 180,
-      "description": "#557: drain the real walkout Sound the Horn just ordered before firing.",
+      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- both drillers (#1, #2) auto-dismount their drill_rigs (#1, #2) the instant each drilling task finishes, so both rigs are undriven by the time Sound the Horn fires here, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with both rigs permanently stranded on their holes, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix), split into tick/event pairs since command mode's own tick loop refuses to advance past a pending event. Both drillers (employees, not gated by #947) still walk out for real across this pad; only the driverless rigs stay behind. #947-followup (this fix): shrunk from `tick 100`x3 (300 ticks total) to `tick 20`x3 (60 ticks, matching safety-projection-visual.json's own #947 pad exactly) -- direct-traced live in interaction mode: the 300-tick version crashed wellBeing 53 -> 0 by tick 230 and triggered a genuine worker_revolt by tick 330, whose LevelEndScreen `.bs-confirm-overlay` is what actually covered the blast panel's execute button (\"element is covered by div\", CI's own reported symptom) -- not a stuck random-event dialog, so no amount of `resolveEventIfPending` could have closed it (the same misdiagnosis vibration-budget.json's own #707 correction already found once for this exact symptom). The two drillers only need to walk clear of the zone once, a short trip from either hole to open ground outside the (5,5)-(39,39) box; 60 ticks is ample margin over that and stays well clear of the wellBeing-crash/revolt threshold this file's own worker count and needs decay were tipping into.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 300,
-          "timeoutMs": 180000
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "commandOutcome": "either",
       "expect": {
         "equals": {
-          "dangerZoneClear": true
-        }
+          "dangerZoneClear": false,
+          "levelEnded": false
+        },
+        "note": "#947: dangerZoneClear reads false, not true -- both stranded driverless drill_rigs keep the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. levelEnded stays false here (#947-followup): the shrunk 60-tick pad (see the first tick step's own note) keeps wellBeing off the worker_revolt threshold this file's original 300-tick pad crashed into live. The blast step's own `deathCount: 0` proof downstream is what actually shows the two drillers evacuated for real."
       }
     },
     {
-      "command": "blast",
-      "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above.",
+      "command": "event choose 0",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "blast",
+      "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above. #947-followup: leading `resolveEventIfPending` added -- the preceding step's own resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing this click with \"element is covered by div\" (same race rock-fragmenter-breaking.json's own #601-followup sequence/blast steps found and fixed, see their notes).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -477,7 +535,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 0
+          "holeCount": 0,
+          "deathCount": 0
         },
         "decreased": [
           "ecology",

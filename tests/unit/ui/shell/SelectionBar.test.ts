@@ -288,6 +288,12 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     const { runner, ctx } = createRunner();
     runner.run('new_game mine_type:desert seed:1 size:32');
     const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 0, 0);
+    // #947: canTickVehicle now requires a driver aboard to advance on tick at
+    // all -- a driverless `vehicle move` is refused outright. This test's own
+    // point is that the dispatched command string parses and reaches the real
+    // command handler, not the driver gate, so give it a driver directly
+    // (same pattern as Zone.test.ts's own #947 fixtures).
+    vehicle.driverId = 1;
 
     const command = extractTemplate()
       .replace('${entity.id}', String(vehicle.id))

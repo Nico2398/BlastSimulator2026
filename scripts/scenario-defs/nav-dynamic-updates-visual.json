@@ -256,6 +256,28 @@
       }
     },
     {
+      "command": "vehicle driver 5 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 5 3"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #5 needs a driver boarded before the move step below can succeed. Employee #3 (Gus Pickaxe, staffed:true's driving.truck driver) is free -- the driller/blaster/other two drivers never touch this vehicle -- and boards it as its continuity driver (VehicleReservation.ts's driverId===employee.id tie-break), matching the pattern hauling-gate.json already uses for a bootstrap `vehicle driver` assignment."
+    },
+    {
+      "command": "tick 60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "role": "setup",
+      "description": "Employee #3 spawns near the staffed fleet's cluster (~0,2); hauler #5 spawns at (35,35), ~48 tiles away -- confirmed live: 60 ticks is enough for #3 to walk over and board (`vehicle list` shows driver:#3 afterward)."
+    },
+    {
       "command": "vehicle move 5 to:15,15",
       "interaction": [
         {

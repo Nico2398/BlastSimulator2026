@@ -190,7 +190,15 @@ function canTickVehicle(vehicle: Vehicle): boolean {
   // #437). task is the sole authority on whether a vehicle should move; state is a derived
   // display value tickVehicleTaskState/tickVehicle themselves update, so it must never block
   // a 'moving' task from actually ticking.
-  return vehicle.task === 'moving' &&
+  //
+  // driverId === null blocks unconditionally, on both the NavGrid and
+  // direct-line branches, regardless of task/state (#947): a vehicle only
+  // ever advances on tick with someone aboard. ArrivalGate.ts's
+  // resolveBoarding deliberately leaves task alone until a driver boards, so
+  // every existing caller that sets task='moving' already has driverId set
+  // first — this closes the class of bug where a driverless vehicle (e.g.
+  // Zone.ts's clearZone, before this fix) drove itself.
+  return vehicle.driverId !== null && vehicle.task === 'moving' &&
     (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting' || vehicle.state === 'working');
 }
 

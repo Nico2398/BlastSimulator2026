@@ -1030,9 +1030,42 @@
       }
     },
     {
+      "command": "vehicle driver 1 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 2"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, and each employee auto-dismounts their vehicle the instant the task that needed it finishes -- so drill_rig #1 (driven here by driller employee #2) sits driverless by the time evacuate-zone's Sound the Horn fires below, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone. Re-board both vehicles before sounding the horn so the walkout this stage's own tutorial gate (isEvacuationZoneClear) requires can genuinely complete, matching tutorial-interactive.json's own #947 fix at the same point."
+    },
+    {
+      "command": "vehicle driver 2 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#947: rock_digger #2, driven earlier by the surveyor-turned-digger employee #1 (box-cut), re-boarded the same way."
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "role": "setup",
+      "description": "#947: enough ticks for both employees to walk to their vehicle and board (ArrivalGate.tickArrivalGate) before Sound the Horn is clicked below."
+    },
+    {
       "command": "zone clear x1:5 y1:5 x2:41 y2:41",
       "timeout": 180,
-      "description": "#557: evacuate-zone. Same box as tutorial-interactive.json's own evacuate-zone step -- computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's identical 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41), which on tutorial_pit's 32x32 map covers nearly the whole site. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click.",
+      "description": "#557: evacuate-zone. Same box as tutorial-interactive.json's own evacuate-zone step -- computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's identical 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41), which on tutorial_pit's 32x32 map covers nearly the whole site. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded.",
       "interaction": [
         {
           "type": "waitForSelector",

@@ -32,6 +32,8 @@ interface Occupant {
   icon: IconName;
   name: string;
   sub: string;
+  /** True for a vehicle stranded in the zone with no driver aboard — clearZone/evacuateZone report it via strandedVehicleIds rather than moving it. */
+  strandedNoDriver: boolean;
 }
 
 export class FireStep {
@@ -101,7 +103,7 @@ export class FireStep {
     const occupants = zone ? this.occupants(state, zone) : [];
     this.hornBtn.disabled = occupants.length === 0;
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, occupants.length);
+    this.renderChecklist(state.drillHoles.length, wet.length, occupants);
   }
 
   refreshLocale(): void {
@@ -119,11 +121,12 @@ export class FireStep {
         icon: e.collapsing ? 'collapse' : 'crew',
         name: e.name,
         sub: t(`role.${e.role}`),
+        strandedNoDriver: false,
       });
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}` });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: v.driverId === null });
     }
     return result;
   }
@@ -135,7 +138,7 @@ export class FireStep {
       if (e.alive && isInZone(e.x, e.z, zone)) keys.push(`e${e.id}`);
     }
     for (const v of state.vehicles.vehicles) {
-      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}`);
+      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${v.driverId === null ? 'nodriver' : 'driver'}`);
     }
     return keys;
   }
@@ -167,17 +170,26 @@ export class FireStep {
         el('span', { text: o.name, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', { text: o.sub, attrs: { style: 'font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
       ] }),
-      el('span', { text: t('ui.blast_workshop.fire.tag_in_zone'), attrs: { style: 'margin-left:auto;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
+      el('span', {
+        text: t(o.strandedNoDriver ? 'ui.blast_workshop.fire.tag_stranded' : 'ui.blast_workshop.fire.tag_in_zone'),
+        attrs: { style: 'margin-left:auto;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' },
+      }),
     );
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, occupantCount: number): void {
+  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[]): void {
     const dryOk = wetCount === 0;
+    const occupantCount = occupants.length;
+    const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount })),
-      this.makeCheckRow(zoneOk, zoneOk ? t('ui.blast_workshop.fire.check_zone_clear') : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
+      this.makeCheckRow(zoneOk, zoneOk
+        ? t('ui.blast_workshop.fire.check_zone_clear')
+        : strandedCount > 0
+          ? t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: occupantCount, strandedCount })
+          : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
     );
   }
 

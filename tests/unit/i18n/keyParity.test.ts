@@ -288,8 +288,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // the count. Net -9, both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
+    // Baseline is now 3464 (up from 3461): #947 adds 3 keys for the zone-clear
+    // driver gate (ui.blast_workshop.fire.tag_stranded,
+    // ui.blast_workshop.fire.check_zone_occupied_stranded,
+    // vehicle.move_no_driver), both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3461);
+    expect(Object.keys(en).length).toBe(3464);
   });
 });
 
