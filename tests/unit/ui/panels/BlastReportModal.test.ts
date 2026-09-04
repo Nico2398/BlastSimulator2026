@@ -403,6 +403,147 @@ describe('BlastReportModal', () => {
     expect(modal.visible).toBe(false);
   });
 
+  // ── real collapse duration as a floor against BLAST_REPORT_DELAY_MS (#950) ──
+  // The 3000ms floor is decoupled from how long the fragment-collapse
+  // animation actually plays — a blast with real flyrock (long projectile
+  // arcs) can run well past 3s, and the old fixed floor let the report cover
+  // the collapse mid-flight. update()'s second parameter,
+  // blastPlaybackDurationS, is the real playback duration in seconds
+  // (GameRenderer.fragmentPlaybackDuration); the modal must wait out
+  // whichever is longer: the floor, or that real duration.
+
+  describe('real collapse duration as a floor against the delay (#950)', () => {
+    it('stays closed past the 3000ms floor when the real collapse runs longer, opening only once the real duration elapses', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      modal.update(state, 5); // arms with a 5s real collapse duration
+
+      // Past the old fixed floor (3000ms) — must still be closed, since the
+      // real 5s collapse is still playing.
+      setNow(BLAST_REPORT_DELAY_MS);
+      modal.update(state, 5);
+      expect(modal.visible).toBe(false);
+      expect(modal.pending).toBe(true);
+
+      // Just under the real duration (5000ms) — still closed.
+      setNow(4999);
+      modal.update(state, 5);
+      expect(modal.visible).toBe(false);
+      expect(modal.pending).toBe(true);
+
+      // The real duration has now elapsed — opens.
+      setNow(5000);
+      modal.update(state, 5);
+      expect(modal.visible).toBe(true);
+      expect(modal.pending).toBe(false);
+    });
+
+    it('still waits the full 3000ms floor when the real collapse duration is shorter than the floor (unchanged #545 behavior)', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      modal.update(state, 1); // a 1s real collapse — shorter than the 3s floor
+
+      setNow(999);
+      modal.update(state, 1);
+      expect(modal.visible).toBe(false);
+
+      // The real duration (1000ms) has elapsed, but the floor has not.
+      setNow(1000);
+      modal.update(state, 1);
+      expect(modal.visible).toBe(false);
+      expect(modal.pending).toBe(true);
+
+      setNow(BLAST_REPORT_DELAY_MS - 1);
+      modal.update(state, 1);
+      expect(modal.visible).toBe(false);
+
+      setNow(BLAST_REPORT_DELAY_MS);
+      modal.update(state, 1);
+      expect(modal.visible).toBe(true);
+    });
+
+    it('still waits the full 3000ms floor when blastPlaybackDurationS is exactly 0 (unchanged #545 behavior)', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      modal.update(state, 0);
+
+      setNow(BLAST_REPORT_DELAY_MS - 1);
+      modal.update(state, 0);
+      expect(modal.visible).toBe(false);
+
+      setNow(BLAST_REPORT_DELAY_MS);
+      modal.update(state, 0);
+      expect(modal.visible).toBe(true);
+    });
+
+    it('update(state) with the duration parameter omitted behaves identically to before — floor stays 3000ms', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      modal.update(state); // no second argument at all
+
+      setNow(BLAST_REPORT_DELAY_MS - 1);
+      modal.update(state);
+      expect(modal.visible).toBe(false);
+      expect(modal.pending).toBe(true);
+
+      setNow(BLAST_REPORT_DELAY_MS);
+      modal.update(state);
+      expect(modal.visible).toBe(true);
+      expect(modal.pending).toBe(false);
+    });
+
+    it('does not reset or extend the deadline when update() is pumped every frame with an unchanged report and duration', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      // Arm with a 5s real duration, then call update() repeatedly at every
+      // tick in between (as the real render loop's per-frame call does) —
+      // none of these calls may push pendingDeadlineMs further out.
+      modal.update(state, 5);
+      for (let ms = 0; ms <= 4999; ms += 500) {
+        setNow(ms);
+        modal.update(state, 5);
+        expect(modal.visible).toBe(false);
+      }
+
+      // Still opens at exactly the original 5000ms deadline, not later.
+      setNow(5000);
+      modal.update(state, 5);
+      expect(modal.visible).toBe(true);
+    });
+
+    it('data-outstanding marker stays true through an extended real-duration delay, and flips false only once genuinely dismissed', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+
+      modal.update(state, 5);
+      expect(modal.root.dataset['outstanding']).toBe('true');
+
+      setNow(BLAST_REPORT_DELAY_MS); // past the old floor, still mid-collapse
+      modal.update(state, 5);
+      expect(modal.root.dataset['outstanding']).toBe('true');
+      expect(modal.visible).toBe(false);
+
+      setNow(5000); // real duration elapsed — opens
+      modal.update(state, 5);
+      expect(modal.root.dataset['outstanding']).toBe('true');
+      expect(modal.visible).toBe(true);
+
+      (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+      expect(modal.root.dataset['outstanding']).toBe('false');
+    });
+  });
+
   it('refreshLocale() does not throw', () => {
     const { modal } = makeModal();
     expect(() => modal.refreshLocale()).not.toThrow();
