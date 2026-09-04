@@ -40,6 +40,6 @@ describe('linearstep', () => {
   });
 
   it('handles a descending (a > b) range consistently with the general formula', () => {
-    expect(() => linearstep(10, 0, 5)).not.toThrow();
+    expect(linearstep(10, 0, 5)).toBe(0.5);
   });
 });
