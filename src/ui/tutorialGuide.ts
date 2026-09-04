@@ -111,16 +111,6 @@ export function allowedSelectors(stage: TutorialStage | undefined): string[] {
   return [stage.target, ...(stage.also ?? [])];
 }
 
-/** Controls inside any modal that is currently on screen. */
-function visibleModalControls(root: ParentNode): Element[] {
-  const controls: Element[] = [];
-  for (const modal of Array.from(root.querySelectorAll(MODAL_SELECTOR))) {
-    if (getComputedStyle(modal as HTMLElement).display === 'none') continue;
-    controls.push(...Array.from(modal.querySelectorAll('button, select, input')));
-  }
-  return controls;
-}
-
 /**
  * Every modal currently on screen (matches `MODAL_SELECTOR` and its own
  * `display` is not `none`).
@@ -128,9 +118,10 @@ function visibleModalControls(root: ParentNode): Element[] {
  * Used by `applyRails` to decide, per modal, whether it gets blanket-allowed
  * or narrowed down to the active stage's own target (#951).
  */
-export function visibleModals(_root: ParentNode | Document): Element[] {
-  // TODO: implement
-  return [];
+export function visibleModals(root: ParentNode | Document): Element[] {
+  return Array.from(root.querySelectorAll(MODAL_SELECTOR)).filter(
+    (modal) => getComputedStyle(modal as HTMLElement).display !== 'none',
+  );
 }
 
 /**
@@ -142,11 +133,15 @@ export function visibleModals(_root: ParentNode | Document): Element[] {
  * stage's own target plus `MODAL_DISMISS_SELECTOR` instead (#951).
  */
 export function stageTargetsInsideModal(
-  _stage: TutorialStage | undefined,
-  _modal: Element,
-  _root: ParentNode | Document,
+  stage: TutorialStage | undefined,
+  modal: Element,
+  root: ParentNode | Document,
 ): boolean {
-  // TODO: implement
+  for (const selector of allowedSelectors(stage)) {
+    for (const el of Array.from(root.querySelectorAll(selector))) {
+      if (modal.contains(el)) return true;
+    }
+  }
   return false;
 }
 
@@ -172,8 +167,20 @@ export function applyRails(
   for (const el of Array.from(root.querySelectorAll(`.${HIGHLIGHT_CLASS}`))) {
     el.classList.remove(HIGHLIGHT_CLASS);
   }
-  // An open modal is always operable, even mid-stage.
-  for (const el of visibleModalControls(root)) el.classList.add(ALLOWED_CLASS);
+  // An open modal is always operable, unless the active stage targets one of
+  // its own controls (#951) — then only that target and the modal's own
+  // dismiss control stay allowed, so a player can still back out.
+  for (const modal of visibleModals(root)) {
+    if (stageTargetsInsideModal(stage, modal, root)) {
+      for (const el of Array.from(modal.querySelectorAll(MODAL_DISMISS_SELECTOR))) {
+        el.classList.add(ALLOWED_CLASS);
+      }
+    } else {
+      for (const el of Array.from(modal.querySelectorAll('button, select, input'))) {
+        el.classList.add(ALLOWED_CLASS);
+      }
+    }
+  }
 
   for (const selector of extraAllowed) {
     for (const el of Array.from(root.querySelectorAll(selector))) {
