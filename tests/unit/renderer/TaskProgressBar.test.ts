@@ -292,6 +292,53 @@ describe('TaskProgressBar', () => {
       bar.dispose();
     });
 
+    it('at update(MOVE_TWEEN_DURATION_S / 2), fill scale.x is exactly the arithmetic midpoint of the retarget (linear, not smoothstep-curved)', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      bar.update(MOVE_TWEEN_DURATION_S / 2);
+
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.4, 5);
+      bar.dispose();
+    });
+
+    it('at update(MOVE_TWEEN_DURATION_S / 4), fill scale.x is exactly the linear quarter-point value, not smoothstep', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      bar.update(MOVE_TWEEN_DURATION_S / 4);
+
+      // Smoothstep at t=0.25 would give ≈0.242 (0.2 + 0.4*0.104), not 0.3.
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.3, 5);
+      bar.dispose();
+    });
+
+    it('at update(MOVE_TWEEN_DURATION_S * 3/4), fill scale.x is exactly the linear three-quarter-point value, not smoothstep', () => {
+      const scene = new THREE.Scene();
+      const bar = new TaskProgressBar(scene, makeCamera());
+      const anchor = new THREE.Group();
+      scene.add(anchor);
+
+      bar.sync([empAtFraction(1, 0.2)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+      bar.sync([empAtFraction(1, 0.6)], NO_VEHICLES, id => (id === 1 ? anchor : null));
+
+      bar.update((MOVE_TWEEN_DURATION_S * 3) / 4);
+
+      // Smoothstep at t=0.75 would give ≈0.558 (0.2 + 0.4*0.896), not 0.5.
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.5, 5);
+      bar.dispose();
+    });
+
     it('repeated update() calls with no intervening sync() leave the fill unchanged once converged', () => {
       const scene = new THREE.Scene();
       const bar = new TaskProgressBar(scene, makeCamera());

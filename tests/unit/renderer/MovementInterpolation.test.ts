@@ -62,6 +62,26 @@ describe('MovementInterpolation', () => {
       expect(pos.z).toBeLessThan(20);
     });
 
+    it('returns exactly the arithmetic midpoint at elapsedS === durationS / 2 (linear, not smoothstep-curved)', () => {
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, durationS / 2, durationS);
+      expect(pos.x).toBe(5);
+      expect(pos.z).toBe(10);
+    });
+
+    it('returns exactly the linear quarter-point value at elapsedS === durationS / 4, not smoothstep', () => {
+      // Smoothstep at t=0.25 of the range would give ≈0.104 of the way — 1.04, not 2.5.
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, durationS / 4, durationS);
+      expect(pos.x).toBe(2.5);
+      expect(pos.z).toBe(5);
+    });
+
+    it('returns exactly the linear three-quarter-point value at elapsedS === durationS * 3/4, not smoothstep', () => {
+      // Smoothstep at t=0.75 of the range would give ≈0.896 of the way — 8.96, not 7.5.
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, (durationS * 3) / 4, durationS);
+      expect(pos.x).toBe(7.5);
+      expect(pos.z).toBe(15);
+    });
+
     it('is monotonic — increasing elapsedS never moves the result away from target', () => {
       const targetX = 10, targetZ = -30;
       let prevDist = Infinity;
