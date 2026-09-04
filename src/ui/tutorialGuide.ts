@@ -118,7 +118,7 @@ export function allowedSelectors(stage: TutorialStage | undefined): string[] {
  * Used by `applyRails` to decide, per modal, whether it gets blanket-allowed
  * or narrowed down to the active stage's own target (#951).
  */
-export function visibleModals(root: ParentNode | Document): Element[] {
+function visibleModals(root: ParentNode | Document): Element[] {
   return Array.from(root.querySelectorAll(MODAL_SELECTOR)).filter(
     (modal) => getComputedStyle(modal as HTMLElement).display !== 'none',
   );
@@ -132,7 +132,7 @@ export function visibleModals(root: ParentNode | Document): Element[] {
  * targets a control inside it; when one does, that modal is narrowed to the
  * stage's own target plus `MODAL_DISMISS_SELECTOR` instead (#951).
  */
-export function stageTargetsInsideModal(
+function stageTargetsInsideModal(
   stage: TutorialStage | undefined,
   modal: Element,
   root: ParentNode | Document,
