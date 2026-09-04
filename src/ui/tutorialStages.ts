@@ -55,13 +55,33 @@ export interface TutorialStage {
 const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
-/** Pick a tile, then confirm — the shared tail of every placement step. */
-function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] {
+/**
+ * Pick a tile, then confirm — the shared tail of every placement step.
+ *
+ * `extraAlso` (#949): the grid tool's own spacing/depth steppers live on the
+ * shared `ParamStrip` (`#bs-param-strip-bar`), rendered alongside the canvas
+ * the instant the tool arms — not gated behind a selection existing, so they
+ * are reachable for the whole picker stage. Without listing them here they
+ * stayed `pointer-events: none` for this stage's entire duration, same as
+ * Charge's amount/stemming steppers below: a player could drag a grid but
+ * never actually retune spacing/depth off the tool's own defaults. Only the
+ * drill picker passes any (survey/build/box-cut pickers have nothing to
+ * tune, so they keep the empty default).
+ */
+function pickerStages(pickHintKey: string, region: TileRegion, extraAlso: string[] = []): TutorialStage[] {
   return [
-    { target: PICKER_CANVAS, hintKey: pickHintKey, region },
-    { target: PICKER_CONFIRM, hintKey: 'tutorial.stage.picker_confirm', also: [PICKER_CANVAS], region },
+    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: extraAlso },
+    { target: PICKER_CONFIRM, hintKey: 'tutorial.stage.picker_confirm', also: [PICKER_CANVAS, ...extraAlso], region },
   ];
 }
+
+// #949: grid tool's spacing/depth steppers, rendered on the shared ParamStrip
+// (`#bs-param-strip-bar`, ParamStrip.ts) once the grid tool is armed — same
+// `data-field`/`.bsx-stepper-btn` convention Charge.ts's amount/stemming
+// steppers use below. Both buttons (inc and dec) are allowlisted, not just
+// increment: a player over- or under-shooting a click needs the other one too.
+const GRID_SPACING_STEPPER = '#bs-param-strip-bar [data-field="spacing"] .bsx-stepper-btn';
+const GRID_DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn';
 
 /**
  * Where each guided placement belongs, in tiles on the 32×32 tutorial map
@@ -228,12 +248,25 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },
-    ...pickerStages('tutorial.stage.drill_area', REGION.drill),
+    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, GRID_DEPTH_STEPPER]),
   ],
 
+  // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
+  // convention) alongside Charge All — without them the scripted plan's
+  // amount:4/stemming:2.5 was unreachable by a real click: the panel opens at
+  // its own 5kg/2.0m defaults and nothing on this stage let a player move off
+  // them. Both stepper buttons (inc/dec) allowed, not just the direction the
+  // scripted plan happens to need.
   charge: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
-    { target: '#bs-blast-panel [data-action="charge-all"]', hintKey: 'tutorial.stage.charge_all' },
+    {
+      target: '#bs-blast-panel [data-action="charge-all"]',
+      hintKey: 'tutorial.stage.charge_all',
+      also: [
+        '#bs-blast-panel [data-field="amount"] .bsx-stepper-btn',
+        '#bs-blast-panel [data-field="stemming"] .bsx-stepper-btn',
+      ],
+    },
   ],
 
   // #926: `auto-sequence` lives inside the Sequence tab's own body, hidden
