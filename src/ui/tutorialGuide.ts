@@ -97,6 +97,14 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
  */
 const MODAL_SELECTOR = '.bs-confirm-overlay';
 
+/**
+ * A modal's own dismiss/cancel/close control — stays allowed even when a
+ * stage narrows the rest of that modal's controls down to a single target
+ * (#951), so a player can still back out of the modal the stage is pointing
+ * into.
+ */
+export const MODAL_DISMISS_SELECTOR = '[data-action$="-cancel"], [data-action$="-close"], .bs-event-dismiss';
+
 /** Every selector the player may interact with during a stage. */
 export function allowedSelectors(stage: TutorialStage | undefined): string[] {
   if (!stage) return [];
@@ -111,6 +119,35 @@ function visibleModalControls(root: ParentNode): Element[] {
     controls.push(...Array.from(modal.querySelectorAll('button, select, input')));
   }
   return controls;
+}
+
+/**
+ * Every modal currently on screen (matches `MODAL_SELECTOR` and its own
+ * `display` is not `none`).
+ *
+ * Used by `applyRails` to decide, per modal, whether it gets blanket-allowed
+ * or narrowed down to the active stage's own target (#951).
+ */
+export function visibleModals(_root: ParentNode | Document): Element[] {
+  // TODO: implement
+  return [];
+}
+
+/**
+ * Whether `stage`'s target/also selectors resolve to an element contained by
+ * `modal`.
+ *
+ * `applyRails` blanket-allows a modal's controls only when no active stage
+ * targets a control inside it; when one does, that modal is narrowed to the
+ * stage's own target plus `MODAL_DISMISS_SELECTOR` instead (#951).
+ */
+export function stageTargetsInsideModal(
+  _stage: TutorialStage | undefined,
+  _modal: Element,
+  _root: ParentNode | Document,
+): boolean {
+  // TODO: implement
+  return false;
 }
 
 /**
