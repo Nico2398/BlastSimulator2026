@@ -122,6 +122,47 @@ describe('GameRenderer — onBlast()', () => {
     // syncFromContext was never called — terrain/lastGrid are still null.
     expect(() => renderer.onBlast(ctx)).not.toThrow();
   });
+
+  it('resets fragmentPlaybackDuration to 0 on a later blast with nothing to show, rather than keeping an earlier long-duration blast\'s (#950)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+
+    // First blast: real flight data that takes a long time to play out.
+    ctx.lastBlastFlights = [{
+      fragmentId: 0,
+      from: { x: 10, y: 20, z: 10 },
+      to: { x: 10, y: 0, z: 10 },
+      delayS: 0,
+      durationS: 5,
+      impactSpeed: 10,
+      thrown: false,
+    }];
+    ctx.lastBlastFragmentData = [{
+      id: 0,
+      position: { x: 10, y: 0, z: 10 },
+      volume: 0.5,
+      mass: 1000,
+      rockId: 'sandite',
+      oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+      shapeSeed: 3,
+    }];
+
+    renderer.onBlast(ctx);
+
+    expect(renderer.fragmentPlaybackDuration).toBeGreaterThan(0);
+
+    // Second blast: nothing to show (empty fragment data / no flights).
+    ctx.lastBlastFlights = [];
+    ctx.lastBlastFragmentData = [];
+
+    renderer.onBlast(ctx);
+
+    expect(renderer.fragmentPlaybackDuration).toBe(0);
+  });
 });
 
 describe('GameRenderer — safety zone evacuation wiring', () => {
