@@ -4,7 +4,7 @@
 // (a task progress bar's fill fraction) instead of an (x, z) position.
 // No THREE import — same pure-logic-out-of-mesh-class seam.
 
-import { smoothstep } from '../core/math/Smoothstep.js';
+import { linearstep } from '../core/math/Linearstep.js';
 import { MOVE_TWEEN_DURATION_S } from './MovementInterpolation.js';
 
 export interface FillTween {
@@ -61,13 +61,13 @@ export function stepFillTween(
   tween.elapsedS += dt;
 
   // Converged (or a large dt jumped past the duration) — return the target
-  // exactly rather than relying on smoothstep(1)'s arithmetic to cancel out.
+  // exactly rather than relying on linearstep(1)'s arithmetic to cancel out.
   if (tween.elapsedS >= MOVE_TWEEN_DURATION_S) {
     tween.elapsedS = MOVE_TWEEN_DURATION_S;
     tween.prevFraction = targetFraction;
     return targetFraction;
   }
 
-  const ease = smoothstep(0, MOVE_TWEEN_DURATION_S, tween.elapsedS);
+  const ease = linearstep(0, MOVE_TWEEN_DURATION_S, tween.elapsedS);
   return tween.prevFraction + (tween.targetFraction - tween.prevFraction) * ease;
 }

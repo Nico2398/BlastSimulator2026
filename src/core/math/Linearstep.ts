@@ -4,9 +4,6 @@
 // task-fill tweening, and UI progress transitions (#948).
 
 export function linearstep(a: number, b: number, t: number): number {
-  // TODO: implement
-  void a;
-  void b;
-  void t;
-  return 0;
+  if (a === b) return t < a ? 0 : 1;
+  return Math.min(1, Math.max(0, (t - a) / (b - a)));
 }

@@ -211,7 +211,7 @@ const CSS = `
 .bs-contract-row:last-child { border-bottom: none; }
 .bs-contract-btns { display: flex; gap: 4px; margin-top: 5px; }
 .bs-progress-bar-bg { background: rgba(255,255,255,0.1); border-radius: 3px; height: 5px; margin-top: 4px; }
-.bs-progress-bar-fill { height: 100%; background: #4caf50; border-radius: 3px; transition: width 0.4s; }
+.bs-progress-bar-fill { height: 100%; background: #4caf50; border-radius: 3px; transition: width 0.4s linear; }
 
 /* ─── Build menu ─── */
 .bs-build-row {
@@ -290,16 +290,16 @@ const CSS = `
 .bs-entity-name { font-weight: 600; color: #e0d8c8; }
 .bs-entity-sub { color: #847a6a; font-size: 10px; margin-top: 1px; }
 .bs-hp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; width: 60px; margin-top: 3px; }
-.bs-hp-bar-fill { height: 100%; background: #4caf50; border-radius: 2px; transition: width 0.3s; }
+.bs-hp-bar-fill { height: 100%; background: #4caf50; border-radius: 2px; transition: width 0.3s linear; }
 
 /* ─── Employee skills detail (10.6.2) ─── */
 .bs-skill-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 10px; }
 .bs-skill-category { color: #d0b090; font-weight: 600; }
 .bs-skill-stars { color: #ffc840; font-size: 11px; }
 .bs-xp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; margin-top: 2px; flex: 1; min-width: 40px; }
-.bs-xp-bar-fill { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); border-radius: 2px; transition: width 0.3s; }
+.bs-xp-bar-fill { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); border-radius: 2px; transition: width 0.3s linear; }
 .bs-need-bar-bg { background: rgba(255,255,255,0.08); border-radius: 2px; height: 5px; margin-top: 1px; }
-.bs-need-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.bs-need-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s linear; }
 .bs-task-queue { margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
 .bs-task-entry { display: flex; align-items: center; gap: 4px; padding: 2px 0; font-size: 10px; color: #a09070; }
 .bs-task-entry.current { color: #d0c8b0; font-weight: 600; }
@@ -477,7 +477,7 @@ body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-cleara
 .bs-tutorial-progress-fill {
   height: 100%;
   background: var(--bsx-amber);
-  transition: width 0.3s ease;
+  transition: width 0.3s linear;
 }
 .bs-tutorial-commands-label {
   font-size: 9px;
