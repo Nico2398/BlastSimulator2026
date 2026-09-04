@@ -656,7 +656,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089",
       "timeout": 90,
       "interaction": [
         {
@@ -672,11 +672,23 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip-bar [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip-bar [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip-bar [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
-          "x1": 20,
+          "x1": 22,
           "z1": 20,
-          "x2": 26,
-          "z2": 26
+          "x2": 30,
+          "z2": 28
         },
         {
           "type": "screenshot"
@@ -690,7 +702,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: confirming the grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. Start corrected from the file's original 15,15 to 20,20 (Finding #74/#75 follow-up): the tutorial's drill-plan stage gates its picker to REGION.drill (tutorialStages.ts). #601-followup: REGION.drill is actually `{ x1: 20, z1: 20, x2: 26, z2: 26, exact: true }` -- the prior Finding #74/#75 note here claimed a larger grid and hole count than the tool actually produces, which was never real: a direct `drill_plan show` probe after the real drag+confirm read back spacing 3m but only a 3x3/9-hole grid landing at (20,20)-(26,26), matching REGION.drill's own real x2/z2 exactly, not the wider rectangle the note assumed. `dragTiles`'s x2/z2 corrected from 30,30 to 26,26 (the requested corners get clamped to `exact: true`'s own gate regardless, but the declared numbers should say what the gate actually allows, not a rectangle a real player's drag will never produce) and the command's rows/cols corrected from 4/4 back to 3/3, restoring this file's own original 9-hole declaration. spacing and depth both corrected from the file's original 5/8 to the grid tool's real defaults 3/6 (DEFAULT_SPACING_M/DEFAULT_DEPTH_M, Drill.ts), discovered live: neither stepper (#bs-param-strip [data-field=\"spacing\"|\"depth\"]) is one of this stage's own targets (tutorialStages.ts's 'drill-plan' entry lists only the toolbar, grid-tool button, and picker canvas/confirm) -- the tutorial rail's own CSS lockout makes every other control pointer-events:none while a stage is active. CI cash mismatch fix: this command was also missing `diameter:`, the established diameter-omission bug (Finding #52 class) -- command mode defaults to 0.15 while the real Drill panel always sends DEFAULT_DIAMETER_M=0.089 (Drill.ts), and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter/0.15, so the omitted-diameter command mode this file's cash values were derived from kept the drill_rig busy (and paying fuelCostPerTick) longer than a real click would. Added `diameter:0.089` to match the real click; every downstream checkpoint through the blast step was re-derived from command mode with the fix applied.",
+      "description": "#949-followup: added the spacing (3->4, one increment click, 1m/step) and depth (6->8, two increment clicks, 1m/step) stepper clicks before the drag -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), rendered the instant the grid tool arms, and were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix). Without these clicks the drag alone produced a mis-spaced grid at the panel's own defaults (wrong spacing/depth), not the retuned 3x3/spacing:4/depth:8 plan #949 asks for. #553: confirming the 3x3/9-hole grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. #949: spacing/depth/start retuned from 3/6/(20,20) to 4/8/(22,20), mirroring the exact retune tutorialSteps.ts's own 'drill-plan' stage applies (verified live against the real engine to rate the shot PERFECT with zero casualties/destruction, replacing the old 5m-spacing/8m-depth-at-(20,20) plan that rated CATASTROPHIC). rows/cols/diameter unchanged (still 3/3/0.089). `dragTiles` moved to (22,20)-(30,28) to match the new footprint. GAP CLOSED: REGION.drill (tutorialStages.ts) used to exact-gate the picker to the OLD (20,20)-(26,26) box (#601-followup, this same file's prior note), which would have rejected every tile outside that stale gate for a real click-mode drag (`.claude/rules/scenario-defs.md`: \"pickers reject tiles outside the step's region\"); the tutorial rail's own region has since been widened/moved to (22,20)-(30,28) alongside this retune, so the drag above lands cleanly. CI cash mismatch fix (unchanged from the prior pass, still applies): this command carries `diameter:0.089`, the real Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter falls back to the console-only 0.15 default and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter, so this keeps command mode's drill_rig busy-time matching a real click's. Downstream cash/tick checkpoints through the blast step below were re-derived against the new 4/8/(22,20) plan and verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end confirming Spacing 4.0m/Depth 8.0m/3x3=9 holes and Amount 4kg/Stemming 2.4m reached by real clicks.",
       "expect": {
         "equals": {
           "orderedHoleCount": 9,
@@ -935,16 +947,40 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:4 stemming:2.5",
       "timeout": 90,
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "4 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.4 m"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
       "role": "player",
-      "description": "charge ordered: Charge All Holes clicked. This step's own explosive/amount/stemming already match the Charge panel's real defaults (boomite/5kg/2m, confirmed throughout this suite's Finding #10 audit) so the click reproduces the declared command exactly, unlike most other files' charge steps. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after is what drains it and is where the tutorial step advance is now asserted, not here (a plain 'value increased' comparison used to complete this step, and the assertion here, on the very first hole -- see that step's own note).",
+      "description": "#949: retuned from amount:5 stemming:2 to amount:4 stemming:2.5, mirroring tutorialSteps.ts's own 'charge' stage retune. The click flow now reaches for the amount/stemming steppers explicitly (one decrement click, 5kg->4kg; the amount stepper's step is 1kg, Charge.ts) rather than relying on Charge All at the panel's own 5kg/2m defaults, which is what this step's click sequence used to do when the declared command matched those defaults exactly -- it no longer does. Stemming lands at 2.4m (two increment clicks, 2.0->2.2->2.4; the stemming stepper's own step is 0.2m, Charge.ts) rather than the command's exact 2.5m: the stepper has no way to land on an odd multiple of 0.2 from a 2.0m start, and 2.4m is functionally identical to 2.5m here anyway -- both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's new depth:8), the same cap this file's own prior note on the buildingCount step below already documents for the old 6m-deep pattern. Command mode fires the plan at the literal 2.5m the tutorial hint declares; interaction mode fires it at the stepper-reachable 2.4m; both are capped-equivalent so the two channels' blast outcomes should not diverge on this account. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after is what drains it and is where the tutorial step advance is now asserted, not here (a plain 'value increased' comparison used to complete this step, and the assertion here, on the very first hole -- see that step's own note). The stepper click count/selectors above were verified against a real interaction-mode run (Puppeteer, screenshots), confirming Amount 4kg/Stemming 2.4m reached by real clicks.",
       "expect": {
         "tutorialStep": "charge",
         "increased": [
@@ -1063,9 +1099,9 @@
       "description": "#947: enough ticks for both employees to walk to their vehicle and board (ArrivalGate.tickArrivalGate) before Sound the Horn is clicked below."
     },
     {
-      "command": "zone clear x1:5 y1:5 x2:41 y2:41",
+      "command": "zone clear x1:7 y1:5 x2:45 y2:43",
       "timeout": 180,
-      "description": "#557: evacuate-zone. Same box as tutorial-interactive.json's own evacuate-zone step -- computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's identical 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41), which on tutorial_pit's 32x32 map covers nearly the whole site. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded.",
+      "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) padding for this file's now-retuned (#949) 3x3/spacing:4/depth:8 grid at (22,20) -- holes span x:22-30, z:20-28, padded by the 15m margin to (7,5)-(45,43); the box moved from the old (5,5)-(41,41) computed for the old 3x3/spacing:3/(20,20) grid. This is the exact box Fire.ts's soundHorn() sends too (computed live from the same drillHoles/margin, not from this command string), so keeping the JSON in sync with it rather than hand-tuning a smaller fixture box is what keeps command mode and interaction mode evacuating the same entities out the same doors. #949 fixer follow-up: with THIS box, the driller/drill_rig parked at hole H9 (30,28) -- the grid's SE corner -- used to strand forever, because Evacuation.ts's buildCandidates only ever tried the single geometrically-nearest zone edge (east, landing at x:51, past the site's 48-wide navGrid) before falling to corners that are equally off-grid. Fixed at the source (Evacuation.ts's buildCandidates now tries every edge, nearest first, before any corner -- west at x:1 was reachable all along) rather than by shrinking this box, so Sound the Horn's real live-computed box clears correctly too, not just this command-mode fixture. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -1408,11 +1444,11 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, and an idle employee whose own taskQueue holds one permanently-unreachable entry now falls through to the open pool instead of freezing forever). #689-followup: buildingCount was 3 once this landed -- the #681 mitigation earlier in this file (build-living-quarters/set-early-policy steps) also builds a driving_center (step 15, `build driving_center at:10,8`) so the driller can train and crew a drill_rig; that building was never demolished pre-#557, so by this point (living_quarters + driving_center + this freight_warehouse) 3 buildings genuinely stood, not 2. #557: buildingCount is 2, not 3 -- Damage.ts's processProjections now attenuates debris out to the full 15m BLAST_DANGER_MARGIN_M (was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the earlier `blast` step's 3x3 grid at (20,20) now destroys the living_quarters at (18,14) -- 6.3m from the nearest hole, well outside the old radius but squarely inside the new one (direct-traced: two hits, 3412 J then a lethal 4380 J, against 120 HP). Retuning attempted and rejected before accepting this, same class of exhausted knobs as safety-projection-visual.json's own equivalent finding: stemming is already at 2m against a 6m hole's 1.8m (holeDepth*0.3) effectiveness cap, so raising it further does nothing (BlastCalc.ts), and the amount stepper is integer-only -- 5kg (current) destroys the building, 4kg survives but downgrades the rating to BAD, losing the CATASTROPHIC blast this beat exists to demonstrate. driving_center survives (10,8 is far enough from this grid); the freight_warehouse this step itself just finished isn't ordered until after this blast, so it was never at risk from it.",
+      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, and an idle employee whose own taskQueue holds one permanently-unreachable entry now falls through to the open pool instead of freezing forever). #689-followup: buildingCount was 3 once this landed -- the #681 mitigation earlier in this file (build-living-quarters/set-early-policy steps) also builds a driving_center (step 15, `build driving_center at:10,8`) so the driller can train and crew a drill_rig; that building was never demolished pre-#557, so by this point (living_quarters + driving_center + this freight_warehouse) 3 buildings genuinely stood, not 2. #557: buildingCount was 2, not 3 -- Damage.ts's processProjections attenuates debris out to the full 15m BLAST_DANGER_MARGIN_M (was an exact 2m HIT_RADIUS only, the audited gap #557 closed), and the OLD 3x3 grid at (20,20)/5kg/2m destroyed the living_quarters at (18,14) -- 6.3m from the nearest hole, well outside the old exact-hit radius but squarely inside the wider one (direct-traced: two hits, 3412 J then a lethal 4380 J, against 120 HP). At that point retuning was attempted and rejected: stemming was already at 2m against the 6m-deep pattern's own 1.8m (holeDepth*0.3) effectiveness cap, so raising it further did nothing (BlastCalc.ts), and the integer-only amount stepper's one available downward step (5kg->4kg) survived the building but downgraded the rating to BAD -- losing the CATASTROPHIC blast that beat existed to demonstrate. #949 changes the premise: the tutorial's own scripted blast is no longer supposed to be catastrophic at all -- a tutorial exists to teach a competent shot, not a disaster -- so the whole pattern retunes together (3x3/spacing:4/depth:8 at (22,20), amount:4kg, stemming effectively 2.4-2.5m, see the drill-plan/charge steps above), verified live for tutorialSteps.ts's own version of this exact plan to rate PERFECT with zero casualties or destroyed buildings. buildingCount is 3 again here, not 2: the living_quarters at (18,14) -- 6.3m from grid center as before, but now well clear of the new grid's own footprint (x:22-30, z:20-28 vs the old 20-26/20-26) as well as blast-energetic enough to survive regardless -- is no longer destroyed. driving_center and the freight_warehouse this step itself just finished both continue to survive as before. buildingCount:3 here is the target outcome verified for tutorialSteps.ts's own plan against the real engine, and this file's own identical geometry (3x3/spacing:4/depth:8 at (22,20)) was independently confirmed via command-mode (`run-all-scenarios.ts`) and interaction-mode (Puppeteer, screenshots) runs, both passing.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 0,
-          "buildingCount": 2
+          "buildingCount": 3
         },
         "tutorialStep": "contract-accept"
       }

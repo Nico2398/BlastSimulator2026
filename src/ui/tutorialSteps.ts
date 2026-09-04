@@ -282,7 +282,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // held, every subsequent scenario `tick N` is capped to exactly 1 real tick
   // per call (events.ts's tickCommand checks isPaused only at the end of each
   // iteration), so no tick budget, however large, ever recovers from it.
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 5: charge ──
   // #554: charging is real, queued work now (was instant) -- without
@@ -306,7 +306,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'charge',
     titleKey: 'tutorial.step6.title',
     textKey: 'tutorial.step6',
-    commands: ['charge hole:* explosive:boomite amount:5 stemming:2'],
+    commands: ['charge hole:* explosive:boomite amount:4 stemming:2.5'],
     highlightTarget: TOOLBAR_TARGET.blast,
     tickBudget: 20,
     waitsOnWork: true,

@@ -292,7 +292,8 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:4 stemming:1.8",
+      "description": "#949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were verified to run clean via the command-mode scenario run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough` -- 59/59 steps OK).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -363,7 +364,7 @@
     },
     {
       "command": "blast",
-      "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience.",
+      "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience. #949: deathCount stays 2, unchanged by the amount/stemming retune above -- blast.ts's own exact-hit check (\"Standing on the rock when it goes is not survivable, whatever the charge\") kills any employee standing on a column the blast clears regardless of charge tuning, and this file never adds an evacuate-zone step before this first blast (unlike the tutorial's own scripted flow, which now teaches evacuation before every shot). These two deaths are positional, not overload-related, so #949's retune of the shot's energy does not touch them.",
       "interaction": [
         {
           "type": "clickSelector",

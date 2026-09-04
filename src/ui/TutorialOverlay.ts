@@ -320,7 +320,7 @@ export class TutorialOverlay {
     // The console equivalent stays off the card.
     //
     // It reads as an instruction, and the ones that carry coordinates —
-    // `build_ramp start:16,19 end:16,31`, `drill_plan ... start:20,20` — read
+    // `build_ramp start:16,19 end:16,31`, `drill_plan ... start:22,20` — read
     // as coordinates the player is expected to reproduce by hand. There is no
     // control in the game that takes a typed tile, so a player who tried was
     // stuck (#489: "expects the player to use the exact coordinates that are
