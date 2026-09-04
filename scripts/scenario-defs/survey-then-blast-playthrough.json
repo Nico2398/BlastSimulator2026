@@ -19,11 +19,12 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow cash:400000",
+      "description": "#947 CI-fix follow-up: bumped 200000 -> 400000. This file's drilling wait was converted from a hand-tuned, razor-thin `tick 50/50/50/50/30` pad (racing a fixed worker-revolt tick) to a `waitUntil` once `set_policy mode:shift_8h` (below) removed the revolt race by keeping well-being off the zero floor -- but forced rest under that policy costs real payroll/fuel ticks a pre-existing worker_revolt used to cut the file off from ever paying (direct trace: cash reached -$30,598 and tripped bankruptcy instead, mid-drilling, at the old 200000 starting cash). No absolute `cash` checkpoint anywhere else in this file depends on the exact starting figure -- every later assertion is a `changedBy`/`decreased` delta -- so this is a pure headroom bump, matching the same class of fix already used for the same class of problem in rock-fragmenter-breaking.json (#697).",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow cash:400000"
         }
       ],
       "role": "setup",
@@ -148,6 +149,25 @@
         }
       },
       "role": "bootstrap"
+    },
+    {
+      "command": "set_policy mode:shift_8h",
+      "description": "#947 CI-fix follow-up: added to prevent a pre-existing worker_revolt this file's own drilling window already raced against on a razor-thin margin (see the fifth drilling chunk's own note further down: well-being pinned at 0 by tick ~275, revolt firing at a near-fixed tick regardless of how much headroom is added to drilling). Confirmed via `git worktree` against `main` (pre-#947, unrelated to this PR's own driver-gate change) that a real interaction-mode run of this exact file already crosses that fixed revolt tick before reaching the sequence step (`THE CREW HAS WALKED OUT` level-end screen covering the blast panel is what CI's own `clickSelector \"#bs-blast-panel [data-action=\\\"auto-sequence\\\"]\" failed: element is covered by div` actually reports -- not a Fire.ts rendering/reflow issue). Continuous shifts (this file's own default) skip the forced rest that shift-based schedules use, so employees keep working through low fatigue instead of resting automatically -- arming shift_8h enforcement (same fix already used for the same problem in blast-execution-visual.json, #682) forces rest before well-being crashes, removing the race against the revolt clock entirely rather than continuing to shave ticks off an already-documented 5-tick margin.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "ops"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-shift-mode=\"shift_8h\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "employee list",
@@ -630,93 +650,16 @@
       "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs (one tier-2) working it in parallel -- see the second `employee hire role:driller` step above."
     },
     {
-      "command": "tick 50",
-      "description": "#553 follow-up: drain the ordered plan in bounded chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With a second (tier-2) driller/drill_rig working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~300-315 from a drill_plan at tick 102, with 59+ ticks of margin before both the worker-revolt countdown (tick ~333+) and the bankruptcy grace period run out -- the last (5th) chunk below is deliberately smaller than the others to land in that window rather than overshoot.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
+      "timeout": 120,
+      "description": "#947 CI-fix: replaces the old 5-chunk `tick 50/50/50/50/30` pad (each followed by its own `event choose 0`) with a single `waitUntil` (#590), which auto-resolves a mid-wait event itself in both modes instead of needing a paired `event choose 0` step. The old pad was hand-tuned to a razor-thin race against a fixed worker-revolt tick (see this step's own prior history: '5-tick margin... the fix is NOT more headroom'), which the `set_policy mode:shift_8h` step above (also #947 CI-fix) now removes entirely -- forced rest keeps well-being off the zero floor, so drilling no longer needs to outrun a revolt clock, only actually finish. `waitUntil` drives to genuine completion regardless of how many ticks forced rest now costs.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 30",
-      "description": "Fifth and final chunk. Bumped from 20 to 25 (#596/#597: event pool/cooldown fixes moved the last hole 5 ticks later), and from 25 to 30 (#922: accurate driver-position tracking (syncDriverPosition, EntityMovementTick.ts) makes selectBestActionForEmployee's per-tick cost ranking (ActionSelection.ts) sensitive to a driller's real, continuously-updated position instead of the pre-#922 position frozen at boarding -- so which of the two drillers claims which remaining hole next can now tip a few ticks either way between two runs of the same command sequence, something command mode's own tick-for-tick identical replay never surfaces but interaction mode's real browser pacing does. Re-measured directly (interaction-mode engine probe): last hole lands at tick ~302 (was tick 300, a 2-tick shift) -- BUT well-being here is already pinned at 0 by tick 275 (both modes), and the worker-revolt countdown that starts from that moment fires at a near-fixed tick regardless of how this chunk's own size changes anything, measured directly at tick ~382 in-probe. A generous +40 bump (tried first) left only ~5 ticks between the charge/sequence/blast steps finishing and that fixed revolt tick and reliably lost the race -- the fix is NOT more headroom here (every extra tick spent finishing drilling is an extra tick of well-being-zero decay eating the SAME fixed budget the charge/blast steps need after it), it's the smallest bump that reliably clears 302 (a 5-tick margin over the measured landing tick, re-verified stable across repeated runs) so the charge/sequence/blast steps downstream keep their own share of the fixed pre-revolt window.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 30"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -726,16 +669,6 @@
           "holeCount": 9
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
