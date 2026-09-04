@@ -377,7 +377,7 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
-  update(state: GameState, weatherCycle?: WeatherCycleState, rng?: Random, tutorialActive: boolean = false): void {
+  update(state: GameState, weatherCycle?: WeatherCycleState, rng?: Random, tutorialActive: boolean = false, blastPlaybackDurationS: number = 0): void {
     const weather = weatherCycle?.current;
     this.topBar.update(state, weatherCycle, rng, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
@@ -407,7 +407,7 @@ export class UIManager {
     // lastBlastReport's tick actually changes) and neither's visibility is
     // tied to blastUI's own, so gating on it here would miss real transitions.
     this.preflightModal.update(state, weather);
-    this.blastReportModal.update(state);
+    this.blastReportModal.update(state, blastPlaybackDurationS);
     // Unconditional like settingsPanel below, same reason: contracts can
     // change (a blast finishing, a delivery landing) while the panel is
     // closed, and the player expects current offers the instant they open

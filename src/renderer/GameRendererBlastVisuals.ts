@@ -49,10 +49,14 @@ export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
   // spawnFragments places them where they came to rest; the animator walks
   // them there from where they broke, so the player sees the face come down
   // instead of a finished muck pile appearing at the moment of detonation.
+  // Reset the animator's duration on every blast, even one with nothing to
+  // spawn (#950) — otherwise it keeps holding an earlier blast's (possibly
+  // much longer) duration, which the blast report modal reads as its floor.
+  deps.fragmentAnimator?.begin(ctx.lastBlastFlights ?? []);
+
   if (deps.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
     deps.fragments.clearAll();
     deps.fragments.spawnFragments(ctx.lastBlastFragmentData);
-    if (ctx.lastBlastFlights) deps.fragmentAnimator?.begin(ctx.lastBlastFlights);
   }
 
   if (!deps.blastEffects || !ctx.state) return;

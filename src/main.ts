@@ -503,7 +503,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -1066,7 +1066,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
     if (!mainMenu.visible) uiManager.show();
     savesModal.onTick(ctx.state);
   }

@@ -44,7 +44,10 @@ const REPORT_ACCIDENT_TYPES = new Set<AccidentRecord['type']>(['death', 'injury'
 
 // Real-time delay between a blast report becoming available and the modal
 // actually opening (#545), so the fragment-collapse animation plays in the
-// clear instead of being instantly covered.
+// clear instead of being instantly covered. Acts as a floor, not the whole
+// delay (#950): the real collapse (flyrock/projection arcs included) can run
+// longer than this, so update()'s caller also supplies the actual playback
+// duration and the modal waits out whichever is longer.
 export const BLAST_REPORT_DELAY_MS = 3000;
 
 export class BlastReportModal {
@@ -151,7 +154,7 @@ export class BlastReportModal {
     this.lastShownReport = currentReport;
   }
 
-  update(state: GameState): void {
+  update(state: GameState, blastPlaybackDurationS: number = 0): void {
     const report = state.lastBlastReport;
 
     // Once the level has ended, LevelEndScreen (z-index var(--bsx-z-menu),
@@ -191,7 +194,8 @@ export class BlastReportModal {
     // arrival time. The first report is never shown.
     if (report && report !== this.lastShownReport && report !== this.pendingReport) {
       this.pendingReport = report;
-      this.pendingDeadlineMs = this.now() + BLAST_REPORT_DELAY_MS;
+      const delayMs = Math.max(BLAST_REPORT_DELAY_MS, blastPlaybackDurationS * 1000);
+      this.pendingDeadlineMs = this.now() + delayMs;
     }
 
     if (this.pendingReport !== null && this.pendingDeadlineMs !== null && this.now() >= this.pendingDeadlineMs) {
