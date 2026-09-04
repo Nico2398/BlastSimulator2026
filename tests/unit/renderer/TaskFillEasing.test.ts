@@ -44,6 +44,44 @@ describe('TaskFillEasing', () => {
       expect(result).toBeLessThan(targetFraction);
     });
 
+    it('forward retarget: at dt === MOVE_TWEEN_DURATION_S / 2, returns exactly the arithmetic midpoint of the delta (linear, not smoothstep-curved)', () => {
+      const tween = createFillTween(0.2);
+      const renderFraction = 0.2;
+      const targetFraction = 0.6;
+      const dt = MOVE_TWEEN_DURATION_S / 2;
+
+      const result = stepFillTween(tween, renderFraction, targetFraction, dt);
+
+      expect(result).toBe(renderFraction + (targetFraction - renderFraction) * 0.5);
+      expect(result).toBeCloseTo(0.4, 10);
+    });
+
+    it('forward retarget: at dt === MOVE_TWEEN_DURATION_S / 4, returns exactly the linear quarter-point value, not smoothstep', () => {
+      const tween = createFillTween(0.2);
+      const renderFraction = 0.2;
+      const targetFraction = 0.6;
+      const dt = MOVE_TWEEN_DURATION_S / 4;
+
+      const result = stepFillTween(tween, renderFraction, targetFraction, dt);
+
+      // Smoothstep at t=0.25 would give ≈0.104 of the way (result ≈ 0.242), not 0.3.
+      expect(result).toBe(renderFraction + (targetFraction - renderFraction) * 0.25);
+      expect(result).toBeCloseTo(0.3, 10);
+    });
+
+    it('forward retarget: at dt === MOVE_TWEEN_DURATION_S * 3/4, returns exactly the linear three-quarter-point value, not smoothstep', () => {
+      const tween = createFillTween(0.2);
+      const renderFraction = 0.2;
+      const targetFraction = 0.6;
+      const dt = (MOVE_TWEEN_DURATION_S * 3) / 4;
+
+      const result = stepFillTween(tween, renderFraction, targetFraction, dt);
+
+      // Smoothstep at t=0.75 would give ≈0.896 of the way (result ≈ 0.558), not 0.5.
+      expect(result).toBe(renderFraction + (targetFraction - renderFraction) * 0.75);
+      expect(result).toBeCloseTo(0.5, 10);
+    });
+
     it('no motion when dt === 0: returns renderFraction unchanged', () => {
       const tween = createFillTween(0.2);
       const renderFraction = 0.2;

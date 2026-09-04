@@ -62,6 +62,26 @@ describe('MovementInterpolation', () => {
       expect(pos.z).toBeLessThan(20);
     });
 
+    it('returns exactly the arithmetic midpoint at elapsedS === durationS / 2 (linear, not smoothstep-curved)', () => {
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, durationS / 2, durationS);
+      expect(pos.x).toBe(5);
+      expect(pos.z).toBe(10);
+    });
+
+    it('returns exactly the linear quarter-point value at elapsedS === durationS / 4, not smoothstep', () => {
+      // Smoothstep at t=0.25 of the range would give ≈0.104 of the way — 1.04, not 2.5.
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, durationS / 4, durationS);
+      expect(pos.x).toBe(2.5);
+      expect(pos.z).toBe(5);
+    });
+
+    it('returns exactly the linear three-quarter-point value at elapsedS === durationS * 3/4, not smoothstep', () => {
+      // Smoothstep at t=0.75 of the range would give ≈0.896 of the way — 8.96, not 7.5.
+      const pos = computeInterpolatedPosition(0, 0, 10, 20, (durationS * 3) / 4, durationS);
+      expect(pos.x).toBe(7.5);
+      expect(pos.z).toBe(15);
+    });
+
     it('is monotonic — increasing elapsedS never moves the result away from target', () => {
       const targetX = 10, targetZ = -30;
       let prevDist = Infinity;
@@ -143,7 +163,14 @@ describe('MovementInterpolation', () => {
       const jump = Math.hypot(pos2.x - renderX, pos2.z - renderZ);
       // One small dt step of gliding should cover only a small fraction of
       // the (now much larger) remaining distance, not pop toward it.
-      expect(jump).toBeLessThan(2);
+      // Linear interpolation (#948) has constant velocity across the whole
+      // tween, unlike the old smoothstep curve whose derivative tapered to 0
+      // near a fresh retarget (elapsedS resets to 0) — so the natural
+      // one-frame jump here is (dt/durationS) * distanceToNewTarget, with no
+      // taper to shrink it. Worst case for this test's dt=0.05/durationS=1
+      // is bounded by MOVE_TELEPORT_DISTANCE (60): any larger distance snaps
+      // instead of gliding, so the ceiling is 0.05 * 60 = 3.
+      expect(jump).toBeLessThan(3);
     });
 
     it('snaps immediately to the target when it is >= MOVE_TELEPORT_DISTANCE away, regardless of dt', () => {

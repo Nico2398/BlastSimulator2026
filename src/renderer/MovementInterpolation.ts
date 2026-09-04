@@ -5,7 +5,7 @@
 // pattern in VehicleWaitingQueue.ts.
 
 import { BASE_TICK_MS } from '../core/config/balance.js';
-import { smoothstep } from '../core/math/Smoothstep.js';
+import { linearstep } from '../core/math/Linearstep.js';
 
 export interface MovementTween {
   prevX: number;
@@ -27,15 +27,17 @@ export function createTween(x: number, z: number): MovementTween {
 }
 
 // Pure: eased position at `elapsedS` into a `durationS`-long tween from
-// (prevX,prevZ) to (targetX,targetZ). Smoothstep easing (shared with
-// core/math/Smoothstep.ts), which already clamps to exactly 0/1 at/beyond
-// the [0,durationS] bounds, so no separate early-return is needed.
+// (prevX,prevZ) to (targetX,targetZ). Linear interpolation (shared with
+// core/math/Linearstep.ts), which already clamps to exactly 0/1 at/beyond
+// the [0,durationS] bounds, so no separate early-return is needed. Constant
+// rate by default (#948) — an eased curve is only for an effect that names
+// why it needs one.
 export function computeInterpolatedPosition(
   prevX: number, prevZ: number,
   targetX: number, targetZ: number,
   elapsedS: number, durationS: number,
 ): { x: number; z: number } {
-  const ease = smoothstep(0, durationS, elapsedS);
+  const ease = linearstep(0, durationS, elapsedS);
   return {
     x: prevX + (targetX - prevX) * ease,
     z: prevZ + (targetZ - prevZ) * ease,
