@@ -16,6 +16,7 @@ import {
   HIGHLIGHT_CLASS,
   DEFAULT_TICK_BUDGET,
   WORK_GRACE_TICKS,
+  MODAL_DISMISS_SELECTOR,
 } from '../../../src/ui/tutorialGuide.js';
 import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
@@ -404,6 +405,83 @@ describe('applyRails', () => {
     applyRails({ target: '#elsewhere', hintKey: 'k' });
 
     expect(dismiss.classList.contains(ALLOWED_CLASS)).toBe(false);
+  });
+
+  // #951: the 'event-fire-resolve' stage highlights only ONE of the 3
+  // consequence-bearing consultant-event choices — applyRails used to
+  // blanket-allow every control in ANY open modal regardless of what the
+  // active stage targets, so all 3 buttons stayed clickable and a player
+  // could pick a materially different (and worse) option than the one the
+  // rail was pointing at. Once a stage targets a control inside an open
+  // modal, only that control (plus MODAL_DISMISS_SELECTOR) may stay allowed
+  // — sibling controls in the same modal must go inert.
+  describe('narrows a modal to the active stage\'s own target (#951)', () => {
+    it('does not allow sibling controls in the same modal when the stage targets one control inside it', () => {
+      const modal = document.createElement('div');
+      modal.className = 'bs-confirm-overlay';
+      modal.id = 'bs-event-dialog';
+      document.body.appendChild(modal);
+      const choice1 = button('choice1', modal);
+      const choice2 = button('choice2', modal);
+      const choice3 = button('choice3', modal);
+      const dismiss = document.createElement('button');
+      dismiss.className = 'bs-event-dismiss';
+      modal.appendChild(dismiss);
+      withBox(dismiss);
+
+      applyRails({ target: '#choice1', hintKey: 'k' });
+
+      expect(choice1.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(choice1.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+      expect(
+        choice2.classList.contains(ALLOWED_CLASS),
+        'sibling control in the targeted modal must not be allowed',
+      ).toBe(false);
+      expect(
+        choice3.classList.contains(ALLOWED_CLASS),
+        'sibling control in the targeted modal must not be allowed',
+      ).toBe(false);
+    });
+
+    it('still allows the modal\'s own dismiss control (MODAL_DISMISS_SELECTOR) even when the stage narrows the rest', () => {
+      const modal = document.createElement('div');
+      modal.className = 'bs-confirm-overlay';
+      modal.id = 'bs-event-dialog';
+      document.body.appendChild(modal);
+      button('choice1', modal);
+      button('choice2', modal);
+      const dismiss = document.createElement('button');
+      dismiss.className = 'bs-event-dismiss';
+      modal.appendChild(dismiss);
+      withBox(dismiss);
+      expect(dismiss.matches(MODAL_DISMISS_SELECTOR)).toBe(true);
+
+      applyRails({ target: '#choice1', hintKey: 'k' });
+
+      expect(dismiss.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(dismiss.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    });
+
+    it('regression guard: still allows every control in a modal no active stage targets (blanket allowance preserved)', () => {
+      const modal = document.createElement('div');
+      modal.className = 'bs-confirm-overlay';
+      document.body.appendChild(modal);
+      const btn = button('choice1', modal);
+      const select = document.createElement('select');
+      modal.appendChild(select);
+      withBox(select);
+      const input = document.createElement('input');
+      modal.appendChild(input);
+      withBox(input);
+
+      // The active stage's target lives entirely outside this modal.
+      button('elsewhere');
+      applyRails({ target: '#elsewhere', hintKey: 'k' });
+
+      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(select.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(input.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
   });
 });
 

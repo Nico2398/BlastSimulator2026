@@ -948,9 +948,43 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 90,
+      "description": "event-fire-resolve rail restriction (#951): the stage highlights only the first (`event choose 0`, +$15 well-being for -$3,000) of the consultant event's 3 choices, whose effects differ materially -- so the 2nd option (`event choose 1`: -10 well-being/-5 safety) must be genuinely inert while the dialog is open, not merely un-highlighted. Proven as unreachable (`expect.blocked`, interaction mode only) rather than clicked -- a real click that cannot land is exactly what a guard step exists to prove, per checkStepActionAllowed's own contract. Command is a harmless `state` read: this step performs no player action of its own, only a proof, so command mode has nothing to assert here.",
+      "role": "guard",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-event-dialog .bs-event-choice:nth-child(2)",
+        "note": "the un-highlighted -10 well-being/-5 safety option must stay inert so a player cannot pick it by mistake instead of the highlighted +15 well-being option"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "event-fire-resolve rail restriction (#951), 3rd option: same proof as the preceding step for the event's other un-highlighted choice (`event choose 2`: +5 well-being/-5 safety) -- both siblings of the highlighted first choice must be inert, not just one.",
+      "role": "guard",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-event-dialog .bs-event-choice:nth-child(3)",
+        "note": "the un-highlighted +5 well-being/-5 safety option must also stay inert"
+      }
+    },
+    {
       "command": "event choose 0",
       "timeout": 90,
-      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, outcome read, then dismissed. #776: raised to 90s -- this and the following post-blast steps (blast at step 31 leaves a 994-fragment muck pile this scenario never fully clears) each pay for this file's own shots:[\"overview\",\"birdseye\"] (2 screenshot renders + a state dump) under software-rasterization cost; step 37 below already failed on shot-capture cost alone with its actual command succeeding, so raised to the file's own established 90s precedent (steps 31/39/41/42) rather than retuning each step individually.",
+      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, outcome read, then dismissed. Click is scoped to `:first-child` (#951) -- the tutorial stage's own target, and the only choice the two guard steps above leave reachable. #776: raised to 90s -- this and the following post-blast steps (blast at step 31 leaves a 994-fragment muck pile this scenario never fully clears) each pay for this file's own shots:[\"overview\",\"birdseye\"] (2 screenshot renders + a state dump) under software-rasterization cost; step 37 below already failed on shot-capture cost alone with its actual command succeeding, so raised to the file's own established 90s precedent (steps 31/39/41/42) rather than retuning each step individually.",
       "role": "player",
       "interaction": [
         {
@@ -960,7 +994,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
+          "selector": "#bs-event-dialog .bs-event-choice:first-child"
         },
         {
           "type": "waitForSelector",
