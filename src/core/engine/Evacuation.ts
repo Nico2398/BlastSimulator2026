@@ -72,28 +72,36 @@ const EVACUATION_CANDIDATE_OFFSET_M = EVACUATION_CLEARANCE_M + 1;
 
 /**
  * Candidate safe destinations for an entity at (fromX, fromZ) evacuating
- * `zone`: the projection past the zone's nearest edge (the shortest way out),
- * then the zone's four corners (each pushed out by more than
- * EVACUATION_CLEARANCE_M, see EVACUATION_CANDIDATE_OFFSET_M) as fallbacks
- * when the nearest-edge point is blocked or unreachable.
+ * `zone`: the projection past each of the zone's four edges, nearest first
+ * (the shortest way out tried first), then the zone's four corners (each
+ * pushed out by more than EVACUATION_CLEARANCE_M, see
+ * EVACUATION_CANDIDATE_OFFSET_M) as final fallbacks.
+ *
+ * Originally tried only the single nearest edge before falling straight to
+ * corners (#557). That left a real gap: a zone whose nearest-edge projection
+ * lands off the navigable map (e.g. an entity near the zone's far corner,
+ * close to the map's own edge) had every corner candidate ALSO off-map — the
+ * corners are the nearest edge's offset compounded on a second axis, so
+ * they're never closer to the map interior than the nearest edge alone — and
+ * findSafeEvacuationCell reported the entity permanently stranded even
+ * though the OTHER three edges, ignored entirely, led straight back into the
+ * open map (confirmed live: #949's retuned tutorial drill grid pushed a
+ * drilled hole's SE corner close enough to the site's edge that the nearest
+ * (east) edge candidate landed past the navGrid's own width, stranding the
+ * driller and rig on top of the charged holes for the rest of the run).
+ * Trying every edge before any corner costs at most three extra
+ * cellAt/findPath probes and fixes that whole class of stranding without
+ * changing the chosen destination for the common case, where the nearest
+ * edge was already reachable.
  */
 function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): EvacuationDestination[] {
-  const distLeft = fromX - zone.x1;
-  const distRight = zone.x2 - fromX;
-  const distTop = fromZ - zone.z1;
-  const distBottom = zone.z2 - fromZ;
-  const minDist = Math.min(distLeft, distRight, distTop, distBottom);
-
-  let nearestEdge: EvacuationDestination;
-  if (minDist === distLeft) {
-    nearestEdge = { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: fromZ };
-  } else if (minDist === distRight) {
-    nearestEdge = { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: fromZ };
-  } else if (minDist === distTop) {
-    nearestEdge = { x: fromX, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M };
-  } else {
-    nearestEdge = { x: fromX, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M };
-  }
+  const edges: { dist: number; candidate: EvacuationDestination }[] = [
+    { dist: fromX - zone.x1, candidate: { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: fromZ } },
+    { dist: zone.x2 - fromX, candidate: { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: fromZ } },
+    { dist: fromZ - zone.z1, candidate: { x: fromX, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M } },
+    { dist: zone.z2 - fromZ, candidate: { x: fromX, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M } },
+  ];
+  const orderedEdges = edges.sort((a, b) => a.dist - b.dist).map(e => e.candidate);
 
   const corners: EvacuationDestination[] = [
     { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M },
@@ -102,7 +110,7 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
     { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M },
   ];
 
-  return [nearestEdge, ...corners].map(c => ({ x: Math.round(c.x), z: Math.round(c.z) }));
+  return [...orderedEdges, ...corners].map(c => ({ x: Math.round(c.x), z: Math.round(c.z) }));
 }
 
 /**
