@@ -118,7 +118,7 @@ export function allowedSelectors(stage: TutorialStage | undefined): string[] {
  * Used by `applyRails` to decide, per modal, whether it gets blanket-allowed
  * or narrowed down to the active stage's own target (#951).
  */
-function visibleModals(root: ParentNode | Document): Element[] {
+function visibleModals(root: ParentNode): Element[] {
   return Array.from(root.querySelectorAll(MODAL_SELECTOR)).filter(
     (modal) => getComputedStyle(modal as HTMLElement).display !== 'none',
   );
@@ -132,10 +132,10 @@ function visibleModals(root: ParentNode | Document): Element[] {
  * targets a control inside it; when one does, that modal is narrowed to the
  * stage's own target plus `MODAL_DISMISS_SELECTOR` instead (#951).
  */
-function stageTargetsInsideModal(
+function isStageTargetInsideModal(
   stage: TutorialStage | undefined,
   modal: Element,
-  root: ParentNode | Document,
+  root: ParentNode,
 ): boolean {
   for (const selector of allowedSelectors(stage)) {
     for (const el of Array.from(root.querySelectorAll(selector))) {
@@ -171,7 +171,7 @@ export function applyRails(
   // its own controls (#951) — then only that target and the modal's own
   // dismiss control stay allowed, so a player can still back out.
   for (const modal of visibleModals(root)) {
-    if (stageTargetsInsideModal(stage, modal, root)) {
+    if (isStageTargetInsideModal(stage, modal, root)) {
       for (const el of Array.from(modal.querySelectorAll(MODAL_DISMISS_SELECTOR))) {
         el.classList.add(ALLOWED_CLASS);
       }
