@@ -626,6 +626,12 @@ export const MOVE_STUCK_ABANDON_TICKS = 30;
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 
+/**
+ * Max voxel height-difference an agent can step between adjacent NavGrid
+ * cells. Above this, the step is a wall (blocked), not a ramp (#953).
+ */
+export const NAV_MAX_CLIMB_HEIGHT = 2;
+
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 
 /** Productivity well-being multiplier from Living Quarters by tier (and absent). */

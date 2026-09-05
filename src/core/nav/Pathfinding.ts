@@ -153,6 +153,19 @@ function isImpassable(cell: NavCell, avoidVehicles: boolean): boolean {
   return false;
 }
 
+/**
+ * True when stepping between two cells whose surfaceY are `fromY`/`toY`
+ * is a physically negotiable climb. Either side missing surfaceY (hand-built
+ * test fixtures that don't model terrain height) is treated as unconstrained.
+ */
+export function isStepClimbable(fromY: number | undefined, toY: number | undefined, maxClimb: number): boolean {
+  void fromY;
+  void toY;
+  void maxClimb;
+  // TODO: implement (#953)
+  throw new Error('not implemented');
+}
+
 /** Octile distance heuristic. */
 export function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(ax - bx);

@@ -35,6 +35,12 @@ export interface NavCell {
    * finally block before returning — no lasting mutation to the grid.
    */
   vehicleOccupied: boolean;
+  /**
+   * Column's absolute world Y at classification time. Populated only by
+   * buildNavGrid/patchNavGrid; undefined for hand-built test fixtures that
+   * don't model terrain height (#953).
+   */
+  surfaceY?: number;
 }
 
 export class NavGrid {
@@ -302,7 +308,7 @@ export class NavGrid {
   /**
    * Create a NavCell with the given type and appropriate move cost.
    */
-  private static makeCell(type: NavCellType, benchLevel: number = 0): NavCell {
+  private static makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
     let moveCost: number;
     switch (type) {
       case 'walkable': moveCost = 1.0; break;
@@ -316,6 +322,6 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel, vehicleOccupied: false };
+    return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
   }
 }
