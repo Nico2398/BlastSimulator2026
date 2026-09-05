@@ -194,11 +194,17 @@ export interface ScrollBoundedSectionOptions {
  * siblings arbitrarily far down a panel's body.
  */
 export function scrollBoundedSection(
-  _children: (Node | null | undefined)[],
-  _maxHeightPx: number,
-  _opts?: ScrollBoundedSectionOptions,
+  children: (Node | null | undefined)[],
+  maxHeightPx: number,
+  opts?: ScrollBoundedSectionOptions,
 ): HTMLElement {
-  throw new Error('not implemented');
+  const section = el('div', { children });
+  if (opts?.className) section.className = opts.className;
+  section.style.cssText = [
+    'overflow-y:auto', `max-height:${maxHeightPx}px`, 'flex-shrink:0',
+    'display:flex', 'flex-direction:column', `gap:${opts?.gap ?? 8}px`,
+  ].join(';');
+  return section;
 }
 
 // ── Panel chrome ──
