@@ -20,6 +20,7 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -461,6 +462,41 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     for (let z = 0; z < 5; z++) {
       expect(nav.cells[z]![0]!.type).toBe('walkable');
     }
+  });
+
+  it('a neighbour delta well beyond NAV_MAX_CLIMB_HEIGHT does NOT classify as ramp — bounded band (#953)', () => {
+    // 3×3 grid, center column (1,1) solidY=10, south neighbor (1,2) lowered
+    // far past NAV_MAX_CLIMB_HEIGHT — an eight-metre crater wall, matching
+    // the issue's own example. Before the fix, ramp classification was
+    // unbounded (any delta > 1), so an 8-voxel cliff read as a walkable
+    // 'ramp' at cost 1.8, identical to a dug haul road.
+    const centerTop = 10;
+    const bigDelta = NAV_MAX_CLIMB_HEIGHT + 6;
+    const neighborTop = centerTop - bigDelta;
+    const grid = new VoxelGrid(3, 15, 3);
+    for (let y = 0; y <= centerTop; y++) grid.setVoxel(1, y, 1, solidVoxel());
+    for (let y = 0; y <= neighborTop; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 3; x++) {
+        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
+        for (let y = 0; y <= centerTop; y++) grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Bounded band: delta > NAV_MAX_CLIMB_HEIGHT falls through to walkable,
+    // never ramp — the actual impassability gate lives in Pathfinding.
+    expect(nav.cells[1]![1]!.type).toBe('walkable');
+  });
+});
+
+describe('NavGrid.buildNavGrid — surfaceY population (#953)', () => {
+  it('populates NavCell.surfaceY with the column\'s computed surface Y', () => {
+    const grid = makeSolidGrid(5, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Column (2,2) has solid rock y=0..4 → surfaceY = 4, matching
+    // NavGrid.computeSurfaceY's own contract for the same column.
+    expect(nav.cells[2]![2]!.surfaceY).toBe(NavGrid.computeSurfaceY(grid, 2, 2));
+    expect(nav.cells[2]![2]!.surfaceY).toBe(4);
   });
 });
 

@@ -13,14 +13,18 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, octileHeuristic, getBenchLevel, findRampConnections } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, octileHeuristic, getBenchLevel, findRampConnections, isStepClimbable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function makeCell(type: NavCellType, benchLevel: number = 0): NavCell {
+/** Third `surfaceY` param defaults undefined — hand-built fixtures that don't
+ * pass it model no terrain height and stay unconstrained by climb gating
+ * (#953), matching every pre-existing call site in this file unmodified. */
+function makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
   let moveCost: number;
   switch (type) {
     case 'walkable':  moveCost = 1.0; break;
@@ -29,7 +33,7 @@ function makeCell(type: NavCellType, benchLevel: number = 0): NavCell {
     case 'blocked':
     case 'void':      moveCost = Infinity; break;
   }
-  return { type, moveCost, benchLevel, vehicleOccupied: false };
+  return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
 }
 
 /** Create a flat NavGrid where every cell has the given type (default 'walkable'). */
@@ -861,5 +865,101 @@ describe('findPath — multi-level routing', () => {
     expect(Array.isArray(connections)).toBe(true);
     // The stub returns [], but the real implementation should detect the ramp
     // For now we just verify the call doesn't crash and returns an array
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 12: isStepClimbable (#953)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('isStepClimbable', () => {
+  it('returns true when the surfaceY delta is under the climb limit', () => {
+    expect(isStepClimbable(10, 11, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(11, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  });
+
+  it('returns true when the surfaceY delta is exactly the climb limit (boundary)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  });
+
+  it('returns false when the surfaceY delta exceeds the climb limit', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT + 1, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT + 1, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+  });
+
+  it('falls back to unconstrained (true) when either side is missing surfaceY', () => {
+    expect(isStepClimbable(undefined, 100, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(100, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(undefined, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 13: findPath — climb-limit gating on surfaceY (#953)
+//
+// A crater rim reads as ordinary 'walkable' terrain (bounded ramp band, see
+// NavGrid.test.ts), so the only thing standing between an agent and a
+// straight walk across an 8-metre drop is Pathfinding itself refusing the
+// step. These fixtures set surfaceY directly (bypassing VoxelGrid) so the
+// climb gate is exercised independently of cell type.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Build a flat plateau NavGrid with a rectangular "pit" whose surfaceY sits
+ * far below the plateau — every pit-perimeter step exceeds NAV_MAX_CLIMB_HEIGHT.
+ * All cells are 'walkable' by cell type; only surfaceY marks the pit.
+ */
+function makePlateauWithPit(
+  width: number,
+  height: number,
+  pit: { minX: number; maxX: number; minZ: number; maxZ: number },
+  plateauY: number,
+  pitY: number,
+): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      const inPit = x >= pit.minX && x <= pit.maxX && z >= pit.minZ && z <= pit.maxZ;
+      row.push(makeCell('walkable', 0, inPit ? pitY : plateauY));
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells, plateauY);
+}
+
+describe('findPath — climb-limit gating on surfaceY (#953)', () => {
+  const PIT = { minX: 5, maxX: 9, minZ: 5, maxZ: 9 };
+  const PLATEAU_Y = 20;
+  const PIT_Y = 5; // delta 15, well beyond NAV_MAX_CLIMB_HEIGHT
+
+  it('routes around a pit whose rim exceeds the climb limit — no waypoint enters the pit footprint', () => {
+    const grid = makePlateauWithPit(15, 15, PIT, PLATEAU_Y, PIT_Y);
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 14, toZ: 14, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    for (const wp of result.waypoints) {
+      const inPit = wp.x >= PIT.minX && wp.x <= PIT.maxX && wp.z >= PIT.minZ && wp.z <= PIT.maxZ;
+      expect(inPit).toBe(false);
+    }
+  });
+
+  it('returns found:false when the goal sits inside a pit with no within-limit descent anywhere on its perimeter', () => {
+    const grid = makePlateauWithPit(15, 15, PIT, PLATEAU_Y, PIT_Y);
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 7, toZ: 7, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+
+  it('refuses a diagonal step whose surfaceY delta exceeds the climb limit, same as a cardinal one', () => {
+    // 2×2 grid: only a diagonal step connects start to goal (both cardinal
+    // neighbours are blocked), and that diagonal step's surfaceY delta is
+    // far beyond the climb limit.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 1, 'walkable', { surfaceY: NAV_MAX_CLIMB_HEIGHT + 5 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(false);
   });
 });

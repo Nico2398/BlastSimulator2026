@@ -11,6 +11,7 @@ import {
   computeRampSegmentCarveTarget, carveRampSegmentSlice,
   type RampDef,
 } from '../../src/core/mining/Ramp.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../../src/core/config/balance.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,29 @@ describe('NavMesh and pathfinding', () => {
       toX: conn.lowerX, toZ: conn.lowerZ, avoidVehicles: false,
     });
     expect(result.found).toBe(true);
+
+    // Augmentation (#953): a ramp connector registering, and a one-cell hop
+    // across it succeeding, is no longer sufficient proof post-fix — climb
+    // gating could in principle still block a longer route that has to
+    // actually traverse the ramp's own gradual descent rather than a single
+    // pre-identified adjacent pair. Drive a genuinely distant surface point
+    // down to the carved trench floor and confirm every step of the real
+    // route stays within the climb limit end to end.
+    const distantSurface = { x: 0, z: 0 };
+    const endToEnd = findPath(navAfter, {
+      agentId: 1, fromX: distantSurface.x, fromZ: distantSurface.z,
+      toX: conn.lowerX, toZ: conn.lowerZ, avoidVehicles: false,
+    });
+    expect(endToEnd.found).toBe(true);
+    for (let i = 0; i < endToEnd.waypoints.length - 1; i++) {
+      const a = endToEnd.waypoints[i]!;
+      const b = endToEnd.waypoints[i + 1]!;
+      const ay = navAfter.cellAt(a.x, a.z)!.surfaceY;
+      const by = navAfter.cellAt(b.x, b.z)!.surfaceY;
+      expect(ay).toBeDefined();
+      expect(by).toBeDefined();
+      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+    }
   });
 
   it('multi-level routing returns found:false when no ramp connects two separated benches', () => {
@@ -323,6 +347,86 @@ describe('NavMesh and pathfinding', () => {
       agentId: 1, fromX: 10, fromZ: 5, toX: 10, toZ: 25, avoidVehicles: false,
     });
     expect(result.found).toBe(false);
+  });
+
+  // ── #953: a blast crater must be routed AROUND or through a dug ramp,
+  // never walked straight across. A sheer crater wall (delta well beyond
+  // NAV_MAX_CLIMB_HEIGHT) falls through to 'walkable' cell type post-fix
+  // (see NavGrid.test.ts), so cell-type labels alone can't prove the fix —
+  // only an end-to-end findPath plus a per-step surfaceY delta check can.
+
+  describe('crater + climb-limit gating (#953)', () => {
+    // Flat plateau, surface Y=22. A rectangular crater x=[7,13] z=[15,22] is
+    // carved sheer (straight clearVoxel, no gradual slope) down to floor
+    // Y=14 — an 8-voxel drop, matching the issue's "eight-metre crater wall".
+    // Columns x=[9,11] for z<=21 are left untouched by the crater cut so a
+    // real buildRamp() call can carve their own gradual descent instead.
+    const CRATER_MIN_X = 7, CRATER_MAX_X = 13, CRATER_MIN_Z = 15, CRATER_MAX_Z = 22;
+    const RAMP_BAND_MIN_X = 9, RAMP_BAND_MAX_X = 11, RAMP_BAND_MAX_Z = 21;
+
+    function buildCraterPlateau(): VoxelGrid {
+      const grid = new VoxelGrid(20, 30, 30);
+      fillSolid(grid, 22);
+      for (let z = CRATER_MIN_Z; z <= CRATER_MAX_Z; z++) {
+        for (let x = CRATER_MIN_X; x <= CRATER_MAX_X; x++) {
+          if (x >= RAMP_BAND_MIN_X && x <= RAMP_BAND_MAX_X && z <= RAMP_BAND_MAX_Z) continue;
+          for (let y = 15; y <= 22; y++) grid.clearVoxel(x, y, z);
+        }
+      }
+      return grid;
+    }
+
+    it('routes through a dug ramp into the crater — every waypoint step respects the climb limit', () => {
+      const grid = buildCraterPlateau();
+
+      const rampResult = buildRamp(grid, {
+        originX: 10, originZ: 14, direction: 'south', length: 8, targetDepth: 8,
+      }, 1_000_000);
+      expect(rampResult.success).toBe(true);
+
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      const from = { x: 10, z: 5 };  // surface, well outside the crater
+      const to = { x: 10, z: 21 };   // ramp's own last carved column — crater floor
+
+      const result = findPath(nav, {
+        agentId: 1, fromX: from.x, fromZ: from.z, toX: to.x, toZ: to.z, avoidVehicles: false,
+      });
+
+      expect(result.found).toBe(true);
+
+      // Real proof it used the ramp, independent of cell-type labels: every
+      // consecutive waypoint pair's surfaceY delta stays within the climb limit.
+      for (let i = 0; i < result.waypoints.length - 1; i++) {
+        const a = result.waypoints[i]!;
+        const b = result.waypoints[i + 1]!;
+        const ay = nav.cellAt(a.x, a.z)!.surfaceY;
+        const by = nav.cellAt(b.x, b.z)!.surfaceY;
+        expect(ay).toBeDefined();
+        expect(by).toBeDefined();
+        expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+      }
+    });
+
+    it('same crater with NO ramp dug — findPath from surface to crater floor returns found:false', () => {
+      const grid = new VoxelGrid(20, 30, 30);
+      fillSolid(grid, 22);
+      // Carve the full crater sheer, including the would-be ramp band —
+      // no gradual descent exists anywhere on the crater's perimeter.
+      for (let z = CRATER_MIN_Z; z <= CRATER_MAX_Z; z++) {
+        for (let x = CRATER_MIN_X; x <= CRATER_MAX_X; x++) {
+          for (let y = 15; y <= 22; y++) grid.clearVoxel(x, y, z);
+        }
+      }
+
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      const result = findPath(nav, {
+        agentId: 1, fromX: 10, fromZ: 5, toX: 10, toZ: 21, avoidVehicles: false,
+      });
+
+      expect(result.found).toBe(false);
+    });
   });
 
   // ── #555/#925: progressive ramp excavation lands one NavGrid patch per
