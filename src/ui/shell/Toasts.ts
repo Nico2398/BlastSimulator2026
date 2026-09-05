@@ -72,11 +72,18 @@ export class Toasts {
 
   private makeToast(toast: Toast, center: NotificationCenter): HTMLElement {
     const box = el('div');
+    // No entrance animation (issue #977): a toast's visibility must never depend
+    // on an animation frame actually running. Under sustained main-thread load
+    // (headless/no-GPU rendering), a CSS animation's currentTime can fail to
+    // advance for the toast's entire fixed lifetime, so a fade-in from
+    // opacity:0 could leave it never visibly painted before auto-dismiss.
+    // The toast is fully visible (opacity:1, no transform offset) from its
+    // first painted frame instead.
     box.style.cssText = [
       'display:flex', 'gap:9px', 'padding:10px 11px', 'border-radius:6px',
       'background:rgba(17,21,27,.97)', 'border:1px solid rgba(255,255,255,.1)',
       `border-left:3px solid ${toast.color}`, 'box-shadow:0 8px 24px rgba(0,0,0,.45)',
-      'pointer-events:all', 'animation:bsx-toast-in .18s ease-out',
+      'pointer-events:all',
     ].join(';');
 
     const iconWrap = el('div');

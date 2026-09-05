@@ -442,24 +442,21 @@ export const TOKENS_CSS = `
 }
 .bsx-menu-lang-pill.active { background: var(--bsx-amber); color: var(--bsx-text-on-amber); }
 
-@keyframes bsx-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
 /* ── reduced motion (P10): drop transform-based motion, keep opacity ──
    Vestibular-trigger guidance is about movement (translate/scale/rotate),
    not fades, so this only collapses transform-carrying motion — everything
    else in this file (the background/border-color/color/filter/width
    transitions above) is left running at its normal duration.
-   bsx-toast-in mixes both: the override below keeps its opacity fade at the
-   same .18s and drops only the translateY slide-in.
+   Toasts no longer carry an entrance animation at all (issue #977 — a CSS
+   keyframe animation's currentTime can stall under main-thread load and
+   never reach a visible frame), so there is nothing toast-specific to
+   override here any more.
    .bsx-btn:active's transform: translateY(1px) has no entry here — the
    .bsx-btn transition list above only covers background/border-color/color/
    filter, so the transform already snaps instantly with no motion to drop.
    A new transform transition/animation added under .bsx-root needs its own
    override here; collapsing every duration blanket-style (the old rule)
    also killed pure-opacity fades, which is the bug this replaces. */
-@media (prefers-reduced-motion: reduce) {
-  @keyframes bsx-toast-in { from { opacity: 0; } to { opacity: 1; } }
-}
 `;
 
 let injected = false;
