@@ -56,7 +56,7 @@ export interface Toast extends LogEntry {
 }
 
 /** Max toasts visible/queued at once before the oldest is dropped from the toast list (it stays in the log). */
-const MAX_TOASTS = 4;
+export const MAX_TOASTS = 4;
 /** Ring-buffer cap for the activity log. */
 const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
