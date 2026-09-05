@@ -181,6 +181,26 @@ export function statGrid(items: { key: string; value: string; color?: string }[]
   return grid;
 }
 
+export interface ScrollBoundedSectionOptions {
+  /** Vertical gap between children, in px. Default 8, matching ChargeHoleList/Sequence. */
+  gap?: number;
+  /** Extra hook class, e.g. for a stable selector. */
+  className?: string;
+}
+
+/**
+ * A bounded, independently-scrollable section for content whose length is
+ * unbounded (Work Queue, Incidents), so it never pushes fixed-height
+ * siblings arbitrarily far down a panel's body.
+ */
+export function scrollBoundedSection(
+  _children: (Node | null | undefined)[],
+  _maxHeightPx: number,
+  _opts?: ScrollBoundedSectionOptions,
+): HTMLElement {
+  throw new Error('not implemented');
+}
+
 // ── Panel chrome ──
 //
 // Every slide-out panel (Build, Blast, Contracts, Crew, Finances, Fleet,
