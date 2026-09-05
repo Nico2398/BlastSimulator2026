@@ -16,9 +16,9 @@ export interface Rect { readonly x: number; readonly y: number; readonly width: 
  *             drawer, a modal, a popover anchored to its own control) —
  *             exempt from the pairwise overlap check, still checked for on-screen.
  */
-export type LayoutLayer = 'hud' | 'overlay';
+type LayoutLayer = 'hud' | 'overlay';
 
-export interface LayoutRegion {
+interface LayoutRegion {
   readonly id: string;
   readonly layer: LayoutLayer;
   readonly bounds: (viewport: Viewport) => Rect;
