@@ -170,6 +170,22 @@ export class TutorialOverlay {
     return TUTORIAL_STEPS[this.stepIndex] ?? { id: '' };
   }
 
+  /**
+   * Tail of reaching the last (closing) step: show it for a fixed beat, then
+   * auto-dismiss the tutorial.
+   *
+   * Extracted from advanceToNextStep()'s own "reached last step" branch —
+   * behavior unchanged. tickGuide()/onCommandExecuted() will grow a second
+   * call site once state.levelEndReason reports a non-completed defeat
+   * mid-tutorial, short-circuiting straight here instead of only being
+   * reached by stepping through every step in order (#959).
+   */
+  private jumpToLastStep(): void {
+    this.stopGuide();
+    this.clearAutoAdvance();
+    this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+  }
+
   /** Move to the next step, or finish when the last one is already showing. */
   private advanceToNextStep(): void {
     if (!this._active) return;
@@ -194,10 +210,7 @@ export class TutorialOverlay {
     this.render();
 
     if (this.stepIndex === LAST_STEP_INDEX) {
-      // Congratulations: show for a fixed beat, then dismiss.
-      this.stopGuide();
-      this.clearAutoAdvance();
-      this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+      this.jumpToLastStep();
     }
   }
 

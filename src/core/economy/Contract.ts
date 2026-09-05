@@ -97,6 +97,9 @@ export function generateContracts(
   state: ContractState,
   rng: Random,
   currentTick: number,
+  // TODO: implement — threaded through to generateOneContract but not yet
+  // applied to the pricing math (#959).
+  priceMultiplier: number = 1,
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < REFRESH_INTERVAL && state.available.length > 0) return;
@@ -108,12 +111,12 @@ export function generateContracts(
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
     if (state.available.length >= MAX_AVAILABLE) break;
-    state.available.push(generateOneContract(state, rng));
+    state.available.push(generateOneContract(state, rng, priceMultiplier));
   }
   state.lastRefreshTick = currentTick;
 }
 
-function generateOneContract(state: ContractState, rng: Random): Contract {
+function generateOneContract(state: ContractState, rng: Random, _priceMultiplier: number = 1): Contract {
   const typeRoll = rng.nextFloat(0, 1);
   let type: ContractType;
   let materialId: string;

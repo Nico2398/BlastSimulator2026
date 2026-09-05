@@ -28,6 +28,15 @@ export interface TutorialStep {
   titleKey: string;
   textKey: string;
   /**
+   * Overrides `titleKey` when present, resolved against the current
+   * `GameState` — e.g. the closing card picking congratulations vs. a
+   * defeat-specific title depending on `state.levelEndReason`. Checked in
+   * preference to the static `titleKey` wherever a step's title is rendered.
+   */
+  titleKeyFor?(state: GameState): string;
+  /** Same override shape as `titleKeyFor`, for `textKey`. */
+  textKeyFor?(state: GameState): string;
+  /**
    * Console commands equivalent to the step's objective, shown to the player as
    * a hint. These are never executed by the tutorial — completing the step is
    * the player's job.
@@ -468,8 +477,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 20, waitsOnWork: true },
   ),
 
-  // ── Step 15: contract-deliver ──
-  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts, { tickBudget: 20, waitsOnWork: true }),
+  // ── Step 15: sell-ore ──
+  // Replaces the old contract-deliver step (#959): the tutorial never hauled
+  // and sold the blasted ore for money, so a player following it to the
+  // letter finished with negative cash. Repeatable — the player may accept
+  // and deliver more than one ore-sale contract before the step is done.
+  // TODO: implement — real isComplete/commands land with the feature.
+  {
+    id: 'sell-ore',
+    titleKey: 'tutorial.step_sellore.title',
+    textKey: 'tutorial.step_sellore',
+    highlightTarget: TOOLBAR_TARGET.contracts,
+    tickBudget: 20,
+    waitsOnWork: true,
+    isComplete: () => false,
+  },
 
   // ── Step 16: finances ──
   createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({

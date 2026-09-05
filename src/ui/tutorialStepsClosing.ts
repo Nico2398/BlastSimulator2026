@@ -58,6 +58,9 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     tickBudget: 60,
     waitsOnWork: true,
     highlightTarget: '#bs-hud-scores',
+    // TODO: implement — gate on state.levelEndReason === 'completed' rather
+    // than any levelEnded===true, so a bankruptcy/defeat doesn't complete
+    // this step and show congratulations (#959).
     isComplete: (state: GameState) => state.levelEnded === true,
   },
 
@@ -66,6 +69,10 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     id: 'congratulations',
     titleKey: 'tutorial.complete_title',
     textKey: 'tutorial.complete_text',
+    // TODO: implement — resolve tutorial.complete_* vs
+    // tutorial.defeat.<reason>.* depending on state.levelEndReason (#959).
+    titleKeyFor: (_state: GameState) => 'tutorial.complete_title',
+    textKeyFor: (_state: GameState) => 'tutorial.complete_text',
     isComplete: () => true,
   },
 ];

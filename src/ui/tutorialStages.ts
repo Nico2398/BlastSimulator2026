@@ -348,12 +348,14 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.vehicle_watch' },
   ],
 
-  'contract-deliver': [
+  // TODO: implement — placeholder selectors; implementer finalizes against
+  // the real sell-ore flow (accept an ore_sale contract, haul, deliver) (#959).
+  'sell-ore': [
     { target: TOOLBAR_TARGET.contracts, hintKey: 'tutorial.stage.open_contracts' },
     {
-      target: '#bs-contract-panel .bs-contract-deliver',
-      hintKey: 'tutorial.stage.contract_deliver',
-      also: ['#bs-contract-panel .bs-contract-amount'],
+      target: '#bs-contract-panel .bs-contract-accept',
+      hintKey: 'tutorial.stage.contract_accept',
+      also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
     },
   ],
 
