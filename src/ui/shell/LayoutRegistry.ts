@@ -67,11 +67,19 @@ export function rectWithinViewport(rect: Rect, viewport: Viewport): boolean {
   );
 }
 
-/** Order: spec floor, spec ceiling, ultrawide, short, tall. */
+/**
+ * Order: spec floor, spec ceiling, ultrawide, short, tall.
+ *
+ * The ultrawide entry is 2560x1080 (UWFHD, 21:9), not the more common
+ * 3440x1440 -- sustained WebGL/terrain rendering load at 3440x1440 starves
+ * the main thread enough to freeze in-flight CSS animations (e.g. the
+ * Toasts entrance animation getting stuck at opacity:0 for its whole
+ * lifetime) under headless/no-GPU rendering. See issue #977.
+ */
 export const SHELL_VIEWPORT_MATRIX: readonly Viewport[] = [
   { width: 1280, height: 720 },
   { width: 1920, height: 1080 },
-  { width: 3440, height: 1440 },
+  { width: 2560, height: 1080 },
   { width: 1920, height: 800 },
   { width: 1280, height: 1600 },
 ];
