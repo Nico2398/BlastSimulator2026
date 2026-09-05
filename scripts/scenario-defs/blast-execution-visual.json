@@ -3347,7 +3347,7 @@
     },
     {
       "command": "charge hole:H55 explosive:boomite amount:8 stemming:0.5",
-      "description": "#953 CI-fix: straggler added -- ACTION_SELECTION_MAX_PATH_ATTEMPTS went 5 -> 30 (balance.ts) to stop the dispatch search exhausting its whole budget on a blast crater's own unreachable interior before ever trying a farther, actually-reachable candidate; direct trace against this exact file's 8x8/spacing:1 grid found H55 and H32 (below) drilled late enough that the bulk `charge hole:*` order above never reaches them (`plannedChargesByHole` stays empty for both afterward, so no amount of extra ticking on its own drains a charge order that was never placed). Same `commandOutcome: either` tolerance as every other straggler here.",
+      "description": "#953 CI-fix: straggler added -- selectBestActionForEmployee's climb-aware reachable-set pre-filter (ActionSelection.ts) changes dispatch ordering enough that H55 and H32 (below) get drilled late enough that the bulk `charge hole:*` order above never reaches them (`plannedChargesByHole` stays empty for both afterward, so no amount of extra ticking on its own drains a charge order that was never placed). Same `commandOutcome: either` tolerance as every other straggler here (see #947).",
       "interaction": [
         {
           "type": "resolveEventIfPending"

@@ -586,28 +586,15 @@ export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
  * dispatch cost at a fixed number of pathfinds regardless of how many
  * pending actions exist.
  *
- * Raised from 5 to 30 (#953 regression): `estimateActionCost`'s cheap octile
- * heuristic has no idea a step can be climb-illegal, so it ranks every
- * fragment inside a fresh blast crater by raw distance same as anything
- * else — and a crater's own `haul_debris` candidates, being right where the
- * employee or a dispatched hauler already stands, dominate the cheapest end
- * of that ranking. Once #953 made a genuine crater wall (as opposed to
- * ordinary bench relief) climb-illegal, a budget of 5 could be spent
- * entirely on one blast's own unreachable interior before ever reaching a
- * farther, actually-reachable candidate from a different hole or an earlier
- * blast's already-hauled area — direct-traced against the tutorial's
- * haul-debris step (#552): a 3x3 drill grid at 5m spacing left each hole's
- * own narrow, steep-walled pocket contributing dozens of mutually-close
- * `haul_debris` candidates, and the closest 5-20 of them by heuristic were
- * never enough to reach one from a different, actually-walkable hole. 30
- * cleared every candidate in that direct trace with room to spare; the real
- * fix is a pre-filter that never spends a `findPath` on a candidate already
- * known unreachable (mirroring the `isClaimable` pre-filter #611 added for
- * an unclaimable backlog), but that needs a climb-aware reachability query
- * this module doesn't have yet — tracked as a follow-up, not blocking this
- * regression fix.
+ * A crater's own nearby candidates can still dominate the cheap end of the
+ * ranking pass by raw distance even when a climb-illegal step makes them
+ * unreachable (#953) — `selectBestActionForEmployee` (ActionSelection.ts)
+ * handles that with a climb-aware reachable-set pre-filter (computed once
+ * per call, screening out any candidate the requesting employee cannot
+ * climb-legally reach) rather than by widening this budget, so this stays
+ * at its original, deliberately small value.
  */
-export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 30;
+export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 
 /**
  * Ranking-priority bonus (ticks) subtracted from a haul_debris/fragment_debris

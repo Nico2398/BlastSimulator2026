@@ -27,7 +27,7 @@ import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/N
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
@@ -59,6 +59,36 @@ function blockColumn(grid: NavGrid, x: number): void {
   for (let z = 0; z < grid.height; z++) {
     grid.cells[z]![x] = makeCell('blocked');
   }
+}
+
+/** A walkable cell carrying a `surfaceY`, so the climb-limit gate (#953) actually applies to it. */
+function makeCellWithSurfaceY(surfaceY: number): NavCell {
+  return { ...makeCell('walkable'), surfaceY };
+}
+
+/**
+ * Flat NavGrid at `surfaceY: 0` everywhere, except every (x, z) in
+ * `craterCells` sunk to `surfaceY: craterY` — deep enough below
+ * `NAV_MAX_CLIMB_HEIGHT` that stepping between a crater cell and any
+ * surrounding flat cell is climb-illegal, while every crater cell stays
+ * climb-legal relative to its crater neighbours (same `craterY`). Mirrors a
+ * fresh blast crater's own walled-off interior (#953).
+ */
+function makeGridWithCraterPocket(
+  width: number,
+  height: number,
+  craterCells: ReadonlySet<string>,
+  craterY = -(NAV_MAX_CLIMB_HEIGHT + 8),
+): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push(makeCellWithSurfaceY(craterCells.has(`${x},${z}`) ? craterY : 0));
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
 }
 
 // ── PendingAction / Employee helpers ────────────────────────────────────────
@@ -373,31 +403,30 @@ describe('selectBestActionForEmployee', () => {
     expect(result).toBeNull();
   });
 
-  it('never resolves a real path for more than ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates — a reachable candidate ranked beyond the budget is never chosen', () => {
-    const state = makeState(30, 80);
+  it('a provably-unreachable near candidate cluster is screened out before consuming any path-attempt budget, so a farther reachable candidate is still found (#953)', () => {
+    const state = makeState(30, 40);
     blockColumn(state.navGrid!, 1); // isolates x >= 2 from the employee at x = 0
     const emp = makeEmployee(state, 0, 0);
 
-    // ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates geometrically very close
-    // (heuristic-nearest) but on the unreachable side of the wall — these
-    // fill the entire path-attempt budget before a real, reachable
-    // candidate is ever tried.
-    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(30);
+    // More than ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates geometrically
+    // very close (heuristic-nearest) but entirely walled off from the
+    // employee — selectBestActionForEmployee's own climb/impassable-aware
+    // reachable-set pre-filter (#953) proves every one of these unreachable
+    // in one flood fill and skips them without spending a real findPath
+    // attempt on any of them, so they can never starve a farther, genuinely
+    // reachable candidate the way an unbounded ranking pass alone would.
+    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(5);
     const nearUnreachable: PendingAction[] = [];
-    for (let i = 1; i <= ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
+    for (let i = 1; i <= 5; i++) {
       nearUnreachable.push(makeAction({ id: i, targetX: 2, targetZ: i }));
     }
-    // Reachable, but ranked (by cost) behind every one of the candidates
-    // above — comfortably farther than the farthest near-unreachable
-    // candidate (distance ~ACTION_SELECTION_MAX_PATH_ATTEMPTS), so it stays
-    // ranked last regardless of the budget's own size.
-    const farReachable = makeAction({ id: ACTION_SELECTION_MAX_PATH_ATTEMPTS + 1, targetX: 0, targetZ: 60 });
+    // Reachable, but ranked 6th by the heuristic — far beyond the budget.
+    const farReachable = makeAction({ id: 6, targetX: 0, targetZ: 25 });
 
     const result = selectBestActionForEmployee(state, emp, [...nearUnreachable, farReachable]);
 
-    // The budget is spent entirely on the unreachable near candidates, so
-    // the reachable one is never reached — cost control over correctness.
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(6);
   });
 
   // ── isClaimable pre-filter starvation (#611) ───────────────────────────
@@ -412,14 +441,14 @@ describe('selectBestActionForEmployee', () => {
   // so the budget is spent only on already-claimable candidates.
 
   it('an unclaimable backlog larger than the attempt budget does not starve a farther claimable candidate (#611)', () => {
-    const state = makeState(70, 40);
+    const state = makeState(40, 40);
     const emp = makeEmployee(state, 0, 0);
 
     const QUALIFIED_ID = 100;
 
-    // ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3 cheap candidates, all ranked
+    // ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3 = 8 cheap candidates, all ranked
     // ahead of the qualified one, all unclaimable.
-    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(30);
+    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(5);
     const unclaimableBacklog: PendingAction[] = [];
     for (let i = 1; i <= ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3; i++) {
       unclaimableBacklog.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
@@ -427,7 +456,7 @@ describe('selectBestActionForEmployee', () => {
 
     // Farther (higher estimated cost) than every backlog candidate, but
     // reachable AND claimable.
-    const qualified = makeAction({ id: QUALIFIED_ID, targetX: 60, targetZ: 0 });
+    const qualified = makeAction({ id: QUALIFIED_ID, targetX: 30, targetZ: 0 });
 
     const isClaimable = (action: PendingAction): boolean => action.id === QUALIFIED_ID;
 
@@ -440,7 +469,7 @@ describe('selectBestActionForEmployee', () => {
   });
 
   it('bounds real-cost resolution to ACTION_SELECTION_MAX_PATH_ATTEMPTS spent on claimable candidates, never wasted on an unclaimable backlog (#611)', () => {
-    const state = makeState(60, 60);
+    const state = makeState(30, 60);
     blockColumn(state.navGrid!, 15); // isolates x >= 16 from the employee at x = 0
     const emp = makeEmployee(state, 0, 0);
 
@@ -452,9 +481,13 @@ describe('selectBestActionForEmployee', () => {
       unclaimable.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
     }
 
-    // ACTION_SELECTION_MAX_PATH_ATTEMPTS claimable-but-unreachable candidates
-    // (behind the wall at x = 15), ranked (by cost) ahead of the one
-    // claimable-and-reachable candidate below within the claimable subset.
+    // Claimable-but-unreachable candidates (behind the wall at x = 15),
+    // ranked (by cost) ahead of the one claimable-and-reachable candidate
+    // below within the claimable subset. The climb/impassable-aware
+    // reachable-set pre-filter (#953) proves every one of these unreachable
+    // without spending a real findPath attempt, so — unlike a plain ranking
+    // budget — a cluster of these larger than the attempt budget still can't
+    // starve the claimable-and-reachable candidate below.
     const claimableUnreachable: PendingAction[] = [];
     for (let i = 0; i < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
       claimableUnreachable.push(makeAction({ id: 21 + i, targetX: 16 + i, targetZ: 0 }));
@@ -462,8 +495,8 @@ describe('selectBestActionForEmployee', () => {
 
     // Claimable and reachable (near side of the wall), but far higher cost
     // (via z-distance) than every claimable-unreachable candidate above —
-    // ranked just past the budget within the claimable subset.
-    const claimableReachable = makeAction({ id: 999, targetX: 10, targetZ: 50 });
+    // ranked last within the claimable subset.
+    const claimableReachable = makeAction({ id: 30, targetX: 10, targetZ: 50 });
 
     const claimableIds = new Set<number>([...claimableUnreachable.map(c => c.id), claimableReachable.id]);
     const isClaimable = (action: PendingAction): boolean => claimableIds.has(action.id);
@@ -474,24 +507,80 @@ describe('selectBestActionForEmployee', () => {
       state, emp, [...unclaimable, ...claimableUnreachable, claimableReachable], isClaimable,
     );
 
-    // The budget is spent entirely on the claimable-but-unreachable
-    // candidates, so the claimable-and-reachable one (ranked just past the
-    // budget) is never reached — same "cost control over correctness"
-    // tradeoff as the reachability-only budget test above, but now proven
-    // to apply to the CLAIMABLE subset specifically, not the raw candidate
-    // list.
-    expect(result).toBeNull();
+    // The claimable-but-unreachable candidates are screened out for free, so
+    // the claimable-and-reachable one is still found despite being ranked
+    // last within the claimable subset — proven to apply to the CLAIMABLE
+    // subset specifically, not just the raw candidate list.
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(30);
     // The unclaimable backlog (cheaper-ranked than everything claimable)
-    // must never consume a real-cost resolution: at least one, and never
-    // more than ACTION_SELECTION_MAX_PATH_ATTEMPTS, real-cost resolutions
-    // happen — all of them against claimable candidates. Old (buggy) code
-    // burns the whole budget's `continue`s on the 10 unclaimable candidates
-    // (cheaper-ranked than the whole claimable subset) and never calls
-    // findPath at all.
+    // must never consume a real-cost resolution, and neither must any of the
+    // provably-unreachable claimableUnreachable candidates: exactly one real
+    // findPath call happens, against the one candidate that was ever going
+    // to resolve. Old (buggy) code burns the whole budget's `continue`s on
+    // the 10 unclaimable candidates (cheaper-ranked than the whole claimable
+    // subset) and never calls findPath at all.
     expect(findPathSpy.mock.calls.length).toBeGreaterThan(0);
     expect(findPathSpy.mock.calls.length).toBeLessThanOrEqual(ACTION_SELECTION_MAX_PATH_ATTEMPTS);
 
     findPathSpy.mockRestore();
+  });
+
+  // ── Climb-limit pocket starvation (#953) ───────────────────────────────
+  //
+  // A fresh blast crater's own interior sinks well below NAV_MAX_CLIMB_HEIGHT
+  // relative to the surrounding surface, so every step in or out of it is
+  // climb-illegal (Pathfinding.ts's isStepClimbable) even though the
+  // crater's own cells are all mutually climb-legal with each other — a
+  // candidate deep inside one has plenty of climb-legal neighbours immediately
+  // around it, so a single-hop adjacency check alone can't tell it's cut off.
+  // Only actual connectivity to the requesting employee does.
+
+  it('a climb-isolated crater pocket does not starve a farther, genuinely reachable candidate (#953)', () => {
+    const state = makeState(30, 40);
+    const craterCells = new Set<string>();
+    for (let z = 0; z <= 6; z++) craterCells.add(`2,${z}`); // 7 cells >> ACTION_SELECTION_MAX_PATH_ATTEMPTS (5)
+    state.navGrid = makeGridWithCraterPocket(30, 40, craterCells);
+    const emp = makeEmployee(state, 0, 0);
+
+    // Cheapest-ranked by raw distance, but every one sits inside the
+    // climb-isolated crater pocket — none reachable from the employee.
+    const nearUnreachable: PendingAction[] = [];
+    for (let z = 0; z <= 6; z++) {
+      nearUnreachable.push(makeAction({ id: z + 1, targetX: 2, targetZ: z }));
+    }
+    // Reachable (flat ground, no crater), but ranked well beyond the budget
+    // by raw distance.
+    const farReachable = makeAction({ id: 100, targetX: 0, targetZ: 25 });
+
+    const findPathSpy = vi.spyOn(PathfindingModule, 'findPath');
+
+    const result = selectBestActionForEmployee(state, emp, [...nearUnreachable, farReachable]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(100);
+    // Every crater candidate is screened out by the climb-aware reachable-set
+    // pre-filter without spending a real findPath attempt — only the one
+    // genuinely reachable candidate ever reaches resolveActionCost.
+    expect(findPathSpy.mock.calls.length).toBe(1);
+
+    findPathSpy.mockRestore();
+  });
+
+  it('an employee standing inside the same climb-isolated pocket as a candidate can still be dispatched to it (#953)', () => {
+    const state = makeState(30, 40);
+    const craterCells = new Set<string>();
+    for (let z = 0; z <= 6; z++) craterCells.add(`2,${z}`);
+    state.navGrid = makeGridWithCraterPocket(30, 40, craterCells);
+    // Employee already inside the crater pocket, not outside it.
+    const emp = makeEmployee(state, 2, 0);
+
+    const inPocket = makeAction({ id: 1, targetX: 2, targetZ: 3 });
+
+    const result = selectBestActionForEmployee(state, emp, [inPocket]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(1);
   });
 });
 
