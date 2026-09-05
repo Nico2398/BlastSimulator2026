@@ -1350,6 +1350,106 @@
         },
         "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note."
       }
+    },
+    {
+      "command": "tick 300",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 300"
+        }
+      ],
+      "description": "#959: this file never once sold real ore -- every ore_sale delivery attempt above (sparkium/gloomium) targeted a material this file's own two drill patterns never actually contain (direct trace: `collectedOre` holds only `dirtite`, from both blasts combined), so all three were guaranteed BLOCKED by design and the file closed on a purely negative economy, the same bug #959 reports against the tutorial's own scripted flow. Both fleets are destroyed by blast 2 (vehicleCount 0 above) so no further hauling can happen, but the dirtite already hauled into storage before blast 2 (2 stored fragments carrying it, direct-traced) survives untouched -- none of the guard-blocked deliveries above ever actually called `consumeStoredOre` for real, so nothing was ever removed from it. All that's missing is a real `ore_sale dirtite` offer, which the pool has not rolled yet at tick 384 (direct trace: rustite/sparkium/blingite/absurdium/craktonite/gloomium/treranium ore_sale offers all cycle through first). Direct-traced against this exact 58-step prefix, a single `tick 300` (not 300x `tick 1` -- `tickCommand`'s own contract-refresh RNG is seeded once per command call from the tick count at the call's *start*, so a batched call and an equivalent run of single ticks draw a genuinely different sequence) reliably rolls one in by tick 684, at which point one is present and never absent again in a re-run of this exact sequence. cash changedBy -39600 is the ordinary tick-drain of a mine down to one surviving employee (the manager, #3) and zero vehicles -- no active tasks, no contracts, nothing but payroll and building upkeep, matching every other file's plain-tick-drain pattern (see the tick 5 step's own note near the end of the second blast wait, above).",
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "changedBy": {
+          "cash": -39600
+        }
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "description": "#959: unlike the three guard steps earlier in this file, `dirtite` is a material this file's own blasts actually mined -- this is the tutorial's missing sell half, finally exercised for real. #513/#581/#635: scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` and selected by `type:`/`material:`, not a numeric id, for the same offer-pool-rotation reasons as every other accept step in this file. Direct-traced: the offer accepted here is 470kg @ $3.8828146003419537/kg, deadline 50 ticks."
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:470",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "470"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 0
+        },
+        "changedBy": {
+          "cash": 2098.922862160718
+        }
+      },
+      "description": "#959: a real, successful sell -- unqualified `.bs-contract-amount`/`.bs-contract-deliver` are unambiguous here the same way economy-full-loop.json's own rubble-deliver step already established: the panel is already open from the accept step above and this is the only active card (activeContractCount just went 0 -> 1). Direct-traced: $1824.92 payment + $274.00 early bonus (delivered well inside the 50-tick deadline) = $2,098.922862160718 exact. This is the fix's other missing half made concrete at the console-command level: the tutorial's own economy can genuinely recover cash by hauling and selling blasted ore, not just spending on hires, vehicles and buildings against a one-way deficit."
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ],
+      "description": "#959: cash is still deeply negative here ($-56,068.08, direct-traced) even after a real ore sale -- one $2,098.92 sale cannot outrun the five-figure cost of two full drill-charge-blast cycles, a wiped-out fleet and a five-person body count. This is exactly why the issue's second fix (wiring `tutorial_pit.contractPriceMultiplier: 1.5`, currently declared in Level.ts but never read by `generateContracts`/`generateOneContract`, into the pricing math) matters on top of this scenario's own missing-sell-cycle fix: raising realizable per-contract income is what closes the gap the tutorial's own narrower, better-tuned scripted blast is sized to close, not this file's deliberately harsher one (two guard-triggering deaths in blast 1 alone, by design -- see that blast step's own note). `campaign status` itself moves nothing (a pure readout), so the shortfall is documented here in prose rather than asserted as a before/after delta this no-op step cannot produce.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "activeContractCount": 0
+        }
+      }
     }
   ]
 }

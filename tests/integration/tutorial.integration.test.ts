@@ -1,3 +1,14 @@
+// @vitest-environment jsdom
+//
+// jsdom (#959): the full-playthrough test below drives TUTORIAL_STEPS'
+// 'blast' step, whose real isComplete calls isBlastReportOutstanding()
+// (tutorialStepHelpers.ts), which reads `document.querySelector` — undefined
+// under this file's previous plain-node environment. jsdom's empty document
+// resolves that query to null, matching the documented "no modal marker
+// exists at all (non-browser / test harness state)" case (see
+// tutorialSteps.test.ts's own test of the same name) and is a no-op for
+// every other test already in this file, none of which touch the DOM.
+//
 // BlastSimulator2026 — Integration tests: Tutorial flow
 // Verifies the console commands invoked by the Tutorial button in main.ts
 // produce the expected game state: new_game seed:42 size:24 + campaign start level:tutorial_pit.
@@ -13,6 +24,9 @@ import { TutorialRails } from '../../src/ui/tutorialRails.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
+import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { computeDangerZone } from '../../src/core/entities/Zone.js';
+import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -130,7 +144,7 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 27th of 34 tutorial steps (0-based index 26), between contract-accept and contract-deliver', () => {
+  it('is the 27th of 34 tutorial steps (0-based index 26), between contract-accept and sell-ore', () => {
     // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
     // right after hire-driller, shifting every later step (including this
     // one) up by 3 from their pre-#553 positions. #555 inserts
@@ -151,12 +165,15 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // standalone 'time-speed' step (was right after hire-surveyor) and adds
     // speed-up-for-dig/speed-normal-after-dig right after box-cut instead —
     // both well before this step — net +1, shifting it up 1 more (25 -> 26).
+    // #959 renames the step right after this one from 'contract-deliver' to
+    // 'sell-ore' (the tutorial never actually hauled and sold blasted ore for
+    // money) — the count and this step's own index are unchanged.
     const ids = TUTORIAL_STEPS.map(s => s.id);
     const idx = ids.indexOf('haul-debris');
     expect(idx).toBe(26);
     expect(ids[idx - 1]).toBe('contract-accept');
     expect(ids[idx - 2]).toBe('build-storage');
-    expect(ids[idx + 1]).toBe('contract-deliver');
+    expect(ids[idx + 1]).toBe('sell-ore');
   });
 
   it('completes via automatic hauling alone: fragments move on_ground -> stored with no "vehicle haul" command issued', () => {
@@ -754,4 +771,197 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     // Still teaches a real shot: rock actually broke.
     expect(report!.clearedVoxels).toBeGreaterThan(0);
   });
+});
+
+// ── #959: the tutorial must end WON, with positive cash, not bankrupt ──
+//
+// The reported bug: a player who does exactly what the tutorial teaches
+// finishes deep in the red, yet the closing card still reads "Tutorial
+// Complete!" — 'victory' (tutorialStepsClosing.ts) completes on any
+// `state.levelEnded === true`, which bankruptcy/arrest/ecological_shutdown/
+// worker_revolt all set just as readily as a genuine win, and
+// 'congratulations' always shows the same success copy regardless. The
+// other, structural half of the same bug: nothing in TUTORIAL_STEPS ever
+// hauls and sells the ore the tutorial's own scripted blast produces, so the
+// operating deficit the rest of the level runs up (hires, buildings,
+// vehicles, two full drill-charge-blast cycles) never has anything to offset
+// it. This test drives every TUTORIAL_STEPS command in order, through a
+// real console + real ticking, exactly the way a player follows the card
+// deck, and proves the level can actually be WON — cash positive,
+// `levelEndReason` genuinely 'completed', netProfit past the level's own
+// unlockThreshold — not just declared won by a step whose own condition
+// cannot tell a win from a bankruptcy.
+describe('full tutorial playthrough ends WON with positive cash, not bankrupt-but-congratulated (#959)', () => {
+  /**
+   * Advance ticks one at a time, topping up every living employee's fatigue
+   * (the same anti-collapse hack every other real-tick-driving test in this
+   * file already uses) and auto-resolving any pending event (tutorial_pit's
+   * own eventFreqMultiplier is 0, so the only pending event this can ever see
+   * is the one 'event-fire-resolve' fires itself) — stops the instant
+   * `done()` reads true, or after `maxTicks`.
+   */
+  function tickUntil(
+    run: (cmd: string) => { success: boolean; output: string },
+    state: GameState,
+    maxTicks: number,
+    done: () => boolean,
+  ): void {
+    for (let i = 0; i < maxTicks && !done(); i++) {
+      for (const emp of state.employees.employees) {
+        if (emp.alive) emp.fatigue = 100;
+      }
+      if (state.events.pendingEvent) run('event choose 0');
+      run('tick 1');
+    }
+  }
+
+  it('drives every TUTORIAL_STEPS command in order to a genuine, profitable level completion', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('campaign start level:tutorial_pit').success).toBe(true);
+    const state = ctx.state!;
+
+    for (const step of TUTORIAL_STEPS) {
+      // 'drill-plan' is a createComparisonStep that completes on the FIRST
+      // ordered hole landing, not all of them, by design (see its own
+      // comment in tutorialSteps.ts) — the rail moves on long before a
+      // multi-hole grid finishes drilling. Unlike 'charge' below it (whose
+      // own isComplete already requires every hole charged, #926), a
+      // `charge hole:*` issued the instant this step's card opens would only
+      // reach whichever holes had already landed, permanently leaving the
+      // rest un-chargeable once landed later. Draining the drill queue first
+      // is what a patient real player effectively achieves by not clicking
+      // Charge All until the plan visibly stops changing.
+      //
+      // A blanket "drain until state.pendingActions is empty" was tried and
+      // rejected here: once fragments hit the ground after 'blast', an
+      // unclaimed haul_debris PendingAction sits queued (no hauler exists
+      // yet at that point in the deck) and never resolves on its own,
+      // burning the entire tick budget on every later step for nothing —
+      // exactly the outstanding-work signal TutorialRails' own clock-hold
+      // exists to stop paying for by pausing instead of ticking.
+      if (step.id === 'charge') {
+        tickUntil(run, state, 500, () => state.plannedDrillHoles.length === 0);
+      }
+
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+
+      // ── Steps this Node-level test cannot drive exactly as a player would ──
+
+      if (step.id === 'toggle-survey-overlay') {
+        // Genuinely DOM-only: the step completes on a single click of a real
+        // button's aria-pressed state, with no console equivalent at all
+        // (see its own step definition). Out of scope for a console-driven
+        // playthrough — the interaction-mode scenario channel covers the
+        // real click. Treated as satisfied so the rest of the deck can be
+        // driven without a step this test structurally cannot exercise.
+        continue;
+      }
+
+      if (step.id === 'contract-accept') {
+        // The step's own `commands` hint hardcodes `contract accept 1` —
+        // by the time this step is actually reached, the survey/drilling/
+        // charging/hauling stretch above has spent well over
+        // CONTRACT_REFRESH_INTERVAL ticks, so the offer pool has already
+        // rotated past id 1 (#597/#635's own reason for preferring a
+        // type/material selector). Accept whichever offer genuinely leads
+        // the pool right now instead of trusting the stale hint literally.
+        const offer = state.contracts.available[0];
+        expect(offer, 'no contract available to accept at all').toBeDefined();
+        expect(run(`contract accept ${offer!.id}`).success).toBe(true);
+        tickUntil(run, state, 500, () => step.isComplete(state, snapshot));
+        expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+        continue;
+      }
+
+      if (step.id === 'evacuate-zone') {
+        // No console command hint at all (the step teaches "Sound the Horn",
+        // BlastWorkshop.ts's Fire step, whose own handler dispatches `zone
+        // clear ...`) — but by the time this step is reached, the driller
+        // and digger have gone idle (no vehicle-gated task left to run) and
+        // are not currently boarding either vehicle, so `clearZone` reports
+        // both driverless and permanently strands them (Zone.ts: "a
+        // driverless vehicle can never advance on tick — order it out
+        // anyway and it just sits there... report it stranded either way").
+        // Actually driving a vehicle back out is its own multi-step
+        // interaction this Node-level playthrough doesn't otherwise need to
+        // exercise, so — matching this same file's own precedent just above
+        // ("blast refuses to fire on an occupied zone", `emp.x = 44` /
+        // `veh.x = 44`) — clear the zone directly by relocating every
+        // employee and vehicle to a corner beyond it, the same primitive a
+        // real evacuation would leave them at.
+        const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
+        expect(zone, 'no drill holes to compute a danger zone from').not.toBeNull();
+        const z = zone!;
+        const safeX = z.x1 - 5;
+        const safeZ = z.z1 - 5;
+        for (const emp of state.employees.employees) {
+          if (!emp.alive) continue;
+          emp.x = safeX;
+          emp.z = safeZ;
+        }
+        for (const veh of state.vehicles.vehicles) {
+          veh.x = safeX;
+          veh.z = safeZ;
+        }
+        expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+        continue;
+      }
+
+      if (step.id === 'sell-ore') {
+        // #959's own missing half, driven for real: repeatedly accept
+        // whichever available ore_sale contract matches ore this file's own
+        // blasts actually mined, and deliver what's deliverable. A tier-1
+        // freight_warehouse only holds 2000kg (#959 planner note), so this
+        // is deliberately a multi-cycle loop, not a single accept+deliver.
+        for (let cycle = 0; cycle < 60 && !step.isComplete(state, snapshot); cycle++) {
+          const minedMaterials = Object.entries(state.collectedOre ?? {})
+            .filter(([, kg]) => (kg as number) > 0)
+            .map(([id]) => id);
+          const offer = state.contracts.available.find(
+            (c) => c.type === 'ore_sale' && minedMaterials.includes(c.materialId),
+          );
+          if (offer) {
+            if (run(`contract accept ${offer.id}`).success) {
+              const active = state.contracts.active.find((c) => c.id === offer.id);
+              if (active) {
+                const amount = Math.min(active.quantityKg, state.collectedOre[active.materialId] ?? 0);
+                if (amount > 0) {
+                  run(`contract deliver ${active.id} amount:${amount}`);
+                }
+              }
+            }
+          }
+          tickUntil(run, state, 30, () => step.isComplete(state, snapshot));
+        }
+        expect(
+          step.isComplete(state, snapshot),
+          'tutorial step "sell-ore" never completed -- stub isComplete is hardcoded false (#959)',
+        ).toBe(true);
+        continue;
+      }
+
+      // ── Every other step: run its own commands/autoCommands, then tick ──
+
+      for (const cmd of step.autoCommands ?? []) run(cmd);
+      for (const cmd of step.commands ?? []) run(cmd);
+
+      tickUntil(run, state, Math.max(500, (step.tickBudget ?? 20) * 25), () => step.isComplete(state, snapshot));
+
+      expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+    }
+
+    // Every step reported complete -- including 'victory' and
+    // 'congratulations' -- so the level must have genuinely ended WON, not
+    // merely have `levelEnded === true` for any reason at all (#959's own
+    // 'victory' bug: today it accepts a bankruptcy/arrest/ecological_shutdown/
+    // worker_revolt just as readily as a real win).
+    expect(state.levelEndReason).toBe('completed');
+    expect(state.cash).toBeGreaterThan(0);
+
+    const level = getLevel('tutorial_pit')!;
+    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
+    expect(netProfit).toBeGreaterThanOrEqual(level.unlockThreshold);
+  }, 120_000);
 });
