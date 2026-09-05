@@ -13,11 +13,55 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
+/** Root row horizontal padding, matching its inline style below. */
+const SELECTION_BAR_PADDING_X_PX = 14;
+/** Root row vertical padding, matching its inline style below. */
+const SELECTION_BAR_PADDING_Y_PX = 10;
+/** Gap between the identity block, action buttons and close button, matching its inline style below. */
+const SELECTION_BAR_ROOT_GAP_PX = 14;
+/** Identity block min-width, matching its inline style below. */
+const SELECTION_BAR_IDENTITY_MIN_WIDTH_PX = 110;
+/** Identity block right padding (before its border), matching its inline style below. */
+const SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX = 12;
+/** Identity block right border, matching its inline style below. */
+const SELECTION_BAR_IDENTITY_BORDER_PX = 1;
+/** Close button size, matching its inline style below. */
+const SELECTION_BAR_CLOSE_BTN_PX = 26;
+/** Gap between action buttons, matching its inline style below. */
+const SELECTION_BAR_BUTTON_GAP_PX = 8;
+/** `.bsx-btn` height (tokens.ts's shared button class) — the tallest child in the row. */
+const SELECTION_BAR_CONTENT_HEIGHT_PX = 30;
+/**
+ * Worst-case per-button width: `.bsx-btn` padding (2×12) + border (2×1) +
+ * icon (12) + icon/label gap (7) + the longest translated action label at
+ * 600 weight / 10px / .1em letter-spacing — "Dispatch Here" (en) and
+ * "Désaffecter" (fr) both land well under this, rounded up for headroom.
+ */
+const SELECTION_BAR_BUTTON_WIDTH_PX = 150;
+/**
+ * Widest action set across every entity kind buildActions() renders — the
+ * vehicle case (follow, move_here, haul, unassign). Bump this alongside any
+ * new action added to that switch's widest branch.
+ */
+const SELECTION_BAR_MAX_ACTIONS = 4;
 
-/** Bottom-center bar, hidden (zero-area) while no entity is selected. */
-function selectionBarBounds(_viewport: Viewport): Rect {
-  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
-  return { x: 0, y: 0, width: 0, height: 0 };
+/** Bottom-center bar, sized for the widest action set (vehicle selection) so the declared envelope covers every entity kind. */
+function selectionBarBounds(viewport: Viewport): Rect {
+  const actionsWidth = SELECTION_BAR_MAX_ACTIONS * SELECTION_BAR_BUTTON_WIDTH_PX
+    + (SELECTION_BAR_MAX_ACTIONS - 1) * SELECTION_BAR_BUTTON_GAP_PX;
+  const identityWidth = SELECTION_BAR_IDENTITY_MIN_WIDTH_PX + SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX + SELECTION_BAR_IDENTITY_BORDER_PX;
+  const width = SELECTION_BAR_PADDING_X_PX * 2
+    + identityWidth
+    + SELECTION_BAR_ROOT_GAP_PX * 2
+    + actionsWidth
+    + SELECTION_BAR_CLOSE_BTN_PX;
+  const height = SELECTION_BAR_PADDING_Y_PX * 2 + SELECTION_BAR_CONTENT_HEIGHT_PX;
+  return {
+    x: (viewport.width - width) / 2,
+    y: viewport.height - SELECTION_BAR_BOTTOM_OFFSET_PX - height,
+    width,
+    height,
+  };
 }
 
 // 'move_here' (vehicle, drive to the hovered tile) is deliberately distinct
@@ -41,15 +85,15 @@ export class SelectionBar {
     this.root = el('div', { className: 'bsx-root', attrs: { id: 'bs-selection-bar' } });
     this.root.style.cssText = [
       'position:fixed', 'left:50%', `bottom:${SELECTION_BAR_BOTTOM_OFFSET_PX}px`, 'transform:translateX(-50%)',
-      'z-index:var(--bsx-z-panel)', 'align-items:center', 'gap:14px',
-      'padding:10px 14px', 'border-radius:var(--bsx-r-panel)', 'background:rgba(18,22,28,.96)',
+      'z-index:var(--bsx-z-panel)', 'align-items:center', `gap:${SELECTION_BAR_ROOT_GAP_PX}px`,
+      `padding:${SELECTION_BAR_PADDING_Y_PX}px ${SELECTION_BAR_PADDING_X_PX}px`, 'border-radius:var(--bsx-r-panel)', 'background:rgba(18,22,28,.96)',
       'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 10px 30px rgba(0,0,0,.45)',
       'pointer-events:all',
     ].join(';');
     this.root.style.display = 'none'; // set separately — jsdom's cssText parser can drop this declaration when it shares a cssText string with a var(...) value
 
     const identity = el('div');
-    identity.style.cssText = 'display:flex;flex-direction:column;gap:1px;padding-right:12px;border-right:1px solid var(--bsx-hairline);min-width:110px';
+    identity.style.cssText = `display:flex;flex-direction:column;gap:1px;padding-right:${SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX}px;border-right:${SELECTION_BAR_IDENTITY_BORDER_PX}px solid var(--bsx-hairline);min-width:${SELECTION_BAR_IDENTITY_MIN_WIDTH_PX}px`;
     this.titleEl = el('div');
     this.titleEl.style.cssText = 'font:600 12px/1.2 var(--bsx-font-ui);color:var(--bsx-text-primary)';
     this.subEl = el('div', { className: 'bsx-mono' });
@@ -57,10 +101,10 @@ export class SelectionBar {
     identity.append(this.titleEl, this.subEl);
 
     this.actionsEl = el('div');
-    this.actionsEl.style.cssText = 'display:flex;align-items:center;gap:8px';
+    this.actionsEl.style.cssText = `display:flex;align-items:center;gap:${SELECTION_BAR_BUTTON_GAP_PX}px`;
 
     const closeBtn = el('button');
-    closeBtn.style.cssText = 'width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--bsx-text-muted);cursor:pointer;pointer-events:all';
+    closeBtn.style.cssText = `width:${SELECTION_BAR_CLOSE_BTN_PX}px;height:${SELECTION_BAR_CLOSE_BTN_PX}px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--bsx-text-muted);cursor:pointer;pointer-events:all`;
     closeBtn.appendChild(iconEl('x', 13));
     closeBtn.addEventListener('click', () => this.hide());
 

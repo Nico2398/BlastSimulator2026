@@ -38,11 +38,28 @@ const RAIL_ENTRIES: readonly RailEntry[] = [
 const RAIL_RIGHT_OFFSET_PX = 12;
 /** Per-entry button height, matching its inline style below. */
 const RAIL_BUTTON_HEIGHT_PX = 52;
+/** Per-entry button width, matching its inline style below. */
+const RAIL_BUTTON_WIDTH_PX = 58;
+/** Rail container padding, matching its inline style below. */
+const RAIL_PADDING_PX = 6;
+/** Gap between rail buttons, matching its inline style below. */
+const RAIL_GAP_PX = 3;
 
-/** Vertically-centered strip pinned to the right edge; height grows with the number of revealed entries. */
-function toolRailBounds(_viewport: Viewport): Rect {
-  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
-  return { x: 0, y: 0, width: 0, height: 0 };
+/**
+ * Vertically-centered strip pinned to the right edge; height grows with the
+ * number of revealed entries. Uses RAIL_ENTRIES.length (worst case: every
+ * gated entry, e.g. 'shady', revealed) since a revealed entry never re-hides.
+ */
+function toolRailBounds(viewport: Viewport): Rect {
+  const width = RAIL_PADDING_PX * 2 + RAIL_BUTTON_WIDTH_PX;
+  const entryCount = RAIL_ENTRIES.length;
+  const height = RAIL_PADDING_PX * 2 + entryCount * RAIL_BUTTON_HEIGHT_PX + (entryCount - 1) * RAIL_GAP_PX;
+  return {
+    x: viewport.width - RAIL_RIGHT_OFFSET_PX - width,
+    y: (viewport.height - height) / 2,
+    width,
+    height,
+  };
 }
 
 export class ToolRail {
@@ -56,8 +73,8 @@ export class ToolRail {
     this.el.className = 'bsx-root';
     this.el.style.cssText = [
       'position:fixed', `right:${RAIL_RIGHT_OFFSET_PX}px`, 'top:50%', 'transform:translateY(-50%)',
-      'z-index:var(--bsx-z-rail)', 'display:flex', 'flex-direction:column', 'gap:3px',
-      'padding:6px', 'border-radius:8px', 'background:rgba(18,22,28,.92)',
+      'z-index:var(--bsx-z-rail)', 'display:flex', 'flex-direction:column', `gap:${RAIL_GAP_PX}px`,
+      `padding:${RAIL_PADDING_PX}px`, 'border-radius:8px', 'background:rgba(18,22,28,.92)',
       'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 10px 30px rgba(0,0,0,.4)',
       'pointer-events:all',
     ].join(';');
@@ -66,7 +83,7 @@ export class ToolRail {
       const btn = document.createElement('button');
       btn.dataset['panel'] = entry.panel;
       btn.style.cssText = [
-        'width:58px', `height:${RAIL_BUTTON_HEIGHT_PX}px`, 'display:flex', 'flex-direction:column',
+        `width:${RAIL_BUTTON_WIDTH_PX}px`, `height:${RAIL_BUTTON_HEIGHT_PX}px`, 'display:flex', 'flex-direction:column',
         'align-items:center', 'justify-content:center', 'gap:5px',
         'border:1px solid transparent', 'border-radius:5px', 'background:transparent',
         'color:var(--bsx-text-muted)', 'cursor:pointer', 'position:relative',

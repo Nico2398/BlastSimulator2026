@@ -6,16 +6,33 @@ import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import type { NotificationCenter, Toast } from '../notify/NotificationCenter.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+import { TOPBAR_HEIGHT_PX, SPACING_3_PX } from '../tokens.js';
+import { MAX_TOASTS } from '../notify/NotificationCenter.js';
 
 /** Right offset of the toast stack, matching its `right:` inline style below. */
 const TOASTS_RIGHT_OFFSET_PX = 96;
 /** Toast stack width, matching its `width:` inline style below. */
 const TOASTS_WIDTH_PX = 296;
+/** Gap between stacked toasts, matching its `gap:` inline style below. */
+const TOASTS_GAP_PX = 7;
+/**
+ * Worst-case single-toast height: vertical padding (2×10) + a one-line title
+ * (~15px @ 12px/1.25) + column gap (3) + a two-line body — the conservative
+ * case, since body text length is content-driven and can wrap within the
+ * ~296px stack width (~2×15.4px @ 11px/1.4) + column gap (3) + an optional
+ * CTA line (~10px + 2px margin-top), rounded up. See makeToast() below.
+ */
+const TOAST_ENTRY_HEIGHT_PX = 84;
 
 /** Stack pinned below the top bar, right-aligned; height grows with the number of live toasts, exempt from the pairwise 'hud' check as it's transient and self-clearing. */
-function toastsBounds(_viewport: Viewport): Rect {
-  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
-  return { x: 0, y: 0, width: 0, height: 0 };
+function toastsBounds(viewport: Viewport): Rect {
+  const height = MAX_TOASTS * TOAST_ENTRY_HEIGHT_PX + (MAX_TOASTS - 1) * TOASTS_GAP_PX;
+  return {
+    x: viewport.width - TOASTS_RIGHT_OFFSET_PX - TOASTS_WIDTH_PX,
+    y: TOPBAR_HEIGHT_PX + SPACING_3_PX,
+    width: TOASTS_WIDTH_PX,
+    height,
+  };
 }
 
 export class Toasts {
@@ -26,7 +43,7 @@ export class Toasts {
     this.el = el('div', { className: 'bsx-root' });
     this.el.style.cssText = [
       'position:fixed', `right:${TOASTS_RIGHT_OFFSET_PX}px`, 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))', 'z-index:var(--bsx-z-toast)',
-      `width:${TOASTS_WIDTH_PX}px`, 'display:flex', 'flex-direction:column', 'gap:7px',
+      `width:${TOASTS_WIDTH_PX}px`, 'display:flex', 'flex-direction:column', `gap:${TOASTS_GAP_PX}px`,
       'pointer-events:none',
     ].join(';');
     container.appendChild(this.el);
