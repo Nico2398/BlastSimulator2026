@@ -12,7 +12,7 @@
 // intended character: a tight system sans for UI text, and a tabular
 // monospace (via font-variant-numeric) for every countable value.
 
-const TOKENS_CSS = `
+export const TOKENS_CSS = `
 :root {
   /* ── surfaces ── */
   --bsx-app: #0b0e12;
@@ -67,6 +67,7 @@ const TOKENS_CSS = `
   --bsx-z-panel: 100;
   --bsx-z-scene-bar: 120;
   --bsx-z-topbar: 150;
+  --bsx-z-toast: 160;
   --bsx-z-rail: 200;
   --bsx-z-popover: 210;
   --bsx-z-hovertag: 320;
@@ -81,6 +82,9 @@ const TOKENS_CSS = `
      original 600 until this was found: the confirm dialog rendered, but
      entirely hidden behind the panel that requested it. */
   --bsx-z-modal: 10500;
+
+  /* ── layout ── */
+  --bsx-topbar-height: 52px;
 
   /* ── type ── */
   --bsx-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
