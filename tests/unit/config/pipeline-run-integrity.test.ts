@@ -212,11 +212,53 @@ describe('a run that settles nothing is retried', () => {
     }
   });
 
-  // No `success()` in the condition, deliberately: the retry must fire when the
-  // attempt reported success having produced nothing, which is what #406 did.
-  it('retries on the state verdict alone, not on the attempt exit code', () => {
+  // `always()` and the state verdict, nothing else: the retry must fire when the
+  // attempt reported success having produced nothing (#406), and just as much
+  // when it failed or timed out — a step without `always()` is skipped after any
+  // failed step, so `success()` implied or written would confine the gate to the
+  // exit-0 case.
+  it('retries on the state verdict alone, whatever the attempt exit code', () => {
     for (const name of RUNNERS) {
-      expect(workflow(name), name).toContain("if: steps.state.outputs.retry == 'true'");
+      expect(workflow(name), name).toContain("if: always() && steps.state.outputs.retry == 'true'");
+    }
+  });
+
+  // Runs 565, 591, 606 and 609 each ran their agent step for the whole 360-minute
+  // job and ended on the job clock: a cancelled job skips the retry gate and gives
+  // the rescue seconds. A step-level timeout below the job's fails the attempt
+  // inside a live job instead, so the state check, the retry and the rescue run
+  // with clock left. Pinned per attempt step, and as arithmetic against the job.
+  it('bounds each agent step below the job, with room for the retry and the rescue', () => {
+    const minRemaining = Number(/min_remaining_minutes:[\s\S]*?default: ["'](\d+)["']/.exec(action('agentic-run-state'))?.[1]);
+    expect(minRemaining).toBeGreaterThan(0);
+    for (const name of RUNNERS) {
+      const text = workflow(name);
+      const job = Number(/timeout-minutes:\s*(\d+)/.exec(text)?.[1]);
+      const stepTimeouts = [...text.matchAll(/^\s{8}timeout-minutes:\s*(\d+)/gm)].map((m) => Number(m[1]));
+      expect(stepTimeouts, `${name}: first attempt and retry each carry a step timeout`).toHaveLength(2);
+      const [first = 0, retry = 0] = stepTimeouts;
+      expect(first, `${name}: the first attempt gets the larger share`).toBeGreaterThan(retry);
+      expect(job - first, `${name}: a timed-out first attempt must leave the retry gate its minimum`)
+        .toBeGreaterThanOrEqual(minRemaining);
+      expect(first + retry, `${name}: both attempts plus setup, state checks and rescue fit the job`)
+        .toBeLessThanOrEqual(job - 5);
+    }
+  });
+
+  // The loop deadline is the one clock every pipeline loop shares. It is derived
+  // from the same `started_at` the retry gate reads, falls back to a default on a
+  // bad variable rather than opening the budget, and reaches both attempts —
+  // the retry inherits the same absolute deadline and so starts with its loops
+  // already closed.
+  it('exports one loop deadline to both attempts, from the job start', () => {
+    for (const name of RUNNERS) {
+      const text = workflow(name);
+      const clock = text.slice(text.indexOf('- name: Record when the job started'), text.indexOf('actions/checkout'));
+      expect(clock, name).toContain('LOOP_BUDGET_MINUTES: ${{ vars.AGENTIC_LOOP_BUDGET_MINUTES }}');
+      expect(clock, name).toContain("''|*[!0-9]*|0) budget=180 ;;");
+      expect(clock, name).toContain('loop_deadline=$(( started_at + budget * 60 ))');
+      const exports = text.match(/AGENTIC_LOOP_DEADLINE_EPOCH: \$\{\{ steps\.clock\.outputs\.loop_deadline \}\}/g) ?? [];
+      expect(exports, `${name}: first attempt and retry both receive the deadline`).toHaveLength(2);
     }
   });
 
