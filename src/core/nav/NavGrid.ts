@@ -7,7 +7,7 @@ import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
-import { NAV_BENCH_HEIGHT } from '../config/balance.js';
+import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
@@ -172,7 +172,7 @@ export class NavGrid {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
         const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
-        row.push(NavGrid.makeCell(cellType, benchLevel));
+        row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY));
       }
       cells.push(row);
     }
@@ -220,7 +220,7 @@ export class NavGrid {
         }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY)));
+        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY), surfaceY));
       }
     }
 
@@ -280,8 +280,13 @@ export class NavGrid {
    * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
    *
    * Ramp detection: if any cardinal neighbor's surface Y differs from this cell's
-   * surface Y by more than 1 voxel, the cell is classified as a ramp. This allows
-   * pathfinding to handle elevation changes (e.g. stepped terrain or ramp transitions).
+   * surface Y by more than 1 voxel and at most NAV_MAX_CLIMB_HEIGHT voxels, the
+   * cell is classified as a ramp. This allows pathfinding to handle elevation
+   * changes (e.g. stepped terrain or ramp transitions). A delta beyond
+   * NAV_MAX_CLIMB_HEIGHT (e.g. a blast crater wall) does NOT classify as a ramp —
+   * it falls through to walkable, and Pathfinding's per-step climb gate (#953)
+   * is what actually refuses that illegal step, since a cell can be legitimately
+   * walkable from one neighbor and illegally steep relative to another.
    */
   private static classifyCellType(
     x: number,
@@ -298,8 +303,11 @@ export class NavGrid {
     // Ramp detection: cardinal neighbor with surface height delta > 1 voxel
     for (const [dx, dz] of CARDINAL_OFFSETS) {
       const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
-      if (neighborSurfaceY !== -1 && Math.abs(surfaceY - neighborSurfaceY) > 1) {
-        return 'ramp';
+      if (neighborSurfaceY !== -1) {
+        const delta = Math.abs(surfaceY - neighborSurfaceY);
+        if (delta > 1 && delta <= NAV_MAX_CLIMB_HEIGHT) {
+          return 'ramp';
+        }
       }
     }
     return 'walkable';
