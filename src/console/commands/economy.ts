@@ -16,7 +16,7 @@ import { negotiateContract } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
-import { requireGame } from './commandUtils.js';
+import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 
 // ── finances command ──
 
@@ -128,7 +128,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount);
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
       }

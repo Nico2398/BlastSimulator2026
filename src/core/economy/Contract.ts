@@ -97,8 +97,7 @@ export function generateContracts(
   state: ContractState,
   rng: Random,
   currentTick: number,
-  // TODO: implement — threaded through to generateOneContract but not yet
-  // applied to the pricing math (#959).
+  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`). Defaults to 1 so every caller that doesn't pass one reproduces today's pricing exactly. */
   priceMultiplier: number = 1,
 ): void {
   // Only refresh if enough time has passed
@@ -116,7 +115,7 @@ export function generateContracts(
   state.lastRefreshTick = currentTick;
 }
 
-function generateOneContract(state: ContractState, rng: Random, _priceMultiplier: number = 1): Contract {
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1): Contract {
   const typeRoll = rng.nextFloat(0, 1);
   let type: ContractType;
   let materialId: string;
@@ -142,6 +141,8 @@ function generateOneContract(state: ContractState, rng: Random, _priceMultiplier
     pricePerKg = (ORE_CONTRACT_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }
+
+  pricePerKg *= priceMultiplier;
 
   const quantityKg = Math.round(rng.nextFloat(50, 500) / 10) * 10;
   const deadlineTicks = rng.nextInt(30, 100);

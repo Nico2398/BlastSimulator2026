@@ -2,6 +2,8 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import type { GameState } from '../../core/state/GameState.js';
+import { getLevel } from '../../core/campaign/Level.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /** Re-evaluates on every call so a runtime language switch (Settings) is reflected. */
@@ -43,6 +45,20 @@ function parseBooleanFlag(raw: string | undefined): boolean | undefined | null {
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   return null;
+}
+
+/**
+ * The active level's own `contractPriceMultiplier` (Level.ts), or 1 when no
+ * level is active (sandbox/no-game state) or the active id no longer
+ * resolves. Shared by every console command that generates contracts
+ * (`contract list`, the auto-refresh in `tick.ts`) so the level's declared
+ * multiplier actually reaches contract pricing instead of the stubbed
+ * default (#959).
+ */
+export function resolveContractPriceMultiplier(state: GameState): number {
+  const levelId = state.campaign.activeLevelId;
+  if (!levelId) return 1;
+  return getLevel(levelId)?.contractPriceMultiplier ?? 1;
 }
 
 /**

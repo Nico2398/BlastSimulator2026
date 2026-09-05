@@ -481,16 +481,28 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // Replaces the old contract-deliver step (#959): the tutorial never hauled
   // and sold the blasted ore for money, so a player following it to the
   // letter finished with negative cash. Repeatable — the player may accept
-  // and deliver more than one ore-sale contract before the step is done.
-  // TODO: implement — real isComplete/commands land with the feature.
+  // and deliver more than one ore-sale contract before the step is done,
+  // since the tier-1 warehouse's own capacity is far smaller than the
+  // blasted ore's total mass. Completion is keyed off the contract
+  // completion history itself (a genuine ore_sale contract closing since
+  // this step opened) rather than a fixed cycle count, so it self-adjusts
+  // regardless of how many accept/deliver rounds that turns out to take.
   {
     id: 'sell-ore',
     titleKey: 'tutorial.step_sellore.title',
     textKey: 'tutorial.step_sellore',
+    commands: ['contract accept type:ore_sale', 'contract deliver type:ore_sale amount:2000'],
     highlightTarget: TOOLBAR_TARGET.contracts,
     tickBudget: 20,
     waitsOnWork: true,
-    isComplete: () => false,
+    captureSnapshot: (state: GameState) => ({
+      completedOreSales: (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale').length,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const before = (snapshot.completedOreSales as number | undefined) ?? 0;
+      const after = (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale').length;
+      return after > before;
+    },
   },
 
   // ── Step 16: finances ──

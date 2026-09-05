@@ -8,6 +8,12 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
+import type { DefeatReason } from './screens/LevelEndScreen.js';
+
+/** True for any terminal `levelEndReason` other than a genuine win — reuses the same union `LevelEndScreen` already carries rather than redefining it (#959). */
+function isDefeatReason(reason: GameState['levelEndReason']): reason is DefeatReason {
+  return reason !== null && reason !== 'completed';
+}
 
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
   // ── Step 19: set-policy ──
@@ -58,10 +64,13 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     tickBudget: 60,
     waitsOnWork: true,
     highlightTarget: '#bs-hud-scores',
-    // TODO: implement — gate on state.levelEndReason === 'completed' rather
-    // than any levelEnded===true, so a bankruptcy/defeat doesn't complete
-    // this step and show congratulations (#959).
-    isComplete: (state: GameState) => state.levelEnded === true,
+    // Only a genuine win completes this step — `state.levelEnded` alone also
+    // goes true on bankruptcy/arrest/ecological_shutdown/worker_revolt, which
+    // used to hand straight to the congratulations card on a loss (#959).
+    // Any other terminal reason is handled generically by TutorialOverlay's
+    // own defeat short-circuit (jumpToLastStep via shortCircuitOnDefeat),
+    // which fires from every step, not just this one.
+    isComplete: (state: GameState) => state.levelEndReason === 'completed',
   },
 
   // ── Step 22: congratulations ──
@@ -69,10 +78,19 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     id: 'congratulations',
     titleKey: 'tutorial.complete_title',
     textKey: 'tutorial.complete_text',
-    // TODO: implement — resolve tutorial.complete_* vs
-    // tutorial.defeat.<reason>.* depending on state.levelEndReason (#959).
-    titleKeyFor: (_state: GameState) => 'tutorial.complete_title',
-    textKeyFor: (_state: GameState) => 'tutorial.complete_text',
+    // A defeat reaches this card via the short-circuit above rather than via
+    // 'victory' completing, so its title/text still have to reflect what
+    // actually happened instead of always congratulating (#959).
+    titleKeyFor: (state: GameState) => (
+      isDefeatReason(state.levelEndReason)
+        ? `tutorial.defeat.${state.levelEndReason}.title`
+        : 'tutorial.complete_title'
+    ),
+    textKeyFor: (state: GameState) => (
+      isDefeatReason(state.levelEndReason)
+        ? `tutorial.defeat.${state.levelEndReason}.text`
+        : 'tutorial.complete_text'
+    ),
     isComplete: () => true,
   },
 ];

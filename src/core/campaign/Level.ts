@@ -96,7 +96,18 @@ const LEVELS: readonly LevelDef[] = [
     // blast with cash to spare (#555 tutorial worker-revolt fix — bankruptcy
     // was the next failure this level's own starting cash hit once the
     // worker-revolt bug ahead of it was fixed).
-    startingCash: 290000,
+    // #959: bumped $290,000 -> $340,000. Re-verified empirically (command
+    // mode, tutorial's own real step order, contractPriceMultiplier now
+    // actually wired into contract pricing): cash is down to ~$47,000 by the
+    // time the freight_warehouse finishes building, and drains a further
+    // ~$200-250/tick in ongoing payroll/maintenance/fuel from there with
+    // nothing yet sold — enough to cross BANKRUPTCY_THRESHOLD ($5,000) within
+    // ~200 ticks and trigger bankruptcy (BANKRUPTCY_GRACE_TICKS=100 further)
+    // well before the sell-ore step's first accept/deliver cycle can
+    // realistically land. The extra $50,000 buys roughly 200-250 more ticks
+    // of runway past that same point, giving the first sale a real chance to
+    // land before the grace window runs out.
+    startingCash: 340000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,
