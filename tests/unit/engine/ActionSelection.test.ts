@@ -374,25 +374,28 @@ describe('selectBestActionForEmployee', () => {
   });
 
   it('never resolves a real path for more than ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates — a reachable candidate ranked beyond the budget is never chosen', () => {
-    const state = makeState(30, 40);
+    const state = makeState(30, 80);
     blockColumn(state.navGrid!, 1); // isolates x >= 2 from the employee at x = 0
     const emp = makeEmployee(state, 0, 0);
 
-    // 5 candidates geometrically very close (heuristic-nearest) but on the
-    // unreachable side of the wall — these fill the entire path-attempt
-    // budget (ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5) before a real,
-    // reachable candidate is ever tried.
-    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(5);
+    // ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates geometrically very close
+    // (heuristic-nearest) but on the unreachable side of the wall — these
+    // fill the entire path-attempt budget before a real, reachable
+    // candidate is ever tried.
+    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(30);
     const nearUnreachable: PendingAction[] = [];
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
       nearUnreachable.push(makeAction({ id: i, targetX: 2, targetZ: i }));
     }
-    // Reachable, but ranked 6th by the heuristic — far beyond the budget.
-    const farReachable = makeAction({ id: 6, targetX: 0, targetZ: 25 });
+    // Reachable, but ranked (by cost) behind every one of the candidates
+    // above — comfortably farther than the farthest near-unreachable
+    // candidate (distance ~ACTION_SELECTION_MAX_PATH_ATTEMPTS), so it stays
+    // ranked last regardless of the budget's own size.
+    const farReachable = makeAction({ id: ACTION_SELECTION_MAX_PATH_ATTEMPTS + 1, targetX: 0, targetZ: 60 });
 
     const result = selectBestActionForEmployee(state, emp, [...nearUnreachable, farReachable]);
 
-    // The budget is spent entirely on the 5 unreachable near candidates, so
+    // The budget is spent entirely on the unreachable near candidates, so
     // the reachable one is never reached — cost control over correctness.
     expect(result).toBeNull();
   });
@@ -409,14 +412,14 @@ describe('selectBestActionForEmployee', () => {
   // so the budget is spent only on already-claimable candidates.
 
   it('an unclaimable backlog larger than the attempt budget does not starve a farther claimable candidate (#611)', () => {
-    const state = makeState(40, 40);
+    const state = makeState(70, 40);
     const emp = makeEmployee(state, 0, 0);
 
     const QUALIFIED_ID = 100;
 
-    // ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3 = 8 cheap candidates, all ranked
+    // ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3 cheap candidates, all ranked
     // ahead of the qualified one, all unclaimable.
-    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(5);
+    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(30);
     const unclaimableBacklog: PendingAction[] = [];
     for (let i = 1; i <= ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3; i++) {
       unclaimableBacklog.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
@@ -424,7 +427,7 @@ describe('selectBestActionForEmployee', () => {
 
     // Farther (higher estimated cost) than every backlog candidate, but
     // reachable AND claimable.
-    const qualified = makeAction({ id: QUALIFIED_ID, targetX: 30, targetZ: 0 });
+    const qualified = makeAction({ id: QUALIFIED_ID, targetX: 60, targetZ: 0 });
 
     const isClaimable = (action: PendingAction): boolean => action.id === QUALIFIED_ID;
 
@@ -437,7 +440,7 @@ describe('selectBestActionForEmployee', () => {
   });
 
   it('bounds real-cost resolution to ACTION_SELECTION_MAX_PATH_ATTEMPTS spent on claimable candidates, never wasted on an unclaimable backlog (#611)', () => {
-    const state = makeState(30, 60);
+    const state = makeState(60, 60);
     blockColumn(state.navGrid!, 15); // isolates x >= 16 from the employee at x = 0
     const emp = makeEmployee(state, 0, 0);
 
@@ -449,9 +452,9 @@ describe('selectBestActionForEmployee', () => {
       unclaimable.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
     }
 
-    // 5 claimable-but-unreachable candidates (behind the wall at x = 15),
-    // ranked (by cost) ahead of the one claimable-and-reachable candidate
-    // below within the claimable subset.
+    // ACTION_SELECTION_MAX_PATH_ATTEMPTS claimable-but-unreachable candidates
+    // (behind the wall at x = 15), ranked (by cost) ahead of the one
+    // claimable-and-reachable candidate below within the claimable subset.
     const claimableUnreachable: PendingAction[] = [];
     for (let i = 0; i < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
       claimableUnreachable.push(makeAction({ id: 21 + i, targetX: 16 + i, targetZ: 0 }));
@@ -459,8 +462,8 @@ describe('selectBestActionForEmployee', () => {
 
     // Claimable and reachable (near side of the wall), but far higher cost
     // (via z-distance) than every claimable-unreachable candidate above —
-    // ranked 6th within the claimable subset, i.e. just past the budget.
-    const claimableReachable = makeAction({ id: 30, targetX: 10, targetZ: 50 });
+    // ranked just past the budget within the claimable subset.
+    const claimableReachable = makeAction({ id: 999, targetX: 10, targetZ: 50 });
 
     const claimableIds = new Set<number>([...claimableUnreachable.map(c => c.id), claimableReachable.id]);
     const isClaimable = (action: PendingAction): boolean => claimableIds.has(action.id);
@@ -471,11 +474,12 @@ describe('selectBestActionForEmployee', () => {
       state, emp, [...unclaimable, ...claimableUnreachable, claimableReachable], isClaimable,
     );
 
-    // Budget (5) is spent entirely on the 5 claimable-but-unreachable
-    // candidates, so the 6th-ranked (claimable, reachable) one is never
-    // reached — same "cost control over correctness" tradeoff as the
-    // reachability-only budget test above, but now proven to apply to the
-    // CLAIMABLE subset specifically, not the raw candidate list.
+    // The budget is spent entirely on the claimable-but-unreachable
+    // candidates, so the claimable-and-reachable one (ranked just past the
+    // budget) is never reached — same "cost control over correctness"
+    // tradeoff as the reachability-only budget test above, but now proven
+    // to apply to the CLAIMABLE subset specifically, not the raw candidate
+    // list.
     expect(result).toBeNull();
     // The unclaimable backlog (cheaper-ranked than everything claimable)
     // must never consume a real-cost resolution: at least one, and never

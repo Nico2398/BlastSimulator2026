@@ -1135,14 +1135,14 @@
       }
     },
     {
-      "command": "tick 60",
+      "command": "tick 90",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 60"
+          "command": "tick 90"
         }
       ],
-      "description": "#553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (8,8) and sink all four holes. Sandbox-measured pad.",
+      "description": "#553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (24,24) and sink all four holes. Sandbox-measured pad. #953: raised 60 -> 90 -- ACTION_SELECTION_MAX_PATH_ATTEMPTS went 5 -> 30 (balance.ts) to stop the top-ranked-by-heuristic dispatch search exhausting its whole budget on a blast crater's own unreachable interior before trying a farther, actually-reachable candidate; direct trace against this exact file found the fourth hole (H4) now finishes drilling around tick offset +65, past the old +60 pad, leaving it still a `plannedDrillHole` when the charge step below fired (\"Ordered charges for 3 holes\", then `blast` refused with \"H4: Missing charge\"). 90 re-verified clean via `npx tsx scripts/scenario-test.ts --scenario tutorial-playthrough`.",
       "role": "setup",
       "expect": {
         "equals": {
