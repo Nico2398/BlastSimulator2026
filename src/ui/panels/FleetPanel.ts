@@ -151,7 +151,7 @@ export class FleetPanel extends PanelBase {
     const vehicleCards = vehicles.length === 0
       ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.none') })]
       : vehicles.map(v => this.makeVehicleCard(v, state));
-    children.push(scrollBoundedSection(vehicleCards, 200));
+    children.push(scrollBoundedSection(vehicleCards, 200, { gap: 9 }));
     children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state.cash));
     this.bodyEl.replaceChildren(...children);
   }

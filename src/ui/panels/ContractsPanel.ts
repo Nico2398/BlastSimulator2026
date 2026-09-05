@@ -105,6 +105,7 @@ export class ContractsPanel extends PanelBase {
           ? state.contracts.active.map(c => this.makeActiveCard(c, state))
           : [emptyState(t('ui.contracts.none_active'))],
         200,
+        { gap: 10 },
       ),
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
@@ -112,6 +113,7 @@ export class ContractsPanel extends PanelBase {
           ? state.contracts.available.map(c => this.makeOfferedCard(c, state))
           : [emptyState(t('ui.contracts.none'))],
         200,
+        { gap: 10 },
       ),
       sectionHeader(t('ui.contracts.closed')),
       scrollBoundedSection(
@@ -119,6 +121,7 @@ export class ContractsPanel extends PanelBase {
           ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
           : [emptyState(t('ui.contracts.none_closed'))],
         200,
+        { gap: 10 },
       ),
     ];
     this.bodyEl.replaceChildren(...sections);

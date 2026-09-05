@@ -56,6 +56,9 @@ export class FireStep {
     this.zoneHeaderLabelEl = el('span', { className: 'bsx-section-label' });
     zoneHeader.append(this.zoneHeaderLabelEl, el('span', { className: 'bsx-section-rule' }));
 
+    // Bounded + independently scrollable, same reasoning as Charge's product
+    // list: a crowded danger zone would otherwise push Sound the Horn and the
+    // preflight checklist past the panel's fold.
     this.zoneListEl = scrollBoundedSection([], 200, { gap: 4 });
 
     this.hornBtn = el('button', { className: 'bsx-btn bsx-btn-warn' });

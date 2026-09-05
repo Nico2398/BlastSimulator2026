@@ -108,6 +108,9 @@ export class DrillStep {
     const holesLabelEl = this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.drill.holes_section');
     holesHeader.append(holesLabelEl, el('span', { className: 'bsx-section-rule' }), this.holesNoteEl);
 
+    // Bounded + independently scrollable, same reasoning as Charge's product
+    // list: a full tutorial-sized plan (16 holes) would otherwise push saved
+    // plans past the panel's fold.
     this.holeListEl = scrollBoundedSection([], 200, { gap: 3 });
 
     this.savedPlans = new SavedPlansList(

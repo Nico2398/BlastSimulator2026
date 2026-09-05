@@ -173,8 +173,9 @@ export class CrewPanel extends PanelBase {
       ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
       : employees.map(e => this.makeRosterCard(e, state));
     this.bodyEl.replaceChildren(
-      scrollBoundedSection(cards, 200),
-      sectionHeader(t('ui.crew.hiring')), ...this.makeHiringRows(state),
+      scrollBoundedSection(cards, 200, { gap: 8 }),
+      sectionHeader(t('ui.crew.hiring')),
+      ...this.makeHiringRows(state),
     );
   }
 

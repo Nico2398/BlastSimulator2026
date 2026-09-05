@@ -81,7 +81,7 @@ export class FinancesPanel extends PanelBase {
       sectionHeader(t('ui.finances.expenses')),
       ...this.makeCategoryRows(report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
       sectionHeader(t('ui.finances.ledger')),
-      scrollBoundedSection(this.makeLedger(state), 200),
+      scrollBoundedSection(this.makeLedger(state), 200, { gap: 10 }),
     ];
     this.bodyEl.replaceChildren(...sections);
   }
