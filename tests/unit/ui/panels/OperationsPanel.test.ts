@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState, PendingAction } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
@@ -343,5 +344,213 @@ describe('OperationsPanel — work queue (#548)', () => {
 
     expect(panel.root.textContent).toContain('Walking'); // ui.operations.work_queue_status_assigned
     expect(panel.root.textContent).not.toContain('Queued');
+  });
+});
+
+// ── Scroll-bounded Work Queue / Incidents sections (#957) ───────────────────
+//
+// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
+// the panel root's second child. Sections are rendered in a flat sequence of
+// sectionHeader()s and their content into bodyEl.replaceChildren(...) — a
+// bounded section groups its content into one scrollBoundedSection() wrapper
+// standing between one sectionHeader and the next, instead of spreading a
+// row per pending action / incident directly into bodyEl.
+
+function getBodyEl(panel: OperationsPanel): HTMLElement {
+  return panel.root.children[1] as HTMLElement;
+}
+
+/**
+ * Every direct child of `bodyEl` between the section header whose text
+ * contains `label` and the next section header (or the end of bodyEl).
+ */
+function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
+  const children = Array.from(bodyEl.children) as HTMLElement[];
+  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
+  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
+  const result: HTMLElement[] = [];
+  for (let i = idx + 1; i < children.length; i++) {
+    if (children[i]!.classList.contains('bsx-section')) break;
+    result.push(children[i]!);
+  }
+  return result;
+}
+
+function pushPendingActions(state: GameState, count: number): void {
+  for (let i = 0; i < count; i++) {
+    const id = 1000 + i;
+    state.pendingActions.push({
+      id, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: i, targetZ: i, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null,
+    });
+    state.ghostPreviews.push({ id, type: 'general_work', targetX: i, targetZ: i, targetY: 0, claimed: false });
+  }
+}
+
+function pushAccidents(state: GameState, count: number): void {
+  for (let i = 0; i < count; i++) {
+    state.damage.accidents.push(makeAccident({ tick: i, entityId: i, type: 'vehicle_damage' }));
+  }
+}
+
+describe('OperationsPanel — scroll-bounded Work Queue / Incidents sections (#957)', () => {
+  it('nests all 50 Work Queue rows inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const workQueueChildren = sectionChildren(bodyEl, t('ui.operations.work_queue'));
+
+    // The 50 rows must be nested inside exactly one wrapper element that is
+    // itself the only direct child of bodyEl for this section — proving the
+    // rows didn't flatten directly into bodyEl (today's behavior).
+    expect(workQueueChildren.length).toBe(1);
+    const wrapper = workQueueChildren[0]!;
+    expect(wrapper.querySelectorAll('[data-cancel-action]').length).toBe(50);
+  });
+
+  it('gives the Work Queue wrapper inline overflow-y:auto and a numeric max-height (not vh/%)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const wrapper = sectionChildren(bodyEl, t('ui.operations.work_queue'))[0]!;
+
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+  });
+
+  it('keeps #bs-policy-apply in the Policy section, outside the Work Queue bounded wrapper, reachable regardless of queue length', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const workQueueWrapper = sectionChildren(bodyEl, t('ui.operations.work_queue'))[0]!;
+    // Scoped attribute selector, not an id selector: jsdom's querySelector can
+    // return null for an id-selector query on a scoped root when the same id
+    // exists elsewhere in the shared test document (other panels created by
+    // earlier tests in this file are never removed from `document.body`).
+    // `data-action` is unique to this button within the panel and side-steps it.
+    const applyBtn = panel.root.querySelector('[data-action="apply-policy"]');
+
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.id).toBe('bs-policy-apply');
+    expect(bodyEl.contains(applyBtn)).toBe(true);
+    expect(workQueueWrapper.contains(applyBtn)).toBe(false);
+  });
+
+  it('Incidents rows nest inside their own bounded wrapper, distinct from the Work Queue wrapper', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+    pushAccidents(state, 20);
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const workQueueWrapper = sectionChildren(bodyEl, t('ui.operations.work_queue'))[0]!;
+    const incidentsChildren = sectionChildren(bodyEl, t('ui.operations.incidents'));
+
+    expect(incidentsChildren.length).toBe(1);
+    const incidentsWrapper = incidentsChildren[0]!;
+    expect(incidentsWrapper).not.toBe(workQueueWrapper);
+    expect(incidentsWrapper.style.overflowY).toBe('auto');
+    expect(incidentsWrapper.style.maxHeight).toMatch(/^\d+px$/);
+    // Recent-incidents cap (RECENT_INCIDENTS=10) still applies inside the wrapper.
+    expect(incidentsWrapper.children.length).toBeGreaterThan(0);
+  });
+
+  it('keeps bodyEl the sole outer scroll owner: overflow-y:auto and flex unchanged regardless of section content size', () => {
+    const { panel: emptyPanel } = makePanel();
+    emptyPanel.show();
+    emptyPanel.update(makeState());
+    const emptyBodyEl = getBodyEl(emptyPanel);
+
+    const { panel: fullPanel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+    pushAccidents(state, 20);
+    fullPanel.show();
+    fullPanel.update(state);
+    const fullBodyEl = getBodyEl(fullPanel);
+
+    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+      expect(bodyEl.style.overflowY).toBe('auto');
+      expect(bodyEl.style.flex).toBe('1 1 auto');
+    }
+  });
+
+  it('every section is present as a descendant of bodyEl at both extremes: 0 items and 50/20 items', () => {
+    const labels = [
+      t('ui.operations.logistics'),
+      t('ui.operations.work_queue'),
+      t('ui.operations.ore_on_hand'),
+      t('ui.operations.last_ore_report'),
+      t('ui.operations.incidents'),
+      t('ui.policy.title'),
+    ];
+
+    const { panel: emptyPanel } = makePanel();
+    emptyPanel.show();
+    emptyPanel.update(makeState());
+    const emptyBodyEl = getBodyEl(emptyPanel);
+
+    const { panel: fullPanel } = makePanel();
+    const state = makeState();
+    pushPendingActions(state, 50);
+    pushAccidents(state, 20);
+    fullPanel.show();
+    fullPanel.update(state);
+    const fullBodyEl = getBodyEl(fullPanel);
+
+    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+      for (const label of labels) {
+        expect(() => sectionChildren(bodyEl, label)).not.toThrow();
+      }
+    }
+  });
+
+  it('with zero pending actions, the Work Queue bounded wrapper is still present and contains the empty state', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+
+    const bodyEl = getBodyEl(panel);
+    const workQueueChildren = sectionChildren(bodyEl, t('ui.operations.work_queue'));
+
+    expect(workQueueChildren.length).toBe(1);
+    const wrapper = workQueueChildren[0]!;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+    expect(wrapper.textContent).toContain(t('ui.operations.work_queue_empty'));
+  });
+
+  it('with zero incidents, the Incidents bounded wrapper is still present and contains the empty state', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+
+    const bodyEl = getBodyEl(panel);
+    const incidentsChildren = sectionChildren(bodyEl, t('ui.operations.incidents'));
+
+    expect(incidentsChildren.length).toBe(1);
+    const wrapper = incidentsChildren[0]!;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+    expect(wrapper.textContent).toContain(t('ui.operations.no_incidents'));
   });
 });

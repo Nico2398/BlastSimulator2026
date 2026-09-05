@@ -1267,6 +1267,25 @@
       }
     },
     {
+      "command": "drill_plan grid rows:10 cols:5 spacing:1 depth:6 start:24,2",
+      "timeout": 90,
+      "description": "#957 bootstrap: queues a 10x5 (50-hole) drill_plan grid so the very next step (set-policy) opens the Operations panel with a Work Queue long enough to actually exercise the new bounded/scrollable Work Queue section, rather than the handful of rows every earlier step in this file leaves behind. `role: bootstrap`, not `setup` or `player`: `drill_plan` has a real UI path (the earlier drill-plan step above drives it by clicking), but that path is gated by the tutorial rail's REGION.drill (tutorialStages.ts), armed only during the 'drill-plan' stage the rail has long since advanced past by the time set-policy shows -- off-target and inert here by the tutorial's own design (rules.md), not a reachability gap. Allowlisted in bootstrap-allowlist.ts (exact-string) with that reasoning. This grid is deliberately disjoint from every coordinate this file already touches: the original drill_plan grid (start:22,20, rows:3 cols:3 spacing:4 -- x:22-30, z:20-28, now blasted open pit), living_quarters (18,14), driving_center (10,8), freight_warehouse (6,6), and the build_ramp run (x:16, z:19-31). start:24,2 with cols:5 spacing:1 spans x:24-28, z:2-11 on this level's 32x32 grid (Level.ts, tutorial_pit: gridX:32 gridZ:32) -- clear of all of the above, comfortably inside the map's bounds, and never revisited by any later step in this file (the scenario ends two steps after set-policy, with only a tick and a forced campaign-complete). One assumption this step could not verify against a live run (`npm run scenario` was not exercised for this addition per the test-writer phase's own instructions): that (24,2)-(28,11) is genuinely open, unclaimed-or-claimable, unbuilt ground at this point in a live interaction-mode playthrough. If a future run of this scenario finds that patch already occupied or unclaimable, retarget this step's coordinates rather than removing it -- the Work Queue length this step exists to create is what proves #957's fix.",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:10 cols:5 spacing:1 depth:6 start:24,2"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "pendingActionCount": 50,
+          "orderedHoleCount": 50
+        },
+        "note": "50 new queued drill_hole PendingActions (requiredSkill:'blasting', requiredVehicleRole:'drill_rig', both already trained/bought by this point in the file) is what turns the very next step's Operations-panel Work Queue section into the long, unbounded-until-#957 list the tutorial's set-policy beat used to have to scroll past to reach Apply."
+      }
+    },
+    {
       "command": "set_policy mode:shift_8h",
       "timeout": 90,
       "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) — the form mirrors the policy in force, and applying it unchanged still counts. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",

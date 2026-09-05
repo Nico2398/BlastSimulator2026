@@ -168,4 +168,14 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // is no hire button for a role that doesn't exist, a genuine no-op in
   // both modes.
   'employee hire role:hauler',
+  // tutorial-interactive.json (#957): a second drill_plan grid, inserted
+  // right before the set-policy beat purely to give that beat's Operations
+  // panel a Work Queue long enough to exercise the new bounded/scrollable
+  // section. No UI path reaches the Blast panel's grid tool here — the
+  // tutorial rail's REGION.drill (tutorialStages.ts) only arms during the
+  // earlier 'drill-plan' stage the rail has long since advanced past by
+  // set-policy, so a real click sequence at this point is off-target and
+  // inert by the tutorial's own design, not a reachability gap a control
+  // could close.
+  'drill_plan grid rows:10 cols:5 spacing:1 depth:6 start:24,2',
 ];
