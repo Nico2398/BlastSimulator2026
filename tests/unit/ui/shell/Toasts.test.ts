@@ -4,8 +4,8 @@
 // the top bar (`height:52px`, z-index 150) because the toast stack's own
 // z-index (100, `--bsx-z-panel`) sits below it. The fix moves the toast
 // stack's top offset below the bar and lifts its z-index above it, both
-// driven from the shared `LAYOUT.topbarHeight` / `--bsx-topbar-height`
-// token rather than a second independently-set literal.
+// driven from the shared `--bsx-topbar-height` token rather than a second
+// independently-set literal.
 //
 // jsdom has no real layout engine — real rects are always zero here — so
 // intersection is proven by parsing the inline style strings each root
@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Toasts } from '../../../../src/ui/shell/Toasts.js';
 import { TopBar } from '../../../../src/ui/shell/TopBar.js';
-import { LAYOUT, Z_INDEX } from '../../../../src/ui/tokens.js';
+import { TOKENS_CSS } from '../../../../src/ui/tokens.js';
 import { NotificationCenter } from '../../../../src/ui/notify/NotificationCenter.js';
 
 const TOASTS_SRC = readFileSync(resolve(__dirname, '../../../../src/ui/shell/Toasts.ts'), 'utf-8');
@@ -40,9 +40,20 @@ function styleValue(cssText: string, prop: string): string | null {
   return match ? match[1]!.trim() : null;
 }
 
+/** Read a `--bsx-*` custom property's numeric value straight out of the real
+ *  `TOKENS_CSS` `:root` block — the single source of truth — rather than a
+ *  JS mirror that could drift from it. */
+function getCssVarNumber(css: string, varName: string): number {
+  const match = new RegExp(`${varName}:\\s*(-?\\d+(?:\\.\\d+)?)`).exec(css);
+  if (!match) throw new Error(`CSS var ${varName} not found in TOKENS_CSS`);
+  return Number(match[1]);
+}
+
 describe('Toasts — z-index and top-offset vs TopBar (#955)', () => {
-  it('Z_INDEX.toast sits above Z_INDEX.topbar', () => {
-    expect(Z_INDEX.toast).toBeGreaterThan(Z_INDEX.topbar);
+  it('--bsx-z-toast sits above --bsx-z-topbar', () => {
+    const zToast = getCssVarNumber(TOKENS_CSS, '--bsx-z-toast');
+    const zTopbar = getCssVarNumber(TOKENS_CSS, '--bsx-z-topbar');
+    expect(zToast).toBeGreaterThan(zTopbar);
   });
 
   it('the toast stack z-index is not the panel tier (which sits below the top bar)', () => {
@@ -66,15 +77,19 @@ describe('Toasts — z-index and top-offset vs TopBar (#955)', () => {
     if (pxMatch) {
       // jsdom resolved a literal pixel value (the unfixed `top:12px`) — prove
       // the AABB non-intersection numerically against the top bar's own
-      // known geometry (top:0, height LAYOUT.topbarHeight, full width).
+      // known geometry (top:0, height --bsx-topbar-height, full width).
+      const topbarHeight = getCssVarNumber(TOKENS_CSS, '--bsx-topbar-height');
       const topPx = Number(pxMatch[1]);
-      expect(topPx).toBeGreaterThanOrEqual(LAYOUT.topbarHeight);
+      expect(topPx).toBeGreaterThanOrEqual(topbarHeight);
     } else {
       // jsdom cannot resolve calc()/custom properties — fall back to the raw
-      // style string, which must build the offset from the shared token
-      // rather than a new magic number.
-      expect(top).toContain('calc(');
-      expect(top).toContain('var(--bsx-topbar-height)');
+      // style string, which must build the offset from the shared token via
+      // the exact expected expression. An exact match (not a substring check
+      // on 'calc(' and 'var(--bsx-topbar-height)' independently) catches a
+      // regression that swaps `+` for `-`: `calc(var(--bsx-topbar-height) -
+      // var(--bsx-sp-3))` still contains both substrings, still lands inside
+      // the 52px band, and is exactly the #955 bug this test exists to catch.
+      expect(top).toBe('calc(var(--bsx-topbar-height) + var(--bsx-sp-3))');
     }
     toasts.dispose();
   });

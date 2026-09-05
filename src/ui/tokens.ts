@@ -12,32 +12,7 @@
 // intended character: a tight system sans for UI text, and a tabular
 // monospace (via font-variant-numeric) for every countable value.
 
-/** Layout constants mirrored as JS values for code that needs to compute against
- *  them (e.g. `calc()` expressions or scroll-margin math) rather than just apply
- *  them via CSS custom property. Keep in sync with the `:root` block below. */
-export const LAYOUT = {
-  topbarHeight: 52,
-} as const;
-
-/** Z-index tiers mirrored as JS values, in sync with the `--bsx-z-*` custom
- *  properties in the `:root` block below (design system §03). */
-export const Z_INDEX = {
-  canvas: 0,
-  panel: 100,
-  sceneBar: 120,
-  topbar: 150,
-  toast: 160,
-  rail: 200,
-  popover: 210,
-  hovertag: 320,
-  coach: 400,
-  log: 500,
-  menu: 9999,
-  menuSettings: 10000,
-  modal: 10500,
-} as const;
-
-const TOKENS_CSS = `
+export const TOKENS_CSS = `
 :root {
   /* ── surfaces ── */
   --bsx-app: #0b0e12;
