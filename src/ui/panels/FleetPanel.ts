@@ -16,7 +16,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody } from '../dom.js';
+import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -148,11 +148,10 @@ export class FleetPanel extends PanelBase {
     const banner = this.makeTrafficBanner(state);
     if (banner) children.push(this.tag(banner, 'bs-fleet-traffic'));
 
-    if (vehicles.length === 0) {
-      children.push(el('div', { className: 'bsx-empty', text: t('ui.fleet.none') }));
-    } else {
-      for (const v of vehicles) children.push(this.makeVehicleCard(v, state));
-    }
+    const vehicleCards = vehicles.length === 0
+      ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.none') })]
+      : vehicles.map(v => this.makeVehicleCard(v, state));
+    children.push(scrollBoundedSection(vehicleCards, 200));
     children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state.cash));
     this.bodyEl.replaceChildren(...children);
   }

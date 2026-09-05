@@ -17,7 +17,7 @@
 // — not the design mock's placeholder `Math.ceil(n / 3)`.
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, stepper, emptyState } from '../../dom.js';
+import { el, stepper, emptyState, scrollBoundedSection } from '../../dom.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -77,11 +77,10 @@ export class SequenceStep {
     );
     callout.append(calloutIcon, calloutText);
 
-    this.holeListEl = el('div');
     // Bounded + independently scrollable, same reasoning as Charge's product
     // list: a full tutorial-sized plan (16 holes) would otherwise inflate the
     // step far past the panel's fold.
-    this.holeListEl.style.cssText = 'display:flex;flex-direction:column;gap:3px;max-height:220px;overflow-y:auto';
+    this.holeListEl = scrollBoundedSection([], 220, { gap: 3 });
 
     this.el.append(sectionEl, controlRow, callout, this.holeListEl);
     container.appendChild(this.el);

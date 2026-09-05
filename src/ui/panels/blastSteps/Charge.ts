@@ -24,7 +24,7 @@
 // derivable via wetHoles()).
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, stepper, sectionHeader, reasonLine, button } from '../../dom.js';
+import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
@@ -68,13 +68,12 @@ export class ChargeStep {
     const productLabelEl = this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.charge.section');
     productHeader.append(productLabelEl, el('span', { className: 'bsx-section-rule' }));
 
-    this.productListEl = el('div');
     // Bounded + independently scrollable: 8 catalog cards would otherwise
     // push Charge All and the tubing block below the panel's fold, out of
     // reach without the player first scrolling the whole step (#24 found
     // this the moment the step's own update() actually ran live — the
     // stub-era wiring gap had been masking it).
-    this.productListEl.style.cssText = 'display:flex;flex-direction:column;gap:4px;max-height:184px;overflow-y:auto';
+    this.productListEl = scrollBoundedSection([], 184, { gap: 4 });
 
     const fieldLabelStyle = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-micro)';
     const amountStepperEl = stepper(`${this.amountKg} kg`, () => this.adjustAmount(-1), () => this.adjustAmount(1));
