@@ -4,7 +4,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { advanceAlongPath, type AdvanceAlongPathInput } from '../../../src/core/nav/AgentAdvance.js';
-import { AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, NAV_MAX_CLIMB_HEIGHT, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 function baseInput(overrides?: Partial<AdvanceAlongPathInput>): AdvanceAlongPathInput {
   return {
@@ -131,5 +132,106 @@ describe('advanceAlongPath', () => {
     // becameStuck true exactly once — on the tick consecutiveFailures first reaches STUCK_THRESHOLD.
     expect(becameStuckTicks.filter(Boolean)).toHaveLength(1);
     expect(becameStuckTicks[STUCK_THRESHOLD - 1]).toBe(true);
+  });
+});
+
+// ── Already-walked waypoints (#953) ────────────────────────────────────────────
+//
+// With a climb limit in force, the legal route out of a cell often starts by
+// stepping back to a neighbour the agent has already passed. Flooring the
+// agent's continuous position into the cell it just left then hands it that
+// backwards hop every tick, and it oscillates instead of arriving.
+
+/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map. */
+function heightGrid(heights: number[][]): NavGrid {
+  const cells = heights.map(row => row.map((surfaceY): NavCell => ({
+    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY,
+  })));
+  return new NavGrid(heights[0]!.length, heights.length, cells, Math.max(...heights.flat()));
+}
+
+describe('advanceAlongPath — waypoints the agent has already walked', () => {
+  const flat = heightGrid([
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ]);
+
+  /** A tick short enough that only a fraction of one cell is walked, so direction is readable. */
+  const HALF_CELL = 0.5;
+
+  it('skips a first waypoint the agent has already passed, instead of walking back to it', () => {
+    // The agent stands between (1,0) and (0,1) and floors into (0,0), whose
+    // route out starts by stepping back to (1,0) — the shape that oscillates.
+    const result = advanceAlongPath(baseInput({
+      x: 0.3, z: 0.7,
+      walkSpeed: HALF_CELL,
+      destinationX: 0, destinationZ: 1,
+      path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 0, z: 1 }] },
+      navGrid: flat,
+    }));
+
+    expect(result.z).toBeGreaterThan(0.7);
+    expect(result.x).toBeLessThan(0.3);
+  });
+
+  it('keeps the stepping stone when skipping it would invent a climb-illegal step', () => {
+    // (1,1) → (1,2) → (2,1) descends and comes back up precisely because
+    // (1,1) → (2,1) is a face taller than the climb limit.
+    const stepped = heightGrid([
+      [0, 0, 0],
+      [0, NAV_MAX_CLIMB_HEIGHT + 1, 0],
+      [0, NAV_MAX_CLIMB_HEIGHT + 1, 0],
+    ]);
+
+    const result = advanceAlongPath(baseInput({
+      x: 1, z: 1.2,
+      walkSpeed: HALF_CELL,
+      destinationX: 2, destinationZ: 1,
+      path: { found: true, waypoints: [{ x: 1, z: 1 }, { x: 1, z: 2 }, { x: 2, z: 1 }] },
+      navGrid: stepped,
+    }));
+
+    expect(result.z).toBeGreaterThan(1.2);
+    expect(result.x).toBe(1);
+  });
+
+  it('takes the same skip when the hop it opens up is climb-legal', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 1, z: 1.2,
+      walkSpeed: HALF_CELL,
+      destinationX: 2, destinationZ: 1,
+      path: { found: true, waypoints: [{ x: 1, z: 1 }, { x: 1, z: 2 }, { x: 2, z: 1 }] },
+      navGrid: flat,
+    }));
+
+    expect(result.x).toBeGreaterThan(1);
+  });
+
+  it('still walks to the next waypoint when the agent has not reached it yet', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 0, z: 0,
+      walkSpeed: HALF_CELL,
+      destinationX: 2, destinationZ: 0,
+      path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 0 }] },
+      navGrid: flat,
+    }));
+
+    expect(result.x).toBeCloseTo(HALF_CELL, 5);
+    expect(result.z).toBe(0);
+  });
+
+  it('leaves the skip alone when the caller has no navgrid (direct-line branch)', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 0.3, z: 0.7,
+      walkSpeed: HALF_CELL,
+      destinationX: 0, destinationZ: 1,
+      path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 0, z: 1 }] },
+      navGrid: null,
+    }));
+
+    // No grid to prove the skip is legal, so waypoint 1 stands and the agent
+    // walks back toward it — the pre-#953 behaviour, unchanged.
+    expect(result.x).toBeGreaterThan(0.3);
   });
 });

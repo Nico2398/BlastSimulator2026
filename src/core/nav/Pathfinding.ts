@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid } from './NavGrid.js';
+import { NavGrid, isStepClimbable } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
@@ -151,16 +151,6 @@ function isImpassable(cell: NavCell, avoidVehicles: boolean): boolean {
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && cell.vehicleOccupied) return true;
   return false;
-}
-
-/**
- * True when stepping between two cells whose surfaceY are `fromY`/`toY`
- * is a physically negotiable climb. Either side missing surfaceY (hand-built
- * test fixtures that don't model terrain height) is treated as unconstrained.
- */
-export function isStepClimbable(fromY: number | undefined, toY: number | undefined, maxClimb: number): boolean {
-  if (fromY === undefined || toY === undefined) return true; // unconstrained fallback for fixtures without terrain height
-  return Math.abs(fromY - toY) <= maxClimb;
 }
 
 /** Octile distance heuristic. */

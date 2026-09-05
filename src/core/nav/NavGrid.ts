@@ -13,6 +13,23 @@ import * as reachability from './NavGridReachability.js';
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
+/**
+ * True when stepping between two cells whose column surfaces sit at `fromY`
+ * and `toY` is a physically negotiable climb (#953). Either side missing
+ * `surfaceY` — hand-built test fixtures that don't model terrain height —
+ * is treated as unconstrained.
+ *
+ * Lives here, next to the `NavCell.surfaceY` it reads, because three
+ * separate layers apply the identical gate and must never drift apart:
+ * `Pathfinding.findPath`'s neighbour expansion, `NavGridReachability`'s
+ * climb-aware flood fill, and the reachable-set pre-filter
+ * `ActionSelection.selectBestActionForEmployee` screens candidates with.
+ */
+export function isStepClimbable(fromY: number | undefined, toY: number | undefined, maxClimb: number): boolean {
+  if (fromY === undefined || toY === undefined) return true;
+  return Math.abs(fromY - toY) <= maxClimb;
+}
+
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';
 
 export interface NavCell {
@@ -273,6 +290,23 @@ export class NavGrid {
    */
   static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
     return reachability.computeReachableSet(navGrid, anchorX, anchorZ);
+  }
+
+  /**
+   * `computeReachableSet` with findPath's own per-step climb gate applied.
+   * See NavGridReachability.computeClimbReachableSet for the full doc.
+   */
+  static computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
+    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ);
+  }
+
+  /**
+   * Nearest cell to (targetX, targetZ) inside the grid's largest
+   * climb-connected region. See NavGridReachability.findNearestNavigableCell
+   * for the full doc.
+   */
+  static findNearestNavigableCell(navGrid: NavGrid, targetX: number, targetZ: number): { x: number; z: number } {
+    return reachability.findNearestNavigableCell(navGrid, targetX, targetZ);
   }
 
   /**

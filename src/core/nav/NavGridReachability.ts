@@ -7,6 +7,8 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid } from './NavGrid.js';
+import { isStepClimbable } from './NavGrid.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -154,11 +156,38 @@ const EMPTY_REACHABLE_SET: ReachableSet = { has: () => false, size: 0 };
  * this is a raw reachability query from the exact anchor given).
  */
 export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
+  return reachableSetFrom(navGrid, anchorX, anchorZ, false);
+}
+
+/**
+ * `computeReachableSet` with `findPath`'s own per-step climb gate applied
+ * (#953): a cell this set contains is one a real `findPath` from the same
+ * anchor can actually resolve against, where the plain set only proves grid
+ * adjacency and so still includes a bench floor no agent can climb down to.
+ *
+ * Use it wherever a candidate destination is about to be ranked or filtered
+ * without paying for a real pathfind — `selectBestActionForEmployee`
+ * (ActionSelection.ts) screens every ranked candidate through one of these,
+ * computed once per call, so a fresh crater's own walled-off interior can
+ * never spend the bounded real-pathfind attempts meant for candidates that
+ * can actually resolve.
+ */
+export function computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
+  // Clamped, unlike computeReachableSet's raw anchor: callers pass a live
+  // agent position, and an agent standing on the site's outer border rounds
+  // to a coordinate one past the last cell. Left unclamped that reads as
+  // "anchor not traversable" and returns the empty set — which, for the one
+  // caller this exists for, silently filters out every candidate action and
+  // leaves the agent idle for the rest of the game.
+  return reachableSetFrom(navGrid, navGrid.clampX(anchorX), navGrid.clampZ(anchorZ), true);
+}
+
+function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, climbAware: boolean): ReachableSet {
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
   if (!isTraversableCell(navGrid, ax, az)) return EMPTY_REACHABLE_SET;
 
-  const { width, height, count } = floodFillReachable(navGrid, ax, az);
+  const { width, height, count } = floodFillReachable(navGrid, ax, az, climbAware);
   const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
@@ -177,6 +206,94 @@ export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: 
     size: count,
   };
 }
+
+/**
+ * Nearest cell to (targetX, targetZ) inside the grid's **largest
+ * climb-connected region** — the main body of ground an agent standing
+ * anywhere in it can walk across without scaling a face taller than
+ * `NAV_MAX_CLIMB_HEIGHT` (#953).
+ *
+ * Unlike `findNearestReachableCell`, it takes no anchor. That helper's
+ * contract — "pass a world corner, it sits in the map's main connected
+ * region" — only held while every traversable cell was connected to every
+ * other one by flat 8-directional adjacency. Once a step taller than the
+ * climb limit stopped being a legal move, a corner (or any other fixed
+ * coordinate) can itself be a one-cell island on top of a terrain peak,
+ * which is exactly how a staffed site spawned its driller and drill rig onto
+ * an alpine summit they could never walk off. Asking for the largest region
+ * instead of a region containing some assumed-good anchor removes that
+ * assumption: the answer is a cell the site's workforce, its vehicles and
+ * its work area can all actually reach each other from.
+ *
+ * Returns (targetX, targetZ) unchanged when the grid holds no traversable
+ * cell at all.
+ */
+export function findNearestNavigableCell(
+  navGrid: NavGrid,
+  targetX: number,
+  targetZ: number,
+): { x: number; z: number } {
+  const { width, height, originX, originZ } = navGrid;
+  const componentOf = new Int32Array(width * height).fill(UNVISITED);
+  const queue = new Int32Array(width * height);
+
+  let bestComponentSize = 0;
+  let best: { x: number; z: number } | null = null;
+  let bestDistSq = Infinity;
+
+  for (let startIdx = 0; startIdx < componentOf.length; startIdx++) {
+    if (componentOf[startIdx] !== UNVISITED) continue;
+    const sx = originX + (startIdx % width);
+    const sz = originZ + ((startIdx / width) | 0);
+    if (!isTraversableCell(navGrid, sx, sz)) continue;
+
+    // Flood one component, tracking its size and its cell nearest the target
+    // in the same pass — a second scan over it would need the labels kept.
+    let count = 0;
+    componentOf[startIdx] = startIdx;
+    queue[count++] = startIdx;
+    let nearest = { x: sx, z: sz };
+    let nearestDistSq = (sx - targetX) ** 2 + (sz - targetZ) ** 2;
+
+    for (let head = 0; head < count; head++) {
+      const idx = queue[head]!;
+      const x = originX + (idx % width);
+      const z = originZ + ((idx / width) | 0);
+      const cell = navGrid.cellAt(x, z);
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (!isTraversableCell(navGrid, nx, nz)) continue;
+        if (!isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
+        const neighbourIdx = (nz - originZ) * width + (nx - originX);
+        if (componentOf[neighbourIdx] !== UNVISITED) continue;
+        componentOf[neighbourIdx] = startIdx;
+        queue[count++] = neighbourIdx;
+        const distSq = (nx - targetX) ** 2 + (nz - targetZ) ** 2;
+        if (distSq < nearestDistSq) {
+          nearestDistSq = distSq;
+          nearest = { x: nx, z: nz };
+        }
+      }
+    }
+
+    // Strictly-greater keeps the scan deterministic: on a tie the region
+    // whose first cell comes first in row-major order wins.
+    if (count > bestComponentSize) {
+      bestComponentSize = count;
+      best = nearest;
+      bestDistSq = nearestDistSq;
+    } else if (count === bestComponentSize && nearestDistSq < bestDistSq) {
+      best = nearest;
+      bestDistSq = nearestDistSq;
+    }
+  }
+
+  return best ?? { x: targetX, z: targetZ };
+}
+
+/** Component label for a cell no component scan has claimed yet. */
+const UNVISITED = -1;
 
 // ---------------------------------------------------------------------------
 // Flood-fill scratch (#458 T6.2/D14)
@@ -215,11 +332,16 @@ const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
  * both agree on every fixture. Result is only valid until the next call —
  * callers must either consume it synchronously (findNearestReachableCell) or
  * copy what they need out of it (computeReachableSet).
+ *
+ * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_CLIMB_HEIGHT`
+ * per step (#953), which is what makes the fill match `findPath`'s own
+ * neighbour expansion exactly rather than only its impassability check.
  */
 function floodFillReachable(
   navGrid: NavGrid,
   anchorX: number,
   anchorZ: number,
+  climbAware: boolean = false,
 ): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
@@ -237,10 +359,12 @@ function floodFillReachable(
     const idx = queueArr[head]!;
     const x = navGrid.originX + (idx % width);
     const z = navGrid.originZ + ((idx / width) | 0);
+    const cell = climbAware ? navGrid.cellAt(x, z) : null;
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
       if (!isTraversableCell(navGrid, nx, nz)) continue;
+      if (climbAware && !isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
       visitedArr[neighborIdx] = 1;

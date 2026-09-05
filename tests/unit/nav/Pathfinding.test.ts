@@ -13,8 +13,8 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, octileHeuristic, getBenchLevel, findRampConnections, isStepClimbable } from '../../../src/core/nav/Pathfinding.js';
-import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { findPath, octileHeuristic, getBenchLevel, findRampConnections } from '../../../src/core/nav/Pathfinding.js';
+import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════

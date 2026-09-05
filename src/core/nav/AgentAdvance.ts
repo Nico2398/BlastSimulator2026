@@ -5,6 +5,8 @@
 // (vehicle occupancy pre-check, employee morale penalty).
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
+import { isStepClimbable, type NavGrid } from './NavGrid.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -21,6 +23,13 @@ export interface AdvanceAlongPathInput {
   consecutiveFailures: number;
   isStuck: boolean;
   path: AgentPath;
+  /**
+   * The grid the path was found on, when the caller has one. Used only to
+   * check that skipping an already-walked waypoint stays a legal step — see
+   * `firstUnwalkedWaypoint`. Callers on the direct-line branch (no navgrid)
+   * pass null and get the plain "skip the agent's own cell" behaviour.
+   */
+  navGrid?: NavGrid | null;
 }
 
 export interface AdvanceAlongPathOutcome {
@@ -93,7 +102,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   // that never reaches the destination (found via a #458 T6.1 regression:
   // resized levels carry more natural terrain relief, putting agents near a
   // ramp far more often than the old, flatter levels did).
-  const startIndex = input.path.waypoints.length > 1 ? 1 : 0;
+  const startIndex = firstUnwalkedWaypoint(input.x, input.z, input.path.waypoints, input.navGrid ?? null);
   const advance = advanceAgent({
     x: input.x,
     z: input.z,
@@ -115,4 +124,57 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     becameStuck: false,
     isPathComplete: advance.isPathComplete,
   };
+}
+
+/**
+ * Index of the first waypoint the agent has not effectively walked already.
+ *
+ * Index 0 is the agent's own floor-rounded cell (see the note in
+ * `advanceAlongPath`), so 1 is the normal answer. Index 1 has to be skipped
+ * too whenever the route's first hop is a *detour backwards*: with a climb
+ * limit in force (#953), the legal way out of a cell often starts by stepping
+ * to a neighbour the agent has already passed, because the direct
+ * continuation is a face too tall to climb. An agent standing between the two
+ * cells floors into the one it just left, is handed a route whose first hop
+ * points back the way it came, walks back, floors into the other cell, and
+ * gets the mirror image next tick — the same stable two-tick oscillation
+ * #458 D14 documents for ramps, reached through the climb gate instead.
+ * Reproduced on `sandbox-mode`: a drill rig bouncing between (11,10) and
+ * (10,11) for the whole scenario, one hole drilled out of four.
+ *
+ * Two conditions both have to hold before waypoint 1 is skipped, and each
+ * one rules out a way of making things worse:
+ *
+ * - The agent must be at least as close to waypoint 2 as waypoint 1 is —
+ *   i.e. it has effectively arrived at waypoint 1 already. A wider "nearest
+ *   waypoint anywhere on the path" rule would cut corners across terrain the
+ *   route deliberately walks around, which on a crater rim means stepping
+ *   off the wall this gate exists to make impassable.
+ * - The hop from the cell the agent is actually standing in (nearest cell,
+ *   not floored — flooring is what misplaces it in the first place) to
+ *   waypoint 2 must itself be passable and climb-legal. Without this the
+ *   skip invents a step A* rejected: the route (11,12) → (11,13) → (12,12)
+ *   descends and re-ascends precisely because (11,12) → (12,12) is a
+ *   three-voxel face, and skipping the stepping stone walks the agent
+ *   straight at it, trading one oscillation for another.
+ */
+function firstUnwalkedWaypoint(
+  x: number,
+  z: number,
+  waypoints: Array<{ x: number; z: number }>,
+  navGrid: NavGrid | null,
+): number {
+  if (waypoints.length <= 1) return 0;
+  if (waypoints.length === 2 || !navGrid) return 1;
+
+  const next = waypoints[1]!;
+  const afterNext = waypoints[2]!;
+  const agentToAfterNext = (x - afterNext.x) ** 2 + (z - afterNext.z) ** 2;
+  const nextToAfterNext = (next.x - afterNext.x) ** 2 + (next.z - afterNext.z) ** 2;
+  if (agentToAfterNext > nextToAfterNext) return 1;
+
+  const target = navGrid.cellAt(afterNext.x, afterNext.z);
+  if (!target || target.type === 'blocked' || target.type === 'void') return 1;
+  const standing = navGrid.cellAt(navGrid.clampX(x), navGrid.clampZ(z));
+  return isStepClimbable(standing?.surfaceY, target.surfaceY, NAV_MAX_CLIMB_HEIGHT) ? 2 : 1;
 }

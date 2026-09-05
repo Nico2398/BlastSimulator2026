@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import { createGame, buildGameNavGrid, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
@@ -134,6 +134,9 @@ export function regenerateGrid(
   ctx.playableArea = new PlayableArea(ctx.grid, config);
   syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  // Terrain only exists now, so this is the first moment a spawn point picked
+  // blind (staffed roster, campaign level literals) can be checked against it.
+  snapAgentsToNavigableGround(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 

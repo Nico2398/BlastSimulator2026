@@ -7,12 +7,12 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees } from '../entities/Employee.js';
-import { octileHeuristic, findPath, isStepClimbable } from '../nav/Pathfinding.js';
-import type { NavGrid } from '../nav/NavGrid.js';
+import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
@@ -190,130 +190,6 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
   return { totalTicks: travelTicks + workTicks };
 }
 
-/** 8-directional neighbour offsets — mirrors Pathfinding.ts's own NEIGHBOUR_OFFSETS. */
-const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
-  [0, -1], [0, 1], [-1, 0], [1, 0],
-  [-1, -1], [1, -1], [-1, 1], [1, 1],
-];
-
-/**
- * Climb-aware reachable-set scratch (mirrors NavGridReachability.ts's own
- * flood-fill scratch pattern: flat typed arrays grown, never shrunk, to the
- * largest grid seen, with only the previous call's own touched cells cleared
- * before reuse — not the whole buffer). Kept local to this module rather
- * than added to NavGridReachability's shared `computeReachableSet` because
- * that flat 8-directional adjacency check has no notion of a climb-illegal
- * step and several existing callers (FragmentTaskLifecycle.ts, vehicle/
- * employee spawn placement) rely on that today; giving it climb-awareness
- * would change their behaviour too, which is outside this fix's scope.
- */
-let climbScratchCapacity = 0;
-let climbVisitedArr = new Uint8Array(0);
-let climbQueueArr = new Int32Array(0);
-let climbLastFillCount = 0;
-
-function ensureClimbReachabilityScratch(size: number): void {
-  if (size <= climbScratchCapacity) return;
-  climbScratchCapacity = size;
-  climbVisitedArr = new Uint8Array(size);
-  climbQueueArr = new Int32Array(size);
-  climbLastFillCount = 0; // fresh arrays are already all-zero; nothing to clear
-}
-
-/** A climb-aware reachable-set query result — `has(x, z)` only, no `size` (no caller needs it). */
-interface ClimbReachableSet {
-  has(x: number, z: number): boolean;
-}
-
-const EMPTY_CLIMB_REACHABLE_SET: ClimbReachableSet = { has: () => false };
-
-/**
- * The set of every cell climb-reachable from (`anchorX`, `anchorZ`) via
- * 8-directional steps that are both non-impassable (not `blocked`/`void`)
- * and climb-legal (`isStepClimbable`/`NAV_MAX_CLIMB_HEIGHT` — the identical
- * per-step gate `findPath`'s own neighbour expansion applies in
- * Pathfinding.ts). Because this walks the exact same adjacency relation
- * ordinary A* does, the set it returns is exactly the set of targets a real
- * `findPath` call from the same anchor can succeed against — an exact
- * reachability oracle, not a heuristic (mod `findPath`'s own node-budget cap
- * on a pathologically large open region, which this unbounded flood fill has
- * no equivalent ceiling for and so never falls short of).
- *
- * Exists because `estimateActionCost`'s cheap octile-heuristic ranking has
- * no notion of a climb-illegal step (#953): a fresh blast crater's own
- * nearby haul/charge candidates rank cheapest by raw distance even when
- * walled off by a climb-illegal drop, and a *local* neighbour check alone
- * can't tell a genuinely isolated pocket from ordinary terrain — a candidate
- * deep inside a crater typically has plenty of climb-legal neighbours
- * immediately around it (other cells in the same crater), and a large blast
- * pattern's combined craters can wall off a pocket far bigger than any
- * single-crater bound would safely cover. Only checking actual connectivity
- * to the requesting employee resolves both cases. Computed once per
- * `selectBestActionForEmployee` call (from the employee's own position) and
- * reused as an O(1) membership check across every ranked candidate, rather
- * than probed per candidate — one flood fill instead of up to
- * `ACTION_SELECTION_MAX_PATH_ATTEMPTS` failed real `findPath` searches, each
- * of which would otherwise explore up to its own node budget before
- * concluding "unreachable" (`pathfindingNodeBudget`, balance.ts).
- *
- * Returns the shared empty set when the anchor cell itself is missing or
- * impassable (defensive — `employee.x`/`employee.z` should always resolve
- * to a real cell).
- */
-function computeClimbAwareReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ClimbReachableSet {
-  const ax = navGrid.clampX(anchorX);
-  const az = navGrid.clampZ(anchorZ);
-  const anchorCell = navGrid.cellAt(ax, az);
-  if (!anchorCell || anchorCell.type === 'blocked' || anchorCell.type === 'void') return EMPTY_CLIMB_REACHABLE_SET;
-
-  const { width, height, originX, originZ } = navGrid;
-  ensureClimbReachabilityScratch(width * height);
-
-  // Clear only what the previous call actually touched, not the whole grid.
-  for (let i = 0; i < climbLastFillCount; i++) climbVisitedArr[climbQueueArr[i]!] = 0;
-
-  let count = 0;
-  const startIdx = (az - originZ) * width + (ax - originX);
-  climbVisitedArr[startIdx] = 1;
-  climbQueueArr[count++] = startIdx;
-
-  for (let head = 0; head < count; head++) {
-    const idx = climbQueueArr[head]!;
-    const x = originX + (idx % width);
-    const z = originZ + ((idx / width) | 0);
-    const cell = navGrid.cellAt(x, z)!;
-    for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-      const nx = x + dx;
-      const nz = z + dz;
-      const neighbour = navGrid.cellAt(nx, nz);
-      if (!neighbour || neighbour.type === 'blocked' || neighbour.type === 'void') continue;
-      if (!isStepClimbable(cell.surfaceY, neighbour.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
-
-      const neighbourIdx = (nz - originZ) * width + (nx - originX);
-      if (climbVisitedArr[neighbourIdx]) continue;
-      climbVisitedArr[neighbourIdx] = 1;
-      climbQueueArr[count++] = neighbourIdx;
-    }
-  }
-
-  climbLastFillCount = count;
-
-  // Consumed synchronously within the same selectBestActionForEmployee call
-  // that requested it (across its ranked-candidate loop), with no other
-  // computeClimbAwareReachableSet call interleaved before that loop
-  // finishes — safe to close over the shared scratch buffer directly rather
-  // than copy it, same rationale as NavGridReachability.findNearestReachableCell.
-  const visited = climbVisitedArr;
-  return {
-    has(x: number, z: number): boolean {
-      const lx = x - originX;
-      const lz = z - originZ;
-      if (lx < 0 || lz < 0 || lx >= width || lz >= height) return false;
-      return visited[lz * width + lx] === 1;
-    },
-  };
-}
-
 /** A candidate action chosen for an employee, with its resolved real cost. */
 export interface SelectedAction {
   action: PendingAction;
@@ -395,7 +271,7 @@ export function selectBestActionForEmployee(
   // the budget for a farther candidate that might actually resolve. One
   // flood fill for the whole call, reused as an O(1) check per candidate.
   const climbReachable = state.navGrid !== null
-    ? computeClimbAwareReachableSet(state.navGrid, employee.x, employee.z)
+    ? NavGrid.computeClimbReachableSet(state.navGrid, employee.x, employee.z)
     : null;
 
   let attemptsSpent = 0;

@@ -1268,3 +1268,94 @@ describe('NavGrid.computeReachableSet', () => {
     expect(reachable.has(nearest.x, nearest.z)).toBe(true);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 20: climb-aware reachability (#953)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map. */
+function makeNavGridFromHeights(heights: number[][]): NavGrid {
+  const height = heights.length;
+  const width = heights[0]!.length;
+  const cells = heights.map(row => row.map((surfaceY): NavCell => ({
+    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY,
+  })));
+  return new NavGrid(width, height, cells, Math.max(...heights.flat()));
+}
+
+describe('NavGrid.computeClimbReachableSet', () => {
+  it('stops at a face taller than the climb limit, where the plain set walks straight over it', () => {
+    const floor = 0;
+    const bench = floor + NAV_MAX_CLIMB_HEIGHT + 1;
+    const nav = makeNavGridFromHeights([
+      [bench, bench, bench, bench],
+      [bench, bench, bench, bench],
+      [floor, floor, floor, floor],
+      [floor, floor, floor, floor],
+    ]);
+
+    const climbAware = NavGrid.computeClimbReachableSet(nav, 0, 0);
+    const plain = NavGrid.computeReachableSet(nav, 0, 0);
+
+    expect(climbAware.has(0, 1)).toBe(true);
+    expect(climbAware.has(0, 2)).toBe(false);
+    expect(plain.has(0, 2)).toBe(true);
+  });
+
+  it('walks a grade the climb limit allows', () => {
+    const nav = makeNavGridFromHeights([
+      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
+      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
+      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
+    ]);
+
+    const reachable = NavGrid.computeClimbReachableSet(nav, 0, 0);
+
+    expect(reachable.has(2, 2)).toBe(true);
+  });
+
+  it('treats a fixture without surfaceY as unconstrained, matching the plain set', () => {
+    const rows: NavCellType[][] = Array.from({ length: 4 }, () =>
+      Array.from({ length: 4 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+
+    expect(NavGrid.computeClimbReachableSet(nav, 0, 0).size).toBe(NavGrid.computeReachableSet(nav, 0, 0).size);
+  });
+});
+
+describe('NavGrid.findNearestNavigableCell', () => {
+  it('answers from the largest climb-connected region, not the one the target sits on', () => {
+    const summit = 20;
+    const nav = makeNavGridFromHeights([
+      [summit, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+
+    // (0,0) is a one-cell island: every neighbour is a 20-voxel drop.
+    const snapped = NavGrid.findNearestNavigableCell(nav, 0, 0);
+
+    expect(snapped).not.toEqual({ x: 0, z: 0 });
+    expect(NavGrid.computeClimbReachableSet(nav, snapped.x, snapped.z).size).toBeGreaterThan(1);
+  });
+
+  it('leaves a point that already sits on the main ground exactly where it is', () => {
+    const nav = makeNavGridFromHeights([
+      [20, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ]);
+
+    expect(NavGrid.findNearestNavigableCell(nav, 2, 2)).toEqual({ x: 2, z: 2 });
+  });
+
+  it('returns the target unchanged when no cell of the grid is traversable', () => {
+    const rows: NavCellType[][] = Array.from({ length: 3 }, () =>
+      Array.from({ length: 3 }, (): NavCellType => 'void'));
+
+    expect(NavGrid.findNearestNavigableCell(makeNavGridFromTypes(rows), 1, 1)).toEqual({ x: 1, z: 1 });
+  });
+});

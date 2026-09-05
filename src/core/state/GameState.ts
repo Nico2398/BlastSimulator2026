@@ -513,6 +513,46 @@ export function buildGameNavGrid(
 }
 
 /**
+ * Move any employee or vehicle that fresh terrain left standing somewhere it
+ * cannot walk off onto the nearest cell of the site's main navigable ground
+ * (#953).
+ *
+ * Spawn coordinates are picked before the terrain exists:
+ * `applyStaffedComposition` above staggers the staffed roster around the site
+ * origin with no navgrid to consult, and a campaign level's own fixed spawn
+ * points are literals in its definition. That was harmless while an agent
+ * could walk off any drop; with a climb limit in force, a site whose origin
+ * happens to fall on an alpine peak or a cliff face spawns its workforce onto
+ * a one-cell island — no path in or out, every dispatched task refused
+ * forever, and nothing in the game able to explain why.
+ *
+ * An agent already standing on the main ground is left exactly where it is,
+ * sub-cell position included: `findNearestNavigableCell` returns its own cell
+ * back, so this is a no-op for every site whose spawn area is ordinary
+ * terrain.
+ */
+export function snapAgentsToNavigableGround(state: GameState): void {
+  const navGrid = state.navGrid;
+  if (!navGrid) return;
+
+  for (const employee of state.employees.employees) {
+    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(employee.x), Math.round(employee.z));
+    if (snapped.x !== Math.round(employee.x) || snapped.z !== Math.round(employee.z)) {
+      employee.x = snapped.x;
+      employee.z = snapped.z;
+    }
+  }
+
+  for (const vehicle of state.vehicles.vehicles) {
+    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(vehicle.x), Math.round(vehicle.z));
+    if (snapped.x !== Math.round(vehicle.x) || snapped.z !== Math.round(vehicle.z)) {
+      vehicle.x = snapped.x;
+      vehicle.z = snapped.z;
+    }
+  }
+}
+
+/**
  * Copy the grid's live bounding box onto `state.world`, so everything reading
  * the state dump (minimap, UI pickers, interaction mode) follows the site as
  * it grows. `baseSizeX`/`baseSizeZ` are left untouched — they are the

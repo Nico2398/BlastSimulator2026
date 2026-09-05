@@ -140,6 +140,7 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     consecutiveFailures: vehicle.moveConsecutiveFailures,
     isStuck: vehicle.isMoveStuck,
     path,
+    navGrid: state.navGrid,
   });
 
   vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -320,6 +321,7 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
       consecutiveFailures: emp.moveConsecutiveFailures,
       isStuck: emp.isMoveStuck,
       path,
+      navGrid: state.navGrid,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
