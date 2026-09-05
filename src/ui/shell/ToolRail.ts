@@ -8,6 +8,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { paintToggleButton } from '../dom.js';
 import type { PanelName } from '../UIManager.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 
 interface RailEntry {
   readonly panel: PanelName;
@@ -33,6 +34,17 @@ const RAIL_ENTRIES: readonly RailEntry[] = [
   { panel: 'settings', icon: 'settings', labelKey: 'shell.rail.settings' },
 ];
 
+/** Right-edge offset of the rail, matching its `right:` inline style below. */
+const RAIL_RIGHT_OFFSET_PX = 12;
+/** Per-entry button height, matching its inline style below. */
+const RAIL_BUTTON_HEIGHT_PX = 52;
+
+/** Vertically-centered strip pinned to the right edge; height grows with the number of revealed entries. */
+function toolRailBounds(_viewport: Viewport): Rect {
+  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
+  return { x: 0, y: 0, width: 0, height: 0 };
+}
+
 export class ToolRail {
   private readonly el: HTMLElement;
   private readonly locale = new LocaleTextRegistry();
@@ -43,7 +55,7 @@ export class ToolRail {
     this.el.id = 'bs-toolbar';
     this.el.className = 'bsx-root';
     this.el.style.cssText = [
-      'position:fixed', 'right:12px', 'top:50%', 'transform:translateY(-50%)',
+      'position:fixed', `right:${RAIL_RIGHT_OFFSET_PX}px`, 'top:50%', 'transform:translateY(-50%)',
       'z-index:var(--bsx-z-rail)', 'display:flex', 'flex-direction:column', 'gap:3px',
       'padding:6px', 'border-radius:8px', 'background:rgba(18,22,28,.92)',
       'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 10px 30px rgba(0,0,0,.4)',
@@ -54,7 +66,7 @@ export class ToolRail {
       const btn = document.createElement('button');
       btn.dataset['panel'] = entry.panel;
       btn.style.cssText = [
-        'width:58px', 'height:52px', 'display:flex', 'flex-direction:column',
+        'width:58px', `height:${RAIL_BUTTON_HEIGHT_PX}px`, 'display:flex', 'flex-direction:column',
         'align-items:center', 'justify-content:center', 'gap:5px',
         'border:1px solid transparent', 'border-radius:5px', 'background:transparent',
         'color:var(--bsx-text-muted)', 'cursor:pointer', 'position:relative',
@@ -74,6 +86,8 @@ export class ToolRail {
     }
 
     container.appendChild(this.el);
+
+    shellLayoutRegistry.register({ id: 'tool-rail', layer: 'hud', bounds: toolRailBounds });
   }
 
   /** Reveal any gated rail entry (currently just 'shady') once its condition is met. Never re-hides. */
@@ -100,5 +114,8 @@ export class ToolRail {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void {
+    this.el.remove();
+    shellLayoutRegistry.unregister('tool-rail');
+  }
 }

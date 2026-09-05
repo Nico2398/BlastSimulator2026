@@ -9,6 +9,16 @@ import { iconEl } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+
+/** Bottom offset of the bar, matching its `bottom:` inline style below. */
+const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
+
+/** Bottom-center bar, hidden (zero-area) while no entity is selected. */
+function selectionBarBounds(_viewport: Viewport): Rect {
+  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
+  return { x: 0, y: 0, width: 0, height: 0 };
+}
 
 // 'move_here' (vehicle, drive to the hovered tile) is deliberately distinct
 // from 'move' (building, relocate via the Build panel) — same English verb,
@@ -30,7 +40,7 @@ export class SelectionBar {
   constructor(container: HTMLElement) {
     this.root = el('div', { className: 'bsx-root', attrs: { id: 'bs-selection-bar' } });
     this.root.style.cssText = [
-      'position:fixed', 'left:50%', 'bottom:22px', 'transform:translateX(-50%)',
+      'position:fixed', 'left:50%', `bottom:${SELECTION_BAR_BOTTOM_OFFSET_PX}px`, 'transform:translateX(-50%)',
       'z-index:var(--bsx-z-panel)', 'align-items:center', 'gap:14px',
       'padding:10px 14px', 'border-radius:var(--bsx-r-panel)', 'background:rgba(18,22,28,.96)',
       'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 10px 30px rgba(0,0,0,.45)',
@@ -56,6 +66,8 @@ export class SelectionBar {
 
     this.root.append(identity, this.actionsEl, closeBtn);
     container.appendChild(this.root);
+
+    shellLayoutRegistry.register({ id: 'selection-bar', layer: 'hud', bounds: selectionBarBounds });
   }
 
   setActionHandler(cb: (action: SelectionAction, entity: EntityPick) => void): void {
@@ -152,5 +164,6 @@ export class SelectionBar {
 
   dispose(): void {
     this.root.remove();
+    shellLayoutRegistry.unregister('selection-bar');
   }
 }

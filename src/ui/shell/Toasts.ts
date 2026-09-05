@@ -5,6 +5,18 @@
 import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import type { NotificationCenter, Toast } from '../notify/NotificationCenter.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+
+/** Right offset of the toast stack, matching its `right:` inline style below. */
+const TOASTS_RIGHT_OFFSET_PX = 96;
+/** Toast stack width, matching its `width:` inline style below. */
+const TOASTS_WIDTH_PX = 296;
+
+/** Stack pinned below the top bar, right-aligned; height grows with the number of live toasts, exempt from the pairwise 'hud' check as it's transient and self-clearing. */
+function toastsBounds(_viewport: Viewport): Rect {
+  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
+  return { x: 0, y: 0, width: 0, height: 0 };
+}
 
 export class Toasts {
   private readonly el: HTMLElement;
@@ -13,11 +25,13 @@ export class Toasts {
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root' });
     this.el.style.cssText = [
-      'position:fixed', 'right:96px', 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))', 'z-index:var(--bsx-z-toast)',
-      'width:296px', 'display:flex', 'flex-direction:column', 'gap:7px',
+      'position:fixed', `right:${TOASTS_RIGHT_OFFSET_PX}px`, 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))', 'z-index:var(--bsx-z-toast)',
+      `width:${TOASTS_WIDTH_PX}px`, 'display:flex', 'flex-direction:column', 'gap:7px',
       'pointer-events:none',
     ].join(';');
     container.appendChild(this.el);
+
+    shellLayoutRegistry.register({ id: 'toasts', layer: 'hud', bounds: toastsBounds });
   }
 
   update(center: NotificationCenter): void {
@@ -34,7 +48,10 @@ export class Toasts {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void {
+    this.el.remove();
+    shellLayoutRegistry.unregister('toasts');
+  }
 
   private makeToast(toast: Toast, center: NotificationCenter): HTMLElement {
     const box = el('div');
