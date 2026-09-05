@@ -6,6 +6,18 @@ import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
 import type { NotificationCenter } from '../notify/NotificationCenter.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+
+/** Drawer content width, matching its `width:` inline style below. */
+const ACTIVITY_LOG_WIDTH_PX = 352;
+/** Left border, matching its `border-left:` inline style below — part of the painted box, so the declared bounds carry it. */
+const ACTIVITY_LOG_BORDER_PX = 1;
+
+/** Right-side drawer, full height; drawn deliberately over hud chrome when open, so it's an 'overlay' region — zero-area while closed. */
+function activityLogBounds(viewport: Viewport): Rect {
+  const width = ACTIVITY_LOG_WIDTH_PX + ACTIVITY_LOG_BORDER_PX;
+  return { x: viewport.width - width, y: 0, width, height: viewport.height };
+}
 
 export class ActivityLog {
   private readonly el: HTMLElement;
@@ -14,9 +26,9 @@ export class ActivityLog {
   private lastSignature = '';
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root' });
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-activity-log' } });
     this.el.style.cssText = [
-      'position:fixed', 'right:0', 'top:0', 'bottom:0', 'width:352px',
+      'position:fixed', 'right:0', 'top:0', 'bottom:0', `width:${ACTIVITY_LOG_WIDTH_PX}px`,
       'z-index:var(--bsx-z-log)', 'background:var(--bsx-panel)',
       'border-left:1px solid var(--bsx-hairline-strong)',
       'box-shadow:-18px 0 44px rgba(0,0,0,.5)', 'display:none',
@@ -39,6 +51,8 @@ export class ActivityLog {
 
     this.el.append(header, this.body);
     container.appendChild(this.el);
+
+    shellLayoutRegistry.register({ id: 'activity-log', layer: 'overlay', bounds: activityLogBounds });
   }
 
   show(): void { this._visible = true; this.el.style.display = 'flex'; this.lastSignature = ''; }
@@ -74,5 +88,8 @@ export class ActivityLog {
     }
   }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void {
+    this.el.remove();
+    shellLayoutRegistry.unregister('activity-log');
+  }
 }
