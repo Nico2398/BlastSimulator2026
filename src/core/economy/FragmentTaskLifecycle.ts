@@ -77,11 +77,15 @@ export function driveTowardFragment(state: GameState, vehicle: Vehicle, fragment
 }
 
 /**
- * Nearest 'on_ground' fragment reachable from (originX, originZ) via NavGrid,
- * among those `extraEligible` accepts — the search and reachability check
- * are identical between findReachableOversizedFragment (breaking) and
- * findReachableGroundFragment (hauling); only the per-fragment eligibility
- * predicate differs (oversized-only vs. non-oversized-and-fits-in-storage).
+ * Nearest 'on_ground' fragment reachable from (originX, originZ) via NavGrid's
+ * climb-aware reachable set (#953/#959) — same climb gate real pathfinding
+ * applies, so a fragment across a wall taller than NAV_MAX_CLIMB_HEIGHT is
+ * never picked as "nearest" only to have the vehicle freeze mid-drive when
+ * findPath refuses the step. Among fragments `extraEligible` accepts — the
+ * search and reachability check are identical between
+ * findReachableOversizedFragment (breaking) and findReachableGroundFragment
+ * (hauling); only the per-fragment eligibility predicate differs
+ * (oversized-only vs. non-oversized-and-fits-in-storage).
  */
 export function findNearestReachableFragment(
   state: GameState,
@@ -92,7 +96,7 @@ export function findNearestReachableFragment(
 ): number | null {
   if (!state.navGrid) return null;
 
-  const reachable = NavGrid.computeReachableSet(state.navGrid, originX, originZ);
+  const reachable = NavGrid.computeClimbReachableSet(state.navGrid, originX, originZ);
   if (reachable.size === 0) return null;
 
   let bestId: number | null = null;
