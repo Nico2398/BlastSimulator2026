@@ -13,7 +13,7 @@ export class Toasts {
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root' });
     this.el.style.cssText = [
-      'position:fixed', 'right:96px', 'top:12px', 'z-index:var(--bsx-z-panel)',
+      'position:fixed', 'right:96px', 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))', 'z-index:var(--bsx-z-toast)',
       'width:296px', 'display:flex', 'flex-direction:column', 'gap:7px',
       'pointer-events:none',
     ].join(';');
