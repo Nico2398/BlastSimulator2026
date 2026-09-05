@@ -12,6 +12,15 @@
 // intended character: a tight system sans for UI text, and a tabular
 // monospace (via font-variant-numeric) for every countable value.
 
+/**
+ * Single source of truth for two geometry values also consumed directly by
+ * shell region bounds functions (LayoutRegistry, #956) — the CSS custom
+ * properties below and the layout math must never drift from each other
+ * again (see #955).
+ */
+export const TOPBAR_HEIGHT_PX = 52;
+export const SPACING_3_PX = 12;
+
 export const TOKENS_CSS = `
 :root {
   /* ── surfaces ── */
@@ -56,7 +65,7 @@ export const TOKENS_CSS = `
   /* ── spacing (4px base) ── */
   --bsx-sp-1: 4px;
   --bsx-sp-2: 8px;
-  --bsx-sp-3: 12px;
+  --bsx-sp-3: ${SPACING_3_PX}px;
   --bsx-sp-4: 16px;
   --bsx-sp-5: 20px;
   --bsx-sp-6: 24px;
@@ -84,7 +93,7 @@ export const TOKENS_CSS = `
   --bsx-z-modal: 10500;
 
   /* ── layout ── */
-  --bsx-topbar-height: 52px;
+  --bsx-topbar-height: ${TOPBAR_HEIGHT_PX}px;
 
   /* ── type ── */
   --bsx-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;

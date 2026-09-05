@@ -15,6 +15,7 @@ import type { Random } from '../../core/math/Random.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 
 const FORECAST_DAYS = 14;
 /** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */
@@ -69,6 +70,12 @@ export function netPerTick(state: GameState, windowTicks = TREND_WINDOW_TICKS): 
   }
   const spanTicks = Math.min(windowTicks, Math.max(1, state.tickCount));
   return net / spanTicks;
+}
+
+/** Full-width strip pinned to the top edge, TOPBAR_HEIGHT_PX tall (tokens.ts's TOPBAR_HEIGHT_PX / --bsx-topbar-height, #955/#956). */
+function topBarBounds(_viewport: Viewport): Rect {
+  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
+  return { x: 0, y: 0, width: 0, height: 0 };
 }
 
 export class TopBar {
@@ -238,6 +245,8 @@ export class TopBar {
 
     this.root.append(this.balanceWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
     container.appendChild(this.root);
+
+    shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
@@ -494,5 +503,6 @@ export class TopBar {
   dispose(): void {
     document.removeEventListener('click', this.onDocumentClick);
     this.root.remove();
+    shellLayoutRegistry.unregister('topbar');
   }
 }
