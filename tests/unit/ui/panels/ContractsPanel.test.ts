@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ContractsPanel } from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Contract } from '../../../../src/core/economy/Contract.js';
 
@@ -254,5 +255,139 @@ describe('ContractsPanel', () => {
 
     expect(gameConsole).toHaveBeenCalledWith('contract deliver 8 amount:60');
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringMatching(/^contract deliver 5 /));
+  });
+});
+
+// ── Scroll-bounded Active/Available/Closed sections (#958) ──────────────────
+//
+// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
+// the panel root's second child. Active, Available (offered), and Closed
+// (history) are each a flat run of cards/rows spread directly into bodyEl
+// between one sectionHeader and the next — a long list in any one of them
+// buries the following sections far below the panel's fold. The fix nests
+// each of the three lists inside its OWN scrollBoundedSection wrapper,
+// standing between its own section header and the next.
+
+function getBodyEl(panel: ContractsPanel): HTMLElement {
+  return panel.root.children[1] as HTMLElement;
+}
+
+/**
+ * Every direct child of `bodyEl` between the section header whose text
+ * contains `label` and the next section header (or the end of bodyEl).
+ */
+function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
+  const children = Array.from(bodyEl.children) as HTMLElement[];
+  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
+  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
+  const result: HTMLElement[] = [];
+  for (let i = idx + 1; i < children.length; i++) {
+    if (children[i]!.classList.contains('bsx-section')) break;
+    result.push(children[i]!);
+  }
+  return result;
+}
+
+function makeManyContracts(count: number, idBase: number): Contract[] {
+  return Array.from({ length: count }, (_, i) => makeContract({ id: idBase + i }));
+}
+
+describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#958)', () => {
+  it('wraps Active, Available, and Closed each in their own distinct bounded wrapper', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100000;
+    state.contracts.active.push(...makeManyContracts(20, 100));
+    state.contracts.available.push(...makeManyContracts(20, 200));
+    state.contracts.completedHistory.push(...makeManyContracts(20, 300).map(c => ({ ...c, completed: true })));
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const activeChildren = sectionChildren(bodyEl, t('ui.contracts.active'));
+    const availableChildren = sectionChildren(bodyEl, t('ui.contracts.available'));
+    const closedChildren = sectionChildren(bodyEl, t('ui.contracts.closed'));
+
+    expect(activeChildren.length).toBe(1);
+    expect(availableChildren.length).toBe(1);
+    expect(closedChildren.length).toBe(1);
+
+    const activeWrapper = activeChildren[0]!;
+    const availableWrapper = availableChildren[0]!;
+    const closedWrapper = closedChildren[0]!;
+
+    // Distinct elements — one section's wrapper never swallows another's rows.
+    expect(activeWrapper).not.toBe(availableWrapper);
+    expect(availableWrapper).not.toBe(closedWrapper);
+    expect(activeWrapper).not.toBe(closedWrapper);
+
+    expect(activeWrapper.querySelectorAll('[data-contract-id]').length).toBe(20);
+    expect(availableWrapper.querySelectorAll('[data-contract-id]').length).toBe(20);
+    expect(closedWrapper.children.length).toBe(20);
+  });
+
+  it('gives each of the three wrappers inline overflow-y:auto and a numeric max-height', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100000;
+    state.contracts.active.push(...makeManyContracts(20, 100));
+    state.contracts.available.push(...makeManyContracts(20, 200));
+    state.contracts.completedHistory.push(...makeManyContracts(20, 300).map(c => ({ ...c, completed: true })));
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const wrappers = [
+      sectionChildren(bodyEl, t('ui.contracts.active'))[0]!,
+      sectionChildren(bodyEl, t('ui.contracts.available'))[0]!,
+      sectionChildren(bodyEl, t('ui.contracts.closed'))[0]!,
+    ];
+    for (const wrapper of wrappers) {
+      expect(wrapper.style.overflowY).toBe('auto');
+      expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+    }
+  });
+
+  it('keeps all three section headers reachable as bodyEl-level siblings — one wrapper never swallows another section\'s header', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100000;
+    state.contracts.active.push(...makeManyContracts(20, 100));
+    state.contracts.available.push(...makeManyContracts(20, 200));
+    state.contracts.completedHistory.push(...makeManyContracts(20, 300).map(c => ({ ...c, completed: true })));
+
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const headers = (Array.from(bodyEl.children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'));
+    const headerLabels = headers.map(h => h.textContent ?? '');
+
+    expect(headerLabels.some(l => l.includes(t('ui.contracts.active')))).toBe(true);
+    expect(headerLabels.some(l => l.includes(t('ui.contracts.available')))).toBe(true);
+    expect(headerLabels.some(l => l.includes(t('ui.contracts.closed')))).toBe(true);
+    expect(headers.length).toBe(3);
+  });
+
+  it('with zero contracts in any list, each of the three bounded wrappers is still present and contains the empty state', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+
+    const bodyEl = getBodyEl(panel);
+    for (const [label, emptyKey] of [
+      [t('ui.contracts.active'), t('ui.contracts.none_active')],
+      [t('ui.contracts.available'), t('ui.contracts.none')],
+      [t('ui.contracts.closed'), t('ui.contracts.none_closed')],
+    ] as const) {
+      const children = sectionChildren(bodyEl, label);
+      expect(children.length).toBe(1);
+      const wrapper = children[0]!;
+      expect(wrapper.style.overflowY).toBe('auto');
+      expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+      expect(wrapper.textContent).toContain(emptyKey);
+    }
   });
 });

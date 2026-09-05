@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 function makeState(): GameState {
@@ -135,5 +136,118 @@ describe('FinancesPanel', () => {
     const { panel, container } = makePanel();
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
+  });
+});
+
+// ── Scroll-bounded ledger section (#958) ────────────────────────────────────
+//
+// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
+// the panel root's second child. The ledger (makeLedger, capped at
+// RECENT_TRANSACTIONS=15 but still one row per transaction) is spread
+// directly into bodyEl after the fixed Income/Expenses category rows — the
+// fix nests those rows inside one scrollBoundedSection wrapper standing
+// after the Ledger section header, leaving Balance/Income/Expenses
+// unwrapped, reachable bodyEl-level siblings before it.
+
+function getBodyEl(panel: FinancesPanel): HTMLElement {
+  return panel.root.children[1] as HTMLElement;
+}
+
+/**
+ * Every direct child of `bodyEl` between the section header whose text
+ * contains `label` and the next section header (or the end of bodyEl).
+ */
+function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
+  const children = Array.from(bodyEl.children) as HTMLElement[];
+  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
+  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
+  const result: HTMLElement[] = [];
+  for (let i = idx + 1; i < children.length; i++) {
+    if (children[i]!.classList.contains('bsx-section')) break;
+    result.push(children[i]!);
+  }
+  return result;
+}
+
+function pushTransactions(state: GameState, count: number): void {
+  for (let i = 0; i < count; i++) {
+    state.finances.transactions.push({
+      tick: i, type: i % 2 === 0 ? 'income' : 'expense', amount: 10 + i, category: 'fuel', description: `tx ${i}`,
+    });
+  }
+}
+
+describe('FinancesPanel — scroll-bounded ledger section (#958)', () => {
+  it('nests all 15 ledger rows inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushTransactions(state, 15);
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const ledgerChildren = sectionChildren(bodyEl, t('ui.finances.ledger'));
+
+    expect(ledgerChildren.length).toBe(1);
+    const wrapper = ledgerChildren[0]!;
+    expect(wrapper.children.length).toBe(15);
+  });
+
+  it('gives the ledger wrapper inline overflow-y:auto and a numeric max-height (not vh/%)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushTransactions(state, 15);
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const wrapper = sectionChildren(bodyEl, t('ui.finances.ledger'))[0]!;
+
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+  });
+
+  it('keeps Balance/Income/Expenses sections reachable as bodyEl-level siblings before the ledger wrapper', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    pushTransactions(state, 15);
+    panel.show();
+    panel.update(state);
+
+    const bodyEl = getBodyEl(panel);
+    const children = Array.from(bodyEl.children) as HTMLElement[];
+    const ledgerIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.finances.ledger')));
+    const incomeIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.finances.income')));
+    const expensesIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.finances.expenses')));
+
+    expect(incomeIdx).toBeGreaterThan(-1);
+    expect(expensesIdx).toBeGreaterThan(-1);
+    expect(ledgerIdx).toBeGreaterThan(-1);
+    expect(incomeIdx).toBeLessThan(ledgerIdx);
+    expect(expensesIdx).toBeLessThan(ledgerIdx);
+
+    const ledgerWrapper = children[ledgerIdx + 1]!;
+    expect(ledgerWrapper.contains(children[incomeIdx]!)).toBe(false);
+    expect(ledgerWrapper.contains(children[expensesIdx]!)).toBe(false);
+    // First child is the balance card, not a section header.
+    expect(children[0]!.classList.contains('bsx-section')).toBe(false);
+  });
+
+  it('keeps bodyEl itself scrollable (overflow-y:auto unchanged) regardless of ledger size', () => {
+    const { panel: emptyPanel } = makePanel();
+    emptyPanel.show();
+    emptyPanel.update(makeState());
+    const emptyBodyEl = getBodyEl(emptyPanel);
+
+    const { panel: fullPanel } = makePanel();
+    const state = makeState();
+    pushTransactions(state, 15);
+    fullPanel.show();
+    fullPanel.update(state);
+    const fullBodyEl = getBodyEl(fullPanel);
+
+    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+      expect(bodyEl.style.overflowY).toBe('auto');
+    }
   });
 });

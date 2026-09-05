@@ -191,4 +191,28 @@ describe('BlastWorkshop', () => {
     workshop.update(makeState(), 'sunny');
     expect(workshop.root.textContent).toContain('Drill');
   });
+
+  // ── Short-viewport reachability (#958) ──
+  //
+  // #bs-panel-body is the single outer scroll owner for every step (Drill,
+  // Charge, Sequence, Preview, Fire all mount into it — see BlastWorkshop.ts's
+  // constructor). Bounding an inner list (e.g. Drill's hole list) must never
+  // come at the cost of this outer container's own scrollability — otherwise
+  // a short viewport with every inner wrapper already at its own max-height
+  // would have nowhere left to scroll to reach a step's later controls.
+
+  it('keeps #bs-panel-body scrollable (overflow-y:auto unchanged) regardless of how many holes the Drill step holds', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+
+    const emptyBodyEl = workshop.root.querySelector('#bs-panel-body') as HTMLElement;
+    expect(emptyBodyEl.style.overflowY).toBe('auto');
+
+    const state = makeState();
+    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    workshop.update(state, 'sunny');
+
+    const fullBodyEl = workshop.root.querySelector('#bs-panel-body') as HTMLElement;
+    expect(fullBodyEl.style.overflowY).toBe('auto');
+  });
 });

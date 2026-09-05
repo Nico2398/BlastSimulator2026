@@ -219,3 +219,55 @@ describe('FireStep', () => {
     expect(step.root.textContent).toContain('Danger zone is clear');
   });
 });
+
+// ── Scroll-bounded zone occupant list (#958) ─────────────────────────────────
+//
+// zoneListEl (one row per employee/vehicle in the blast danger zone,
+// unbounded) is a plain flex column today with no overflow/max-height at
+// all — a fully staffed roster+fleet caught in the zone buries Sound the
+// Horn and the pre-flight checklist below the panel's fold. The fix bounds
+// it to a scrollBoundedSection wrapper, leaving both a reachable sibling
+// after it.
+
+/** The bounded wrapper holding zone occupant rows: inline overflow-y:auto + numeric max-height, containing the IN ZONE tag. */
+function findZoneListWrapper(root: HTMLElement): HTMLElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLElement>('div')).find(d =>
+    d.style.overflowY === 'auto'
+    && /^\d+px$/.test(d.style.maxHeight)
+    && (d.textContent ?? '').includes('IN ZONE'),
+  );
+}
+
+describe('FireStep — scroll-bounded zone occupant list (#958)', () => {
+  it('bounds the zone occupant list to a wrapper with inline overflow-y:auto and a numeric max-height, holding every occupant', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    for (let i = 0; i < 20; i++) addEmployee(state, 21, 21);
+    for (let i = 0; i < 20; i++) purchaseVehicle(state.vehicles, 'debris_hauler', 22, 22);
+    step.update(state, 'sunny');
+
+    const wrapper = findZoneListWrapper(step.root);
+    expect(wrapper).not.toBeUndefined();
+    expect(wrapper!.children.length).toBe(40);
+  });
+
+  it('keeps Sound the Horn and the pre-flight checklist reachable as siblings, outside the bounded wrapper', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    for (let i = 0; i < 20; i++) addEmployee(state, 21, 21);
+    for (let i = 0; i < 20; i++) purchaseVehicle(state.vehicles, 'debris_hauler', 22, 22);
+    step.update(state, 'sunny');
+
+    const wrapper = findZoneListWrapper(step.root)!;
+    expect(wrapper).not.toBeUndefined();
+
+    const hornBtn = step.root.querySelector('[data-action="sound-horn"]');
+    expect(hornBtn).not.toBeNull();
+    expect(wrapper.contains(hornBtn)).toBe(false);
+    expect(hornBtn instanceof HTMLButtonElement && hornBtn.disabled).toBe(false);
+
+    expect(step.root.textContent).toContain('Pre-Flight');
+  });
+});
