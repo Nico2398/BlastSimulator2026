@@ -672,7 +672,11 @@
         "equals": {
           "buildingCount": 2,
           "orderedBuildingCount": 0
-        }
+        },
+        "increased": [
+          "storedMassKg"
+        ],
+        "note": "#953: the file's 'storedMassKg must have grown' proof moved here from the tick-40 step below. This wait runs until both warehouses stand — up to 400 ticks — and it is the window in which the first delivery lands in BOTH modes. The later step only held the proof while command mode happened to still have a haul outstanding when it opened; interaction mode, which ticks on its own while polling, has always delivered everything before then, and the climb gate's dispatch timing moved command mode the same way."
       }
     },
     {
@@ -700,10 +704,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "cash still drains from salary/fuel even though this batch stops early on a pending event; storedMassKg's own check moved past the event-resolve step below since the hauler hasn't had enough real elapsed ticks yet to complete its round trip.",
-        "increased": [
-          "storedMassKg"
-        ]
+        "note": "cash still drains from salary/fuel even though this batch stops early on a pending event; storedMassKg's own check moved past the event-resolve step below since the hauler hasn't had enough real elapsed ticks yet to complete its round trip. #953: the storedMassKg proof moved up to the wait_until step above — see its note. This step keeps the cash drain it was always about."
       }
     },
     {
