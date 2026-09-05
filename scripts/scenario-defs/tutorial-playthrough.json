@@ -1135,14 +1135,14 @@
       }
     },
     {
-      "command": "tick 60",
+      "command": "tick 90",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 60"
+          "command": "tick 90"
         }
       ],
-      "description": "#553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (8,8) and sink all four holes. Sandbox-measured pad.",
+      "description": "#953: raised 60 -> 90 -- the climb-limit gate makes the driller's ordinary route between the two patterns route via ramp-based multi-level pathing instead of a straight walk whenever the two patterns sit on different bench levels, which costs a few more ticks than the old straight-line estimate assumed; direct trace (npx tsx scripts/run-all-scenarios.ts tutorial-playthrough) confirmed 90 clears the fourth hole (H4) before the charge step below fires. #553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (8,8) and sink all four holes. Sandbox-measured pad.",
       "role": "setup",
       "expect": {
         "equals": {

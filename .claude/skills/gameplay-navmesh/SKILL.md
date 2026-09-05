@@ -22,8 +22,10 @@ The `NavGrid` is 2D array of `NavCell` covering VoxelGrid's live X×Z **bounding
 1. `void` if no solid voxel below surface at that column
 2. `drill_hole` if a `DrillHole` exists at (x, z)
 3. `blocked` if building footprint covers it, or vehicle parked/stationary
-4. `ramp` if surface height delta to any neighbor > 1 voxel
+4. `ramp` if surface height delta to any cardinal neighbor is more than 1 voxel and at most `NAV_MAX_CLIMB_HEIGHT` (balance.ts) — a negotiable grade
 5. All remaining solid-surface cells = `walkable`
+
+A delta beyond `NAV_MAX_CLIMB_HEIGHT` is a **face**, not a ramp, and does not classify the cell at all: the same cell is often walkable from one neighbour and a wall relative to another, so the refusal belongs to the step, not to the cell. `findPath` applies it per step (`isStepClimbable`, NavGrid.ts) on both the A* neighbour expansion and the direct-line fallback, and the reachability helpers below mirror it. This is what makes a fresh blast crater an obstacle rather than a gentle slope (#953): a bench face is `NAV_BENCH_HEIGHT` and a crater a hole-depth deeper, so both are out of reach and are descended by a dug ramp, while ordinary terrain relief stays ordinary.
 
 **Move costs:**
 
@@ -56,6 +58,8 @@ Multi-level path planning:
 2. Different levels → find nearest ramp connecting required levels → 3-query route: `start → ramp entrance → ramp exit → destination`
 3. No ramp for required levels → `found: false`, emit `no_ramp_available` event
 
+A pit floor is therefore only workable once a ramp reaches it: dispatch queues haul/charge actions against fragments the crew cannot climb down to, and they sit unclaimed until one is dug. Level scripts and scenarios that blast a bench and then expect it hauled out have to build that ramp first (`level2-playthrough-win.json` does, at the rim, before its first blast).
+
 ## Dynamic NavGrid Updates
 
 NavGrid is **incrementally updated** — full rebuild too expensive.
@@ -78,7 +82,9 @@ Paths crossing updated region → marked stale, re-requested next tick. Paths ou
 Two `NavGrid` static queries, beyond `findPath`, for picking a destination that isn't already known to be walkable:
 
 - `findNearestTraversableCell(navGrid, x, z)` — nearest walkable/ramp/drill_hole cell to (x, z) by pure distance, searching outward in rings. Can land on a traversable pocket a blast crater walled off from the rest of the map with `void` on every side — distance-only, no connectivity check.
-- `findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ)` — BFS flood fill (same 8-directional adjacency as `findPath`) from an `anchorX/anchorZ` known to sit in the map's main connected region (a world corner works), returning the cell nearest `targetX/targetZ` that is actually path-connected to it. Use this, not `findNearestTraversableCell`, wherever a mover must be guaranteed to path away from the point afterward — e.g. snapping a new hire's or purchased vehicle's spawn point off a blast-cleared void or isolated pocket.
+- `findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ)` — BFS flood fill (8-directional adjacency, no climb gate) from an `anchorX/anchorZ` known to sit in the map's main connected region (a world corner works), returning the cell nearest `targetX/targetZ` that is actually path-connected to it. Use this, not `findNearestTraversableCell`, wherever a mover must be guaranteed to path away from the point afterward — e.g. snapping a new hire's or purchased vehicle's spawn point off a blast-cleared void or isolated pocket.
+- `computeReachableSet(navGrid, anchorX, anchorZ)` / `computeClimbReachableSet(...)` — every cell connected to the anchor, without and with the per-step climb gate. The climb-aware one is the exact set a real `findPath` from that anchor can resolve against, which is what lets a caller screen candidate destinations without paying for a pathfind (`selectBestActionForEmployee`, ActionSelection.ts).
+- `findNearestNavigableCell(navGrid, targetX, targetZ)` — nearest cell inside the grid's **largest climb-connected region**, with no anchor to assume. Spawn points are chosen before terrain exists (a staffed roster, a campaign level's literals), and with a climb limit in force a fixed coordinate can land on a one-cell island atop a peak. `regenerateGrid` snaps every employee and vehicle through this once the grid is built (`snapAgentsToNavigableGround`, GameState.ts); an agent already on the main ground is left untouched.
 
 ## Building Approach Cells
 

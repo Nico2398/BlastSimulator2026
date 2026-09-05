@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid } from './NavGrid.js';
+import { NavGrid, isStepClimbable } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget } from '../config/balance.js';
+import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -244,6 +244,7 @@ function directLineWalk(
   let totalCost = 0;
   let prevX = x0;
   let prevZ = z0;
+  let prevCell: NavCell | undefined;
 
   for (let i = 0; i <= steps; i++) {
     const t = steps > 0 ? i / steps : 0;
@@ -258,6 +259,7 @@ function directLineWalk(
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
+      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, NAV_MAX_CLIMB_HEIGHT)) return null;
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
@@ -267,6 +269,7 @@ function directLineWalk(
     waypoints.push({ x: clampedX, z: clampedZ });
     prevX = clampedX;
     prevZ = clampedZ;
+    prevCell = cell;
   }
 
   return { found: true, waypoints, totalCost };
@@ -604,6 +607,8 @@ function findOrdinaryPath(
 
       const neighborCell = grid.cellAt(nx, nz);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles)) continue;
+      const currentCell = grid.cellAt(cx, cz)!;
+      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

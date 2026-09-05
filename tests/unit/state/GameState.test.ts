@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround } from '../../../src/core/state/GameState.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
@@ -495,5 +497,62 @@ describe('createGame — applyStaffedComposition vehicle spawn placement (issue 
 
     const keys = state.vehicles.vehicles.map(v => `${v.x},${v.z}`);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+// =============================================================================
+// snapAgentsToNavigableGround (#953)
+// =============================================================================
+
+/**
+ * A site whose origin column is a peak: solid to `peakTopY` at (0,0), to
+ * `groundTopY` everywhere else. The staffed roster's first employee spawns on
+ * (0,0) and, with a climb limit in force, cannot walk off it.
+ */
+function makePeakAtOriginGrid(size: number, groundTopY: number, peakTopY: number): VoxelGrid {
+  const grid = new VoxelGrid(size, peakTopY + 2, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const top = x === 0 && z === 0 ? peakTopY : groundTopY;
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
+describe('snapAgentsToNavigableGround', () => {
+  it('moves an agent stranded on a peak onto ground it can actually walk', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makePeakAtOriginGrid(12, 1, 1 + NAV_MAX_CLIMB_HEIGHT + 5), [], []);
+    const stranded = state.employees.employees[0]!;
+    expect([stranded.x, stranded.z]).toEqual([0, 0]);
+
+    snapAgentsToNavigableGround(state);
+
+    expect([stranded.x, stranded.z]).not.toEqual([0, 0]);
+    expect(NavGrid.computeClimbReachableSet(state.navGrid!, stranded.x, stranded.z).size).toBeGreaterThan(1);
+  });
+
+  it('leaves every agent on ordinary flat terrain exactly where it spawned', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    const flat = new VoxelGrid(12, 4, 12);
+    for (let z = 0; z < 12; z++) {
+      for (let x = 0; x < 12; x++) {
+        for (let y = 0; y <= 1; y++) flat.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    buildGameNavGrid(state, flat, [], []);
+    const before = [...state.employees.employees, ...state.vehicles.vehicles].map(a => `${a.x},${a.z}`);
+
+    snapAgentsToNavigableGround(state);
+
+    expect([...state.employees.employees, ...state.vehicles.vehicles].map(a => `${a.x},${a.z}`)).toEqual(before);
+  });
+
+  it('does nothing when no navgrid has been built yet', () => {
+    const state = createGame({ seed: 42, staffed: true });
+
+    expect(() => snapAgentsToNavigableGround(state)).not.toThrow();
+    expect(state.employees.employees[0]!.x).toBe(0);
   });
 });

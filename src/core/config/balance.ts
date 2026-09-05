@@ -585,6 +585,14 @@ export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
  * real `findPath` call resolving before giving up. Caps per-employee
  * dispatch cost at a fixed number of pathfinds regardless of how many
  * pending actions exist.
+ *
+ * A crater's own nearby candidates can still dominate the cheap end of the
+ * ranking pass by raw distance even when a climb-illegal step makes them
+ * unreachable (#953) — `selectBestActionForEmployee` (ActionSelection.ts)
+ * handles that with a climb-aware reachable-set pre-filter (computed once
+ * per call, screening out any candidate the requesting employee cannot
+ * climb-legally reach) rather than by widening this budget, so this stays
+ * at its original, deliberately small value.
  */
 export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 
@@ -625,6 +633,27 @@ export const MOVE_STUCK_ABANDON_TICKS = 30;
 
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
+
+/**
+ * Max voxel height-difference an agent can step between adjacent NavGrid
+ * cells. Above this the step is a wall, not a grade: `NavGrid` stops
+ * classifying it as a `ramp` and `Pathfinding` refuses it as a move (#953).
+ *
+ * Sits deliberately between the two heights the world actually produces.
+ * Natural relief on a generated level steps by up to three voxels between
+ * neighbouring columns — alpine slopes do it constantly — and that is
+ * terrain a worker walks. A bench face is `NAV_BENCH_HEIGHT` (5) and a blast
+ * crater is dug a hole-depth deeper still (6 in every level and tutorial
+ * plan), so both stay firmly out of reach and are descended by a dug ramp,
+ * which is the whole point of the issue.
+ *
+ * Two lowers this to the point where an ordinary mountainside becomes a maze
+ * of one-cell detours: measured on `sandbox-mode`'s alpine_granite site, a
+ * drill rig sent up that slope drilled one hole of four and spent the rest
+ * of the scenario oscillating, because a legal route that zig-zags cell by
+ * cell is one the per-tick replanner cannot follow.
+ */
+export const NAV_MAX_CLIMB_HEIGHT = 3;
 
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 

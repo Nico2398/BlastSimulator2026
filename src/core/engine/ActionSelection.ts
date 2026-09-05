@@ -8,6 +8,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees } from '../entities/Employee.js';
 import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
@@ -263,9 +264,27 @@ export function selectBestActionForEmployee(
     return costDiff !== 0 ? costDiff : a.id - b.id;
   });
 
-  const attempts = Math.min(ranked.length, ACTION_SELECTION_MAX_PATH_ATTEMPTS);
-  for (let i = 0; i < attempts; i++) {
+  // Cheap, exact pre-filter (#953): a candidate outside the employee's own
+  // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
+  // interior) can never be reached by any real findPath, so it's skipped
+  // below without spending one of the bounded real-pathfind attempts — frees
+  // the budget for a farther candidate that might actually resolve. One
+  // flood fill for the whole call, reused as an O(1) check per candidate.
+  const climbReachable = state.navGrid !== null
+    ? NavGrid.computeClimbReachableSet(state.navGrid, employee.x, employee.z)
+    : null;
+
+  let attemptsSpent = 0;
+  for (let i = 0; i < ranked.length && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
     const candidate = ranked[i]!;
+
+    if (climbReachable !== null && state.navGrid !== null) {
+      const cx = state.navGrid.clampX(candidate.targetX);
+      const cz = state.navGrid.clampZ(candidate.targetZ);
+      if (!climbReachable.has(cx, cz)) continue;
+    }
+
+    attemptsSpent++;
     const resolved = resolveActionCost(state, employee, candidate);
     if (resolved !== null) {
       return { action: candidate, totalTicks: resolved.totalTicks };

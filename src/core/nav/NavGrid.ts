@@ -7,11 +7,28 @@ import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
-import { NAV_BENCH_HEIGHT } from '../config/balance.js';
+import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
+/**
+ * True when stepping between two cells whose column surfaces sit at `fromY`
+ * and `toY` is a physically negotiable climb (#953). Either side missing
+ * `surfaceY` — hand-built test fixtures that don't model terrain height —
+ * is treated as unconstrained.
+ *
+ * Lives here, next to the `NavCell.surfaceY` it reads, because three
+ * separate layers apply the identical gate and must never drift apart:
+ * `Pathfinding.findPath`'s neighbour expansion, `NavGridReachability`'s
+ * climb-aware flood fill, and the reachable-set pre-filter
+ * `ActionSelection.selectBestActionForEmployee` screens candidates with.
+ */
+export function isStepClimbable(fromY: number | undefined, toY: number | undefined, maxClimb: number): boolean {
+  if (fromY === undefined || toY === undefined) return true;
+  return Math.abs(fromY - toY) <= maxClimb;
+}
 
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';
 
@@ -35,6 +52,12 @@ export interface NavCell {
    * finally block before returning — no lasting mutation to the grid.
    */
   vehicleOccupied: boolean;
+  /**
+   * Column's absolute world Y at classification time. Populated only by
+   * buildNavGrid/patchNavGrid; undefined for hand-built test fixtures that
+   * don't model terrain height (#953).
+   */
+  surfaceY?: number;
 }
 
 export class NavGrid {
@@ -166,7 +189,7 @@ export class NavGrid {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
         const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
-        row.push(NavGrid.makeCell(cellType, benchLevel));
+        row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY));
       }
       cells.push(row);
     }
@@ -214,7 +237,7 @@ export class NavGrid {
         }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY)));
+        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY), surfaceY));
       }
     }
 
@@ -270,12 +293,34 @@ export class NavGrid {
   }
 
   /**
+   * `computeReachableSet` with findPath's own per-step climb gate applied.
+   * See NavGridReachability.computeClimbReachableSet for the full doc.
+   */
+  static computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
+    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ);
+  }
+
+  /**
+   * Nearest cell to (targetX, targetZ) inside the grid's largest
+   * climb-connected region. See NavGridReachability.findNearestNavigableCell
+   * for the full doc.
+   */
+  static findNearestNavigableCell(navGrid: NavGrid, targetX: number, targetZ: number): { x: number; z: number } {
+    return reachability.findNearestNavigableCell(navGrid, targetX, targetZ);
+  }
+
+  /**
    * Classify a single NavGrid cell based on column solidity, drill holes, buildings, and ramps.
    * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
    *
    * Ramp detection: if any cardinal neighbor's surface Y differs from this cell's
-   * surface Y by more than 1 voxel, the cell is classified as a ramp. This allows
-   * pathfinding to handle elevation changes (e.g. stepped terrain or ramp transitions).
+   * surface Y by more than 1 voxel and at most NAV_MAX_CLIMB_HEIGHT voxels, the
+   * cell is classified as a ramp. This allows pathfinding to handle elevation
+   * changes (e.g. stepped terrain or ramp transitions). A delta beyond
+   * NAV_MAX_CLIMB_HEIGHT (e.g. a blast crater wall) does NOT classify as a ramp —
+   * it falls through to walkable, and Pathfinding's per-step climb gate (#953)
+   * is what actually refuses that illegal step, since a cell can be legitimately
+   * walkable from one neighbor and illegally steep relative to another.
    */
   private static classifyCellType(
     x: number,
@@ -292,8 +337,11 @@ export class NavGrid {
     // Ramp detection: cardinal neighbor with surface height delta > 1 voxel
     for (const [dx, dz] of CARDINAL_OFFSETS) {
       const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
-      if (neighborSurfaceY !== -1 && Math.abs(surfaceY - neighborSurfaceY) > 1) {
-        return 'ramp';
+      if (neighborSurfaceY !== -1) {
+        const delta = Math.abs(surfaceY - neighborSurfaceY);
+        if (delta > 1 && delta <= NAV_MAX_CLIMB_HEIGHT) {
+          return 'ramp';
+        }
       }
     }
     return 'walkable';
@@ -302,7 +350,7 @@ export class NavGrid {
   /**
    * Create a NavCell with the given type and appropriate move cost.
    */
-  private static makeCell(type: NavCellType, benchLevel: number = 0): NavCell {
+  private static makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
     let moveCost: number;
     switch (type) {
       case 'walkable': moveCost = 1.0; break;
@@ -316,6 +364,6 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel, vehicleOccupied: false };
+    return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
   }
 }
