@@ -166,12 +166,14 @@ describe('GameRenderer — onBlast()', () => {
 });
 
 describe('GameRenderer — safety zone evacuation wiring', () => {
-  it('marks employees inside the active zone as evacuating', () => {
+  it('marks employees inside the active zone as evacuating when a live blast plan still threatens it (#952)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     const rng = new Random(1);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, 5, 5);
     defineZone(ctx.state!.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    // Hole at (5,5), margin 15 → danger box (-10,-10)-(20,20), overlaps (0,0)-(10,10).
+    addHole(ctx.state!.drillHoles, 5, 5, 10, 0.1);
 
     const evacSpy = vi.spyOn(CharacterMesh.prototype, 'setEvacuating');
     renderer.syncFromContext(ctx);
@@ -180,12 +182,28 @@ describe('GameRenderer — safety zone evacuation wiring', () => {
     evacSpy.mockRestore();
   });
 
-  it('does not mark employees outside the active zone as evacuating', () => {
+  it('does not mark employees outside the active zone as evacuating, even with a live threatening blast plan', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     const rng = new Random(1);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, 25, 25);
     defineZone(ctx.state!.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    addHole(ctx.state!.drillHoles, 5, 5, 10, 0.1);
+
+    const evacSpy = vi.spyOn(CharacterMesh.prototype, 'setEvacuating');
+    renderer.syncFromContext(ctx);
+
+    expect(evacSpy).toHaveBeenCalledWith(employee.id, false);
+    evacSpy.mockRestore();
+  });
+
+  it('does not mark employees inside the active zone as evacuating when no live blast plan threatens it (#952)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, 5, 5);
+    defineZone(ctx.state!.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    // No drillHoles — zone drawn but no live/charged blast plan threatens it.
 
     const evacSpy = vi.spyOn(CharacterMesh.prototype, 'setEvacuating');
     renderer.syncFromContext(ctx);
