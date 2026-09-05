@@ -12,6 +12,31 @@
 // intended character: a tight system sans for UI text, and a tabular
 // monospace (via font-variant-numeric) for every countable value.
 
+/** Layout constants mirrored as JS values for code that needs to compute against
+ *  them (e.g. `calc()` expressions or scroll-margin math) rather than just apply
+ *  them via CSS custom property. Keep in sync with the `:root` block below. */
+export const LAYOUT = {
+  topbarHeight: 52,
+} as const;
+
+/** Z-index tiers mirrored as JS values, in sync with the `--bsx-z-*` custom
+ *  properties in the `:root` block below (design system §03). */
+export const Z_INDEX = {
+  canvas: 0,
+  panel: 100,
+  sceneBar: 120,
+  topbar: 150,
+  toast: 160,
+  rail: 200,
+  popover: 210,
+  hovertag: 320,
+  coach: 400,
+  log: 500,
+  menu: 9999,
+  menuSettings: 10000,
+  modal: 10500,
+} as const;
+
 const TOKENS_CSS = `
 :root {
   /* ── surfaces ── */
@@ -67,6 +92,7 @@ const TOKENS_CSS = `
   --bsx-z-panel: 100;
   --bsx-z-scene-bar: 120;
   --bsx-z-topbar: 150;
+  --bsx-z-toast: 160;
   --bsx-z-rail: 200;
   --bsx-z-popover: 210;
   --bsx-z-hovertag: 320;
@@ -81,6 +107,9 @@ const TOKENS_CSS = `
      original 600 until this was found: the confirm dialog rendered, but
      entirely hidden behind the panel that requested it. */
   --bsx-z-modal: 10500;
+
+  /* ── layout ── */
+  --bsx-topbar-height: 52px;
 
   /* ── type ── */
   --bsx-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
