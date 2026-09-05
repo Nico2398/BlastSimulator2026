@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
-import { findPath, findRampConnections, octileHeuristic } from '../../src/core/nav/Pathfinding.js';
+import { findPath, findRampConnections, getBenchLevel, octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import {
@@ -286,33 +286,43 @@ describe('NavMesh and pathfinding', () => {
 
     const navAfter = NavGrid.buildNavGrid(grid, [], []);
 
-    // The fix must produce at least one ramp connector spanning two distinct
-    // bench levels.
-    const connections = findRampConnections(navAfter);
-    expect(connections.length).toBeGreaterThan(0);
+    // #953: buildRamp's own per-step descent changes by at most 1 voxel
+    // between adjacent footprint columns (by design — see the #925 flat-
+    // bench tests), so no single cell's neighbour delta ever exceeds 1 at
+    // the exact point a discretised bench boundary (NAV_BENCH_HEIGHT) is
+    // crossed. A lone 'ramp'-typed cell (classification requires delta > 1)
+    // can therefore never itself straddle two distinct bench levels on a
+    // smooth graded ramp like this one — findRampConnections exists to find
+    // a single steep-but-climbable ledge, not this shape of terrain, so it
+    // is the wrong tool to prove this ramp's connectivity. Proof instead:
+    // the untouched plateau just above the ramp's entrance and the fully
+    // carved floor at its far end sit on different bench levels, and
+    // findPath actually connects them end to end.
+    const deepX = 10;
+    const deepZ = 5 + 12 - 1; // ramp's far end column (originZ + length - 1)
+    const upperLevel = getBenchLevel(navAfter, 10, 4); // untouched plateau just above the ramp entrance
+    const lowerLevel = getBenchLevel(navAfter, deepX, deepZ);
+    expect(upperLevel).not.toBe(lowerLevel);
 
-    const conn = connections[0]!;
-    expect(conn.upperLevel).not.toBe(conn.lowerLevel);
-
-    // Pathfinding from the upper side of the connection to the lower side
-    // must succeed now that the ramp physically exists.
+    // Pathfinding from the untouched plateau above the entrance down to the
+    // carved floor must succeed now that the ramp physically exists.
     const result = findPath(navAfter, {
-      agentId: 1, fromX: conn.upperX, fromZ: conn.upperZ,
-      toX: conn.lowerX, toZ: conn.lowerZ, avoidVehicles: false,
+      agentId: 1, fromX: 10, fromZ: 4,
+      toX: deepX, toZ: deepZ, avoidVehicles: false,
     });
     expect(result.found).toBe(true);
 
-    // Augmentation (#953): a ramp connector registering, and a one-cell hop
-    // across it succeeding, is no longer sufficient proof post-fix — climb
-    // gating could in principle still block a longer route that has to
-    // actually traverse the ramp's own gradual descent rather than a single
-    // pre-identified adjacent pair. Drive a genuinely distant surface point
-    // down to the carved trench floor and confirm every step of the real
-    // route stays within the climb limit end to end.
+    // Augmentation (#953): a level-spanning findPath succeeding over one
+    // short hop is not sufficient proof post-fix — climb gating could in
+    // principle still block a longer route that has to actually traverse
+    // the ramp's own gradual descent rather than a single nearby pair.
+    // Drive a genuinely distant surface point down to the carved trench
+    // floor and confirm every step of the real route stays within the
+    // climb limit end to end.
     const distantSurface = { x: 0, z: 0 };
     const endToEnd = findPath(navAfter, {
       agentId: 1, fromX: distantSurface.x, fromZ: distantSurface.z,
-      toX: conn.lowerX, toZ: conn.lowerZ, avoidVehicles: false,
+      toX: deepX, toZ: deepZ, avoidVehicles: false,
     });
     expect(endToEnd.found).toBe(true);
     for (let i = 0; i < endToEnd.waypoints.length - 1; i++) {
@@ -558,23 +568,33 @@ describe('NavMesh and pathfinding', () => {
     }
     const lastCell = segmentsFull[segmentsFull.length - 1]!.cells[0]!;
     const fullyDugSurfaceY = NavGrid.computeSurfaceY(gridFull, lastCell.x, lastCell.z);
-    const connectionsFull = findRampConnections(navFull);
-    expect(connectionsFull.length).toBeGreaterThan(0);
-    // connectionsFull[0] is merely the first 'ramp' cell found in row-major
-    // scan order — for a ramp whose bench levels quantize coarsely
-    // (computeBenchLevel/NAV_BENCH_HEIGHT), that is typically a shallow
-    // entrance-area transition already present long before the ramp
-    // finishes, not the connector this test cares about. The connector tied
-    // specifically to the deepest layer's own column is the one anchored at
-    // rampZ === lastCell.z.
-    const fullConn = connectionsFull.find(c => c.rampZ === lastCell.z);
-    expect(fullConn).toBeDefined();
-    expect(fullConn!.upperLevel).not.toBe(fullConn!.lowerLevel);
+
+    // #953: findRampConnections looks for a single 'ramp'-typed cell whose
+    // own neighbours span two distinct bench levels. On a smooth graded ramp
+    // like this one, the per-step descent changes by at most 1 voxel between
+    // adjacent columns (#925), so no cell's neighbour delta is ever large
+    // enough (> 1) at the exact point a discretised bench boundary
+    // (NAV_BENCH_HEIGHT) is crossed — a lone climb-legal 'ramp' cell can
+    // never itself straddle two bench levels here. findRampConnections is
+    // therefore the wrong tool to prove this ramp's connectivity; proof
+    // instead is that the fully-dug deepest column sits on a different bench
+    // level than the untouched plateau above the entrance, and findPath
+    // actually connects the two end to end.
+    const upperLevel = getBenchLevel(navFull, 10, 4); // untouched plateau just above the ramp entrance
+    const lowerLevelFull = getBenchLevel(navFull, lastCell.x, lastCell.z);
+    expect(upperLevel).not.toBe(lowerLevelFull);
     const fullPath = findPath(navFull, {
-      agentId: 1, fromX: fullConn!.upperX, fromZ: fullConn!.upperZ,
-      toX: fullConn!.lowerX, toZ: fullConn!.lowerZ, avoidVehicles: false,
+      agentId: 1, fromX: 10, fromZ: 4,
+      toX: lastCell.x, toZ: lastCell.z, avoidVehicles: false,
     });
     expect(fullPath.found).toBe(true);
+    for (let i = 0; i < fullPath.waypoints.length - 1; i++) {
+      const a = fullPath.waypoints[i]!;
+      const b = fullPath.waypoints[i + 1]!;
+      const ay = navFull.cellAt(a.x, a.z)!.surfaceY;
+      const by = navFull.cellAt(b.x, b.z)!.surfaceY;
+      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+    }
 
     // Every layer except the very deepest one — the ramp is not fully dug yet.
     const gridPrefix = buildElevatedPlateau();
@@ -590,20 +610,10 @@ describe('NavMesh and pathfinding', () => {
     const prefixSurfaceY = NavGrid.computeSurfaceY(gridPrefix, lastCell.x, lastCell.z);
     expect(prefixSurfaceY).toBeGreaterThan(fullyDugSurfaceY);
 
-    // The full-depth connector discovered once the ramp is complete is not
-    // yet present while the last segment remains undug. Matching on
-    // upperLevel too (not just the lower/native-ground side) matters under
-    // layer-based excavation (#925): the ramp's deepest column is carved
-    // incrementally across many earlier layer segments, so a shallower
-    // (partial-depth) connector at the same lower cell already exists before
-    // the last segment lands — only the full-depth bench level (upperLevel)
-    // distinguishes "fully excavated" from "partially excavated".
-    const connectionsPrefix = findRampConnections(navPrefix);
-    const hasFullConnector = connectionsPrefix.some(
-      c => c.lowerX === fullConn!.lowerX && c.lowerZ === fullConn!.lowerZ && c.lowerLevel === fullConn!.lowerLevel
-        && c.upperLevel === fullConn!.upperLevel,
-    );
-    expect(hasFullConnector).toBe(false);
+    // Its bench level hasn't reached the fully-excavated level either — only
+    // the last segment landing crosses that final boundary.
+    const lowerLevelPrefix = getBenchLevel(navPrefix, lastCell.x, lastCell.z);
+    expect(lowerLevelPrefix).not.toBe(lowerLevelFull);
   });
 
   // ── #946: progressive within-segment carving ──────────────────────────────
