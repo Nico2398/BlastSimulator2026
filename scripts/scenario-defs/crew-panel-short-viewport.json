@@ -46,19 +46,19 @@
     },
     {
       "command": "employee list",
-      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly. The scroll is asserted through `waitForProperty` rather than a bare `assert`, because page.mouse.wheel() resolving does not guarantee the scroll has actually landed — Chrome can commit a wheel-triggered scroll on the compositor thread after the CDP call returns, independent of how fast the page itself is running. CI (PR #888, shard 6/10, Chrome 127) caught this asserting scrollTop immediately after the wheel action — 'expected scrollTop=50, got 0' — reproducibly, on a build that already had both real fixes applied, while sandbox runs here (Chrome 141, a dedicated browser per run rather than CI's shared one across a shard) never hit it. `waitForProperty` polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails loudly — naming the last scrollTop it saw — if the scroll never lands, which is what the negative control depends on.",
+      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly. The scroll is asserted through `waitForProperty` rather than a bare `assert`, because page.mouse.wheel() resolving does not guarantee the scroll has actually landed — Chrome can commit a wheel-triggered scroll on the compositor thread after the CDP call returns, independent of how fast the page itself is running. CI (PR #888, shard 6/10, Chrome 127) caught this asserting scrollTop immediately after the wheel action — 'expected scrollTop=50, got 0' — reproducibly, on a build that already had both real fixes applied, while sandbox runs here (Chrome 141, a dedicated browser per run rather than CI's shared one across a shard) never hit it. `waitForProperty` polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails loudly — naming the last scrollTop it saw — if the scroll never lands, which is what the negative control depends on. The scroller wheeled here is the roster's own bounded section (`.bs-crew-roster-scroll`, `src/ui/panels/CrewPanel.ts`), not the panel body: #980 bounded the roster to 200px, so the body itself stopped overflowing and a wheel over it moved nothing — this step was red on main until it was pointed at the element that actually scrolls.",
       "interaction": [
         { "type": "viewport", "width": 1280, "height": 600 },
         { "type": "ensurePanel", "panel": "employees" },
         { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
         { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" },
         { "type": "screenshot" },
-        { "type": "assert", "selector": "#bs-employee-panel .bsx-panel-body", "property": "scrollTop", "expectedValue": 0 },
+        { "type": "assert", "selector": "#bs-employee-panel .bs-crew-roster-scroll", "property": "scrollTop", "expectedValue": 0 },
         { "type": "mousemove", "x": 190, "y": 300 },
         { "type": "wheel", "deltaX": 0, "deltaY": 50 },
         {
           "type": "waitForProperty",
-          "selector": "#bs-employee-panel .bsx-panel-body",
+          "selector": "#bs-employee-panel .bs-crew-roster-scroll",
           "property": "scrollTop",
           "expectedValue": 50,
           "timeoutMs": 5000
@@ -66,7 +66,7 @@
         { "type": "screenshot" }
       ],
       "role": "player",
-      "expect": { "note": "The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+      "expect": { "note": "The regression proper: the last assert action above proves a real wheel gesture actually scrolled the roster's bounded scroller — 50px dispatched, 50px landed (well short of what this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved its scrollTop at all)." }
     },
     {
       "command": "employee train 1 skill:driving.drill_rig",
