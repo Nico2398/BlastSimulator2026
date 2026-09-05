@@ -88,18 +88,45 @@ describe('findClosingKeywordViolations', () => {
     expect(violations).toHaveLength(0);
   });
 
-  // The pipeline's `open-pr` step mandates the title `<type>: Resolve #<N>`.
-  // The guard (#765) landed against that convention, so PR #773 — the first
-  // pipeline PR opened after it merged — failed on its own mandated title, and
-  // every pipeline PR after it would have too. Both shapes are deliberate
-  // directives, not the prose the postmortem is about.
+  // Through PR #980 the pipeline's `open-pr` step mandated the title
+  // `<type>: Resolve #<N>`. The guard (#765) landed against that convention, so
+  // PR #773 — the first pipeline PR opened after it merged — failed on its own
+  // mandated title, and every pipeline PR after it would have too. Both shapes
+  // are deliberate directives, not the prose the postmortem is about. The
+  // exemption stays for the pull requests already opened under that title and
+  // for a hand-written directive title.
   it.each([
     'fix: Resolve #769',
     'feat: Closes #12',
     'refactor(renderer): Resolves #300',
     'fix(core)!: Fixes #1',
-  ])('does not flag the mandated PR title shape %s', (title) => {
+  ])('does not flag the typed directive title shape %s', (title) => {
     expect(findClosingKeywordViolations({ title })).toHaveLength(0);
+  });
+
+  // The title `open-pr` writes now: `<type>: <summary> (#<N>)`. It carries no
+  // closing directive — the body's `Closes #<N>` line does that — so it passes
+  // on the parser's own terms, with no exemption involved. The parenthesis
+  // between a summary's last word and the number is what keeps a summary that
+  // happens to end in a keyword clean.
+  it.each([
+    'feat: charging is real work, a blaster loads holes one at a time (#554)',
+    'fix: tutorial deadlock at Train Driller/Train Digger (#903)',
+    'fix: armed placement tool survives a right-drag camera orbit (#544)',
+    'fix: dispatcher no longer hangs on close (#554)',
+    'refactor(renderer): extract the terrain skirt builder (#560)',
+  ])('does not flag the descriptive PR title shape %s', (title) => {
+    expect(findClosingKeywordViolations({ title })).toHaveLength(0);
+  });
+
+  // A descriptive title is not a licence to narrate: the summary itself is
+  // read the same way as any prose.
+  it('flags a descriptive title whose summary puts a keyword before a number', () => {
+    const violations = findClosingKeywordViolations({
+      title: 'fix: dispatcher no longer hangs, which also fixes #560 (#554)',
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0].source).toBe('title');
   });
 
   // The prefix is a closed list of conventional-commit types, which is what
