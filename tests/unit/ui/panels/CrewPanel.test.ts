@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { CrewPanel } from '../../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
@@ -391,5 +392,105 @@ describe('CrewPanel', () => {
     const { panel, container } = makePanel();
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
+  });
+});
+
+// ── Scroll-bounded roster section (#958) ────────────────────────────────────
+//
+// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
+// the panel root's second child. Roster cards (one per living employee,
+// unbounded) are rendered directly into bodyEl today, followed by the HIRING
+// sectionHeader and its 5 fixed role rows — a long roster buries HIRING far
+// below the panel's fold. The fix nests every roster card inside one
+// scrollBoundedSection wrapper standing before the HIRING section header,
+// leaving HIRING and its rows unwrapped, reachable bodyEl-level siblings.
+
+function getBodyEl(panel: CrewPanel): HTMLElement {
+  return panel.root.children[1] as HTMLElement;
+}
+
+/** Every direct child of `bodyEl` before the section header whose text contains `label`. */
+function childrenBeforeSection(bodyEl: HTMLElement, label: string): HTMLElement[] {
+  const children = Array.from(bodyEl.children) as HTMLElement[];
+  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
+  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
+  return children.slice(0, idx);
+}
+
+function makeManyEmployees(count: number): Employee[] {
+  return Array.from({ length: count }, (_, i) => makeEmployee({ id: i + 1, name: `Crew ${i + 1}` }));
+}
+
+describe('CrewPanel — scroll-bounded roster section (#958)', () => {
+  it('nests all 55 roster cards inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyEmployees(55)));
+
+    const bodyEl = getBodyEl(panel);
+    const rosterChildren = childrenBeforeSection(bodyEl, t('ui.crew.hiring'));
+
+    // The 55 cards must be nested inside exactly one wrapper element that is
+    // itself the only bodyEl child before HIRING — proving the cards didn't
+    // flatten directly into bodyEl (today's behavior).
+    expect(rosterChildren.length).toBe(1);
+    const wrapper = rosterChildren[0]!;
+    expect(wrapper.querySelectorAll('[data-employee-id]').length).toBe(55);
+  });
+
+  it('gives the roster wrapper inline overflow-y:auto and a numeric max-height (not vh/%)', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyEmployees(55)));
+
+    const bodyEl = getBodyEl(panel);
+    const wrapper = childrenBeforeSection(bodyEl, t('ui.crew.hiring'))[0]!;
+
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+  });
+
+  it('keeps the HIRING section header and all 5 role rows reachable as bodyEl children, outside the roster wrapper', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyEmployees(55)));
+
+    const bodyEl = getBodyEl(panel);
+    const children = Array.from(bodyEl.children) as HTMLElement[];
+    const hiringIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.crew.hiring')));
+    expect(hiringIdx).toBeGreaterThan(-1);
+
+    const rosterWrapper = children[0]!;
+    const hiringHeader = children[hiringIdx]!;
+    const hiringRows = children.slice(hiringIdx + 1);
+
+    expect(rosterWrapper.contains(hiringHeader)).toBe(false);
+    expect(hiringRows.length).toBe(5); // ROLES: driller, blaster, driver, surveyor, manager
+    for (const row of hiringRows) expect(rosterWrapper.contains(row)).toBe(false);
+  });
+
+  it('keeps bodyEl itself scrollable (overflow-y:auto unchanged) regardless of roster size', () => {
+    const { panel: emptyPanel } = makePanel();
+    emptyPanel.update(makeState([]));
+    const emptyBodyEl = getBodyEl(emptyPanel);
+
+    const { panel: fullPanel } = makePanel();
+    fullPanel.update(makeState(makeManyEmployees(55)));
+    const fullBodyEl = getBodyEl(fullPanel);
+
+    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+      expect(bodyEl.style.overflowY).toBe('auto');
+    }
+  });
+
+  it('with zero employees, the roster bounded wrapper is still present and contains the empty state', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+
+    const bodyEl = getBodyEl(panel);
+    const rosterChildren = childrenBeforeSection(bodyEl, t('ui.crew.hiring'));
+
+    expect(rosterChildren.length).toBe(1);
+    const wrapper = rosterChildren[0]!;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+    expect(wrapper.textContent).toContain(t('ui.crew.none'));
   });
 });

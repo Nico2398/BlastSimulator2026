@@ -17,7 +17,7 @@
 // place rather than having them leave.
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el } from '../../dom.js';
+import { el, scrollBoundedSection } from '../../dom.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
@@ -56,8 +56,10 @@ export class FireStep {
     this.zoneHeaderLabelEl = el('span', { className: 'bsx-section-label' });
     zoneHeader.append(this.zoneHeaderLabelEl, el('span', { className: 'bsx-section-rule' }));
 
-    this.zoneListEl = el('div');
-    this.zoneListEl.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+    // Bounded + independently scrollable, same reasoning as Charge's product
+    // list: a crowded danger zone would otherwise push Sound the Horn and the
+    // preflight checklist past the panel's fold.
+    this.zoneListEl = scrollBoundedSection([], 200, { gap: 4 });
 
     this.hornBtn = el('button', { className: 'bsx-btn bsx-btn-warn' });
     this.hornBtn.style.cssText = 'height:38px;gap:9px';

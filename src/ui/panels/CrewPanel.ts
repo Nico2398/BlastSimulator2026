@@ -17,7 +17,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, sectionHeader, panelRoot, panelHeader, panelBody } from '../dom.js';
+import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -172,7 +172,11 @@ export class CrewPanel extends PanelBase {
     const cards = employees.length === 0
       ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
       : employees.map(e => this.makeRosterCard(e, state));
-    this.bodyEl.replaceChildren(...cards, sectionHeader(t('ui.crew.hiring')), ...this.makeHiringRows(state));
+    this.bodyEl.replaceChildren(
+      scrollBoundedSection(cards, 200, { gap: 8 }),
+      sectionHeader(t('ui.crew.hiring')),
+      ...this.makeHiringRows(state),
+    );
   }
 
   private makeHiringRows(state: GameState): HTMLElement[] {

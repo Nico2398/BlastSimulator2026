@@ -17,7 +17,7 @@
 // a scenario can click it directly.
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState } from '../../dom.js';
+import { el, emptyState, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import type { SavedBlastPlan } from '../../../core/state/GameState.js';
@@ -85,11 +85,10 @@ export class SavedPlansList {
     const saveRow = el('div', { children: [this.nameInput, saveBtn] });
     saveRow.style.cssText = 'display:flex;gap:7px;align-items:center';
 
-    this.listEl = el('div');
     // Bounded + independently scrollable, same reasoning as the Sequence step's
     // hole rows: a long-running site accumulates saved plans, and they must not
     // push the hole list past the panel's fold.
-    this.listEl.style.cssText = 'display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto';
+    this.listEl = scrollBoundedSection([], 120, { gap: 3 });
 
     this.el.append(header, saveRow, this.listEl);
   }

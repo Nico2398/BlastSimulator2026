@@ -17,7 +17,7 @@
 // gesture as "select, then charge them all".
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState } from '../../dom.js';
+import { el, emptyState, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
@@ -52,11 +52,10 @@ export class ChargeHoleList {
       el('span', { className: 'bsx-section-rule' }),
     );
 
-    this.listEl = el('div');
     // Bounded + independently scrollable, same reasoning as the Charge step's
     // product list and the Sequence step's hole rows: a full plan (16 holes)
     // would otherwise push the tubing block past the panel's fold.
-    this.listEl.style.cssText = 'display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto';
+    this.listEl = scrollBoundedSection([], 160, { gap: 3 });
 
     this.el.append(header, this.listEl);
   }

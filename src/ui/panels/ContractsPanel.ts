@@ -20,7 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody } from '../dom.js';
+import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
@@ -100,17 +100,29 @@ export class ContractsPanel extends PanelBase {
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
       sectionHeader(t('ui.contracts.active')),
-      ...(state.contracts.active.length > 0
-        ? state.contracts.active.map(c => this.makeActiveCard(c, state))
-        : [emptyState(t('ui.contracts.none_active'))]),
+      scrollBoundedSection(
+        state.contracts.active.length > 0
+          ? state.contracts.active.map(c => this.makeActiveCard(c, state))
+          : [emptyState(t('ui.contracts.none_active'))],
+        200,
+        { gap: 10 },
+      ),
       sectionHeader(t('ui.contracts.available')),
-      ...(state.contracts.available.length > 0
-        ? state.contracts.available.map(c => this.makeOfferedCard(c, state))
-        : [emptyState(t('ui.contracts.none'))]),
+      scrollBoundedSection(
+        state.contracts.available.length > 0
+          ? state.contracts.available.map(c => this.makeOfferedCard(c, state))
+          : [emptyState(t('ui.contracts.none'))],
+        200,
+        { gap: 10 },
+      ),
       sectionHeader(t('ui.contracts.closed')),
-      ...(state.contracts.completedHistory.length > 0
-        ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
-        : [emptyState(t('ui.contracts.none_closed'))]),
+      scrollBoundedSection(
+        state.contracts.completedHistory.length > 0
+          ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
+          : [emptyState(t('ui.contracts.none_closed'))],
+        200,
+        { gap: 10 },
+      ),
     ];
     this.bodyEl.replaceChildren(...sections);
   }

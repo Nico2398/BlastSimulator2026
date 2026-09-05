@@ -20,7 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody } from '../dom.js';
+import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -81,7 +81,7 @@ export class FinancesPanel extends PanelBase {
       sectionHeader(t('ui.finances.expenses')),
       ...this.makeCategoryRows(report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
       sectionHeader(t('ui.finances.ledger')),
-      ...this.makeLedger(state),
+      scrollBoundedSection(this.makeLedger(state), 200, { gap: 10 }),
     ];
     this.bodyEl.replaceChildren(...sections);
   }

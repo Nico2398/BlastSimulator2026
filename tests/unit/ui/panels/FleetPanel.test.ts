@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { FleetPanel } from '../../../../src/ui/panels/FleetPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
@@ -394,5 +395,89 @@ describe('FleetPanel', () => {
     (panel.root.querySelector('[data-vehicle-id="3"]') as HTMLElement).click();
 
     expect(selected).toEqual([2, 3]);
+  });
+});
+
+// ── Scroll-bounded vehicle list section (#958) ──────────────────────────────
+//
+// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
+// the panel root's second child. Vehicle cards (one per fleet vehicle,
+// unbounded) are rendered directly into bodyEl today, followed by the
+// DEALERSHIP sectionHeader and its fixed role × tier catalog rows — a large
+// fleet buries the dealership far below the panel's fold. The fix nests
+// every vehicle card inside one scrollBoundedSection wrapper standing before
+// the DEALERSHIP section header, leaving the dealership unwrapped, a
+// reachable bodyEl-level sibling.
+
+function getBodyEl(panel: FleetPanel): HTMLElement {
+  return panel.root.children[1] as HTMLElement;
+}
+
+/** Every direct child of `bodyEl` before the section header whose text contains `label`. */
+function childrenBeforeSection(bodyEl: HTMLElement, label: string): HTMLElement[] {
+  const children = Array.from(bodyEl.children) as HTMLElement[];
+  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
+  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
+  return children.slice(0, idx);
+}
+
+function makeManyVehicles(count: number): ReturnType<typeof makeVehicle>[] {
+  // Distinct (x,z) per vehicle and no waitingTicks — avoids tripping the
+  // traffic-jam banner, which would add an extra pre-DEALERSHIP child unrelated
+  // to this test's own concern.
+  return Array.from({ length: count }, (_, i) => makeVehicle({ id: i + 1, x: i, z: 0, targetX: i, targetZ: 0 }));
+}
+
+describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
+  it('nests all 12 vehicle cards inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyVehicles(12)));
+
+    const bodyEl = getBodyEl(panel);
+    const preDealership = childrenBeforeSection(bodyEl, t('ui.fleet.dealership'));
+
+    expect(preDealership.length).toBe(1);
+    const wrapper = preDealership[0]!;
+    expect(wrapper.querySelectorAll('[data-vehicle-id]').length).toBe(12);
+  });
+
+  it('gives the vehicle wrapper inline overflow-y:auto and a numeric max-height (not vh/%)', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyVehicles(12)));
+
+    const bodyEl = getBodyEl(panel);
+    const wrapper = childrenBeforeSection(bodyEl, t('ui.fleet.dealership'))[0]!;
+
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+  });
+
+  it('keeps the DEALERSHIP section reachable as a bodyEl-level sibling, outside the vehicle wrapper', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyVehicles(12)));
+
+    const bodyEl = getBodyEl(panel);
+    const children = Array.from(bodyEl.children) as HTMLElement[];
+    const dealershipIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.fleet.dealership')));
+    expect(dealershipIdx).toBeGreaterThan(-1);
+
+    const vehicleWrapper = children[0]!;
+    expect(vehicleWrapper.contains(children[dealershipIdx]!)).toBe(false);
+    // 5 roles × 3 tiers of dealership buttons still resolve, unwrapped.
+    expect(bodyEl.querySelectorAll('.bs-fleet-tier-btn').length).toBe(5 * 3);
+  });
+
+  it('keeps bodyEl itself scrollable (overflow-y:auto unchanged) regardless of fleet size', () => {
+    const { panel: emptyPanel } = makePanel();
+    emptyPanel.update(makeState([]));
+    const emptyBodyEl = getBodyEl(emptyPanel);
+
+    const { panel: fullPanel } = makePanel();
+    fullPanel.update(makeState(makeManyVehicles(12)));
+    const fullBodyEl = getBodyEl(fullPanel);
+
+    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+      expect(bodyEl.style.overflowY).toBe('auto');
+    }
   });
 });

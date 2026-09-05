@@ -255,3 +255,47 @@ describe('DrillStep', () => {
     expect(container.contains(step.root)).toBe(false);
   });
 });
+
+// ── Scroll-bounded hole list (#958) ──────────────────────────────────────────
+//
+// holeListEl (one row per drilled hole, unbounded) is a plain flex column
+// today with no overflow/max-height at all — a full plan buries the Saved
+// Plans block below the panel's fold. The fix bounds it to a
+// scrollBoundedSection wrapper, leaving SavedPlansList's save/load block a
+// reachable sibling after it.
+
+/** The bounded wrapper holding hole rows: inline overflow-y:auto + numeric max-height, containing hole delete buttons. */
+function findHoleListWrapper(root: HTMLElement): HTMLElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLElement>('div')).find(d =>
+    d.style.overflowY === 'auto'
+    && /^\d+px$/.test(d.style.maxHeight)
+    && d.querySelector('[data-action="remove-hole"]') !== null,
+  );
+}
+
+describe('DrillStep — scroll-bounded hole list (#958)', () => {
+  it('bounds the hole list to a wrapper with inline overflow-y:auto and a numeric max-height, holding every row', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    step.update(state, 'sunny');
+
+    const wrapper = findHoleListWrapper(step.root);
+    expect(wrapper).not.toBeUndefined();
+    expect(wrapper!.querySelectorAll('[data-action="remove-hole"]').length).toBe(50);
+  });
+
+  it('keeps the Saved Plans save/load block reachable as a sibling of the bounded hole-list wrapper', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    step.update(state, 'sunny');
+
+    const wrapper = findHoleListWrapper(step.root)!;
+    expect(wrapper).not.toBeUndefined();
+    expect(step.root.textContent).toContain('Saved Plans');
+    const saveBtn = step.root.querySelector('[data-action="save-plan"]');
+    expect(saveBtn).not.toBeNull();
+    expect(wrapper.contains(saveBtn)).toBe(false);
+  });
+});
