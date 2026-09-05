@@ -5,6 +5,16 @@
 // two 'hud'-layer regions overlap at a matrix of viewport sizes, and that
 // none falls outside the viewport. Populated by each shell region on
 // construction, cleared on dispose() — see shell/TopBar.ts etc.
+//
+// A region declares the box it may grow to, not the box it happens to
+// occupy: worst-case entry counts, worst-case action sets, borders and
+// padding included. An envelope wider than the painted element is safe (it
+// over-reports a collision); one narrower than it is not.
+//
+// TODO(#983): src/ui/MiniMap.ts is a screen-edge region too and does not
+// register here yet — it really overlaps the ToolRail at 1280x720 today, and
+// its width is locale-dependent (215px en / 245px fr), so declaring it needs
+// a layout decision rather than a constant. Tracked in #983.
 
 export interface Viewport { readonly width: number; readonly height: number; }
 export interface Rect { readonly x: number; readonly y: number; readonly width: number; readonly height: number; }
@@ -68,16 +78,9 @@ export function rectWithinViewport(rect: Rect, viewport: Viewport): boolean {
 }
 
 /**
- * Order: spec floor, spec ceiling, ultrawide, short, tall.
- *
- * The ultrawide entry is 3440x1440 (UWQHD, 21:9) -- the earlier swap to
- * 2560x1080 worked around a Toasts entrance animation that could stall at
- * opacity:0 for its whole lifetime under sustained main-thread/render load
- * (headless/no-GPU rendering). That root cause is fixed directly: Toasts no
- * longer has an entrance animation to stall (see Toasts.ts, issue #956),
- * so the matrix is restored to the true ultrawide resolution. Sustained
- * main-thread starvation under headless rendering remains a broader concern
- * for other main-thread-dependent behavior; tracked in issue #977.
+ * Viewport sizes the overlap matrix runs at: spec floor, spec ceiling,
+ * ultrawide (UWQHD 21:9), short, tall. Adding a size here is how a new
+ * aspect ratio gets covered — nothing else needs to change.
  */
 export const SHELL_VIEWPORT_MATRIX: readonly Viewport[] = [
   { width: 1280, height: 720 },

@@ -44,6 +44,8 @@ const RAIL_BUTTON_WIDTH_PX = 58;
 const RAIL_PADDING_PX = 6;
 /** Gap between rail buttons, matching its inline style below. */
 const RAIL_GAP_PX = 3;
+/** Container border, matching its `border:` inline style below — part of the painted box, so the declared bounds carry it. */
+const RAIL_BORDER_PX = 1;
 
 /**
  * Vertically-centered strip pinned to the right edge; height grows with the
@@ -51,9 +53,9 @@ const RAIL_GAP_PX = 3;
  * gated entry, e.g. 'shady', revealed) since a revealed entry never re-hides.
  */
 function toolRailBounds(viewport: Viewport): Rect {
-  const width = RAIL_PADDING_PX * 2 + RAIL_BUTTON_WIDTH_PX;
+  const width = RAIL_BORDER_PX * 2 + RAIL_PADDING_PX * 2 + RAIL_BUTTON_WIDTH_PX;
   const entryCount = RAIL_ENTRIES.length;
-  const height = RAIL_PADDING_PX * 2 + entryCount * RAIL_BUTTON_HEIGHT_PX + (entryCount - 1) * RAIL_GAP_PX;
+  const height = RAIL_BORDER_PX * 2 + RAIL_PADDING_PX * 2 + entryCount * RAIL_BUTTON_HEIGHT_PX + (entryCount - 1) * RAIL_GAP_PX;
   return {
     x: viewport.width - RAIL_RIGHT_OFFSET_PX - width,
     y: (viewport.height - height) / 2,

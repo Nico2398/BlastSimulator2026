@@ -29,6 +29,8 @@ const SELECTION_BAR_IDENTITY_BORDER_PX = 1;
 const SELECTION_BAR_CLOSE_BTN_PX = 26;
 /** Gap between action buttons, matching its inline style below. */
 const SELECTION_BAR_BUTTON_GAP_PX = 8;
+/** Root row border, matching its `border:` inline style below — part of the painted box, so the declared bounds carry it. */
+const SELECTION_BAR_BORDER_PX = 1;
 /** `.bsx-btn` height (tokens.ts's shared button class) — the tallest child in the row. */
 const SELECTION_BAR_CONTENT_HEIGHT_PX = 30;
 /**
@@ -50,12 +52,13 @@ function selectionBarBounds(viewport: Viewport): Rect {
   const actionsWidth = SELECTION_BAR_MAX_ACTIONS * SELECTION_BAR_BUTTON_WIDTH_PX
     + (SELECTION_BAR_MAX_ACTIONS - 1) * SELECTION_BAR_BUTTON_GAP_PX;
   const identityWidth = SELECTION_BAR_IDENTITY_MIN_WIDTH_PX + SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX + SELECTION_BAR_IDENTITY_BORDER_PX;
-  const width = SELECTION_BAR_PADDING_X_PX * 2
+  const width = SELECTION_BAR_BORDER_PX * 2
+    + SELECTION_BAR_PADDING_X_PX * 2
     + identityWidth
     + SELECTION_BAR_ROOT_GAP_PX * 2
     + actionsWidth
     + SELECTION_BAR_CLOSE_BTN_PX;
-  const height = SELECTION_BAR_PADDING_Y_PX * 2 + SELECTION_BAR_CONTENT_HEIGHT_PX;
+  const height = SELECTION_BAR_BORDER_PX * 2 + SELECTION_BAR_PADDING_Y_PX * 2 + SELECTION_BAR_CONTENT_HEIGHT_PX;
   return {
     x: (viewport.width - width) / 2,
     y: viewport.height - SELECTION_BAR_BOTTOM_OFFSET_PX - height,

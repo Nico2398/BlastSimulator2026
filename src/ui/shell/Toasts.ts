@@ -24,7 +24,12 @@ const TOASTS_GAP_PX = 7;
  */
 const TOAST_ENTRY_HEIGHT_PX = 84;
 
-/** Stack pinned below the top bar, right-aligned; height grows with the number of live toasts, exempt from the pairwise 'hud' check as it's transient and self-clearing. */
+/**
+ * Stack pinned below the top bar, right-aligned. Declared at its worst-case
+ * height (MAX_TOASTS entries) rather than the live count: the envelope a
+ * region reserves has to hold whatever it may grow to, since the matrix test
+ * runs against declared bounds, not a rendered DOM.
+ */
 function toastsBounds(viewport: Viewport): Rect {
   const height = MAX_TOASTS * TOAST_ENTRY_HEIGHT_PX + (MAX_TOASTS - 1) * TOASTS_GAP_PX;
   return {
@@ -40,7 +45,7 @@ export class Toasts {
   private lastSignature = '';
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root' });
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-toasts' } });
     this.el.style.cssText = [
       'position:fixed', `right:${TOASTS_RIGHT_OFFSET_PX}px`, 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))', 'z-index:var(--bsx-z-toast)',
       `width:${TOASTS_WIDTH_PX}px`, 'display:flex', 'flex-direction:column', `gap:${TOASTS_GAP_PX}px`,

@@ -8,12 +8,15 @@ import { t } from '../../core/i18n/I18n.js';
 import type { NotificationCenter } from '../notify/NotificationCenter.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 
-/** Drawer width, matching its `width:` inline style below. */
+/** Drawer content width, matching its `width:` inline style below. */
 const ACTIVITY_LOG_WIDTH_PX = 352;
+/** Left border, matching its `border-left:` inline style below — part of the painted box, so the declared bounds carry it. */
+const ACTIVITY_LOG_BORDER_PX = 1;
 
 /** Right-side drawer, full height; drawn deliberately over hud chrome when open, so it's an 'overlay' region — zero-area while closed. */
 function activityLogBounds(viewport: Viewport): Rect {
-  return { x: viewport.width - ACTIVITY_LOG_WIDTH_PX, y: 0, width: ACTIVITY_LOG_WIDTH_PX, height: viewport.height };
+  const width = ACTIVITY_LOG_WIDTH_PX + ACTIVITY_LOG_BORDER_PX;
+  return { x: viewport.width - width, y: 0, width, height: viewport.height };
 }
 
 export class ActivityLog {
@@ -23,7 +26,7 @@ export class ActivityLog {
   private lastSignature = '';
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root' });
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-activity-log' } });
     this.el.style.cssText = [
       'position:fixed', 'right:0', 'top:0', 'bottom:0', `width:${ACTIVITY_LOG_WIDTH_PX}px`,
       'z-index:var(--bsx-z-log)', 'background:var(--bsx-panel)',

@@ -111,6 +111,56 @@ describe('shell regions — layout matrix (#956)', () => {
   });
 });
 
+describe('declared bounds match browser-measured geometry (#956)', () => {
+  // jsdom computes no layout, so nothing in this file would catch a declared
+  // bounds function drifting from the CSS it mirrors. These numbers were
+  // measured with getBoundingClientRect() in headless Chrome at 1280x720
+  // right after `new_game seed:42 staffed:true`. They pin the mirror: change
+  // an inline style without changing the matching constant and this fails.
+  const VIEWPORT = { width: 1280, height: 720 };
+
+  // Own mount/dispose pair: the matrix block above disposes its regions in its
+  // own afterAll, which runs before this block's tests.
+  let regions: { dispose(): void }[] = [];
+
+  beforeAll(() => {
+    const container = mountContainer();
+    regions = [new TopBar(container), new ToolRail(container, () => {}), new Toasts(container)];
+  });
+
+  afterAll(() => {
+    for (const region of regions) region.dispose();
+  });
+
+  function boundsOf(id: string): Rect {
+    const region = shellLayoutRegistry.list().find(r => r.id === id);
+    if (!region) throw new Error(`region "${id}" is not registered`);
+    return region.bounds(VIEWPORT);
+  }
+
+  it('topbar matches its measured rect exactly', () => {
+    expect(boundsOf('topbar')).toEqual({ x: 0, y: 0, width: 1280, height: 52 });
+  });
+
+  it('tool rail matches its measured x and width (borders included)', () => {
+    // Measured: x 1196, width 72. Height is not compared: the rail declares
+    // its 9-entry worst case (RAIL_ENTRIES, with the gated 'shady' entry
+    // revealed) while only 8 are painted on a fresh game.
+    const rail = boundsOf('tool-rail');
+    expect(rail.x).toBe(1196);
+    expect(rail.width).toBe(72);
+  });
+
+  it('toast stack matches its measured x, width and top edge', () => {
+    // Measured: x 888, y 64, width 296. Height is not compared: the stack
+    // declares its MAX_TOASTS worst case and is empty on a fresh game.
+    const toasts = boundsOf('toasts');
+    expect(toasts.x).toBe(888);
+    expect(toasts.y).toBe(64);
+    expect(toasts.width).toBe(296);
+  });
+});
+
 // A throwaway registry instance (never the shared singleton) with two
 // fabricated 'hud' regions whose rects are hand-picked to deliberately
 // intersect. This is the permanent proof that the overlap-detection logic
