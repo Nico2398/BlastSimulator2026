@@ -111,7 +111,7 @@ export class TopBar {
     this.root.id = 'bs-hud-top';
     this.root.className = 'bsx-root';
     this.root.style.cssText = [
-      'position:fixed', 'top:0', 'left:0', 'right:0', 'height:52px',
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'height:var(--bsx-topbar-height)',
       'z-index:var(--bsx-z-topbar)', 'display:flex', 'align-items:stretch',
       'background:var(--bsx-chrome)', 'border-bottom:1px solid var(--bsx-hairline-strong)',
       'pointer-events:all',
