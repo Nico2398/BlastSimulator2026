@@ -16,6 +16,7 @@ import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+import { TOPBAR_HEIGHT_PX } from '../tokens.js';
 
 const FORECAST_DAYS = 14;
 /** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */
@@ -73,9 +74,8 @@ export function netPerTick(state: GameState, windowTicks = TREND_WINDOW_TICKS): 
 }
 
 /** Full-width strip pinned to the top edge, TOPBAR_HEIGHT_PX tall (tokens.ts's TOPBAR_HEIGHT_PX / --bsx-topbar-height, #955/#956). */
-function topBarBounds(_viewport: Viewport): Rect {
-  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
-  return { x: 0, y: 0, width: 0, height: 0 };
+function topBarBounds(viewport: Viewport): Rect {
+  return { x: 0, y: 0, width: viewport.width, height: TOPBAR_HEIGHT_PX };
 }
 
 export class TopBar {

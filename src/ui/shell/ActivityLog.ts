@@ -12,9 +12,8 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 const ACTIVITY_LOG_WIDTH_PX = 352;
 
 /** Right-side drawer, full height; drawn deliberately over hud chrome when open, so it's an 'overlay' region — zero-area while closed. */
-function activityLogBounds(_viewport: Viewport): Rect {
-  // TODO: implement — geometry is the implementer's job (#956 skeleton phase).
-  return { x: 0, y: 0, width: 0, height: 0 };
+function activityLogBounds(viewport: Viewport): Rect {
+  return { x: viewport.width - ACTIVITY_LOG_WIDTH_PX, y: 0, width: ACTIVITY_LOG_WIDTH_PX, height: viewport.height };
 }
 
 export class ActivityLog {

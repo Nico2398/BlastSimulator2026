@@ -25,20 +25,47 @@ export interface LayoutRegion {
 }
 
 export class LayoutRegistry {
-  register(_region: LayoutRegion): void { throw new Error('not implemented'); }
-  unregister(_id: string): void { throw new Error('not implemented'); }
-  list(): readonly LayoutRegion[] { throw new Error('not implemented'); }
-  has(_id: string): boolean { throw new Error('not implemented'); }
+  private readonly regions = new Map<string, LayoutRegion>();
+
+  register(region: LayoutRegion): void {
+    this.regions.set(region.id, region);
+  }
+
+  unregister(id: string): void {
+    this.regions.delete(id);
+  }
+
+  list(): readonly LayoutRegion[] {
+    return Array.from(this.regions.values());
+  }
+
+  has(id: string): boolean {
+    return this.regions.has(id);
+  }
 }
 
 /** Process-wide instance shared by every shell region, mirroring the injectTokens()/registerIcons() singleton pattern already used in src/ui. */
 export const shellLayoutRegistry = new LayoutRegistry();
 
 /** Shared-area test on two axis-aligned boxes; touching edges do not count as intersecting. */
-export function rectsIntersect(_a: Rect, _b: Rect): boolean { throw new Error('not implemented'); }
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  );
+}
 
 /** True when rect sits entirely within [0,0,viewport.width,viewport.height]. */
-export function rectWithinViewport(_rect: Rect, _viewport: Viewport): boolean { throw new Error('not implemented'); }
+export function rectWithinViewport(rect: Rect, viewport: Viewport): boolean {
+  return (
+    rect.x >= 0 &&
+    rect.y >= 0 &&
+    rect.x + rect.width <= viewport.width &&
+    rect.y + rect.height <= viewport.height
+  );
+}
 
 /** Order: spec floor, spec ceiling, ultrawide, short, tall. */
 export const SHELL_VIEWPORT_MATRIX: readonly Viewport[] = [
