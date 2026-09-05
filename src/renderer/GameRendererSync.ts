@@ -7,7 +7,7 @@ import type { GameState } from '../core/state/GameState.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherCycleState, WeatherState } from '../core/weather/WeatherCycle.js';
 import type { ZoneBounds } from '../core/entities/Zone.js';
-import { isInZone } from '../core/entities/Zone.js';
+import { isInZone, isZoneStillBlastThreatened } from '../core/entities/Zone.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
@@ -130,11 +130,15 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     );
   }
 
-  // Blink employees still inside an active safety zone during clearing
+  // Blink employees still inside an active safety zone during clearing —
+  // only while that zone is still genuinely blast-threatened (#952), since
+  // the drawn zone rectangle never resets and would otherwise blink an
+  // employee forever after the blast has long since fired.
   if (deps.characters) {
     const zone = deps.zone;
+    const stillThreatened = zone !== null && isZoneStillBlastThreatened(state.drillHoles, zone);
     for (const e of state.employees.employees) {
-      deps.characters.setEvacuating(e.id, zone !== null && isInZone(e.x, e.z, zone));
+      deps.characters.setEvacuating(e.id, stillThreatened && isInZone(e.x, e.z, zone!));
     }
   }
 
