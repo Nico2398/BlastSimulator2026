@@ -182,7 +182,7 @@ export function statGrid(items: { key: string; value: string; color?: string }[]
 }
 
 export interface ScrollBoundedSectionOptions {
-  /** Vertical gap between children, in px. Default 8, matching ChargeHoleList/Sequence. */
+  /** Vertical gap between children, in px. Default 8. */
   gap?: number;
   /** Extra hook class, e.g. for a stable selector. */
   className?: string;
@@ -198,8 +198,7 @@ export function scrollBoundedSection(
   maxHeightPx: number,
   opts?: ScrollBoundedSectionOptions,
 ): HTMLElement {
-  const section = el('div', { children });
-  if (opts?.className) section.className = opts.className;
+  const section = opts?.className ? el('div', { className: opts.className, children }) : el('div', { children });
   section.style.cssText = [
     'overflow-y:auto', `max-height:${maxHeightPx}px`, 'flex-shrink:0',
     'display:flex', 'flex-direction:column', `gap:${opts?.gap ?? 8}px`,
