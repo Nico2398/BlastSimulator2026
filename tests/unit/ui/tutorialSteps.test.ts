@@ -537,7 +537,10 @@ describe('tutorialSteps', () => {
     // own overlay (`data-blast-report-modal`) for the whole arm/open-delay/
     // dismiss lifecycle of a report (#545). The 'blast' step must stay open
     // for that whole window so its own CLOSE button never goes inert under
-    // the tutorial rail (`visibleModalControls`, tutorialGuide.ts).
+    // the tutorial rail (#951: no 'blast' sub-stage targets anything inside
+    // this modal, so `applyRails`'s per-modal restriction in
+    // tutorialGuide.ts never narrows it -- it keeps the old blanket
+    // allowance).
     describe('gated on the Blast Report modal (#707)', () => {
       afterEach(() => {
         document.querySelectorAll('[data-blast-report-modal]').forEach((el) => el.remove());

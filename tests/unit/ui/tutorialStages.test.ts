@@ -369,6 +369,26 @@ describe('sequence stage list — Charge-tab reachability regression (#926)', ()
   });
 });
 
+describe('event-fire-resolve stage targets exactly the highlighted choice (#951)', () => {
+  // The 3 consultant-event choices have materially different effects
+  // (TutorialEvents.ts: option 1 is -$3,000/+15 well-being, option 2 is
+  // -10 well-being/-5 safety, option 3 is +5 well-being/-5 safety). The
+  // stage used to target every `.bs-event-choice` sibling (matching all 3),
+  // letting applyRails' modal blanket-allowance leave all 3 clickable even
+  // though only the first is highlighted. Narrowed to `:first-child` so the
+  // stage's own selector resolves to exactly the one choice the hint points
+  // at.
+  it('targets only the first choice button, not every sibling', () => {
+    const stage = TUTORIAL_STAGES['event-fire-resolve']![0]!;
+    expect(stage.target).toBe('#bs-event-dialog .bs-event-choice:first-child');
+  });
+
+  it('still has a second stage targeting the dismiss button, unchanged', () => {
+    const stage = TUTORIAL_STAGES['event-fire-resolve']![1]!;
+    expect(stage.target).toBe('#bs-event-dialog .bs-event-dismiss');
+  });
+});
+
 describe('stagesFor', () => {
   it('falls back to the step highlight target when no stages are keyed', () => {
     const stages = stagesFor('not-a-step', '#bs-toolbar [data-panel="blast"]');

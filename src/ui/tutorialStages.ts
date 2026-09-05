@@ -311,7 +311,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'event-fire-resolve': [
-    { target: '#bs-event-dialog .bs-event-choice', hintKey: 'tutorial.stage.event_choose' },
+    { target: '#bs-event-dialog .bs-event-choice:first-child', hintKey: 'tutorial.stage.event_choose' },
     { target: '#bs-event-dialog .bs-event-dismiss', hintKey: 'tutorial.stage.event_dismiss' },
   ],
 

@@ -97,20 +97,52 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
  */
 const MODAL_SELECTOR = '.bs-confirm-overlay';
 
+/**
+ * A modal's own dismiss/cancel/close control — stays allowed even when a
+ * stage narrows the rest of that modal's controls down to a single target
+ * (#951), so a player can still back out of the modal the stage is pointing
+ * into.
+ */
+export const MODAL_DISMISS_SELECTOR = '[data-action$="-cancel"], [data-action$="-close"], .bs-event-dismiss';
+
 /** Every selector the player may interact with during a stage. */
 export function allowedSelectors(stage: TutorialStage | undefined): string[] {
   if (!stage) return [];
   return [stage.target, ...(stage.also ?? [])];
 }
 
-/** Controls inside any modal that is currently on screen. */
-function visibleModalControls(root: ParentNode): Element[] {
-  const controls: Element[] = [];
-  for (const modal of Array.from(root.querySelectorAll(MODAL_SELECTOR))) {
-    if (getComputedStyle(modal as HTMLElement).display === 'none') continue;
-    controls.push(...Array.from(modal.querySelectorAll('button, select, input')));
+/**
+ * Every modal currently on screen (matches `MODAL_SELECTOR` and its own
+ * `display` is not `none`).
+ *
+ * Used by `applyRails` to decide, per modal, whether it gets blanket-allowed
+ * or narrowed down to the active stage's own target (#951).
+ */
+function visibleModals(root: ParentNode): Element[] {
+  return Array.from(root.querySelectorAll(MODAL_SELECTOR)).filter(
+    (modal) => getComputedStyle(modal as HTMLElement).display !== 'none',
+  );
+}
+
+/**
+ * Whether `stage`'s target/also selectors resolve to an element contained by
+ * `modal`.
+ *
+ * `applyRails` blanket-allows a modal's controls only when no active stage
+ * targets a control inside it; when one does, that modal is narrowed to the
+ * stage's own target plus `MODAL_DISMISS_SELECTOR` instead (#951).
+ */
+function isStageTargetInsideModal(
+  stage: TutorialStage | undefined,
+  modal: Element,
+  root: ParentNode,
+): boolean {
+  for (const selector of allowedSelectors(stage)) {
+    for (const el of Array.from(root.querySelectorAll(selector))) {
+      if (modal.contains(el)) return true;
+    }
   }
-  return controls;
+  return false;
 }
 
 /**
@@ -135,8 +167,20 @@ export function applyRails(
   for (const el of Array.from(root.querySelectorAll(`.${HIGHLIGHT_CLASS}`))) {
     el.classList.remove(HIGHLIGHT_CLASS);
   }
-  // An open modal is always operable, even mid-stage.
-  for (const el of visibleModalControls(root)) el.classList.add(ALLOWED_CLASS);
+  // An open modal is always operable, unless the active stage targets one of
+  // its own controls (#951) — then only that target and the modal's own
+  // dismiss control stay allowed, so a player can still back out.
+  for (const modal of visibleModals(root)) {
+    if (isStageTargetInsideModal(stage, modal, root)) {
+      for (const el of Array.from(modal.querySelectorAll(MODAL_DISMISS_SELECTOR))) {
+        el.classList.add(ALLOWED_CLASS);
+      }
+    } else {
+      for (const el of Array.from(modal.querySelectorAll('button, select, input'))) {
+        el.classList.add(ALLOWED_CLASS);
+      }
+    }
+  }
 
   for (const selector of extraAllowed) {
     for (const el of Array.from(root.querySelectorAll(selector))) {

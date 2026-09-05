@@ -353,9 +353,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // moved on, against a control the guide no longer kept live. Gating
   // completion on `!isBlastReportOutstanding()` as well keeps this step (and
   // the rail) on 'blast' for the whole arm-delay-open-dismiss lifecycle of
-  // the report, so CLOSE stays reachable (`visibleModalControls`,
-  // tutorialGuide.ts, keeps any open modal's own controls live regardless of
-  // stage) until the player actually clicks it.
+  // the report, so CLOSE stays reachable (#951: no 'blast' sub-stage targets
+  // anything inside BlastReportModal, so applyRails's per-modal restriction
+  // in tutorialGuide.ts never narrows it -- it keeps the old blanket
+  // allowance) until the player actually clicks it.
   {
     id: 'blast',
     titleKey: 'tutorial.step8.title',
