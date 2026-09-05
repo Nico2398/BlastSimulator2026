@@ -538,6 +538,17 @@ const SETTINGS_HOOKS = [
       'a background task — #604 threw away 3h11m of finished work that way',
   },
   {
+    script: '.claude/hooks/report-loop-budget.sh',
+    event: 'PreToolUse',
+    /** It speaks before every delegation, so the matcher must cover them. */
+    tools: ['Agent', 'Task'],
+    why:
+      'the loop budget is a number the orchestrator has to be told, and only a settings.json ' +
+      'hook reaches the orchestrator `/agentic-run` forks into. Without it every pipeline loop ' +
+      'is bounded by its own count alone, which is how runs 565, 591, 606 and 609 each spent ' +
+      'five hours iterating after a one-hour TDD cycle and died on the job clock',
+  },
+  {
     script: '.claude/hooks/require-settled-turn.sh',
     event: 'Stop',
     /** Stop carries no tool name; registration itself is the whole check. */

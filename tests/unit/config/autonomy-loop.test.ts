@@ -20,6 +20,7 @@
 // in `.github/scripts/assignability.cjs` and tested in `assignability.test.ts`.
 
 import { describe, it, expect } from 'vitest';
+import { spawnSync } from 'child_process';
 import { readdirSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { join } from 'path';
@@ -1796,6 +1797,54 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
 
   it('keeps the delegation guard that closed #404 and #406', () => {
     expect(registered('PreToolUse', 'require-foreground-agents.sh').length).toBeGreaterThan(0);
+  });
+
+  // The loop budget. Every pipeline loop is bounded by its own count and the
+  // counts add up to more than the job holds: runs 565, 591, 606 and 609 each
+  // finished TDD inside an hour and iterated for five more until the job clock
+  // cut them off. The orchestrator has to be *told* the one clock they share,
+  // and only a settings.json PreToolUse hook on delegation both reaches the
+  // forked orchestrator and carries `additionalContext` to the model.
+  describe('the loop budget reaches the orchestrator before every delegation', () => {
+    const script = join(ROOT, '.claude/hooks/report-loop-budget.sh');
+    const run = (env: Record<string, string>) =>
+      spawnSync('bash', [script], { input: '{}', encoding: 'utf8', env: { ...process.env, ...env } });
+
+    it('is registered on delegation, from settings.json', () => {
+      const entries = registered('PreToolUse', 'report-loop-budget.sh');
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries.some((entry) => /(^|\|)Agent(\||$)/.test(entry.matcher ?? ''))).toBe(true);
+    });
+
+    it('says nothing in a session nobody timed', () => {
+      const { AGENTIC_LOOP_DEADLINE_EPOCH: _dropped, ...rest } = process.env;
+      const result = spawnSync('bash', [script], { input: '{}', encoding: 'utf8', env: rest as NodeJS.ProcessEnv });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('');
+    });
+
+    it('counts the minutes down while the budget is open', () => {
+      const result = run({ AGENTIC_LOOP_DEADLINE_EPOCH: String(Math.floor(Date.now() / 1000) + 90 * 60) });
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+      expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+      expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^LOOP BUDGET: (89|90) min left/);
+    });
+
+    it('closes the loops past the deadline without blocking the delegation', () => {
+      const result = run({ AGENTIC_LOOP_DEADLINE_EPOCH: String(Math.floor(Date.now() / 1000) - 600) });
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: Record<string, string> };
+      expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^LOOP BUDGET CLOSED \(10 min past/);
+      expect(parsed.hookSpecificOutput.additionalContext).toContain('Finish the iteration already in flight');
+      expect(parsed.hookSpecificOutput).not.toHaveProperty('permissionDecision');
+    });
+
+    it('treats a malformed deadline as no deadline', () => {
+      const result = run({ AGENTIC_LOOP_DEADLINE_EPOCH: 'soon' });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('');
+    });
   });
 
   // The warning used to be the retry's alone. The first attempt is the one

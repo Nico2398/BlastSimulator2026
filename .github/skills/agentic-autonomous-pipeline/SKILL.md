@@ -32,11 +32,26 @@ Both runners are single-shot: the harness sends one message, the agent works unt
 Two rules follow, and they hold under every runtime:
 
 1. **Parallel means several delegations issued in one message and awaited together in that same turn.** Never work launched now and collected later, whatever background or notify-me-when-done mode the runtime offers.
-2. **A turn ends on a pull request whose CI has reported green, a `PAUSED:` line, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work.
+2. **A turn ends on a pull request whose CI has reported green, a `PAUSED:` line, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work. One more ending is allowed and is not outstanding work: a pull request whose CI reported red after the single fix round `agentic-pipeline-finalization` gives a run. That red is handed to a fresh session by the fail-safe in `references/github-loop.md`, which is a better use of a budget than the tail of a spent one.
 
 The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
 
 The runtimes disagree on what delegation defaults to, so the same sentence produces opposite behaviour depending on where it is read. Each runtime's own configuration layer enforces the rule; `references/runtime-parity.md` records which layer, and the run that died proving it necessary.
+
+## ▶ The loop budget
+
+Every pipeline bounds its loops by count — fixer retries after a red test run, visual iterations, big loops back to the implementer, CI-fix rounds — and each count was set alone. On a two-core runner one iteration of any of them costs 15 to 30 minutes of fixed verification before any thinking happens: a full `npm run test`, a full `npm run scenarios`, a CI round. Added together the counts hold more than the job does. Runs 565, 591, 606 and 609 (#921, #947, #953, #956) each finished their TDD cycle inside the first hour and spent the next five iterating — scenario recalibration, a visual loop on a runner without a GPU, fix rounds against CI — until the job clock cut them off with nothing landed.
+
+So a run carries **one clock across all of its loops**, the loop deadline. The runner sets it — `AGENTIC_LOOP_BUDGET_MINUTES` after the job started, default 180 — and exports it to the session as `AGENTIC_LOOP_DEADLINE_EPOCH`; the orchestrator is told how much of it is left before every delegation. A session nobody timed — a CLI, a human at a terminal — has no deadline, and its budget is open.
+
+Once the deadline has passed:
+
+- **No loop-back row in any pipeline's failure table starts a new iteration.** Every `→ @fixer → re-run`, every big loop to `@implementer`, every visual iteration, the CI-fix round.
+- **The iteration in flight finishes.** A fixer already delegated completes and its test run happens; an implementer already fixing visual findings commits and is verified once. The deadline closes the *next* iteration, never the current one.
+- **Every linear step still runs.** Qualimetry, the reviewers, the refactorer, the validator, the pull request, `[await-ci]`, the context maintainer, the summary comment. A closed budget skips nothing; it stops repeating.
+- **PR status is decided exactly as before**, by `agentic-pipeline-pr-management`: green channels carry `READY TO MERGE`; a channel that stayed red makes a draft that names it. A closed budget is never itself a reason to draft, pause or block, and the summary comment says which loop it closed and what that loop left red.
+
+A retry attempt inherits the same absolute deadline, so it starts with its loops already closed and does linear work only — which is the work a retry exists for.
 
 ## ▶ Branch namespace — solution-independent
 

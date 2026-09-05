@@ -127,25 +127,25 @@ One comment per run, posted only when the register held something. An empty regi
 | @refactorer or [test-runner after refactorer] | @implementer (big loop) |
 | @validator | @implementer (big loop) |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
-| [await-ci] | The CI-fix loop below — never a big loop: the PR exists and its branch is the deliverable |
+| [await-ci] | The one CI-fix round below — never a big loop: the PR exists and its branch is the deliverable |
 | Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 
-### The CI-fix loop — a red channel this run handed to CI is still this run's
+### The CI-fix round — a red channel this run handed to CI is still this run's
 
 `static`, `logic` and command-mode `scenario` are runnable in the session. Interaction-mode `visual`, the production `build`, and every channel on a machine with a GPU are CI's — and CI reports minutes *after* the step that opened the PR. Ending there is what PR #581 did: green on every channel its session ran, marked `READY TO MERGE`, two interaction shards red in CI, and `agentic-auto-merge.yml` skips a failed CI run by design. Nothing merged it, nothing chained, and issue #552 held `in-progress` with the whole queue behind it.
 
 So `[await-ci]` is not a courtesy wait. It is the step that reads the channels this run deferred.
 
-On RED, bounded at **3 rounds**, counted per finalization invocation:
+On RED, **one round**, counted per finalization invocation, and only while the loop budget is open (`agentic-autonomous-pipeline`):
 
 1. Read the failing jobs the script named. Fetch the log; for an interaction-mode failure read the FAIL screenshots in the run's artifacts. Never re-run the whole suite locally to "confirm" it — a sandbox without a GPU cannot reproduce that channel, and #581's session already proved a local run of those exact files times out on load contention.
 2. Decide which side is wrong, the change or the expectation, then delegate: `@fixer` for a test/expectation disagreement, `@implementer` for a defect in the change, `@visual-tester` when the failure is a rendering or click-reachability claim.
 3. Commit and push to `pipeline/feature-<label>`. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why.
 4. Run `[await-ci]` again. The script reads one run per workflow, newest first, so the run CI cancelled on the previous head does not count against you.
 
-After 3 rounds still red: convert the PR to a draft, comment naming the channel, what fails and what would unblock it, label the issue `blocked`, and stop with `ESCALATED: CI red after 3 fix rounds`. That is a terminal state — `handle-failure.yml` chains the queue past it.
+Still red after that round, or red with the loop budget closed: **end the run with the pull request as it stands** — marker on, not a draft, the issue's labels untouched — and say so in the summary comment, naming the failing jobs. `agentic-ci-failure.yml` hands that red to a fresh session with a whole budget, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`; because this session was live when the verdict landed, the watchdog's sweep is what raises it — `agentic-autonomous-pipeline`'s github-loop reference holds the path. The same fail-safe covers a session that dies before `[await-ci]` returns.
 
-**If the session dies before `[await-ci]` returns**, `agentic-ci-failure.yml` posts the failure back as a fresh task on the same PR, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`. That is the fail-safe, not the plan: a nudged session pays the whole startup cost again to read a verdict this one was already holding.
+Three rounds used to be allowed here. #947's run opened its PR four hours and twenty minutes in, then spent its last ninety-eight minutes on two of them — each push cancelling a twenty-minute CI run and starting another — and the job clock cut it off waiting on the third; the ci-fix session that took the handback the next morning turned the same PR green in a hundred and thirty minutes. A round costs the same in a spent session as in a fresh one, and the fresh one has the budget to finish.
 
 When looping back to `@implementer` from any finalization step:
 `@implementer on impl branch → cherry-pick → switch-to-feature → qualimetry → finalization`

@@ -76,17 +76,30 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    # Kept identical to claude-runner.yml: GitHub-hosted maximum, because 180 cut
-    # a real run off mid-finalization and a cancelled job loses everything the
-    # rescue step cannot push. `AGENTIC_STALL_MINUTES` must stay above this — see
-    # agentic-watchdog.yml.
+    # GitHub-hosted maximum, and the outer bound only. Each agent step below
+    # carries its own `timeout-minutes`, so an attempt that overruns fails inside
+    # a live job and the retry and rescue still run — claude-runner.yml holds the
+    # arithmetic and the runs that decided it. `AGENTIC_STALL_MINUTES` must stay
+    # above this — see agentic-watchdog.yml.
     timeout-minutes: 360
     steps:
       # First step, so elapsed time measured against it matches the window
-      # `timeout-minutes` is counting. The retry gate below spends it.
+      # `timeout-minutes` is counting. The retry gate below spends it, and the
+      # loop deadline derived from it is what the session's own loops read —
+      # `agentic-autonomous-pipeline` holds that rule; claude-runner.yml holds
+      # the fallback rule for the variable.
       - name: Record when the job started
         id: clock
-        run: echo "started_at=$(date +%s)" >> "$GITHUB_OUTPUT"
+        env:
+          LOOP_BUDGET_MINUTES: ${{ vars.AGENTIC_LOOP_BUDGET_MINUTES }}
+        run: |
+          started_at=$(date +%s)
+          echo "started_at=${started_at}" >> "$GITHUB_OUTPUT"
+          case "${LOOP_BUDGET_MINUTES}" in
+            ''|*[!0-9]*|0) budget=180 ;;
+            *) budget=${LOOP_BUDGET_MINUTES} ;;
+          esac
+          echo "loop_deadline=$(( started_at + budget * 60 ))" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v6
         with:
@@ -143,6 +156,8 @@ jobs:
       # through the /agentic-run command instead.
       - name: Run opencode
         id: opencode
+        # The first attempt's share of the job budget — claude-runner.yml.
+        timeout-minutes: 270
         shell: bash
         run: |
           set +e
@@ -156,6 +171,10 @@ jobs:
           OPENCODE_PERMISSION: '{"external_directory":"allow","doom_loop":"deny"}'
           MODEL: opencode/deepseek-v4-flash-free
           MENTIONS: '@opencode'
+          # Past this epoch the session starts no new loop iteration —
+          # `agentic-autonomous-pipeline`. OpenCode reads it from the shared
+          # skill text alone; `references/runtime-parity.md` says why.
+          AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
 
       - name: Export full session
         if: always()
@@ -184,9 +203,12 @@ jobs:
           started_at: ${{ steps.clock.outputs.started_at }}
           budget_minutes: '360'
 
+      # `always()` for the reason claude-runner.yml gives on its own retry: a
+      # step without it is skipped after any failed step, timeouts included.
       - name: Retry the run when the first attempt settled nothing
         id: opencode_retry
-        if: steps.state.outputs.retry == 'true'
+        if: always() && steps.state.outputs.retry == 'true'
+        timeout-minutes: 80
         shell: bash
         run: |
           set +e
@@ -200,6 +222,7 @@ jobs:
           OPENCODE_PERMISSION: '{"external_directory":"allow","doom_loop":"deny"}'
           MODEL: opencode/deepseek-v4-flash-free
           MENTIONS: '@opencode'
+          AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
           # Overrides the PROMPT the agentic-prompt action exported, so the retry
           # knows it is one, and knows what the previous attempt left behind: those
           # branches are on this disk and nowhere else, never pushed.
