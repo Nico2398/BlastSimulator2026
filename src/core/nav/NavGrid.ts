@@ -5,7 +5,8 @@
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
-import type { BlastRegion } from '../mining/BlastExecution.js';
+import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
@@ -52,6 +53,15 @@ export interface NavCell {
    * finally block before returning — no lasting mutation to the grid.
    */
   vehicleOccupied: boolean;
+  /**
+   * Count of on-ground fragments mapped to this cell. Absent/zero means no
+   * fragment occupies the cell. Optional — like `surfaceY` — so hand-built
+   * test fixtures that predate #954 keep compiling unmodified. Maintained
+   * incrementally by addFragmentOccupant/removeFragmentOccupant as
+   * fragments are created/hauled/broken; never recomputed by a full navgrid
+   * rebuild.
+   */
+  fragmentOccupancy?: number;
   /**
    * Column's absolute world Y at classification time. Populated only by
    * buildNavGrid/patchNavGrid; undefined for hand-built test fixtures that
@@ -116,6 +126,24 @@ export class NavGrid {
     if (row && x >= this.originX && x < this.maxX) row[x - this.originX] = cell;
   }
 
+  /**
+   * Mark that an on-ground fragment now occupies world (x, z), incrementing
+   * the cell's fragmentOccupancy in place (#954). No-op outside the covered
+   * box.
+   */
+  addFragmentOccupant(_x: number, _z: number): void {
+    // TODO: implement
+  }
+
+  /**
+   * Mark that an on-ground fragment no longer occupies world (x, z),
+   * decrementing the cell's fragmentOccupancy in place (#954). No-op outside
+   * the covered box.
+   */
+  removeFragmentOccupant(_x: number, _z: number): void {
+    // TODO: implement
+  }
+
   /** Clamp world x into the covered box. */
   clampX(x: number): number {
     return Math.max(this.originX, Math.min(this.maxX - 1, Math.round(x)));
@@ -163,11 +191,17 @@ export class NavGrid {
   /**
    * Build a full NavGrid from the voxel grid, buildings, and drill holes.
    * Each cell is classified as walkable, blocked, drill_hole, ramp, or void.
+   *
+   * `groundFragments` and `vehicles` seed the per-cell fragmentOccupancy/
+   * vehicleOccupied counts at build time (#954); both default to empty so
+   * existing callers are unaffected until wired up.
    */
   static buildNavGrid(
     voxelGrid: VoxelGrid,
     buildings: Building[],
     drillHoles: DrillHole[],
+    _groundFragments: FragmentData[] = [],
+    _vehicles: Vehicle[] = [],
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
@@ -350,7 +384,13 @@ export class NavGrid {
   /**
    * Create a NavCell with the given type and appropriate move cost.
    */
-  private static makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
+  private static makeCell(
+    type: NavCellType,
+    benchLevel: number = 0,
+    surfaceY?: number,
+    vehicleOccupied: boolean = false,
+    fragmentOccupancy: number = 0,
+  ): NavCell {
     let moveCost: number;
     switch (type) {
       case 'walkable': moveCost = 1.0; break;
@@ -364,6 +404,6 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
+    return { type, moveCost, benchLevel, vehicleOccupied, fragmentOccupancy, ...(surfaceY !== undefined && { surfaceY }) };
   }
 }

@@ -146,8 +146,12 @@ class MinHeap<T extends { key: number }> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Check whether a cell blocks traversal. */
-function isImpassable(cell: NavCell, avoidVehicles: boolean): boolean {
+/**
+ * Check whether a cell blocks traversal. `_isAgentCell` will gate whether a
+ * fragment/vehicle-occupied cell is impassable for foot traffic (#954) —
+ * unused until the implementation phase wires call sites to it.
+ */
+function isImpassable(cell: NavCell, avoidVehicles: boolean, _isAgentCell: boolean = false): boolean {
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && cell.vehicleOccupied) return true;
   return false;

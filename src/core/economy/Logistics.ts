@@ -3,6 +3,7 @@
 
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
+import type { NavGrid } from '../nav/NavGrid.js';
 
 // ── Fragment states ──
 
@@ -35,8 +36,13 @@ export function createLogisticsState(storageCapacityKg: number = 5000): Logistic
 
 // ── Operations ──
 
-/** Add fragments from a blast result to the ground. */
-export function addBlastFragments(state: LogisticsState, fragments: FragmentData[]): void {
+/**
+ * Add fragments from a blast result to the ground. `_navGrid`, when
+ * provided, will register each fragment's cell as an occupant via
+ * NavGrid.addFragmentOccupant (#954) — unused until the implementation
+ * phase wires it in.
+ */
+export function addBlastFragments(state: LogisticsState, fragments: FragmentData[], _navGrid: NavGrid | null = null): void {
   for (const f of fragments) {
     state.fragments.push({
       fragment: f,
