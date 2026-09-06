@@ -31,8 +31,13 @@ import {
   TRAFFIC_JAM_MIN_TICKS,
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
   WORK_DURATION_TICKS,
+  MOVE_STUCK_ABANDON_TICKS,
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
+import { createGame } from '../../src/core/state/GameState.js';
+import type { PendingAction } from '../../src/core/state/GameState.js';
+import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { NavGrid } from '../../src/core/nav/NavGrid.js';
 // #922: driver-position invariant — no console command drives this directly,
 // so the assertions below read findDrivenVehicle, the core-level lookup
 // computeEmployeeActivity uses to report the driving/driving_to_task activity
@@ -981,6 +986,151 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
     }
 
     expect(sawUnescalatedOverThreshold).toBe(false);
+  });
+});
+
+// ── Sustained-stuck release for a vehicle-gated task (#986) ────────────────
+// End-to-end repro through the real console `tick` command (not the lower-
+// level tickVehicle/EntityMovementTick APIs the unit tests use directly):
+// a debris_hauler driven toward a target inside a sheer, unramped blast
+// crater interior — the exact "climb-limit gating" shape from
+// navmesh.integration.test.ts's own "crater + climb-limit gating (#953)"
+// fixture's "same crater with NO ramp dug" case — can never findPath in.
+// Before this fix, tickVehicleOnNavGrid had no sustained-stuck release for
+// this (unlike tickEmployeeMovement's on-foot MOVE_STUCK_ABANDON_TICKS
+// release, #938): the vehicle just called markVehicleWaiting forever, and
+// the driver's claimed task/vehicle reservation was never freed for anyone
+// else to pick up.
+//
+// Uses a hand-built PendingAction (type 'general_work', requiredVehicleRole:
+// 'debris_hauler') driven through GameLoop's own plain vehicle-movement step
+// (tickCommand's step 8f) rather than a full blast -> fragment ->
+// syncHaulDispatch -> auto-claim -> haul_debris pipeline: the regression this
+// covers lives entirely inside tickVehicleOnNavGrid, which every
+// vehicle-gated task's drive phase shares regardless of the specific
+// PendingAction type driving it (a real haul_debris drive-to-fragment phase
+// calls the very same tickVehicle, via HaulingTask.tickHaulingProgress's own
+// driveTowardFragment) — hand-rolling the full fragment/depot machinery would
+// add setup unrelated to the code path actually under test.
+
+describe('tickVehicle — sustained-stuck release for a vehicle-gated task inside an unreachable blast crater (#986)', () => {
+  const CRATER_MIN_X = 7, CRATER_MAX_X = 13, CRATER_MIN_Z = 15, CRATER_MAX_Z = 22;
+  const SURFACE_Y = 22;
+  const CRATER_FLOOR_Y = 14;
+
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /** Fill every column with solid rock from y=0 to yMax (inclusive). */
+  function fillSolid(grid: VoxelGrid, yMax: number) {
+    for (let x = 0; x < grid.sizeX; x++)
+      for (let y = 0; y <= yMax; y++)
+        for (let z = 0; z < grid.sizeZ; z++)
+          grid.setVoxel(x, y, z, solidVoxel());
+  }
+
+  /**
+   * Same fixture shape as navmesh.integration.test.ts's "crater + climb-limit
+   * gating (#953)" describe block's "same crater with NO ramp dug" test: a
+   * flat plateau with a rectangular crater carved sheer down to
+   * CRATER_FLOOR_Y, no gradual ramp anywhere on its perimeter — the interior
+   * is permanently unreachable from the surface.
+   */
+  function buildCraterVoxelGrid(): VoxelGrid {
+    const grid = new VoxelGrid(20, 30, 30);
+    fillSolid(grid, SURFACE_Y);
+    for (let z = CRATER_MIN_Z; z <= CRATER_MAX_Z; z++) {
+      for (let x = CRATER_MIN_X; x <= CRATER_MAX_X; x++) {
+        for (let y = CRATER_FLOOR_Y + 1; y <= SURFACE_Y; y++) grid.clearVoxel(x, y, z);
+      }
+    }
+    return grid;
+  }
+
+  /** Minimal PendingAction fixture — mirrors this suite's own hand-rolled shape elsewhere. */
+  function makeVehicleGatedAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 10, targetZ: 21, targetY: CRATER_FLOOR_Y,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'assigned',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  function buildCtx(): GameContext {
+    const grid = buildCraterVoxelGrid();
+    const state = createGame({ seed: 42 });
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.cash = 1_000_000;
+    return makeEmptyGameContext({ state, grid });
+  }
+
+  it('releases the driver\'s claim and frees the vehicle within MOVE_STUCK_ABANDON_TICKS ticks, then completes a second, different, reachable task afterward', () => {
+    const ctx = buildCtx();
+    const state = ctx.state!;
+    const rng = new Random(42);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 5);
+
+    const action = makeVehicleGatedAction({ id: 9001, holderId: driver.id });
+    state.pendingActions.push(action);
+    vehicle.driverId = driver.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 10;
+    vehicle.targetZ = 21; // crater floor — unreachable, no ramp dug
+    driver.activeActionId = action.id;
+
+    let releasedAtTick = -1;
+    for (let i = 1; i <= MOVE_STUCK_ABANDON_TICKS + 5; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (vehicle.driverId === null) {
+        releasedAtTick = i;
+        break;
+      }
+    }
+
+    expect(releasedAtTick).toBeGreaterThan(0);
+    expect(releasedAtTick).toBeLessThanOrEqual(MOVE_STUCK_ABANDON_TICKS);
+
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
+
+    const releasedAction = state.pendingActions.find(a => a.id === 9001)!;
+    expect(releasedAction.status).toBe('queued');
+    expect(releasedAction.holderId).toBeNull();
+
+    // Not frozen permanently: the same vehicle, re-boarded by the same
+    // driver, is now sent on a second, different, reachable task — outside
+    // the crater entirely — and must actually arrive.
+    const action2 = makeVehicleGatedAction({ id: 9002, holderId: driver.id, targetX: 15, targetZ: 5 });
+    state.pendingActions.push(action2);
+    vehicle.driverId = driver.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 15;
+    vehicle.targetZ = 5;
+    driver.activeActionId = action2.id;
+
+    let arrived = false;
+    for (let i = 0; i < 60; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (vehicle.x === 15 && vehicle.z === 5 && vehicle.task === 'idle') {
+        arrived = true;
+        break;
+      }
+    }
+
+    expect(arrived).toBe(true);
+    expect(vehicle.isMoveStuck).toBe(false);
   });
 });
 
