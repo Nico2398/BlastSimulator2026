@@ -5,11 +5,11 @@
 // needs-interruption, or the vehicle being destroyed underneath it.
 // EmployeeDispatchSteps.ts's claim/promotion sites call into this module rather than
 // duplicating any of it. Core-pure: imports only from entities/, state/,
-// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back),
-// and — for the haul_debris/fragment_debris continuity case (#552) —
-// economy/FragmentTaskLifecycle.js (startVehicleGatedFragmentWork, shared
-// with ArrivalGate.ts's resolveBoarding), which does not import anything
-// from engine/ that could cycle back here.
+// EntityMovementTick.js, and — for the haul_debris/fragment_debris
+// continuity case (#552) — economy/FragmentTaskLifecycle.js
+// (startVehicleGatedFragmentWork, shared with ArrivalGate.ts's
+// resolveBoarding), which does not import anything from engine/ that could
+// cycle back here.
 // Deliberately does NOT import TaskDispatch.ts directly — TaskDispatch.ts's
 // own module re-exports from TaskCancellation.ts, which imports
 // releaseVehicleReservation from here, so calling into TaskDispatch.ts
@@ -18,16 +18,20 @@
 // caller instead of performing the interruption itself — see
 // reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
 // caller, which already imports both modules safely.
-// A cycle nonetheless exists through EntityMovementTick.js, which this module
-// already imports one-way: EntityMovementTick.ts itself imports
-// interruptActiveAction from TaskDispatch.ts (#938, for its sustained-stuck
-// abandonment path), closing VehicleReservation -> EntityMovementTick ->
-// TaskDispatch -> TaskCancellation -> VehicleReservation. Safe for the same
-// reason the pre-existing EntityMovementTick.ts <-> VehicleOccupancyReroute.ts
-// cycle is safe: every import here is a function declaration, called only
-// from inside other function bodies, never evaluated at module-load time —
-// ESM resolves the cycle fine as long as nothing at the top level reads a
-// not-yet-initialized binding.
+// Two cycles exist through EntityMovementTick.js, which this module already
+// imports: an indirect one (EntityMovementTick.ts itself imports
+// interruptActiveAction from TaskDispatch.ts, #938, for its sustained-stuck
+// abandonment path, closing VehicleReservation -> EntityMovementTick ->
+// TaskDispatch -> TaskCancellation -> VehicleReservation), and — since
+// #986's dismountVehicleDriver extraction — a direct one (EntityMovementTick.ts
+// imports dismountVehicleDriver from here for its own sustained-stuck vehicle
+// release, closing VehicleReservation -> EntityMovementTick ->
+// VehicleReservation). Both are safe for the same reason the pre-existing
+// EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle is safe: every
+// import here is a function declaration, called only from inside other
+// function bodies, never evaluated at module-load time — ESM resolves the
+// cycle fine as long as nothing at the top level reads a not-yet-initialized
+// binding.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -271,6 +275,47 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
 }
 
 /**
+ * Full dismount of `vehicle`'s driver, if any: aborts any in-flight
+ * vehicle-gated fragment work (haulingPhase/breakPhase) first, so that
+ * unassignDriver's own fail-closed guard (Vehicle.ts — it refuses to clear
+ * driverId while haulingPhase is set) is guaranteed to succeed rather than
+ * silently no-op. A caller that skipped the abort and ignored
+ * unassignDriver's return value could flip task/state to idle while
+ * driverId/haulingPhase stayed set — next tick's tickHaulingProgress would
+ * then find haulingPhase !== null, re-drive the vehicle at the same
+ * unreachable target, and reproduce the exact stuck-forever bug this
+ * dismount exists to fix (#986 review follow-up).
+ *
+ * No-op (past the abort) if the vehicle currently has no driver.
+ *
+ * Shared by releaseVehicleReservation, whose `findAndAbortReservedVehicle`
+ * already aborts as part of clearing the reservation (a second, idempotent
+ * abort here is a harmless no-op in that case), and by
+ * EntityMovementTick.ts's sustained-stuck release for a vehicle driven with
+ * no PendingAction/reservation at all — that caller holds the vehicle
+ * directly and has nothing to look up by actionId, so it calls this instead
+ * of releaseVehicleReservation.
+ */
+export function dismountVehicleDriver(state: GameState, vehicle: Vehicle): void {
+  abortVehicleGatedFragmentWork(state, vehicle);
+  if (vehicle.driverId === null) return;
+
+  // #593/#922: EntityMovementTick.tickVehicle already calls
+  // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
+  // continuously throughout the drive — this call is a defensive,
+  // idempotent re-assertion at release time, not what establishes the
+  // invariant. It covers any release path that could otherwise run off the
+  // normal tick cycle: without it, a release landing between ticks would
+  // risk reading the employee's position as stale (frozen at the boarding
+  // point) instead of wherever the vehicle currently sits, which every
+  // distance-based decision that follows (nearest living_quarters, the walk
+  // back to reboard) relies on being current.
+  syncDriverPosition(state, vehicle);
+  unassignDriver(state.vehicles, vehicle.id);
+  setVehicleIdle(vehicle);
+}
+
+/**
  * Unconditional release: clears reservedForActionId, and if the vehicle
  * currently has a driver, unassigns them and resets task/state to idle.
  * Used by cancellation, needs-interruption, and the death/destruction
@@ -280,21 +325,7 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
   const vehicle = findAndAbortReservedVehicle(state, actionId);
   if (!vehicle) return;
 
-  if (vehicle.driverId !== null) {
-    // #593/#922: EntityMovementTick.tickVehicle already calls
-    // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
-    // continuously throughout the drive — this call is a defensive,
-    // idempotent re-assertion at release time, not what establishes the
-    // invariant. It covers any release path that could otherwise run off the
-    // normal tick cycle: without it, a release landing between ticks would
-    // risk reading the employee's position as stale (frozen at the boarding
-    // point) instead of wherever the vehicle currently sits, which every
-    // distance-based decision that follows (nearest living_quarters, the walk
-    // back to reboard) relies on being current.
-    syncDriverPosition(state, vehicle);
-    unassignDriver(state.vehicles, vehicle.id);
-    setVehicleIdle(vehicle);
-  }
+  dismountVehicleDriver(state, vehicle);
 }
 
 /**

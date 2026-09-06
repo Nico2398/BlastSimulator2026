@@ -15,6 +15,7 @@ import { advanceAlongPath } from '../nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY, MOVE_STUCK_ABANDON_TICKS } from '../config/balance.js';
 import { applyAdvanceOutcome, handleVehicleOccupancyBlock } from './VehicleOccupancyReroute.js';
 import { interruptActiveAction } from './TaskDispatch.js';
+import { dismountVehicleDriver } from './VehicleReservation.js';
 
 export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
 
@@ -189,6 +190,52 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     if (outcome.becameStuck) {
       emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
     }
+
+    // Sustained-stuck release (#986) — the vehicle-side mirror of
+    // tickEmployeeMovement's own #938 release below. Without it, a vehicle
+    // whose target became permanently unreachable (e.g. boxed in by a
+    // building placed after dispatch) sat in markVehicleWaiting forever,
+    // with its driver's action never released back to the pending-action
+    // pool for another qualified driver to pick up.
+    if (vehicle.isMoveStuck && vehicle.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
+      // driverId must be captured and looked up BEFORE interruptActiveAction:
+      // releaseVehicleReservation (called from within it) nulls
+      // vehicle.driverId as part of the dismount.
+      const driver = vehicle.driverId !== null
+        ? state.employees.employees.find(emp => emp.id === vehicle.driverId)
+        : undefined;
+      if (driver) {
+        const actionId = driver.activeActionId;
+        // interruptActiveAction only releases the vehicle (dismount + idle,
+        // via releaseVehicleReservation) as a side effect of finding a
+        // PendingAction matching actionId. A vehicle driven manually via the
+        // console (e.g. `vehicle haul`/`vehicle break`, which set
+        // haulingPhase/breakPhase directly with no PendingAction at all) has
+        // actionId === null — interruptActiveAction short-circuits, and
+        // driverId/haulingPhase/task/state are left untouched. Without the
+        // explicit dismountVehicleDriver call below, the vehicle
+        // re-accumulates moveConsecutiveFailures and hits this same branch
+        // again ~30 ticks later, forever, never actually freeing the driver
+        // or the vehicle (#986 review follow-up). dismountVehicleDriver
+        // (VehicleReservation.ts) aborts any in-flight haulingPhase/breakPhase
+        // FIRST, so unassignDriver's own fail-closed guard (it refuses to
+        // clear driverId while haulingPhase is set) is guaranteed to succeed
+        // — calling unassignDriver directly here without that abort left
+        // driverId/haulingPhase set while task/state flipped to idle,
+        // reproducing the exact stuck-forever bug this release exists to fix
+        // on the very next tick. When interruptActiveAction already performed
+        // the dismount above (a matching PendingAction existed), driverId is
+        // already null here and dismountVehicleDriver's abort is a harmless
+        // no-op.
+        interruptActiveAction(state, driver, actionId, { forceOpenPool: true });
+        dismountVehicleDriver(state, vehicle);
+        emitter?.emit('vehicle:action_abandoned', { vehicleId: vehicle.id, employeeId: driver.id, actionId });
+      }
+      vehicle.moveConsecutiveFailures = 0;
+      vehicle.isMoveStuck = false;
+      return;
+    }
+
     markVehicleWaiting(vehicle);
     return;
   }

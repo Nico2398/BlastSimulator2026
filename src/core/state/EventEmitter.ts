@@ -33,6 +33,7 @@ export interface GameEventMap {
   'agent:stuck': { employeeId: number };
   'agent:action_abandoned': { employeeId: number; actionId: number | null };
   'vehicle:stuck': { vehicleId: number };
+  'vehicle:action_abandoned': { vehicleId: number; employeeId: number | null; actionId: number | null };
 
   // Arrival-gated vehicle actions
   'vehicle:driver_boarded': { employeeId: number; vehicleId: number };

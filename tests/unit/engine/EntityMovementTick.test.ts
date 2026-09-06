@@ -11,7 +11,7 @@ import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosi
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { purchaseVehicle, type VehicleTask } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, type VehicleTask, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
@@ -169,6 +169,272 @@ describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', 
     expect(stuckEvents).toEqual([vehicle.id]);
     expect(vehicle.isMoveStuck).toBe(true);
     expect(vehicle.waitingTicks).toBe(STUCK_THRESHOLD + 1);
+  });
+});
+
+// ── tickVehicleOnNavGrid — sustained-stuck release (#986) ──────────────────
+// Before this fix, a vehicle driving toward a target that becomes permanently
+// unreachable (e.g. boxed in after the drive was claimed) just kept calling
+// markVehicleWaiting forever once !outcome.pathFound — moveConsecutiveFailures
+// and isMoveStuck grew/stayed pinned with no rescue, and the driver's held
+// PendingAction (and the vehicle reservation under it) was never released
+// back to the pool. tickEmployeeMovement already has this release for
+// on-foot employees via MOVE_STUCK_ABANDON_TICKS (#938, see the
+// tickEmployeeMovement — sustained-stuck action abandonment describe block
+// below) — this mirrors that fix for the vehicle-driving side: once
+// vehicle.moveConsecutiveFailures reaches MOVE_STUCK_ABANDON_TICKS with
+// vehicle.isMoveStuck true and the path still not found, the vehicle's
+// driver (captured via vehicle.driverId before interruptActiveAction nulls
+// it) has their held action released to the open pool
+// (interruptActiveAction(state, driver, driver.activeActionId, {
+// forceOpenPool: true })), the vehicle is set idle and driverless, a
+// 'vehicle:action_abandoned' event fires once, and
+// moveConsecutiveFailures/isMoveStuck are unconditionally reset to
+// 0/false.
+
+describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
+  const SEED = 42;
+
+  /** Solid rock voxel — same fixture shape used throughout this file. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /**
+   * A fully walkable 5×5 plane with exactly ONE column, (3,3), deliberately
+   * left void — mirrors tickEmployeeMovement's own
+   * buildWalledOffDestinationState fixture (#938) below, so a vehicle driving
+   * there behaves exactly like an employee walking there: findPath never
+   * resolves, forever. Every other cell stays walkable, so a vehicle can
+   * still be given a second, reachable target elsewhere on the same grid.
+   */
+  function buildWalledOffDestinationState(): GameState {
+    const state = createGame({ seed: SEED });
+    const vg = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        if (x === 3 && z === 3) continue; // destination column stays void — walled off
+        vg.setVoxel(x, 0, z, solidVoxel());
+        vg.setVoxel(x, 1, z, solidVoxel());
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  /** Minimal PendingAction fixture — mirrors this file's own makeAction helper (below). */
+  function makeVehicleAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 3, targetZ: 3, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'assigned',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  /**
+   * Boards `driver` on `vehicle`, drives it toward the walled-off (3,3)
+   * target, and gives `driver` a real PendingAction (status 'assigned',
+   * holderId === driver.id) the way a vehicle-gated action's drive phase
+   * would — pushed onto state.pendingActions and returned.
+   */
+  function primeStuckVehicleWithAction(
+    state: GameState,
+    vehicle: Vehicle,
+    driver: Employee,
+    actionId: number,
+    targetX = 3,
+    targetZ = 3,
+  ): PendingAction {
+    const action = makeVehicleAction({ id: actionId, holderId: driver.id });
+    state.pendingActions.push(action);
+    vehicle.driverId = driver.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = targetX;
+    vehicle.targetZ = targetZ;
+    // A real vehicle-gated claim always sets this at claim time
+    // (findFreeVehicleForRole/promoteVehicleGatedAction) — releaseVehicleReservation
+    // (called from within interruptActiveAction) looks the vehicle up by this
+    // field, not by driverId, so leaving it unset would silently no-op the
+    // vehicle-side dismount below.
+    vehicle.reservedForActionId = actionId;
+    driver.activeActionId = actionId;
+    return action;
+  }
+
+  it(`stays isMoveStuck without releasing anything through ${MOVE_STUCK_ABANDON_TICKS - 1} consecutive failing ticks (regression guard)`, () => {
+    const state = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    const action = primeStuckVehicleWithAction(state, vehicle, driver, 701);
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS - 1; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(vehicle.moveConsecutiveFailures).toBe(MOVE_STUCK_ABANDON_TICKS - 1);
+    expect(vehicle.state).toBe('waiting'); // still calls markVehicleWaiting, nothing new
+    expect(vehicle.driverId).toBe(driver.id);
+    expect(abandonedEvents).toEqual([]);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(driver.id);
+  });
+
+  it(`releases the driver's held action back to the pool on the tick moveConsecutiveFailures reaches MOVE_STUCK_ABANDON_TICKS (${MOVE_STUCK_ABANDON_TICKS}), emitting vehicle:action_abandoned exactly once`, () => {
+    const state = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    const action = primeStuckVehicleWithAction(state, vehicle, driver, 702);
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickVehicle(state, vehicle, emitter);
+      if (i < MOVE_STUCK_ABANDON_TICKS - 1) {
+        expect(abandonedEvents).toEqual([]); // never fires early, on any still-accumulating tick
+      }
+    }
+
+    expect(abandonedEvents).toEqual([{ vehicleId: vehicle.id, employeeId: driver.id, actionId: 702 }]);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
+
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(action.targetEmployeeId).toBeNull();
+
+    // Further ticks (vehicle now idle/driverless, canTickVehicle fails) must
+    // never re-fire the event.
+    tickVehicle(state, vehicle, emitter);
+    tickVehicle(state, vehicle, emitter);
+    expect(abandonedEvents).toEqual([{ vehicleId: vehicle.id, employeeId: driver.id, actionId: 702 }]);
+  });
+
+  it('does not immediately re-trigger the abandon branch on a fresh assignment right after release — takes another full MOVE_STUCK_ABANDON_TICKS ticks', () => {
+    const state = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    primeStuckVehicleWithAction(state, vehicle, driver, 703);
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+    expect(abandonedEvents).toHaveLength(1);
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
+
+    // Fresh assignment: same vehicle, same driver, re-boarded, driven at the
+    // same unreachable target again — moveConsecutiveFailures starts back at
+    // 0, so it must NOT abandon again on the very next tick.
+    const action2 = primeStuckVehicleWithAction(state, vehicle, driver, 704);
+
+    tickVehicle(state, vehicle, emitter);
+    expect(abandonedEvents).toHaveLength(1); // still just the first one
+    expect(vehicle.moveConsecutiveFailures).toBe(1);
+    expect(vehicle.driverId).toBe(driver.id); // still boarded — not re-abandoned yet
+
+    for (let i = 1; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(abandonedEvents).toEqual([
+      { vehicleId: vehicle.id, employeeId: driver.id, actionId: 703 },
+      { vehicleId: vehicle.id, employeeId: driver.id, actionId: 704 },
+    ]);
+    expect(action2.status).toBe('queued');
+    expect(action2.holderId).toBeNull();
+  });
+
+  it('resets moveConsecutiveFailures/isMoveStuck to 0/false without emitting or throwing when driverId names an employee that no longer exists (boundary: dangling id)', () => {
+    const state = buildWalledOffDestinationState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.driverId = 999999; // dangling — no such employee on the roster
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 3;
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    expect(() => {
+      for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+        tickVehicle(state, vehicle, emitter);
+      }
+    }).not.toThrow();
+
+    expect(abandonedEvents).toEqual([]);
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
+  });
+
+  it('fully releases a manually-driven mid-haul vehicle (no PendingAction, driver.activeActionId === null) — the exact case #986 review found silently left driverId/haulingPhase set', () => {
+    // Mirrors the manual `vehicle haul <vehicleId> <fragmentId>` console
+    // command (requestHaulFragment, HaulingTask.ts): sets vehicle.haulingPhase
+    // directly with no PendingAction ever pushed, so
+    // driver.activeActionId stays null throughout. interruptActiveAction
+    // short-circuits on a null actionId, so only the sustained-stuck
+    // branch's own explicit dismountVehicleDriver call (EntityMovementTick.ts)
+    // — which aborts haulingPhase via abortVehicleGatedFragmentWork BEFORE
+    // calling unassignDriver — can actually free this vehicle.
+    const state = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+
+    vehicle.driverId = driver.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 3;
+    vehicle.haulingPhase = 'to_fragment';
+    // No pendingActions entry, no reservedForActionId, no activeActionId —
+    // exactly what the manual console path leaves.
+    expect(driver.activeActionId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(abandonedEvents).toEqual([{ vehicleId: vehicle.id, employeeId: driver.id, actionId: null }]);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
   });
 });
 
