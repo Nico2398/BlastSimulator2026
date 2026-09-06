@@ -130,7 +130,7 @@ export function sellFragment(
  * between 0 and the fragment's mass (use `sellFragment` to remove the whole
  * fragment instead).
  */
-function splitStoredFragmentMass(
+export function splitStoredFragmentMass(
   state: LogisticsState,
   fragmentId: number,
   massToRemoveKg: number,
