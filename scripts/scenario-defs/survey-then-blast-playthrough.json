@@ -767,7 +767,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "levelEndReason": null,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -884,7 +890,13 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "levelEndReason": null,
+          "levelEnded": false
+        }
+      }
     }
   ]
 }
