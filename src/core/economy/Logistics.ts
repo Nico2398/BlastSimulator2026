@@ -4,6 +4,8 @@
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
+import { scale } from '../math/Vec3.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -96,6 +98,14 @@ export function deliverToDepot(
   return true;
 }
 
+/** Mass/volume/ore content removed from storage by a sale or a partial split. */
+type RemovedFragmentMass = { mass: number; volume: number; oreDensities: Record<string, number> };
+
+/** Find a fragment currently in storage by id, or undefined when absent/not stored. */
+function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+}
+
 /**
  * Sell a stored fragment. Returns the mass sold (for contract fulfillment).
  * Removes the fragment from logistics.
@@ -103,7 +113,7 @@ export function deliverToDepot(
 export function sellFragment(
   state: LogisticsState,
   fragmentId: number,
-): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
+): RemovedFragmentMass | null {
   const idx = state.fragments.findIndex(
     f => f.fragment.id === fragmentId && f.state === 'stored',
   );
@@ -121,12 +131,54 @@ export function sellFragment(
 }
 
 /**
+ * Split a stored fragment's mass, removing `massToRemoveKg` from it and leaving
+ * the remainder in storage (as a smaller fragment covering the same ore
+ * densities). Returns the removed mass/volume/oreDensities, or null when the
+ * fragment is not found, not stored, or `massToRemoveKg` is not strictly
+ * between 0 and the fragment's mass (use `sellFragment` to remove the whole
+ * fragment instead).
+ */
+export function splitStoredFragmentMass(
+  state: LogisticsState,
+  fragmentId: number,
+  massToRemoveKg: number,
+): RemovedFragmentMass | null {
+  if (!Number.isFinite(massToRemoveKg) || massToRemoveKg <= 0) return null;
+
+  const tracked = findStoredFragment(state, fragmentId);
+  if (!tracked) return null;
+
+  const fragment = tracked.fragment;
+  if (massToRemoveKg >= fragment.mass) return null;
+
+  const fraction = massToRemoveKg / fragment.mass;
+  const removedVolume = fragment.volume * fraction;
+  const removedOreDensities = { ...fragment.oreDensities };
+
+  fragment.mass -= massToRemoveKg;
+  fragment.volume -= removedVolume;
+  const shrink = Math.cbrt(1 - fraction);
+  fragment.halfExtents = scale(fragment.halfExtents, shrink);
+
+  state.storedMassKg -= massToRemoveKg;
+
+  return {
+    mass: massToRemoveKg,
+    volume: removedVolume,
+    oreDensities: removedOreDensities,
+  };
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
- * removing whole fragments (via sellFragment) until the requested amount is
- * covered, decrementing collectedOre[materialId] (and every other ore key each
- * removed fragment touches) by the exact ore-kg physically removed.
- * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
- * ore content — any fragment, ore-bearing or not.
+ * oldest-first, until the requested amount is covered: a fragment whose full
+ * contribution the request still needs is removed whole (via sellFragment),
+ * and a fragment that only needs to give up part of its contribution is
+ * shrunk in place (via splitStoredFragmentMass), decrementing
+ * collectedOre[materialId] (and every other ore key each touched fragment
+ * carries) by the exact ore-kg physically removed. materialId === ''
+ * (rubble_disposal) consumes raw stored mass regardless of ore content — any
+ * fragment, ore-bearing or not.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -160,14 +212,36 @@ export function consumeStoredOre(
     let tally = 0;
     for (const id of storedIds) {
       if (tally >= amountKg) break;
-      const sold = sellFragment(state, id);
-      if (!sold) continue;
-      const acc: Record<string, number> = {};
-      accumulateOreMass(acc, sold.volume, sold.oreDensities);
-      for (const [oreId, kg] of Object.entries(acc)) {
-        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+
+      const tracked = findStoredFragment(state, id);
+      if (!tracked) continue;
+
+      const remaining = amountKg - tally;
+      const probe: Record<string, number> = {};
+      accumulateOreMass(probe, tracked.fragment.volume, tracked.fragment.oreDensities);
+      const contribution = probe[materialId] ?? 0;
+
+      if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+        const sold = sellFragment(state, id);
+        if (!sold) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, sold.volume, sold.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += acc[materialId] ?? 0;
+      } else {
+        const massSlice = remaining * (tracked.fragment.mass / contribution);
+        const split = splitStoredFragmentMass(state, id, massSlice);
+        if (!split) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, split.volume, split.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += remaining;
+        break;
       }
-      tally += acc[materialId] ?? 0;
     }
 
     return { success: true, consumedKg: Math.min(tally, amountKg) };
@@ -190,9 +264,23 @@ export function consumeStoredOre(
   let removedMass = 0;
   for (const id of storedIds) {
     if (removedMass >= amountKg) break;
-    const sold = sellFragment(state, id);
-    if (!sold) continue;
-    removedMass += sold.mass;
+
+    const tracked = findStoredFragment(state, id);
+    if (!tracked) continue;
+
+    const remaining = amountKg - removedMass;
+    const contribution = tracked.fragment.mass;
+
+    if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+      const sold = sellFragment(state, id);
+      if (!sold) continue;
+      removedMass += sold.mass;
+    } else {
+      const split = splitStoredFragmentMass(state, id, remaining);
+      if (!split) continue;
+      removedMass += remaining;
+      break;
+    }
   }
 
   return { success: true, consumedKg: Math.min(removedMass, amountKg) };
