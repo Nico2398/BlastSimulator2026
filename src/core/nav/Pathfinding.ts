@@ -147,17 +147,21 @@ class MinHeap<T extends { key: number }> {
 // ---------------------------------------------------------------------------
 
 /**
- * Check whether a cell blocks traversal. `_isAgentCell` will gate whether a
- * fragment/vehicle-occupied cell is impassable for foot traffic (#954) —
- * unused until the implementation phase wires call sites to it.
+ * Check whether a cell blocks traversal. `isAgentCell` is true when this is
+ * the pathing agent's own current cell (#954): occupancy flags
+ * (vehicleOccupied, fragmentOccupancy) never block an agent from pathing out
+ * of the cell it is already standing on, but the cell's base solidity
+ * ('blocked'/'void') still does — an agent's own cell can never itself be a
+ * building or void.
  *
  * Exported (visibility only, no behaviour change) so
  * `tests/unit/nav/Pathfinding.test.ts` can exercise the isAgentCell
  * contract directly rather than only indirectly through findPath (#954).
  */
-export function isImpassable(cell: NavCell, avoidVehicles: boolean, _isAgentCell: boolean = false): boolean {
+export function isImpassable(cell: NavCell, avoidVehicles: boolean, isAgentCell: boolean = false): boolean {
   if (cell.type === 'blocked' || cell.type === 'void') return true;
-  if (avoidVehicles && cell.vehicleOccupied) return true;
+  if (isAgentCell) return false;
+  if (avoidVehicles && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0)) return true;
   return false;
 }
 
@@ -263,7 +267,7 @@ function directLineWalk(
     const { x: clampedX, z: clampedZ } = clampToGrid(grid, cx, cz);
 
     const cell = grid.cellAt(clampedX, clampedZ)!;
-    if (isImpassable(cell, avoidVehicles)) return null;
+    if (isImpassable(cell, avoidVehicles, i === 0)) return null;
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
@@ -505,15 +509,19 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
   const { avoidVehicles } = request;
 
-  // 2. Start impassable check (must precede start==goal check)
+  // 2. Start impassable check (must precede start==goal check). isAgentCell:
+  //    true — the agent is standing on this cell, so its own occupancy never
+  //    blocks it from pathing out.
   const startCell = grid.cellAt(sx, sz)!;
-  if (isImpassable(startCell, avoidVehicles)) {
+  if (isImpassable(startCell, avoidVehicles, true)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
-  // 3. Goal impassable check
+  // 3. Goal impassable check. isAgentCell only when the goal is the same
+  //    cell as the start (the trivial already-there case below) — a distinct
+  //    goal cell's occupancy is a real obstacle.
   const goalCell = grid.cellAt(gx, gz)!;
-  if (isImpassable(goalCell, avoidVehicles)) {
+  if (isImpassable(goalCell, avoidVehicles, sx === gx && sz === gz)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 

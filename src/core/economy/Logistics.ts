@@ -37,18 +37,18 @@ export function createLogisticsState(storageCapacityKg: number = 5000): Logistic
 // ── Operations ──
 
 /**
- * Add fragments from a blast result to the ground. `_navGrid`, when
- * provided, will register each fragment's cell as an occupant via
- * NavGrid.addFragmentOccupant (#954) — unused until the implementation
- * phase wires it in.
+ * Add fragments from a blast result to the ground. `navGrid`, when provided,
+ * registers each fragment's cell as an occupant via NavGrid.addFragmentOccupant
+ * (#954) so foot pathfinding treats it as impassable.
  */
-export function addBlastFragments(state: LogisticsState, fragments: FragmentData[], _navGrid: NavGrid | null = null): void {
+export function addBlastFragments(state: LogisticsState, fragments: FragmentData[], navGrid: NavGrid | null = null): void {
   for (const f of fragments) {
     state.fragments.push({
       fragment: f,
       state: 'on_ground',
       vehicleId: null,
     });
+    navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
   }
 }
 

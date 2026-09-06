@@ -94,6 +94,10 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     if (arrived) {
       const loaded = pickupFragment(state.logistics, vehicle.haulingFragmentId!, String(vehicle.id));
       if (loaded) {
+        state.navGrid?.removeFragmentOccupant(
+          Math.round(tracked.fragment.position.x),
+          Math.round(tracked.fragment.position.z),
+        );
         vehicle.payloadKg = tracked.fragment.mass;
         vehicle.haulingPhase = 'to_depot';
         vehicle.task = 'transport';

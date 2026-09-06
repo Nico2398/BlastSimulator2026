@@ -44,6 +44,10 @@ export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
  * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD on a blocked next cell (#591).
  */
 export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  const wasStationary = vehicle.state !== 'moving';
+  const prevX = Math.round(vehicle.x);
+  const prevZ = Math.round(vehicle.z);
+
   // tickVehicleMovement reports (via its return value) whether the vehicle
   // was actually driving this tick — syncing must NOT run when it wasn't
   // (task !== 'moving' on entry, e.g. a driver assigned to a vehicle that
@@ -59,6 +63,40 @@ export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventE
   // second, on-foot task queued against a not-yet-dispatched vehicle).
   const wasDriving = tickVehicleMovement(state, vehicle, emitter);
   if (wasDriving) syncDriverPosition(state, vehicle);
+
+  updateVehicleCellOccupancy(state, vehicle, wasStationary, prevX, prevZ);
+}
+
+/**
+ * Keeps NavCell.vehicleOccupied in sync with a vehicle's own current cell
+ * (#954), independent of vehicle role — a single shared path so drill_rig,
+ * debris_hauler, rock_fragmenter etc. all block foot pathfinding identically
+ * rather than needing a per-role branch. Guarded on state.navGrid since some
+ * ticks may run before a navgrid exists (e.g. tests constructing a bare
+ * GameState).
+ */
+function updateVehicleCellOccupancy(
+  state: GameState,
+  vehicle: Vehicle,
+  wasStationary: boolean,
+  prevX: number,
+  prevZ: number,
+): void {
+  if (!state.navGrid) return;
+  const isStationaryNow = vehicle.state !== 'moving';
+  const nextX = Math.round(vehicle.x);
+  const nextZ = Math.round(vehicle.z);
+  const cellChanged = nextX !== prevX || nextZ !== prevZ;
+
+  if ((wasStationary && !isStationaryNow) || cellChanged) {
+    const oldCell = state.navGrid.cellAt(prevX, prevZ);
+    if (oldCell) oldCell.vehicleOccupied = false;
+  }
+
+  if (isStationaryNow) {
+    const currentCell = state.navGrid.cellAt(nextX, nextZ);
+    if (currentCell) currentCell.vehicleOccupied = true;
+  }
 }
 
 /**
@@ -285,6 +323,17 @@ export interface EmployeeMovementResult {
  * non-movement this replaces, and consistent with tickVehicle's own
  * pre-navmesh behaviour.
  */
+/**
+ * True when the NavCell at (x, z) is currently marked vehicle- or
+ * fragment-occupied (#954). Used to decide, per walk, whether an employee's
+ * own destination is a cell they must be able to stand on regardless of
+ * occupancy — see tickEmployeeMovement's avoidVehicles comment.
+ */
+function isDestinationOccupied(state: GameState, x: number, z: number): boolean {
+  const cell = state.navGrid?.cellAt(Math.round(x), Math.round(z));
+  return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
+}
+
 export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): EmployeeMovementResult {
   const result: EmployeeMovementResult = { moved: [], arrived: [], stuck: [], abandoned: [] };
 
@@ -305,7 +354,21 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
         fromZ: emp.z,
         toX: emp.destinationX,
         toZ: emp.destinationZ,
-        avoidVehicles: false,
+        // Employees walk on foot around vehicles and ground fragments alike
+        // (#954) — unlike a vehicle's own routing, which must be able to
+        // drive onto a fragment's or another vehicle's cell to interact
+        // with it (see tickVehicleOnNavGrid's avoidVehicles:false). The same
+        // exception applies here whenever the DESTINATION itself is occupied
+        // — boarding a vehicle (VehicleBoarding.ts sets destinationX/Z to the
+        // vehicle's own cell) and charging a hole a drill_rig is still parked
+        // on top of (drilling drives the vehicle to the hole's exact cell,
+        // with no approach offset, and nothing moves it off afterward) both
+        // send an employee to stand exactly where a vehicle already sits.
+        // Falling back to avoidVehicles:false only for that specific walk —
+        // never a blanket exemption — keeps the detour behaviour #954 adds
+        // for every ordinary destination, and only lets an employee walk
+        // straight onto the one cell they were always going to arrive at.
+        avoidVehicles: !isDestinationOccupied(state, emp.destinationX, emp.destinationZ),
       })
       // No NavGrid yet: synthesize a direct two-point path (start, destination) —
       // findPath is never called, so this always "succeeds", matching the

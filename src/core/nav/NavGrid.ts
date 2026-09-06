@@ -43,14 +43,16 @@ export interface NavCell {
    * tickVehicle/tickEmployeeMovement's own per-tick pathfinds both request
    * avoidVehicles:false and instead do vehicle-vs-vehicle collision avoidance
    * by comparing live x/z directly (see isCellOccupiedByOtherVehicle in
-   * EntityMovementTick.ts) — this field plays no part in that. The one caller
-   * that does set it is the vehicle-occupancy-reroute escalation path
-   * (handleVehicleOccupancyBlock/findPathAvoidingOtherVehicles in
-   * VehicleOccupancyReroute.ts, #591): once a vehicle has waited
-   * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks on a blocked next cell, it
-   * temporarily marks every other live vehicle's current cell true, requests
-   * avoidVehicles:true for a one-shot reroute, then reverts the marks in a
-   * finally block before returning — no lasting mutation to the grid.
+   * EntityMovementTick.ts) — this field plays no part in that. The
+   * vehicle-occupancy-reroute escalation path (handleVehicleOccupancyBlock/
+   * findPathAvoidingOtherVehicles in VehicleOccupancyReroute.ts, #591) still
+   * sets it transiently the same way it always has. Since #954 it is also
+   * maintained persistently by EntityMovementTick's per-vehicle tick (set
+   * true on the vehicle's current cell while stationary, cleared when it
+   * starts/finishes moving) and seeded by buildNavGrid, so it doubles as a
+   * standing "a vehicle physically occupies this cell" flag that foot
+   * pathfinding (avoidVehicles:true, employees) treats as impassable via
+   * Pathfinding.isImpassable.
    */
   vehicleOccupied: boolean;
   /**
@@ -131,8 +133,10 @@ export class NavGrid {
    * the cell's fragmentOccupancy in place (#954). No-op outside the covered
    * box.
    */
-  addFragmentOccupant(_x: number, _z: number): void {
-    // TODO: implement
+  addFragmentOccupant(x: number, z: number): void {
+    const cell = this.cellAt(x, z);
+    if (!cell) return;
+    cell.fragmentOccupancy = (cell.fragmentOccupancy ?? 0) + 1;
   }
 
   /**
@@ -140,8 +144,10 @@ export class NavGrid {
    * decrementing the cell's fragmentOccupancy in place (#954). No-op outside
    * the covered box.
    */
-  removeFragmentOccupant(_x: number, _z: number): void {
-    // TODO: implement
+  removeFragmentOccupant(x: number, z: number): void {
+    const cell = this.cellAt(x, z);
+    if (!cell) return;
+    cell.fragmentOccupancy = Math.max(0, (cell.fragmentOccupancy ?? 0) - 1);
   }
 
   /** Clamp world x into the covered box. */
@@ -200,8 +206,8 @@ export class NavGrid {
     voxelGrid: VoxelGrid,
     buildings: Building[],
     drillHoles: DrillHole[],
-    _groundFragments: FragmentData[] = [],
-    _vehicles: Vehicle[] = [],
+    groundFragments: FragmentData[] = [],
+    vehicles: Vehicle[] = [],
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
@@ -228,7 +234,18 @@ export class NavGrid {
       cells.push(row);
     }
 
-    return new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
+    const navGrid = new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
+
+    for (const fragment of groundFragments) {
+      navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
+    }
+    for (const vehicle of vehicles) {
+      if (vehicle.state === 'moving') continue;
+      const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
+      if (cell) cell.vehicleOccupied = true;
+    }
+
+    return navGrid;
   }
 
   /**
@@ -264,14 +281,25 @@ export class NavGrid {
 
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
-        if (navGrid.cellAt(x, z)!.benchLevel === 0) mayHaveLoweredThePeak = true;
+        const oldCell = navGrid.cellAt(x, z)!;
+        if (oldCell.benchLevel === 0) mayHaveLoweredThePeak = true;
         if (!voxelGrid.containsColumn(x, z)) {
+          // Column no longer exists — nothing to carry forward.
           navGrid.setCellAt(x, z, NavGrid.makeCell('void', 0));
           continue;
         }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY), surfaceY));
+        navGrid.setCellAt(
+          x, z,
+          NavGrid.makeCell(
+            cellType,
+            NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY),
+            surfaceY,
+            oldCell.vehicleOccupied,
+            oldCell.fragmentOccupancy ?? 0,
+          ),
+        );
       }
     }
 

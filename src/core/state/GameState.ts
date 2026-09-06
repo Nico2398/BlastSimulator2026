@@ -509,7 +509,13 @@ export function buildGameNavGrid(
   drillHoles: DrillHole[],
 ): void {
   if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;
-  state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles);
+  // Re-seed occupancy (#954) from the fragments/vehicles already live on
+  // state — a rebuild would otherwise lose every fragment/vehicle cell the
+  // previous navgrid had marked impassable for foot traffic.
+  const groundFragments = state.logistics.fragments
+    .filter(f => f.state === 'on_ground')
+    .map(f => f.fragment);
+  state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles, groundFragments, state.vehicles.vehicles);
 }
 
 /**
