@@ -9,7 +9,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
-import { pickupFragment, deliverToDepot } from './Logistics.js';
+import { pickupFragment, deliverToDepot, returnFragmentToGround } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
@@ -125,7 +125,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     b => b.id === vehicle.haulingDepotBuildingId && b.active,
   );
   if (!building) {
-    abortHaul(vehicle);
+    abortHaulReturningCargo(state, vehicle);
     return;
   }
 
@@ -208,4 +208,20 @@ export function abortHaul(vehicle: Vehicle): void {
   vehicle.payloadKg = 0;
   vehicle.task = 'idle';
   vehicle.reservedForActionId = null;
+}
+
+/**
+ * Abort `vehicle`'s in-progress haul, returning any cargo already picked up
+ * to the ground first (dropped at the vehicle's current position, not the
+ * fragment's stale pre-pickup one — see returnFragmentToGround's own doc
+ * comment) before clearing the haul state via abortHaul. Shared by
+ * tickHaulingProgress's missing-depot-building branch above and
+ * FragmentTaskLifecycle.ts's abortVehicleGatedFragmentWork (#974 fixer round
+ * follow-up: both ran this identical two-step sequence independently).
+ */
+export function abortHaulReturningCargo(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.haulingFragmentId !== null) {
+    returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  }
+  abortHaul(vehicle);
 }

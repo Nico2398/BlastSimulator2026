@@ -81,9 +81,7 @@ export function deliverToDepot(
   fragmentId: number,
   collectedOre?: Record<string, number>,
 ): boolean {
-  const tracked = state.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'in_transit',
-  );
+  const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
   tracked.state = 'stored';
@@ -104,6 +102,11 @@ type RemovedFragmentMass = { mass: number; volume: number; oreDensities: Record<
 /** Find a fragment currently in storage by id, or undefined when absent/not stored. */
 function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
   return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+}
+
+/** Find a fragment currently in transit by id, or undefined when absent/not in transit. */
+function findInTransitFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
 }
 
 /**
@@ -325,4 +328,55 @@ export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
 /** Total ore mass across all materials in `collectedOre`, in kg. */
 export function totalCollectedOreKg(collectedOre: Record<string, number>): number {
   return Object.values(collectedOre).reduce((sum, kg) => sum + kg, 0);
+}
+
+/**
+ * Inverse of pickupFragment: returns an in-transit fragment to the ground,
+ * clearing its vehicle association. Used when a vehicle's haul is aborted
+ * mid-flight (forced rest, cancellation, driver death) so cargo already
+ * picked up is not permanently lost.
+ *
+ * @param navGrid - when provided, re-registers the fragment as a nav-grid
+ *   occupant at its recorded position (mirrors addBlastFragments' occupancy
+ *   registration).
+ * @param dropPosition - when provided, relocates the fragment here instead of
+ *   leaving it at its stale pre-pickup position (#974 follow-up: a haul
+ *   interrupted on its 'to_depot' leg, after loading, has already covered
+ *   real ground toward the depot — snapping the cargo back to where the
+ *   original blast placed it discards that entire distance, and a fatigue
+ *   policy short-cycling work/rest faster than one full haul leg can complete
+ *   (e.g. `set_policy mode:continuous`'s WORK_DURATION_TICKS=6 cadence)
+ *   otherwise resets the same haul to zero progress every cycle forever —
+ *   direct-traced via tutorial-interactive.json's/tutorial-steps-visual.json's
+ *   contract-deliver step, where fragment 32/similar never converged on
+ *   delivery across 400+ ticks of repeated interrupt-and-restart. Callers
+ *   pass the vehicle's own current position so the cargo lands wherever the
+ *   vehicle actually was, preserving whatever ground it had already covered.
+ * @returns true if a matching in_transit fragment was found and reverted;
+ *   false if no such fragment exists (no mutation in that case).
+ */
+export function returnFragmentToGround(
+  state: LogisticsState,
+  fragmentId: number,
+  navGrid?: NavGrid | null,
+  dropPosition?: { x: number; y: number; z: number },
+): boolean {
+  const tracked = findInTransitFragment(state, fragmentId);
+  if (!tracked) return false;
+
+  tracked.state = 'on_ground';
+  tracked.vehicleId = null;
+
+  if (dropPosition) {
+    tracked.fragment.position = dropPosition;
+  }
+
+  if (navGrid) {
+    navGrid.addFragmentOccupant(
+      Math.round(tracked.fragment.position.x),
+      Math.round(tracked.fragment.position.z),
+    );
+  }
+
+  return true;
 }

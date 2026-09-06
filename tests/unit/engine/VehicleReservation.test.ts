@@ -16,11 +16,14 @@ import {
   findFreeVehicleForRole,
   reserveVehicle,
   releaseVehicleReservation,
+  releaseVehicleReservationKeepDriver,
   releaseVehicleOnCompletion,
   reconcileVehicleReservations,
   isMidVehicleGatedWork,
   canReassignStrandedReservation,
 } from '../../../src/core/engine/VehicleReservation.js';
+import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 // reconcileVehicleReservations no longer performs the interruption itself
 // (import-cycle fix, #550) — it only reports which actions need it. Unit
 // tests are allowed to import interruptActiveAction directly to perform the
@@ -132,6 +135,54 @@ describe('findFreeVehicleForRole', () => {
     purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
 
     expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
+  });
+
+  // #974 follow-up: findFreeVehicleForRole must exclude a vehicle already
+  // mid vehicle-gated fragment work (haulingPhase/breakPhase set) even though
+  // it looks "free" by the pre-existing checks (no reservedForActionId, no
+  // driver) — otherwise a same-tick self-dispatch claim can "free-ride" onto
+  // a vehicle a manual `vehicle haul`/`vehicle break` console command drove
+  // out-of-band, tearing down its unrelated in-flight work on release. See
+  // this function's own doc comment for the full trace
+  // (blast-oversized-boulders.integration.test.ts).
+  it('excludes an otherwise-free vehicle whose haulingPhase is set (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.haulingPhase = 'to_fragment';
+
+    expect(findFreeVehicleForRole(state, 'debris_hauler', employee)).toBeNull();
+  });
+
+  it('excludes an otherwise-free vehicle whose breakPhase is set (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
+    vehicle.breakPhase = 'to_boulder';
+
+    expect(findFreeVehicleForRole(state, 'rock_fragmenter', employee)).toBeNull();
+  });
+
+  it('returns the vehicle when haulingPhase and breakPhase are both null (exclusion is specific, not overly broad) (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.haulingPhase = null;
+    vehicle.breakPhase = null;
+
+    const picked = findFreeVehicleForRole(state, 'debris_hauler', employee);
+
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(vehicle.id);
   });
 });
 
@@ -565,5 +616,197 @@ describe('canReassignStrandedReservation', () => {
     vehicle.reservedForActionId = action.id;
 
     expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+});
+
+// ── #974: releaseVehicleReservation must abort vehicle-gated fragment work
+// (haul/break in flight) BEFORE unassigning the driver. unassignDriver
+// (Vehicle.ts) refuses to unassign while haulingPhase !== null, and the old
+// code discarded that failure — leaving driverId permanently stuck and any
+// cargo already picked up permanently lost. abortVehicleGatedFragmentWork
+// (FragmentTaskLifecycle.ts) must run first so the unassign that follows
+// always succeeds.
+
+function makeCargoFragment(id: number, mass = 850): FragmentData {
+  return {
+    id,
+    position: { x: 0, y: 0, z: 0 },
+    volume: 0.3,
+    mass,
+    rockId: 'cruite',
+    oreDensities: { dirtite: 0.3 },
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
+}
+
+describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work first (#974)', () => {
+  it('a vehicle mid-haul (to_depot, cargo loaded) releases fully: driver unassigned, reservation cleared, haul state cleared, and the cargo fragment is returned to the ground instead of permanently lost', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
+    pickupFragment(state.logistics, 1, String(vehicle.id));
+
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 100;
+    vehicle.haulingFragmentId = 1;
+    vehicle.haulingPhase = 'to_depot';
+    vehicle.haulingDepotBuildingId = 999;
+    vehicle.payloadKg = 850;
+    vehicle.task = 'transport';
+    vehicle.state = 'working';
+
+    releaseVehicleReservation(state, 100);
+
+    // The bug this regression pins: without aborting the haul first,
+    // unassignDriver refuses while haulingPhase !== null and driverId stays
+    // stuck forever.
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.haulingFragmentId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+
+    // The cargo already picked up is not permanently lost — back on the ground.
+    const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(cargo.vehicleId).toBeNull();
+  });
+
+  it('the released vehicle becomes claimable again via findFreeVehicleForRole (permanently-unclaimable bug is actually fixed)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { employee: freshDriver } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, freshDriver.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
+    pickupFragment(state.logistics, 1, String(vehicle.id));
+
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 101;
+    vehicle.haulingFragmentId = 1;
+    vehicle.haulingPhase = 'to_depot';
+    vehicle.payloadKg = 850;
+
+    releaseVehicleReservation(state, 101);
+
+    const picked = findFreeVehicleForRole(state, 'debris_hauler', freshDriver);
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(vehicle.id);
+  });
+
+  it('a vehicle mid-break releases fully: driver unassigned, reservation cleared, break state cleared', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
+    addBlastFragments(state.logistics, [makeCargoFragment(2, 5000)]);
+
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 102;
+    vehicle.breakFragmentId = 2;
+    vehicle.breakPhase = 'to_boulder';
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+
+    releaseVehicleReservation(state, 102);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.breakPhase).toBeNull();
+    expect(vehicle.breakFragmentId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+  });
+
+  it('a vehicle with neither phase set keeps the existing (pre-#974) release behaviour unchanged', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 103;
+    vehicle.task = 'drilling';
+    vehicle.state = 'working';
+
+    releaseVehicleReservation(state, 103);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+  });
+});
+
+describe('releaseVehicleReservationKeepDriver clears in-flight fragment work the same way, while keeping its own driver-retention contract (#974)', () => {
+  it('a vehicle mid-haul (to_depot, cargo loaded): reservation clears, haul state clears, cargo returns to ground, but the driver stays seated (this function\'s own existing contract)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
+    pickupFragment(state.logistics, 1, String(vehicle.id));
+
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 200;
+    vehicle.haulingFragmentId = 1;
+    vehicle.haulingPhase = 'to_depot';
+    vehicle.payloadKg = 850;
+
+    releaseVehicleReservationKeepDriver(state, 200);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.haulingFragmentId).toBeNull();
+    // Driver-retention is this function's own contract — untouched.
+    expect(vehicle.driverId).toBe(employee.id);
+    const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(cargo.vehicleId).toBeNull();
+  });
+
+  it('a vehicle mid-break: reservation clears, break state clears, driver stays seated', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
+    addBlastFragments(state.logistics, [makeCargoFragment(2, 5000)]);
+
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 201;
+    vehicle.breakFragmentId = 2;
+    vehicle.breakPhase = 'to_boulder';
+
+    releaseVehicleReservationKeepDriver(state, 201);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.breakPhase).toBeNull();
+    expect(vehicle.breakFragmentId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
+  });
+
+  it('a vehicle with neither phase set keeps the existing (pre-#974) keep-driver release behaviour unchanged', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = 202;
+
+    releaseVehicleReservationKeepDriver(state, 202);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
   });
 });

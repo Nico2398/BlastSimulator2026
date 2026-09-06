@@ -36,7 +36,7 @@ import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
-import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -81,10 +81,23 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, and either undriven
- * (driverId === null) or already driven by `employee` themself (the
- * continuity case — lets a claim naturally re-pick the vehicle the
- * employee is already sitting in for their next same-role task).
+ * (reservedForActionId === null), not `broken`, not already mid vehicle-gated
+ * fragment work (haulingPhase/breakPhase both null — #974 follow-up: a
+ * debris_hauler/rock_fragmenter driven out-of-band by the manual `vehicle
+ * haul`/`vehicle break` console command never sets reservedForActionId, so
+ * without this check a continuity claim could "free-ride" a driver who
+ * appears idle to the dispatch system onto a vehicle that is, in reality,
+ * already mid-haul/mid-break on unrelated cargo. The claim would then fail
+ * at promotion time (requestHaulFragment/requestBreakBoulder's own
+ * already-busy guard) and releaseVehicleReservationKeepDriver's
+ * abortVehicleGatedFragmentWork call would abort that unrelated in-flight
+ * work, discarding real progress instead of the harmless no-op it was before
+ * #974 — traced via blast-oversized-boulders.integration.test.ts's manually
+ * hauled piece being aborted mid-drive by a same-tick self-dispatch claim for
+ * a different fragment), and either undriven (driverId === null) or already
+ * driven by `employee` themself (the continuity case — lets a claim
+ * naturally re-pick the vehicle the employee is already sitting in for their
+ * next same-role task).
  * Ties broken by lowest vehicle id. Read-only — never mutates.
  * Returns null when none qualify.
  */
@@ -95,6 +108,8 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.state !== 'broken' &&
     v.reservedForActionId === null &&
+    v.haulingPhase === null &&
+    v.breakPhase === null &&
     (v.driverId === null || v.driverId === employee.id),
   );
   if (qualifying.length === 0) return null;
@@ -238,16 +253,33 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
 }
 
 /**
+ * Shared prefix of releaseVehicleReservation and releaseVehicleReservationKeepDriver:
+ * find the vehicle reserved for `actionId`, abort any in-flight vehicle-gated
+ * fragment work on it (returning cargo to the ground first if mid-haul), and
+ * clear the reservation. Returns the vehicle for the caller's own remaining
+ * logic (driver unassignment vs. driver retention), or null when no vehicle
+ * is reserved for `actionId` — the caller returns early exactly as before in
+ * that case.
+ */
+function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return null;
+
+  abortVehicleGatedFragmentWork(state, vehicle);
+  vehicle.reservedForActionId = null;
+  return vehicle;
+}
+
+/**
  * Unconditional release: clears reservedForActionId, and if the vehicle
  * currently has a driver, unassigns them and resets task/state to idle.
  * Used by cancellation, needs-interruption, and the death/destruction
  * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
  */
 export function releaseVehicleReservation(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  const vehicle = findAndAbortReservedVehicle(state, actionId);
   if (!vehicle) return;
 
-  vehicle.reservedForActionId = null;
   if (vehicle.driverId !== null) {
     // #593/#922: EntityMovementTick.tickVehicle already calls
     // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
@@ -279,10 +311,7 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
  * is reserved for `actionId`.
  */
 export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
-  if (!vehicle) return;
-
-  vehicle.reservedForActionId = null;
+  findAndAbortReservedVehicle(state, actionId);
 }
 
 /**

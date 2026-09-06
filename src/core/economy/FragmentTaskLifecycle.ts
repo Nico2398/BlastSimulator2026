@@ -18,14 +18,15 @@
 // engine/ is the one-way direction the architecture already requires.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { tickVehicle } from '../engine/EntityMovementTick.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { requestHaulFragment } from './HaulingTask.js';
-import { requestBreakBoulder } from './BoulderBreaking.js';
+import { requestHaulFragment, abortHaulReturningCargo } from './HaulingTask.js';
+import { requestBreakBoulder, abortBreak } from './BoulderBreaking.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -140,4 +141,66 @@ export function startVehicleGatedFragmentWork(
     ? requestHaulFragment(state, vehicle.id, fragmentId)
     : requestBreakBoulder(state, vehicle.id, fragmentId);
   return started.success;
+}
+
+/**
+ * Shared abort-on-forced-release counterpart to startVehicleGatedFragmentWork.
+ * Cleanly unwinds whatever vehicle-gated fragment work (hauling or breaking)
+ * is in flight on this vehicle, so a reservation can be safely released:
+ *  - if haulingPhase is set: returns any picked-up cargo to the ground first
+ *    (via returnFragmentToGround), then aborts the haul (abortHaul).
+ *  - if breakPhase is set: aborts the break (abortBreak) — no cargo return
+ *    needed, breaking never moves a fragment off-ground until it splits.
+ *  - if neither is set: no-op.
+ * Callers (reservation release, cancellation, driver death) do not need to
+ * know which kind of work was in flight, or any of the phase constants.
+ */
+export function abortVehicleGatedFragmentWork(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.haulingPhase !== null) {
+    // Drop any cargo wherever the vehicle currently sits, not back at the
+    // fragment's original pre-pickup position (#974 follow-up — see
+    // returnFragmentToGround's own doc comment for the livelock this avoids
+    // when a fatigue policy interrupts faster than one haul leg can
+    // complete), then clear the haul state (HaulingTask.ts's
+    // abortHaulReturningCargo — shared with tickHaulingProgress's own
+    // missing-depot-building abort branch).
+    abortHaulReturningCargo(state, vehicle);
+    return;
+  }
+
+  if (vehicle.breakPhase !== null) {
+    abortBreak(vehicle);
+  }
+}
+
+/**
+ * True when `employee` is the boarded driver of a vehicle already carrying
+ * cargo toward a depot (haulingPhase === 'to_depot') — the one vehicle-gated
+ * sub-phase where an interruption costs far more than a generic mid-drive
+ * pause. abortVehicleGatedFragmentWork's returnFragmentToGround now drops
+ * cargo wherever the vehicle currently sits rather than teleporting it back
+ * to its original pre-pickup position (#974 follow-up), but resuming still
+ * means a fresh pickup-and-redrive cycle from that drop point — unlike a
+ * 'to_fragment' (not yet loaded) interruption, which only repeats the
+ * initial approach.
+ *
+ * Exists so ForceShiftRest.ts's policy-aware mid-execution guard
+ * (isMidVehicleGatedWork, VehicleReservation.ts — scoped to
+ * `taskTicksRemaining !== null`, a field haul_debris/fragment_debris never
+ * sets since both are phase-driven rather than employee-timer-driven) can
+ * also protect this one costly sub-phase, without reopening the broader
+ * "don't protect mid-drive-to-target" decision that guard's own doc comment
+ * already settled for every other vehicle-gated task. Without this, a
+ * fatigue policy that force-rests faster than one haul leg can complete
+ * (e.g. `set_policy mode:continuous`'s WORK_DURATION_TICKS=6 cadence)
+ * interrupts the SAME loaded haul repeatedly — each cycle makes some real
+ * forward progress now (unlike before this fix, which reset to zero every
+ * time), but repeated interruption can still miss a contract's own delivery
+ * deadline (direct-traced via tutorial-interactive.json's/
+ * tutorial-steps-visual.json's contract-deliver step).
+ */
+export function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
+  return state.vehicles.vehicles.some(
+    v => v.driverId === employee.id && v.haulingPhase === 'to_depot',
+  );
 }

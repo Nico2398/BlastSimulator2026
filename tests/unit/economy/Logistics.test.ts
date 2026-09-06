@@ -9,9 +9,24 @@ import {
   getFragmentCounts,
   consumeStoredOre,
   splitStoredFragmentMass,
+  returnFragmentToGround,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../../src/core/config/balance.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+
+/** Minimal all-walkable NavGrid fixture, mirroring NavGrid.test.ts's own hand-built grids. */
+function makeTestNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells, 0);
+}
 
 function makeFragment(id: number, mass: number = 100): FragmentData {
   return {
@@ -646,5 +661,109 @@ describe('splitStoredFragmentMass', () => {
     expect(splitStoredFragmentMass(state, 1, -50)).toBeNull();
     expect(state.storedMassKg).toBe(500);
     expect(getFragmentCounts(state).stored).toBe(1);
+  });
+});
+
+// ── returnFragmentToGround (#974) ────────────────────────────────────────────
+// Inverse of pickupFragment — used when a vehicle's haul is aborted mid-flight
+// (forced rest, cancellation, driver death) so cargo already picked up isn't
+// permanently lost.
+
+describe('returnFragmentToGround', () => {
+  it('flips an in_transit fragment back to on_ground, clearing its vehicle association', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+    const before = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(before.state).toBe('in_transit');
+    expect(before.vehicleId).toBe('truck-01');
+
+    const ok = returnFragmentToGround(state, 1);
+
+    expect(ok).toBe(true);
+    const after = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(after.state).toBe('on_ground');
+    expect(after.vehicleId).toBeNull();
+  });
+
+  it('returns false and mutates nothing when the fragment is already on_ground (no matching in_transit fragment)', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]); // never picked up
+
+    const ok = returnFragmentToGround(state, 1);
+
+    expect(ok).toBe(false);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.state).toBe('on_ground');
+    expect(tracked.vehicleId).toBeNull();
+  });
+
+  it('returns false and mutates nothing for a nonexistent fragment id', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+
+    const ok = returnFragmentToGround(state, 999);
+
+    expect(ok).toBe(false);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.state).toBe('in_transit');
+    expect(getFragmentCounts(state).total).toBe(1);
+  });
+
+  it('when a navGrid is provided, re-registers the fragment as a nav-grid occupant at its recorded position', () => {
+    const state = createLogisticsState();
+    const navGrid = makeTestNavGrid(5, 5);
+    addBlastFragments(state, [makeFragment(1, 100)], navGrid); // registers occupancy at (0,0)
+    expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(1);
+    pickupFragment(state, 1, 'truck-01');
+    navGrid.removeFragmentOccupant(0, 0); // mirrors what the real haul pickup path does
+    expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(0);
+
+    const ok = returnFragmentToGround(state, 1, navGrid);
+
+    expect(ok).toBe(true);
+    expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(1);
+  });
+
+  it('succeeds without throwing when navGrid is omitted', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+
+    let ok = false;
+    expect(() => { ok = returnFragmentToGround(state, 1); }).not.toThrow();
+    expect(ok).toBe(true);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.state).toBe('on_ground');
+  });
+
+  it('when dropPosition is provided, relocates the fragment there instead of leaving it at its stale pre-pickup position (#974)', () => {
+    const state = createLogisticsState();
+    // Fragment's ORIGINAL recorded position (where the blast placed it).
+    addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
+    pickupFragment(state, 1, 'truck-01');
+
+    // Vehicle's CURRENT position, partway through its 'to_depot' leg —
+    // clearly different from the fragment's original position.
+    const dropPosition = { x: 50, y: 0, z: 30 };
+    const ok = returnFragmentToGround(state, 1, undefined, dropPosition);
+
+    expect(ok).toBe(true);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.fragment.position).toEqual(dropPosition);
+    expect(tracked.fragment.position).not.toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('when dropPosition is omitted, the fragment reverts to its own already-recorded position', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
+    pickupFragment(state, 1, 'truck-01');
+
+    const ok = returnFragmentToGround(state, 1);
+
+    expect(ok).toBe(true);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.fragment.position).toEqual({ x: 0, y: 0, z: 0 });
   });
 });
