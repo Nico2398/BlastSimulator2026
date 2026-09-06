@@ -1486,7 +1486,7 @@
       "expect": {
         "equals": {
           "tickCount": 410,
-          "cash": -387352,
+          "cash": -386740,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1878,7 +1878,7 @@
       "expect": {
         "equals": {
           "tickCount": 465,
-          "cash": -428777,
+          "cash": -428165,
           "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,

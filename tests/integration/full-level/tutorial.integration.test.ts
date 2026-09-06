@@ -22,6 +22,8 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { pickupFragment, deliverToDepot } from '../../../src/core/economy/Logistics.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { accumulateOreMass } from '../../../src/core/mining/BlastOreReport.js';
 import { createGameEngine } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
 import { countNavCellsByType } from '../../../src/ui/tutorialStepHelpers.js';
@@ -169,23 +171,54 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(assignMgt.success).toBe(true);
     expect(assignMgt.output).toContain('assigned skill');
 
-    // 16. Accept a contract for whichever ore this blast actually produced
-    // the most of, among what's currently on offer. Not hardcoded to id 1
-    // (#554): charging now takes real time, and the extra ticks
-    // driveChargePlanToCompletion spends draining the charge orders above
-    // are enough for the deadline-driven contract pool to cycle #1 out
-    // before this step runs — and the contract that replaces it is drawn
-    // from the full material catalog, not necessarily an ore this blast
-    // yielded at all (the dominant ore, dirtite at this seed, is common
-    // enough to not always be on offer itself). Ranking by yield rather than
-    // taking the first match still matters for step 22 below: storage is
-    // capacity-capped, so a contract for a barely-mined trace ore could
-    // still fail delivery even once matched to *some* mined material.
-    const oreYields = ctx.state!.lastOreReport?.oreYields ?? {};
-    const rankedByYield = [...ctx.state!.contracts.available]
-      .filter(c => (oreYields[c.materialId] ?? 0) > 0)
-      .sort((a, b) => (oreYields[b.materialId] ?? 0) - (oreYields[a.materialId] ?? 0));
-    const availableContract = rankedByYield[0] ?? ctx.state!.contracts.available[0]!;
+    // 16. Accept a contract for whichever ore step 22's own greedy pickup
+    // will actually land in storage, among what's currently on offer. Not
+    // hardcoded to id 1 (#554): charging now takes real time, and the extra
+    // ticks driveChargePlanToCompletion spends draining the charge orders
+    // above are enough for the deadline-driven contract pool to cycle #1
+    // out before this step runs — and the contract that replaces it is
+    // drawn from the full material catalog, not necessarily an ore this
+    // blast yielded at all.
+    //
+    // Ranking by `lastOreReport.oreYields` alone isn't enough (#959): that
+    // report totals ore across the WHOLE blast, but step 22 only picks up
+    // ground fragments one at a time into a capacity-capped
+    // freight_warehouse (2000kg at tier 1) — a real blast throws off far
+    // more mass than that fits, so a contract for the single
+    // highest-yielding ore overall can still land on one this greedy,
+    // capacity-limited haul never actually stores (traced live: dirtite
+    // dominates the whole-blast yield, but the fragments that happen to
+    // fit in the first 2000kg landed here carry only rustite — an
+    // unrelated upstream timing fix shifted this seed's RNG stream just
+    // enough to flip which ore that turns out to be). Preview the same
+    // greedy, order-preserving, capacity-capped pickup step 22 itself runs
+    // and rank candidates by what it would ACTUALLY land, not the
+    // unreachable whole-blast total.
+    const previewCapacityKg = getBuildingDef('freight_warehouse', 1).capacity;
+    const haulablePreview: Record<string, number> = {};
+    let previewStoredKg = 0;
+    for (const f of ctx.state!.logistics.fragments) {
+      if (f.state !== 'on_ground') continue;
+      if (previewStoredKg + f.fragment.mass > previewCapacityKg) continue;
+      previewStoredKg += f.fragment.mass;
+      accumulateOreMass(haulablePreview, f.fragment.volume, f.fragment.oreDensities);
+    }
+    const rankByHaulable = (contracts: NonNullable<typeof ctx.state>['contracts']['available']) => [...contracts]
+      .filter(c => (haulablePreview[c.materialId] ?? 0) > 0)
+      .sort((a, b) => (haulablePreview[b.materialId] ?? 0) - (haulablePreview[a.materialId] ?? 0));
+    // The board is re-rolled every CONTRACT_REFRESH_INTERVAL (20) ticks, so
+    // "nothing on offer matches" is a transient state, not a dead end — a
+    // fixed single-shot fallback to `available[0]` can pick a contract for
+    // an ore step 22 will never actually deliver, guaranteeing its delivery
+    // fails. Ticking forward and re-rolling finds a genuine match instead of
+    // gambling on the first board — up to 60 refreshes (1200 ticks):
+    // dirtite alone is haulable at this seed (single-digit % odds per
+    // ore_sale roll), so waiting for it can take a real string of misses.
+    for (let attempt = 0; attempt < 60 && rankByHaulable(ctx.state!.contracts.available).length === 0; attempt++) {
+      tickWithEvents(ctx, 20);
+    }
+    const rankedByHaulable = rankByHaulable(ctx.state!.contracts.available);
+    const availableContract = rankedByHaulable[0] ?? ctx.state!.contracts.available[0]!;
     const availableContractId = availableContract.id;
     const acceptContract = contractCommand(ctx, ['accept', String(availableContractId)], {});
     expect(acceptContract.success).toBe(true);

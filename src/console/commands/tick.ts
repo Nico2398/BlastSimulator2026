@@ -36,7 +36,7 @@ import { updateScores, clampScore, type ScoreInputs } from '../../core/scores/Sc
 import { CONTRACT_REFRESH_INTERVAL } from '../../core/config/balance.js';
 import { BASE_TICK_MS } from '../../core/engine/GameLoop.js';
 import { isExposed, processSmuggling } from '../../core/events/MafiaActions.js';
-import { requireGame } from './commandUtils.js';
+import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveTaskCompletion } from './tickTaskCompletion.js';
 import { checkGameOverConditions } from './tickGameOver.js';
 import { buildEventContext, pushEventOptionLines } from './eventResolution.js';
@@ -102,7 +102,7 @@ export function tickCommand(
 
     // 4. Auto-refresh available contracts on schedule
     if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-      generateContracts(state.contracts, rng, state.tickCount);
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
     }
 
     // 5. Smuggling income

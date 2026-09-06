@@ -25,6 +25,55 @@ describe('Contract system', () => {
     }
   });
 
+  // ── priceMultiplier (#959) ──────────────────────────────────────────────
+  // tutorial_pit declares contractPriceMultiplier: 16.0 (Level.ts) so its own
+  // narrower economy can still close a deficit through contract income, but
+  // no call site ever threads it through — generateContracts/
+  // generateOneContract accept the parameter today but generateOneContract's
+  // own copy is prefixed `_priceMultiplier` (unused, no-op).
+  describe('priceMultiplier', () => {
+    it('scales every generated contract\'s pricePerKg by the given multiplier, relative to the unmultiplied baseline', () => {
+      const baseline = createContractState();
+      generateContracts(baseline, new Random(42), 0);
+
+      const multiplied = createContractState();
+      generateContracts(multiplied, new Random(42), 0, 1.5);
+
+      expect(multiplied.available.length).toBe(baseline.available.length);
+      for (let i = 0; i < baseline.available.length; i++) {
+        const base = baseline.available[i]!;
+        const scaled = multiplied.available[i]!;
+        // Same contract shape (same seed/roll sequence) — only price moves.
+        expect(scaled.type).toBe(base.type);
+        expect(scaled.materialId).toBe(base.materialId);
+        expect(scaled.quantityKg).toBe(base.quantityKg);
+        expect(scaled.pricePerKg).toBeCloseTo(base.pricePerKg * 1.5, 6);
+      }
+    });
+
+    it('a multiplier of 1 (the default) reproduces the unmultiplied baseline exactly', () => {
+      const baseline = createContractState();
+      generateContracts(baseline, new Random(42), 0);
+
+      const explicit = createContractState();
+      generateContracts(explicit, new Random(42), 0, 1);
+
+      expect(explicit.available).toEqual(baseline.available);
+    });
+
+    it('a sub-1 multiplier (a tight, lowball market) scales prices down, not just up', () => {
+      const baseline = createContractState();
+      generateContracts(baseline, new Random(42), 0);
+
+      const discounted = createContractState();
+      generateContracts(discounted, new Random(42), 0, 0.85);
+
+      for (let i = 0; i < baseline.available.length; i++) {
+        expect(discounted.available[i]!.pricePerKg).toBeCloseTo(baseline.available[i]!.pricePerKg * 0.85, 6);
+      }
+    });
+  });
+
   it('contract list refreshes periodically (new contracts appear)', () => {
     const state = createContractState();
     const rng = new Random(42);

@@ -12,7 +12,7 @@ import type { Employee } from '../entities/Employee.js';
 import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
 import { releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
-import { isRampSegmentClaimable } from './ActionSelection.js';
+import { isRampSegmentClaimable, selectBestActionForEmployee } from './ActionSelection.js';
 import { promoteActionToActive } from './EmployeeDispatchSteps.js';
 
 /**
@@ -35,9 +35,14 @@ import { promoteActionToActive } from './EmployeeDispatchSteps.js';
  * every employee in the game, not just vehicle-gated ones (regression fixed
  * by restoring the original 8d-before-8e order and adding this function).
  *
- * Ties broken by lowest action id, matching claimActionsTargetedAtEmployee's
- * own determinism rule — cost-based ranking (selectBestActionForEmployee) is
- * unnecessary here since every candidate already shares the same vehicle.
+ * The two candidate sources rank differently. `queuedFollowUps` (this
+ * employee's own taskQueue) were already validated reachable when originally
+ * claimed, so ties are broken by lowest action id, matching
+ * claimActionsTargetedAtEmployee's own determinism rule. `poolFollowUps`
+ * (the open `queued` pool) are fresh and never vetted for this employee, so
+ * they go through selectBestActionForEmployee's reachability-checked cost
+ * ranking instead — see that branch's own comment for why an id-sort there
+ * regressed (#953).
  *
  * Returns true when a follow-up was promoted this way (caller must skip
  * releaseVehicleOnCompletion — the vehicle is now reserved for the new
@@ -85,12 +90,29 @@ export function tryContinueVehicleGatedAction(
       // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
       isHaulOrFragmentActionClaimable(state, a) &&
       // #555: see queuedFollowUps' own comment on the same check, just above.
-      isRampSegmentClaimable(state, a))
-    .sort((a, b) => a.id - b.id);
+      isRampSegmentClaimable(state, a));
 
   if (poolFollowUps.length === 0) return false;
 
-  const followUp = poolFollowUps[0]!;
+  // Reachability-ranked (#959), unlike queuedFollowUps' plain id-sort just
+  // above: these candidates are fresh from the open pool, never vetted for
+  // this employee at all, where queuedFollowUps' were already validated
+  // reachable when originally claimed. Picking the lowest id here — the
+  // oldest-queued fragment, not the nearest one — could and did hand the
+  // vehicle a target outside its climb-reachable region (a fresh blast's
+  // walled-off interior, #953) with no recovery: the drive then freezes on
+  // it (mitigated separately by EntityMovementTick.ts's sustained-stuck
+  // release), gets released back to the pool, and this exact same unchecked
+  // sort immediately hands back the same unreachable lowest-id candidate —
+  // the vehicle never once reaches an actually-haulable fragment again.
+  // selectBestActionForEmployee already carries the fix (#953's own
+  // climb-reachable-set pre-filter plus a real findPath confirmation) that
+  // claimOnePoolCandidate uses for the general idle-employee case; this
+  // continuity fast path needs the exact same guard.
+  const selection = selectBestActionForEmployee(state, employee, poolFollowUps);
+  if (selection === null) return false;
+
+  const followUp = selection.action;
   const claimed = claimPendingAction(state, followUp.id, employee.id);
   if (!claimed) return false;
 

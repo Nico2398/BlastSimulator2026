@@ -28,6 +28,15 @@ export interface TutorialStep {
   titleKey: string;
   textKey: string;
   /**
+   * Overrides `titleKey` when present, resolved against the current
+   * `GameState` — e.g. the closing card picking congratulations vs. a
+   * defeat-specific title depending on `state.levelEndReason`. Checked in
+   * preference to the static `titleKey` wherever a step's title is rendered.
+   */
+  titleKeyFor?(state: GameState): string;
+  /** Same override shape as `titleKeyFor`, for `textKey`. */
+  textKeyFor?(state: GameState): string;
+  /**
    * Console commands equivalent to the step's objective, shown to the player as
    * a hint. These are never executed by the tutorial — completing the step is
    * the player's job.
@@ -468,8 +477,31 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 20, waitsOnWork: true },
   ),
 
-  // ── Step 15: contract-deliver ──
-  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts, { tickBudget: 20, waitsOnWork: true }),
+  // ── Step 15: sell-ore ──
+  // Replaces the old contract-deliver step (#959): the tutorial never hauled
+  // and sold the blasted ore for money, so a player following it to the
+  // letter finished with negative cash. Repeatable — the player may accept
+  // and deliver more than one ore-sale contract before the step is done,
+  // since the tier-1 warehouse's own capacity is far smaller than the
+  // blasted ore's total mass. Completion is keyed off the contract
+  // completion history itself (a genuine ore_sale contract closing since
+  // this step opened) rather than a fixed cycle count, so it self-adjusts
+  // regardless of how many accept/deliver rounds that turns out to take —
+  // exactly createComparisonStep's "value increased since snapshot" shape,
+  // like 'drill-plan'/'sequence' above. `completedHistory` also holds
+  // EXPIRED contracts (Contract.ts's checkDeadlines pushes there too), so
+  // the count is filtered to `completed: true` — a contract that merely
+  // timed out with a penalty must not falsely advance this step without a
+  // single dollar sold (#959).
+  createComparisonStep(
+    'sell-ore',
+    'tutorial.step_sellore.title',
+    'tutorial.step_sellore',
+    (s) => (s.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length,
+    ['contract accept type:ore_sale', 'contract deliver type:ore_sale amount:2000'],
+    TOOLBAR_TARGET.contracts,
+    { tickBudget: 20, waitsOnWork: true },
+  ),
 
   // ── Step 16: finances ──
   createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({

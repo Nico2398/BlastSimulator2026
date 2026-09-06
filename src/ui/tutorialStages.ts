@@ -348,12 +348,19 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.vehicle_watch' },
   ],
 
-  'contract-deliver': [
+  // A single merged stage, not separate accept/deliver stages (#959): the
+  // step is repeatable across several accept/deliver rounds (2b), and
+  // resolveStageIndex's "last reachable stage wins" would otherwise bounce
+  // between an accept stage and a deliver stage every cycle as the panel's
+  // own offered/active cards come and go. `also` keeps the deliver button and
+  // amount field clickable alongside accept for the whole step, matching how
+  // the old contract-deliver stage kept its own amount field alongside deliver.
+  'sell-ore': [
     { target: TOOLBAR_TARGET.contracts, hintKey: 'tutorial.stage.open_contracts' },
     {
-      target: '#bs-contract-panel .bs-contract-deliver',
-      hintKey: 'tutorial.stage.contract_deliver',
-      also: ['#bs-contract-panel .bs-contract-amount'],
+      target: '#bs-contract-panel .bs-contract-accept',
+      hintKey: 'tutorial.stage.sell_ore',
+      also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
     },
   ],
 

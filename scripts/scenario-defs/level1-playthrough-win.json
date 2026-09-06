@@ -461,12 +461,12 @@
           "command": "tick 60"
         }
       ],
-      "description": "#553: sandbox-measured. The lone driller lands only 4 of the pattern's 16 holes in this window -- not the full drain the pattern set out to order. Landing all 16 (tutorial-playthrough.json's own solo-driller measurement: ~400 ticks for the same size pattern) would keep this file's cash below the $5,000 bankruptcy threshold for well over the 100-tick grace period (Bankruptcy.ts) -- see the file description's bankruptcy finding. This file blasts with the 4 that land instead of waiting for the rest, the only way any of drilling/blasting/hauling/contract-fulfillment survives to be exercised at all. Holes 5-16 never land: the pad stops here on purpose, not because 60 was too small a guess.",
+      "description": "#553: sandbox-measured (re-verified, #959 fixer pass: 5, not the pre-#959 4, land in this window -- an unrelated upstream vehicle-continuity fix picks the driller's next hole more efficiently). The lone driller lands only 5 of the pattern's 16 holes in this window -- not the full drain the pattern set out to order. Landing all 16 (tutorial-playthrough.json's own solo-driller measurement: ~400 ticks for the same size pattern) would keep this file's cash below the $5,000 bankruptcy threshold for well over the 100-tick grace period (Bankruptcy.ts) -- see the file description's bankruptcy finding. This file blasts with the 5 that land instead of waiting for the rest, the only way any of drilling/blasting/hauling/contract-fulfillment survives to be exercised at all. The rest never land: the pad stops here on purpose, not because 60 was too small a guess.",
       "role": "setup",
       "expect": {
         "equals": {
-          "orderedHoleCount": 12,
-          "holeCount": 4
+          "orderedHoleCount": 11,
+          "holeCount": 5
         }
       }
     },
@@ -545,9 +545,10 @@
         }
       ],
       "role": "player",
+      "description": "#959 fixer pass: H8 has already landed by this point (re-verified) -- an unrelated upstream vehicle-continuity fix changed drilling order enough that H8 is one of the 5 already-drilled holes rather than one of the 11 still-ordered ones, so removing it now decreases `holeCount` (a real landed hole torn out), not `orderedHoleCount` (nothing left un-landed to cancel).",
       "expect": {
         "decreased": [
-          "orderedHoleCount"
+          "holeCount"
         ]
       }
     },
@@ -828,7 +829,7 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly. `deathCount` updated for #557 (this file's crew shrunk to just staffed:true's 5 free employees plus one hired surveyor -- see the earlier hire step's own finding): drill_rig #1 itself still survives (its driver, employee #1, was mid rest-cycle and dismounted onto the vehicle's own position by #593's fix, then the 12 hole-cancellation steps above froze it there for good -- outside this blast's radius, matching `vehicleCount`:4 below) -- but charging is real, in-person work (#554): every blasting-qualified employee the game auto-dispatched to load one of the 4 charges walked to that hole and stayed there once done. With only two blasting-qualified employees left in this crew (driller #1 once its drilling task ends, and free blaster #2), both of them plus the surveyor #6 (from the original finding above) are the toll -- sandbox-confirmed directly (`employee list` right after the blast: #1, #2, #6 DEAD, #3/#4/#5 unaffected) -- three casualties, not five, now that this file no longer hires extra blasters/drillers who never did any of the charging. #928: vehicleCount 4 -> 3 -- direct trace (createGameEngine + runSteps replay through step 32, then `vehicle list`) shows drill_rig #1 idle at (16.32,16.00) right before this blast, not the pre-#928 (15,17.27) -- the single-gauge fatigue model shifts exactly when driller #1's rest/dismount cycle lands relative to the 12 hole-cancellation steps above, so it freezes one tile closer to the hole cluster this time, inside the blast's destruction radius instead of just outside it. deathCount (3) is unaffected -- the drill_rig's own destruction is a vehicle loss, not a casualty.",
+      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly. `deathCount` updated for #557 (this file's crew shrunk to just staffed:true's 5 free employees plus one hired surveyor -- see the earlier hire step's own finding): drill_rig #1 itself still survives (its driver, employee #1, was mid rest-cycle and dismounted onto the vehicle's own position by #593's fix, then the 12 hole-cancellation steps above froze it there for good -- outside this blast's radius, matching `vehicleCount`:4 below) -- but charging is real, in-person work (#554): every blasting-qualified employee the game auto-dispatched to load one of the 4 charges walked to that hole and stayed there once done. With only two blasting-qualified employees left in this crew (driller #1 once its drilling task ends, and free blaster #2), both of them plus the surveyor #6 (from the original finding above) are the toll -- sandbox-confirmed directly (`employee list` right after the blast: #1, #2, #6 DEAD, #3/#4/#5 unaffected) -- three casualties, not five, now that this file no longer hires extra blasters/drillers who never did any of the charging. #928: vehicleCount 4 -> 3 -- direct trace (createGameEngine + runSteps replay through step 32, then `vehicle list`) shows drill_rig #1 idle at (16.32,16.00) right before this blast, not the pre-#928 (15,17.27) -- the single-gauge fatigue model shifts exactly when driller #1's rest/dismount cycle lands relative to the 12 hole-cancellation steps above, so it freezes one tile closer to the hole cluster this time, inside the blast's destruction radius instead of just outside it. #959 fixer pass: vehicleCount 3 -> 4 again -- an unrelated upstream vehicle-continuity fix (reachability-checked follow-up job selection) shifts drill_rig #1's own idle position once more, this time back outside the blast's destruction radius, so it survives. deathCount (3) is unaffected -- the drill_rig's own survival/destruction is a vehicle count, not a casualty count.",
       "role": "player",
       "expect": {
         "equals": {
@@ -836,7 +837,7 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 3,
-          "vehicleCount": 3
+          "vehicleCount": 4
         }
       }
     },
@@ -1212,11 +1213,11 @@
           "levelEnded": false,
           "levelEndReason": null,
           "surveyCount": 1,
-          "vehicleCount": 3,
+          "vehicleCount": 4,
           "holeCount": 0,
           "orderedHoleCount": 0
         },
-        "note": "Closing tickCount re-measured 170 -> 175 (#947): the corridor-clearing bootstrap ahead of the three vehicle-move steps (giving each blocking vehicle a driver, per the new driver-gate on vehicle movement) spends 10 real ticks upfront but also shifts the tail's own event-interruption timing (see the two `tick 10` steps above), netting +5 rather than +10. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note); the fleet stays at 3 for the rest of the file."
+        "note": "Closing tickCount re-measured 170 -> 175 (#947): the corridor-clearing bootstrap ahead of the three vehicle-move steps (giving each blocking vehicle a driver, per the new driver-gate on vehicle movement) spends 10 real ticks upfront but also shifts the tail's own event-interruption timing (see the two `tick 10` steps above), netting +5 rather than +10. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note). #959 fixer pass: vehicleCount 3 -> 4 again -- drill_rig #1 now survives that same blast (see the blast step's own #959 note); the fleet stays at 4 for the rest of the file."
       },
       "role": "setup"
     }
