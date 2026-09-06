@@ -4,6 +4,8 @@
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
+import { vec3 } from '../math/Vec3.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -128,13 +130,41 @@ export function sellFragment(
  * between 0 and the fragment's mass (use `sellFragment` to remove the whole
  * fragment instead).
  */
-export function splitStoredFragmentMass(
-  _state: LogisticsState,
-  _fragmentId: number,
-  _massToRemoveKg: number,
+function splitStoredFragmentMass(
+  state: LogisticsState,
+  fragmentId: number,
+  massToRemoveKg: number,
 ): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
-  // TODO: implement
-  throw new Error('not implemented');
+  if (!Number.isFinite(massToRemoveKg) || massToRemoveKg <= 0) return null;
+
+  const tracked = state.fragments.find(
+    f => f.fragment.id === fragmentId && f.state === 'stored',
+  );
+  if (!tracked) return null;
+
+  const fragment = tracked.fragment;
+  if (massToRemoveKg >= fragment.mass) return null;
+
+  const fraction = massToRemoveKg / fragment.mass;
+  const removedVolume = fragment.volume * fraction;
+  const removedOreDensities = { ...fragment.oreDensities };
+
+  fragment.mass -= massToRemoveKg;
+  fragment.volume -= removedVolume;
+  const shrink = Math.cbrt(1 - fraction);
+  fragment.halfExtents = vec3(
+    fragment.halfExtents.x * shrink,
+    fragment.halfExtents.y * shrink,
+    fragment.halfExtents.z * shrink,
+  );
+
+  state.storedMassKg -= massToRemoveKg;
+
+  return {
+    mass: massToRemoveKg,
+    volume: removedVolume,
+    oreDensities: removedOreDensities,
+  };
 }
 
 /**
@@ -177,14 +207,36 @@ export function consumeStoredOre(
     let tally = 0;
     for (const id of storedIds) {
       if (tally >= amountKg) break;
-      const sold = sellFragment(state, id);
-      if (!sold) continue;
-      const acc: Record<string, number> = {};
-      accumulateOreMass(acc, sold.volume, sold.oreDensities);
-      for (const [oreId, kg] of Object.entries(acc)) {
-        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+
+      const tracked = state.fragments.find(f => f.fragment.id === id && f.state === 'stored');
+      if (!tracked) continue;
+
+      const remaining = amountKg - tally;
+      const probe: Record<string, number> = {};
+      accumulateOreMass(probe, tracked.fragment.volume, tracked.fragment.oreDensities);
+      const contribution = probe[materialId] ?? 0;
+
+      if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+        const sold = sellFragment(state, id);
+        if (!sold) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, sold.volume, sold.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += acc[materialId] ?? 0;
+      } else {
+        const massSlice = remaining * (tracked.fragment.mass / contribution);
+        const split = splitStoredFragmentMass(state, id, massSlice);
+        if (!split) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, split.volume, split.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += remaining;
+        break;
       }
-      tally += acc[materialId] ?? 0;
     }
 
     return { success: true, consumedKg: Math.min(tally, amountKg) };
@@ -207,9 +259,23 @@ export function consumeStoredOre(
   let removedMass = 0;
   for (const id of storedIds) {
     if (removedMass >= amountKg) break;
-    const sold = sellFragment(state, id);
-    if (!sold) continue;
-    removedMass += sold.mass;
+
+    const tracked = state.fragments.find(f => f.fragment.id === id && f.state === 'stored');
+    if (!tracked) continue;
+
+    const remaining = amountKg - removedMass;
+    const contribution = tracked.fragment.mass;
+
+    if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+      const sold = sellFragment(state, id);
+      if (!sold) continue;
+      removedMass += sold.mass;
+    } else {
+      const split = splitStoredFragmentMass(state, id, remaining);
+      if (!split) continue;
+      removedMass += remaining;
+      break;
+    }
   }
 
   return { success: true, consumedKg: Math.min(removedMass, amountKg) };
