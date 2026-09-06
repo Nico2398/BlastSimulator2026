@@ -81,10 +81,23 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, and either undriven
- * (driverId === null) or already driven by `employee` themself (the
- * continuity case — lets a claim naturally re-pick the vehicle the
- * employee is already sitting in for their next same-role task).
+ * (reservedForActionId === null), not `broken`, not already mid vehicle-gated
+ * fragment work (haulingPhase/breakPhase both null — #974 follow-up: a
+ * debris_hauler/rock_fragmenter driven out-of-band by the manual `vehicle
+ * haul`/`vehicle break` console command never sets reservedForActionId, so
+ * without this check a continuity claim could "free-ride" a driver who
+ * appears idle to the dispatch system onto a vehicle that is, in reality,
+ * already mid-haul/mid-break on unrelated cargo. The claim would then fail
+ * at promotion time (requestHaulFragment/requestBreakBoulder's own
+ * already-busy guard) and releaseVehicleReservationKeepDriver's
+ * abortVehicleGatedFragmentWork call would abort that unrelated in-flight
+ * work, discarding real progress instead of the harmless no-op it was before
+ * #974 — traced via blast-oversized-boulders.integration.test.ts's manually
+ * hauled piece being aborted mid-drive by a same-tick self-dispatch claim for
+ * a different fragment), and either undriven (driverId === null) or already
+ * driven by `employee` themself (the continuity case — lets a claim
+ * naturally re-pick the vehicle the employee is already sitting in for their
+ * next same-role task).
  * Ties broken by lowest vehicle id. Read-only — never mutates.
  * Returns null when none qualify.
  */
@@ -95,6 +108,8 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.state !== 'broken' &&
     v.reservedForActionId === null &&
+    v.haulingPhase === null &&
+    v.breakPhase === null &&
     (v.driverId === null || v.driverId === employee.id),
   );
   if (qualifying.length === 0) return null;

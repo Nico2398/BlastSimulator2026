@@ -126,7 +126,10 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
   );
   if (!building) {
     if (vehicle.haulingFragmentId !== null) {
-      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid);
+      // #974 follow-up: drop at the vehicle's current position, not the
+      // fragment's stale pre-pickup one — see returnFragmentToGround's own
+      // doc comment.
+      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
     }
     abortHaul(vehicle);
     return;
