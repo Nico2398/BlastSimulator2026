@@ -16,7 +16,8 @@ import {
   isRampSegmentClaimable, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
+import { releaseActionToOpenPool } from './TaskCancellation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
@@ -126,6 +127,23 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // automatically if its target ever becomes walkable again (a blast,
       // e.g.), it just no longer blocks this employee from doing anything
       // else in the meantime.
+      //
+      // #954 follow-up (economy-full-loop regression): a vehicle-gated entry
+      // among those same unreachable candidates may be reserved to a vehicle
+      // nobody has boarded yet, with a different, already-idle, already-
+      // licensed employee standing by who could use it right now —
+      // canReassignStrandedReservation's own doc comment (VehicleReservation.ts)
+      // has the full trace. Handing it back to the open pool here, rather
+      // than leaving it locked to this employee until its own retry
+      // eventually succeeds (which resolveActionCost's #954 occupancy
+      // check can now correctly refuse forever), lets that other employee
+      // claim it the very next time they're offered the pool below.
+      for (const candidate of candidates) {
+        if (canReassignStrandedReservation(state, candidate)) {
+          employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
+          releaseActionToOpenPool(state, candidate);
+        }
+      }
     }
   }
 

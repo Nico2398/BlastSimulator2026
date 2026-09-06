@@ -18,6 +18,7 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
+import { findFreeVehicleForRole } from './VehicleReservation.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -161,6 +162,56 @@ export function estimateActionCost(state: GameState, employee: Employee, action:
 }
 
 /**
+ * The coordinate `employee` must actually walk to on foot to work `action` —
+ * the action's own target for an ordinary on-foot action, but for a
+ * vehicle-gated one (#954 follow-up, economy-full-loop regression) the
+ * RESERVED VEHICLE's own current position instead: promoteVehicleGatedAction/
+ * requestBoardVehicle (VehicleReservation.ts) send the employee walking to
+ * board the vehicle first, never straight to the action's own cargo target —
+ * only the vehicle itself drives there afterward (moveVehicle). Using
+ * action.targetX/targetZ here for a vehicle-gated action validated
+ * reachability against a coordinate the employee's own foot-walk never goes
+ * near, which cuts both ways: a claim could pass with a cargo target that
+ * happens to read as "occupied" (so avoidVehicles' exemption falls out in its
+ * favor) while the real walk to a perfectly reachable vehicle never needed
+ * that exemption at all, or — the regression this fixes — a claim could pass
+ * purely because the cargo target's own occupancy happened to disable
+ * avoidVehicles for that resolution, while the real walk (to the reserved
+ * vehicle's unoccupied, and therefore avoidVehicles-enabled, cell) finds the
+ * employee's current position boxed in by fragment occupancy on every
+ * neighbour cell — genuinely unreachable, but reported claimable anyway.
+ * Direct-traced via economy-full-loop.json: a driver mid-shift on a
+ * rock_fragmenter reserves a debris_hauler haul action ahead of time
+ * (reserveOnePoolActionAhead); by the time that reservation is promoted, the
+ * rubble their own rock-breaking work just produced surrounds their current
+ * cell on all 8 sides, and the debris_hauler's own spawn cell was never
+ * marked vehicleOccupied (only a NavGrid rebuild or an actual drive seeds
+ * that flag — a freshly bought, never-yet-driven vehicle has neither) — so
+ * `isDestinationOccupied` on the vehicle's real position reads false,
+ * avoidVehicles stays enabled for that walk, and a boxed-in employee has no
+ * legal first step at all, regardless of distance. Falls back to the
+ * action's own target when no vehicle is reserved yet and none is currently
+ * free (defensive — findVehicleForClaim's own isClaimable gate normally
+ * prevents resolveActionCost from ever being asked about such a candidate),
+ * and when `employee` already holds the reserved vehicle's driverId (the
+ * continuity case — already boarded, no further foot-walk needed at all).
+ */
+function resolveVehicleGatedWalkTarget(state: GameState, employee: Employee, action: PendingAction): { x: number; z: number } {
+  if (action.requiredVehicleRole === null) {
+    return { x: action.targetX, z: action.targetZ };
+  }
+
+  const reserved = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  const vehicle = reserved ?? findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
+
+  if (vehicle === null || vehicle.driverId === employee.id) {
+    return { x: action.targetX, z: action.targetZ };
+  }
+
+  return { x: vehicle.x, z: vehicle.z };
+}
+
+/**
  * Real findPath-based cost for `employee` performing `action`, or `null` if
  * the target is unreachable on the current NavGrid.
  *
@@ -168,6 +219,10 @@ export function estimateActionCost(state: GameState, employee: Employee, action:
  * tickEmployeeMovement's own fallback (EntityMovementTick.ts): the target is
  * treated as directly reachable via a straight line, so this never returns
  * null purely for lack of a NavGrid.
+ *
+ * The walk target itself is resolveVehicleGatedWalkTarget's own concern (see
+ * its doc comment) — a vehicle-gated action's real foot-walk goes to the
+ * reserved vehicle, not the action's cargo target.
  *
  * avoidVehicles mirrors tickEmployeeMovement's own rule for the exact same
  * walk (#954 follow-up fix): an employee's foot travel avoids vehicle/
@@ -196,18 +251,19 @@ export function estimateActionCost(state: GameState, employee: Employee, action:
  */
 export function resolveActionCost(state: GameState, employee: Employee, action: PendingAction): { totalTicks: number } | null {
   const workTicks = computeActionWorkTicks(state, employee, action);
+  const walkTarget = resolveVehicleGatedWalkTarget(state, employee, action);
 
   if (state.navGrid === null) {
-    return { totalTicks: estimateTravelTicks(employee, action) + workTicks };
+    return { totalTicks: cellsToTravelTicks(octileHeuristic(employee.x, employee.z, walkTarget.x, walkTarget.z)) + workTicks };
   }
 
   const path = findPath(state.navGrid, {
     agentId: employee.id,
     fromX: employee.x,
     fromZ: employee.z,
-    toX: action.targetX,
-    toZ: action.targetZ,
-    avoidVehicles: !isDestinationOccupied(state, action.targetX, action.targetZ),
+    toX: walkTarget.x,
+    toZ: walkTarget.z,
+    avoidVehicles: !isDestinationOccupied(state, walkTarget.x, walkTarget.z),
   });
 
   if (!path.found) return null;
