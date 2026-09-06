@@ -1085,6 +1085,12 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     vehicle.state = 'moving';
     vehicle.targetX = 10;
     vehicle.targetZ = 21; // crater floor — unreachable, no ramp dug
+    // A real vehicle-gated claim always sets this at claim time
+    // (findFreeVehicleForRole/promoteVehicleGatedAction) — releaseVehicleReservation
+    // (called from within interruptActiveAction) looks the vehicle up by this
+    // field, not by driverId, so leaving it unset would silently no-op the
+    // vehicle-side dismount on sustained-stuck release.
+    vehicle.reservedForActionId = action.id;
     driver.activeActionId = action.id;
 
     let releasedAtTick = -1;

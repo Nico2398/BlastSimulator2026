@@ -258,6 +258,12 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     vehicle.state = 'moving';
     vehicle.targetX = targetX;
     vehicle.targetZ = targetZ;
+    // A real vehicle-gated claim always sets this at claim time
+    // (findFreeVehicleForRole/promoteVehicleGatedAction) — releaseVehicleReservation
+    // (called from within interruptActiveAction) looks the vehicle up by this
+    // field, not by driverId, so leaving it unset would silently no-op the
+    // vehicle-side dismount below.
+    vehicle.reservedForActionId = actionId;
     driver.activeActionId = actionId;
     return action;
   }
