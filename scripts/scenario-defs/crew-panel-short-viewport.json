@@ -53,12 +53,12 @@
         { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
         { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" },
         { "type": "screenshot" },
-        { "type": "assert", "selector": "#bs-employee-panel .bsx-panel-body", "property": "scrollTop", "expectedValue": 0 },
+        { "type": "assert", "selector": "#bs-employee-panel .bsx-roster-scroll", "property": "scrollTop", "expectedValue": 0 },
         { "type": "mousemove", "x": 190, "y": 300 },
         { "type": "wheel", "deltaX": 0, "deltaY": 50 },
         {
           "type": "waitForProperty",
-          "selector": "#bs-employee-panel .bsx-panel-body",
+          "selector": "#bs-employee-panel .bsx-roster-scroll",
           "property": "scrollTop",
           "expectedValue": 50,
           "timeoutMs": 5000
