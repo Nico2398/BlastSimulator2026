@@ -195,13 +195,16 @@ function resolveDepotApproach(state: GameState, building: Building, vehicle: Veh
  * haul so GameLoop's completion pass can still find the vehicle to continue
  * or release it.
  *
- * Exported for Evacuation.ts (#557): a vehicle mid-haul is driven by this
- * file's own tickHaulingProgress loop, not the generic mover — evacuating one
- * has to abort the haul first (clearing haulingPhase) or the tick loop keeps
+ * Internal to this file (#994 — no longer exported: Evacuation.ts's own
+ * vehicle-abort now goes through FragmentTaskLifecycle.ts's
+ * abortVehicleGatedFragmentWork, which reaches this via
+ * abortHaulReturningCargo below rather than calling it directly). A vehicle
+ * mid-haul is driven by this file's own tickHaulingProgress loop, not the
+ * generic mover — aborting has to clear haulingPhase or the tick loop keeps
  * skipping it (see EntityMovementTick.ts's tickVehicle-skip condition) even
  * after moveVehicle stages a new target.
  */
-export function abortHaul(vehicle: Vehicle): void {
+function abortHaul(vehicle: Vehicle): void {
   vehicle.haulingFragmentId = null;
   vehicle.haulingPhase = null;
   vehicle.haulingDepotBuildingId = null;
