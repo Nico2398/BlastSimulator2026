@@ -202,7 +202,9 @@ function highestFragmentId(state: GameState): number {
  * without this the vehicle would stay permanently reserved for an action
  * nothing will ever complete.
  *
- * Exported for Evacuation.ts (#557): mirrors HaulingTask.ts's abortHaul — a
+ * Exported (#994) because FragmentTaskLifecycle.ts's
+ * abortVehicleGatedFragmentWork calls this directly — Evacuation.ts no
+ * longer calls it itself, instead routing through that shared helper. A
  * vehicle mid-break is driven by this file's own tickBreakProgress loop, and
  * evacuating one needs breakPhase cleared first so it stops fighting the
  * evacuation's own moveVehicle target.
