@@ -81,9 +81,7 @@ export function deliverToDepot(
   fragmentId: number,
   collectedOre?: Record<string, number>,
 ): boolean {
-  const tracked = state.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'in_transit',
-  );
+  const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
   tracked.state = 'stored';
@@ -104,6 +102,11 @@ type RemovedFragmentMass = { mass: number; volume: number; oreDensities: Record<
 /** Find a fragment currently in storage by id, or undefined when absent/not stored. */
 function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
   return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+}
+
+/** Find a fragment currently in transit by id, or undefined when absent/not in transit. */
+function findInTransitFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
 }
 
 /**
@@ -358,9 +361,7 @@ export function returnFragmentToGround(
   navGrid?: NavGrid | null,
   dropPosition?: { x: number; y: number; z: number },
 ): boolean {
-  const tracked = state.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'in_transit',
-  );
+  const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
   tracked.state = 'on_ground';

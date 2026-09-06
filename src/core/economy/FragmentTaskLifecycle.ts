@@ -22,11 +22,10 @@ import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
-import { returnFragmentToGround } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { tickVehicle } from '../engine/EntityMovementTick.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { requestHaulFragment, abortHaul } from './HaulingTask.js';
+import { requestHaulFragment, abortHaulReturningCargo } from './HaulingTask.js';
 import { requestBreakBoulder, abortBreak } from './BoulderBreaking.js';
 
 /**
@@ -158,15 +157,14 @@ export function startVehicleGatedFragmentWork(
  */
 export function abortVehicleGatedFragmentWork(state: GameState, vehicle: Vehicle): void {
   if (vehicle.haulingPhase !== null) {
-    if (vehicle.haulingFragmentId !== null) {
-      // Drop cargo wherever the vehicle currently sits, not back at the
-      // fragment's original pre-pickup position (#974 follow-up — see
-      // returnFragmentToGround's own doc comment for the livelock this
-      // avoids when a fatigue policy interrupts faster than one haul leg
-      // can complete).
-      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
-    }
-    abortHaul(vehicle);
+    // Drop any cargo wherever the vehicle currently sits, not back at the
+    // fragment's original pre-pickup position (#974 follow-up — see
+    // returnFragmentToGround's own doc comment for the livelock this avoids
+    // when a fatigue policy interrupts faster than one haul leg can
+    // complete), then clear the haul state (HaulingTask.ts's
+    // abortHaulReturningCargo — shared with tickHaulingProgress's own
+    // missing-depot-building abort branch).
+    abortHaulReturningCargo(state, vehicle);
     return;
   }
 

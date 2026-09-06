@@ -125,13 +125,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     b => b.id === vehicle.haulingDepotBuildingId && b.active,
   );
   if (!building) {
-    if (vehicle.haulingFragmentId !== null) {
-      // #974 follow-up: drop at the vehicle's current position, not the
-      // fragment's stale pre-pickup one — see returnFragmentToGround's own
-      // doc comment.
-      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
-    }
-    abortHaul(vehicle);
+    abortHaulReturningCargo(state, vehicle);
     return;
   }
 
@@ -214,4 +208,20 @@ export function abortHaul(vehicle: Vehicle): void {
   vehicle.payloadKg = 0;
   vehicle.task = 'idle';
   vehicle.reservedForActionId = null;
+}
+
+/**
+ * Abort `vehicle`'s in-progress haul, returning any cargo already picked up
+ * to the ground first (dropped at the vehicle's current position, not the
+ * fragment's stale pre-pickup one — see returnFragmentToGround's own doc
+ * comment) before clearing the haul state via abortHaul. Shared by
+ * tickHaulingProgress's missing-depot-building branch above and
+ * FragmentTaskLifecycle.ts's abortVehicleGatedFragmentWork (#974 fixer round
+ * follow-up: both ran this identical two-step sequence independently).
+ */
+export function abortHaulReturningCargo(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.haulingFragmentId !== null) {
+    returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  }
+  abortHaul(vehicle);
 }

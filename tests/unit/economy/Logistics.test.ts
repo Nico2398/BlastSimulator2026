@@ -737,4 +737,33 @@ describe('returnFragmentToGround', () => {
     const tracked = state.fragments.find(f => f.fragment.id === 1)!;
     expect(tracked.state).toBe('on_ground');
   });
+
+  it('when dropPosition is provided, relocates the fragment there instead of leaving it at its stale pre-pickup position (#974)', () => {
+    const state = createLogisticsState();
+    // Fragment's ORIGINAL recorded position (where the blast placed it).
+    addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
+    pickupFragment(state, 1, 'truck-01');
+
+    // Vehicle's CURRENT position, partway through its 'to_depot' leg —
+    // clearly different from the fragment's original position.
+    const dropPosition = { x: 50, y: 0, z: 30 };
+    const ok = returnFragmentToGround(state, 1, undefined, dropPosition);
+
+    expect(ok).toBe(true);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.fragment.position).toEqual(dropPosition);
+    expect(tracked.fragment.position).not.toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('when dropPosition is omitted, the fragment reverts to its own already-recorded position', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
+    pickupFragment(state, 1, 'truck-01');
+
+    const ok = returnFragmentToGround(state, 1);
+
+    expect(ok).toBe(true);
+    const tracked = state.fragments.find(f => f.fragment.id === 1)!;
+    expect(tracked.fragment.position).toEqual({ x: 0, y: 0, z: 0 });
+  });
 });

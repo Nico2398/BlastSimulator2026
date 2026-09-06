@@ -136,6 +136,54 @@ describe('findFreeVehicleForRole', () => {
 
     expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
   });
+
+  // #974 follow-up: findFreeVehicleForRole must exclude a vehicle already
+  // mid vehicle-gated fragment work (haulingPhase/breakPhase set) even though
+  // it looks "free" by the pre-existing checks (no reservedForActionId, no
+  // driver) — otherwise a same-tick self-dispatch claim can "free-ride" onto
+  // a vehicle a manual `vehicle haul`/`vehicle break` console command drove
+  // out-of-band, tearing down its unrelated in-flight work on release. See
+  // this function's own doc comment for the full trace
+  // (blast-oversized-boulders.integration.test.ts).
+  it('excludes an otherwise-free vehicle whose haulingPhase is set (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.haulingPhase = 'to_fragment';
+
+    expect(findFreeVehicleForRole(state, 'debris_hauler', employee)).toBeNull();
+  });
+
+  it('excludes an otherwise-free vehicle whose breakPhase is set (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
+    vehicle.breakPhase = 'to_boulder';
+
+    expect(findFreeVehicleForRole(state, 'rock_fragmenter', employee)).toBeNull();
+  });
+
+  it('returns the vehicle when haulingPhase and breakPhase are both null (exclusion is specific, not overly broad) (#974)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.haulingPhase = null;
+    vehicle.breakPhase = null;
+
+    const picked = findFreeVehicleForRole(state, 'debris_hauler', employee);
+
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(vehicle.id);
+  });
 });
 
 describe('reserveVehicle', () => {

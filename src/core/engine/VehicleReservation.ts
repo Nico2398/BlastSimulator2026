@@ -253,18 +253,33 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
 }
 
 /**
+ * Shared prefix of releaseVehicleReservation and releaseVehicleReservationKeepDriver:
+ * find the vehicle reserved for `actionId`, abort any in-flight vehicle-gated
+ * fragment work on it (returning cargo to the ground first if mid-haul), and
+ * clear the reservation. Returns the vehicle for the caller's own remaining
+ * logic (driver unassignment vs. driver retention), or null when no vehicle
+ * is reserved for `actionId` — the caller returns early exactly as before in
+ * that case.
+ */
+function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return null;
+
+  abortVehicleGatedFragmentWork(state, vehicle);
+  vehicle.reservedForActionId = null;
+  return vehicle;
+}
+
+/**
  * Unconditional release: clears reservedForActionId, and if the vehicle
  * currently has a driver, unassigns them and resets task/state to idle.
  * Used by cancellation, needs-interruption, and the death/destruction
  * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
  */
 export function releaseVehicleReservation(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  const vehicle = findAndAbortReservedVehicle(state, actionId);
   if (!vehicle) return;
 
-  abortVehicleGatedFragmentWork(state, vehicle);
-
-  vehicle.reservedForActionId = null;
   if (vehicle.driverId !== null) {
     // #593/#922: EntityMovementTick.tickVehicle already calls
     // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
@@ -296,12 +311,7 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
  * is reserved for `actionId`.
  */
 export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
-  if (!vehicle) return;
-
-  abortVehicleGatedFragmentWork(state, vehicle);
-
-  vehicle.reservedForActionId = null;
+  findAndAbortReservedVehicle(state, actionId);
 }
 
 /**
