@@ -7,8 +7,7 @@ import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../ent
 import { clearZone, isInZone } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
-import { abortHaul } from '../economy/HaulingTask.js';
-import { abortBreak } from '../economy/BoulderBreaking.js';
+import { abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import type { Employee } from '../entities/Employee.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import {
@@ -159,8 +158,11 @@ export function findSafeEvacuationCell(
  * destination, and interruptActiveAction would stomp it if run after.
  * Likewise, a vehicle mid-haul or mid-break is driven by HaulingTask.ts's/
  * BoulderBreaking.ts's own phase loops rather than the generic mover, so its
- * phase is aborted first — otherwise clearZone's moveVehicle call stages a
- * target the tick loop never advances toward (see EntityMovementTick.ts's
+ * phase is aborted first via abortVehicleGatedFragmentWork (FragmentTaskLifecycle.ts,
+ * #974/#994) — which also returns any already-picked-up cargo to the ground
+ * before clearing the haul, so a mid-'to_depot' evacuation doesn't strand the
+ * fragment in transit forever — otherwise clearZone's moveVehicle call stages
+ * a target the tick loop never advances toward (see EntityMovementTick.ts's
  * tickVehicle-skip condition on haulingPhase/reservedForActionId).
  */
 export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResult {
@@ -202,8 +204,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
 
   for (const vehicle of state.vehicles.vehicles) {
     if (!isInZone(vehicle.x, vehicle.z, zone)) continue;
-    if (vehicle.haulingPhase !== null) abortHaul(vehicle);
-    if (vehicle.breakPhase !== null) abortBreak(vehicle);
+    abortVehicleGatedFragmentWork(state, vehicle);
   }
 
   // Stamp every already-queued, unheld action (targetEmployeeId === null or
