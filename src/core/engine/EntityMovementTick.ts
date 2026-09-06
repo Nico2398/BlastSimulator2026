@@ -7,7 +7,7 @@
 // logic, split out once it pushed this file past the 300-line limit (#591).
 
 import type { GameState } from '../state/GameState.js';
-import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, unassignDriver, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { isCellOccupied } from '../nav/NavGrid.js';
@@ -205,7 +205,27 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
         : undefined;
       if (driver) {
         const actionId = driver.activeActionId;
+        // interruptActiveAction only releases the vehicle (dismount + idle,
+        // via releaseVehicleReservation) as a side effect of finding a
+        // PendingAction matching actionId. A vehicle driven manually via the
+        // console (`vehicle driver` to board, `vehicle move` to drive) has no
+        // PendingAction at all — actionId is null, interruptActiveAction
+        // short-circuits, and driverId/task/state are left untouched. Without
+        // the explicit dismount below, the vehicle re-accumulates
+        // moveConsecutiveFailures and hits this same branch again ~30 ticks
+        // later, forever, never actually freeing the driver or the vehicle
+        // (#986 review follow-up). Mirrors releaseVehicleReservation's own
+        // driver-dismount block exactly, so the two release paths (via a
+        // PendingAction, or none at all) leave the vehicle in the same idle,
+        // driverless state; when interruptActiveAction already performed the
+        // dismount above (a matching PendingAction existed), driverId is
+        // already null here and this is a no-op.
         interruptActiveAction(state, driver, actionId, { forceOpenPool: true });
+        if (vehicle.driverId !== null) {
+          syncDriverPosition(state, vehicle);
+          unassignDriver(state.vehicles, vehicle.id);
+          setVehicleIdle(vehicle);
+        }
         emitter?.emit('vehicle:action_abandoned', { vehicleId: vehicle.id, employeeId: driver.id, actionId });
       }
       vehicle.moveConsecutiveFailures = 0;
