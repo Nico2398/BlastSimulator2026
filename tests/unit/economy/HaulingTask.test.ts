@@ -472,6 +472,35 @@ describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
 // otherwise a hauler and a fragmenter sent to the same boulder would park in
 // different places.
 
+// ── tickHaulingProgress — NavGrid fragment-occupancy clearing (#954) ───────
+//
+// Pickup at the fragment ('to_fragment' -> 'to_depot' transition) clears the
+// fragment's own cell occupant count via NavGrid.removeFragmentOccupant —
+// only ever indirectly covered before, through Logistics.addBlastFragments's
+// own wiring in the full-loop integration test.
+
+describe('tickHaulingProgress — NavGrid fragment-occupancy clearing (#954)', () => {
+  it('clears the fragment cell\'s occupancy count on pickup', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    placeWarehouse(state, 10, 10);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)], state.navGrid);
+    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
+    requestHaulFragment(state, vehicle.id, 1);
+
+    // Arrived: task idle, position matches the fragment.
+    vehicle.task = 'idle';
+    vehicle.x = 5;
+    vehicle.z = 5;
+
+    tickHaulingProgress(state, vehicle);
+
+    expect(state.logistics.fragments[0]!.state).toBe('in_transit');
+    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(0);
+  });
+});
+
 describe('fragmentApproachCell — shared between hauling and breaking (#484)', () => {
   it('haul and break resolve the same approach cell for equivalent fragments at the same position', () => {
     const haulState = createGame({ seed: SEED });

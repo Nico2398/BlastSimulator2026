@@ -113,6 +113,9 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
   let nextId = Math.max(highestFragmentId(state), originalId) + 1;
   const idx = state.logistics.fragments.indexOf(tracked);
   if (idx >= 0) state.logistics.fragments.splice(idx, 1);
+  const cellX = Math.round(tracked.fragment.position.x);
+  const cellZ = Math.round(tracked.fragment.position.z);
+  state.navGrid?.removeFragmentOccupant(cellX, cellZ);
 
   // Fixture/parent fragments built by hand (e.g. in tests) may omit
   // halfExtents even though FragmentData declares it required — fall back to
@@ -135,6 +138,7 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
       shapeSeed: rng.nextInt(0, 0x7fffffff),
     };
     state.logistics.fragments.push({ fragment: newFragment, state: 'on_ground', vehicleId: null });
+    state.navGrid?.addFragmentOccupant(cellX, cellZ);
   }
 
   // Inlined instead of calling abortBreak (#552): a successful split must

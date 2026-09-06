@@ -105,6 +105,51 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   return qualifying.reduce((lowest, v) => (v.id < lowest.id ? v : lowest));
 }
 
+/**
+ * True when a vehicle-gated action still sitting in a holder's taskQueue
+ * (reserved via reserveOnePoolActionAhead, #611, but never promoted to
+ * active) can be safely handed to a different employee instead of staying
+ * locked to `action.holderId` (#954 follow-up, economy-full-loop
+ * regression): the reserved vehicle exists, nobody has boarded it yet
+ * (driverId === null — no drive progress to lose by releasing), and a
+ * DIFFERENT living, idle, role-licensed employee exists right now who could
+ * actually use it.
+ *
+ * Exists because reserveOnePoolActionAhead reserves the vehicle the instant
+ * a busy employee claims ahead, long before that employee ever walks toward
+ * it — usually a brief lock, but resolveActionCost's own #954 occupancy
+ * check (ActionSelection.ts) can now correctly and PERMANENTLY refuse to
+ * promote a claim whose holder's own foot-walk to the vehicle is genuinely
+ * blocked (e.g. boxed in by the very fragment debris their own prior vehicle
+ * work produced), and nothing previously re-evaluated a reservation that
+ * never even started walking — a second, already-idle, already-licensed
+ * employee standing right next to the reserved vehicle stayed locked out of
+ * it forever. Direct-traced via economy-full-loop.json: a rock_fragmenter
+ * driver reserves the site's only debris_hauler ahead of time, then produces
+ * enough of its own rubble to box itself in before ever boarding it, while
+ * the debris_hauler's own already-idle, already-licensed driver waits beside
+ * the vehicle the whole time.
+ *
+ * Scoped to `driverId === null` so this only ever discards a reservation
+ * nobody has started executing — real boarding/driving progress has its own
+ * dedicated interruption machinery (interruptActiveAction) and is never
+ * touched here.
+ */
+export function canReassignStrandedReservation(state: GameState, action: PendingAction): boolean {
+  if (action.requiredVehicleRole === null) return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  if (!vehicle || vehicle.driverId !== null) return false;
+
+  const role = action.requiredVehicleRole;
+  return state.employees.employees.some(other =>
+    other.id !== action.holderId
+    && other.alive
+    && other.activeActionId === null
+    && other.restTicksRemaining === null
+    && isLicensedForRole(other, role),
+  );
+}
+
 /** Marks `vehicle` reserved for `actionId`. Caller must have already confirmed the vehicle came from findFreeVehicleForRole this same tick. */
 export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
   vehicle.reservedForActionId = actionId;

@@ -7,13 +7,28 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid } from './NavGrid.js';
-import { isStepClimbable } from './NavGrid.js';
+import { isStepClimbable, isCellOccupied } from './NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
   const cell = navGrid.cellAt(x, z);
   return !!cell && cell.type !== 'blocked' && cell.type !== 'void';
+}
+
+/**
+ * True when a cell is currently vehicle- or fragment-occupied (#954). Mirrors
+ * EntityMovementTick.ts's own isDestinationOccupied, but works from a bare
+ * NavGrid rather than GameState — this module never imports GameState
+ * (dev-architecture layering: NavGridReachability sits below the engine
+ * tier), and every call site here already holds a NavGrid reference.
+ *
+ * Used by findNearestTraversableCell/findNearestReachableCell's optional
+ * avoidOccupancy mode (#954 follow-up fix) — see that parameter's own doc
+ * comment for why entity-spawn placement needs it.
+ */
+function isOccupiedCell(navGrid: NavGrid, x: number, z: number): boolean {
+  return isCellOccupied(navGrid.cellAt(x, z));
 }
 
 /**
@@ -27,14 +42,35 @@ export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boole
  * pockets walled off by 'void' on every side — nearest-by-distance can land
  * on one of those. Callers that need an actually reachable point should use
  * findNearestReachableCell instead.
+ *
+ * avoidOccupancy (#954 follow-up fix, default false — every pre-existing
+ * caller's behaviour is unchanged): when true, a vehicle- or fragment-
+ * occupied cell (isOccupiedCell) is treated the same as 'blocked'/'void' —
+ * present but unusable — even though its NavCell `type` still reads
+ * 'walkable'. Entity-spawn placement (hire, vehicle purchase) needs this: a
+ * spawn point whose raw target sits inside a dense post-blast fragment field
+ * is still "traversable" by cell type, so without this flag it is accepted
+ * unmoved even when every one of its neighbours is also occupied — an
+ * employee spawned there can never take a single step (isImpassable blocks
+ * fragment-occupied neighbours for foot travel, #954), and monopolizes any
+ * pool action targeting that area via ActionSelection.ts's own reachability
+ * check forever, since nothing ever relocates them. Confirmed live:
+ * tutorial-playthrough.json's own manager and driver both hired at the
+ * world-centre spawn point, which landed squarely inside the fresh blast
+ * crater's fragment field — both permanently boxed in, both re-claiming (and
+ * re-failing) the same freight_warehouse order for 400+ ticks.
  */
 export function findNearestTraversableCell(
   navGrid: NavGrid,
   x: number,
   z: number,
   maxRadius: number = Math.max(navGrid.width, navGrid.height),
+  avoidOccupancy: boolean = false,
 ): { x: number; z: number } {
-  if (isTraversableCell(navGrid, x, z)) return { x, z };
+  const usable = (cx: number, cz: number): boolean =>
+    isTraversableCell(navGrid, cx, cz) && (!avoidOccupancy || !isOccupiedCell(navGrid, cx, cz));
+
+  if (usable(x, z)) return { x, z };
 
   for (let r = 1; r <= maxRadius; r++) {
     let best: { x: number; z: number } | null = null;
@@ -44,7 +80,7 @@ export function findNearestTraversableCell(
         if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // ring only
         const cx = x + dx;
         const cz = z + dz;
-        if (!isTraversableCell(navGrid, cx, cz)) continue;
+        if (!usable(cx, cz)) continue;
         const distSq = dx * dx + dz * dz;
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
@@ -94,6 +130,12 @@ export function findNearestTraversableCell(
  * routing for this call entirely, rather than attempting to stabilize its
  * ramp selection (a larger, riskier change to Pathfinding.ts's stateless,
  * recomputed-fresh-every-tick design).
+ *
+ * avoidOccupancy (#954 follow-up fix, default false — every pre-existing
+ * caller's behaviour is unchanged): threaded straight through to
+ * findNearestTraversableCell (the anchor snap) and floodFillReachable (the
+ * reachable-set walk) — see findNearestTraversableCell's own doc comment for
+ * why entity-spawn placement needs it.
  */
 export function findNearestReachableCell(
   navGrid: NavGrid,
@@ -101,12 +143,15 @@ export function findNearestReachableCell(
   anchorZ: number,
   targetX: number,
   targetZ: number,
+  avoidOccupancy: boolean = false,
 ): { x: number; z: number } {
-  const anchor = findNearestTraversableCell(navGrid, anchorX, anchorZ);
-  if (!isTraversableCell(navGrid, anchor.x, anchor.z)) return { x: targetX, z: targetZ };
+  const anchor = findNearestTraversableCell(navGrid, anchorX, anchorZ, undefined, avoidOccupancy);
+  if (!isTraversableCell(navGrid, anchor.x, anchor.z) || (avoidOccupancy && isOccupiedCell(navGrid, anchor.x, anchor.z))) {
+    return { x: targetX, z: targetZ };
+  }
 
   // 8-directional flood fill from the anchor — same adjacency A* uses.
-  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z);
+  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z, false, avoidOccupancy);
   const anchorLevel = navGrid.cellAt(anchor.x, anchor.z)?.benchLevel;
 
   let best = anchor;
@@ -336,12 +381,19 @@ const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
  * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_CLIMB_HEIGHT`
  * per step (#953), which is what makes the fill match `findPath`'s own
  * neighbour expansion exactly rather than only its impassability check.
+ *
+ * `avoidOccupancy` (#954 follow-up fix, default false — every pre-existing
+ * caller unchanged) additionally refuses a vehicle- or fragment-occupied
+ * neighbour, mirroring `Pathfinding.isImpassable`'s own `avoidVehicles: true`
+ * rule for foot travel — see `findNearestTraversableCell`'s own doc comment
+ * for why entity-spawn placement (the only caller that passes true) needs it.
  */
 function floodFillReachable(
   navGrid: NavGrid,
   anchorX: number,
   anchorZ: number,
   climbAware: boolean = false,
+  avoidOccupancy: boolean = false,
 ): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
@@ -364,6 +416,7 @@ function floodFillReachable(
       const nx = x + dx;
       const nz = z + dz;
       if (!isTraversableCell(navGrid, nx, nz)) continue;
+      if (avoidOccupancy && isOccupiedCell(navGrid, nx, nz)) continue;
       if (climbAware && !isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;

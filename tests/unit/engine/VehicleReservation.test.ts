@@ -19,6 +19,7 @@ import {
   releaseVehicleOnCompletion,
   reconcileVehicleReservations,
   isMidVehicleGatedWork,
+  canReassignStrandedReservation,
 } from '../../../src/core/engine/VehicleReservation.js';
 // reconcileVehicleReservations no longer performs the interruption itself
 // (import-cycle fix, #550) — it only reports which actions need it. Unit
@@ -454,5 +455,115 @@ describe('isMidVehicleGatedWork', () => {
     vehicle.driverId = otherDriver.id; // reservation exists, but this employee never boarded it
 
     expect(isMidVehicleGatedWork(state, employee)).toBe(false);
+  });
+});
+
+// #954 follow-up: a vehicle-gated queue entry reserved via
+// reserveOnePoolActionAhead, but never boarded (driverId still null), can
+// otherwise stay locked to its holder forever once resolveActionCost's own
+// occupancy check correctly and permanently refuses to promote a claim whose
+// holder's own foot-walk to the vehicle is genuinely blocked. No test
+// previously referenced this predicate by name.
+describe('canReassignStrandedReservation', () => {
+  it('is true: reserved vehicle has no driver yet, and a different idle, licensed employee exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 1, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+    // vehicle.driverId stays null — never boarded.
+
+    expect(canReassignStrandedReservation(state, action)).toBe(true);
+  });
+
+  it('is false when the action requires no vehicle role (boundary: requiredVehicleRole null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    hireEmployee(state.employees, 'driller', rng); // a different idle employee exists, but is moot here
+    const action = makeAction(state, { id: 2, holderId: holder.id, status: 'assigned', requiredVehicleRole: null });
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when no vehicle is currently reserved for the action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const action = makeAction(state, { id: 3, holderId: holder.id, status: 'assigned' });
+    // No purchaseVehicle/reservedForActionId set for this action at all.
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when the reserved vehicle already has a driver — real boarding progress must never be discarded here', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 4, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+    vehicle.driverId = holder.id; // already boarded — has a driver
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when no other employee is licensed for the role, even though one is idle', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    hireEmployee(state.employees, 'driller', rng); // idle, but no driving.drill_rig qualification assigned
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 5, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when the only licensed other employee is not idle (mid-task)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    other.activeActionId = 999; // busy on a different action
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 6, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when the only licensed other employee is resting', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    other.restTicksRemaining = 5;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 7, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
+  });
+
+  it('is false when the reservation\'s own holder is the only licensed idle employee (excluded — self is never the reassignment target)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, holder.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const action = makeAction(state, { id: 8, holderId: holder.id, status: 'assigned' });
+    vehicle.reservedForActionId = action.id;
+
+    expect(canReassignStrandedReservation(state, action)).toBe(false);
   });
 });

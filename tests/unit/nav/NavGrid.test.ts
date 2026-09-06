@@ -21,6 +21,8 @@ import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { createVehicleState, purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -95,6 +97,28 @@ function makeBlastPlan(holes: DrillHole[]) {
 /** Standard test grid: 20 × 10 × 20, solid rock y=0..4. */
 function makeTestGrid(): VoxelGrid {
   return makeSolidGrid(20, 10, 20, 4);
+}
+
+/** Minimal FragmentData fixture resting on the ground at (x, z) (#954). */
+function makeGroundFragment(id: number, x: number, z: number): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 1,
+    mass: 100,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
+}
+
+/** Stationary Vehicle fixture parked at (x, z) (#954). */
+function makeParkedVehicle(x: number, z: number): Vehicle {
+  const fleet = createVehicleState();
+  return purchaseVehicle(fleet, 'debris_hauler', x, z).vehicle;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1071,6 +1095,49 @@ describe('NavGrid.findNearestTraversableCell', () => {
     const result = NavGrid.findNearestTraversableCell(nav, 0, 0, 2);
     expect(result).toEqual({ x: 0, z: 0 });
   });
+
+  // ── avoidOccupancy (#954 follow-up fix) ───────────────────────────────────
+  // A vehicle- or fragment-occupied cell is still 'walkable' by NavCell type,
+  // so without this flag it is accepted unmoved even though foot travel
+  // (Pathfinding.isImpassable, avoidVehicles: true) refuses to step onto it.
+
+  it('with avoidOccupancy, treats a fragment-occupied cell as non-traversable and searches past it (#954)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.addFragmentOccupant(1, 1);
+
+    expect(NavGrid.findNearestTraversableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+    const result = NavGrid.findNearestTraversableCell(nav, 1, 1, undefined, true);
+    expect(result).not.toEqual({ x: 1, z: 1 });
+    expect(nav.cells[result.z]![result.x]!.fragmentOccupancy ?? 0).toBe(0);
+  });
+
+  it('with avoidOccupancy, treats a vehicleOccupied cell as non-traversable and searches past it (#954)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.cells[1]![1]!.vehicleOccupied = true;
+
+    const result = NavGrid.findNearestTraversableCell(nav, 1, 1, undefined, true);
+    expect(result).not.toEqual({ x: 1, z: 1 });
+    expect(nav.cells[result.z]![result.x]!.vehicleOccupied).toBe(false);
+  });
+
+  it('without avoidOccupancy (default), an occupied cell is still accepted unchanged (boundary — every pre-existing caller keeps its behavior)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.addFragmentOccupant(1, 1);
+
+    expect(NavGrid.findNearestTraversableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+  });
 });
 
 describe('NavGrid.findNearestReachableCell', () => {
@@ -1175,6 +1242,48 @@ describe('NavGrid.findNearestReachableCell', () => {
 
     const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4);
     expect(nav.cells[result.z]![result.x]!.benchLevel).toBe(0);
+  });
+
+  // ── avoidOccupancy (#954 follow-up fix) ───────────────────────────────────
+  // Entity-spawn placement (employee hire, vehicle purchase) needs a spawn
+  // point an entity can actually take a foot-step away from — a target that
+  // is 'walkable' by cell type but boxed in by fragment/vehicle occupancy on
+  // every neighbour cell is otherwise accepted unmoved, stranding whoever
+  // spawns there exactly as before #954 introduced occupancy blocking.
+
+  it('with avoidOccupancy, does not accept a target boxed in by fragment occupancy on every neighbour cell, even though it is itself walkable (#954)', () => {
+    // 7×7, entirely walkable — fragments ring every one of the 8 neighbours
+    // of (3,3), matching a dense post-blast field an employee could spawn
+    // into. (3,3) itself stays clear (an occupied START cell is not what
+    // this guards against — Pathfinding's own isAgentCell exemption already
+    // covers that; this is about the cell being unable to go anywhere).
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      nav.addFragmentOccupant(x, z);
+    }
+
+    // Sanity: without avoidOccupancy, the boxed-in cell is accepted as
+    // "reachable" unchanged — the #954 defect this call site's own fix
+    // (employees.ts/vehicle.ts) guards against.
+    expect(NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3)).toEqual({ x: 3, z: 3 });
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3, true);
+
+    expect(result).not.toEqual({ x: 3, z: 3 });
+    const resultCell = nav.cells[result.z]![result.x]!;
+    expect(resultCell.fragmentOccupancy ?? 0).toBe(0);
+    expect(resultCell.vehicleOccupied).toBe(false);
+  });
+
+  it('with avoidOccupancy, still returns the target unchanged when it and its neighbours are unoccupied (happy path)', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4, true);
+    expect(result).toEqual({ x: 4, z: 4 });
   });
 });
 
@@ -1357,5 +1466,193 @@ describe('NavGrid.findNearestNavigableCell', () => {
       Array.from({ length: 3 }, (): NavCellType => 'void'));
 
     expect(NavGrid.findNearestNavigableCell(makeNavGridFromTypes(rows), 1, 1)).toEqual({ x: 1, z: 1 });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 21: addFragmentOccupant / removeFragmentOccupant (#954)
+//
+// A cell occupied by an on-ground fragment or a standing vehicle must be
+// impassable to foot pathfinding, same as a building. fragmentOccupancy is a
+// count (not a flag) — maintained incrementally as fragments spawn, break
+// apart, and get hauled away — so it must never go negative and must be a
+// pure no-op outside the grid's covered box.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
+  it('addFragmentOccupant marks a cell occupied (fragmentOccupancy > 0)', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cellAt(3, 3)!.fragmentOccupancy ?? 0).toBe(0);
+
+    nav.addFragmentOccupant(3, 3);
+
+    expect(nav.cellAt(3, 3)!.fragmentOccupancy).toBeGreaterThan(0);
+  });
+
+  it('removeFragmentOccupant returns an occupied cell back to 0', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    nav.addFragmentOccupant(3, 3);
+    expect(nav.cellAt(3, 3)!.fragmentOccupancy).toBeGreaterThan(0);
+
+    nav.removeFragmentOccupant(3, 3);
+
+    expect(nav.cellAt(3, 3)!.fragmentOccupancy).toBe(0);
+  });
+
+  it('addFragmentOccupant increments across multiple fragments sharing a cell', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    nav.addFragmentOccupant(4, 4);
+    nav.addFragmentOccupant(4, 4);
+    nav.addFragmentOccupant(4, 4);
+
+    expect(nav.cellAt(4, 4)!.fragmentOccupancy).toBe(3);
+  });
+
+  it('removeFragmentOccupant floors at 0 — never goes negative when removed more times than added', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    nav.addFragmentOccupant(5, 5);
+
+    nav.removeFragmentOccupant(5, 5);
+    nav.removeFragmentOccupant(5, 5);
+    nav.removeFragmentOccupant(5, 5);
+
+    expect(nav.cellAt(5, 5)!.fragmentOccupancy).toBe(0);
+  });
+
+  it('addFragmentOccupant is a no-op outside the grid bounds — does not throw', () => {
+    const grid = makeSolidGrid(5, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    expect(() => nav.addFragmentOccupant(999, 999)).not.toThrow();
+    expect(() => nav.addFragmentOccupant(-5, -5)).not.toThrow();
+    // No in-bounds cell was accidentally touched.
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        expect(nav.cellAt(x, z)!.fragmentOccupancy ?? 0).toBe(0);
+      }
+    }
+  });
+
+  it('removeFragmentOccupant is a no-op outside the grid bounds — does not throw', () => {
+    const grid = makeSolidGrid(5, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    expect(() => nav.removeFragmentOccupant(999, 999)).not.toThrow();
+    expect(() => nav.removeFragmentOccupant(-5, -5)).not.toThrow();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 22: patchNavGrid preserves occupancy fields (#954)
+//
+// A patch recomputes a cell's type/moveCost/benchLevel from the voxel grid,
+// buildings and drill holes — but a fragment sitting on the ground or a
+// vehicle parked there is tracked independently of any of those inputs, so a
+// patch must carry the OLD cell's occupancy fields into the NEW cell it
+// builds rather than resetting them to the makeCell defaults (false / 0).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.patchNavGrid — preserves vehicle/fragment occupancy (#954)', () => {
+  it('preserves vehicleOccupied: true on a cell inside the patched region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    nav.cellAt(4, 4)!.vehicleOccupied = true;
+
+    // Patch the region without changing terrain — still expect the flag to survive.
+    const region: BlastRegion = { minX: 4, maxX: 4, minZ: 4, maxZ: 4 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    expect(nav.cellAt(4, 4)!.vehicleOccupied).toBe(true);
+  });
+
+  it('preserves fragmentOccupancy > 0 on a cell inside the patched region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    nav.addFragmentOccupant(4, 4);
+    const before = nav.cellAt(4, 4)!.fragmentOccupancy;
+    expect(before).toBeGreaterThan(0);
+
+    const region: BlastRegion = { minX: 4, maxX: 4, minZ: 4, maxZ: 4 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    expect(nav.cellAt(4, 4)!.fragmentOccupancy).toBe(before);
+  });
+
+  it('preserves both vehicleOccupied and fragmentOccupancy together across a patch that also changes cell type', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    nav.cellAt(2, 2)!.vehicleOccupied = true;
+    nav.addFragmentOccupant(2, 2);
+
+    // Add a drill hole so the patch actually changes the cell's type/moveCost —
+    // occupancy must survive a real type transition, not just a no-op patch.
+    const holes: DrillHole[] = [{ id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 }];
+    const region: BlastRegion = { minX: 2, maxX: 2, minZ: 2, maxZ: 2 };
+    NavGrid.patchNavGrid(nav, grid, [], holes, region);
+
+    expect(nav.cellAt(2, 2)!.type).toBe('drill_hole');
+    expect(nav.cellAt(2, 2)!.vehicleOccupied).toBe(true);
+    expect(nav.cellAt(2, 2)!.fragmentOccupancy).toBeGreaterThan(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 23: buildNavGrid seeds occupancy from groundFragments/vehicles (#954)
+//
+// A rebuilt or reloaded NavGrid must re-seed occupancy from the game's live
+// fragments/vehicles rather than losing it — buildNavGrid's new params exist
+// for exactly this (GameState.buildGameNavGrid wires them through).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicles (#954)', () => {
+  it('seeds fragmentOccupancy on the cell under each ground fragment', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const fragments: FragmentData[] = [makeGroundFragment(1, 6, 6)];
+
+    const nav = NavGrid.buildNavGrid(grid, [], [], fragments, []);
+
+    expect(nav.cellAt(6, 6)!.fragmentOccupancy).toBeGreaterThan(0);
+    // A cell with no fragment stays unoccupied.
+    expect(nav.cellAt(0, 0)!.fragmentOccupancy ?? 0).toBe(0);
+  });
+
+  it('accumulates fragmentOccupancy when multiple fragments share a cell', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const fragments: FragmentData[] = [
+      makeGroundFragment(1, 6, 6),
+      makeGroundFragment(2, 6, 6),
+    ];
+
+    const nav = NavGrid.buildNavGrid(grid, [], [], fragments, []);
+
+    expect(nav.cellAt(6, 6)!.fragmentOccupancy).toBe(2);
+  });
+
+  it('seeds vehicleOccupied: true on the cell under a parked vehicle', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const vehicle = makeParkedVehicle(7, 7);
+
+    const nav = NavGrid.buildNavGrid(grid, [], [], [], [vehicle]);
+
+    expect(nav.cellAt(7, 7)!.vehicleOccupied).toBe(true);
+    // A cell with no vehicle stays unoccupied.
+    expect(nav.cellAt(0, 0)!.vehicleOccupied).toBe(false);
+  });
+
+  it('defaults to unoccupied when groundFragments/vehicles are omitted', () => {
+    const grid = makeSolidGrid(5, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        expect(nav.cellAt(x, z)!.fragmentOccupancy ?? 0).toBe(0);
+        expect(nav.cellAt(x, z)!.vehicleOccupied).toBe(false);
+      }
+    }
   });
 });

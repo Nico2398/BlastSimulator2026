@@ -5,7 +5,8 @@
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
-import type { BlastRegion } from '../mining/BlastExecution.js';
+import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
@@ -42,22 +43,49 @@ export interface NavCell {
    * tickVehicle/tickEmployeeMovement's own per-tick pathfinds both request
    * avoidVehicles:false and instead do vehicle-vs-vehicle collision avoidance
    * by comparing live x/z directly (see isCellOccupiedByOtherVehicle in
-   * EntityMovementTick.ts) — this field plays no part in that. The one caller
-   * that does set it is the vehicle-occupancy-reroute escalation path
-   * (handleVehicleOccupancyBlock/findPathAvoidingOtherVehicles in
-   * VehicleOccupancyReroute.ts, #591): once a vehicle has waited
-   * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks on a blocked next cell, it
-   * temporarily marks every other live vehicle's current cell true, requests
-   * avoidVehicles:true for a one-shot reroute, then reverts the marks in a
-   * finally block before returning — no lasting mutation to the grid.
+   * EntityMovementTick.ts) — this field plays no part in that. The
+   * vehicle-occupancy-reroute escalation path (handleVehicleOccupancyBlock/
+   * findPathAvoidingOtherVehicles in VehicleOccupancyReroute.ts, #591) still
+   * sets it transiently the same way it always has. Since #954 it is also
+   * maintained persistently by EntityMovementTick's per-vehicle tick (set
+   * true on the vehicle's current cell while stationary, cleared when it
+   * starts/finishes moving) and seeded by buildNavGrid, so it doubles as a
+   * standing "a vehicle physically occupies this cell" flag that foot
+   * pathfinding (avoidVehicles:true, employees) treats as impassable via
+   * Pathfinding.isImpassable.
    */
   vehicleOccupied: boolean;
+  /**
+   * Count of on-ground fragments mapped to this cell. Absent/zero means no
+   * fragment occupies the cell. Optional — like `surfaceY` — so hand-built
+   * test fixtures that predate #954 keep compiling unmodified. Maintained
+   * incrementally by addFragmentOccupant/removeFragmentOccupant as
+   * fragments are created/hauled/broken; never recomputed by a full navgrid
+   * rebuild.
+   */
+  fragmentOccupancy?: number;
   /**
    * Column's absolute world Y at classification time. Populated only by
    * buildNavGrid/patchNavGrid; undefined for hand-built test fixtures that
    * don't model terrain height (#953).
    */
   surfaceY?: number;
+}
+
+/**
+ * True when `cell` is currently vehicle- or fragment-occupied (#954) — the
+ * single shared definition of "occupied", consolidated here after the exact
+ * same `cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0` expression
+ * had been written three times independently: Pathfinding.ts's isImpassable,
+ * NavGridReachability.ts's isOccupiedCell, and EntityMovementTick.ts's
+ * isDestinationOccupied. Takes the cell directly rather than a NavGrid plus
+ * coordinates so it stays usable from NavGridReachability.ts, which never
+ * imports GameState (dev-architecture layering) — every call site already
+ * holds or can cheaply resolve its own cell reference. `undefined` (an
+ * out-of-bounds or not-yet-built cell) is never occupied.
+ */
+export function isCellOccupied(cell: NavCell | undefined): boolean {
+  return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
 }
 
 export class NavGrid {
@@ -116,6 +144,28 @@ export class NavGrid {
     if (row && x >= this.originX && x < this.maxX) row[x - this.originX] = cell;
   }
 
+  /**
+   * Mark that an on-ground fragment now occupies world (x, z), incrementing
+   * the cell's fragmentOccupancy in place (#954). No-op outside the covered
+   * box.
+   */
+  addFragmentOccupant(x: number, z: number): void {
+    const cell = this.cellAt(x, z);
+    if (!cell) return;
+    cell.fragmentOccupancy = (cell.fragmentOccupancy ?? 0) + 1;
+  }
+
+  /**
+   * Mark that an on-ground fragment no longer occupies world (x, z),
+   * decrementing the cell's fragmentOccupancy in place (#954). No-op outside
+   * the covered box.
+   */
+  removeFragmentOccupant(x: number, z: number): void {
+    const cell = this.cellAt(x, z);
+    if (!cell) return;
+    cell.fragmentOccupancy = Math.max(0, (cell.fragmentOccupancy ?? 0) - 1);
+  }
+
   /** Clamp world x into the covered box. */
   clampX(x: number): number {
     return Math.max(this.originX, Math.min(this.maxX - 1, Math.round(x)));
@@ -163,11 +213,17 @@ export class NavGrid {
   /**
    * Build a full NavGrid from the voxel grid, buildings, and drill holes.
    * Each cell is classified as walkable, blocked, drill_hole, ramp, or void.
+   *
+   * `groundFragments` and `vehicles` seed the per-cell fragmentOccupancy/
+   * vehicleOccupied counts at build time (#954); both default to empty so
+   * existing callers are unaffected until wired up.
    */
   static buildNavGrid(
     voxelGrid: VoxelGrid,
     buildings: Building[],
     drillHoles: DrillHole[],
+    groundFragments: FragmentData[] = [],
+    vehicles: Vehicle[] = [],
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
@@ -194,7 +250,18 @@ export class NavGrid {
       cells.push(row);
     }
 
-    return new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
+    const navGrid = new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
+
+    for (const fragment of groundFragments) {
+      navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
+    }
+    for (const vehicle of vehicles) {
+      if (vehicle.state === 'moving') continue;
+      const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
+      if (cell) cell.vehicleOccupied = true;
+    }
+
+    return navGrid;
   }
 
   /**
@@ -230,14 +297,25 @@ export class NavGrid {
 
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
-        if (navGrid.cellAt(x, z)!.benchLevel === 0) mayHaveLoweredThePeak = true;
+        const oldCell = navGrid.cellAt(x, z)!;
+        if (oldCell.benchLevel === 0) mayHaveLoweredThePeak = true;
         if (!voxelGrid.containsColumn(x, z)) {
+          // Column no longer exists — nothing to carry forward.
           navGrid.setCellAt(x, z, NavGrid.makeCell('void', 0));
           continue;
         }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY), surfaceY));
+        navGrid.setCellAt(
+          x, z,
+          NavGrid.makeCell(
+            cellType,
+            NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY),
+            surfaceY,
+            oldCell.vehicleOccupied,
+            oldCell.fragmentOccupancy ?? 0,
+          ),
+        );
       }
     }
 
@@ -264,14 +342,16 @@ export class NavGrid {
     x: number,
     z: number,
     maxRadius: number = Math.max(navGrid.width, navGrid.height),
+    avoidOccupancy: boolean = false,
   ): { x: number; z: number } {
-    return reachability.findNearestTraversableCell(navGrid, x, z, maxRadius);
+    return reachability.findNearestTraversableCell(navGrid, x, z, maxRadius, avoidOccupancy);
   }
 
   /**
    * Find the nearest cell to (targetX, targetZ) actually path-connected to
    * (anchorX, anchorZ). See NavGridReachability.findNearestReachableCell
-   * for the full doc.
+   * for the full doc, including the avoidOccupancy (#954 follow-up fix)
+   * parameter entity-spawn placement passes true for.
    */
   static findNearestReachableCell(
     navGrid: NavGrid,
@@ -279,8 +359,9 @@ export class NavGrid {
     anchorZ: number,
     targetX: number,
     targetZ: number,
+    avoidOccupancy: boolean = false,
   ): { x: number; z: number } {
-    return reachability.findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ);
+    return reachability.findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ, avoidOccupancy);
   }
 
   /**
@@ -350,7 +431,13 @@ export class NavGrid {
   /**
    * Create a NavCell with the given type and appropriate move cost.
    */
-  private static makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
+  private static makeCell(
+    type: NavCellType,
+    benchLevel: number = 0,
+    surfaceY?: number,
+    vehicleOccupied: boolean = false,
+    fragmentOccupancy: number = 0,
+  ): NavCell {
     let moveCost: number;
     switch (type) {
       case 'walkable': moveCost = 1.0; break;
@@ -364,6 +451,6 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
+    return { type, moveCost, benchLevel, vehicleOccupied, fragmentOccupancy, ...(surfaceY !== undefined && { surfaceY }) };
   }
 }

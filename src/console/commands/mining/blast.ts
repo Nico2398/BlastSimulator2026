@@ -161,7 +161,7 @@ export function blastCommand(
   // Track blast fragments in logistics for contract delivery. collectedOre is
   // only credited once a fragment is hauled and delivered to a warehouse
   // (see Logistics.deliverToDepot), not the instant the blast resolves.
-  addBlastFragments(state.logistics, result.fragments);
+  addBlastFragments(state.logistics, result.fragments, state.navGrid);
 
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];

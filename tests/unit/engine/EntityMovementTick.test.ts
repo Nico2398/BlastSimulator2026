@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition, isDestinationOccupied } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -169,6 +169,58 @@ describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', 
     expect(stuckEvents).toEqual([vehicle.id]);
     expect(vehicle.isMoveStuck).toBe(true);
     expect(vehicle.waitingTicks).toBe(STUCK_THRESHOLD + 1);
+  });
+});
+
+// ── tickVehicle — NavCell.vehicleOccupied lifecycle (#954) ──────────────────
+// updateVehicleCellOccupancy keeps NavCell.vehicleOccupied in sync with a
+// vehicle's own current cell — set while stationary, cleared the instant it
+// starts moving, set again on the new cell once it parks there. No test
+// previously drove a vehicle through a full park -> drive -> park cycle and
+// asserted the flag actually flips on both ends.
+
+describe('tickVehicle — NavCell.vehicleOccupied lifecycle (#954)', () => {
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  it('flips NavCell.vehicleOccupied through a park -> drive -> park cycle', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 5, 2);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        vg.setVoxel(x, 0, z, solidVoxel());
+      }
+    }
+    // No vehicles passed here — buildNavGrid's own vehicle-seeding is
+    // deliberately unused so the flag's only source, through this test, is
+    // updateVehicleCellOccupancy itself.
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    // #947: a driverless vehicle never advances on tick at all.
+    vehicle.driverId = 1;
+
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(false);
+
+    // Stationary (task still 'idle'): one tick marks the parked cell occupied.
+    tickVehicle(state, vehicle);
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(true);
+
+    // Drive away toward (3, 0).
+    vehicle.task = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 0;
+    for (let i = 0; i < 20 && !(vehicle.state === 'idle' && vehicle.x === 3 && vehicle.z === 0); i++) {
+      tickVehicle(state, vehicle);
+    }
+    expect(vehicle.x).toBe(3);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('idle'); // fully arrived and re-settled
+
+    // OLD cell cleared once the vehicle left it; NEW cell marked once parked.
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(false);
+    expect(state.navGrid.cellAt(3, 0)!.vehicleOccupied).toBe(true);
   });
 });
 
@@ -1299,5 +1351,53 @@ describe('tickEmployeeMovement — sustained-stuck action abandonment (#938)', (
     expect(actionA.holderId).toBeNull();
     expect(actionB.status).toBe('queued');
     expect(actionB.holderId).toBeNull();
+  });
+});
+
+// ── isDestinationOccupied (#954 follow-up fix) ──────────────────────────────
+// Exported so ActionSelection.ts's resolveActionCost can apply the exact same
+// occupied-destination exemption tickEmployeeMovement's own avoidVehicles
+// rule already uses — see that call site's own doc comment.
+
+describe('isDestinationOccupied (#954 follow-up fix)', () => {
+  const SEED = 42;
+
+  function buildFlatNavGridState(): GameState {
+    const state = createGame({ seed: SEED });
+    const vg = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  it('is false for an ordinary unoccupied walkable cell (happy path)', () => {
+    const state = buildFlatNavGridState();
+    expect(isDestinationOccupied(state, 2, 2)).toBe(false);
+  });
+
+  it('is true for a cell marked vehicleOccupied', () => {
+    const state = buildFlatNavGridState();
+    const cell = state.navGrid!.cellAt(2, 2)!;
+    cell.vehicleOccupied = true;
+    expect(isDestinationOccupied(state, 2, 2)).toBe(true);
+  });
+
+  it('is true for a cell carrying fragmentOccupancy > 0 (#954)', () => {
+    const state = buildFlatNavGridState();
+    state.navGrid!.addFragmentOccupant(2, 2);
+    expect(isDestinationOccupied(state, 2, 2)).toBe(true);
+  });
+
+  it('is false with no NavGrid built yet, or for a cell outside the grid (rejection/boundary)', () => {
+    const state = createGame({ seed: SEED });
+    expect(state.navGrid).toBeNull();
+    expect(isDestinationOccupied(state, 2, 2)).toBe(false);
+
+    const withGrid = buildFlatNavGridState();
+    expect(isDestinationOccupied(withGrid, 999, 999)).toBe(false);
   });
 });
