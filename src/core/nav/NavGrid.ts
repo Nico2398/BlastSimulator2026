@@ -326,14 +326,16 @@ export class NavGrid {
     x: number,
     z: number,
     maxRadius: number = Math.max(navGrid.width, navGrid.height),
+    avoidOccupancy: boolean = false,
   ): { x: number; z: number } {
-    return reachability.findNearestTraversableCell(navGrid, x, z, maxRadius);
+    return reachability.findNearestTraversableCell(navGrid, x, z, maxRadius, avoidOccupancy);
   }
 
   /**
    * Find the nearest cell to (targetX, targetZ) actually path-connected to
    * (anchorX, anchorZ). See NavGridReachability.findNearestReachableCell
-   * for the full doc.
+   * for the full doc, including the avoidOccupancy (#954 follow-up fix)
+   * parameter entity-spawn placement passes true for.
    */
   static findNearestReachableCell(
     navGrid: NavGrid,
@@ -341,8 +343,9 @@ export class NavGrid {
     anchorZ: number,
     targetX: number,
     targetZ: number,
+    avoidOccupancy: boolean = false,
   ): { x: number; z: number } {
-    return reachability.findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ);
+    return reachability.findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ, avoidOccupancy);
   }
 
   /**

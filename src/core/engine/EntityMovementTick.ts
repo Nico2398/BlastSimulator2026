@@ -328,8 +328,13 @@ export interface EmployeeMovementResult {
  * fragment-occupied (#954). Used to decide, per walk, whether an employee's
  * own destination is a cell they must be able to stand on regardless of
  * occupancy — see tickEmployeeMovement's avoidVehicles comment.
+ *
+ * Exported (#954 follow-up fix) so ActionSelection.ts's resolveActionCost can
+ * apply the exact same occupied-destination exemption to its own claim-time
+ * reachability check — see that call site's own comment for why the two must
+ * agree.
  */
-function isDestinationOccupied(state: GameState, x: number, z: number): boolean {
+export function isDestinationOccupied(state: GameState, x: number, z: number): boolean {
   const cell = state.navGrid?.cellAt(Math.round(x), Math.round(z));
   return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
 }

@@ -230,7 +230,14 @@ export function resolveTaskCompletion(
               const cx = Math.round(other.x);
               const cz = Math.round(other.z);
               if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
-              const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, other.x, other.z);
+              // avoidOccupancy: true (#954 follow-up fix): this relocates a
+              // living, foot-travelling employee, so the same fragment-/
+              // vehicle-occupancy rule their own foot travel obeys (#954)
+              // must gate the cell they get relocated onto — otherwise this
+              // sweep could "rescue" them from a newly-blocked footprint
+              // straight into a fragment-boxed spot with the same problem.
+              // See NavGrid.findNearestReachableCell's own doc comment.
+              const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, other.x, other.z, true);
               other.x = nearest.x;
               other.z = nearest.z;
             }

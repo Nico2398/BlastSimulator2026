@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState, syncDriverPosition, isDestinationOccupied } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -1299,5 +1299,53 @@ describe('tickEmployeeMovement — sustained-stuck action abandonment (#938)', (
     expect(actionA.holderId).toBeNull();
     expect(actionB.status).toBe('queued');
     expect(actionB.holderId).toBeNull();
+  });
+});
+
+// ── isDestinationOccupied (#954 follow-up fix) ──────────────────────────────
+// Exported so ActionSelection.ts's resolveActionCost can apply the exact same
+// occupied-destination exemption tickEmployeeMovement's own avoidVehicles
+// rule already uses — see that call site's own doc comment.
+
+describe('isDestinationOccupied (#954 follow-up fix)', () => {
+  const SEED = 42;
+
+  function buildFlatNavGridState(): GameState {
+    const state = createGame({ seed: SEED });
+    const vg = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  it('is false for an ordinary unoccupied walkable cell (happy path)', () => {
+    const state = buildFlatNavGridState();
+    expect(isDestinationOccupied(state, 2, 2)).toBe(false);
+  });
+
+  it('is true for a cell marked vehicleOccupied', () => {
+    const state = buildFlatNavGridState();
+    const cell = state.navGrid!.cellAt(2, 2)!;
+    cell.vehicleOccupied = true;
+    expect(isDestinationOccupied(state, 2, 2)).toBe(true);
+  });
+
+  it('is true for a cell carrying fragmentOccupancy > 0 (#954)', () => {
+    const state = buildFlatNavGridState();
+    state.navGrid!.addFragmentOccupant(2, 2);
+    expect(isDestinationOccupied(state, 2, 2)).toBe(true);
+  });
+
+  it('is false with no NavGrid built yet, or for a cell outside the grid (rejection/boundary)', () => {
+    const state = createGame({ seed: SEED });
+    expect(state.navGrid).toBeNull();
+    expect(isDestinationOccupied(state, 2, 2)).toBe(false);
+
+    const withGrid = buildFlatNavGridState();
+    expect(isDestinationOccupied(withGrid, 999, 999)).toBe(false);
   });
 });

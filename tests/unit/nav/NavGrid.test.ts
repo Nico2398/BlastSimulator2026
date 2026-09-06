@@ -1095,6 +1095,49 @@ describe('NavGrid.findNearestTraversableCell', () => {
     const result = NavGrid.findNearestTraversableCell(nav, 0, 0, 2);
     expect(result).toEqual({ x: 0, z: 0 });
   });
+
+  // ── avoidOccupancy (#954 follow-up fix) ───────────────────────────────────
+  // A vehicle- or fragment-occupied cell is still 'walkable' by NavCell type,
+  // so without this flag it is accepted unmoved even though foot travel
+  // (Pathfinding.isImpassable, avoidVehicles: true) refuses to step onto it.
+
+  it('with avoidOccupancy, treats a fragment-occupied cell as non-traversable and searches past it (#954)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.addFragmentOccupant(1, 1);
+
+    expect(NavGrid.findNearestTraversableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+    const result = NavGrid.findNearestTraversableCell(nav, 1, 1, undefined, true);
+    expect(result).not.toEqual({ x: 1, z: 1 });
+    expect(nav.cells[result.z]![result.x]!.fragmentOccupancy ?? 0).toBe(0);
+  });
+
+  it('with avoidOccupancy, treats a vehicleOccupied cell as non-traversable and searches past it (#954)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.cells[1]![1]!.vehicleOccupied = true;
+
+    const result = NavGrid.findNearestTraversableCell(nav, 1, 1, undefined, true);
+    expect(result).not.toEqual({ x: 1, z: 1 });
+    expect(nav.cells[result.z]![result.x]!.vehicleOccupied).toBe(false);
+  });
+
+  it('without avoidOccupancy (default), an occupied cell is still accepted unchanged (boundary — every pre-existing caller keeps its behavior)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    nav.addFragmentOccupant(1, 1);
+
+    expect(NavGrid.findNearestTraversableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+  });
 });
 
 describe('NavGrid.findNearestReachableCell', () => {
@@ -1199,6 +1242,48 @@ describe('NavGrid.findNearestReachableCell', () => {
 
     const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4);
     expect(nav.cells[result.z]![result.x]!.benchLevel).toBe(0);
+  });
+
+  // ── avoidOccupancy (#954 follow-up fix) ───────────────────────────────────
+  // Entity-spawn placement (employee hire, vehicle purchase) needs a spawn
+  // point an entity can actually take a foot-step away from — a target that
+  // is 'walkable' by cell type but boxed in by fragment/vehicle occupancy on
+  // every neighbour cell is otherwise accepted unmoved, stranding whoever
+  // spawns there exactly as before #954 introduced occupancy blocking.
+
+  it('with avoidOccupancy, does not accept a target boxed in by fragment occupancy on every neighbour cell, even though it is itself walkable (#954)', () => {
+    // 7×7, entirely walkable — fragments ring every one of the 8 neighbours
+    // of (3,3), matching a dense post-blast field an employee could spawn
+    // into. (3,3) itself stays clear (an occupied START cell is not what
+    // this guards against — Pathfinding's own isAgentCell exemption already
+    // covers that; this is about the cell being unable to go anywhere).
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      nav.addFragmentOccupant(x, z);
+    }
+
+    // Sanity: without avoidOccupancy, the boxed-in cell is accepted as
+    // "reachable" unchanged — the #954 defect this call site's own fix
+    // (employees.ts/vehicle.ts) guards against.
+    expect(NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3)).toEqual({ x: 3, z: 3 });
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3, true);
+
+    expect(result).not.toEqual({ x: 3, z: 3 });
+    const resultCell = nav.cells[result.z]![result.x]!;
+    expect(resultCell.fragmentOccupancy ?? 0).toBe(0);
+    expect(resultCell.vehicleOccupied).toBe(false);
+  });
+
+  it('with avoidOccupancy, still returns the target unchanged when it and its neighbours are unoccupied (happy path)', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4, true);
+    expect(result).toEqual({ x: 4, z: 4 });
   });
 });
 

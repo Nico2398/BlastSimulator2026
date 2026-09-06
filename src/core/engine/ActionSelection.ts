@@ -17,6 +17,7 @@ import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { isDestinationOccupied } from './EntityMovementTick.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -167,6 +168,31 @@ export function estimateActionCost(state: GameState, employee: Employee, action:
  * tickEmployeeMovement's own fallback (EntityMovementTick.ts): the target is
  * treated as directly reachable via a straight line, so this never returns
  * null purely for lack of a NavGrid.
+ *
+ * avoidVehicles mirrors tickEmployeeMovement's own rule for the exact same
+ * walk (#954 follow-up fix): an employee's foot travel avoids vehicle/
+ * fragment-occupied cells, except when the destination itself is occupied
+ * (isDestinationOccupied — boarding a vehicle, charging a hole a drill_rig
+ * still sits on). Before this fix the claim-time reachability check here
+ * always passed avoidVehicles: false, so it could report an action
+ * "reachable" (and cheap) for an employee whose real walk — which DOES avoid
+ * occupied cells — can never actually get there, e.g. an employee standing
+ * inside a dense post-blast fragment field with zero passable neighbour
+ * cells. selectBestActionForEmployee/claimOnePoolCandidate then let that
+ * employee claim the action anyway; EntityMovementTick.ts's own
+ * MOVE_STUCK_ABANDON_TICKS mechanism (#938) would release it back to the pool
+ * ~30 ticks later, but with employees dispatched in ascending-id order and no
+ * other employee ever getting a look-in before this one re-claims the SAME
+ * unreachable action via the SAME false-positive check, the whole cycle
+ * repeats forever — a livelock, not a slow convergence (confirmed live:
+ * tutorial-playthrough.json's own freight_warehouse order, with the one
+ * employee standing on it after a blast permanently boxed in by fragment
+ * occupancy on every one of its 8 neighbour cells, monopolized the claim for
+ * 400+ ticks while a second, unblocked, idle employee stood by, qualified and
+ * reachable, the whole time). Matching the real walk rule here means an
+ * employee this action can never reach now correctly resolves to `null`
+ * (unclaimable), so selectBestActionForEmployee/claimOnePoolCandidate leave
+ * it queued for a genuinely reachable employee instead.
  */
 export function resolveActionCost(state: GameState, employee: Employee, action: PendingAction): { totalTicks: number } | null {
   const workTicks = computeActionWorkTicks(state, employee, action);
@@ -181,7 +207,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
     fromZ: employee.z,
     toX: action.targetX,
     toZ: action.targetZ,
-    avoidVehicles: false,
+    avoidVehicles: !isDestinationOccupied(state, action.targetX, action.targetZ),
   });
 
   if (!path.found) return null;

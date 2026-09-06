@@ -202,6 +202,43 @@ describe('resolveActionCost', () => {
 
     expect(result).toBeNull();
   });
+
+  it('returns null when an employee is boxed in by fragment occupancy on every neighbour cell, even though a vehicle-ignoring path would succeed (#954 follow-up fix)', () => {
+    // Reproduces the #954 livelock's actual mechanism: before this fix,
+    // resolveActionCost always called findPath with avoidVehicles: false, so
+    // it reported a target "reachable" for an employee whose REAL foot travel
+    // (tickEmployeeMovement's own avoidVehicles: true) can never get there —
+    // letting a permanently fragment-trapped employee claim (and re-claim,
+    // forever, once EntityMovementTick's #938 stuck-abandon mechanism handed
+    // it back to the pool) an action no other, genuinely reachable employee
+    // ever got a chance at. Confirmed live via tutorial-playthrough.json's own
+    // freight_warehouse order: the employee standing on it after a blast was
+    // boxed in on all 8 neighbour cells by fragment occupancy and
+    // monopolized the claim for 400+ ticks.
+    const state = makeState(10, 10);
+    const emp = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, targetX: 8, targetZ: 8 });
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
+  });
+
+  it('still resolves a real cost when the DESTINATION itself is occupied (boarding a vehicle standing on it — matches tickEmployeeMovement’s own exemption, boundary)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 5, targetZ: 5 });
+    state.navGrid!.addFragmentOccupant(5, 5); // the target cell itself, not a cell along the route
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).not.toBeNull();
+    expect(result!.totalTicks).toBeGreaterThan(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
