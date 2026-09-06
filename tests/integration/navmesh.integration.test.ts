@@ -12,6 +12,8 @@ import {
   type RampDef,
 } from '../../src/core/mining/Ramp.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../src/core/config/balance.js';
+import { createLogisticsState, addBlastFragments } from '../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,22 @@ function fillSolidColumn(grid: VoxelGrid, x: number, z: number, yMax: number) {
       density: 1.0, oreDensities: {}, fractureModifier: 1.0,
     });
   }
+}
+
+/** Minimal FragmentData fixture resting on the ground at (x, z) (#954). */
+function makeGroundFragment(id: number, x: number, z: number): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 1,
+    mass: 100,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
 }
 
 // ── NavMesh and pathfinding ──────────────────────────────────────────────────
@@ -718,6 +736,59 @@ describe('NavMesh and pathfinding', () => {
       expect(finalResult.voxelsCleared).toBeGreaterThan(0);
       if (finalResult.region) NavGrid.patchNavGrid(nav, grid, [], [], finalResult.region);
       expect(NavGrid.computeSurfaceY(grid, notYetCarvedCell.x, notYetCarvedCell.z)).toBeLessThan(surfaceBeforeNotYet);
+    });
+  });
+
+  // ── #954: tutorial play-test feedback — employees walked through debris and
+  // parked machines after a blast. A cell occupied by an on-ground fragment
+  // must be impassable to foot pathfinding (avoidVehicles: true), and freeing
+  // it (hauling the fragment away) must restore the direct route — exercised
+  // through the real Logistics.addBlastFragments/NavGrid wiring, matching
+  // this file's own convention of driving production core functions directly
+  // rather than through console commands.
+
+  describe('fragment occupancy blocks foot pathfinding (#954)', () => {
+    it('no foot-pathfind route enters a cell still occupied by an on-ground fragment', () => {
+      const vg = new VoxelGrid(10, 10, 10);
+      fillSolid(vg, 4);
+      const nav = NavGrid.buildNavGrid(vg, [], []);
+
+      const logistics = createLogisticsState();
+      // The fragment lands squarely on the shortest route between (0,5) and (9,5).
+      addBlastFragments(logistics, [makeGroundFragment(1, 5, 5)], nav);
+
+      const result = findPath(nav, {
+        agentId: 1, fromX: 0, fromZ: 5, toX: 9, toZ: 5, avoidVehicles: true,
+      });
+
+      expect(result.found).toBe(true);
+      expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 5)).toBe(false);
+    });
+
+    it('once the fragment is hauled away, the direct route through that cell is restored', () => {
+      const vg = new VoxelGrid(10, 10, 10);
+      fillSolid(vg, 4);
+      const nav = NavGrid.buildNavGrid(vg, [], []);
+
+      const logistics = createLogisticsState();
+      addBlastFragments(logistics, [makeGroundFragment(1, 5, 5)], nav);
+
+      // Occupied: the direct route avoids the cell.
+      const blocked = findPath(nav, {
+        agentId: 1, fromX: 0, fromZ: 5, toX: 9, toZ: 5, avoidVehicles: true,
+      });
+      expect(blocked.found).toBe(true);
+      expect(blocked.waypoints.some(wp => wp.x === 5 && wp.z === 5)).toBe(false);
+
+      // Simulate the fragment being picked up and hauled off (HaulingTask's
+      // 'to_fragment' arrival branch calls this same NavGrid API — #954).
+      nav.removeFragmentOccupant(5, 5);
+
+      const restored = findPath(nav, {
+        agentId: 1, fromX: 0, fromZ: 5, toX: 9, toZ: 5, avoidVehicles: true,
+      });
+      expect(restored.found).toBe(true);
+      expect(restored.waypoints.some(wp => wp.x === 5 && wp.z === 5)).toBe(true);
     });
   });
 

@@ -13,7 +13,7 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, octileHeuristic, getBenchLevel, findRampConnections } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
@@ -961,5 +961,122 @@ describe('findPath — climb-limit gating on surfaceY (#953)', () => {
     setCell(grid, 1, 1, 'walkable', { surfaceY: NAV_MAX_CLIMB_HEIGHT + 5 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 14: occupancy avoidance — fragments and vehicles block foot pathfinding,
+// except an agent's own occupied start/goal cell (#954)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('isImpassable — isAgentCell exemption (#954)', () => {
+  it('returns false for a vehicle-occupied cell when isAgentCell is true, even with avoidVehicles true', () => {
+    const cell = makeCell('walkable');
+    cell.vehicleOccupied = true;
+    expect(isImpassable(cell, true, true)).toBe(false);
+  });
+
+  it('returns true for the same vehicle-occupied cell when isAgentCell is false', () => {
+    const cell = makeCell('walkable');
+    cell.vehicleOccupied = true;
+    expect(isImpassable(cell, true, false)).toBe(true);
+  });
+
+  it('returns false for a fragment-occupied cell when isAgentCell is true, even with avoidVehicles true', () => {
+    const cell = makeCell('walkable');
+    cell.fragmentOccupancy = 1;
+    expect(isImpassable(cell, true, true)).toBe(false);
+  });
+
+  it('returns true for the same fragment-occupied cell when isAgentCell is false and avoidVehicles is true', () => {
+    const cell = makeCell('walkable');
+    cell.fragmentOccupancy = 1;
+    expect(isImpassable(cell, true, false)).toBe(true);
+  });
+
+  it('does not exempt a fragment-occupied cell when avoidVehicles is false, regardless of isAgentCell', () => {
+    const cell = makeCell('walkable');
+    cell.fragmentOccupancy = 1;
+    expect(isImpassable(cell, false, false)).toBe(false);
+  });
+
+  it('still blocks a genuinely blocked (building) cell for isAgentCell true — only occupancy flags are exempted, not solidity', () => {
+    const cell = makeCell('blocked');
+    expect(isImpassable(cell, true, true)).toBe(true);
+  });
+
+  it('still blocks a void cell for isAgentCell true', () => {
+    const cell = makeCell('void');
+    expect(isImpassable(cell, true, true)).toBe(true);
+  });
+});
+
+describe('findPath — occupancy avoidance (#954)', () => {
+  it('routes around a fragment-occupied cell (fragmentOccupancy > 0) with avoidVehicles: true, detouring rather than failing', () => {
+    // 10×3 grid, cell (5,1) carries a fragment — the straight route between
+    // (0,1) and (9,1) would otherwise go right through it.
+    const grid = makeFlatGrid(10, 3, 'walkable');
+    setCell(grid, 5, 1, 'walkable', { fragmentOccupancy: 1 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 1, toX: 9, toZ: 1, avoidVehicles: true });
+    expect(result.found).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 1)).toBe(false);
+  });
+
+  it('routes around a vehicle-occupied cell with avoidVehicles: true, detouring rather than failing', () => {
+    const grid = makeFlatGrid(10, 3, 'walkable');
+    setCell(grid, 5, 1, 'walkable', { vehicleOccupied: true });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 1, toX: 9, toZ: 1, avoidVehicles: true });
+    expect(result.found).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 1)).toBe(false);
+  });
+
+  it('an agent can path out of its own vehicle-occupied start cell (isAgentCell exemption)', () => {
+    // 5×5 grid, avoidVehicles: true. The agent's OWN start cell is
+    // vehicle-occupied (e.g. a vehicle spawned onto the same cell the agent
+    // stands on) — the agent must still be able to leave it.
+    const grid = makeFlatGrid(5, 5, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { vehicleOccupied: true });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: true });
+    expect(result.found).toBe(true);
+  });
+
+  it('an agent can path out of its own fragment-occupied start cell (isAgentCell exemption)', () => {
+    const grid = makeFlatGrid(5, 5, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { fragmentOccupancy: 1 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: true });
+    expect(result.found).toBe(true);
+  });
+
+  it('findPath still refuses a DIFFERENT occupied cell that is not the agent\'s own start/goal', () => {
+    // Sanity companion to the exemption tests above: occupancy still blocks
+    // when it is not the agent's own cell. Single-row corridor, no detour
+    // possible, so avoidVehicles: true must fail outright.
+    const grid = makeFlatGrid(5, 1, 'walkable');
+    setCell(grid, 2, 0, 'walkable', { fragmentOccupancy: 1 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 0, avoidVehicles: true });
+    expect(result.found).toBe(false);
+  });
+
+  it('findPath succeeds trivially when start === goal and that single cell is vehicle-occupied', () => {
+    // goal === start, so the goal-cell check's own isAgentCell exemption
+    // applies too — the agent isn't asked to move anywhere.
+    const grid = makeFlatGrid(3, 3, 'walkable');
+    setCell(grid, 1, 1, 'walkable', { vehicleOccupied: true });
+    const result = findPath(grid, { agentId: 1, fromX: 1, fromZ: 1, toX: 1, toZ: 1, avoidVehicles: true });
+    expect(result.found).toBe(true);
+    expect(result.waypoints).toEqual([{ x: 1, z: 1 }]);
+  });
+
+  it('directLineWalk\'s own first-step exemption: finds the direct-line route when only the start cell is occupied, on a grid too large for the A* budget', () => {
+    // 600×1 grid forces findOrdinaryPath through directLineWalk (both as the
+    // initial fast-path attempt and, since A* itself exceeds its node
+    // budget on a corridor this long, the final fallback too) — so this
+    // isolates directLineWalk's own i===0 exemption rather than just the
+    // top-level findPath start-cell check.
+    const grid = makeFlatGrid(600, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { vehicleOccupied: true });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: true });
+    expect(result.found).toBe(true);
+    expect(result.totalCost).toBe(599);
   });
 });

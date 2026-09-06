@@ -150,8 +150,12 @@ class MinHeap<T extends { key: number }> {
  * Check whether a cell blocks traversal. `_isAgentCell` will gate whether a
  * fragment/vehicle-occupied cell is impassable for foot traffic (#954) —
  * unused until the implementation phase wires call sites to it.
+ *
+ * Exported (visibility only, no behaviour change) so
+ * `tests/unit/nav/Pathfinding.test.ts` can exercise the isAgentCell
+ * contract directly rather than only indirectly through findPath (#954).
  */
-function isImpassable(cell: NavCell, avoidVehicles: boolean, _isAgentCell: boolean = false): boolean {
+export function isImpassable(cell: NavCell, avoidVehicles: boolean, _isAgentCell: boolean = false): boolean {
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && cell.vehicleOccupied) return true;
   return false;
