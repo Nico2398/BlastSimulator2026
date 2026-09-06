@@ -190,10 +190,11 @@ export class TutorialOverlay {
    * auto-dismiss the tutorial.
    *
    * Extracted from advanceToNextStep()'s own "reached last step" branch —
-   * behavior unchanged. tickGuide()/onCommandExecuted() will grow a second
-   * call site once state.levelEndReason reports a non-completed defeat
-   * mid-tutorial, short-circuiting straight here instead of only being
-   * reached by stepping through every step in order (#959).
+   * behavior unchanged. Has a second call site in shortCircuitOnDefeat()
+   * (#959), which lands on the same closing step when state.levelEndReason
+   * reports a non-completed defeat mid-tutorial instead of only being
+   * reached by stepping through every step in order; the two share the
+   * "move onto a step" sequence itself via landOnStep(), below.
    */
   private jumpToLastStep(): void {
     this.stopGuide();
@@ -215,15 +216,7 @@ export class TutorialOverlay {
     if (!reason || reason === 'completed') return false;
     if (this.stepIndex >= LAST_STEP_INDEX) return false;
 
-    this.rails.releaseClock(this.gameState);
-    this.pausedEl.style.display = 'none';
-
-    this.stepIndex = LAST_STEP_INDEX;
-    this.rails.beginStep(this.step(), this.gameState);
-    if (this.gameState) {
-      this.captureSnapshotForCurrentStep();
-    }
-    this.render();
+    this.landOnStep(LAST_STEP_INDEX);
     this.jumpToLastStep();
     return true;
   }
@@ -237,23 +230,35 @@ export class TutorialOverlay {
       return;
     }
 
-    // From the first advance on, the simulation has to run: survey, drilling,
-    // hauling and contract delivery are queued work that only resolves on a tick.
+    this.landOnStep(this.stepIndex + 1, () => this.runAutoCommands());
+
+    if (this.stepIndex === LAST_STEP_INDEX) {
+      this.jumpToLastStep();
+    }
+  }
+
+  /**
+   * Shared tail of moving onto a given step: release the clock (from here on
+   * the simulation has to run: survey, drilling, hauling and contract
+   * delivery are queued work that only resolves on a tick), hide the paused
+   * chip, set the step index, run any caller-specific work that has to see
+   * the new index before the rails/render do (`advanceToNextStep`'s
+   * `runAutoCommands`), then re-arm the rails, snapshot the new step and
+   * re-render. Shared by `advanceToNextStep` and `shortCircuitOnDefeat` so
+   * the two ways of landing on a step can't drift apart from each other.
+   */
+  private landOnStep(index: number, afterIndexSet?: () => void): void {
     this.rails.releaseClock(this.gameState);
     this.pausedEl.style.display = 'none';
 
-    this.stepIndex++;
-    this.runAutoCommands();
+    this.stepIndex = index;
+    afterIndexSet?.();
 
     this.rails.beginStep(this.step(), this.gameState);
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
     this.render();
-
-    if (this.stepIndex === LAST_STEP_INDEX) {
-      this.jumpToLastStep();
-    }
   }
 
   /**

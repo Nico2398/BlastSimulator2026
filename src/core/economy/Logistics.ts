@@ -115,6 +115,28 @@ export function sellFragment(
 }
 
 /**
+ * Decrement `collectedOre` by the exact ore-kg carried in a just-sold
+ * fragment (`sellFragment`'s return shape). Shared by both branches of
+ * `consumeStoredOre` below — a materialId-specific sale and a rubble/no-ore
+ * sale both need `collectedOre` to reflect a fragment leaving storage the
+ * same way, they just differ in which fragments they pick to sell.
+ * Returns the per-ore breakdown so a caller that needs the amount of one
+ * specific ore removed (the materialId branch's own running tally) doesn't
+ * have to recompute it.
+ */
+function decrementCollectedOre(
+  collectedOre: Record<string, number>,
+  sold: { volume: number; oreDensities: Record<string, number> },
+): Record<string, number> {
+  const acc: Record<string, number> = {};
+  accumulateOreMass(acc, sold.volume, sold.oreDensities);
+  for (const [oreId, kg] of Object.entries(acc)) {
+    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+  }
+  return acc;
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
  * removing whole fragments (via sellFragment) until the requested amount is
  * covered, decrementing collectedOre[materialId] (and every other ore key each
@@ -156,11 +178,7 @@ export function consumeStoredOre(
       if (tally >= amountKg) break;
       const sold = sellFragment(state, id);
       if (!sold) continue;
-      const acc: Record<string, number> = {};
-      accumulateOreMass(acc, sold.volume, sold.oreDensities);
-      for (const [oreId, kg] of Object.entries(acc)) {
-        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
-      }
+      const acc = decrementCollectedOre(collectedOre, sold);
       tally += acc[materialId] ?? 0;
     }
 
@@ -204,11 +222,7 @@ export function consumeStoredOre(
     // that's physically gone — so a LATER ore_sale contract can be accepted
     // against stock that no longer exists in storage, silently under-
     // delivers, and expires for a penalty instead of completing (#959).
-    const acc: Record<string, number> = {};
-    accumulateOreMass(acc, sold.volume, sold.oreDensities);
-    for (const [oreId, kg] of Object.entries(acc)) {
-      collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
-    }
+    decrementCollectedOre(collectedOre, sold);
   }
 
   return { success: true, consumedKg: Math.min(removedMass, amountKg) };

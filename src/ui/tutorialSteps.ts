@@ -486,28 +486,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // blasted ore's total mass. Completion is keyed off the contract
   // completion history itself (a genuine ore_sale contract closing since
   // this step opened) rather than a fixed cycle count, so it self-adjusts
-  // regardless of how many accept/deliver rounds that turns out to take.
-  {
-    id: 'sell-ore',
-    titleKey: 'tutorial.step_sellore.title',
-    textKey: 'tutorial.step_sellore',
-    commands: ['contract accept type:ore_sale', 'contract deliver type:ore_sale amount:2000'],
-    highlightTarget: TOOLBAR_TARGET.contracts,
-    tickBudget: 20,
-    waitsOnWork: true,
-    captureSnapshot: (state: GameState) => ({
-      // `completedHistory` also holds EXPIRED contracts (Contract.ts's
-      // checkDeadlines pushes there too) — only a genuine `completed: true`
-      // sale counts, or a contract that merely timed out with a penalty
-      // would falsely advance this step without a single dollar sold (#959).
-      completedOreSales: (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const before = (snapshot.completedOreSales as number | undefined) ?? 0;
-      const after = (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length;
-      return after > before;
-    },
-  },
+  // regardless of how many accept/deliver rounds that turns out to take —
+  // exactly createComparisonStep's "value increased since snapshot" shape,
+  // like 'drill-plan'/'sequence' above. `completedHistory` also holds
+  // EXPIRED contracts (Contract.ts's checkDeadlines pushes there too), so
+  // the count is filtered to `completed: true` — a contract that merely
+  // timed out with a penalty must not falsely advance this step without a
+  // single dollar sold (#959).
+  createComparisonStep(
+    'sell-ore',
+    'tutorial.step_sellore.title',
+    'tutorial.step_sellore',
+    (s) => (s.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length,
+    ['contract accept type:ore_sale', 'contract deliver type:ore_sale amount:2000'],
+    TOOLBAR_TARGET.contracts,
+    { tickBudget: 20, waitsOnWork: true },
+  ),
 
   // ── Step 16: finances ──
   createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({

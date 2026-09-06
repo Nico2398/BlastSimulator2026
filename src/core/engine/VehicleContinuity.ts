@@ -35,9 +35,14 @@ import { promoteActionToActive } from './EmployeeDispatchSteps.js';
  * every employee in the game, not just vehicle-gated ones (regression fixed
  * by restoring the original 8d-before-8e order and adding this function).
  *
- * Ties broken by lowest action id, matching claimActionsTargetedAtEmployee's
- * own determinism rule — cost-based ranking (selectBestActionForEmployee) is
- * unnecessary here since every candidate already shares the same vehicle.
+ * The two candidate sources rank differently. `queuedFollowUps` (this
+ * employee's own taskQueue) were already validated reachable when originally
+ * claimed, so ties are broken by lowest action id, matching
+ * claimActionsTargetedAtEmployee's own determinism rule. `poolFollowUps`
+ * (the open `queued` pool) are fresh and never vetted for this employee, so
+ * they go through selectBestActionForEmployee's reachability-checked cost
+ * ranking instead — see that branch's own comment for why an id-sort there
+ * regressed (#953).
  *
  * Returns true when a follow-up was promoted this way (caller must skip
  * releaseVehicleOnCompletion — the vehicle is now reserved for the new

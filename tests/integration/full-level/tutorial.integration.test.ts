@@ -203,7 +203,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
       previewStoredKg += f.fragment.mass;
       accumulateOreMass(haulablePreview, f.fragment.volume, f.fragment.oreDensities);
     }
-    const rankByHaulable = (contracts: typeof ctx.state!.contracts.available) => [...contracts]
+    const rankByHaulable = (contracts: NonNullable<typeof ctx.state>['contracts']['available']) => [...contracts]
       .filter(c => (haulablePreview[c.materialId] ?? 0) > 0)
       .sort((a, b) => (haulablePreview[b.materialId] ?? 0) - (haulablePreview[a.materialId] ?? 0));
     // The board is re-rolled every CONTRACT_REFRESH_INTERVAL (20) ticks, so
