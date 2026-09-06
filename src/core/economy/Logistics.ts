@@ -326,3 +326,23 @@ export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
 export function totalCollectedOreKg(collectedOre: Record<string, number>): number {
   return Object.values(collectedOre).reduce((sum, kg) => sum + kg, 0);
 }
+
+/**
+ * Inverse of pickupFragment: returns an in-transit fragment to the ground,
+ * clearing its vehicle association. Used when a vehicle's haul is aborted
+ * mid-flight (forced rest, cancellation, driver death) so cargo already
+ * picked up is not permanently lost.
+ *
+ * @param navGrid - when provided, re-registers the fragment as a nav-grid
+ *   occupant at its recorded position (mirrors addBlastFragments' occupancy
+ *   registration).
+ * @returns true if a matching in_transit fragment was found and reverted;
+ *   false if no such fragment exists (no mutation in that case).
+ */
+export function returnFragmentToGround(
+  _state: LogisticsState,
+  _fragmentId: number,
+  _navGrid?: NavGrid | null,
+): boolean {
+  throw new Error('not implemented');
+}

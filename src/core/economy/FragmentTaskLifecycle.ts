@@ -141,3 +141,19 @@ export function startVehicleGatedFragmentWork(
     : requestBreakBoulder(state, vehicle.id, fragmentId);
   return started.success;
 }
+
+/**
+ * Shared abort-on-forced-release counterpart to startVehicleGatedFragmentWork.
+ * Cleanly unwinds whatever vehicle-gated fragment work (hauling or breaking)
+ * is in flight on this vehicle, so a reservation can be safely released:
+ *  - if haulingPhase is set: returns any picked-up cargo to the ground first
+ *    (via returnFragmentToGround), then aborts the haul (abortHaul).
+ *  - if breakPhase is set: aborts the break (abortBreak) — no cargo return
+ *    needed, breaking never moves a fragment off-ground until it splits.
+ *  - if neither is set: no-op.
+ * Callers (reservation release, cancellation, driver death) do not need to
+ * know which kind of work was in flight, or any of the phase constants.
+ */
+export function abortVehicleGatedFragmentWork(_state: GameState, _vehicle: Vehicle): void {
+  throw new Error('not implemented');
+}
