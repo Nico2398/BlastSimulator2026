@@ -13,13 +13,31 @@
 // monospace (via font-variant-numeric) for every countable value.
 
 /**
- * Single source of truth for two geometry values also consumed directly by
- * shell region bounds functions (LayoutRegistry, #956) — the CSS custom
- * properties below and the layout math must never drift from each other
- * again (see #955).
+ * Single source of truth for the geometry values consumed directly by shell
+ * region bounds functions (LayoutRegistry, #956) — the CSS custom properties
+ * below and the layout math must never drift from each other again (#955).
  */
 export const TOPBAR_HEIGHT_PX = 52;
 export const SPACING_3_PX = 12;
+
+/**
+ * The MiniMap's reserved bottom-right strip (#983). It lives in
+ * src/ui/MiniMap.ts, but the ToolRail has to know how much of the right edge
+ * it may not enter, and importing a panel component into a shell region for
+ * three numbers would couple them for no reason — so the strip is declared
+ * here, where the top bar's height already is, and both read it.
+ *
+ * The width is fixed rather than `fit-content` because the legend row is
+ * translated: measured at 1280x720 it was 215px in English and 245px in
+ * French, which would have made the declared region locale-dependent. Fixed
+ * at a width that fits the longer of the two with headroom, the footprint is
+ * the same in every language.
+ */
+export const MINIMAP_WIDTH_PX = 252;
+/** Border (2) + header (26) + canvas margin-top (6) + MAP_SIZE (120) + legend (16). */
+export const MINIMAP_HEIGHT_PX = 170;
+/** Distance from the right and bottom viewport edges. */
+export const MINIMAP_EDGE_OFFSET_PX = 10;
 
 export const TOKENS_CSS = `
 :root {

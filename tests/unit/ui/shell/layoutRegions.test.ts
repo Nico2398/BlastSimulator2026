@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // #956 — Shell layout region matrix. Every screen-edge HUD region (TopBar,
-// ToolRail, Toasts, SelectionBar, ActivityLog) registers its own on-screen
+// ToolRail, Toasts, SelectionBar, ActivityLog, MiniMap) registers its own on-screen
 // bounds with the shared `shellLayoutRegistry` (LayoutRegistry.ts). This file
 // proves two things at a matrix of viewport sizes (SHELL_VIEWPORT_MATRIX):
 //
@@ -20,7 +20,7 @@
 // time). Vitest isolates modules per test *file* by default, so this
 // singleton starts empty for this file, but state still accumulates across
 // the `it` blocks *within* this file since they all import the same module
-// instance — hence disposing all 5 real regions in `afterAll`, once, rather
+// instance — hence disposing all 6 real regions in `afterAll`, once, rather
 // than re-mounting per test.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TopBar } from '../../../../src/ui/shell/TopBar.js';
@@ -28,6 +28,7 @@ import { ToolRail } from '../../../../src/ui/shell/ToolRail.js';
 import { Toasts } from '../../../../src/ui/shell/Toasts.js';
 import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
 import { ActivityLog } from '../../../../src/ui/shell/ActivityLog.js';
+import { MiniMap } from '../../../../src/ui/MiniMap.js';
 import {
   LayoutRegistry,
   shellLayoutRegistry,
@@ -36,8 +37,16 @@ import {
   SHELL_VIEWPORT_MATRIX,
   type Rect,
 } from '../../../../src/ui/shell/LayoutRegistry.js';
+import { TOPBAR_HEIGHT_PX } from '../../../../src/ui/tokens.js';
 
-const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log'] as const;
+const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap'] as const;
+
+/** Declared bounds of a registered region at a viewport, by id. */
+function boundsFor(id: string, viewport: { width: number; height: number }): Rect {
+  const region = shellLayoutRegistry.list().find(r => r.id === id);
+  if (!region) throw new Error(`region "${id}" is not registered`);
+  return region.bounds(viewport);
+}
 
 function mountContainer(): HTMLDivElement {
   const container = document.createElement('div');
@@ -58,6 +67,7 @@ describe('shell regions — layout matrix (#956)', () => {
   let toasts!: Toasts;
   let selectionBar!: SelectionBar;
   let activityLog!: ActivityLog;
+  let miniMap!: MiniMap;
 
   beforeAll(() => {
     const container = mountContainer();
@@ -66,6 +76,7 @@ describe('shell regions — layout matrix (#956)', () => {
     toasts = new Toasts(container);
     selectionBar = new SelectionBar(container);
     activityLog = new ActivityLog(container);
+    miniMap = new MiniMap(container);
   });
 
   afterAll(() => {
@@ -76,9 +87,10 @@ describe('shell regions — layout matrix (#956)', () => {
     toasts?.dispose();
     selectionBar?.dispose();
     activityLog?.dispose();
+    miniMap?.dispose();
   });
 
-  it('registers exactly the 5 expected shell regions on construction', () => {
+  it('registers exactly the 6 expected shell regions on construction', () => {
     const ids = shellLayoutRegistry.list().map(r => r.id).sort();
     expect(ids).toEqual([...EXPECTED_IDS].sort());
   });
@@ -108,6 +120,51 @@ describe('shell regions — layout matrix (#956)', () => {
       }
     }
     expect(overlaps, `hud regions overlapping at ${JSON.stringify(viewport)}:\n${overlaps.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('ToolRail clears the MiniMap at the smallest supported viewport (#983)', () => {
+  // The defect this pins: the rail used to centre on the viewport, so at
+  // 1280x720 its lower half painted over the bottom-right map panel — the
+  // Settings button sat on top of it. Centring on the band between the top
+  // bar and the MiniMap's reserved strip is only half the fix; the rail also
+  // had to lose 6px per button, because a fully revealed 9-entry rail at 52px
+  // was 506px tall against a 488px band and fit nowhere.
+  const SMALLEST = SHELL_VIEWPORT_MATRIX[0]!;
+
+  let container!: HTMLDivElement;
+  let toolRail!: ToolRail;
+  let miniMap!: MiniMap;
+
+  beforeAll(() => {
+    container = mountContainer();
+    toolRail = new ToolRail(container, () => {});
+    miniMap = new MiniMap(container);
+  });
+
+  afterAll(() => {
+    toolRail.dispose();
+    miniMap.dispose();
+  });
+
+  it('is 1280x720 — the smallest entry, where the band is the binding constraint', () => {
+    expect(SMALLEST).toEqual({ width: 1280, height: 720 });
+  });
+
+  it('rail sits below the top bar and above the map, with clearance at both ends', () => {
+    const rail = boundsFor('tool-rail', SMALLEST);
+    const map = boundsFor('minimap', SMALLEST);
+
+    expect(rail.y).toBeGreaterThan(TOPBAR_HEIGHT_PX);
+    expect(rail.y + rail.height).toBeLessThan(map.y);
+  });
+
+  it('the rail at full reveal still fits the band — no negative slack to round away', () => {
+    const rail = boundsFor('tool-rail', SMALLEST);
+    const map = boundsFor('minimap', SMALLEST);
+    const band = map.y - TOPBAR_HEIGHT_PX;
+
+    expect(rail.height).toBeLessThan(band);
   });
 });
 

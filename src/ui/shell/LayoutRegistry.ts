@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Shell layout registry (#956)
 //
-// Screen-edge UI shell regions (TopBar, ToolRail, Toasts, SelectionBar,
-// ActivityLog) declare their on-screen bounds here so a test can prove no
+// Screen-edge UI regions (TopBar, ToolRail, Toasts, SelectionBar,
+// ActivityLog, MiniMap) declare their on-screen bounds here so a test can prove no
 // two 'hud'-layer regions overlap at a matrix of viewport sizes, and that
 // none falls outside the viewport. Populated by each shell region on
 // construction, cleared on dispose() — see shell/TopBar.ts etc.
@@ -11,10 +11,10 @@
 // padding included. An envelope wider than the painted element is safe (it
 // over-reports a collision); one narrower than it is not.
 //
-// TODO(#983): src/ui/MiniMap.ts is a screen-edge region too and does not
-// register here yet — it really overlaps the ToolRail at 1280x720 today, and
-// its width is locale-dependent (215px en / 245px fr), so declaring it needs
-// a layout decision rather than a constant. Tracked in #983.
+// Not every region lives under src/ui/shell/: the MiniMap (src/ui/MiniMap.ts)
+// pins itself to the bottom-right corner and registers here too. The
+// registration lint (tests/unit/lint/ShellRegionsRegistered.test.ts) walks
+// this directory plus an explicit list of the ones outside it.
 
 export interface Viewport { readonly width: number; readonly height: number; }
 export interface Rect { readonly x: number; readonly y: number; readonly width: number; readonly height: number; }

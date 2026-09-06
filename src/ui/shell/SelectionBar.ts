@@ -34,12 +34,18 @@ const SELECTION_BAR_BORDER_PX = 1;
 /** `.bsx-btn` height (tokens.ts's shared button class) — the tallest child in the row. */
 const SELECTION_BAR_CONTENT_HEIGHT_PX = 30;
 /**
- * Worst-case per-button width: `.bsx-btn` padding (2×12) + border (2×1) +
- * icon (12) + icon/label gap (7) + the longest translated action label at
- * 600 weight / 10px / .1em letter-spacing — "Dispatch Here" (en) and
- * "Désaffecter" (fr) both land well under this, rounded up for headroom.
+ * Worst-case per-button width, measured rather than estimated: at 1280x720 the
+ * widest rendered action button is "Transporter" (fr) at 112px, with
+ * "Move Here" (en) at 105 and "Désaffecter" (fr) at 110. 120 covers the
+ * measured maximum with headroom.
+ *
+ * The earlier 150 was a guess, and a guess is not free: it made the declared
+ * bar 789px wide against a real 612, which collided with the MiniMap's
+ * declared region in the matrix test while the painted boxes were 79px apart
+ * (#983). An envelope has to contain the real box, but padding it out by a
+ * third turns the collision test into a source of false failures.
  */
-const SELECTION_BAR_BUTTON_WIDTH_PX = 150;
+const SELECTION_BAR_BUTTON_WIDTH_PX = 120;
 /**
  * Widest action set across every entity kind buildActions() renders — the
  * vehicle case (follow, move_here, haul, unassign). Bump this alongside any

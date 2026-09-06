@@ -17,6 +17,17 @@ const SHELL_ROOT = join(process.cwd(), 'src/ui/shell');
 /** The registry module itself declares the mechanism; it doesn't register with itself. */
 const EXCLUDED_FILES = ['LayoutRegistry.ts'];
 
+/**
+ * Screen-edge regions that live outside src/ui/shell/ (#983). The MiniMap is
+ * one: it pins itself to the bottom-right corner exactly like a shell region
+ * does, and while it sat outside this walk it silently escaped the matrix —
+ * and really did paint over the ToolRail at 1280x720 until #983.
+ *
+ * A path added here must also be constructed in layoutRegions.test.ts, or it
+ * registers a region nothing ever checks.
+ */
+const SCREEN_EDGE_FILES_OUTSIDE_SHELL = ['src/ui/MiniMap.ts'];
+
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -28,7 +39,10 @@ function walk(dir: string): string[] {
 }
 
 describe('shell region files register with shellLayoutRegistry (#956)', () => {
-  const files = walk(SHELL_ROOT);
+  const files = [
+    ...walk(SHELL_ROOT),
+    ...SCREEN_EDGE_FILES_OUTSIDE_SHELL.map(rel => join(process.cwd(), rel)),
+  ];
 
   it('finds shell region files at all (guards the walk itself)', () => {
     // If the walk silently found nothing (wrong path, empty directory), every
