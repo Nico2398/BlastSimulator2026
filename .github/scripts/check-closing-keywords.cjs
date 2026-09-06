@@ -44,11 +44,10 @@ const COMMIT_TYPE_PREFIX = '(?:feat|fix|refactor|docs|test|chore|perf|build|ci|s
  * The exempt shape: a line whose entire (trimmed) content is a closing directive,
  * optionally behind a conventional-commit type prefix, optionally followed by a
  * single trailing `.` or `,`. Matches the pipeline's `Closes #<N>` body convention,
- * its `Fixes`/`Resolves` synonyms, and the PR title `agentic-pipeline-finalization`
- * mandates — `<type>: Resolve #<N>`.
+ * its `Fixes`/`Resolves` synonyms, and a typed directive title — `<type>: Resolve #<N>`.
  *
- * That title had to be admitted, and admitting it is not a softening. The guard
- * landed (#765) while `open-pr` was already required to write exactly that title,
+ * The typed title had to be admitted, and admitting it is not a softening. The
+ * guard landed (#765) while `open-pr` was required to write exactly that title,
  * so the two shipped in direct contradiction: PR #773 — the first pipeline PR
  * opened after the guard merged — failed this check on its own mandated title,
  * and every pipeline PR after it would have failed the same way. Both are
@@ -56,6 +55,14 @@ const COMMIT_TYPE_PREFIX = '(?:feat|fix|refactor|docs|test|chore|perf|build|ci|s
  * prose the postmortem is about. What stays flagged is unchanged: a closing
  * keyword inside a *sentence*, which is what every incident on #707 actually was,
  * and which no amount of naming the right issue number excuses.
+ *
+ * The pipeline no longer writes that title. Because the exemption is a whole-line
+ * match, the bare directive was the only title it could write, and every pipeline
+ * PR from #773 to #980 read `fix: Resolve #<N>` with nothing descriptive in it.
+ * `open-pr` now titles a PR `<type>: <summary> (#<N>)` and leaves the directive to
+ * the body's `Closes #<N>` line — a title with no closing keyword, which this guard
+ * passes without any exemption. The typed shape stays admitted for the pull
+ * requests already opened under it and for a hand-written directive title.
  */
 const SANCTIONED_LINE_RE = new RegExp(
   `^(?:${COMMIT_TYPE_PREFIX})?(close[sd]?|fix(?:es|ed)?|resolve[sd]?)\\s+#(\\d+)[.,]?$`,
@@ -157,8 +164,9 @@ function main() {
     console.error(
       'Fix: rephrase so the keyword and the number are not adjacent, or wrap the whole phrase in a' +
         ' code span. The exempt shape is a line that is exactly `Closes #<N>` (or Fixes/Resolves),' +
-        ' optionally behind a conventional-commit type — `fix: Resolve #<N>`, the PR title the' +
-        ' pipeline mandates. Nothing else on that line.'
+        ' optionally behind a conventional-commit type — `fix: Resolve #<N>`. Nothing else on that' +
+        ' line. A PR title needs no directive at all: the pipeline writes `<type>: <summary> (#<N>)`' +
+        ' and closes the issue from the body.'
     );
     process.exitCode = 1;
     return;

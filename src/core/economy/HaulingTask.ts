@@ -9,7 +9,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
-import { pickupFragment, deliverToDepot } from './Logistics.js';
+import { pickupFragment, deliverToDepot, returnFragmentToGround } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
@@ -94,6 +94,10 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     if (arrived) {
       const loaded = pickupFragment(state.logistics, vehicle.haulingFragmentId!, String(vehicle.id));
       if (loaded) {
+        state.navGrid?.removeFragmentOccupant(
+          Math.round(tracked.fragment.position.x),
+          Math.round(tracked.fragment.position.z),
+        );
         vehicle.payloadKg = tracked.fragment.mass;
         vehicle.haulingPhase = 'to_depot';
         vehicle.task = 'transport';
@@ -121,7 +125,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     b => b.id === vehicle.haulingDepotBuildingId && b.active,
   );
   if (!building) {
-    abortHaul(vehicle);
+    abortHaulReturningCargo(state, vehicle);
     return;
   }
 
@@ -191,17 +195,36 @@ function resolveDepotApproach(state: GameState, building: Building, vehicle: Veh
  * haul so GameLoop's completion pass can still find the vehicle to continue
  * or release it.
  *
- * Exported for Evacuation.ts (#557): a vehicle mid-haul is driven by this
- * file's own tickHaulingProgress loop, not the generic mover — evacuating one
- * has to abort the haul first (clearing haulingPhase) or the tick loop keeps
+ * Internal to this file (#994 — no longer exported: Evacuation.ts's own
+ * vehicle-abort now goes through FragmentTaskLifecycle.ts's
+ * abortVehicleGatedFragmentWork, which reaches this via
+ * abortHaulReturningCargo below rather than calling it directly). A vehicle
+ * mid-haul is driven by this file's own tickHaulingProgress loop, not the
+ * generic mover — aborting has to clear haulingPhase or the tick loop keeps
  * skipping it (see EntityMovementTick.ts's tickVehicle-skip condition) even
  * after moveVehicle stages a new target.
  */
-export function abortHaul(vehicle: Vehicle): void {
+function abortHaul(vehicle: Vehicle): void {
   vehicle.haulingFragmentId = null;
   vehicle.haulingPhase = null;
   vehicle.haulingDepotBuildingId = null;
   vehicle.payloadKg = 0;
   vehicle.task = 'idle';
   vehicle.reservedForActionId = null;
+}
+
+/**
+ * Abort `vehicle`'s in-progress haul, returning any cargo already picked up
+ * to the ground first (dropped at the vehicle's current position, not the
+ * fragment's stale pre-pickup one — see returnFragmentToGround's own doc
+ * comment) before clearing the haul state via abortHaul. Shared by
+ * tickHaulingProgress's missing-depot-building branch above and
+ * FragmentTaskLifecycle.ts's abortVehicleGatedFragmentWork (#974 fixer round
+ * follow-up: both ran this identical two-step sequence independently).
+ */
+export function abortHaulReturningCargo(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.haulingFragmentId !== null) {
+    returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  }
+  abortHaul(vehicle);
 }

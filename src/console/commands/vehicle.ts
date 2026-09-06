@@ -106,8 +106,18 @@ export function vehicleCommand(
       // that is actually path-connected to the map's main region (anchored
       // at a corner, since blast sites are never placed on the map edge) so
       // a freshly bought vehicle is always reachable on foot.
+      //
+      // avoidOccupancy: true (#954 follow-up fix): a raw spawn point can also
+      // land inside a dense post-blast fragment field — still 'walkable' by
+      // cell type, so the reachability check above alone would accept it
+      // unmoved, but with every neighbour fragment-occupied no driver could
+      // ever walk up to board it (foot travel avoids occupied cells, #954),
+      // stranding the vehicle exactly as "always reachable on foot" above
+      // promises it never should be. Same hazard, same fix as the employee
+      // hire spawn point right above this file's own sibling in
+      // employees.ts — see that call site's own comment for the live repro.
       const { x: spawnX, z: spawnZ } = state.navGrid
-        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ)
+        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ, true)
         : { x: rawSpawnX, z: rawSpawnZ };
       // Deducts the same `cost` the guard above tested, so the checked amount
       // and the charged amount can never drift apart.

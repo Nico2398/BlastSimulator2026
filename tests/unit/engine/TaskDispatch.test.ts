@@ -27,6 +27,20 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+
+/** Flat, all-walkable NavGrid fixture — mirrors Pathfinding.test.ts's own makeFlatGrid. */
+function makeFlatGridWithNavCell(width: number, height: number, fillType: NavCell['type'] = 'walkable'): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: fillType, moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
 
 // ── Deterministic fixture helpers ────────────────────────────────────────────
 
@@ -1061,6 +1075,111 @@ describe('interruptActiveAction (#549)', () => {
     // reclaims a pinned action for its one target every tick, before
     // claimOnePoolCandidate ever sees it as available to anyone else).
     expect(stored.targetEmployeeId).toBeNull();
+  });
+
+  it('does NOT release the pin to a nominally-closer candidate whose REAL routed distance is unreachable (Infinity) — a full fragment-wall partition (#954 livelock fix)', () => {
+    // Reproduces the #954 livelock shape: plain octile straight-line distance
+    // judges `closer` as nearer to the target, but a fragment wall spans the
+    // ENTIRE width of the grid at z=10, fully partitioning `closer`'s side
+    // from the target — walkingDistanceEstimate's findPath call reports
+    // `found: false` for `closer`, scoring Infinity, never merely "worse".
+    // `emp` (nominally farther) has a clear, short real route on the far
+    // side of the wall, so its own finite distance beats closer's Infinity
+    // either way. Before the #954 fix (octileHeuristic-only ranking, which
+    // has no notion of reachability at all), this released the pin to
+    // `closer` regardless — exactly the mismatch that starved
+    // tutorial-playthrough.json's ore-hauling task indefinitely. See the
+    // "finite-but-worse" test just below for the OTHER branch this fix
+    // covers: a real detour that resolves, just to a longer distance.
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.x = 0; emp.z = 20; // clear, short route straight to the target row
+
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const closer = state.employees.employees.find(e => e.id !== empId)!;
+    closer.x = 12; closer.z = 0; // nominally closer to the target...
+
+    // ...but a fragment wall spans the whole row between `closer` and the
+    // target, forcing a long detour around it — real routed distance is far
+    // worse than the straight-line estimate says.
+    const grid = makeFlatGridWithNavCell(20, 20, 'walkable');
+    for (let x = 0; x < 20; x++) {
+      grid.addFragmentOccupant(x, 10);
+    }
+    state.navGrid = grid;
+
+    const action = makePendingAction({ id: 201, requiredSkill: 'blasting', targetX: 12, targetZ: 20 });
+    dispatchPendingAction(state, action);
+
+    simulateClaimWalking(state, 201, empId, {
+      targetX: 12, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    interruptActiveAction(state, emp, 201);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 201).targetEmployeeId).toBe(empId);
+
+    simulateClaimWalking(state, 201, empId, {
+      targetX: 12, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    expect(emp.taskTicksRemaining).toBeNull();
+    interruptActiveAction(state, emp, 201);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 201);
+    // Still pinned to emp: `closer` LOOKS nearer in a straight line, but its
+    // real routed distance is Infinity (the wall fully partitions it from the
+    // target) — releasing would hand the walk to an UNREACHABLE candidate,
+    // exactly what the pre-#954-fix octile-only ranking did.
+    expect(stored.targetEmployeeId).toBe(empId);
+  });
+
+  it('does NOT release the pin to a nominally-closer candidate whose REAL routed distance is finite but longer than the pinned employee\'s own (partial fragment detour, #954 livelock fix)', () => {
+    // Companion to the Infinity-branch test above: this time the fragment
+    // wall leaves a gap, so `closer`'s real route around it RESOLVES — it's
+    // not unreachable, just longer than a straight line would suggest, and
+    // longer than `emp`'s own clear route. walkingDistanceEstimate must
+    // still prefer `emp`'s finite-and-shorter real distance over `closer`'s
+    // finite-but-longer one; before the #954 fix (octileHeuristic-only
+    // ranking), straight-line distance alone would have released the pin to
+    // `closer` regardless of the real detour cost.
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.x = 0; emp.z = 19; // already on the target's own row — clear, short route
+
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const closer = state.employees.employees.find(e => e.id !== empId)!;
+    closer.x = 12; closer.z = 0; // nominally closer to the target...
+
+    // ...but a fragment wall spans MOST of the row between `closer` and the
+    // target, leaving only a narrow gap at x=16..19 — a real, finite detour,
+    // not a full partition (contrast the Infinity-branch test above, whose
+    // wall spans the entire row).
+    const grid = makeFlatGridWithNavCell(20, 20, 'walkable');
+    for (let x = 0; x < 16; x++) {
+      grid.addFragmentOccupant(x, 10);
+    }
+    state.navGrid = grid;
+
+    const action = makePendingAction({ id: 202, requiredSkill: 'blasting', targetX: 12, targetZ: 19 });
+    dispatchPendingAction(state, action);
+
+    simulateClaimWalking(state, 202, empId, {
+      targetX: 12, targetZ: 19, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    interruptActiveAction(state, emp, 202);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 202).targetEmployeeId).toBe(empId);
+
+    simulateClaimWalking(state, 202, empId, {
+      targetX: 12, targetZ: 19, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    expect(emp.taskTicksRemaining).toBeNull();
+    interruptActiveAction(state, emp, 202);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 202);
+    // Still pinned to emp: closer's real (finite) routed distance around the
+    // gap is longer than emp's own clear, short route — releasing would hand
+    // the walk to the WORSE (but reachable) candidate.
+    expect(stored.targetEmployeeId).toBe(empId);
   });
 
   it('does NOT release the pin on a repeat walk-only interruption when no other idle employee is closer (#556 boundary — the original far-target relay stays fixed)', () => {

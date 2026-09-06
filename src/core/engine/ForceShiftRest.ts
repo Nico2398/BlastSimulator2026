@@ -14,6 +14,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork } from './VehicleReservation.js';
+import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuationWalk } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
@@ -213,6 +214,19 @@ export function forceShiftRestIfNeededByPolicy(
   // interruption as intended behavior for the legacy (non-policy)
   // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
   if (emp.taskTicksRemaining !== null && isMidVehicleGatedWork(state, emp)) return;
+  // #974 follow-up: a debris_hauler already carrying cargo toward a depot
+  // (haulingPhase === 'to_depot') never sets taskTicksRemaining — hauling is
+  // phase-driven, not employee-timer-driven — so the guard just above can
+  // never see it as "mid-execution" the way it sees a boarded dig_ramp_segment.
+  // Interrupting here is far costlier than the mid-drive-to-target case the
+  // comment above deliberately leaves unprotected: since #974 made a haul
+  // abort correctly return cargo to the ground instead of silently completing
+  // behind the scenes, an unprotected 'to_depot' interruption forces a whole
+  // new pickup-and-redrive cycle every time this policy's own short
+  // work/rest cadence fires (e.g. `mode:continuous`'s WORK_DURATION_TICKS=6),
+  // which can repeatedly miss a contract's own delivery deadline — see
+  // isMidLoadedHaul's own doc comment (FragmentTaskLifecycle.ts).
+  if (isMidLoadedHaul(state, emp)) return;
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;

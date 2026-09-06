@@ -88,8 +88,23 @@ export function employeeCommand(
       // path anywhere afterwards — findPath rejects an impassable start
       // outright — so snap to the nearest tile actually connected to the
       // map's main region before placing them.
+      //
+      // avoidOccupancy: true (#954 follow-up fix): the raw spawn point can
+      // also land inside a dense post-blast fragment field — still
+      // 'walkable' by cell type, so untouched by the check above, but with
+      // every neighbour cell fragment-occupied an employee spawned there can
+      // never take a single step (foot travel avoids occupied cells, #954).
+      // Left unfixed, that employee permanently monopolizes any pool action
+      // targeting the area (ActionSelection.ts's own reachability check
+      // reported it "reachable" via the pre-#954-fix avoidVehicles: false
+      // call there — see that fix's own comment) since nothing ever relocates
+      // them off the spot. Confirmed live: tutorial-playthrough.json's own
+      // manager and driver hires both landed inside the fresh blast crater's
+      // fragment field this way, boxed in on every side, monopolizing (and
+      // endlessly re-failing) the same freight_warehouse order for 400+
+      // ticks.
       const { x: empX, z: empZ } = state.navGrid
-        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawEmpX, rawEmpZ)
+        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawEmpX, rawEmpZ, true)
         : { x: rawEmpX, z: rawEmpZ };
       // Seeded on nextId too, not just seed+tickCount: two hires dispatched in
       // the same tick would otherwise re-seed identically and always pick the

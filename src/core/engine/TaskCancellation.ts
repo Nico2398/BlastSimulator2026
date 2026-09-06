@@ -11,7 +11,7 @@ import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
-import { octileHeuristic } from '../nav/Pathfinding.js';
+import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -187,7 +187,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * benefit — exactly the relay #556 fixed in the first place.
  */
 function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, action: PendingAction): boolean {
-  const ownDistance = octileHeuristic(pinnedEmployee.x, pinnedEmployee.z, action.targetX, action.targetZ);
+  const ownDistance = walkingDistanceEstimate(state, pinnedEmployee.x, pinnedEmployee.z, action.targetX, action.targetZ);
   return state.employees.employees.some(other =>
     other.id !== pinnedEmployee.id
     && other.alive
@@ -195,8 +195,54 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
     && other.activeActionId === null
     && other.restTicksRemaining === null
     && other.pendingDriverVehicleId === null
-    && octileHeuristic(other.x, other.z, action.targetX, action.targetZ) < ownDistance,
+    && walkingDistanceEstimate(state, other.x, other.z, action.targetX, action.targetZ) < ownDistance,
   );
+}
+
+/**
+ * Estimated on-foot walking cost from (fromX, fromZ) to (toX, toZ), used only
+ * by hasCloserIdleCandidate to rank candidates.
+ *
+ * With a NavGrid built, runs the real A* search (Pathfinding.findPath, the
+ * same one EntityMovementTick.ts actually walks employees along, with
+ * avoidVehicles: true matching an employee's own foot travel) rather than the
+ * plain octile straight-line heuristic hasCloserIdleCandidate used before
+ * #954 (#954 fix). Straight-line distance was a reasonable proxy for real
+ * walking cost only as long as nothing could block a straight line — once
+ * fragments/parked vehicles started blocking foot pathfinding (#954), a
+ * nominally-closer candidate can have a far longer REAL routed distance than
+ * a nominally-farther one with a clear route, and hasCloserIdleCandidate has
+ * no way to know that from straight-line distance alone. Confirmed live: in a
+ * dense post-blast fragment field the straight-line heuristic kept judging
+ * the same fragment-boxed-in candidate "closer" release after release, each
+ * release discarding whichever employee currently held the walk-only pin
+ * (#556/#867) and restarting the walk on someone else who then got displaced
+ * the same way — a livelock, not a slow convergence, that starved
+ * tutorial-playthrough.json's ore-hauling task indefinitely. Running the real
+ * pathfinder here (rather than merely bounding how many times a release may
+ * happen) fixes the actual mismatch the heuristic can no longer paper over,
+ * instead of papering over ITS symptom with an arbitrary retry cap.
+ *
+ * A path that resolves to "not found" (fully boxed in, no legal route at all)
+ * scores Infinity rather than the octile fallback's finite guess — an
+ * unreachable candidate must never look closer than a reachable one, and an
+ * unreachable pinned employee must never block a reachable candidate from
+ * taking over.
+ *
+ * Falls back to the plain octile heuristic when no NavGrid exists yet
+ * (state.navGrid === null — sandbox/tests before a grid is built), mirroring
+ * EntityMovementTick.ts's own direct-line fallback for the same case: with no
+ * grid, nothing can block a straight line in the first place, so the original
+ * proxy is exact rather than approximate.
+ */
+function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
+  if (!state.navGrid) return octileHeuristic(fromX, fromZ, toX, toZ);
+  const result = findPath(state.navGrid, {
+    agentId: -1,
+    fromX, fromZ, toX, toZ,
+    avoidVehicles: true,
+  });
+  return result.found ? result.totalCost : Infinity;
 }
 
 export function interruptActiveAction(

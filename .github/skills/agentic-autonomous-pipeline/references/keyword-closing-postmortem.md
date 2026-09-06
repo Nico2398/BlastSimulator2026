@@ -61,20 +61,32 @@ Two changes, evaluated together per issue #755's own instructions:
   matching `close[sd]?/fix(es|ed)?/resolve[sd]?\s+#\d+` outside fenced and
   inline code spans, exempting only a line whose entire content is a
   standalone closing directive — `Closes #<N>`, the pipeline's body convention,
-  optionally behind a conventional-commit type, which is the PR title
-  `agentic-pipeline-finalization` mandates (`fix: Resolve #<N>`). A match
+  optionally behind a conventional-commit type (`fix: Resolve #<N>`). A match
   anywhere else fails the check — including a correct reference to the right
   issue, if it is not written as one of those two shapes, because the incidents
   were never about the wrong number, they were about the phrase appearing where
   a reader parses it as prose rather than as a deliberate directive.
 
   **The title shape had to be admitted, and the omission cost a pull request.**
-  The guard shipped while `open-pr` was already required to write exactly that
-  title, so the two landed in direct contradiction: PR #773 — the first pipeline
-  PR opened after the guard merged — failed this check on its own mandated
-  title, and every pipeline PR after it would have failed the same way. A guard
-  that rejects the convention it ships beside does not harden the pipeline, it
-  stops it.
+  The guard shipped while `open-pr` was required to write exactly
+  `<type>: Resolve #<N>` as the PR title, so the two landed in direct
+  contradiction: PR #773 — the first pipeline PR opened after the guard merged —
+  failed this check on its own mandated title, and every pipeline PR after it
+  would have failed the same way. A guard that rejects the convention it ships
+  beside does not harden the pipeline, it stops it.
+
+  **Admitting the shape cost the titles.** The exemption is a whole-line match,
+  so the one title the pipeline could write was the bare directive, and every
+  pipeline PR from #773 to #980 read `fix: Resolve #<N>` — the descriptive half
+  the titles carried through #616 (`feat: Resolve #554 — charging is real work,
+  a blaster loads holes one at a time`) was gone from `git log`. `open-pr` now
+  writes `<type>: <summary> (#<N>)`: the directive lives only in the body's
+  `Closes #<N>` line, which is what closes the issue at merge, and the title
+  carries no closing keyword at all, so the guard has nothing to admit. The
+  typed-directive exemption stays in `SANCTIONED_LINE_RE` for the pull requests
+  already opened under the old title and for a hand-written directive title;
+  what it never admits is unchanged — a directive with prose after it on the
+  same line.
 
   No branch protection rule was added for this check, on the grounds that
   `agentic-auto-merge` and `scripts/await-pr-ci.ts` already read every workflow

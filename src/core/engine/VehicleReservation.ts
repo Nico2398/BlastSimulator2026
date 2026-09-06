@@ -5,11 +5,11 @@
 // needs-interruption, or the vehicle being destroyed underneath it.
 // EmployeeDispatchSteps.ts's claim/promotion sites call into this module rather than
 // duplicating any of it. Core-pure: imports only from entities/, state/,
-// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back),
-// and — for the haul_debris/fragment_debris continuity case (#552) —
-// economy/FragmentTaskLifecycle.js (startVehicleGatedFragmentWork, shared
-// with ArrivalGate.ts's resolveBoarding), which does not import anything
-// from engine/ that could cycle back here.
+// EntityMovementTick.js, and — for the haul_debris/fragment_debris
+// continuity case (#552) — economy/FragmentTaskLifecycle.js
+// (startVehicleGatedFragmentWork, shared with ArrivalGate.ts's
+// resolveBoarding), which does not import anything from engine/ that could
+// cycle back here.
 // Deliberately does NOT import TaskDispatch.ts directly — TaskDispatch.ts's
 // own module re-exports from TaskCancellation.ts, which imports
 // releaseVehicleReservation from here, so calling into TaskDispatch.ts
@@ -18,16 +18,20 @@
 // caller instead of performing the interruption itself — see
 // reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
 // caller, which already imports both modules safely.
-// A cycle nonetheless exists through EntityMovementTick.js, which this module
-// already imports one-way: EntityMovementTick.ts itself imports
-// interruptActiveAction from TaskDispatch.ts (#938, for its sustained-stuck
-// abandonment path), closing VehicleReservation -> EntityMovementTick ->
-// TaskDispatch -> TaskCancellation -> VehicleReservation. Safe for the same
-// reason the pre-existing EntityMovementTick.ts <-> VehicleOccupancyReroute.ts
-// cycle is safe: every import here is a function declaration, called only
-// from inside other function bodies, never evaluated at module-load time —
-// ESM resolves the cycle fine as long as nothing at the top level reads a
-// not-yet-initialized binding.
+// Two cycles exist through EntityMovementTick.js, which this module already
+// imports: an indirect one (EntityMovementTick.ts itself imports
+// interruptActiveAction from TaskDispatch.ts, #938, for its sustained-stuck
+// abandonment path, closing VehicleReservation -> EntityMovementTick ->
+// TaskDispatch -> TaskCancellation -> VehicleReservation), and — since
+// #986's dismountVehicleDriver extraction — a direct one (EntityMovementTick.ts
+// imports dismountVehicleDriver from here for its own sustained-stuck vehicle
+// release, closing VehicleReservation -> EntityMovementTick ->
+// VehicleReservation). Both are safe for the same reason the pre-existing
+// EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle is safe: every
+// import here is a function declaration, called only from inside other
+// function bodies, never evaluated at module-load time — ESM resolves the
+// cycle fine as long as nothing at the top level reads a not-yet-initialized
+// binding.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -36,7 +40,7 @@ import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
-import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -81,10 +85,23 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, and either undriven
- * (driverId === null) or already driven by `employee` themself (the
- * continuity case — lets a claim naturally re-pick the vehicle the
- * employee is already sitting in for their next same-role task).
+ * (reservedForActionId === null), not `broken`, not already mid vehicle-gated
+ * fragment work (haulingPhase/breakPhase both null — #974 follow-up: a
+ * debris_hauler/rock_fragmenter driven out-of-band by the manual `vehicle
+ * haul`/`vehicle break` console command never sets reservedForActionId, so
+ * without this check a continuity claim could "free-ride" a driver who
+ * appears idle to the dispatch system onto a vehicle that is, in reality,
+ * already mid-haul/mid-break on unrelated cargo. The claim would then fail
+ * at promotion time (requestHaulFragment/requestBreakBoulder's own
+ * already-busy guard) and releaseVehicleReservationKeepDriver's
+ * abortVehicleGatedFragmentWork call would abort that unrelated in-flight
+ * work, discarding real progress instead of the harmless no-op it was before
+ * #974 — traced via blast-oversized-boulders.integration.test.ts's manually
+ * hauled piece being aborted mid-drive by a same-tick self-dispatch claim for
+ * a different fragment), and either undriven (driverId === null) or already
+ * driven by `employee` themself (the continuity case — lets a claim
+ * naturally re-pick the vehicle the employee is already sitting in for their
+ * next same-role task).
  * Ties broken by lowest vehicle id. Read-only — never mutates.
  * Returns null when none qualify.
  */
@@ -95,6 +112,8 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.state !== 'broken' &&
     v.reservedForActionId === null &&
+    v.haulingPhase === null &&
+    v.breakPhase === null &&
     (v.driverId === null || v.driverId === employee.id),
   );
   if (qualifying.length === 0) return null;
@@ -103,6 +122,51 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   if (continuity) return continuity;
 
   return qualifying.reduce((lowest, v) => (v.id < lowest.id ? v : lowest));
+}
+
+/**
+ * True when a vehicle-gated action still sitting in a holder's taskQueue
+ * (reserved via reserveOnePoolActionAhead, #611, but never promoted to
+ * active) can be safely handed to a different employee instead of staying
+ * locked to `action.holderId` (#954 follow-up, economy-full-loop
+ * regression): the reserved vehicle exists, nobody has boarded it yet
+ * (driverId === null — no drive progress to lose by releasing), and a
+ * DIFFERENT living, idle, role-licensed employee exists right now who could
+ * actually use it.
+ *
+ * Exists because reserveOnePoolActionAhead reserves the vehicle the instant
+ * a busy employee claims ahead, long before that employee ever walks toward
+ * it — usually a brief lock, but resolveActionCost's own #954 occupancy
+ * check (ActionSelection.ts) can now correctly and PERMANENTLY refuse to
+ * promote a claim whose holder's own foot-walk to the vehicle is genuinely
+ * blocked (e.g. boxed in by the very fragment debris their own prior vehicle
+ * work produced), and nothing previously re-evaluated a reservation that
+ * never even started walking — a second, already-idle, already-licensed
+ * employee standing right next to the reserved vehicle stayed locked out of
+ * it forever. Direct-traced via economy-full-loop.json: a rock_fragmenter
+ * driver reserves the site's only debris_hauler ahead of time, then produces
+ * enough of its own rubble to box itself in before ever boarding it, while
+ * the debris_hauler's own already-idle, already-licensed driver waits beside
+ * the vehicle the whole time.
+ *
+ * Scoped to `driverId === null` so this only ever discards a reservation
+ * nobody has started executing — real boarding/driving progress has its own
+ * dedicated interruption machinery (interruptActiveAction) and is never
+ * touched here.
+ */
+export function canReassignStrandedReservation(state: GameState, action: PendingAction): boolean {
+  if (action.requiredVehicleRole === null) return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  if (!vehicle || vehicle.driverId !== null) return false;
+
+  const role = action.requiredVehicleRole;
+  return state.employees.employees.some(other =>
+    other.id !== action.holderId
+    && other.alive
+    && other.activeActionId === null
+    && other.restTicksRemaining === null
+    && isLicensedForRole(other, role),
+  );
 }
 
 /** Marks `vehicle` reserved for `actionId`. Caller must have already confirmed the vehicle came from findFreeVehicleForRole this same tick. */
@@ -193,31 +257,75 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
 }
 
 /**
+ * Shared prefix of releaseVehicleReservation and releaseVehicleReservationKeepDriver:
+ * find the vehicle reserved for `actionId`, abort any in-flight vehicle-gated
+ * fragment work on it (returning cargo to the ground first if mid-haul), and
+ * clear the reservation. Returns the vehicle for the caller's own remaining
+ * logic (driver unassignment vs. driver retention), or null when no vehicle
+ * is reserved for `actionId` — the caller returns early exactly as before in
+ * that case.
+ */
+function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return null;
+
+  abortVehicleGatedFragmentWork(state, vehicle);
+  vehicle.reservedForActionId = null;
+  return vehicle;
+}
+
+/**
+ * Full dismount of `vehicle`'s driver, if any: aborts any in-flight
+ * vehicle-gated fragment work (haulingPhase/breakPhase) first, so that
+ * unassignDriver's own fail-closed guard (Vehicle.ts — it refuses to clear
+ * driverId while haulingPhase is set) is guaranteed to succeed rather than
+ * silently no-op. A caller that skipped the abort and ignored
+ * unassignDriver's return value could flip task/state to idle while
+ * driverId/haulingPhase stayed set — next tick's tickHaulingProgress would
+ * then find haulingPhase !== null, re-drive the vehicle at the same
+ * unreachable target, and reproduce the exact stuck-forever bug this
+ * dismount exists to fix (#986 review follow-up).
+ *
+ * No-op (past the abort) if the vehicle currently has no driver.
+ *
+ * Shared by releaseVehicleReservation, whose `findAndAbortReservedVehicle`
+ * already aborts as part of clearing the reservation (a second, idempotent
+ * abort here is a harmless no-op in that case), and by
+ * EntityMovementTick.ts's sustained-stuck release for a vehicle driven with
+ * no PendingAction/reservation at all — that caller holds the vehicle
+ * directly and has nothing to look up by actionId, so it calls this instead
+ * of releaseVehicleReservation.
+ */
+export function dismountVehicleDriver(state: GameState, vehicle: Vehicle): void {
+  abortVehicleGatedFragmentWork(state, vehicle);
+  if (vehicle.driverId === null) return;
+
+  // #593/#922: EntityMovementTick.tickVehicle already calls
+  // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
+  // continuously throughout the drive — this call is a defensive,
+  // idempotent re-assertion at release time, not what establishes the
+  // invariant. It covers any release path that could otherwise run off the
+  // normal tick cycle: without it, a release landing between ticks would
+  // risk reading the employee's position as stale (frozen at the boarding
+  // point) instead of wherever the vehicle currently sits, which every
+  // distance-based decision that follows (nearest living_quarters, the walk
+  // back to reboard) relies on being current.
+  syncDriverPosition(state, vehicle);
+  unassignDriver(state.vehicles, vehicle.id);
+  setVehicleIdle(vehicle);
+}
+
+/**
  * Unconditional release: clears reservedForActionId, and if the vehicle
  * currently has a driver, unassigns them and resets task/state to idle.
  * Used by cancellation, needs-interruption, and the death/destruction
  * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
  */
 export function releaseVehicleReservation(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  const vehicle = findAndAbortReservedVehicle(state, actionId);
   if (!vehicle) return;
 
-  vehicle.reservedForActionId = null;
-  if (vehicle.driverId !== null) {
-    // #593/#922: EntityMovementTick.tickVehicle already calls
-    // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
-    // continuously throughout the drive — this call is a defensive,
-    // idempotent re-assertion at release time, not what establishes the
-    // invariant. It covers any release path that could otherwise run off the
-    // normal tick cycle: without it, a release landing between ticks would
-    // risk reading the employee's position as stale (frozen at the boarding
-    // point) instead of wherever the vehicle currently sits, which every
-    // distance-based decision that follows (nearest living_quarters, the walk
-    // back to reboard) relies on being current.
-    syncDriverPosition(state, vehicle);
-    unassignDriver(state.vehicles, vehicle.id);
-    setVehicleIdle(vehicle);
-  }
+  dismountVehicleDriver(state, vehicle);
 }
 
 /**
@@ -234,10 +342,7 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
  * is reserved for `actionId`.
  */
 export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
-  if (!vehicle) return;
-
-  vehicle.reservedForActionId = null;
+  findAndAbortReservedVehicle(state, actionId);
 }
 
 /**

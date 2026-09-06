@@ -14,6 +14,8 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EVACUATION_CLEARANCE_M } from '../../../src/core/config/balance.js';
+import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
 const EVACUATION_SEED = 42;
 
@@ -304,5 +306,133 @@ describe('evacuateZone — stale rest targets and taskQueue entries (#557 follow
     expect(stored.status).toBe('queued');
     expect(stored.holderId).toBeNull();
     expect(isEvacuationHoldActive(state, stored)).toBe(true);
+  });
+});
+
+// ── #994: evacuateZone must abort in-flight vehicle-gated fragment work
+// (haul/break) through the same abortVehicleGatedFragmentWork helper #974
+// already routed VehicleReservation.ts's two release paths through, instead
+// of calling abortHaul/abortBreak directly. A vehicle whose haulingPhase is
+// 'to_depot' has already picked up a cargo fragment (state 'in_transit',
+// vehicleId set) — calling abortHaul alone clears the vehicle's own haul
+// fields but never touches the fragment, so it is stranded 'in_transit'
+// forever: unclaimable (pickupFragment/findNearestReachableFragment only see
+// 'on_ground') and unsellable (only 'stored' fragments count toward a sale).
+// The fix routes through abortVehicleGatedFragmentWork instead, whose
+// haulingPhase branch returns any picked-up cargo to the ground first.
+
+function makeCargoFragment(id: number, mass = 850): FragmentData {
+  return {
+    id,
+    position: { x: 0, y: 0, z: 0 },
+    volume: 0.3,
+    mass,
+    rockId: 'cruite',
+    oreDensities: { dirtite: 0.3 },
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
+}
+
+describe('evacuateZone aborts in-flight vehicle-gated fragment work without losing cargo (#994)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  it('a vehicle mid-haul (to_depot, cargo already picked up) returns the fragment to the ground instead of leaving it in_transit forever', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
+    pickupFragment(state.logistics, 1, String(vehicle.id));
+    vehicle.driverId = 999; // driver aboard — proves the "ordered" path, not the #947 driver gate
+    vehicle.haulingFragmentId = 1;
+    vehicle.haulingPhase = 'to_depot';
+    vehicle.haulingDepotBuildingId = 999;
+    vehicle.payloadKg = 850;
+    vehicle.task = 'transport';
+    vehicle.state = 'working';
+
+    evacuateZone(state, zone);
+
+    // The bug this regression pins: without routing through
+    // abortVehicleGatedFragmentWork, the cargo fragment stays 'in_transit'
+    // with vehicleId still set, forever unclaimable and unsellable.
+    const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(cargo.vehicleId).toBeNull();
+
+    // Haul state itself still clears, same as before.
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.haulingFragmentId).toBeNull();
+
+    // Vehicle is still ordered out of the zone like any other evacuee.
+    expect(vehicle.task).toBe('moving');
+    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+  });
+
+  it('a vehicle mid-haul (to_fragment, cargo not yet picked up) clears haul state with no fragment side effects', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    addBlastFragments(state.logistics, [makeCargoFragment(2, 850)]);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
+    vehicle.driverId = 999;
+    vehicle.haulingFragmentId = 2;
+    vehicle.haulingPhase = 'to_fragment';
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+
+    evacuateZone(state, zone);
+
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.haulingFragmentId).toBeNull();
+
+    // Nothing was carried — the fragment is untouched, still on the ground.
+    const cargo = state.logistics.fragments.find(f => f.fragment.id === 2)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(cargo.vehicleId).toBeNull();
+
+    expect(vehicle.task).toBe('moving');
+    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+  });
+
+  it('a vehicle mid-break (breakPhase set) still aborts the break as before (behavior-preserving)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    addBlastFragments(state.logistics, [makeCargoFragment(3, 5000)]);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 15, 15);
+    vehicle.driverId = 999;
+    vehicle.breakFragmentId = 3;
+    vehicle.breakPhase = 'to_boulder';
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+
+    evacuateZone(state, zone);
+
+    expect(vehicle.breakPhase).toBeNull();
+    expect(vehicle.breakFragmentId).toBeNull();
+
+    expect(vehicle.task).toBe('moving');
+    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+  });
+
+  it('a vehicle with neither haulingPhase nor breakPhase set is unaffected — no-op, no crash', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
+    vehicle.driverId = 999;
+    vehicle.task = 'idle';
+    vehicle.state = 'idle';
+
+    expect(() => evacuateZone(state, zone)).not.toThrow();
+
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.breakPhase).toBeNull();
+    expect(vehicle.task).toBe('moving');
+    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
   });
 });

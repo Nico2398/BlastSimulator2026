@@ -16,6 +16,7 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { requestBreakBoulder, tickBreakProgress } from '../../../src/core/economy/BoulderBreaking.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { isOversized, OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 const SEED = 42;
 
@@ -199,5 +200,40 @@ describe('tickBreakProgress — arrival at the boulder', () => {
     expect(vehicle.breakFragmentId).toBeNull();
     expect(vehicle.breakPhase).toBeNull();
     expect(vehicle.task).toBe('idle');
+  });
+});
+
+// ── tickBreakProgress — NavGrid fragment-occupancy transfer (#954) ─────────
+//
+// The original boulder's cell occupant count is removed once (regardless of
+// how many sub-fragments replace it), then re-added once per sub-fragment
+// landing on that same cell — only ever indirectly covered before, through
+// Logistics.addBlastFragments's own wiring in the full-loop integration test.
+
+describe('tickBreakProgress — NavGrid fragment-occupancy transfer (#954)', () => {
+  function makeFlatNavGrid(size: number): NavGrid {
+    const cells: NavCell[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false })));
+    return new NavGrid(size, size, cells, 0);
+  }
+
+  it('removes the boulder\'s single occupant and adds one per resulting sub-fragment on the same cell', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenFragmenter(state, 0, 0);
+    const fragment = makeFragment(1, 5, 5, 1.3, 2600);
+    addBlastFragments(state.logistics, [fragment], state.navGrid);
+    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
+
+    requestBreakBoulder(state, vehicle.id, 1);
+    vehicle.x = vehicle.targetX;
+    vehicle.z = vehicle.targetZ;
+
+    const brokenId = tickBreakProgress(state, vehicle);
+
+    expect(brokenId).toBe(1);
+    const pieceCount = state.logistics.fragments.length;
+    expect(pieceCount).toBeGreaterThan(0);
+    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(pieceCount);
   });
 });

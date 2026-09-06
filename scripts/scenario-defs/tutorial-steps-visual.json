@@ -1480,7 +1480,7 @@
       }
     },
     {
-      "command": "tick 40",
+      "command": "tick 46",
       "timeout": 90,
       "interaction": [
         {
@@ -1494,7 +1494,7 @@
         }
       ],
       "role": "player",
-      "description": "#552 (supersedes the Finding #74/#75 follow-up this step was originally inserted for): the Fleet panel's Haul button is retired, and hauling self-dispatches automatically once the debris_hauler, its licensed driver, and the freight_warehouse are all in place -- there is no click left to make here. The step teaches watching, not clicking: waitForTutorialStep still drives the real clock for the trip, exactly as before, just without a button triggering it. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #585: command mode's own tick count raised 1 -> 40 (confirmed via direct trace) -- storedMassKg plateaus around tick 30 once the hauler's first delivery lands, and a single tick left storage empty for the delivery attempt right after.",
+      "description": "#552 (supersedes the Finding #74/#75 follow-up this step was originally inserted for): the Fleet panel's Haul button is retired, and hauling self-dispatches automatically once the debris_hauler, its licensed driver, and the freight_warehouse are all in place -- there is no click left to make here. The step teaches watching, not clicking: waitForTutorialStep still drives the real clock for the trip, exactly as before, just without a button triggering it. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #585: command mode's own tick count raised 1 -> 40 (confirmed via direct trace) -- storedMassKg plateaus around tick 30 once the hauler's first delivery lands, and a single tick left storage empty for the delivery attempt right after. #974 follow-up: 40 -> 46 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): a mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) delays storedMassKg's first nonzero landing past the old `tick 40` window; `tick 46` clears it with margin while staying inside the accepted contract's own deadline (direct-traced: `tick 55`+ already reports the contract expired/not found).",
       "expect": {
         "tutorialStep": "contract-deliver"
       }

@@ -172,11 +172,11 @@ export class CrewPanel extends PanelBase {
     const cards = employees.length === 0
       ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
       : employees.map(e => this.makeRosterCard(e, state));
+    // className hook: this inner div, not bodyEl, is now the roster's real
+    // scrolling container (overflow-y:auto lives here per scrollBoundedSection),
+    // so scenario coverage needs a stable selector for it (#964 CI fix).
     this.bodyEl.replaceChildren(
-      // Named so a scenario can address the scroller that actually scrolls:
-      // since #980 bounded the roster, the panel body itself no longer
-      // overflows, and crew-panel-short-viewport's wheel step wheels this.
-      scrollBoundedSection(cards, 200, { gap: 8, className: 'bs-crew-roster-scroll' }),
+      scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll' }),
       sectionHeader(t('ui.crew.hiring')),
       ...this.makeHiringRows(state),
     );

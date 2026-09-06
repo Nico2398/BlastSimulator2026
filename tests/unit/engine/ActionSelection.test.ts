@@ -26,6 +26,7 @@ import { createGame, type GameState, type PendingAction } from '../../../src/cor
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
@@ -201,6 +202,118 @@ describe('resolveActionCost', () => {
     const result = resolveActionCost(state, emp, action);
 
     expect(result).toBeNull();
+  });
+
+  it('returns null when an employee is boxed in by fragment occupancy on every neighbour cell, even though a vehicle-ignoring path would succeed (#954 follow-up fix)', () => {
+    // Reproduces the #954 livelock's actual mechanism: before this fix,
+    // resolveActionCost always called findPath with avoidVehicles: false, so
+    // it reported a target "reachable" for an employee whose REAL foot travel
+    // (tickEmployeeMovement's own avoidVehicles: true) can never get there —
+    // letting a permanently fragment-trapped employee claim (and re-claim,
+    // forever, once EntityMovementTick's #938 stuck-abandon mechanism handed
+    // it back to the pool) an action no other, genuinely reachable employee
+    // ever got a chance at. Confirmed live via tutorial-playthrough.json's own
+    // freight_warehouse order: the employee standing on it after a blast was
+    // boxed in on all 8 neighbour cells by fragment occupancy and
+    // monopolized the claim for 400+ ticks.
+    const state = makeState(10, 10);
+    const emp = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, targetX: 8, targetZ: 8 });
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
+  });
+
+  it('still resolves a real cost when the DESTINATION itself is occupied (boarding a vehicle standing on it — matches tickEmployeeMovement’s own exemption, boundary)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 5, targetZ: 5 });
+    state.navGrid!.addFragmentOccupant(5, 5); // the target cell itself, not a cell along the route
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).not.toBeNull();
+    expect(result!.totalTicks).toBeGreaterThan(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// resolveActionCost — vehicle-gated walk target (resolveVehicleGatedWalkTarget)
+//
+// Every case above uses requiredVehicleRole: null, so resolveVehicleGatedWalkTarget's
+// only real branch — redirect the reachability check to the reserved vehicle's
+// own position rather than the action's own targetX/targetZ — was never
+// exercised. These pin that branch directly: the employee's real foot-walk
+// goes to the vehicle (promoteVehicleGatedAction/requestBoardVehicle), never
+// straight to the action's own cargo target, so reachability must be judged
+// against the vehicle's position in both directions — blocked when the walk
+// to the vehicle is blocked even though the action's own target is clear, and
+// reachable when the walk to the vehicle is clear even though the action's
+// own target is blocked.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)', () => {
+  it('resolves against the reserved vehicle\'s position, not the action\'s own target: blocked when the path to the vehicle is blocked even though the path to the target is clear', () => {
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 20, 0);
+    const action = makeAction({
+      id: 1,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 3,
+      targetZ: 3, // reachable on the employee's own side of the wall
+    });
+    vehicle.reservedForActionId = action.id;
+    blockColumn(state.navGrid!, 10); // isolates the vehicle (x=20) from the employee (x=0)
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
+  });
+
+  it('resolves against the reserved vehicle\'s position, not the action\'s own target: reachable when the path to the vehicle is clear even though the path to the target is blocked', () => {
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
+    const action = makeAction({
+      id: 1,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 25,
+      targetZ: 25, // isolated from the employee by the wall below
+    });
+    vehicle.reservedForActionId = action.id;
+    blockColumn(state.navGrid!, 10); // isolates the action's own target (x=25) from the employee (x=0), but the vehicle (x=0) is on the employee's own side
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).not.toBeNull();
+    expect(result!.totalTicks).toBeGreaterThan(0);
+  });
+
+  it('falls back to the action\'s own target when the employee already holds the reserved vehicle\'s driverId (continuity case)', () => {
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 20, 0);
+    const action = makeAction({
+      id: 1,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 3,
+      targetZ: 3,
+    });
+    vehicle.reservedForActionId = action.id;
+    vehicle.driverId = emp.id; // already boarded — no further foot-walk needed
+    blockColumn(state.navGrid!, 10); // would block the walk to the vehicle, but that walk is moot now
+
+    const result = resolveActionCost(state, emp, action);
+
+    // Reachable: the real walk target is the action's own (reachable) target,
+    // not the (unreachable-behind-the-wall) vehicle.
+    expect(result).not.toBeNull();
   });
 });
 

@@ -3,6 +3,9 @@
 
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
+import type { NavGrid } from '../nav/NavGrid.js';
+import { scale } from '../math/Vec3.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -35,14 +38,19 @@ export function createLogisticsState(storageCapacityKg: number = 5000): Logistic
 
 // ── Operations ──
 
-/** Add fragments from a blast result to the ground. */
-export function addBlastFragments(state: LogisticsState, fragments: FragmentData[]): void {
+/**
+ * Add fragments from a blast result to the ground. `navGrid`, when provided,
+ * registers each fragment's cell as an occupant via NavGrid.addFragmentOccupant
+ * (#954) so foot pathfinding treats it as impassable.
+ */
+export function addBlastFragments(state: LogisticsState, fragments: FragmentData[], navGrid: NavGrid | null = null): void {
   for (const f of fragments) {
     state.fragments.push({
       fragment: f,
       state: 'on_ground',
       vehicleId: null,
     });
+    navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
   }
 }
 
@@ -73,9 +81,7 @@ export function deliverToDepot(
   fragmentId: number,
   collectedOre?: Record<string, number>,
 ): boolean {
-  const tracked = state.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'in_transit',
-  );
+  const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
   tracked.state = 'stored';
@@ -90,6 +96,19 @@ export function deliverToDepot(
   return true;
 }
 
+/** Mass/volume/ore content removed from storage by a sale or a partial split. */
+type RemovedFragmentMass = { mass: number; volume: number; oreDensities: Record<string, number> };
+
+/** Find a fragment currently in storage by id, or undefined when absent/not stored. */
+function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+}
+
+/** Find a fragment currently in transit by id, or undefined when absent/not in transit. */
+function findInTransitFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
+}
+
 /**
  * Sell a stored fragment. Returns the mass sold (for contract fulfillment).
  * Removes the fragment from logistics.
@@ -97,7 +116,7 @@ export function deliverToDepot(
 export function sellFragment(
   state: LogisticsState,
   fragmentId: number,
-): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
+): RemovedFragmentMass | null {
   const idx = state.fragments.findIndex(
     f => f.fragment.id === fragmentId && f.state === 'stored',
   );
@@ -115,12 +134,54 @@ export function sellFragment(
 }
 
 /**
+ * Split a stored fragment's mass, removing `massToRemoveKg` from it and leaving
+ * the remainder in storage (as a smaller fragment covering the same ore
+ * densities). Returns the removed mass/volume/oreDensities, or null when the
+ * fragment is not found, not stored, or `massToRemoveKg` is not strictly
+ * between 0 and the fragment's mass (use `sellFragment` to remove the whole
+ * fragment instead).
+ */
+export function splitStoredFragmentMass(
+  state: LogisticsState,
+  fragmentId: number,
+  massToRemoveKg: number,
+): RemovedFragmentMass | null {
+  if (!Number.isFinite(massToRemoveKg) || massToRemoveKg <= 0) return null;
+
+  const tracked = findStoredFragment(state, fragmentId);
+  if (!tracked) return null;
+
+  const fragment = tracked.fragment;
+  if (massToRemoveKg >= fragment.mass) return null;
+
+  const fraction = massToRemoveKg / fragment.mass;
+  const removedVolume = fragment.volume * fraction;
+  const removedOreDensities = { ...fragment.oreDensities };
+
+  fragment.mass -= massToRemoveKg;
+  fragment.volume -= removedVolume;
+  const shrink = Math.cbrt(1 - fraction);
+  fragment.halfExtents = scale(fragment.halfExtents, shrink);
+
+  state.storedMassKg -= massToRemoveKg;
+
+  return {
+    mass: massToRemoveKg,
+    volume: removedVolume,
+    oreDensities: removedOreDensities,
+  };
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
- * removing whole fragments (via sellFragment) until the requested amount is
- * covered, decrementing collectedOre[materialId] (and every other ore key each
- * removed fragment touches) by the exact ore-kg physically removed.
- * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
- * ore content — any fragment, ore-bearing or not.
+ * oldest-first, until the requested amount is covered: a fragment whose full
+ * contribution the request still needs is removed whole (via sellFragment),
+ * and a fragment that only needs to give up part of its contribution is
+ * shrunk in place (via splitStoredFragmentMass), decrementing
+ * collectedOre[materialId] (and every other ore key each touched fragment
+ * carries) by the exact ore-kg physically removed. materialId === ''
+ * (rubble_disposal) consumes raw stored mass regardless of ore content — any
+ * fragment, ore-bearing or not.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -154,14 +215,36 @@ export function consumeStoredOre(
     let tally = 0;
     for (const id of storedIds) {
       if (tally >= amountKg) break;
-      const sold = sellFragment(state, id);
-      if (!sold) continue;
-      const acc: Record<string, number> = {};
-      accumulateOreMass(acc, sold.volume, sold.oreDensities);
-      for (const [oreId, kg] of Object.entries(acc)) {
-        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+
+      const tracked = findStoredFragment(state, id);
+      if (!tracked) continue;
+
+      const remaining = amountKg - tally;
+      const probe: Record<string, number> = {};
+      accumulateOreMass(probe, tracked.fragment.volume, tracked.fragment.oreDensities);
+      const contribution = probe[materialId] ?? 0;
+
+      if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+        const sold = sellFragment(state, id);
+        if (!sold) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, sold.volume, sold.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += acc[materialId] ?? 0;
+      } else {
+        const massSlice = remaining * (tracked.fragment.mass / contribution);
+        const split = splitStoredFragmentMass(state, id, massSlice);
+        if (!split) continue;
+        const acc: Record<string, number> = {};
+        accumulateOreMass(acc, split.volume, split.oreDensities);
+        for (const [oreId, kg] of Object.entries(acc)) {
+          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+        }
+        tally += remaining;
+        break;
       }
-      tally += acc[materialId] ?? 0;
     }
 
     return { success: true, consumedKg: Math.min(tally, amountKg) };
@@ -184,9 +267,23 @@ export function consumeStoredOre(
   let removedMass = 0;
   for (const id of storedIds) {
     if (removedMass >= amountKg) break;
-    const sold = sellFragment(state, id);
-    if (!sold) continue;
-    removedMass += sold.mass;
+
+    const tracked = findStoredFragment(state, id);
+    if (!tracked) continue;
+
+    const remaining = amountKg - removedMass;
+    const contribution = tracked.fragment.mass;
+
+    if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
+      const sold = sellFragment(state, id);
+      if (!sold) continue;
+      removedMass += sold.mass;
+    } else {
+      const split = splitStoredFragmentMass(state, id, remaining);
+      if (!split) continue;
+      removedMass += remaining;
+      break;
+    }
   }
 
   return { success: true, consumedKg: Math.min(removedMass, amountKg) };
@@ -231,4 +328,55 @@ export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
 /** Total ore mass across all materials in `collectedOre`, in kg. */
 export function totalCollectedOreKg(collectedOre: Record<string, number>): number {
   return Object.values(collectedOre).reduce((sum, kg) => sum + kg, 0);
+}
+
+/**
+ * Inverse of pickupFragment: returns an in-transit fragment to the ground,
+ * clearing its vehicle association. Used when a vehicle's haul is aborted
+ * mid-flight (forced rest, cancellation, driver death) so cargo already
+ * picked up is not permanently lost.
+ *
+ * @param navGrid - when provided, re-registers the fragment as a nav-grid
+ *   occupant at its recorded position (mirrors addBlastFragments' occupancy
+ *   registration).
+ * @param dropPosition - when provided, relocates the fragment here instead of
+ *   leaving it at its stale pre-pickup position (#974 follow-up: a haul
+ *   interrupted on its 'to_depot' leg, after loading, has already covered
+ *   real ground toward the depot — snapping the cargo back to where the
+ *   original blast placed it discards that entire distance, and a fatigue
+ *   policy short-cycling work/rest faster than one full haul leg can complete
+ *   (e.g. `set_policy mode:continuous`'s WORK_DURATION_TICKS=6 cadence)
+ *   otherwise resets the same haul to zero progress every cycle forever —
+ *   direct-traced via tutorial-interactive.json's/tutorial-steps-visual.json's
+ *   contract-deliver step, where fragment 32/similar never converged on
+ *   delivery across 400+ ticks of repeated interrupt-and-restart. Callers
+ *   pass the vehicle's own current position so the cargo lands wherever the
+ *   vehicle actually was, preserving whatever ground it had already covered.
+ * @returns true if a matching in_transit fragment was found and reverted;
+ *   false if no such fragment exists (no mutation in that case).
+ */
+export function returnFragmentToGround(
+  state: LogisticsState,
+  fragmentId: number,
+  navGrid?: NavGrid | null,
+  dropPosition?: { x: number; y: number; z: number },
+): boolean {
+  const tracked = findInTransitFragment(state, fragmentId);
+  if (!tracked) return false;
+
+  tracked.state = 'on_ground';
+  tracked.vehicleId = null;
+
+  if (dropPosition) {
+    tracked.fragment.position = dropPosition;
+  }
+
+  if (navGrid) {
+    navGrid.addFragmentOccupant(
+      Math.round(tracked.fragment.position.x),
+      Math.round(tracked.fragment.position.z),
+    );
+  }
+
+  return true;
 }

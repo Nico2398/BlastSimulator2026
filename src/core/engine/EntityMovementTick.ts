@@ -10,10 +10,12 @@ import type { GameState } from '../state/GameState.js';
 import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath } from '../nav/Pathfinding.js';
+import { isCellOccupied } from '../nav/NavGrid.js';
 import { advanceAlongPath } from '../nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY, MOVE_STUCK_ABANDON_TICKS } from '../config/balance.js';
 import { applyAdvanceOutcome, handleVehicleOccupancyBlock } from './VehicleOccupancyReroute.js';
 import { interruptActiveAction } from './TaskDispatch.js';
+import { dismountVehicleDriver } from './VehicleReservation.js';
 
 export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
 
@@ -44,6 +46,10 @@ export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
  * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD on a blocked next cell (#591).
  */
 export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  const wasStationary = vehicle.state !== 'moving';
+  const prevX = Math.round(vehicle.x);
+  const prevZ = Math.round(vehicle.z);
+
   // tickVehicleMovement reports (via its return value) whether the vehicle
   // was actually driving this tick — syncing must NOT run when it wasn't
   // (task !== 'moving' on entry, e.g. a driver assigned to a vehicle that
@@ -59,6 +65,40 @@ export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventE
   // second, on-foot task queued against a not-yet-dispatched vehicle).
   const wasDriving = tickVehicleMovement(state, vehicle, emitter);
   if (wasDriving) syncDriverPosition(state, vehicle);
+
+  updateVehicleCellOccupancy(state, vehicle, wasStationary, prevX, prevZ);
+}
+
+/**
+ * Keeps NavCell.vehicleOccupied in sync with a vehicle's own current cell
+ * (#954), independent of vehicle role — a single shared path so drill_rig,
+ * debris_hauler, rock_fragmenter etc. all block foot pathfinding identically
+ * rather than needing a per-role branch. Guarded on state.navGrid since some
+ * ticks may run before a navgrid exists (e.g. tests constructing a bare
+ * GameState).
+ */
+function updateVehicleCellOccupancy(
+  state: GameState,
+  vehicle: Vehicle,
+  wasStationary: boolean,
+  prevX: number,
+  prevZ: number,
+): void {
+  if (!state.navGrid) return;
+  const isStationaryNow = vehicle.state !== 'moving';
+  const nextX = Math.round(vehicle.x);
+  const nextZ = Math.round(vehicle.z);
+  const cellChanged = nextX !== prevX || nextZ !== prevZ;
+
+  if ((wasStationary && !isStationaryNow) || cellChanged) {
+    const oldCell = state.navGrid.cellAt(prevX, prevZ);
+    if (oldCell) oldCell.vehicleOccupied = false;
+  }
+
+  if (isStationaryNow) {
+    const currentCell = state.navGrid.cellAt(nextX, nextZ);
+    if (currentCell) currentCell.vehicleOccupied = true;
+  }
 }
 
 /**
@@ -150,6 +190,52 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     if (outcome.becameStuck) {
       emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
     }
+
+    // Sustained-stuck release (#986) — the vehicle-side mirror of
+    // tickEmployeeMovement's own #938 release below. Without it, a vehicle
+    // whose target became permanently unreachable (e.g. boxed in by a
+    // building placed after dispatch) sat in markVehicleWaiting forever,
+    // with its driver's action never released back to the pending-action
+    // pool for another qualified driver to pick up.
+    if (vehicle.isMoveStuck && vehicle.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
+      // driverId must be captured and looked up BEFORE interruptActiveAction:
+      // releaseVehicleReservation (called from within it) nulls
+      // vehicle.driverId as part of the dismount.
+      const driver = vehicle.driverId !== null
+        ? state.employees.employees.find(emp => emp.id === vehicle.driverId)
+        : undefined;
+      if (driver) {
+        const actionId = driver.activeActionId;
+        // interruptActiveAction only releases the vehicle (dismount + idle,
+        // via releaseVehicleReservation) as a side effect of finding a
+        // PendingAction matching actionId. A vehicle driven manually via the
+        // console (e.g. `vehicle haul`/`vehicle break`, which set
+        // haulingPhase/breakPhase directly with no PendingAction at all) has
+        // actionId === null — interruptActiveAction short-circuits, and
+        // driverId/haulingPhase/task/state are left untouched. Without the
+        // explicit dismountVehicleDriver call below, the vehicle
+        // re-accumulates moveConsecutiveFailures and hits this same branch
+        // again ~30 ticks later, forever, never actually freeing the driver
+        // or the vehicle (#986 review follow-up). dismountVehicleDriver
+        // (VehicleReservation.ts) aborts any in-flight haulingPhase/breakPhase
+        // FIRST, so unassignDriver's own fail-closed guard (it refuses to
+        // clear driverId while haulingPhase is set) is guaranteed to succeed
+        // — calling unassignDriver directly here without that abort left
+        // driverId/haulingPhase set while task/state flipped to idle,
+        // reproducing the exact stuck-forever bug this release exists to fix
+        // on the very next tick. When interruptActiveAction already performed
+        // the dismount above (a matching PendingAction existed), driverId is
+        // already null here and dismountVehicleDriver's abort is a harmless
+        // no-op.
+        interruptActiveAction(state, driver, actionId, { forceOpenPool: true });
+        dismountVehicleDriver(state, vehicle);
+        emitter?.emit('vehicle:action_abandoned', { vehicleId: vehicle.id, employeeId: driver.id, actionId });
+      }
+      vehicle.moveConsecutiveFailures = 0;
+      vehicle.isMoveStuck = false;
+      return;
+    }
+
     markVehicleWaiting(vehicle);
     return;
   }
@@ -285,6 +371,21 @@ export interface EmployeeMovementResult {
  * non-movement this replaces, and consistent with tickVehicle's own
  * pre-navmesh behaviour.
  */
+/**
+ * True when the NavCell at (x, z) is currently marked vehicle- or
+ * fragment-occupied (#954). Used to decide, per walk, whether an employee's
+ * own destination is a cell they must be able to stand on regardless of
+ * occupancy — see tickEmployeeMovement's avoidVehicles comment.
+ *
+ * Exported (#954 follow-up fix) so ActionSelection.ts's resolveActionCost can
+ * apply the exact same occupied-destination exemption to its own claim-time
+ * reachability check — see that call site's own comment for why the two must
+ * agree.
+ */
+export function isDestinationOccupied(state: GameState, x: number, z: number): boolean {
+  return isCellOccupied(state.navGrid?.cellAt(Math.round(x), Math.round(z)));
+}
+
 export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): EmployeeMovementResult {
   const result: EmployeeMovementResult = { moved: [], arrived: [], stuck: [], abandoned: [] };
 
@@ -305,7 +406,21 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
         fromZ: emp.z,
         toX: emp.destinationX,
         toZ: emp.destinationZ,
-        avoidVehicles: false,
+        // Employees walk on foot around vehicles and ground fragments alike
+        // (#954) — unlike a vehicle's own routing, which must be able to
+        // drive onto a fragment's or another vehicle's cell to interact
+        // with it (see tickVehicleOnNavGrid's avoidVehicles:false). The same
+        // exception applies here whenever the DESTINATION itself is occupied
+        // — boarding a vehicle (VehicleBoarding.ts sets destinationX/Z to the
+        // vehicle's own cell) and charging a hole a drill_rig is still parked
+        // on top of (drilling drives the vehicle to the hole's exact cell,
+        // with no approach offset, and nothing moves it off afterward) both
+        // send an employee to stand exactly where a vehicle already sits.
+        // Falling back to avoidVehicles:false only for that specific walk —
+        // never a blanket exemption — keeps the detour behaviour #954 adds
+        // for every ordinary destination, and only lets an employee walk
+        // straight onto the one cell they were always going to arrive at.
+        avoidVehicles: !isDestinationOccupied(state, emp.destinationX, emp.destinationZ),
       })
       // No NavGrid yet: synthesize a direct two-point path (start, destination) —
       // findPath is never called, so this always "succeeds", matching the
