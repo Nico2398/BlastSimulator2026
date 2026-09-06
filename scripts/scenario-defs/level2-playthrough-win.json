@@ -1439,8 +1439,8 @@
           "surveyCount": 3,
           "wellBeing": 0,
           "safety": 50,
-          "ecology": 48.94,
-          "nuisance": 47.35
+          "ecology": 48.93,
+          "nuisance": 47.325
         },
         "changedBy": {
           "tickCount": 0
@@ -3818,7 +3818,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -638003.8971309054
+          "cash": -637416.8971309054
         },
         "changedBy": {
           "tickCount": 0

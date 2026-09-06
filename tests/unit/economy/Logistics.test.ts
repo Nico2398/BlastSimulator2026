@@ -254,24 +254,48 @@ describe('consumeStoredOre', () => {
     expect(state.storedMassKg).toBe(500);
   });
 
-  it('rubble (materialId "") consumes raw stored mass regardless of ore content, ignoring collectedOre', () => {
+  it('rubble (materialId "") prefers barren fragments, leaving ore-bearing stock and collectedOre untouched when barren stock alone covers the request', () => {
     const state = createLogisticsState();
-    // One ore-bearing fragment, one barren fragment — rubble disposal doesn't care.
+    // One ore-bearing fragment, one barren fragment — a rubble contract pays
+    // cents per kg where an ore_sale pays dollars, so disposal reaches for
+    // genuinely worthless waste before it ever touches ore-bearing rock
+    // (#959: FIFO-over-everything let a rubble sale scrap ore a same-tick
+    // ore_sale contract could have sold for real money instead).
     const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
     const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
     putInStorage(state, oreFrag);
     putInStorage(state, barrenFrag);
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const collectedOreBefore = { ...collectedOre };
 
     const result = consumeStoredOre(state, collectedOre, '', 300);
 
     expect(result.success).toBe(true);
-    expect(result.consumedKg).toBeGreaterThan(0);
-    // collectedOre must be completely untouched by a rubble disposal.
-    expect(collectedOre).toEqual(collectedOreBefore);
-    // Some physical mass was removed from storage.
-    expect(state.storedMassKg).toBeLessThan(800);
+    expect(result.consumedKg).toBe(300);
+    // The barren fragment alone covered the request — ore-bearing stock is
+    // untouched, so collectedOre stays exactly as it was.
+    expect(collectedOre.oreE).toBe(100);
+    expect(state.storedMassKg).toBe(500);
+  });
+
+  it('rubble (materialId "") reaches into ore-bearing fragments once barren stock runs out, decrementing collectedOre for whatever it removes', () => {
+    const state = createLogisticsState();
+    const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
+    const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
+    putInStorage(state, oreFrag);
+    putInStorage(state, barrenFrag);
+    const collectedOre: Record<string, number> = { oreE: 100 };
+
+    // Barren stock (300kg) alone can't cover this — the ore-bearing fragment
+    // (sold whole, like every other fragment) also gets consumed.
+    const result = consumeStoredOre(state, collectedOre, '', 500);
+
+    expect(result.success).toBe(true);
+    // Fragments are removed whole: covering the 500kg request meant selling
+    // both the 300kg barren fragment and the full 500kg ore fragment (800kg
+    // physically removed), but `consumedKg` is capped at what was asked for.
+    expect(result.consumedKg).toBe(500);
+    expect(collectedOre.oreE).toBe(0);
+    expect(state.storedMassKg).toBe(0);
   });
 
   it('rubble boundary: requesting exactly the stored mass succeeds and empties storage', () => {

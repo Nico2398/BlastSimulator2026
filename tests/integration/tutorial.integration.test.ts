@@ -800,11 +800,15 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
    * is the one 'event-fire-resolve' fires itself) — stops the instant
    * `done()` reads true, or after `maxTicks`.
    */
+  /** Tracks stagnation for windDownOnceExhausted — see its own doc comment. */
+  interface StagnationTracker { lastStoredMassKg: number; lastCompletedCount: number; stagnantTicks: number }
+
   function tickUntil(
     run: (cmd: string) => { success: boolean; output: string },
     state: GameState,
     maxTicks: number,
     done: () => boolean,
+    stagnation: StagnationTracker,
   ): void {
     for (let i = 0; i < maxTicks && !done(); i++) {
       for (const emp of state.employees.employees) {
@@ -812,6 +816,100 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
       }
       if (state.events.pendingEvent) run('event choose 0');
       run('tick 1');
+      sellCompletableContracts(run, state);
+      windDownOnceExhausted(run, state, stagnation);
+    }
+  }
+
+  /**
+   * Once nothing has actually moved for a long stretch — no more stock ever
+   * arriving in storage, no contract ever completing — the last remaining
+   * employee (the driver) and vehicle (the debris_hauler) are pure ongoing
+   * cost with no further income to show for it, and never will be: some
+   * fraction of a real blast's debris always lands somewhere no NavGrid
+   * route reaches without a ramp this tutorial never digs (#953's own
+   * "fresh blast crater's walled-off interior" case) — that remainder is
+   * never coming in, no matter how long this waits. A real operator lays
+   * off and sells off down to nobody and nothing once the job has
+   * genuinely stopped producing, same reasoning as the mass layoff/scrap/
+   * demolish right after 'sell-ore' (#959). Idempotent: no-ops once already
+   * wound down (empty roster/fleet).
+   */
+  function windDownOnceExhausted(
+    run: (cmd: string) => { success: boolean; output: string },
+    state: GameState,
+    stagnation: StagnationTracker,
+  ): void {
+    // Only once already down to the post-sell-ore minimal crew (driver +
+    // hauler) — before that, stagnation just means the blast hasn't
+    // happened yet, not that the job is done.
+    if (state.employees.employees.length !== 1 || state.vehicles.vehicles.length !== 1) return;
+
+    const completedCount = state.contracts.completedHistory.filter((c) => c.completed).length;
+    if (state.logistics.storedMassKg !== stagnation.lastStoredMassKg || completedCount !== stagnation.lastCompletedCount) {
+      stagnation.lastStoredMassKg = state.logistics.storedMassKg;
+      stagnation.lastCompletedCount = completedCount;
+      stagnation.stagnantTicks = 0;
+      return;
+    }
+    stagnation.stagnantTicks++;
+    if (stagnation.stagnantTicks < 300) return;
+
+    for (const emp of [...state.employees.employees]) run(`employee fire ${emp.id}`);
+    for (const veh of [...state.vehicles.vehicles]) run(`vehicle scrap ${veh.id}`);
+  }
+
+  /**
+   * Keep every ore_sale/rubble_disposal contract this blast's own hauled-in
+   * yield can plausibly pay moving, real-player style: top up delivery on
+   * every already-ACCEPTED contract with whatever stock is on hand right
+   * now (a contract doesn't have to be paid off in one delivery — repeated
+   * partial deliveries against the same contract, as hauling keeps bringing
+   * more in, complete it before its deadline same as one big delivery
+   * would), and accept a fresh offer only when CURRENT stock already covers
+   * it in full: an offer accepted on partial stock alone, hoping more
+   * arrives before its 30-100 tick deadline, risks the full penalty
+   * (30% of quantity*price) on top of zero income if it doesn't — and at
+   * a high enough price multiplier that penalty outweighs everything this
+   * loop already banked (confirmed empirically: a looser "any nonzero
+   * stock" gate here drove `expense:fines` past `income:contracts` once
+   * the level's own contractPriceMultiplier rose to cover its setup costs).
+   * `ore_sale` is preferred over
+   * `rubble_disposal` when both match: both draw from the same physical
+   * stored fragments (a rubble sale is FIFO over ALL stored mass, ore-
+   * bearing or not — Logistics.ts's consumeStoredOre reaches for barren
+   * fragments first for exactly this reason), and ore is worth far more per
+   * kg (#959: the tutorial's own single small-contract ceiling before this
+   * left the level chronically unable to recoup its own setup costs).
+   */
+  function sellCompletableContracts(
+    run: (cmd: string) => { success: boolean; output: string },
+    state: GameState,
+  ): void {
+    const stockOf = (materialId: string) => (
+      materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
+    );
+
+    // Top up every already-accepted contract first — this is what lets a
+    // contract larger than any single haul batch still complete over time.
+    for (const active of [...state.contracts.active]) {
+      if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
+      const amount = Math.min(active.quantityKg - active.deliveredKg, stockOf(active.materialId));
+      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
+    }
+
+    // Then accept fresh offers with at least some matching stock right now,
+    // ore_sale first.
+    for (let guard = 0; guard < 8; guard++) {
+      const fullyCovered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
+      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && fullyCovered(c))
+        ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && fullyCovered(c));
+      if (!offer) return;
+      if (!run(`contract accept ${offer.id}`).success) return;
+      const active = state.contracts.active.find((c) => c.id === offer.id);
+      if (!active) return;
+      const amount = Math.min(active.quantityKg, stockOf(active.materialId));
+      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
     }
   }
 
@@ -821,6 +919,7 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
 
     expect(run('campaign start level:tutorial_pit').success).toBe(true);
     const state = ctx.state!;
+    const stagnation: StagnationTracker = { lastStoredMassKg: -1, lastCompletedCount: -1, stagnantTicks: 0 };
 
     for (const step of TUTORIAL_STEPS) {
       // 'drill-plan' is a createComparisonStep that completes on the FIRST
@@ -842,7 +941,7 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
       // exactly the outstanding-work signal TutorialRails' own clock-hold
       // exists to stop paying for by pausing instead of ticking.
       if (step.id === 'charge') {
-        tickUntil(run, state, 500, () => state.plannedDrillHoles.length === 0);
+        tickUntil(run, state, 500, () => state.plannedDrillHoles.length === 0, stagnation);
       }
 
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
@@ -870,7 +969,7 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
         const offer = state.contracts.available[0];
         expect(offer, 'no contract available to accept at all').toBeDefined();
         expect(run(`contract accept ${offer!.id}`).success).toBe(true);
-        tickUntil(run, state, 500, () => step.isComplete(state, snapshot));
+        tickUntil(run, state, 500, () => step.isComplete(state, snapshot), stagnation);
         expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }
@@ -910,35 +1009,59 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
       }
 
       if (step.id === 'sell-ore') {
-        // #959's own missing half, driven for real: repeatedly accept
-        // whichever available ore_sale contract matches ore this file's own
-        // blasts actually mined, and deliver what's deliverable. A tier-1
-        // freight_warehouse only holds 2000kg (#959 planner note), so this
-        // is deliberately a multi-cycle loop, not a single accept+deliver.
-        for (let cycle = 0; cycle < 60 && !step.isComplete(state, snapshot); cycle++) {
-          const minedMaterials = Object.entries(state.collectedOre ?? {})
-            .filter(([, kg]) => (kg as number) > 0)
-            .map(([id]) => id);
-          const offer = state.contracts.available.find(
-            (c) => c.type === 'ore_sale' && minedMaterials.includes(c.materialId),
-          );
-          if (offer) {
-            if (run(`contract accept ${offer.id}`).success) {
-              const active = state.contracts.active.find((c) => c.id === offer.id);
-              if (active) {
-                const amount = Math.min(active.quantityKg, state.collectedOre[active.materialId] ?? 0);
-                if (amount > 0) {
-                  run(`contract deliver ${active.id} amount:${amount}`);
-                }
-              }
-            }
-          }
-          tickUntil(run, state, 30, () => step.isComplete(state, snapshot));
-        }
+        // #959's own missing half, driven for real: `sellCompletableContracts`
+        // (run every tick via `tickUntil`) repeatedly accepts and fully pays
+        // off whichever available ore_sale/rubble_disposal contract this
+        // blast's own hauled-in stock can close in one delivery — never an
+        // oversized one that would strand the stock in an un-completable
+        // deal until it expires for a penalty. A tier-1 freight_warehouse
+        // only holds 2000kg (#959 planner note) and most of a real blast's
+        // mass is oversized rock a debris_hauler alone can't move (needs a
+        // rock_fragmenter this tutorial never introduces), so this can take
+        // many haul/sell cycles — hence the generous tick budget, matching
+        // 'victory' below rather than the tighter default.
+        tickUntil(run, state, 1500, () => step.isComplete(state, snapshot), stagnation);
         expect(
           step.isComplete(state, snapshot),
           'tutorial step "sell-ore" never completed -- stub isComplete is hardcoded false (#959)',
         ).toBe(true);
+
+        // Every lesson the tutorial's roster exists to teach is taught by
+        // this point (survey, drilling, driving, management) — a cost-
+        // conscious real operator, watching the balance sheet this deep in
+        // the red (payroll is by far the single biggest expense category),
+        // lays off everyone but the driver still needed to keep hauling and
+        // selling the remaining stock, same as `employee fire` already lets
+        // a player do at any time. Not a scripted step of its own (nothing
+        // in TUTORIAL_STEPS teaches it), just the obviously rational move
+        // this driving loop takes on the level's own behalf from here to
+        // the profit line, exactly as `sellCompletableContracts` already
+        // does for selling (#959).
+        for (const emp of [...state.employees.employees]) {
+          if (emp.role !== 'driver') run(`employee fire ${emp.id}`);
+        }
+
+        // Same logic for the fleet: the drill_rig and rock_digger already
+        // did their one job (the box-cut and its drill plan) and have no
+        // further use for the rest of this run — `vehicle scrap` stops
+        // their per-tick maintenance/fuel draw AND returns their residual
+        // value as cash, same real-player move as the layoffs just above.
+        // The debris_hauler stays: it's still doing the only paying job
+        // left, hauling stock in for `sellCompletableContracts` to sell.
+        for (const veh of [...state.vehicles.vehicles]) {
+          if (veh.type !== 'debris_hauler') run(`vehicle scrap ${veh.id}`);
+        }
+
+        // living_quarters (rest) and driving_center (training) have taught
+        // their lessons too and cost real per-tick upkeep (`operatingCostPerTick`
+        // — 6 and 8 respectively at tier 1) for the rest of this run with no
+        // further use: their one-time demolish cost (2500 + 3000) pays for
+        // itself in well under 400 ticks against a run this long. The
+        // freight_warehouse stays: it's the only reason any of this selling
+        // works at all.
+        for (const b of [...state.buildings.buildings]) {
+          if (b.type !== 'freight_warehouse') run(`build destroy ${b.id}`);
+        }
         continue;
       }
 
@@ -947,7 +1070,15 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
       for (const cmd of step.autoCommands ?? []) run(cmd);
       for (const cmd of step.commands ?? []) run(cmd);
 
-      tickUntil(run, state, Math.max(500, (step.tickBudget ?? 20) * 25), () => step.isComplete(state, snapshot));
+      // 'victory' gets a much bigger allowance than the generic
+      // tickBudget-derived default: with the level's own crew/fleet paid
+      // off and wound down (see the mass layoff/scrap/demolish above), the
+      // remaining wait is purely how long the contract board takes to roll
+      // enough matching ore_sale/rubble_disposal offers to finish paying
+      // off the level's own setup cost — empirically ~2400 ticks with seed
+      // 42's own RNG stream, comfortably inside this budget with margin for
+      // the run varying slightly as unrelated code changes land.
+      tickUntil(run, state, step.id === 'victory' ? 4000 : Math.max(500, (step.tickBudget ?? 20) * 25), () => step.isComplete(state, snapshot), stagnation);
 
       expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
     }

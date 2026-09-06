@@ -354,8 +354,8 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "holeCount": 5,
-          "orderedHoleCount": 20
+          "holeCount": 6,
+          "orderedHoleCount": 19
         },
         "increased": [
           "wellBeing"

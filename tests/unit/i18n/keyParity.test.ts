@@ -292,8 +292,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // driver gate (ui.blast_workshop.fire.tag_stranded,
     // ui.blast_workshop.fire.check_zone_occupied_stranded,
     // vehicle.move_no_driver), both locales.
+    // Baseline is now 3475 (up from 3464): #959 adds 11 keys for the
+    // sell-ore tutorial step and the closing sequence's per-defeat-reason
+    // copy — tutorial.step_sellore + tutorial.step_sellore.title,
+    // tutorial.stage.sell_ore, and tutorial.defeat.{bankruptcy,arrest,
+    // ecological_shutdown,worker_revolt}.{title,text} (4 reasons x 2 fields
+    // = 8), both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3464);
+    expect(Object.keys(en).length).toBe(3475);
   });
 });
 

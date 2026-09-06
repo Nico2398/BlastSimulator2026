@@ -496,11 +496,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     tickBudget: 20,
     waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({
-      completedOreSales: (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale').length,
+      // `completedHistory` also holds EXPIRED contracts (Contract.ts's
+      // checkDeadlines pushes there too) — only a genuine `completed: true`
+      // sale counts, or a contract that merely timed out with a penalty
+      // would falsely advance this step without a single dollar sold (#959).
+      completedOreSales: (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length,
     }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
       const before = (snapshot.completedOreSales as number | undefined) ?? 0;
-      const after = (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale').length;
+      const after = (state.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length;
       return after > before;
     },
   },

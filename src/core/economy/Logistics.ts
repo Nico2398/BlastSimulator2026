@@ -167,7 +167,12 @@ export function consumeStoredOre(
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
-  // Rubble / no-ore materials: consume raw stored mass, any fragment, FIFO.
+  // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
+  // fragments (no ore content at all) go first, oldest-first within each
+  // group, only reaching into ore-bearing fragments once barren stock runs
+  // out — a rubble contract pays cents per kg where an ore_sale pays
+  // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
+  // genuinely worthless waste would squander it for no reason (#959).
   const available = state.storedMassKg;
   if (amountKg > available) {
     return {
@@ -177,9 +182,14 @@ export function consumeStoredOre(
     };
   }
 
-  const storedIds = state.fragments
-    .filter(f => f.state === 'stored')
-    .map(f => f.fragment.id);
+  const stored = state.fragments.filter(f => f.state === 'stored');
+  const isBarren = (f: TrackedFragment) => (
+    Object.values(f.fragment.oreDensities).every(d => d <= 0)
+  );
+  const storedIds = [
+    ...stored.filter(isBarren).map(f => f.fragment.id),
+    ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),
+  ];
 
   let removedMass = 0;
   for (const id of storedIds) {
@@ -187,6 +197,18 @@ export function consumeStoredOre(
     const sold = sellFragment(state, id);
     if (!sold) continue;
     removedMass += sold.mass;
+
+    // A rubble_disposal sale is FIFO over every stored fragment regardless
+    // of ore content, so it can consume an ore-bearing fragment same as any
+    // other. Without this, `collectedOre` stays stale — still showing ore
+    // that's physically gone — so a LATER ore_sale contract can be accepted
+    // against stock that no longer exists in storage, silently under-
+    // delivers, and expires for a penalty instead of completing (#959).
+    const acc: Record<string, number> = {};
+    accumulateOreMass(acc, sold.volume, sold.oreDensities);
+    for (const [oreId, kg] of Object.entries(acc)) {
+      collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+    }
   }
 
   return { success: true, consumedKg: Math.min(removedMass, amountKg) };

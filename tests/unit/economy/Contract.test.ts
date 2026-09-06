@@ -26,7 +26,7 @@ describe('Contract system', () => {
   });
 
   // ── priceMultiplier (#959) ──────────────────────────────────────────────
-  // tutorial_pit declares contractPriceMultiplier: 1.5 (Level.ts) so its own
+  // tutorial_pit declares contractPriceMultiplier: 16.0 (Level.ts) so its own
   // narrower economy can still close a deficit through contract income, but
   // no call site ever threads it through — generateContracts/
   // generateOneContract accept the parameter today but generateOneContract's

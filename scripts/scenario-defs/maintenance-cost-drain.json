@@ -13,7 +13,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 290000
+          "cash": 340000
         }
       }
     },

@@ -70,7 +70,7 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     // Any other terminal reason is handled generically by TutorialOverlay's
     // own defeat short-circuit (jumpToLastStep via shortCircuitOnDefeat),
     // which fires from every step, not just this one.
-    isComplete: (state: GameState) => state.levelEndReason === 'completed',
+    isComplete: (state: GameState) => state.levelEnded === true && state.levelEndReason === 'completed',
   },
 
   // ── Step 22: congratulations ──
