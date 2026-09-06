@@ -1067,14 +1067,28 @@ describe('findPath — occupancy avoidance (#954)', () => {
     expect(result.waypoints).toEqual([{ x: 1, z: 1 }]);
   });
 
-  it('directLineWalk\'s own first-step exemption: finds the direct-line route when only the start cell is occupied, on a grid too large for the A* budget', () => {
-    // 600×1 grid forces findOrdinaryPath through directLineWalk (both as the
-    // initial fast-path attempt and, since A* itself exceeds its node
-    // budget on a corridor this long, the final fallback too) — so this
-    // isolates directLineWalk's own i===0 exemption rather than just the
-    // top-level findPath start-cell check.
+  it('directLineWalk\'s own first-step exemption: finds the direct-line route when only the start cell is vehicle-occupied, on a grid too large for the A* budget', () => {
+    // 600×1 grid, dead straight corridor: directLineWalk's own cost (599,
+    // one walkable step per cell) sits within DIRECT_LINE_TOLERANCE of the
+    // octile lower bound (599 * 1.1), so findOrdinaryPath's fast path takes
+    // the direct-line route immediately and returns before A* is ever
+    // invoked — this isolates directLineWalk's own i===0 occupancy exemption
+    // rather than just the top-level findPath start-cell check.
     const grid = makeFlatGrid(600, 1, 'walkable');
     setCell(grid, 0, 0, 'walkable', { vehicleOccupied: true });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: true });
+    expect(result.found).toBe(true);
+    expect(result.totalCost).toBe(599);
+  });
+
+  it('directLineWalk\'s own first-step exemption: finds the direct-line route when only the start cell is fragment-occupied (same corridor, occupancy kind)', () => {
+    // Same fast-path mechanism as the vehicle-occupied case above — fragment
+    // occupancy is checked by the exact same isImpassable condition, so this
+    // covers the other occupancy kind for this specific isolated-first-step
+    // scenario (the vehicle case and fragment case are already covered
+    // together at findPath's top level, but not here).
+    const grid = makeFlatGrid(600, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { fragmentOccupancy: 1 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: true });
     expect(result.found).toBe(true);
     expect(result.totalCost).toBe(599);

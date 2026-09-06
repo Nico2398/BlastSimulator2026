@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isStepClimbable } from './NavGrid.js';
+import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
@@ -161,7 +161,7 @@ class MinHeap<T extends { key: number }> {
 export function isImpassable(cell: NavCell, avoidVehicles: boolean, isAgentCell: boolean = false): boolean {
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (isAgentCell) return false;
-  if (avoidVehicles && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0)) return true;
+  if (avoidVehicles && isCellOccupied(cell)) return true;
   return false;
 }
 

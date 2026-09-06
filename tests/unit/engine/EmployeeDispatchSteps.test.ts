@@ -271,6 +271,88 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
     expect(employee.activeActionId).toBeNull();
     expect(result.claimed).toEqual([]);
   });
+
+  // #954 follow-up (economy-full-loop regression): a vehicle-gated queue entry
+  // reserved ahead of time (reserveOnePoolActionAhead) but never boarded can
+  // otherwise stay locked to its holder forever once resolveActionCost's own
+  // occupancy check correctly refuses to promote a claim whose holder's own
+  // foot-walk to the reserved vehicle is genuinely blocked — see
+  // canReassignStrandedReservation's own doc comment (VehicleReservation.ts).
+  describe('stranded vehicle-gated reservation release (#954 follow-up)', () => {
+    it('releases a queue entry back to the open pool when its reserved vehicle has no driver and a different idle, licensed employee is available — who then claims it', () => {
+      const state = createGame({ seed: SEED });
+      const grid = makeFlatNavGrid(30, 10);
+      blockColumn(grid, 10); // isolates x < 10 (holder) from x >= 10 (vehicle, other)
+      state.navGrid = grid;
+      const rng = new Random(SEED);
+      const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      // holder deliberately NOT licensed for drill_rig — irrelevant to
+      // canReassignStrandedReservation, which only requires a DIFFERENT
+      // licensed idle employee, but keeps holder's own fallback pool claim
+      // from muddying the assertions below.
+      const { employee: other } = hireEmployee(state.employees, 'driller', rng, 25, 0);
+      assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 0);
+      const action = makeAction({
+        id: 50, targetX: 20, targetZ: 0, requiredVehicleRole: 'drill_rig',
+        status: 'assigned', holderId: holder.id, targetEmployeeId: null,
+      });
+      state.pendingActions.push(action);
+      holder.taskQueue = [50];
+      vehicle.reservedForActionId = action.id;
+      // vehicle.driverId stays null — never actually boarded.
+
+      const result1 = makeResult();
+      fillIdleEmployeeFromQueueOrPool(state, holder, result1);
+
+      expect(holder.taskQueue).not.toContain(50);
+      expect(holder.activeActionId).toBeNull();
+      expect(action.status).toBe('queued');
+      expect(action.holderId).toBeNull();
+      expect(vehicle.reservedForActionId).toBeNull();
+
+      const result2 = makeResult();
+      fillIdleEmployeeFromQueueOrPool(state, other, result2);
+
+      expect(other.activeActionId).toBe(50);
+      expect(action.status).toBe('assigned');
+      expect(action.holderId).toBe(other.id);
+      expect(vehicle.reservedForActionId).toBe(50);
+    });
+
+    it('never releases a reservation whose vehicle already has a driver — real boarding progress is never discarded', () => {
+      const state = createGame({ seed: SEED });
+      const grid = makeFlatNavGrid(30, 10);
+      blockColumn(grid, 10); // isolates x < 10 (holder) from x >= 10 (vehicle/target, other)
+      state.navGrid = grid;
+      const rng = new Random(SEED);
+      const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      const { employee: other } = hireEmployee(state.employees, 'driller', rng, 25, 0);
+      assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 0);
+      vehicle.driverId = holder.id; // already boarded
+      const action = makeAction({
+        id: 51, targetX: 20, targetZ: 0, requiredVehicleRole: 'drill_rig',
+        status: 'assigned', holderId: holder.id, targetEmployeeId: null,
+      });
+      state.pendingActions.push(action);
+      holder.taskQueue = [51];
+      vehicle.reservedForActionId = action.id;
+
+      const result = makeResult();
+      fillIdleEmployeeFromQueueOrPool(state, holder, result);
+
+      // Still pinned to holder — the boarded driver's progress is never
+      // discarded to hand the vehicle to a merely-idle other employee.
+      expect(holder.taskQueue).toContain(51);
+      expect(action.status).toBe('assigned');
+      expect(action.holderId).toBe(holder.id);
+      expect(vehicle.reservedForActionId).toBe(51);
+      expect(other.activeActionId).toBeNull();
+    });
+  });
 });
 
 describe('claimOnePoolCandidate', () => {

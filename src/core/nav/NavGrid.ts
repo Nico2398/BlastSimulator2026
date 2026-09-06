@@ -72,6 +72,22 @@ export interface NavCell {
   surfaceY?: number;
 }
 
+/**
+ * True when `cell` is currently vehicle- or fragment-occupied (#954) — the
+ * single shared definition of "occupied", consolidated here after the exact
+ * same `cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0` expression
+ * had been written three times independently: Pathfinding.ts's isImpassable,
+ * NavGridReachability.ts's isOccupiedCell, and EntityMovementTick.ts's
+ * isDestinationOccupied. Takes the cell directly rather than a NavGrid plus
+ * coordinates so it stays usable from NavGridReachability.ts, which never
+ * imports GameState (dev-architecture layering) — every call site already
+ * holds or can cheaply resolve its own cell reference. `undefined` (an
+ * out-of-bounds or not-yet-built cell) is never occupied.
+ */
+export function isCellOccupied(cell: NavCell | undefined): boolean {
+  return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
+}
+
 export class NavGrid {
   readonly width: number;
   readonly height: number;

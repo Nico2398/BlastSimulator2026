@@ -7,7 +7,7 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid } from './NavGrid.js';
-import { isStepClimbable } from './NavGrid.js';
+import { isStepClimbable, isCellOccupied } from './NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
@@ -28,8 +28,7 @@ export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boole
  * comment for why entity-spawn placement needs it.
  */
 function isOccupiedCell(navGrid: NavGrid, x: number, z: number): boolean {
-  const cell = navGrid.cellAt(x, z);
-  return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
+  return isCellOccupied(navGrid.cellAt(x, z));
 }
 
 /**

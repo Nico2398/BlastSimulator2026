@@ -8,6 +8,9 @@ import type { GameState, PendingAction, ActionType, GhostPreview } from '../../.
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { tick } from '../../../src/core/state/GameLoop.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
@@ -371,6 +374,22 @@ function solidVoxel(): VoxelData {
   };
 }
 
+/** Minimal on-ground FragmentData fixture for occupancy tests. */
+function makeFragment(id: number, x: number, z: number): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 0.3,
+    mass: 1000,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
+}
+
 describe('createGame — navGrid (task 6.10)', () => {
   it('initialises navGrid as null', () => {
     const state = createGame({ seed: 42 });
@@ -465,6 +484,36 @@ describe('buildGameNavGrid (task 6.10)', () => {
     expect(state.navGrid!.cells[5]![5]!.type).toBe('drill_hole');
     // Cell far from building or drill hole should be walkable
     expect(state.navGrid!.cells[0]![0]!.type).toBe('walkable');
+  });
+
+  // #954: a navgrid rebuild (site expansion, world regen) previously lost
+  // every fragment/vehicle occupancy cell the OLD navgrid had marked
+  // impassable for foot traffic — buildGameNavGrid now re-seeds both from
+  // state.logistics.fragments/state.vehicles.vehicles at rebuild time.
+  it('reseeds fragment and vehicle occupancy from state on rebuild (#954)', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(10, 5, 10);
+    for (let z = 0; z < 10; z++) {
+      for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 10; x++) {
+          voxelGrid.setVoxel(x, y, z, solidVoxel());
+        }
+      }
+    }
+
+    addBlastFragments(state.logistics, [makeFragment(1, 4, 4)]);
+    purchaseVehicle(state.vehicles, 'rock_digger', 6, 6);
+    // vehicle.state defaults to 'idle' (stationary) — buildNavGrid only seeds
+    // vehicleOccupied for a non-'moving' vehicle.
+
+    buildGameNavGrid(state, voxelGrid, [], []);
+
+    expect(state.navGrid).not.toBeNull();
+    expect(state.navGrid!.cellAt(4, 4)!.fragmentOccupancy).toBe(1);
+    expect(state.navGrid!.cellAt(6, 6)!.vehicleOccupied).toBe(true);
+    // Untouched cells stay unoccupied.
+    expect(state.navGrid!.cellAt(0, 0)!.fragmentOccupancy ?? 0).toBe(0);
+    expect(state.navGrid!.cellAt(0, 0)!.vehicleOccupied).toBe(false);
   });
 });
 

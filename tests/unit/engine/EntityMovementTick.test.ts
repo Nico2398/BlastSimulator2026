@@ -172,6 +172,58 @@ describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', 
   });
 });
 
+// ── tickVehicle — NavCell.vehicleOccupied lifecycle (#954) ──────────────────
+// updateVehicleCellOccupancy keeps NavCell.vehicleOccupied in sync with a
+// vehicle's own current cell — set while stationary, cleared the instant it
+// starts moving, set again on the new cell once it parks there. No test
+// previously drove a vehicle through a full park -> drive -> park cycle and
+// asserted the flag actually flips on both ends.
+
+describe('tickVehicle — NavCell.vehicleOccupied lifecycle (#954)', () => {
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  it('flips NavCell.vehicleOccupied through a park -> drive -> park cycle', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 5, 2);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        vg.setVoxel(x, 0, z, solidVoxel());
+      }
+    }
+    // No vehicles passed here — buildNavGrid's own vehicle-seeding is
+    // deliberately unused so the flag's only source, through this test, is
+    // updateVehicleCellOccupancy itself.
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    // #947: a driverless vehicle never advances on tick at all.
+    vehicle.driverId = 1;
+
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(false);
+
+    // Stationary (task still 'idle'): one tick marks the parked cell occupied.
+    tickVehicle(state, vehicle);
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(true);
+
+    // Drive away toward (3, 0).
+    vehicle.task = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 0;
+    for (let i = 0; i < 20 && !(vehicle.state === 'idle' && vehicle.x === 3 && vehicle.z === 0); i++) {
+      tickVehicle(state, vehicle);
+    }
+    expect(vehicle.x).toBe(3);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('idle'); // fully arrived and re-settled
+
+    // OLD cell cleared once the vehicle left it; NEW cell marked once parked.
+    expect(state.navGrid.cellAt(0, 0)!.vehicleOccupied).toBe(false);
+    expect(state.navGrid.cellAt(3, 0)!.vehicleOccupied).toBe(true);
+  });
+});
+
 // ── tickVehicle — occupancy-block reroute/stuck escalation (issue #591) ─────
 // tickVehicleOnNavGrid finds a path just fine here (findPath ignores vehicles
 // unless avoidVehicles:true) — the block is a stationary vehicle sitting on

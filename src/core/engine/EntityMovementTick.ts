@@ -10,6 +10,7 @@ import type { GameState } from '../state/GameState.js';
 import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath } from '../nav/Pathfinding.js';
+import { isCellOccupied } from '../nav/NavGrid.js';
 import { advanceAlongPath } from '../nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY, MOVE_STUCK_ABANDON_TICKS } from '../config/balance.js';
 import { applyAdvanceOutcome, handleVehicleOccupancyBlock } from './VehicleOccupancyReroute.js';
@@ -335,8 +336,7 @@ export interface EmployeeMovementResult {
  * agree.
  */
 export function isDestinationOccupied(state: GameState, x: number, z: number): boolean {
-  const cell = state.navGrid?.cellAt(Math.round(x), Math.round(z));
-  return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
+  return isCellOccupied(state.navGrid?.cellAt(Math.round(x), Math.round(z)));
 }
 
 export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): EmployeeMovementResult {
