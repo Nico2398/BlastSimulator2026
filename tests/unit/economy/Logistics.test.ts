@@ -256,6 +256,64 @@ describe('consumeStoredOre', () => {
     expect(state.storedMassKg).toBe(500);
   });
 
+  it('ore: a request within FRAGMENT_SPLIT_EPSILON_KG of a fragment\'s full ore contribution fully removes it instead of leaving a near-zero sliver', () => {
+    const state = createLogisticsState();
+    // volume 0.16 × density 1.0 × 2500 = 400kg of oreK.
+    const oldest = makeStoredFragment(1, 800, 0.16, { oreK: 1.0 });
+    // volume 0.12 × density 1.0 × 2500 = 300kg of oreK.
+    const newer = makeStoredFragment(2, 600, 0.12, { oreK: 1.0 });
+    putInStorage(state, oldest);
+    putInStorage(state, newer);
+    const collectedOre: Record<string, number> = { oreK: 700 };
+
+    // Just under the oldest fragment's exact ore contribution — close enough
+    // that a strict split would leave a sub-epsilon sliver instead of fully
+    // removing the fragment.
+    const requested = 400 - FRAGMENT_SPLIT_EPSILON_KG / 2;
+    const result = consumeStoredOre(state, collectedOre, 'oreK', requested);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBeCloseTo(requested, 9);
+    // The oldest fragment is fully removed — no sliver left behind.
+    expect(getFragmentCounts(state).stored).toBe(1);
+    expect(state.fragments.find(f => f.fragment.id === 1)).toBeUndefined();
+    // The newer fragment is completely untouched.
+    const untouched = state.fragments.find(f => f.fragment.id === 2);
+    expect(untouched).toBeDefined();
+    expect(untouched!.fragment.mass).toBe(600);
+    // storedMassKg lands exactly on the remaining fragment's mass — not
+    // 600 + a sub-epsilon leftover from the oldest.
+    expect(state.storedMassKg).toBe(600);
+  });
+
+  it('ore: a request spanning two fragments fully consumes the oldest and partially splits the next', () => {
+    const state = createLogisticsState();
+    // volume 0.16 × density 1.0 × 2500 = 400kg of oreL.
+    const oldest = makeStoredFragment(1, 800, 0.16, { oreL: 1.0 });
+    // volume 0.12 × density 1.0 × 2500 = 300kg of oreL.
+    const newer = makeStoredFragment(2, 600, 0.12, { oreL: 1.0 });
+    putInStorage(state, oldest);
+    putInStorage(state, newer);
+    const collectedOre: Record<string, number> = { oreL: 700 };
+
+    // 500kg: more than the oldest fragment's 400kg of oreL alone, less than
+    // the combined 700kg — must fully consume the oldest and partially split
+    // 100kg of oreL (200kg of mass) off the newer, leaving its 400kg mass /
+    // 200kg-of-oreL remainder in storage.
+    const result = consumeStoredOre(state, collectedOre, 'oreL', 500);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBe(500);
+    expect(state.fragments.find(f => f.fragment.id === 1)).toBeUndefined();
+    const remainder = state.fragments.find(f => f.fragment.id === 2);
+    expect(remainder).toBeDefined();
+    expect(remainder!.state).toBe('stored');
+    expect(remainder!.fragment.mass).toBe(400);
+    expect(getFragmentCounts(state).stored).toBe(1);
+    expect(state.storedMassKg).toBe(400);
+    expect(collectedOre.oreL).toBe(200);
+  });
+
   it('rubble (materialId "") consumes raw stored mass regardless of ore content, ignoring collectedOre', () => {
     const state = createLogisticsState();
     // One ore-bearing fragment, one barren fragment — rubble disposal doesn't care.

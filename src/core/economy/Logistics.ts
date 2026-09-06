@@ -4,7 +4,7 @@
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
-import { vec3 } from '../math/Vec3.js';
+import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 
 // ── Fragment states ──
@@ -98,6 +98,14 @@ export function deliverToDepot(
   return true;
 }
 
+/** Mass/volume/ore content removed from storage by a sale or a partial split. */
+type RemovedFragmentMass = { mass: number; volume: number; oreDensities: Record<string, number> };
+
+/** Find a fragment currently in storage by id, or undefined when absent/not stored. */
+function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+  return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+}
+
 /**
  * Sell a stored fragment. Returns the mass sold (for contract fulfillment).
  * Removes the fragment from logistics.
@@ -105,7 +113,7 @@ export function deliverToDepot(
 export function sellFragment(
   state: LogisticsState,
   fragmentId: number,
-): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
+): RemovedFragmentMass | null {
   const idx = state.fragments.findIndex(
     f => f.fragment.id === fragmentId && f.state === 'stored',
   );
@@ -134,12 +142,10 @@ export function splitStoredFragmentMass(
   state: LogisticsState,
   fragmentId: number,
   massToRemoveKg: number,
-): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
+): RemovedFragmentMass | null {
   if (!Number.isFinite(massToRemoveKg) || massToRemoveKg <= 0) return null;
 
-  const tracked = state.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'stored',
-  );
+  const tracked = findStoredFragment(state, fragmentId);
   if (!tracked) return null;
 
   const fragment = tracked.fragment;
@@ -152,11 +158,7 @@ export function splitStoredFragmentMass(
   fragment.mass -= massToRemoveKg;
   fragment.volume -= removedVolume;
   const shrink = Math.cbrt(1 - fraction);
-  fragment.halfExtents = vec3(
-    fragment.halfExtents.x * shrink,
-    fragment.halfExtents.y * shrink,
-    fragment.halfExtents.z * shrink,
-  );
+  fragment.halfExtents = scale(fragment.halfExtents, shrink);
 
   state.storedMassKg -= massToRemoveKg;
 
@@ -169,11 +171,14 @@ export function splitStoredFragmentMass(
 
 /**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
- * removing whole fragments (via sellFragment) until the requested amount is
- * covered, decrementing collectedOre[materialId] (and every other ore key each
- * removed fragment touches) by the exact ore-kg physically removed.
- * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
- * ore content — any fragment, ore-bearing or not.
+ * oldest-first, until the requested amount is covered: a fragment whose full
+ * contribution the request still needs is removed whole (via sellFragment),
+ * and a fragment that only needs to give up part of its contribution is
+ * shrunk in place (via splitStoredFragmentMass), decrementing
+ * collectedOre[materialId] (and every other ore key each touched fragment
+ * carries) by the exact ore-kg physically removed. materialId === ''
+ * (rubble_disposal) consumes raw stored mass regardless of ore content — any
+ * fragment, ore-bearing or not.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -208,7 +213,7 @@ export function consumeStoredOre(
     for (const id of storedIds) {
       if (tally >= amountKg) break;
 
-      const tracked = state.fragments.find(f => f.fragment.id === id && f.state === 'stored');
+      const tracked = findStoredFragment(state, id);
       if (!tracked) continue;
 
       const remaining = amountKg - tally;
@@ -260,7 +265,7 @@ export function consumeStoredOre(
   for (const id of storedIds) {
     if (removedMass >= amountKg) break;
 
-    const tracked = state.fragments.find(f => f.fragment.id === id && f.state === 'stored');
+    const tracked = findStoredFragment(state, id);
     if (!tracked) continue;
 
     const remaining = amountKg - removedMass;
