@@ -393,6 +393,49 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     expect(vehicle.moveConsecutiveFailures).toBe(0);
     expect(vehicle.isMoveStuck).toBe(false);
   });
+
+  it('fully releases a manually-driven mid-haul vehicle (no PendingAction, driver.activeActionId === null) — the exact case #986 review found silently left driverId/haulingPhase set', () => {
+    // Mirrors the manual `vehicle haul <vehicleId> <fragmentId>` console
+    // command (requestHaulFragment, HaulingTask.ts): sets vehicle.haulingPhase
+    // directly with no PendingAction ever pushed, so
+    // driver.activeActionId stays null throughout. interruptActiveAction
+    // short-circuits on a null actionId, so only the sustained-stuck
+    // branch's own explicit dismountVehicleDriver call (EntityMovementTick.ts)
+    // — which aborts haulingPhase via abortVehicleGatedFragmentWork BEFORE
+    // calling unassignDriver — can actually free this vehicle.
+    const state = buildWalledOffDestinationState();
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+
+    vehicle.driverId = driver.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 3;
+    vehicle.haulingPhase = 'to_fragment';
+    // No pendingActions entry, no reservedForActionId, no activeActionId —
+    // exactly what the manual console path leaves.
+    expect(driver.activeActionId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+
+    const emitter = new EventEmitter();
+    const abandonedEvents: Array<{ vehicleId: number; employeeId: number | null; actionId: number | null }> = [];
+    emitter.on('vehicle:action_abandoned', (payload) => abandonedEvents.push(payload));
+
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(abandonedEvents).toEqual([{ vehicleId: vehicle.id, employeeId: driver.id, actionId: null }]);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.haulingPhase).toBeNull();
+    expect(vehicle.moveConsecutiveFailures).toBe(0);
+    expect(vehicle.isMoveStuck).toBe(false);
+  });
 });
 
 // ── tickVehicle — NavCell.vehicleOccupied lifecycle (#954) ──────────────────
