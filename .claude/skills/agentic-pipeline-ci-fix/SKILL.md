@@ -41,7 +41,7 @@ The pull request already exists, its branch already carries the work, and its is
                        GREEN → done: auto-merge takes the PR from here.
 ```
 
-Rounds are bounded exactly as `agentic-pipeline-finalization`'s CI-fix loop bounds them, and its terminal case is this pipeline's too: still red after 3 rounds → convert the PR to a draft, comment naming the channel and what fails, label the issue `blocked`, stop with `ESCALATED: CI red after 3 fix rounds`.
+**Three rounds**, counted per session, and the loop budget (`agentic-autonomous-pipeline`) closes them sooner. This session exists for the red and starts with a whole budget, which is why it gets more rounds than the one `agentic-pipeline-finalization` allows a run that already spent its budget building the branch. Still red after the last round → convert the PR to a draft, comment naming the channel and what fails, label the issue `blocked`, stop with `ESCALATED: CI red after 3 fix rounds`.
 
 ## What this pipeline must not do
 

@@ -32,7 +32,7 @@ Two paths invoke this agent:
 | Standard verification | End of full pipeline, after @validator | `pipeline/feature-<label>` | Pass/fail with evidence |
 | Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<label>` | **All failures in one pass**, ranked by severity |
 
-In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
+In both contexts: run the scenarios the orchestrator names — never the whole suite on a runner without a GPU, per `dev-finishing-work` — inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 

@@ -81,18 +81,39 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    # GitHub-hosted maximum. 180 was not enough for a real run: issue #404 was
-    # still fixing code-review findings when the clock cut it off at three hours,
-    # and a cancelled job loses everything the rescue step cannot push. A run
-    # that overruns 360 minutes is stuck, not slow. `AGENTIC_STALL_MINUTES` must
+    # GitHub-hosted maximum, and the outer bound only. 180 was not enough for a
+    # real run: issue #404 was still fixing code-review findings when the clock
+    # cut it off at three hours. But the job clock is the wrong one to hit: a
+    # cancelled job skips the retry gate by design and gives the rescue step a
+    # few seconds of grace. Runs 565, 591, 606 and 609 (#921, #947, #953, #956)
+    # each ran their agent step for the whole 360 minutes and ended exactly
+    # there — wip draft, issue `blocked`, a human finishing every one. So each
+    # agent step below carries its own `timeout-minutes`: a step that overruns
+    # *fails* inside a live job, and `agentic-run-state`, the retry and the
+    # rescue all run with clock left. The budget adds up under this bound —
+    # 270 for the first attempt, 80 for the retry, the rest for setup, the state
+    # checks, the rescue and auto-merge arming. `AGENTIC_STALL_MINUTES` must
     # stay above this — see agentic-watchdog.yml.
     timeout-minutes: 360
     steps:
       # First step, so elapsed time measured against it matches the window
-      # `timeout-minutes` is counting. The retry gate below spends it.
+      # `timeout-minutes` is counting. The retry gate below spends it, and the
+      # loop deadline derived from it is what the session's own loops read —
+      # `agentic-autonomous-pipeline` holds that rule. Anything but a positive
+      # integer in the variable falls back to the default rather than disabling
+      # the brake, the same rule every other limit in this layer follows.
       - name: Record when the job started
         id: clock
-        run: echo "started_at=$(date +%s)" >> "$GITHUB_OUTPUT"
+        env:
+          LOOP_BUDGET_MINUTES: ${{ vars.AGENTIC_LOOP_BUDGET_MINUTES }}
+        run: |
+          started_at=$(date +%s)
+          echo "started_at=${started_at}" >> "$GITHUB_OUTPUT"
+          case "${LOOP_BUDGET_MINUTES}" in
+            ''|*[!0-9]*|0) budget=180 ;;
+            *) budget=${LOOP_BUDGET_MINUTES} ;;
+          esac
+          echo "loop_deadline=$(( started_at + budget * 60 ))" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -150,8 +171,16 @@ jobs:
       # /agentic-run command carries that mandate instead.
       - name: Run Claude Code
         id: claude
+        # The first attempt's share of the job budget — see the job's own
+        # `timeout-minutes` for the arithmetic and the runs that decided it.
+        timeout-minutes: 270
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          # Read by `.claude/hooks/report-loop-budget.sh` before every delegation:
+          # past this epoch the session starts no new loop iteration. The same
+          # absolute deadline goes to the retry, which therefore starts with its
+          # loops already closed and does linear work only.
+          AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -220,9 +249,10 @@ jobs:
           # publish anything a Bash step happened to echo.
           show_full_output: true
 
-      # `always()`: a crashed, failed or early-ended attempt is exactly the case
-      # this gate exists to catch. A cancelled job (the 360-minute timeout) skips
-      # it, which is correct — there is no clock left to retry inside.
+      # `always()`: a crashed, failed, timed-out or early-ended attempt is
+      # exactly the case this gate exists to catch. A cancelled job (the
+      # 360-minute outer bound) reaches it with no clock left, and the budget
+      # check inside says so.
       - name: Did the run settle its issue?
         id: state
         if: always() && steps.context.outputs.issue != ''
@@ -239,14 +269,21 @@ jobs:
       # (a turn ended with work outstanding, a crash in the first minutes, a
       # transient API error) all die early and leave the whole budget behind.
       #
-      # The `if` has no `success()` in it deliberately: this must run precisely
-      # when the attempt above did not settle the issue, whether it reported
-      # failure or reported success having done nothing.
+      # `always()` deliberately: this must run precisely when the attempt above
+      # did not settle the issue, whether it timed out, reported failure, or
+      # reported success having done nothing. A step without it is skipped after
+      # any failed step, so on the state verdict alone the gate could only ever
+      # fire on an attempt that exited 0 — a crash or a step timeout skipped it.
+      # The budget check in `agentic-run-state` is what keeps a cancelled job
+      # from starting an attempt here with no clock to finish it.
       - name: Retry the run when the first attempt settled nothing
         id: claude_retry
-        if: steps.state.outputs.retry == 'true'
+        if: always() && steps.state.outputs.retry == 'true'
+        # What is left after the first attempt's 270 and the steps around it.
+        timeout-minutes: 80
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

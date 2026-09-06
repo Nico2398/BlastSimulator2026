@@ -57,7 +57,12 @@ Runs after test-runner passes on feature branch, before qualimetry. Visual-chang
 
 ```
 LOOP:
-  a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
+  a. @visual-tester   → Run the named scenarios with --shots, inspect ALL screenshots.
+                        Named: every scenario the issue's Verification section calls
+                        for, every definition under scripts/scenario-defs/ the diff
+                        touches, and any the orchestrator adds because the change
+                        reaches it. Never the whole suite — the full interaction-mode
+                        run is CI's, behind `full-ci`.
                         Must return VISUAL: PASS, VISUAL: FAIL, or VISUAL: BLOCKED.
                         If VISUAL: BLOCKED → halt pipeline immediately (escalate).
                         If no failures → exit loop (continue to step 9).
@@ -66,7 +71,8 @@ LOOP:
                         Does NOT switch to impl branch — this is not TDD, it's visual iteration.
   c. [test-runner]    → Verify no test regression.
                         if fail → @fixer → re-run [test-runner]
-  d. goto (a)         → Next iteration. No iteration cap.
+  d. goto (a)         → Next iteration, while fewer than 3 have run and the loop
+                        budget is open (`agentic-autonomous-pipeline`).
 ```
 
 **Key rules:**
@@ -76,9 +82,9 @@ LOOP:
   procedure. A browser harness is the most expensive thing this pipeline runs
   (~6.4 s/frame without a GPU), so this is where the job budget is won or lost.
 - `@implementer` during visual loop: fix ALL reported visual issues, commit, hand back to visual-tester
-- `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
+- `@visual-tester` each iteration: re-run the same named scenarios, report remaining failures
 - No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
-- If the SAME visual failure persists across 3 consecutive iterations → loop makes no progress → orchestrate escalation (7 total iteration cap before hard escalation)
+- Three iterations is the cap, and the loop budget closes the loop sooner. A failure still present after the last iteration goes on the PR the way any red channel does — `agentic-pipeline-pr-management` — never into another pass. The runner has no GPU, a frame costs ~6 s, and one iteration is the most expensive thing this pipeline runs: #956 finished its TDD cycle 28 minutes in and spent the next five and a half hours in this loop, ten probe runs of one ultrawide viewport in the last ninety minutes alone.
 
 ### Non-Agentic Steps
 
