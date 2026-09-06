@@ -121,6 +121,23 @@ export function sellFragment(
 }
 
 /**
+ * Split a stored fragment's mass, removing `massToRemoveKg` from it and leaving
+ * the remainder in storage (as a smaller fragment covering the same ore
+ * densities). Returns the removed mass/volume/oreDensities, or null when the
+ * fragment is not found, not stored, or `massToRemoveKg` is not strictly
+ * between 0 and the fragment's mass (use `sellFragment` to remove the whole
+ * fragment instead).
+ */
+export function splitStoredFragmentMass(
+  _state: LogisticsState,
+  _fragmentId: number,
+  _massToRemoveKg: number,
+): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
  * removing whole fragments (via sellFragment) until the requested amount is
  * covered, decrementing collectedOre[materialId] (and every other ore key each

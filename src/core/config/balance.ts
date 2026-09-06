@@ -216,6 +216,10 @@ export const BLAST_ENERGY_EPSILON = 4.0;
  *  four orders of magnitude below anything that could fracture a voxel. */
 export const PROPAGATION_ENERGY_EPSILON = 0.01;
 
+/** Remaining mass below this (kg) after splitting a stored fragment is treated
+ *  as fully consumed rather than left behind as a negligible remainder. */
+export const FRAGMENT_SPLIT_EPSILON_KG = 1e-6;
+
 /** Fraction of the energy passing through a voxel that is lost to heat and noise
  *  rather than handed to its neighbours, as
  *  `BASE + POROSITY_SCALE × porosity`.
