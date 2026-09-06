@@ -21,11 +21,12 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
+import { returnFragmentToGround } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { tickVehicle } from '../engine/EntityMovementTick.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { requestHaulFragment } from './HaulingTask.js';
-import { requestBreakBoulder } from './BoulderBreaking.js';
+import { requestHaulFragment, abortHaul } from './HaulingTask.js';
+import { requestBreakBoulder, abortBreak } from './BoulderBreaking.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -154,6 +155,16 @@ export function startVehicleGatedFragmentWork(
  * Callers (reservation release, cancellation, driver death) do not need to
  * know which kind of work was in flight, or any of the phase constants.
  */
-export function abortVehicleGatedFragmentWork(_state: GameState, _vehicle: Vehicle): void {
-  throw new Error('not implemented');
+export function abortVehicleGatedFragmentWork(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.haulingPhase !== null) {
+    if (vehicle.haulingFragmentId !== null) {
+      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid);
+    }
+    abortHaul(vehicle);
+    return;
+  }
+
+  if (vehicle.breakPhase !== null) {
+    abortBreak(vehicle);
+  }
 }

@@ -36,7 +36,7 @@ import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
-import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -247,6 +247,8 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
   if (!vehicle) return;
 
+  abortVehicleGatedFragmentWork(state, vehicle);
+
   vehicle.reservedForActionId = null;
   if (vehicle.driverId !== null) {
     // #593/#922: EntityMovementTick.tickVehicle already calls
@@ -281,6 +283,8 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
 export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
   if (!vehicle) return;
+
+  abortVehicleGatedFragmentWork(state, vehicle);
 
   vehicle.reservedForActionId = null;
 }

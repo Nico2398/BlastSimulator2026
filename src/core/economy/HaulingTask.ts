@@ -9,7 +9,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
-import { pickupFragment, deliverToDepot } from './Logistics.js';
+import { pickupFragment, deliverToDepot, returnFragmentToGround } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
@@ -125,6 +125,9 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     b => b.id === vehicle.haulingDepotBuildingId && b.active,
   );
   if (!building) {
+    if (vehicle.haulingFragmentId !== null) {
+      returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid);
+    }
     abortHaul(vehicle);
     return;
   }

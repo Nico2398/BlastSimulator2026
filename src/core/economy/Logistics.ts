@@ -340,9 +340,24 @@ export function totalCollectedOreKg(collectedOre: Record<string, number>): numbe
  *   false if no such fragment exists (no mutation in that case).
  */
 export function returnFragmentToGround(
-  _state: LogisticsState,
-  _fragmentId: number,
-  _navGrid?: NavGrid | null,
+  state: LogisticsState,
+  fragmentId: number,
+  navGrid?: NavGrid | null,
 ): boolean {
-  throw new Error('not implemented');
+  const tracked = state.fragments.find(
+    f => f.fragment.id === fragmentId && f.state === 'in_transit',
+  );
+  if (!tracked) return false;
+
+  tracked.state = 'on_ground';
+  tracked.vehicleId = null;
+
+  if (navGrid) {
+    navGrid.addFragmentOccupant(
+      Math.round(tracked.fragment.position.x),
+      Math.round(tracked.fragment.position.z),
+    );
+  }
+
+  return true;
 }
