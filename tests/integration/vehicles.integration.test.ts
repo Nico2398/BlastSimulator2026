@@ -1129,7 +1129,8 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     let arrived = false;
     for (let i = 0; i < 60; i++) {
       tickCommand(ctx, ['1'], {});
-      if (vehicle.x === 15 && vehicle.z === 5 && vehicle.task === 'idle') {
+      const currentTask = vehicle.task as VehicleTask;
+      if (vehicle.x === 15 && vehicle.z === 5 && currentTask === 'idle') {
         arrived = true;
         break;
       }
