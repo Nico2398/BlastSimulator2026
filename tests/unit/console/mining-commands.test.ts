@@ -14,14 +14,14 @@ import {
   surveyCommand,
   tubingCommand,
 } from '../../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { resetHoleIds, computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import { RAMP_COST_PER_METER, carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
-import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../../src/core/config/balance.js';
+import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
@@ -2046,6 +2046,62 @@ describe('drillPlanCommand — add subcommand dispatch (#790 characterization)',
     drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
 
     expect(ctx.state!.plannedDrillHoles.length).toBe(gridCount + 1);
+  });
+});
+
+// ── Omitted `diameter` default parity with the Drill panel (#965) ──────────
+// drill_plan grid/add must default an omitted `diameter` to
+// DRILL_HOLE_DEFAULT_DIAMETER_M (0.089), matching src/ui/panels/blastSteps/
+// Drill.ts's DEFAULT_DIAMETER_M — not the legacy '0.15' fallback, which drills
+// ~1.7x slower than interaction mode for the same omitted-diameter step.
+
+describe('drillPlanCommand — omitted diameter defaults to DRILL_HOLE_DEFAULT_DIAMETER_M (#965)', () => {
+  it('grid: dispatched drill_hole payload defaults diameter to 0.089, not 0.15', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    expect(result.success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
+    expect(action.payload['diameter']).toBe(DRILL_HOLE_DEFAULT_DIAMETER_M);
+    expect(action.payload['durationTicks']).toBe(
+      computeDrillHoleDurationTicks(8, DRILL_HOLE_DEFAULT_DIAMETER_M),
+    );
+  });
+
+  it('add: dispatched drill_hole payload defaults diameter to 0.089, not 0.15', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8' });
+
+    expect(result.success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
+    expect(action.payload['diameter']).toBe(DRILL_HOLE_DEFAULT_DIAMETER_M);
+    expect(action.payload['durationTicks']).toBe(
+      computeDrillHoleDurationTicks(8, DRILL_HOLE_DEFAULT_DIAMETER_M),
+    );
+  });
+
+  it('grid: an explicit diameter argument still overrides the default', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', diameter: '0.2' });
+
+    expect(result.success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
+    expect(action.payload['diameter']).toBe(0.2);
+    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.2));
+  });
+
+  it('add: an explicit diameter argument still overrides the default', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.2' });
+
+    expect(result.success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
+    expect(action.payload['diameter']).toBe(0.2);
+    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.2));
   });
 });
 

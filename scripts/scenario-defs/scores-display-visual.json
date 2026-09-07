@@ -157,6 +157,69 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#965: a third independent driller/rig pair, same margin reasoning as the #601-followup note on the second hire above — DRILL_HOLE_DEFAULT_DIAMETER_M (0.089, not the legacy 0.15) shortens each hole's own drill time relative to the fixed walk time between holes, so this grid's per-employee workload is now travel-dominated enough that an uneven 3-and-1 hole split between only two drillers can carry the busier one past NEED_COLLAPSE_THRESHOLDS.fatigue mid-task (sandbox-measured, seed:42) — a real, permanent stall, since a vehicle whose driver collapses out idles until a fresh `vehicle driver` command re-crews it (gameplay-vehicle-fleet: \"Driver injured or leaves -> vehicle idles until qualified replacement assigned\"), by design, not a bug this file works around. A third pair gives the dispatcher slack to reclaim the interrupted hole with whichever driller/rig is free, the same way this file's own second driller restored margin once before.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "vehicle driver 1 1",
       "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
@@ -174,6 +237,17 @@
         {
           "type": "command",
           "command": "vehicle driver 2 2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 3 3",
+      "description": "Crews drill_rig #3 with driller #3, same reasoning as the two steps above (#965).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 3"
         }
       ],
       "role": "bootstrap"
@@ -413,7 +487,7 @@
     },
     {
       "command": "zone clear x1:5 y1:5 x2:39 y2:39",
-      "description": "#557: evacuate the crew before firing. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 2x2/spacing:4 grid at (20,20) pads out to (5,5)-(39,39), matching the literal box declared here -- the same rectangle Fire.ts's Sound the Horn button computes and sends. Both drillers (#1, #2) are parked exactly on the holes they just finished drilling (20,20) and (24,20), squarely inside it. Without this, Damage.ts's processProjections (attenuated out to the full 15m BLAST_DANGER_MARGIN_M, #557) kills both the instant the blast fires -- direct-traced: deathCount 0 -> 2, and with nobody left alive, payroll/maintenance stop accruing and every `cash should have decreased` checkpoint for the rest of this file reads a frozen figure instead. clearZone no longer teleports: this only orders a walkout, so the wait_until step right after is what proves it actually finished.",
+      "description": "#557: evacuate the crew before firing. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 2x2/spacing:4 grid at (20,20) pads out to (5,5)-(39,39), matching the literal box declared here -- the same rectangle Fire.ts's Sound the Horn button computes and sends. The drillers (#1-#3, #965: a third pair was added to restore fatigue margin at the faster DRILL_HOLE_DEFAULT_DIAMETER_M default) are parked at the holes they just finished drilling, squarely inside it. Without this, Damage.ts's processProjections (attenuated out to the full 15m BLAST_DANGER_MARGIN_M, #557) kills them the instant the blast fires -- direct-traced (pre-#965, two drillers): deathCount 0 -> 2, and with nobody left alive, payroll/maintenance stop accruing and every `cash should have decreased` checkpoint for the rest of this file reads a frozen figure instead. clearZone no longer teleports: this only orders a walkout, so the wait_until step right after is what proves it actually finished.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -432,7 +506,7 @@
     {
       "command": "tick 20",
       "timeout": 180,
-      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- both drillers (#1, #2) auto-dismount their drill_rigs (#1, #2) the instant each drilling task finishes, so both rigs are undriven by the time Sound the Horn fires here, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with both rigs permanently stranded on their holes, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix), split into tick/event pairs since command mode's own tick loop refuses to advance past a pending event. Both drillers (employees, not gated by #947) still walk out for real across this pad; only the driverless rigs stay behind. #947-followup (this fix): shrunk from `tick 100`x3 (300 ticks total) to `tick 20`x3 (60 ticks, matching safety-projection-visual.json's own #947 pad exactly) -- direct-traced live in interaction mode: the 300-tick version crashed wellBeing 53 -> 0 by tick 230 and triggered a genuine worker_revolt by tick 330, whose LevelEndScreen `.bs-confirm-overlay` is what actually covered the blast panel's execute button (\"element is covered by div\", CI's own reported symptom) -- not a stuck random-event dialog, so no amount of `resolveEventIfPending` could have closed it (the same misdiagnosis vibration-budget.json's own #707 correction already found once for this exact symptom). The two drillers only need to walk clear of the zone once, a short trip from either hole to open ground outside the (5,5)-(39,39) box; 60 ticks is ample margin over that and stays well clear of the wellBeing-crash/revolt threshold this file's own worker count and needs decay were tipping into.",
+      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- each driller auto-dismounts its drill_rig the instant its own drilling task finishes, so every rig is undriven by the time Sound the Horn fires here, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with every rig permanently stranded on its hole, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix), split into tick/event pairs since command mode's own tick loop refuses to advance past a pending event. The drillers (employees, not gated by #947) still walk out for real across this pad; only the driverless rigs stay behind. #947-followup (this fix): shrunk from `tick 100`x3 (300 ticks total) to `tick 20`x3 (60 ticks, matching safety-projection-visual.json's own #947 pad exactly) -- direct-traced live in interaction mode: the 300-tick version crashed wellBeing 53 -> 0 by tick 230 and triggered a genuine worker_revolt by tick 330, whose LevelEndScreen `.bs-confirm-overlay` is what actually covered the blast panel's execute button (\"element is covered by div\", CI's own reported symptom) -- not a stuck random-event dialog, so no amount of `resolveEventIfPending` could have closed it (the same misdiagnosis vibration-budget.json's own #707 correction already found once for this exact symptom). The drillers only need to walk clear of the zone once, a short trip from any hole to open ground outside the (5,5)-(39,39) box; 60 ticks is ample margin over that and stays well clear of the wellBeing-crash/revolt threshold this file's own worker count and needs decay were tipping into. #965: a third driller/rig pair was added upstream to restore fatigue margin at the faster DRILL_HOLE_DEFAULT_DIAMETER_M default -- this pad's own margin was re-confirmed against three rigs, not just the original two.",
       "interaction": [
         {
           "type": "command",
@@ -491,7 +565,7 @@
           "dangerZoneClear": false,
           "levelEnded": false
         },
-        "note": "#947: dangerZoneClear reads false, not true -- both stranded driverless drill_rigs keep the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. levelEnded stays false here (#947-followup): the shrunk 60-tick pad (see the first tick step's own note) keeps wellBeing off the worker_revolt threshold this file's original 300-tick pad crashed into live. The blast step's own `deathCount: 0` proof downstream is what actually shows the two drillers evacuated for real."
+        "note": "#947: dangerZoneClear reads false, not true -- the stranded driverless drill_rigs keep the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. levelEnded stays false here (#947-followup): the shrunk 60-tick pad (see the first tick step's own note) keeps wellBeing off the worker_revolt threshold this file's original 300-tick pad crashed into live. The blast step's own `deathCount: 0` proof downstream is what actually shows the drillers evacuated for real. #965: three drillers/rigs now, not two -- see the third hire's own note."
       }
     },
     {

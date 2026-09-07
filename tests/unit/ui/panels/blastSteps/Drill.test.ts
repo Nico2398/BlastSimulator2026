@@ -4,6 +4,7 @@ import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
+import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
 
@@ -253,6 +254,40 @@ describe('DrillStep', () => {
     const { step, container } = makeStep();
     step.dispose();
     expect(container.contains(step.root)).toBe(false);
+  });
+
+  // #965: DrillStep's default diameter must stay import-identical to
+  // DRILL_HOLE_DEFAULT_DIAMETER_M (src/core/config/balance.ts), the same
+  // constant the console's drill_plan grid/add commands fall back to when a
+  // scenario's `diameter` argument is omitted — a locally-duplicated literal
+  // here (even one that numerically matches today) can silently drift from
+  // that shared constant later. Drives the panel's own grid and add-hole
+  // tools rather than importing a private constant, since DrillStep does not
+  // export its default diameter.
+  it('grid tool dispatches drill_plan grid with diameter import-identical to DRILL_HOLE_DEFAULT_DIAMETER_M', () => {
+    const { step, gameConsole } = makeStep();
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 19, z2: 13 });
+    controller.simulateConfirm();
+
+    const cmd = gameConsole.mock.calls[0]![0] as string;
+    expect(cmd).toContain(`diameter:${DRILL_HOLE_DEFAULT_DIAMETER_M}`);
+  });
+
+  it('add-hole tool dispatches drill_plan add with diameter import-identical to DRILL_HOLE_DEFAULT_DIAMETER_M', () => {
+    const { step, gameConsole } = makeStep();
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 25, z1: 30, x2: 25, z2: 30 });
+    controller.simulateConfirm();
+
+    const cmd = gameConsole.mock.calls[0]![0] as string;
+    expect(cmd).toContain(`diameter:${DRILL_HOLE_DEFAULT_DIAMETER_M}`);
   });
 });
 
