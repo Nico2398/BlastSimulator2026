@@ -655,16 +655,16 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
-      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
-      "timeout": 130,
+      "command": "wait_until field:buildingCount equals:2 max_ticks:900",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first. #1000-followup: max_ticks raised 400 -> 900. With the manager bypass hire gone, the two warehouses are raised by a driver freed by the starvation override (ACTION_STARVATION_TICK_THRESHOLD = 300, balance.ts), so nothing can start on them until 300 ticks after the two build orders are queued -- interaction mode measured the second warehouse landing at tick 593 against a wait that starts at 196, i.e. 397 of the old 400-tick budget. The extra headroom is the threshold, not the construction: raising it does not weaken the assertion, which is still that buildingCount reaches exactly 2.",
+      "timeout": 200,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
           "equals": 2,
-          "maxTicks": 400,
-          "timeoutMs": 120000
+          "maxTicks": 900,
+          "timeoutMs": 180000
         }
       ],
       "role": "setup",

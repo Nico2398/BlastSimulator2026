@@ -13,7 +13,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, type SelectedAction,
+  isRampSegmentClaimable, findStarvedActionForEmployee, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
@@ -144,6 +144,31 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
           releaseActionToOpenPool(state, candidate);
         }
       }
+    }
+  }
+
+  // #1000 (CI follow-up): a queued on-foot action starved past
+  // ACTION_STARVATION_TICK_THRESHOLD wins the open pool outright, ahead of
+  // any cheaper candidate claimOnePoolCandidate's cost ranking would pick.
+  // Ranking alone never rescues it — an idle employee standing in a debris
+  // field of hundreds of nearer haul/fragment actions re-picks one of those
+  // every tick indefinitely, so an ordered building on the far side of the
+  // pit stays unbuilt even while somebody is free to walk to it right now.
+  // VehicleContinuity.ts's own starvation gate does not cover this: it fires
+  // only when a driver *completes* a vehicle-gated action, and an employee
+  // who never completes one — churning on a claim that keeps failing, or
+  // idle between rests — never passes through it at all. Direct-traced via
+  // rock-fragmenter-breaking.json in interaction mode: both `place_building`
+  // orders sat 'queued' and fully claimable (reachable, no required skill,
+  // no vehicle needed) for 3,000 ticks while the one idle driver re-selected
+  // the same haul_debris action on every one of them.
+  const starved = findStarvedActionForEmployee(state, employee);
+  if (starved !== null) {
+    const claimedStarved = claimPendingAction(state, starved.action.id, employee.id);
+    if (claimedStarved !== null) {
+      result.claimed.push(claimedStarved.id);
+      promoteActionToActive(state, employee, claimedStarved);
+      return;
     }
   }
 

@@ -20,7 +20,7 @@ import {
   type TickEmployeesResult,
 } from '../../../src/core/engine/EmployeeDispatchSteps.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
-import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH, NEED_REST_DURATIONS } from '../../../src/core/config/balance.js';
+import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH, NEED_REST_DURATIONS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -215,6 +215,46 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
     // The pool candidate is untouched — the queue entry wins, never both.
     expect(poolAction.status).toBe('queued');
     expect(poolAction.holderId).toBeNull();
+  });
+
+  it('#1000 CI follow-up: a starved on-foot pool action beats a nearer, freshly queued one — cost ranking alone never rescues it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD + 10;
+
+    // The nearer candidate is what the cost ranking would pick every tick.
+    const nearFresh = makeAction({ id: 1, targetX: 1, targetZ: 1, queuedAtTick: state.tickCount });
+    const farStarved = makeAction({ id: 2, targetX: 9, targetZ: 9, queuedAtTick: 0 });
+    state.pendingActions.push(nearFresh, farStarved);
+    const result = makeResult();
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, result);
+
+    expect(employee.activeActionId).toBe(2);
+    expect(farStarved.status).toBe('assigned');
+    expect(farStarved.holderId).toBe(employee.id);
+    expect(result.claimed).toContain(2);
+    expect(nearFresh.status).toBe('queued');
+  });
+
+  it('#1000 CI follow-up: an on-foot pool action younger than the threshold does not override the cost ranking', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD + 10;
+
+    const nearFresh = makeAction({ id: 1, targetX: 1, targetZ: 1, queuedAtTick: state.tickCount });
+    const farNotYetStarved = makeAction({
+      id: 2, targetX: 9, targetZ: 9, queuedAtTick: state.tickCount - ACTION_STARVATION_TICK_THRESHOLD + 1,
+    });
+    state.pendingActions.push(nearFresh, farNotYetStarved);
+    const result = makeResult();
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, result);
+
+    expect(employee.activeActionId).toBe(1);
+    expect(farNotYetStarved.status).toBe('queued');
   });
 
   it('prunes a stale taskQueue entry (no longer assigned/held by this employee) and falls through to the pool', () => {
