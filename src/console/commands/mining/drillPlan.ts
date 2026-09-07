@@ -11,7 +11,7 @@ import {
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
-import { MAX_DRILL_GRID_HOLES } from '../../../core/config/balance.js';
+import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -112,7 +112,7 @@ export function drillPlanCommand(
     const cols = parseInt(named['cols'] ?? '3', 10);
     const spacing = parseFloat(named['spacing'] ?? '3');
     const depth = parseFloat(named['depth'] ?? '8');
-    const diameter = parseFloat(named['diameter'] ?? '0.15');
+    const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
 
     if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
       return { success: false, output: t('mining.drill_plan.invalid_grid') };
@@ -159,7 +159,7 @@ export function drillPlanCommand(
     const x = parseFloat(named['x'] ?? '0');
     const z = parseFloat(named['z'] ?? named['y'] ?? '0');
     const depth = parseFloat(named['depth'] ?? '8');
-    const diameter = parseFloat(named['diameter'] ?? '0.15');
+    const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
 
