@@ -12,7 +12,7 @@ import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
@@ -337,9 +337,15 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
  * `tryContinueVehicleGatedAction` so a long-starved on-foot action can win
  * dispatch over the same-role vehicle continuity fast path (#1000).
  */
-export function findStarvedActionForEmployee(_state: GameState, _employee: Employee): SelectedAction | null {
-  // TODO: implement
-  throw new Error('not implemented');
+export function findStarvedActionForEmployee(state: GameState, employee: Employee): SelectedAction | null {
+  const candidates = state.pendingActions.filter(a =>
+    a.status === 'queued' &&
+    a.requiredVehicleRole === null &&
+    (a.targetEmployeeId === null || a.targetEmployeeId === employee.id) &&
+    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
+    state.tickCount - (a.queuedAtTick ?? state.tickCount) >= ACTION_STARVATION_TICK_THRESHOLD);
+
+  return selectBestActionForEmployee(state, employee, candidates);
 }
 
 export function selectBestActionForEmployee(

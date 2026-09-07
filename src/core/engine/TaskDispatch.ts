@@ -64,7 +64,7 @@ export function dispatchPendingAction(
   }
   // Full record constructed here — every dispatch starts life queued and
   // unheld (#547); callers no longer supply status/holderId themselves.
-  state.pendingActions.push({ ...action, status: 'queued', holderId: null });
+  state.pendingActions.push({ ...action, status: 'queued', holderId: null, queuedAtTick: state.tickCount });
   // A `place_building` ghost carries its real footprint (#556) so the
   // renderer can draw the full site outline instead of a single point —
   // every other action type's ghost is unaffected, footprint stays undefined.

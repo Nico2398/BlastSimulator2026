@@ -12,7 +12,7 @@ import type { Employee } from '../entities/Employee.js';
 import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
 import { releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
-import { isRampSegmentClaimable, selectBestActionForEmployee } from './ActionSelection.js';
+import { isRampSegmentClaimable, selectBestActionForEmployee, findStarvedActionForEmployee } from './ActionSelection.js';
 import { promoteActionToActive } from './EmployeeDispatchSteps.js';
 
 /**
@@ -137,6 +137,24 @@ export function tryContinueVehicleGatedAction(
 export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Employee, actionId: number): void {
   const action = state.pendingActions.find(a => a.id === actionId);
   if (!action || action.requiredVehicleRole === null) return;
+
+  // #1000: a long-starved on-foot (requiredVehicleRole === null) action wins
+  // over same-role vehicle continuity, so a deep haul/fragment backlog can
+  // never permanently starve out an ordered building/survey/demolish that
+  // nobody else is ever free to walk to. Checked before
+  // tryContinueVehicleGatedAction so the override happens at the call site
+  // that decides whether to invoke it, not inside it.
+  const starved = findStarvedActionForEmployee(state, emp);
+  if (starved !== null) {
+    releaseVehicleOnCompletion(state, emp, actionId);
+    clearActiveTaskFields(emp);
+    const claimed = claimPendingAction(state, starved.action.id, emp.id);
+    if (claimed) {
+      promoteActionToActive(state, emp, claimed);
+    }
+    completePendingAction(state, actionId);
+    return;
+  }
 
   const continued = tryContinueVehicleGatedAction(state, emp, action);
   if (!continued) {
