@@ -1,0 +1,344 @@
+{
+  "driving_center": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 3,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 4,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    }
+  },
+  "blasting_academy": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 3,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 3,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    }
+  },
+  "management_office": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 2,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 3,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    }
+  },
+  "geology_lab": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 3,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 3,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    }
+  },
+  "research_center": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 3,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 4,
+      "sizeZ": 4,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    }
+  },
+  "living_quarters": {
+    "1": {
+      "sizeX": 3,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 4,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 5,
+      "sizeZ": 4,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        4,
+        0
+      ]
+    }
+  },
+  "explosive_warehouse": {
+    "1": {
+      "sizeX": 2,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        1,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 3,
+      "sizeZ": 2,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        2,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 4,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    }
+  },
+  "freight_warehouse": {
+    "1": {
+      "sizeX": 4,
+      "sizeZ": 4,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 5,
+      "sizeZ": 4,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        4,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 6,
+      "sizeZ": 5,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        5,
+        0
+      ]
+    }
+  },
+  "vehicle_depot": {
+    "1": {
+      "sizeX": 4,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        3,
+        0
+      ]
+    },
+    "2": {
+      "sizeX": 5,
+      "sizeZ": 3,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        4,
+        0
+      ]
+    },
+    "3": {
+      "sizeX": 6,
+      "sizeZ": 4,
+      "entry": [
+        0,
+        0
+      ],
+      "exit": [
+        5,
+        0
+      ]
+    }
+  }
+}

@@ -52,6 +52,7 @@ import {
   type SceneSetupDeps,
 } from './GameRendererSceneSetup.js';
 import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
+import { modelLibrary } from './models/ModelLibrary.js';
 import {
   raycastSurfaceY, raycastTerrainFromNDC, surfaceYAt, pickables,
   resolveFragmentId, entityWorldPosition, type PickingDeps,
@@ -98,6 +99,8 @@ export class GameRenderer {
   /** Seed of the currently loaded game — used to detect new_game calls. */
   private loadedSeed: number | null = null;
   private lastState: GameState | null = null;
+  /** Model-library revision the entity meshes were last reconciled against — see update(). */
+  private lastModelRevision = -1;
   /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
   private lastWeather: WeatherState = 'sunny';
 
@@ -312,6 +315,15 @@ export class GameRenderer {
 
     if (this.blastEffects) {
       this.blastEffects.update(dt);
+    }
+
+    // A level entered before every model asset arrived shows stand-in boxes;
+    // once the library grows, swap them for the real models.
+    if (modelLibrary.revision !== this.lastModelRevision) {
+      this.lastModelRevision = modelLibrary.revision;
+      this.buildings?.refreshModels();
+      this.vehicles?.refreshModels();
+      this.characters?.refreshModels();
     }
 
     if (this.characters && this.lastState) {

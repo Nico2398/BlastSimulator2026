@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
+import { BUILDING_RUIN_MODEL_ID } from '../../../src/renderer/models/ModelIds.js';
+import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makeBuilding(id: number, type: Building['type'], x = 10, z = 10, hp = 100): Building {
   return { id, type, tier: 1, x, z, hp, active: true };
@@ -43,17 +45,17 @@ describe('BuildingMesh', () => {
     bm.dispose();
   });
 
-  it('destroyed building has different visual (hp=0)', () => {
+  it('destroyed building (hp=0) draws the shared rubble model stretched over its footprint, an intact one its own model', () => {
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
     bm.addBuilding(makeBuilding(1, 'living_quarters', 0, 0, 0)); // hp=0
-    const group = scene.children[0] as THREE.Group;
-    const baseMesh = group.children[0] as THREE.Mesh;
-    const mat = baseMesh.material as THREE.MeshPhongMaterial;
-    // Destroyed color is dark grey (0x333333)
-    expect(mat.color.r).toBeLessThan(0.3);
-    expect(mat.color.g).toBeLessThan(0.3);
-    expect(mat.color.b).toBeLessThan(0.3);
+    bm.addBuilding(makeBuilding(2, 'living_quarters', 10, 10, 100));
+    const ruin = bm.getInstance(1)!;
+    expect(ruin.root.name).toBe(BUILDING_RUIN_MODEL_ID);
+    // living_quarters t1 is 3×3 on a 2×2 rubble model → 1.5× on both axes.
+    expect(ruin.root.scale.x).toBeCloseTo(1.5);
+    expect(ruin.root.scale.z).toBeCloseTo(1.5);
+    expect(bm.getInstance(2)!.root.name).toBe('building_living_quarters_t1');
     bm.dispose();
   });
 
@@ -130,5 +132,28 @@ describe('BuildingMesh', () => {
       expect(bm.pickables()).toHaveLength(0);
       bm.dispose();
     });
+  });
+});
+
+describe('BuildingMesh — model refresh (real assets)', () => {
+  it('refreshModels swaps a stand-in for the real model and re-pins the doors above its roof', async () => {
+    const library = await loadedModelLibrary([]);
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene, library);
+    bm.addBuilding(makeBuilding(1, 'research_center'));
+    expect(bm.getInstance(1)!.isFallback).toBe(true);
+    bm.refreshModels(); // asset still missing — no change
+    expect(bm.getInstance(1)!.isFallback).toBe(true);
+    const loaded = await loadedModelLibrary(['building_research_center_t1']);
+    library.register('building_research_center_t1', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('building_research_center_t1')!);
+    bm.refreshModels();
+    const inst = bm.getInstance(1)!;
+    expect(inst.isFallback).toBe(false);
+    const group = scene.children[0] as THREE.Group;
+    // Model root + entry pin + exit pin, pins above the antenna tip.
+    expect(group.children).toHaveLength(3);
+    const pins = group.children.slice(1) as THREE.Mesh[];
+    for (const pin of pins) expect(pin.position.y).toBeGreaterThan(inst.bounds.max.y);
+    bm.dispose();
   });
 });

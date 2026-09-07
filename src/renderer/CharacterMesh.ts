@@ -1,14 +1,17 @@
-// BlastSimulator2026 — Character Meshes (Placeholders)
-// Minion-style placeholder: capsule body (cylinder + sphere top), sphere head.
-// Role-based colors for visual distinction at a glance.
-// Injured employees show in dark red; dead are removed.
-// During zone clearing, characters move toward the safe zone exit.
+// BlastSimulator2026 — Character Meshes
+// Each employee is a worker minion from the model library (one .glb per
+// role, built in assets/models/blender/workers.py). The role colour tints
+// the overalls and hard hat; injured workers go dark red; dead are removed.
+// Workers turn to face where they walk and waddle while moving — legs and
+// arms swing on the model's own pivot nodes, no skeleton needed.
 
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
 import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
-import { disposeGroup } from './MeshUtils.js';
+import { headingFromDelta, turnToward } from './Heading.js';
+import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
+import { workerModelId } from './models/ModelIds.js';
 
 // ---------- Role colors (bright, distinct) ----------
 // Exported for the Crew panel's roster avatars (redesign P6) — same hue as
@@ -25,63 +28,69 @@ export const ROLE_COLORS: Record<EmployeeRole, number> = {
 const INJURED_COLOR  = 0x993333; // dark red
 const EVACUATING_BLINK_RATE = 3; // blinks per second when evacuating (visual hint)
 
-// ---------- Sizes ----------
-const BODY_RADIUS   = 0.22;
-const BODY_HEIGHT   = 0.55;
-const HEAD_RADIUS   = 0.20;
+/** Material every worker model exposes for its overalls and hat. */
+export const ROLE_TINT = 'TintRole';
+/** Stand-in box while the worker asset is not loaded: roughly a minion's envelope. */
+const FALLBACK_SIZE = [0.55, 1.2, 0.55] as const;
+
+// ---------- Walk cycle ----------
+/** Below this ground speed (m/s) a worker stands still. */
+const WALK_SPEED_MIN = 0.05;
+/** Strides per second. */
+const WALK_CYCLE_HZ = 2.4;
+/** Leg / arm swing amplitude (radians) at full stride. */
+const LEG_SWING = 0.6;
+const ARM_SWING = 0.5;
+/** Body bounce per stride (m) and head wobble (radians). */
+const BOB_HEIGHT = 0.035;
+const HEAD_WOBBLE = 0.08;
+/** How fast the gait blends in/out (per second) and how fast a worker turns (rad/s). */
+const STRIDE_BLEND_RATE = 6;
+const TURN_RATE = 9;
+
+interface WorkerNodes {
+  head: THREE.Object3D | null;
+  armL: THREE.Object3D | null;
+  armR: THREE.Object3D | null;
+  legL: THREE.Object3D | null;
+  legR: THREE.Object3D | null;
+}
+
+interface CharacterEntry {
+  group: THREE.Group;
+  instance: ModelInstance;
+  nodes: WorkerNodes;
+  employee: Employee;
+  evacuating: boolean;
+  tween: MovementTween;
+  /** Walk-cycle phase (radians) and how much of the gait is blended in (0..1). */
+  phase: number;
+  stride: number;
+}
 
 // ---------- Main class ----------
 
 export class CharacterMesh {
   private readonly scene: THREE.Scene;
-  private readonly characters = new Map<number, {
-    group: THREE.Group;
-    bodyMat: THREE.MeshPhongMaterial;
-    headMat: THREE.MeshPhongMaterial;
-    employee: Employee;
-    evacuating: boolean;
-    tween: MovementTween;
-  }>();
+  private readonly library: ModelLibrary;
+  private readonly characters = new Map<number, CharacterEntry>();
   private time = 0;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
     this.scene = scene;
+    this.library = library;
   }
 
   addEmployee(employee: Employee, surfaceY: number = 0): void {
-    const roleColor = ROLE_COLORS[employee.role];
-    const color = employee.injured ? INJURED_COLOR : roleColor;
-
     const group = new THREE.Group();
-
-    // Legs / body (cylinder)
-    const bodyGeo = new THREE.CylinderGeometry(BODY_RADIUS, BODY_RADIUS * 0.8, BODY_HEIGHT, 8);
-    const bodyMat = new THREE.MeshPhongMaterial({ color, shininess: 15 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = BODY_HEIGHT / 2;
-    group.add(body);
-
-    // Head (sphere)
-    const headGeo = new THREE.SphereGeometry(HEAD_RADIUS, 8, 6);
-    const headMat = new THREE.MeshPhongMaterial({ color: 0xffe0b0, shininess: 30 }); // skin tone
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = BODY_HEIGHT + HEAD_RADIUS + 0.05;
-    group.add(head);
-
-    // Hard hat (tiny flat cylinder)
-    const hatColor = employee.injured ? 0xaa0000 : roleColor;
-    const hatGeo = new THREE.CylinderGeometry(HEAD_RADIUS * 1.3, HEAD_RADIUS * 1.1, 0.08, 8);
-    const hatMat = new THREE.MeshPhongMaterial({ color: hatColor, shininess: 40 });
-    const hat = new THREE.Mesh(hatGeo, hatMat);
-    hat.position.y = BODY_HEIGHT + HEAD_RADIUS * 1.8 + 0.05;
-    group.add(hat);
-
+    const { instance, nodes } = this.attachModel(group, employee);
     group.position.set(employee.x, surfaceY, employee.z);
     tagPickable(group, 'employee', employee.id);
     this.scene.add(group);
     this.characters.set(employee.id, {
-      group, bodyMat, headMat, employee, evacuating: false,
+      group, instance, nodes, employee, evacuating: false,
       tween: createTween(employee.x, employee.z),
+      phase: 0, stride: 0,
     });
   }
 
@@ -100,14 +109,17 @@ export class CharacterMesh {
       entry.employee = emp;
 
       // Ease toward work position (duration-aware tween, #520)
-      const eased = stepTween(entry.tween, entry.group.position.x, entry.group.position.z, emp.x, emp.z, dt);
+      const fromX = entry.group.position.x;
+      const fromZ = entry.group.position.z;
+      const eased = stepTween(entry.tween, fromX, fromZ, emp.x, emp.z, dt);
       entry.group.position.x = eased.x;
       entry.group.position.z = eased.z;
+      this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
 
-      // Update body color for injury state
+      // Body colour for injury state
       const roleColor = ROLE_COLORS[emp.role];
       const targetColor = emp.injured ? INJURED_COLOR : roleColor;
-      entry.bodyMat.color.setHex(targetColor);
+      entry.instance.tints.get(ROLE_TINT)?.color.setHex(targetColor);
 
       // Blink when evacuating (alpha toggling is expensive; use scale instead)
       if (entry.evacuating) {
@@ -158,17 +170,32 @@ export class CharacterMesh {
     const entry = this.characters.get(id);
     if (entry) {
       this.scene.remove(entry.group);
-      disposeGroup(entry.group);
+      entry.instance.dispose();
       this.characters.delete(id);
     }
   }
 
   clearAll(): void {
-    for (const { group } of this.characters.values()) {
+    for (const { group, instance } of this.characters.values()) {
       this.scene.remove(group);
-      disposeGroup(group);
+      instance.dispose();
     }
     this.characters.clear();
+  }
+
+  /**
+   * Swap any stand-in box for the real model once its asset has loaded —
+   * a level entered before the preload finished catches up here.
+   */
+  refreshModels(): void {
+    for (const entry of this.characters.values()) {
+      if (!entry.instance.isFallback || !this.library.has(workerModelId(entry.employee.role))) continue;
+      entry.group.remove(entry.instance.root);
+      entry.instance.dispose();
+      const { instance, nodes } = this.attachModel(entry.group, entry.employee);
+      entry.instance = instance;
+      entry.nodes = nodes;
+    }
   }
 
   get count(): number {
@@ -190,8 +217,52 @@ export class CharacterMesh {
     return this.characters.get(id)?.group ?? null;
   }
 
+  /** The model instance drawn for an employee, or null — exposes tint materials and nodes to tests and overlays. */
+  getInstance(id: number): ModelInstance | null {
+    return this.characters.get(id)?.instance ?? null;
+  }
+
   dispose(): void {
     this.clearAll();
   }
-}
 
+  private attachModel(group: THREE.Group, employee: Employee): { instance: ModelInstance; nodes: WorkerNodes } {
+    const instance = this.library.instantiate(workerModelId(employee.role), { size: FALLBACK_SIZE, tint: ROLE_TINT });
+    const color = employee.injured ? INJURED_COLOR : ROLE_COLORS[employee.role];
+    instance.tints.get(ROLE_TINT)?.color.setHex(color);
+    group.add(instance.root);
+    const nodes: WorkerNodes = {
+      head: instance.node('Head'),
+      armL: instance.node('ArmL'),
+      armR: instance.node('ArmR'),
+      legL: instance.node('LegL'),
+      legR: instance.node('LegR'),
+    };
+    return { instance, nodes };
+  }
+
+  /** Face the direction of travel and swing limbs while moving; settle back to rest when still. */
+  private animateGait(entry: CharacterEntry, dx: number, dz: number, dt: number): void {
+    if (dt <= 0) return;
+    const speed = Math.hypot(dx, dz) / dt;
+    const moving = speed > WALK_SPEED_MIN;
+    if (moving) {
+      entry.group.rotation.y = turnToward(entry.group.rotation.y, headingFromDelta(dx, dz), TURN_RATE * dt);
+      entry.phase += dt * WALK_CYCLE_HZ * Math.PI * 2;
+    }
+    const target = moving ? 1 : 0;
+    entry.stride += Math.sign(target - entry.stride) * Math.min(Math.abs(target - entry.stride), STRIDE_BLEND_RATE * dt);
+    if (!moving && entry.stride === 0) entry.phase = 0;
+
+    const swing = Math.sin(entry.phase) * entry.stride;
+    const { head, armL, armR, legL, legR } = entry.nodes;
+    // Legs swing forward/back around Z (the model faces +X); arms counter-swing.
+    if (legL) legL.rotation.z = swing * LEG_SWING;
+    if (legR) legR.rotation.z = -swing * LEG_SWING;
+    if (armL) armL.rotation.z = -swing * ARM_SWING;
+    if (armR) armR.rotation.z = swing * ARM_SWING;
+    // Bounce twice per stride cycle and wobble the head side to side once.
+    entry.instance.root.position.y = Math.abs(Math.sin(entry.phase)) * BOB_HEIGHT * entry.stride;
+    if (head) head.rotation.x = Math.sin(entry.phase / 2) * HEAD_WOBBLE * entry.stride;
+  }
+}

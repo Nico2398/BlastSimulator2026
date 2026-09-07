@@ -79,8 +79,8 @@ describe('LoadingScreen', () => {
     it('runs every phase in order and finishes hidden', async () => {
       const order: string[] = [];
       await screen.runPhases([
-        { run: () => order.push('a') },
-        { run: () => order.push('b') },
+        { run: () => { order.push('a'); } },
+        { run: () => { order.push('b'); } },
       ]);
       expect(order).toEqual(['a', 'b']);
       expect(screen.visible).toBe(false);
@@ -92,8 +92,8 @@ describe('LoadingScreen', () => {
       // with the overlay never actually visible.
       const seen: { visible: boolean; caption: string; progress: number }[] = [];
       await screen.runPhases([
-        { run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
-        { run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
+        { run: () => { seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }); } },
+        { run: () => { seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }); } },
       ]);
 
       expect(seen).toHaveLength(2);

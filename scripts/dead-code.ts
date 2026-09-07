@@ -205,14 +205,17 @@ export function readFileFacts(file: string, text: string): FileFacts {
   return facts;
 }
 
-/** Entry points named by package.json scripts, the workflows and index.html. */
+/** Entry points named by package.json scripts, the workflows and the root .html pages. */
 function discoverEntryPoints(): Set<string> {
   const found = new Set<string>(ALWAYS_LIVE);
   const texts: string[] = [];
 
   texts.push(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  const indexHtml = join(ROOT, 'index.html');
-  if (existsSync(indexHtml)) texts.push(readFileSync(indexHtml, 'utf8'));
+  // Every root .html page is a Vite entry: index.html is the game,
+  // model-viewer.html the dev-only asset viewer.
+  for (const f of readdirSync(ROOT)) {
+    if (f.endsWith('.html')) texts.push(readFileSync(join(ROOT, f), 'utf8'));
+  }
   const workflows = join(ROOT, '.github', 'workflows');
   if (existsSync(workflows)) {
     for (const f of readdirSync(workflows)) {

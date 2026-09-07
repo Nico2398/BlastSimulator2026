@@ -46,7 +46,8 @@ export function nextPaint(): Promise<void> {
  * status meeting, and the phases are not the player's problem anyway.
  */
 export interface LoadPhase {
-  run: () => void;
+  /** The work; an async phase (an asset download) is awaited before the next one starts. */
+  run: () => void | Promise<void>;
   /**
    * Relative cost of this phase against the others in the same run, so the
    * bar advances proportionally to actual work rather than to a position in
@@ -329,7 +330,7 @@ export class LoadingScreen {
         this.setPhase(this.quips.next(), cumulative / total);
         this.setStage(i + 1, phases.length);
         await nextPaint();
-        phase.run();
+        await phase.run();
       }
       this.setPhase(t('loading.ready'), 1);
       await nextPaint();

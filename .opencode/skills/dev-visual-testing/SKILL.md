@@ -72,6 +72,23 @@ Multiple commands separated by `;`. Screenshots saved to `screenshots/`.
 
 Then open the PNG with the Read tool and describe what it shows.
 
+Frame a feature instead of the whole site: `--focus "x,z,distance"`,
+`--focus-entity "employee:1,8"` (live position of a rendered entity) and
+`--orbit "yaw,pitch"` move the camera after the commands run.
+
+### Model previews
+
+A change to a model asset (`assets/models/`, `public/models/`) is judged
+through the game's own scene pipeline without loading a level:
+
+```bash
+npm run models:preview -- worker_driller vehicle_drill_rig   # → screenshots/models/<id>-<view>.png
+python3 assets/models/blender/sheet.py --cols 4 worker        # tile captures into one sheet
+```
+
+`assets/models/README.md` holds the build/preview workflow and the naming
+conventions the renderer relies on.
+
 ## Scenario Testing (State Dumps + Optional Screenshots)
 
 ### Single scenario runner

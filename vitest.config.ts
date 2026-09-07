@@ -32,6 +32,9 @@ export default defineConfig({
         // which drive them in a real browser, not by the unit suite.
         'src/main.ts',
         'src/console.ts',
+        // Dev-only model viewer page: same host-bound construction as main.ts,
+        // proven by `npm run models:preview` in a real browser.
+        'src/model-viewer.ts',
 
         // Thin wrappers over host APIs that exist only in a browser: a
         // WebGLRenderer and its post-processing passes, an AudioContext, an
