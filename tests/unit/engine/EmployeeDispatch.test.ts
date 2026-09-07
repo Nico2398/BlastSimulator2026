@@ -14,6 +14,7 @@ import { completePendingAction, dispatchPendingAction } from '../../../src/core/
 import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
 import { tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../../src/core/engine/VehicleContinuity.js';
 import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
+import { EVACUATION_HOLD_KEY } from '../../../src/core/engine/Evacuation.js';
 import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
@@ -1031,6 +1032,19 @@ describe('completeVehicleGatedActionIfApplicable — starved on-foot action inte
   it('a starved candidate targeted at a different employee is never force-assigned to this one, even past threshold', () => {
     const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
     starvedCandidate.targetEmployeeId = employee.id + 9999; // some other employee's id
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
+  });
+
+  it('falls through to normal continuity when the starved candidate\'s evacuation hold is active (#1000 review)', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    // Employee's own position (0,0) sits inside the active zone, so
+    // isEvacuationHoldActive reads the zone as still occupied.
+    state.zone.activeZone = { x1: 0, z1: 0, x2: 5, z2: 5 };
+    starvedCandidate.payload = { [EVACUATION_HOLD_KEY]: true };
 
     completeVehicleGatedActionIfApplicable(state, employee, 1);
 

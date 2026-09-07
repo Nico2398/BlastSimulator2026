@@ -567,6 +567,28 @@ describe('reserveOnePoolActionAhead', () => {
     expect(employee.taskQueue).toEqual([]);
     expect(result.claimed).toEqual([]);
   });
+
+  it('does not reserve ahead a pool candidate whose requiredVehicleRole differs from the busy driver\'s active vehicle-gated action role (#1000)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 1, 1); // free, licensed, but the WRONG role
+
+    const active = pushActive(state, employee.id, 1);
+    active.requiredVehicleRole = 'drill_rig';
+    employee.activeActionId = active.id;
+
+    const poolAction = makeAction({ id: 2, targetX: 1, targetZ: 1, requiredVehicleRole: 'debris_hauler' });
+    state.pendingActions.push(poolAction);
+    const result = makeResult();
+
+    reserveOnePoolActionAhead(state, employee, result);
+
+    expect(employee.taskQueue).toEqual([]);
+    expect(result.claimed).toEqual([]);
+    expect(poolAction.status).toBe('queued');
+  });
 });
 
 describe('promoteActionToActive', () => {

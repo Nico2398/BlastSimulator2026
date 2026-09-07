@@ -12,7 +12,9 @@ import type { Employee } from '../entities/Employee.js';
 import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
 import { releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
-import { isRampSegmentClaimable, selectBestActionForEmployee, findStarvedActionForEmployee } from './ActionSelection.js';
+import {
+  isRampSegmentClaimable, selectBestActionForEmployee, findStarvedActionForEmployee, isQueuedActionAvailableToEmployee,
+} from './ActionSelection.js';
 import { promoteActionToActive } from './EmployeeDispatchSteps.js';
 
 /**
@@ -83,10 +85,8 @@ export function tryContinueVehicleGatedAction(
 
   const poolFollowUps = state.pendingActions
     .filter(a =>
-      a.status === 'queued' &&
-      (a.targetEmployeeId === null || a.targetEmployeeId === employee.id) &&
+      isQueuedActionAvailableToEmployee(employee, a) &&
       a.requiredVehicleRole === role &&
-      (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
       // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
       isHaulOrFragmentActionClaimable(state, a) &&
       // #555: see queuedFollowUps' own comment on the same check, just above.
