@@ -322,9 +322,18 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
  * existing `releaseActionToOpenPool` helper.
  */
 export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, employee: Employee): void {
-  // TODO(test-writer/implementer): stub only
-  void state;
-  void employee;
+  const queuedIds = [...employee.taskQueue];
+
+  for (const actionId of queuedIds) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    if (!action || action.requiredVehicleRole === null) continue;
+
+    const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+    if (!vehicle || vehicle.driverId !== null) continue;
+
+    employee.taskQueue = employee.taskQueue.filter(id => id !== action.id);
+    releaseActionToOpenPool(state, action);
+  }
 }
 
 /**
