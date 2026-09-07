@@ -76,6 +76,13 @@ Frame a feature instead of the whole site: `--focus "x,z,distance"`,
 `--focus-entity "employee:1,8"` (live position of a rendered entity) and
 `--orbit "yaw,pitch"` move the camera after the commands run.
 
+A level entered through `__gameConsole` skips the loading screen's wait on
+the model preload, so every capture first awaits `window.__modelsReady()`
+(`waitForModels`, `scripts/shared/puppeteer-utils.ts`, bounded at 90 s):
+`npm run screenshot` before its commands run, `captureFrame` once per page.
+A frame captured without that wait shows stand-in boxes and cone trees, not
+the models — never judge a rendering from one.
+
 ### Model previews
 
 A change to a model asset (`assets/models/`, `public/models/`) is judged

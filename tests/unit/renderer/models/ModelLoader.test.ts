@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ModelLibrary } from '../../../../src/renderer/models/ModelLibrary.js';
-import { fetchModelBytes, parseModel, preloadModels, yieldToEventLoop } from '../../../../src/renderer/models/ModelLoader.js';
+import { fetchModelBytes, parseModel, preloadModels, yieldToEventLoop, PRELOAD_SLICE_MS } from '../../../../src/renderer/models/ModelLoader.js';
 import { allModelIds } from '../../../../src/renderer/models/ModelIds.js';
 import { readModelBytes } from '../../../helpers/models.js';
 
@@ -48,19 +48,29 @@ describe('preloadModels', () => {
 });
 
 describe('preloadModels — pacing', () => {
-  it('parses in id order, one at a time, awaiting the yield between parses but not after the last', async () => {
+  const ids = ['worker_driller', 'worker_manager', 'vehicle_drill_rig'];
+  const source = async (url: string): Promise<ArrayBuffer> => readModelBytes(url);
+
+  async function paced(sliceMs: number): Promise<string[]> {
     const lib = new ModelLibrary();
     const events: string[] = [];
-    const source = async (url: string): Promise<ArrayBuffer> => readModelBytes(url);
     const originalRegister = lib.register.bind(lib);
     lib.register = (id, proto) => { events.push(`parse:${id}`); originalRegister(id, proto); };
-    const yields = { count: 0 };
-    await preloadModels(lib, source, {
-      ids: ['worker_driller', 'worker_manager', 'vehicle_drill_rig'],
-      yieldBetween: async () => { yields.count++; events.push('yield'); },
-    });
-    expect(events).toEqual(['parse:worker_driller', 'yield', 'parse:worker_manager', 'yield', 'parse:vehicle_drill_rig']);
-    expect(yields.count).toBe(2);
+    await preloadModels(lib, source, { ids, sliceMs, yieldBetween: async () => { events.push('yield'); } });
+    return events;
+  }
+
+  it('with a zero slice budget parses in id order, one at a time, yielding between parses but not after the last', async () => {
+    expect(await paced(0)).toEqual(['parse:worker_driller', 'yield', 'parse:worker_manager', 'yield', 'parse:vehicle_drill_rig']);
+  });
+
+  it('with a budget no run of parses exhausts, never yields', async () => {
+    expect(await paced(60_000)).toEqual(['parse:worker_driller', 'parse:worker_manager', 'parse:vehicle_drill_rig']);
+  });
+
+  it('defaults to a budget of a fraction of a second, so a page keeps painting through the preload', () => {
+    expect(PRELOAD_SLICE_MS).toBeGreaterThan(0);
+    expect(PRELOAD_SLICE_MS).toBeLessThanOrEqual(250);
   });
 
   it('yieldToEventLoop resolves on a later macrotask', async () => {

@@ -3,6 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   allModelIds, buildingModelId, modelUrl, vehicleModelId, workerModelId, BUILDING_RUIN_MODEL_ID, EMPLOYEE_ROLES,
+  propModelIds, treeModelId, bushModelId, rockModelId, houseModelId, TREE_FAMILIES, TREE_VARIANTS, BUSH_VARIANTS,
+  ROCK_VARIANTS, HOUSE_VARIANTS,
 } from '../../../../src/renderer/models/ModelIds.js';
 
 describe('ModelIds', () => {
@@ -12,14 +14,25 @@ describe('ModelIds', () => {
     expect(buildingModelId('living_quarters', 3)).toBe('building_living_quarters_t3');
   });
 
-  it('enumerates every asset once: 5 workers, 5 vehicles, 9 × 3 buildings, the ruin', () => {
+  it('enumerates every asset once: 5 workers, 5 vehicles, 9 × 3 buildings, the ruin, and the props', () => {
     const ids = allModelIds();
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter(id => id.startsWith('worker_'))).toHaveLength(EMPLOYEE_ROLES.length);
     expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(5);
     expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(27);
     expect(ids).toContain(BUILDING_RUIN_MODEL_ID);
-    expect(ids).toHaveLength(5 + 5 + 27 + 1);
+    const props = propModelIds();
+    // Each tree ships with its decimated far copy.
+    expect(props).toHaveLength(TREE_FAMILIES.length * TREE_VARIANTS * 2 + BUSH_VARIANTS + ROCK_VARIANTS + HOUSE_VARIANTS);
+    expect(ids).toHaveLength(5 + 5 + 27 + 1 + props.length);
+  });
+
+  it('names props by family and variant', () => {
+    expect(treeModelId('conifer', 2)).toBe('prop_tree_conifer_2');
+    expect(bushModelId(0)).toBe('prop_bush_0');
+    expect(rockModelId(1)).toBe('prop_rock_1');
+    expect(houseModelId(2)).toBe('prop_house_2');
+    expect(propModelIds().every(id => id.startsWith('prop_'))).toBe(true);
   });
 
   it('serves assets from /models/ by default and from a custom base when given', () => {

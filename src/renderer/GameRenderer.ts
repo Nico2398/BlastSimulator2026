@@ -29,6 +29,7 @@ import type { WaterSurface } from './ambient/WaterSurface.js';
 import type { VegetationSway } from './ambient/VegetationSway.js';
 import type { DustDevils } from './ambient/DustDevils.js';
 import type { Fireflies } from './ambient/Fireflies.js';
+import type { Scenery } from './ambient/Scenery.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import type { FragmentMesh } from './FragmentMesh.js';
 import type { BlastEffects } from './BlastEffects.js';
@@ -74,6 +75,7 @@ export class GameRenderer {
   private vegetation: VegetationSway | null = null;
   private dustDevils: DustDevils | null = null;
   private fireflies: Fireflies | null = null;
+  private scenery: Scenery | null = null;
   /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
@@ -101,6 +103,8 @@ export class GameRenderer {
   private lastState: GameState | null = null;
   /** Model-library revision the entity meshes were last reconciled against — see update(). */
   private lastModelRevision = -1;
+  /** Context of the last buildAmbient(), so update() can rebuild the layer once its missing props load. */
+  private lastAmbientCtx: MiningContext | null = null;
   /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
   private lastWeather: WeatherState = 'sunny';
 
@@ -119,6 +123,17 @@ export class GameRenderer {
 
   constructor(sceneManager: SceneManager) {
     this.sm = sceneManager;
+  }
+
+  /** Prop ids the ambient layer stood in for when it was last built, for diagnostics. */
+  get ambientMissingModelIds(): string[] {
+    return [...(this.vegetation?.missingModelIds ?? []), ...(this.scenery?.missingModelIds ?? [])];
+  }
+
+  /** True when the ambient layer was built with stand-ins for props that have since loaded. */
+  private ambientPropsArrived(): boolean {
+    const missing = this.ambientMissingModelIds;
+    return missing.length > 0 && missing.every(id => modelLibrary.has(id));
   }
 
   /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
@@ -324,6 +339,9 @@ export class GameRenderer {
       this.buildings?.refreshModels();
       this.vehicles?.refreshModels();
       this.characters?.refreshModels();
+      // Trees, rocks and houses are static instanced batches, rebuilt whole
+      // once every prop they lacked is in — one rebuild, never per model.
+      if (this.lastAmbientCtx && this.ambientPropsArrived()) this.buildAmbient(this.lastAmbientCtx);
     }
 
     if (this.characters && this.lastState) {
@@ -470,6 +488,7 @@ export class GameRenderer {
 
   /** Stage 3 of a level load (#474): birds, chimney smoke, water, vegetation sway, per-biome dust-devil/firefly extras. See GameRendererSceneSetup.ts. */
   buildAmbient(ctx: MiningContext): void {
+    this.lastAmbientCtx = ctx;
     const deps = this.sceneSetupDeps();
     buildAmbient(deps, ctx);
     this.applySceneSetupDeps(deps);
@@ -589,6 +608,7 @@ export class GameRenderer {
       vegetation: this.vegetation,
       dustDevils: this.dustDevils,
       fireflies: this.fireflies,
+      scenery: this.scenery,
       ambientUniforms: this.ambientUniforms,
       fragments: this.fragments,
       fragmentAnimator: this.fragmentAnimator,
@@ -639,6 +659,7 @@ export class GameRenderer {
     this.vegetation = deps.vegetation;
     this.dustDevils = deps.dustDevils;
     this.fireflies = deps.fireflies;
+    this.scenery = deps.scenery;
     this.fragments = deps.fragments;
     this.fragmentAnimator = deps.fragmentAnimator;
     this.blastEffects = deps.blastEffects;

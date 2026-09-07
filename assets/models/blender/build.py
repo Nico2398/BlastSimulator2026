@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from common import finish, reset_scene  # noqa: E402
+from common import finish, finish_far, reset_scene  # noqa: E402
 
 
 def _registry() -> dict[str, tuple[str, callable]]:
@@ -37,6 +37,9 @@ def _registry() -> dict[str, tuple[str, callable]]:
             reg[name] = ('buildings', builder)
     except ImportError:
         pass
+    import props
+    for name, builder in props.registry().items():
+        reg[name] = ('props', builder)
     return reg
 
 
@@ -58,6 +61,9 @@ def main(argv: list[str]) -> int:
         reset_scene()
         reg[name][1]()
         finish(name)
+        # Trees are drawn by the thousand: a decimated far-distance copy rides along.
+        if name.startswith('prop_tree_'):
+            finish_far(name)
         print(f'[models] {name} done in {time.time() - t0:.1f}s')
     return 0
 

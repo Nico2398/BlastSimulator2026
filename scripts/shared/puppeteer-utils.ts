@@ -245,7 +245,38 @@ export async function resumeDrawing(page: Page): Promise<void> {
  * skips it would silently save whatever was on the canvas when drawing was
  * suspended.
  */
+/** Default bound on `waitForModels`: past this a capture goes ahead with whatever has loaded. */
+export const MODELS_READY_TIMEOUT_MS = 90_000;
+
+const modelsAwaited = new WeakSet<Page>();
+
+/**
+ * Wait for the page's model preload to finish, so a captured frame shows the
+ * real assets rather than the stand-in boxes and cone trees a level entered
+ * through `__gameConsole` starts with (enterLevel() waits on the same promise
+ * for a player; the harness bypasses it). Bounded: returns false on timeout
+ * or against a page that predates the bridge, and never rejects. Each page is
+ * awaited once; later calls return at once.
+ */
+export async function waitForModels(page: Page, timeoutMs = MODELS_READY_TIMEOUT_MS): Promise<boolean> {
+  if (modelsAwaited.has(page)) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); });
+  const ready = page.evaluate(async () => {
+    const w = window as unknown as { __modelsReady?: () => Promise<unknown> };
+    if (!w.__modelsReady) return false;
+    await w.__modelsReady();
+    return true;
+  }).catch(() => false);
+  const ok = await Promise.race([ready, timeout]);
+  clearTimeout(timer);
+  if (ok) modelsAwaited.add(page);
+  else console.warn(`  Models not ready after ${timeoutMs}ms — capturing with stand-ins.`);
+  return ok;
+}
+
 export async function captureFrame(page: Page, path: string): Promise<void> {
+  await waitForModels(page);
   await page.evaluate(() => {
     const w = window as unknown as { __renderFrame?: () => void };
     w.__renderFrame?.();

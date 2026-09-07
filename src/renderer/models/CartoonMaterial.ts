@@ -72,25 +72,66 @@ export function createToonMaterial(options: ToonMaterialOptions = {}): THREE.Mes
 }
 
 /**
+ * Wind sway shared by vegetation surfaces and their outlines: bend grows with
+ * height up to the canopy top, phased by the instance's world X so a forest
+ * does not move in lockstep. `uTime`/`uWind` are the scene's ambient uniforms.
+ */
+export interface SwayOptions {
+  uTime: THREE.IUniform<number>;
+  uWind: THREE.IUniform<THREE.Vector2>;
+  /** Model height (m) at which the bend reaches full strength. */
+  canopyHeight: number;
+}
+
+/** GLSL applied to `transformed` in object space, before instancing/projection. Expects `instanceWorldX` in scope. */
+export const SWAY_VERTEX_GLSL = /* glsl */ `
+float bendT = pow(clamp(transformed.y, 0.0, uCanopyHeight) / max(uCanopyHeight, 0.001), 2.0);
+float sway = bendT * 0.4 * sin(uTime * 1.7 + instanceWorldX * 0.35);
+transformed.xz += uWind * sway;
+`;
+
+/**
  * Inverted-hull outline: the same geometry drawn back-face only, pushed out
  * along its normal in view space by a screen-constant width. Cheap (one extra
- * draw per node), needs no post pass, and ignores lighting entirely.
+ * draw per node), needs no post pass, and ignores lighting entirely. Works
+ * on an InstancedMesh too (three defines USE_INSTANCING and supplies
+ * `instanceMatrix`), and can carry the vegetation sway so an outline bends
+ * with its canopy.
  */
-export function createOutlineMaterial(): THREE.ShaderMaterial {
+export function createOutlineMaterial(sway?: SwayOptions): THREE.ShaderMaterial {
+  const uniforms: Record<string, THREE.IUniform> = {
+    color: { value: new THREE.Color(OUTLINE_COLOR) },
+    thicknessPx: { value: OUTLINE_THICKNESS_PX },
+    maxWorld: { value: OUTLINE_MAX_WORLD },
+    viewportHeight: OUTLINE_UNIFORMS.viewportHeight,
+  };
+  if (sway) {
+    uniforms['uTime'] = sway.uTime;
+    uniforms['uWind'] = sway.uWind;
+    uniforms['uCanopyHeight'] = { value: sway.canopyHeight };
+  }
   return new THREE.ShaderMaterial({
-    uniforms: {
-      color: { value: new THREE.Color(OUTLINE_COLOR) },
-      thicknessPx: { value: OUTLINE_THICKNESS_PX },
-      maxWorld: { value: OUTLINE_MAX_WORLD },
-      viewportHeight: OUTLINE_UNIFORMS.viewportHeight,
-    },
+    uniforms,
     vertexShader: /* glsl */ `
       uniform float thicknessPx;
       uniform float maxWorld;
       uniform float viewportHeight;
+      ${sway ? 'uniform float uTime; uniform vec2 uWind; uniform float uCanopyHeight;' : ''}
       void main() {
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vec3 n = normalize(normalMatrix * normal);
+        vec3 transformed = position;
+        vec3 objectNormal = normal;
+        #ifdef USE_INSTANCING
+          float instanceWorldX = instanceMatrix[3].x;
+        #else
+          float instanceWorldX = 0.0;
+        #endif
+        ${sway ? SWAY_VERTEX_GLSL : ''}
+        #ifdef USE_INSTANCING
+          transformed = (instanceMatrix * vec4(transformed, 1.0)).xyz;
+          objectNormal = mat3(instanceMatrix) * objectNormal;
+        #endif
+        vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
+        vec3 n = normalize(normalMatrix * objectNormal);
         float worldPerPx = (-mv.z) * 2.0 / (projectionMatrix[1][1] * viewportHeight);
         float w = min(thicknessPx * worldPerPx, maxWorld);
         mv.xyz += n * w;

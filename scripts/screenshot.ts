@@ -29,7 +29,7 @@ import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
-import { captureFrame } from './shared/puppeteer-utils.js';
+import { captureFrame, waitForModels } from './shared/puppeteer-utils.js';
 
 const SCREENSHOTS_DIR = resolve(process.cwd(), 'screenshots');
 const INIT_WAIT_MS = 3000;
@@ -148,6 +148,9 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
         console.log('Game canvas detected. Waiting for initialization...');
         await new Promise((r) => setTimeout(r, INIT_WAIT_MS));
+        // Enter the level with every model in, as a player would through the
+        // loading screen — otherwise the shot shows stand-ins.
+        await waitForModels(page);
 
         await page.evaluate(() => {
             const menu = document.getElementById('bs-main-menu');

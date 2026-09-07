@@ -25,16 +25,28 @@ export function parseModel(bytes: ArrayBuffer): Promise<ModelPrototype> {
   });
 }
 
+/**
+ * Main-thread budget one run of parses may spend before yielding. Without a
+ * GPU a yield costs a whole software-rendered frame (hundreds of ms in a
+ * headless harness, seconds once a level is up), so yielding after every
+ * parse turned a two-second preload into a minute; parsing in slices keeps
+ * the page responsive at a fraction of that.
+ */
+export const PRELOAD_SLICE_MS = 120;
+
 interface PreloadOptions {
   ids?: readonly string[];
   base?: string;
   /**
-   * Awaited between two parses. The browser passes an event-loop yield so a
-   * page booting through this keeps painting and answering input: every
-   * parse is main-thread work, and 38 of them back to back would otherwise
-   * run as one long task. Tests leave it unset.
+   * Awaited once a run of parses has used up `sliceMs` of main-thread time.
+   * The browser passes an event-loop yield so a page booting through this
+   * keeps painting and answering input: every parse is main-thread work, and
+   * 76 of them back to back would otherwise run as one long task. Tests
+   * leave it unset.
    */
   yieldBetween?: () => Promise<void>;
+  /** Parse budget between two yields; defaults to PRELOAD_SLICE_MS. 0 yields after every parse. */
+  sliceMs?: number;
 }
 
 /**
@@ -49,11 +61,13 @@ export async function preloadModels(
   options: PreloadOptions = {},
 ): Promise<PreloadResult> {
   const ids = options.ids ?? allModelIds();
+  const sliceMs = options.sliceMs ?? PRELOAD_SLICE_MS;
   const result: PreloadResult = { loaded: [], failed: [] };
   const pending = ids.map(id => fetchBytes(modelUrl(id, options.base)).then(
     bytes => ({ bytes }),
     (error: unknown) => ({ error }),
   ));
+  let sliceStart = performance.now();
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i]!;
     const fetched = await pending[i]!;
@@ -64,7 +78,10 @@ export async function preloadModels(
     } catch {
       result.failed.push(id);
     }
-    if (options.yieldBetween && i < ids.length - 1) await options.yieldBetween();
+    if (options.yieldBetween && i < ids.length - 1 && performance.now() - sliceStart >= sliceMs) {
+      await options.yieldBetween();
+      sliceStart = performance.now();
+    }
   }
   return result;
 }

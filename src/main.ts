@@ -698,6 +698,10 @@ window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 // rasterisation. Suspending the draw and forcing one frame per capture keeps
 // the images identical and stops the suites paying for frames nobody sees.
 window.__setRenderEnabled = (enabled: boolean) => { scene.setDrawingEnabled(enabled); };
+// Resolves once every model asset is in (or reported failed). A harness that
+// enters a level through __gameConsole skips enterLevel()'s wait on this, so
+// it awaits it here before capturing a frame it wants to show real assets.
+window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 window.__renderFrame = () => { scene.renderFrame(); };
 
 // Debug: expose grid reference info for diagnostics
@@ -713,6 +717,9 @@ window.__debugGridInfo = () => {
     lastGhostRevisionSynced: gameRenderer.lastGhostRevisionSynced,
     terrainMeshRevisionCount: gameRenderer.terrainMeshRevisionCount,
     lastTerrainRevisionSynced: gameRenderer.lastTerrainRevisionSynced,
+    modelsLoaded: modelLibrary.size,
+    modelRevision: modelLibrary.revision,
+    ambientMissingModelIds: gameRenderer.ambientMissingModelIds,
   };
 };
 

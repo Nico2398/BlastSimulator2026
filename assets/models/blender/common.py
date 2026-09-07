@@ -395,6 +395,27 @@ def export_glb(name: str) -> str:
     return path
 
 
+def finish_far(name: str, ratio: float = 0.12) -> None:
+    """Export a decimated copy of the current scene as `<name>_far` — the distant LOD an instanced forest draws.
+
+    Runs after finish(): the .blend keeps the full-detail modifiers; only the
+    export carries the Decimate.
+    """
+    for ob in all_meshes():
+        m = ob.modifiers.new('Decimate', 'DECIMATE')
+        m.decimate_type = 'COLLAPSE'
+        m.ratio = ratio
+    glb = export_glb(f'{name}_far')
+    tris = 0
+    dg = bpy.context.evaluated_depsgraph_get()
+    for ob in all_meshes():
+        ev = ob.evaluated_get(dg)
+        me = ev.to_mesh()
+        tris += sum(len(p.vertices) - 2 for p in me.polygons)
+        ev.to_mesh_clear()
+    print(f'[models] {name}_far: {tris} tris, {os.path.getsize(glb) // 1024} KB glb')
+
+
 def finish(name: str) -> None:
     """Save the editable source and write the game asset, then report sizes."""
     bpy.context.view_layer.update()
@@ -408,3 +429,42 @@ def finish(name: str) -> None:
         tris += sum(len(p.vertices) - 2 for p in me.polygons)
         ev.to_mesh_clear()
     print(f'[models] {name}: {tris} tris, {os.path.getsize(glb) // 1024} KB glb, {os.path.getsize(blend) // 1024} KB blend')
+
+
+# ------------------------------------------------------- prop helpers ---
+
+def icosphere(name: str, radius: float, loc: Vec3 = (0, 0, 0), subdivisions: int = 3,
+              scale: Vec3 = (1, 1, 1), col: bpy.types.Collection | None = None) -> bpy.types.Object:
+    """Evenly tessellated sphere — the right base for a displaced boulder."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, radius=radius)
+    bmesh.ops.scale(bm, vec=Vector(scale), verts=bm.verts)
+    return _finish(name, bm, loc, None, col, True, None)
+
+
+def displace(ob: bpy.types.Object, strength: float = 0.3, noise_scale: float = 0.6,
+             seed: int = 0) -> bpy.types.DisplaceModifier:
+    """Push vertices along their normals by a procedural cloud texture — lumpy rock, bumpy canopy."""
+    tex = bpy.data.textures.new(f'{ob.name}.Noise', type='CLOUDS')
+    tex.noise_scale = noise_scale
+    tex.noise_depth = 1
+    tex.noise_basis = 'ORIGINAL_PERLIN'
+    m = ob.modifiers.new('Displace', 'DISPLACE')
+    m.texture = tex
+    m.strength = strength
+    m.mid_level = 0.5
+    # Global coordinates: two parts at different places sample different
+    # noise, and no helper object is needed (an extra top-level object would
+    # export as a stray node). `seed` shifts the texture's own noise field.
+    m.texture_coords = 'GLOBAL'
+    tex.noise_scale = noise_scale * (1.0 + (seed % 5) * 0.03)
+    return m
+
+
+def bend(ob: bpy.types.Object, angle_deg: float, axis: str = 'Y') -> bpy.types.SimpleDeformModifier:
+    """Curve a straight part (a palm trunk) with a Simple Deform bend."""
+    m = ob.modifiers.new('Bend', 'SIMPLE_DEFORM')
+    m.deform_method = 'BEND'
+    m.angle = math.radians(angle_deg)
+    m.deform_axis = axis
+    return m

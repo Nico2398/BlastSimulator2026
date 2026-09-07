@@ -66,6 +66,20 @@ export class ModelLibrary {
     return this.prototypes.has(id);
   }
 
+  /**
+   * The registered prototype itself, for consumers that draw a model
+   * instanced (vegetation, scenery) and need its merged geometry rather
+   * than a scene-graph clone. Null when the asset is not loaded.
+   */
+  prototype(id: string): ModelPrototype | null {
+    return this.prototypes.get(id) ?? null;
+  }
+
+  /** Run the scene's material hook on a material this library did not create (an instanced copy's). */
+  applyMaterialSetup(material: THREE.Material): (() => void) | undefined {
+    return this.materialSetup?.(material) ?? undefined;
+  }
+
   get size(): number {
     return this.prototypes.size;
   }
