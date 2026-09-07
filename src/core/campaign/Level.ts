@@ -127,11 +127,20 @@ const LEVELS: readonly LevelDef[] = [
     // 0.85) when a full career, not one scripted blast, was expected to cross
     // the threshold — tutorial_pit's own single-blast, single-sale-cycle
     // design needs a level unto itself here, not a place on that curve.
-    // Re-verified empirically (command mode, tutorial's own real step order,
-    // wind-down applied): 16.0 crosses unlockThreshold with real profit
-    // ($5,719 net, cash $345,719) by tick ~3,021 of the 'victory' step's own
-    // wait, seed 42.
-    contractPriceMultiplier: 16.0,
+    // Re-tuned 16.0 -> 32.0 (#959, merge with #965/#998). 16.0 was measured
+    // to the edge -- it crossed unlockThreshold at tick ~3,021 with $5,719 of
+    // real profit -- and the very next change to land on main took it away:
+    // #998 makes the console's default drill-hole diameter match the panel's,
+    // which changes what the tutorial's own scripted blast breaks, and the
+    // full-playthrough test's netProfit then peaked at about -$185,000 and
+    // declined from there, bankrupt by tick ~4,800 (measured over a 20,000-tick
+    // wait: income from selling roughly matched the mine's own per-tick drain
+    // and never got ahead of the ~$300,000 of one-time setup the tutorial
+    // itself scripts). Bisected against the same test: 24.0 still loses,
+    // 28.0 wins. 32.0 is 28.0 plus margin, deliberately -- a multiplier tuned
+    // to the exact edge is one upstream change away from making the tutorial
+    // unwinnable again, which is the bug this issue exists to fix.
+    contractPriceMultiplier: 32.0,
     scoreDecayRate: 0.01,
     mixedRockHardness: false,
     difficultyTier: 0,
