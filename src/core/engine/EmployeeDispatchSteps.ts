@@ -309,6 +309,25 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
 }
 
 /**
+ * Releases every unboarded, vehicle-gated action in `employee.taskQueue` back to
+ * the open pool. Called when a starvation override is about to send the employee
+ * off on an unrelated on-foot detour of unknown length, so a vehicle reserved
+ * for a not-yet-started taskQueue entry does not sit locked and idle for that
+ * whole detour — another driver can claim it immediately instead.
+ *
+ * Skips a taskQueue entry that is on-foot (`requiredVehicleRole === null`) or
+ * whose reserved vehicle is already boarded (defensive — should not occur for a
+ * taskQueue-only entry). Fully releases matching entries: removes them from
+ * `employee.taskQueue` and hands the action + vehicle back to the pool via the
+ * existing `releaseActionToOpenPool` helper.
+ */
+export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, employee: Employee): void {
+  // TODO(test-writer/implementer): stub only
+  void state;
+  void employee;
+}
+
+/**
  * Promote a claimed action to active on `employee`: sets activeActionId,
  * sends them walking toward the target, and seeds either
  * pendingRestDuration/pendingRestNeedKey (rest) or pendingTaskDuration/
