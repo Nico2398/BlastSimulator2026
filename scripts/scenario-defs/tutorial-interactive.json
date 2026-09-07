@@ -1209,7 +1209,7 @@
     {
       "command": "tick 44",
       "timeout": 90,
-      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin).",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin). #959: the card this step waits for is 'sell-ore', renamed from 'contract-deliver' — the tutorial's own missing beat is now selling the blasted ore for money, not just delivering whatever contract happened to be accepted.",
       "role": "player",
       "interaction": [
         {
@@ -1218,12 +1218,12 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "contract-deliver",
+          "stepId": "sell-ore",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "contract-deliver",
+        "tutorialStep": "sell-ore",
         "note": "The old reported bug this beat guarded against (no UI control anywhere could trigger `vehicle haul`) no longer applies -- #552 retires the button and the whole manual flow, so there is nothing left to get stuck on. No increased check on storedMassKg here -- like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
       }
     },
@@ -1248,22 +1248,238 @@
         {
           "type": "clickSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": [
-            "finances",
-            "needs",
-            "set-policy"
-          ],
-          "timeout": 60000
         }
       ],
       "expect": {
         "equals": {
           "activeContractCount": 0
         },
-        "note": "A genuinely completed delivery again — which is what #653/#585/#707’s own history here describes, and what #817 recorded as no longer true at the time. #557: the file's own starting cash (see the new_game step's own history) needed one more bump — with it, build-storage completes well within every rubble_disposal offer's deadline again (direct-traced, command mode), so #817's genuine game-balance conflict (max contract deadline vs. real construction+interruption time) no longer manifests on this file's own current timings; the underlying conflict itself is unchanged and #817 stays open for whatever crew/timing combination reproduces it. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step’s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim."
+        "note": "#959: this delivery completes the rubble_disposal contract accepted earlier (that is what activeContractCount 0 proves) but deliberately does NOT advance the tutorial card any more: 'sell-ore' completes on a genuinely completed ore_sale contract, not on any delivery at all — the whole point of the issue is that the tutorial never once turned blasted ORE into money. Delivering it anyway keeps the contract from expiring for a penalty and keeps the earlier 'contract-accept' beat honest. A genuinely completed delivery again — which is what #653/#585/#707’s own history here describes, and what #817 recorded as no longer true at the time. #557: the file's own starting cash (see the new_game step's own history) needed one more bump — with it, build-storage completes well within every rubble_disposal offer's deadline again (direct-traced, command mode), so #817's genuine game-balance conflict (max contract deadline vs. real construction+interruption time) no longer manifests on this file's own current timings; the underlying conflict itself is unchanged and #817 stays open for whatever crew/timing combination reproduces it. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step’s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim.",
+        "tutorialStep": "sell-ore"
+      }
+    },
+    {
+      "command": "tick 200",
+      "timeout": 120,
+      "description": "#959 round 1 of 4, wait half: the debris_hauler keeps hauling blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so a dirtite ore_sale offer this pit's own two blasts can actually fill has to be waited for rather than assumed. `role: setup` with a plain `tick` (SETUP_COMMAND_ALLOWLIST) rather than a `waitUntil`: the thing being waited on -- 'an ore_sale offer for a material in storage, with enough of it hauled in to fill the offer' -- is not a single state-dump field `waitUntil`'s own strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock here unless a step asks for it.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "timeout": 120,
+      "description": "#959 round 1 of 4, accept half: Accept clicked on a dirtite ore_sale offer, scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` the same way every other contract click in this file is (#513/#581/#554) so it can never silently accept a different contract than the command names. `clickIfPresent`, not `clickSelector`: whether the pool happens to be offering dirtite in THIS round is genuinely nondeterministic (the offer pool is drawn from `Random(seed + tickCount)` and rotates every 20 ticks), which is exactly the beat `clickIfPresent` exists for -- the control is not hard to reach, it is legitimately absent some rounds. `commandOutcome: 'either'` says the same thing for command mode, where the console refuses the accept outright when no dirtite offer stands. The last round's own `expect` is what proves the sequence as a whole landed a real sale.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:500",
+      "timeout": 120,
+      "description": "#959 round 1 of 4, deliver half: Deliver clicked on the accepted dirtite contract. The amount field is pre-filled by the panel itself to `min(remaining, stored)` (ContractsPanel's `maxDeliverable`), so a plain click delivers exactly what storage can cover right now and nothing is typed -- repeated partial deliveries across rounds complete the contract as more ore is hauled in, which is the mechanic the 'sell-ore' card's own text teaches (\"You may need several rounds\"). `clickIfPresent`/`'either'` for the same reason as the accept half above: no accepted dirtite contract, no card to deliver against.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "tick 200",
+      "timeout": 120,
+      "description": "#959 round 2 of 4, wait half: the debris_hauler keeps hauling blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so a dirtite ore_sale offer this pit's own two blasts can actually fill has to be waited for rather than assumed. `role: setup` with a plain `tick` (SETUP_COMMAND_ALLOWLIST) rather than a `waitUntil`: the thing being waited on -- 'an ore_sale offer for a material in storage, with enough of it hauled in to fill the offer' -- is not a single state-dump field `waitUntil`'s own strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock here unless a step asks for it.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "timeout": 120,
+      "description": "#959 round 2 of 4, accept half: Accept clicked on a dirtite ore_sale offer, scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` the same way every other contract click in this file is (#513/#581/#554) so it can never silently accept a different contract than the command names. `clickIfPresent`, not `clickSelector`: whether the pool happens to be offering dirtite in THIS round is genuinely nondeterministic (the offer pool is drawn from `Random(seed + tickCount)` and rotates every 20 ticks), which is exactly the beat `clickIfPresent` exists for -- the control is not hard to reach, it is legitimately absent some rounds. `commandOutcome: 'either'` says the same thing for command mode, where the console refuses the accept outright when no dirtite offer stands. The last round's own `expect` is what proves the sequence as a whole landed a real sale.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:500",
+      "timeout": 120,
+      "description": "#959 round 2 of 4, deliver half: Deliver clicked on the accepted dirtite contract. The amount field is pre-filled by the panel itself to `min(remaining, stored)` (ContractsPanel's `maxDeliverable`), so a plain click delivers exactly what storage can cover right now and nothing is typed -- repeated partial deliveries across rounds complete the contract as more ore is hauled in, which is the mechanic the 'sell-ore' card's own text teaches (\"You may need several rounds\"). `clickIfPresent`/`'either'` for the same reason as the accept half above: no accepted dirtite contract, no card to deliver against.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "tick 200",
+      "timeout": 120,
+      "description": "#959 round 3 of 4, wait half: the debris_hauler keeps hauling blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so a dirtite ore_sale offer this pit's own two blasts can actually fill has to be waited for rather than assumed. `role: setup` with a plain `tick` (SETUP_COMMAND_ALLOWLIST) rather than a `waitUntil`: the thing being waited on -- 'an ore_sale offer for a material in storage, with enough of it hauled in to fill the offer' -- is not a single state-dump field `waitUntil`'s own strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock here unless a step asks for it.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "timeout": 120,
+      "description": "#959 round 3 of 4, accept half: Accept clicked on a dirtite ore_sale offer, scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` the same way every other contract click in this file is (#513/#581/#554) so it can never silently accept a different contract than the command names. `clickIfPresent`, not `clickSelector`: whether the pool happens to be offering dirtite in THIS round is genuinely nondeterministic (the offer pool is drawn from `Random(seed + tickCount)` and rotates every 20 ticks), which is exactly the beat `clickIfPresent` exists for -- the control is not hard to reach, it is legitimately absent some rounds. `commandOutcome: 'either'` says the same thing for command mode, where the console refuses the accept outright when no dirtite offer stands. The last round's own `expect` is what proves the sequence as a whole landed a real sale.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:500",
+      "timeout": 120,
+      "description": "#959 round 3 of 4, deliver half: Deliver clicked on the accepted dirtite contract. The amount field is pre-filled by the panel itself to `min(remaining, stored)` (ContractsPanel's `maxDeliverable`), so a plain click delivers exactly what storage can cover right now and nothing is typed -- repeated partial deliveries across rounds complete the contract as more ore is hauled in, which is the mechanic the 'sell-ore' card's own text teaches (\"You may need several rounds\"). `clickIfPresent`/`'either'` for the same reason as the accept half above: no accepted dirtite contract, no card to deliver against.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "tick 200",
+      "timeout": 120,
+      "description": "#959 round 4 of 4, wait half: the debris_hauler keeps hauling blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so a dirtite ore_sale offer this pit's own two blasts can actually fill has to be waited for rather than assumed. `role: setup` with a plain `tick` (SETUP_COMMAND_ALLOWLIST) rather than a `waitUntil`: the thing being waited on -- 'an ore_sale offer for a material in storage, with enough of it hauled in to fill the offer' -- is not a single state-dump field `waitUntil`'s own strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock here unless a step asks for it.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "timeout": 120,
+      "description": "#959 round 4 of 4, accept half: Accept clicked on a dirtite ore_sale offer, scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` the same way every other contract click in this file is (#513/#581/#554) so it can never silently accept a different contract than the command names. `clickIfPresent`, not `clickSelector`: whether the pool happens to be offering dirtite in THIS round is genuinely nondeterministic (the offer pool is drawn from `Random(seed + tickCount)` and rotates every 20 ticks), which is exactly the beat `clickIfPresent` exists for -- the control is not hard to reach, it is legitimately absent some rounds. `commandOutcome: 'either'` says the same thing for command mode, where the console refuses the accept outright when no dirtite offer stands. The last round's own `expect` is what proves the sequence as a whole landed a real sale.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:500",
+      "timeout": 120,
+      "description": "#959 round 4 of 4, deliver half: Deliver clicked on the accepted dirtite contract. The amount field is pre-filled by the panel itself to `min(remaining, stored)` (ContractsPanel's `maxDeliverable`), so a plain click delivers exactly what storage can cover right now and nothing is typed -- repeated partial deliveries across rounds complete the contract as more ore is hauled in, which is the mechanic the 'sell-ore' card's own text teaches (\"You may need several rounds\"). `clickIfPresent`/`'either'` for the same reason as the accept half above: no accepted dirtite contract, no card to deliver against.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
+          "timeoutMs": 5000
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "set-policy",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "set-policy",
+        "note": "#959, the issue's own subject made concrete: a completed ore_sale contract is what advances 'sell-ore', so the card moving on at all proves the tutorial genuinely turned blasted ore into money by real clicks -- accept and deliver on the Contracts panel, no console command standing in for either (`role: 'player'`). Asserted on 'set-policy' rather than 'sell-ore''s immediate successor: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat (CONGRATULATIONS/auto-advance timers), so whichever of the three is showing when this step's own goal is evaluated is a race; 'set-policy' is the next card that waits for a click and therefore stays put once reached -- live-verified in interaction mode, where the card had already run on to it. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card."
       }
     },
     {
