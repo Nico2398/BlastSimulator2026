@@ -12,6 +12,33 @@
 // intended character: a tight system sans for UI text, and a tabular
 // monospace (via font-variant-numeric) for every countable value.
 
+/**
+ * Single source of truth for the geometry values consumed directly by shell
+ * region bounds functions (LayoutRegistry, #956) — the CSS custom properties
+ * below and the layout math must never drift from each other again (#955).
+ */
+export const TOPBAR_HEIGHT_PX = 52;
+export const SPACING_3_PX = 12;
+
+/**
+ * The MiniMap's reserved bottom-right strip (#983). It lives in
+ * src/ui/MiniMap.ts, but the ToolRail has to know how much of the right edge
+ * it may not enter, and importing a panel component into a shell region for
+ * three numbers would couple them for no reason — so the strip is declared
+ * here, where the top bar's height already is, and both read it.
+ *
+ * The width is fixed rather than `fit-content` because the legend row is
+ * translated: measured at 1280x720 it was 215px in English and 245px in
+ * French, which would have made the declared region locale-dependent. Fixed
+ * at a width that fits the longer of the two with headroom, the footprint is
+ * the same in every language.
+ */
+export const MINIMAP_WIDTH_PX = 252;
+/** Border (2) + header (26) + canvas margin-top (6) + MAP_SIZE (120) + legend (16). */
+export const MINIMAP_HEIGHT_PX = 170;
+/** Distance from the right and bottom viewport edges. */
+export const MINIMAP_EDGE_OFFSET_PX = 10;
+
 export const TOKENS_CSS = `
 :root {
   /* ── surfaces ── */
@@ -56,7 +83,7 @@ export const TOKENS_CSS = `
   /* ── spacing (4px base) ── */
   --bsx-sp-1: 4px;
   --bsx-sp-2: 8px;
-  --bsx-sp-3: 12px;
+  --bsx-sp-3: ${SPACING_3_PX}px;
   --bsx-sp-4: 16px;
   --bsx-sp-5: 20px;
   --bsx-sp-6: 24px;
@@ -84,7 +111,7 @@ export const TOKENS_CSS = `
   --bsx-z-modal: 10500;
 
   /* ── layout ── */
-  --bsx-topbar-height: 52px;
+  --bsx-topbar-height: ${TOPBAR_HEIGHT_PX}px;
 
   /* ── type ── */
   --bsx-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -433,24 +460,21 @@ export const TOKENS_CSS = `
 }
 .bsx-menu-lang-pill.active { background: var(--bsx-amber); color: var(--bsx-text-on-amber); }
 
-@keyframes bsx-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
 /* ── reduced motion (P10): drop transform-based motion, keep opacity ──
    Vestibular-trigger guidance is about movement (translate/scale/rotate),
    not fades, so this only collapses transform-carrying motion — everything
    else in this file (the background/border-color/color/filter/width
    transitions above) is left running at its normal duration.
-   bsx-toast-in mixes both: the override below keeps its opacity fade at the
-   same .18s and drops only the translateY slide-in.
+   Toasts no longer carry an entrance animation at all (issue #977 — a CSS
+   keyframe animation's currentTime can stall under main-thread load and
+   never reach a visible frame), so there is nothing toast-specific to
+   override here any more.
    .bsx-btn:active's transform: translateY(1px) has no entry here — the
    .bsx-btn transition list above only covers background/border-color/color/
    filter, so the transform already snaps instantly with no motion to drop.
    A new transform transition/animation added under .bsx-root needs its own
    override here; collapsing every duration blanket-style (the old rule)
    also killed pure-opacity fades, which is the bug this replaces. */
-@media (prefers-reduced-motion: reduce) {
-  @keyframes bsx-toast-in { from { opacity: 0; } to { opacity: 1; } }
-}
 `;
 
 let injected = false;
