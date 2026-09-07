@@ -21,7 +21,7 @@ export const readModelBytes: ByteSource = async (url) => {
 
 /** Load every model (or `ids`) from disk into `library`; returns what loaded and what failed. */
 export async function loadModelsFromDisk(library: ModelLibrary, ids?: readonly string[]): Promise<PreloadResult> {
-  return preloadModels(library, readModelBytes, ids);
+  return preloadModels(library, readModelBytes, ids ? { ids } : {});
 }
 
 /** A fresh library holding every exported asset. */

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
 import { modelLibrary } from './renderer/models/ModelLibrary.js';
-import { fetchModelBytes, preloadModels } from './renderer/models/ModelLoader.js';
+import { fetchModelBytes, preloadModels, yieldToEventLoop } from './renderer/models/ModelLoader.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
@@ -61,7 +61,7 @@ modelLibrary.setMaterialSetup(m => {
 // Fetch every model now, alongside the main menu; enterLevel() waits on it
 // as its first phase, and any level entered earlier (a harness driving
 // new_game straight away) catches up through GameRenderer.update().
-const modelsReady = preloadModels(modelLibrary, fetchModelBytes);
+const modelsReady = preloadModels(modelLibrary, fetchModelBytes, { yieldBetween: yieldToEventLoop });
 
 // --- Game Renderer (bridges console commands → Three.js) ---
 const gameRenderer = new GameRenderer(scene);

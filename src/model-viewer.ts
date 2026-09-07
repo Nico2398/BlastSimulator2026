@@ -43,7 +43,7 @@ modelLibrary.setMaterialSetup(m => {
 });
 
 async function show(): Promise<void> {
-  const result = await preloadModels(modelLibrary, fetchModelBytes, [modelId]);
+  const result = await preloadModels(modelLibrary, fetchModelBytes, { ids: [modelId] });
   const instance = modelLibrary.instantiate(modelId, { size: [1, 1, 1] });
   const size = instance.bounds.getSize(new THREE.Vector3());
   const extent = Math.max(size.x, size.y, size.z) || 1;

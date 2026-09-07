@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ModelLibrary } from '../../../../src/renderer/models/ModelLibrary.js';
-import { fetchModelBytes, parseModel, preloadModels } from '../../../../src/renderer/models/ModelLoader.js';
+import { fetchModelBytes, parseModel, preloadModels, yieldToEventLoop } from '../../../../src/renderer/models/ModelLoader.js';
 import { allModelIds } from '../../../../src/renderer/models/ModelIds.js';
 import { readModelBytes } from '../../../helpers/models.js';
 
@@ -31,7 +31,7 @@ describe('preloadModels', () => {
       if (url.includes('garbage')) return new Uint8Array([9, 9, 9, 9]).buffer;
       return readModelBytes(url);
     };
-    const result = await preloadModels(lib, source, ['worker_driller', 'bogus', 'garbage']);
+    const result = await preloadModels(lib, source, { ids: ['worker_driller', 'bogus', 'garbage'] });
     expect(result.loaded).toEqual(['worker_driller']);
     expect(result.failed.sort()).toEqual(['bogus', 'garbage']);
     expect(lib.has('worker_driller')).toBe(true);
@@ -41,9 +41,34 @@ describe('preloadModels', () => {
   it('defaults to every catalogued id and a custom base path', async () => {
     const urls: string[] = [];
     const lib = new ModelLibrary();
-    await preloadModels(lib, async url => { urls.push(url); throw new Error('skip'); }, undefined, '/cdn/');
+    await preloadModels(lib, async url => { urls.push(url); throw new Error('skip'); }, { base: '/cdn/' });
     expect(urls).toHaveLength(allModelIds().length);
     expect(urls.every(u => u.startsWith('/cdn/') && u.endsWith('.glb'))).toBe(true);
+  });
+});
+
+describe('preloadModels — pacing', () => {
+  it('parses in id order, one at a time, awaiting the yield between parses but not after the last', async () => {
+    const lib = new ModelLibrary();
+    const events: string[] = [];
+    const source = async (url: string): Promise<ArrayBuffer> => readModelBytes(url);
+    const originalRegister = lib.register.bind(lib);
+    lib.register = (id, proto) => { events.push(`parse:${id}`); originalRegister(id, proto); };
+    const yields = { count: 0 };
+    await preloadModels(lib, source, {
+      ids: ['worker_driller', 'worker_manager', 'vehicle_drill_rig'],
+      yieldBetween: async () => { yields.count++; events.push('yield'); },
+    });
+    expect(events).toEqual(['parse:worker_driller', 'yield', 'parse:worker_manager', 'yield', 'parse:vehicle_drill_rig']);
+    expect(yields.count).toBe(2);
+  });
+
+  it('yieldToEventLoop resolves on a later macrotask', async () => {
+    let flag = false;
+    const p = yieldToEventLoop().then(() => { flag = true; });
+    expect(flag).toBe(false);
+    await p;
+    expect(flag).toBe(true);
   });
 });
 

@@ -72,6 +72,21 @@ function mergeBucket(parts: SourceMesh[], withColor: boolean): THREE.BufferGeome
   return merged;
 }
 
+/** Position + normal view of already-merged surfaces, concatenated into the hull geometry. */
+function mergeSurfaces(surfaces: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const views = surfaces.map(src => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', src.getAttribute('position'));
+    g.setAttribute('normal', src.getAttribute('normal'));
+    if (src.index) g.setIndex(src.index);
+    return g;
+  });
+  if (views.length === 1) return views[0]!;
+  const merged = mergeGeometries(views, false);
+  if (!merged) throw new Error('mergeGeometries failed: surface attribute sets differ');
+  return merged;
+}
+
 /** Collect every mesh under `node`, with its transform relative to `node`. */
 function collectMeshes(node: THREE.Object3D): SourceMesh[] {
   const out: SourceMesh[] = [];
@@ -109,6 +124,7 @@ function buildNode(source: THREE.Object3D, tintNames: string[]): THREE.Group {
     buckets.set(key, list);
   }
 
+  const surfaces: THREE.BufferGeometry[] = [];
   for (const [key, list] of buckets) {
     const first = list[0]!.material;
     let mesh: THREE.Mesh;
@@ -130,9 +146,14 @@ function buildNode(source: THREE.Object3D, tintNames: string[]): THREE.Group {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     node.add(mesh);
+    surfaces.push(mesh.geometry);
   }
 
-  const hull = new THREE.Mesh(mergeBucket(parts, false), createOutlineMaterial());
+  // The hull is the union of the surfaces just built — merged from their
+  // already-baked buffers (positions + normals shared, not copied) rather than
+  // baking every part a second time. This runs at page boot for every model,
+  // on the main thread, so its cost is what keeps the first frames responsive.
+  const hull = new THREE.Mesh(mergeSurfaces(surfaces), createOutlineMaterial());
   hull.name = `${source.name}.outline`;
   hull.userData[HULL_KEY] = true;
   hull.raycast = () => {};

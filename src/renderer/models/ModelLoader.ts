@@ -25,28 +25,53 @@ export function parseModel(bytes: ArrayBuffer): Promise<ModelPrototype> {
   });
 }
 
+interface PreloadOptions {
+  ids?: readonly string[];
+  base?: string;
+  /**
+   * Awaited between two parses. The browser passes an event-loop yield so a
+   * page booting through this keeps painting and answering input: every
+   * parse is main-thread work, and 38 of them back to back would otherwise
+   * run as one long task. Tests leave it unset.
+   */
+  yieldBetween?: () => Promise<void>;
+}
+
 /**
- * Load every model id (default: all of them) into `library`. Failures are
- * reported, not thrown: a missing asset costs one stand-in box, never the
- * level.
+ * Load every model id (default: all of them) into `library`. Bytes are
+ * fetched concurrently; parsing runs one model at a time, in id order.
+ * Failures are reported, not thrown: a missing asset costs one stand-in box,
+ * never the level.
  */
 export async function preloadModels(
   library: ModelLibrary,
   fetchBytes: ByteSource,
-  ids: readonly string[] = allModelIds(),
-  base?: string,
+  options: PreloadOptions = {},
 ): Promise<PreloadResult> {
+  const ids = options.ids ?? allModelIds();
   const result: PreloadResult = { loaded: [], failed: [] };
-  await Promise.all(ids.map(async id => {
+  const pending = ids.map(id => fetchBytes(modelUrl(id, options.base)).then(
+    bytes => ({ bytes }),
+    (error: unknown) => ({ error }),
+  ));
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]!;
+    const fetched = await pending[i]!;
     try {
-      const bytes = await fetchBytes(modelUrl(id, base));
-      library.register(id, await parseModel(bytes));
+      if ('error' in fetched) throw fetched.error;
+      library.register(id, await parseModel(fetched.bytes));
       result.loaded.push(id);
     } catch {
       result.failed.push(id);
     }
-  }));
+    if (options.yieldBetween && i < ids.length - 1) await options.yieldBetween();
+  }
   return result;
+}
+
+/** Browser yield between parses: one macrotask, so rendering and input get a turn. */
+export function yieldToEventLoop(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 /** Browser byte source: a plain fetch of the served asset. */
