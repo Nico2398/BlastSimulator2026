@@ -161,6 +161,15 @@ export interface PendingAction {
   status: PendingActionStatus;
   /** Employee currently holding (assigned to/working) this action, or null while 'queued' (#547). Distinct from targetEmployeeId, which restricts eligibility rather than recording who claimed it. */
   holderId: number | null;
+  /**
+   * Tick this action was queued at — used by ActionSelection.ts's
+   * `findStarvedActionForEmployee` to detect a queued, unclaimed,
+   * `requiredVehicleRole === null` action that has waited at least
+   * `ACTION_STARVATION_TICK_THRESHOLD` ticks (#1000). Optional: absent on
+   * actions created before this field existed and on any action type this
+   * starvation check doesn't apply to.
+   */
+  queuedAtTick?: number;
 }
 
 /**

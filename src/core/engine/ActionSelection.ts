@@ -330,6 +330,18 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
   return previous?.done === true;
 }
 
+/**
+ * Finds a queued, unclaimed, `requiredVehicleRole === null` action that has
+ * been waiting at least `ACTION_STARVATION_TICK_THRESHOLD` ticks and is
+ * claimable by `employee` — called from VehicleContinuity.ts's
+ * `tryContinueVehicleGatedAction` so a long-starved on-foot action can win
+ * dispatch over the same-role vehicle continuity fast path (#1000).
+ */
+export function findStarvedActionForEmployee(_state: GameState, _employee: Employee): SelectedAction | null {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 export function selectBestActionForEmployee(
   state: GameState,
   employee: Employee,

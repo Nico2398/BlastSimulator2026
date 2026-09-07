@@ -620,6 +620,16 @@ export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 
+/**
+ * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
+ * on-foot action class open to whoever is free — place_building, survey,
+ * general_work, demolish_building) may sit waiting before it must win the
+ * next vehicle-gated completion's dispatch decision, overriding
+ * tryContinueVehicleGatedAction's same-role continuity fast path
+ * (VehicleContinuity.ts) regardless of cost ranking (#1000).
+ */
+export const ACTION_STARVATION_TICK_THRESHOLD = 300;
+
 /** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_EFFECT_PENALTIES for the analogous need-driven table). */
 export const STUCK_MORALE_PENALTY = 2;
 
