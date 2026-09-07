@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
+import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { makeGameContext } from '../helpers/gameContext.js';
@@ -25,11 +26,14 @@ import {
   getBuildingDef,
   type BuildingType,
 } from '../../src/core/entities/Building.js';
-import { createLogisticsState, syncLogisticsCapacity } from '../../src/core/economy/Logistics.js';
+import { createLogisticsState, syncLogisticsCapacity, addBlastFragments } from '../../src/core/economy/Logistics.js';
+import { syncHaulDispatch } from '../../src/core/economy/HaulDispatch.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import {
   BUILDING_CONSTRUCTION_BASE_DURATION_TICKS,
   BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
+  ACTION_STARVATION_TICK_THRESHOLD,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -704,5 +708,142 @@ describe('Construction sites — order-then-build (#556)', () => {
     expect(restoredEmployee!.taskTicksRemaining).toBe(midWork.ticksRemaining);
     expect(restored.plannedBuildings).toEqual(ctx.state!.plannedBuildings);
     expect(restored.buildings.buildings).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1000 — a deep same-role (debris_hauler) haul backlog must never starve out
+// an unclaimed place_building order forever. tryContinueVehicleGatedAction's
+// same-role vehicle-continuity fast path (VehicleContinuity.ts) keeps handing
+// a driver the next open haul_debris action the instant they finish one —
+// with a roster that has NO ONE else free, that means nobody ever walks to
+// the building site. The fix: a queued, unclaimed, requiredVehicleRole: null
+// action that has waited ACTION_STARVATION_TICK_THRESHOLD ticks must win
+// dispatch over that continuity fast path (findStarvedActionForEmployee,
+// ActionSelection.ts).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Buildings — completes despite a starved debris_hauler backlog (#1000)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    // Generous cash: 3 debris_hauler vehicles + a freight_warehouse + a
+    // management_office order, plus several hundred ticks of payroll/upkeep.
+    ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1_000_000 });
+  });
+
+  /** Top up every employee's fatigue before a tick — an unrelated forced-rest
+   * interruption (ForceShiftRest.ts/needs auto-insertion) would otherwise
+   * hand a driver a spontaneous idle window on its own, letting the ordinary
+   * (non-continuity) idle-dispatch path pick up the place_building order and
+   * pass this test for a reason that has nothing to do with #1000. Mirrors
+   * blast-oversized-boulders.integration.test.ts's driveConstructionToCompletion. */
+  function tickWithFatigueToppedUp(): void {
+    for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+    tickCommand(ctx, ['1'], {});
+  }
+
+  it('a place_building order lands even while a huge unclaimed haul_debris backlog exists, because the starved order eventually wins dispatch over vehicle continuity', () => {
+    // Roster: three employees licensed ONLY as debris_hauler drivers
+    // (driving.truck, the 'driver' role's own starting qualification) —
+    // nobody else exists to ever be free on foot. This reproduces the bug
+    // precisely: without the #1000 fix, none of them can ever be spared for
+    // the place_building order once the haul backlog exists.
+    for (let i = 0; i < 3; i++) {
+      const hireResult = employeeCommand(ctx, ['hire'], { role: 'driver' });
+      expect(hireResult.success, JSON.stringify(hireResult)).toBe(true);
+      const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      expect(buyResult.success, JSON.stringify(buyResult)).toBe(true);
+    }
+    expect(ctx.state!.employees.employees).toHaveLength(3);
+    expect(ctx.state!.vehicles.vehicles).toHaveLength(3);
+
+    // A freight_warehouse must exist before any haul_debris action can ever
+    // actually complete (HaulingTask.ts refuses to start hauling with no
+    // active depot) — build it first, before the backlog exists, so this
+    // step alone proves nothing about the fix. Tier 1 (2,000kg capacity,
+    // needs no research unlock) is plenty: the light-weight fragments seeded
+    // below total well under that even if every one were delivered, so
+    // storage room never becomes the bottleneck instead of #1000's own fix.
+    const warehouseOrder = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(warehouseOrder.success, JSON.stringify(warehouseOrder)).toBe(true);
+    for (let i = 0; i < 300 && ctx.state!.plannedBuildings.length > 0; i++) tickWithFatigueToppedUp();
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+
+    // Seed a large (>200), deliberately light (5kg each — total mass well
+    // under the 2,000kg warehouse capacity even if every single fragment
+    // were delivered) haul_debris backlog, sparsely scattered across the
+    // whole site (spacing 2, so drivers never traffic-jam each other) —
+    // dense enough in total that 3 drivers cannot drain it within this
+    // test's tick budget (verified empirically: draining ~225 of these at
+    // this spacing takes ~2000+ ticks, an order of magnitude over budget).
+    const fragments: FragmentData[] = [];
+    let fragId = 1;
+    for (let x = 1; x < 31; x += 2) {
+      for (let z = 1; z < 31; z += 2) {
+        fragments.push({
+          id: fragId++,
+          position: { x, y: 0, z },
+          volume: 0.3,
+          mass: 5,
+          rockId: 'cruite',
+          oreDensities: {},
+          initialVelocity: { x: 0, y: 0, z: 0 },
+          isProjection: false,
+          halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+          shapeSeed: 1,
+        });
+      }
+    }
+    addBlastFragments(ctx.state!.logistics, fragments, ctx.state!.navGrid);
+    syncHaulDispatch(ctx.state!);
+    const backlogSize = ctx.state!.pendingActions.filter(a => a.type === 'haul_debris').length;
+    expect(backlogSize).toBeGreaterThan(200);
+
+    // Let all three drivers actually commit to a haul_debris action FIRST —
+    // this matters because an idle employee's *first* dispatch is the
+    // general cost-ranked pick across every claimable action (which already
+    // considers place_building fairly). The #1000 bug is specifically in
+    // tryContinueVehicleGatedAction's same-role continuity fast path, which
+    // only ever runs once a driver already mid-chain finishes a haul — so
+    // the place_building order below must not exist yet while any driver
+    // could still win it through ordinary idle dispatch, or this test would
+    // pass without exercising the bug at all.
+    const isEveryoneHauling = (): boolean => ctx.state!.employees.employees.every(e => {
+      const action = e.activeActionId !== null
+        ? ctx.state!.pendingActions.find(a => a.id === e.activeActionId)
+        : undefined;
+      return action?.type === 'haul_debris';
+    });
+    for (let i = 0; i < 100 && !isEveryoneHauling(); i++) tickWithFatigueToppedUp();
+    expect(isEveryoneHauling(), JSON.stringify(ctx.state!.employees.employees.map(e => e.activeActionId))).toBe(true);
+
+    // Order the SECOND building only now that every driver is already
+    // committed to the haul backlog via vehicle continuity.
+    const orderResult = buildCommand(ctx, ['management_office'], { at: '25,2' });
+    expect(orderResult.success, JSON.stringify(orderResult)).toBe(true);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1); // not yet landed
+
+    // Budget: ACTION_STARVATION_TICK_THRESHOLD ticks before the starved
+    // order can even win dispatch, plus a tier-1 construction's own duration
+    // (BUILDING_CONSTRUCTION_BASE_DURATION_TICKS) once claimed, plus a
+    // generous travel/dispatch margin — sized well above what the fix
+    // actually needs, so this isn't a flaky race against the tick budget,
+    // yet nowhere near the ~2000+ ticks the backlog above needs to drain on
+    // its own (so this cannot pass merely because the backlog ran out).
+    const TICK_BUDGET = ACTION_STARVATION_TICK_THRESHOLD + BUILDING_CONSTRUCTION_BASE_DURATION_TICKS + 150;
+
+    let backlogStillOpenDuringTheRun = false;
+    for (let i = 0; i < TICK_BUDGET && ctx.state!.buildings.buildings.length < 2; i++) {
+      tickWithFatigueToppedUp();
+      const openHauls = ctx.state!.pendingActions.filter(a => a.type === 'haul_debris' && a.status === 'queued').length;
+      if (openHauls > 0) backlogStillOpenDuringTheRun = true;
+    }
+
+    expect(ctx.state!.buildings.buildings).toHaveLength(2);
+    // Proves the building went up WHILE the backlog was starved, not because
+    // it coincidentally drained first — a false positive this assertion is
+    // specifically here to rule out.
+    expect(backlogStillOpenDuringTheRun).toBe(true);
   });
 });

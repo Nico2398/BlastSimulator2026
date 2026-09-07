@@ -583,35 +583,6 @@
       "role": "observe"
     },
     {
-      "command": "employee hire role:manager",
-      "timeout": 90,
-      "description": "#959: a fourth hand, hired for the two warehouses below. This file's roster is a driller who dies in its own blast and two drivers, and both drivers stay on the fragment/haul backlog the blast leaves behind: `tryContinueVehicleGatedAction` (VehicleContinuity.ts) hands a driver who just finished a vehicle-gated action the best remaining action OF THE SAME VEHICLE ROLE, which with ~340 queued fragment/haul actions is always another one of those, so nobody is ever free to raise a building. Command mode happens to get away with it (one driver goes idle mid-backlog and picks the site up at tick ~239); interaction mode's own trajectory does not, and both warehouses sat unbuilt through 3,000 ticks. A manager carries no driving licence, so no vehicle-gated follow-up can ever claim them and construction is exactly the work they are free for. TODO(#1000): the underlying scheduling gap -- ordered construction starving behind a long vehicle-gated backlog -- is filed separately; drop this hire once it lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"manager\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"manager\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "employeeCount": 4
-        },
-        "changedBy": {
-          "cash": -2000
-        },
-        "note": "HIRING_COSTS.manager = 2000 (balance.ts). employeeCount 4 counts the blast casualty too — this file's own driller is dead by here, which is why a fourth hand is needed at all."
-      }
-    },
-    {
       "command": "build freight_warehouse at:13,13",
       "description": "#697-followup: no longer bracketed by a `time pause`/`time resume` pair -- that #697 fix addressed real-time wall-clock drift, which this scenario never actually has (`?scenarioMode=1` disables main.ts's auto-tick loop in every interaction-mode harness that runs this file). The real deficit is the tick-count divergence the 'new_game' step's own description now explains; the bigger cash cushion there is the actual fix.",
       "interaction": [
