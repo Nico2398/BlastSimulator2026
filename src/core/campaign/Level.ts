@@ -96,11 +96,51 @@ const LEVELS: readonly LevelDef[] = [
     // blast with cash to spare (#555 tutorial worker-revolt fix — bankruptcy
     // was the next failure this level's own starting cash hit once the
     // worker-revolt bug ahead of it was fixed).
-    startingCash: 290000,
+    // #959: bumped $290,000 -> $340,000. Re-verified empirically (command
+    // mode, tutorial's own real step order, contractPriceMultiplier now
+    // actually wired into contract pricing): cash is down to ~$47,000 by the
+    // time the freight_warehouse finishes building, and drains a further
+    // ~$200-250/tick in ongoing payroll/maintenance/fuel from there with
+    // nothing yet sold — enough to cross BANKRUPTCY_THRESHOLD ($5,000) within
+    // ~200 ticks and trigger bankruptcy (BANKRUPTCY_GRACE_TICKS=100 further)
+    // well before the sell-ore step's first accept/deliver cycle can
+    // realistically land. The extra $50,000 buys roughly 200-250 more ticks
+    // of runway past that same point, giving the first sale a real chance to
+    // land before the grace window runs out.
+    startingCash: 340000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,
-    contractPriceMultiplier: 1.5,
+    // #959 fixer pass: bumped 1.5 -> 16.0. Getting the tutorial's sell-ore
+    // mechanism itself genuinely working (a real ore_sale/rubble_disposal
+    // could complete at all, a stuck debris_hauler could recover and keep
+    // hauling) surfaced the deeper number underneath: even a real player who
+    // lays off every employee but the driver, scraps the drill_rig/rock_digger,
+    // and demolishes the now-unused living_quarters/driving_center the instant
+    // 'sell-ore' completes — the obviously rational move once nothing left is
+    // for them to do — still can't out-earn ~$220-300k of unavoidable one-time
+    // setup cost (hiring, training, three buildings, two extra vehicles) by
+    // trickling a single tier-1 debris_hauler's own hauls through the contract
+    // board at $1.5x market rate; one blast's own accessible ore/rubble value
+    // tops out far below that even sold in full. 1.5x was the level's own
+    // stated ceiling among the four (dusty_hollow 1.2, base 1.0, tightest
+    // 0.85) when a full career, not one scripted blast, was expected to cross
+    // the threshold — tutorial_pit's own single-blast, single-sale-cycle
+    // design needs a level unto itself here, not a place on that curve.
+    // Re-tuned 16.0 -> 32.0 (#959, merge with #965/#998). 16.0 was measured
+    // to the edge -- it crossed unlockThreshold at tick ~3,021 with $5,719 of
+    // real profit -- and the very next change to land on main took it away:
+    // #998 makes the console's default drill-hole diameter match the panel's,
+    // which changes what the tutorial's own scripted blast breaks, and the
+    // full-playthrough test's netProfit then peaked at about -$185,000 and
+    // declined from there, bankrupt by tick ~4,800 (measured over a 20,000-tick
+    // wait: income from selling roughly matched the mine's own per-tick drain
+    // and never got ahead of the ~$300,000 of one-time setup the tutorial
+    // itself scripts). Bisected against the same test: 24.0 still loses,
+    // 28.0 wins. 32.0 is 28.0 plus margin, deliberately -- a multiplier tuned
+    // to the exact edge is one upstream change away from making the tutorial
+    // unwinnable again, which is the bug this issue exists to fix.
+    contractPriceMultiplier: 32.0,
     scoreDecayRate: 0.01,
     mixedRockHardness: false,
     difficultyTier: 0,

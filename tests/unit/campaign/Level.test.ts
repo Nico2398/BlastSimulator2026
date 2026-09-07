@@ -91,12 +91,12 @@ describe('Level definition system (7.1)', () => {
     expect(level!.gridX).toBe(32);
     expect(level!.gridY).toBe(20);
     expect(level!.gridZ).toBe(32);
-    expect(level!.startingCash).toBe(290000);
+    expect(level!.startingCash).toBe(340000);
     expect(level!.availableExplosives).toContain('pop_rock');
     expect(level!.availableExplosives).toContain('boomite');
     expect(level!.unlockThreshold).toBe(5000);
     expect(level!.eventFreqMultiplier).toBe(0);
-    expect(level!.contractPriceMultiplier).toBe(1.5);
+    expect(level!.contractPriceMultiplier).toBe(32.0);
     expect(level!.scoreDecayRate).toBe(0.01);
     expect(level!.mixedRockHardness).toBe(false);
     expect(level!.difficultyTier).toBe(0);

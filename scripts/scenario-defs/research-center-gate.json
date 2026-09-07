@@ -14,7 +14,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 290000,
+          "cash": 340000,
           "buildingCount": 0
         }
       }

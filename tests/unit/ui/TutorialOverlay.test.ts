@@ -686,6 +686,69 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
+  describe('defeat short-circuit (#959)', () => {
+    // shortCircuitOnDefeat()/jumpToLastStep() and the titleKeyFor/textKeyFor
+    // resolution wired into render() are otherwise only exercised at the
+    // pure step-object level (tutorialStepsClosing.test.ts) — these drive a
+    // real TutorialOverlay instance through a bankruptcy to confirm the
+    // overlay itself lands on the closing card with the right DOM text.
+    it('jumps straight to the closing card with defeat copy when onCommandExecuted sees a non-completed levelEndReason', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      // Mid-tutorial, well before the closing sequence.
+      tut.stepIndex = 5;
+
+      state.levelEnded = true;
+      state.levelEndReason = 'bankruptcy';
+      tut.onCommandExecuted(state);
+
+      expect(tut.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      expect(titleEl.textContent).toBe('The Bank Foreclosed');
+      expect(textEl.textContent).toBe(
+        "Your cash ran dry before the mine turned a profit. Sell ore as soon as it's hauled in — the bank doesn't offer grace periods.",
+      );
+    });
+
+    it('also fires from the guide-tick poll, not only onCommandExecuted', () => {
+      vi.useFakeTimers();
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.stepIndex = 5;
+
+      state.levelEnded = true;
+      state.levelEndReason = 'arrest';
+      vi.advanceTimersByTime(250);
+
+      expect(tut.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      expect(titleEl.textContent).toBe('Busted');
+      vi.useRealTimers();
+    });
+
+    it('does not short-circuit a genuine win — the completed reason still reaches the success copy', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.stepIndex = 5;
+
+      state.levelEnded = true;
+      state.levelEndReason = 'completed';
+      tut.onCommandExecuted(state);
+
+      // 'completed' is not a defeat reason, so shortCircuitOnDefeat leaves
+      // the step wherever normal completion checks put it.
+      expect(tut.stepIndex).not.toBe(TOTAL_TUTORIAL_STEPS - 1);
+    });
+  });
+
   describe('refreshLocale() (issue #492 section 3 — "clock held" text survives a language switch)', () => {
     it('re-applies the CLOCK HELD tooltip (pausedEl.title) to the active locale', () => {
       const tut = new TutorialOverlay(container) as unknown as { pausedEl: HTMLElement };

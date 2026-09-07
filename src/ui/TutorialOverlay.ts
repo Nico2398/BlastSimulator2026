@@ -156,18 +156,69 @@ export class TutorialOverlay {
     if (this._executingCommands) return;
     this.gameState = state;
 
+    if (this.shortCircuitOnDefeat()) return;
+
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (!step) return;
 
     if (step.isComplete(state, this.snapshots ?? {})) {
       this.advanceToNextStep();
-    } else {
-      this.refreshGuide();
+      return;
     }
+
+    // A command that didn't finish the step may still have unblocked queued
+    // work that only resolves on a tick -- delivering against a contract
+    // frees warehouse room so hauling can resume, for one (#959). Without
+    // releasing here, a step whose budget had already run out stays paused
+    // forever: the held clock stops tickCount from ever advancing again, so
+    // decideClock (tutorialGuide.ts) never gets a fresh tick to re-evaluate
+    // from and the world can never prove it isn't stuck. Scoped to
+    // waitsOnWork steps -- the ones whose completion genuinely depends on
+    // ticks resuming -- so a plain click-only step keeps holding as before.
+    if (step.waitsOnWork) {
+      this.rails.releaseClock(state);
+    }
+    this.refreshGuide();
   }
 
   private step(): { id: string; highlightTarget?: string; tickBudget?: number } {
     return TUTORIAL_STEPS[this.stepIndex] ?? { id: '' };
+  }
+
+  /**
+   * Tail of reaching the last (closing) step: show it for a fixed beat, then
+   * auto-dismiss the tutorial.
+   *
+   * Extracted from advanceToNextStep()'s own "reached last step" branch —
+   * behavior unchanged. Has a second call site in shortCircuitOnDefeat()
+   * (#959), which lands on the same closing step when state.levelEndReason
+   * reports a non-completed defeat mid-tutorial instead of only being
+   * reached by stepping through every step in order; the two share the
+   * "move onto a step" sequence itself via landOnStep(), below.
+   */
+  private jumpToLastStep(): void {
+    this.stopGuide();
+    this.clearAutoAdvance();
+    this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+  }
+
+  /**
+   * If the level just ended in anything but a win while an earlier step is
+   * still showing, jump straight to the closing card instead of hanging on
+   * a condition that can no longer be satisfied (#959) -- a bankruptcy mid
+   * 'sell-ore', say, leaves that step's own isComplete permanently false.
+   * Generic across every step (not sell-ore-specific): called from both the
+   * guide-tick and command-handling paths, mirroring the tail of
+   * advanceToNextStep() that already lands on this same last step normally.
+   */
+  private shortCircuitOnDefeat(): boolean {
+    const reason = this.gameState?.levelEndReason;
+    if (!reason || reason === 'completed') return false;
+    if (this.stepIndex >= LAST_STEP_INDEX) return false;
+
+    this.landOnStep(LAST_STEP_INDEX);
+    this.jumpToLastStep();
+    return true;
   }
 
   /** Move to the next step, or finish when the last one is already showing. */
@@ -179,26 +230,35 @@ export class TutorialOverlay {
       return;
     }
 
-    // From the first advance on, the simulation has to run: survey, drilling,
-    // hauling and contract delivery are queued work that only resolves on a tick.
+    this.landOnStep(this.stepIndex + 1, () => this.runAutoCommands());
+
+    if (this.stepIndex === LAST_STEP_INDEX) {
+      this.jumpToLastStep();
+    }
+  }
+
+  /**
+   * Shared tail of moving onto a given step: release the clock (from here on
+   * the simulation has to run: survey, drilling, hauling and contract
+   * delivery are queued work that only resolves on a tick), hide the paused
+   * chip, set the step index, run any caller-specific work that has to see
+   * the new index before the rails/render do (`advanceToNextStep`'s
+   * `runAutoCommands`), then re-arm the rails, snapshot the new step and
+   * re-render. Shared by `advanceToNextStep` and `shortCircuitOnDefeat` so
+   * the two ways of landing on a step can't drift apart from each other.
+   */
+  private landOnStep(index: number, afterIndexSet?: () => void): void {
     this.rails.releaseClock(this.gameState);
     this.pausedEl.style.display = 'none';
 
-    this.stepIndex++;
-    this.runAutoCommands();
+    this.stepIndex = index;
+    afterIndexSet?.();
 
     this.rails.beginStep(this.step(), this.gameState);
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
     this.render();
-
-    if (this.stepIndex === LAST_STEP_INDEX) {
-      // Congratulations: show for a fixed beat, then dismiss.
-      this.stopGuide();
-      this.clearAutoAdvance();
-      this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
-    }
   }
 
   /**
@@ -279,6 +339,8 @@ export class TutorialOverlay {
   private tickGuide(): void {
     if (!this._active || !this.gameState) return;
 
+    if (this.shortCircuitOnDefeat()) return;
+
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (step && step.isComplete(this.gameState, this.snapshots ?? {})) {
       this.advanceToNextStep();
@@ -307,8 +369,8 @@ export class TutorialOverlay {
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (!step) return;
 
-    this.titleEl.textContent = t(step.titleKey);
-    this.textEl.textContent = t(step.textKey);
+    this.titleEl.textContent = t(step.titleKeyFor && this.gameState ? step.titleKeyFor(this.gameState) : step.titleKey);
+    this.textEl.textContent = t(step.textKeyFor && this.gameState ? step.textKeyFor(this.gameState) : step.textKey);
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;

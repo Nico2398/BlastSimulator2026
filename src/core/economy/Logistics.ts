@@ -173,6 +173,28 @@ export function splitStoredFragmentMass(
 }
 
 /**
+ * Decrement `collectedOre` by the exact ore-kg carried in a just-sold
+ * fragment (`sellFragment`'s return shape). Shared by both branches of
+ * `consumeStoredOre` below — a materialId-specific sale and a rubble/no-ore
+ * sale both need `collectedOre` to reflect a fragment leaving storage the
+ * same way, they just differ in which fragments they pick to sell.
+ * Returns the per-ore breakdown so a caller that needs the amount of one
+ * specific ore removed (the materialId branch's own running tally) doesn't
+ * have to recompute it.
+ */
+function decrementCollectedOre(
+  collectedOre: Record<string, number>,
+  sold: { volume: number; oreDensities: Record<string, number> },
+): Record<string, number> {
+  const acc: Record<string, number> = {};
+  accumulateOreMass(acc, sold.volume, sold.oreDensities);
+  for (const [oreId, kg] of Object.entries(acc)) {
+    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+  }
+  return acc;
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
  * oldest-first, until the requested amount is covered: a fragment whose full
  * contribution the request still needs is removed whole (via sellFragment),
@@ -215,7 +237,6 @@ export function consumeStoredOre(
     let tally = 0;
     for (const id of storedIds) {
       if (tally >= amountKg) break;
-
       const tracked = findStoredFragment(state, id);
       if (!tracked) continue;
 
@@ -227,21 +248,13 @@ export function consumeStoredOre(
       if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
         const sold = sellFragment(state, id);
         if (!sold) continue;
-        const acc: Record<string, number> = {};
-        accumulateOreMass(acc, sold.volume, sold.oreDensities);
-        for (const [oreId, kg] of Object.entries(acc)) {
-          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
-        }
+        const acc = decrementCollectedOre(collectedOre, sold);
         tally += acc[materialId] ?? 0;
       } else {
         const massSlice = remaining * (tracked.fragment.mass / contribution);
         const split = splitStoredFragmentMass(state, id, massSlice);
         if (!split) continue;
-        const acc: Record<string, number> = {};
-        accumulateOreMass(acc, split.volume, split.oreDensities);
-        for (const [oreId, kg] of Object.entries(acc)) {
-          collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
-        }
+        decrementCollectedOre(collectedOre, split);
         tally += remaining;
         break;
       }
@@ -250,7 +263,12 @@ export function consumeStoredOre(
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
-  // Rubble / no-ore materials: consume raw stored mass, any fragment, FIFO.
+  // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
+  // fragments (no ore content at all) go first, oldest-first within each
+  // group, only reaching into ore-bearing fragments once barren stock runs
+  // out — a rubble contract pays cents per kg where an ore_sale pays
+  // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
+  // genuinely worthless waste would squander it for no reason (#959).
   const available = state.storedMassKg;
   if (amountKg > available) {
     return {
@@ -260,27 +278,39 @@ export function consumeStoredOre(
     };
   }
 
-  const storedIds = state.fragments
-    .filter(f => f.state === 'stored')
-    .map(f => f.fragment.id);
+  const stored = state.fragments.filter(f => f.state === 'stored');
+  const isBarren = (f: TrackedFragment) => (
+    Object.values(f.fragment.oreDensities).every(d => d <= 0)
+  );
+  const storedIds = [
+    ...stored.filter(isBarren).map(f => f.fragment.id),
+    ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),
+  ];
 
   let removedMass = 0;
   for (const id of storedIds) {
     if (removedMass >= amountKg) break;
-
     const tracked = findStoredFragment(state, id);
     if (!tracked) continue;
 
     const remaining = amountKg - removedMass;
     const contribution = tracked.fragment.mass;
 
+    // A rubble_disposal sale draws on every stored fragment regardless of ore
+    // content, so it can consume an ore-bearing fragment same as any other.
+    // Without decrementing collectedOre, the ledger stays stale — still
+    // showing ore that is physically gone — so a LATER ore_sale contract can
+    // be accepted against stock that no longer exists in storage, silently
+    // under-deliver, and expire for a penalty instead of completing (#959).
     if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
       const sold = sellFragment(state, id);
       if (!sold) continue;
+      decrementCollectedOre(collectedOre, sold);
       removedMass += sold.mass;
     } else {
       const split = splitStoredFragmentMass(state, id, remaining);
       if (!split) continue;
+      decrementCollectedOre(collectedOre, split);
       removedMass += remaining;
       break;
     }

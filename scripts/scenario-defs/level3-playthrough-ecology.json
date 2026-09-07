@@ -359,8 +359,8 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "holeCount": 4,
-          "orderedHoleCount": 16,
+          "holeCount": 5,
+          "orderedHoleCount": 15,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -383,55 +383,6 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "holeCount": 4,
-          "orderedHoleCount": 16,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 60,
-          "holeCount": 5,
-          "orderedHoleCount": 15,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 60,
           "holeCount": 5,
           "orderedHoleCount": 15,
           "deathCount": 0,
@@ -456,9 +407,58 @@
       "role": "setup",
       "expect": {
         "equals": {
+          "tickCount": 60,
+          "holeCount": 7,
+          "orderedHoleCount": 13,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 60,
+          "holeCount": 7,
+          "orderedHoleCount": 13,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "tickCount": 80,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "holeCount": 10,
+          "orderedHoleCount": 10,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -481,8 +481,8 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "holeCount": 10,
+          "orderedHoleCount": 10,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -506,8 +506,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 9,
-          "orderedHoleCount": 11,
+          "holeCount": 12,
+          "orderedHoleCount": 8,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -530,8 +530,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 9,
-          "orderedHoleCount": 11,
+          "holeCount": 12,
+          "orderedHoleCount": 8,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -555,104 +555,6 @@
       "expect": {
         "equals": {
           "tickCount": 120,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 120,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 140,
-          "holeCount": 13,
-          "orderedHoleCount": 7,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 140,
-          "holeCount": 13,
-          "orderedHoleCount": 7,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 160,
           "holeCount": 14,
           "orderedHoleCount": 6,
           "deathCount": 0,
@@ -676,7 +578,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 160,
+          "tickCount": 120,
           "holeCount": 14,
           "orderedHoleCount": 6,
           "deathCount": 0,
@@ -701,9 +603,107 @@
       "role": "setup",
       "expect": {
         "equals": {
+          "tickCount": 140,
+          "holeCount": 18,
+          "orderedHoleCount": 2,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 140,
+          "holeCount": 18,
+          "orderedHoleCount": 2,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 160,
+          "holeCount": 19,
+          "orderedHoleCount": 1,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 160,
+          "holeCount": 19,
+          "orderedHoleCount": 1,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "tickCount": 180,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -726,8 +726,8 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -751,8 +751,8 @@
       "expect": {
         "equals": {
           "tickCount": 200,
-          "holeCount": 17,
-          "orderedHoleCount": 3,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -775,8 +775,8 @@
       "expect": {
         "equals": {
           "tickCount": 200,
-          "holeCount": 17,
-          "orderedHoleCount": 3,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -1530,7 +1530,7 @@
           "employeeCount": 12,
           "wellBeing": 3.299166666666658,
           "safety": 50.600000000000136,
-          "ecology": 29.53,
+          "ecology": 29.58,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1712,7 +1712,7 @@
           "employeeCount": 12,
           "wellBeing": 3.299166666666658,
           "safety": 50.600000000000136,
-          "ecology": 29.53,
+          "ecology": 29.58,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1763,7 +1763,7 @@
           "employeeCount": 12,
           "wellBeing": 4.299166666666655,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 30.580000000000013,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1808,7 +1808,7 @@
           "employeeCount": 12,
           "wellBeing": 4.299166666666655,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 30.580000000000013,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1832,7 +1832,7 @@
           "employeeCount": 12,
           "wellBeing": 4.299166666666655,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 30.580000000000013,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null,

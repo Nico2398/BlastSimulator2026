@@ -20,7 +20,7 @@ import { getLevel, getAllLevels } from '../../core/campaign/Level.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { GameState } from '../../core/state/GameState.js';
 
-type DefeatReason = Exclude<NonNullable<GameState['levelEndReason']>, 'completed'>;
+export type DefeatReason = Exclude<NonNullable<GameState['levelEndReason']>, 'completed'>;
 
 /**
  * Every defeat cause shares the same critical-red identity (design: uniform

@@ -329,47 +329,68 @@ describe('consumeStoredOre', () => {
     expect(collectedOre.oreL).toBe(200);
   });
 
-  it('rubble (materialId "") consumes raw stored mass regardless of ore content, ignoring collectedOre', () => {
+  it('rubble (materialId "") prefers barren fragments, leaving ore-bearing stock and collectedOre untouched when barren stock alone covers the request', () => {
     const state = createLogisticsState();
-    // One ore-bearing fragment, one barren fragment — rubble disposal doesn't care.
+    // One ore-bearing fragment, one barren fragment — a rubble contract pays
+    // cents per kg where an ore_sale pays dollars, so disposal reaches for
+    // genuinely worthless waste before it ever touches ore-bearing rock
+    // (#959: FIFO-over-everything let a rubble sale scrap ore a same-tick
+    // ore_sale contract could have sold for real money instead).
     const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
     const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
     putInStorage(state, oreFrag);
     putInStorage(state, barrenFrag);
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const collectedOreBefore = { ...collectedOre };
 
-    // 300kg < the oldest fragment's own 500kg — this must be a PARTIAL split
-    // of the oldest fragment only, not a full sellFragment that destroys its
-    // 200kg surplus (issue #973's bug: a small request used to consume an
-    // entire oversized fragment).
+    // 300kg — exactly the barren fragment's own mass, so barren stock alone
+    // covers it and the ore-bearing fragment is never reached.
     const result = consumeStoredOre(state, collectedOre, '', 300);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(300);
-    // collectedOre must be completely untouched by a rubble disposal.
-    expect(collectedOre).toEqual(collectedOreBefore);
-    // Exactly 300kg removed overall...
+    // The barren fragment alone covered the request — ore-bearing stock is
+    // untouched, so collectedOre stays exactly as it was.
+    expect(collectedOre.oreE).toBe(100);
     expect(state.storedMassKg).toBe(500);
-    // ...taken entirely from the oldest fragment, which survives with its
-    // 200kg surplus intact rather than being destroyed whole.
-    const oldest = state.fragments.find(f => f.fragment.id === 1);
-    expect(oldest).toBeDefined();
-    expect(oldest!.state).toBe('stored');
-    expect(oldest!.fragment.mass).toBe(200);
-    // The newer fragment is completely untouched.
-    const newer = state.fragments.find(f => f.fragment.id === 2);
-    expect(newer).toBeDefined();
-    expect(newer!.fragment.mass).toBe(300);
-    // Nothing was fully removed — both fragments remain in storage.
-    expect(getFragmentCounts(state).stored).toBe(2);
+    // The ore-bearing fragment survives whole.
+    const oreTracked = state.fragments.find(f => f.fragment.id === 1);
+    expect(oreTracked).toBeDefined();
+    expect(oreTracked!.fragment.mass).toBe(500);
+    expect(getFragmentCounts(state).stored).toBe(1);
+  });
+
+  it('rubble (materialId "") reaches into ore-bearing fragments once barren stock runs out, splitting them and decrementing collectedOre for the ore it removes', () => {
+    const state = createLogisticsState();
+    const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
+    const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
+    putInStorage(state, oreFrag);
+    putInStorage(state, barrenFrag);
+    const collectedOre: Record<string, number> = { oreE: 100 };
+
+    // Barren stock (300kg) alone can't cover this — the remaining 200kg comes
+    // out of the ore-bearing fragment, split rather than scrapped whole
+    // (#973), and the ore that leaves with it is struck off collectedOre so
+    // the ledger can't overstate what is physically in storage (#959).
+    const result = consumeStoredOre(state, collectedOre, '', 500);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBe(500);
+    // 200kg of the ore fragment's 500kg left storage — 40% of its 100kg oreE.
+    expect(collectedOre.oreE).toBeCloseTo(60, 9);
+    expect(state.storedMassKg).toBe(300);
+    const remainder = state.fragments.find(f => f.fragment.id === 1);
+    expect(remainder).toBeDefined();
+    expect(remainder!.state).toBe('stored');
+    expect(remainder!.fragment.mass).toBe(300);
+    expect(state.fragments.find(f => f.fragment.id === 2)).toBeUndefined();
+    expect(getFragmentCounts(state).stored).toBe(1);
   });
 
   it('rubble: two sequential small deliveries against a single oversized fragment both succeed via partial splits (issue #973 regression)', () => {
     const state = createLogisticsState();
     // Mirrors the actual reported bug shape: a single large stored fragment,
     // then a 100kg delivery followed by a 40kg delivery one step later.
-    const frag = makeStoredFragment(1, 795.75, 0.3183, {}); // barren — rubble ignores ore anyway
+    const frag = makeStoredFragment(1, 795.75, 0.3183, {}); // barren — disposal reaches for waste first
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
 
@@ -445,20 +466,20 @@ describe('consumeStoredOre', () => {
     expect(state.storedMassKg).toBe(200);
   });
 
-  it('rubble: a partial split leaves a fragment\'s ore content completely untouched', () => {
+  it('rubble: a partial split of an ore-bearing fragment decrements collectedOre by the ore that physically left storage', () => {
     const state = createLogisticsState();
-    // Fragment carries real ore, but rubble disposal must ignore it entirely.
+    // The only stored fragment carries real ore, so disposal has no barren
+    // stock to prefer and must split this one.
     const frag = makeStoredFragment(1, 500, 0.04, { oreX: 1.0 }); // 100kg oreX
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreX: 100 };
-    const collectedOreBefore = { ...collectedOre };
 
     const result = consumeStoredOre(state, collectedOre, '', 200);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(200);
-    // collectedOre is completely unaffected by a rubble request, partial or not.
-    expect(collectedOre).toEqual(collectedOreBefore);
+    // 200kg of 500kg left storage — with it, 40% of the fragment's oreX.
+    expect(collectedOre.oreX).toBeCloseTo(60, 9);
     const tracked = state.fragments.find(f => f.fragment.id === 1);
     expect(tracked).toBeDefined();
     expect(tracked!.fragment.mass).toBe(300);

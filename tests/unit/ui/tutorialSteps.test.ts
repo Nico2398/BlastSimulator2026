@@ -136,7 +136,10 @@ describe('tutorialSteps', () => {
       // forward.
       'contract-accept',
       'haul-debris',
-      'contract-deliver',
+      // #959: replaces 'contract-deliver' -- the tutorial never actually
+      // hauled and sold the blasted ore for money, so a player following it
+      // to the letter finished with negative cash.
+      'sell-ore',
       'finances',
       'needs',
       'set-policy',
@@ -435,7 +438,7 @@ describe('tutorialSteps', () => {
       'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
-      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'contract-deliver',
+      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'sell-ore',
       'finances', 'box-cut', 'needs', 'tick-advance',
       // #923
       'speed-up-for-dig', 'speed-normal-after-dig',
@@ -592,12 +595,12 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned after build-storage/contract-accept and before contract-deliver', () => {
+    it('exists, positioned after build-storage/contract-accept and before sell-ore', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const acceptIdx = ids.indexOf('contract-accept');
       const haulIdx = ids.indexOf('haul-debris');
-      const deliverIdx = ids.indexOf('contract-deliver');
+      const sellOreIdx = ids.indexOf('sell-ore');
       expect(haulIdx).toBeGreaterThan(-1);
       // #556/#817: contract-accept sits between build-storage and this step
       // now — a contract's deadline starts at acceptance, and ordering the
@@ -605,7 +608,8 @@ describe('tutorialSteps', () => {
       // deadline watching a construction site.
       expect(acceptIdx).toBe(buildIdx + 1);
       expect(haulIdx).toBe(acceptIdx + 1);
-      expect(deliverIdx).toBe(haulIdx + 1);
+      // #959: 'sell-ore' replaces the old 'contract-deliver' step here.
+      expect(sellOreIdx).toBe(haulIdx + 1);
     });
 
     it('completes when storedMassKg increases past the value captured when the step opened', () => {
@@ -653,6 +657,111 @@ describe('tutorialSteps', () => {
     });
   });
 
+  // ── sell-ore (#959) ──────────────────────────────────────────────────────
+  // Replaces the old contract-deliver step: the tutorial never actually
+  // hauled and sold the blasted ore for money, so a player following it to
+  // the letter finished with negative cash even on a technical "win". The
+  // step is repeatable — a tier-1 freight_warehouse only holds 2000kg, so
+  // more than one accept-and-deliver cycle is expected, not a bug.
+  //
+  // isComplete's real contract (design decision this test pins for the
+  // implementer): complete once at least one ore_sale contract has been
+  // fully delivered SINCE the step opened — read off
+  // state.contracts.completedHistory, the same ledger deliverMaterials
+  // (Contract.ts) already pushes a contract onto the instant it completes.
+  // Snapshot-gated the same way createHireStep/haul-debris are: an ore_sale
+  // contract completed BEFORE this step opened must not retroactively
+  // satisfy it.
+  describe('sell-ore step (#959)', () => {
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'sell-ore')!;
+
+    it('exists', () => {
+      expect(step).toBeDefined();
+    });
+
+    it('has a Contracts-toolbar highlightTarget', () => {
+      expect(step.highlightTarget).toBe('#bs-toolbar [data-panel="contracts"]');
+    });
+
+    it('waits on work and is given a tick allowance — hauling and delivering are queued, real work', () => {
+      expect(step.waitsOnWork).toBe(true);
+      expect(step.tickBudget ?? 0).toBeGreaterThan(0);
+    });
+
+    it('has a captureSnapshot, so a contract completed before the step opened cannot retroactively satisfy it', () => {
+      expect(step.captureSnapshot).toBeDefined();
+    });
+
+    it('does not complete when nothing has ever been delivered', () => {
+      const state = { contracts: { completedHistory: [] } } as unknown as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+      expect(step.isComplete(state, snapshot)).toBe(false);
+    });
+
+    it('completes once an ore_sale contract is completed after the step opened', () => {
+      const before = { contracts: { completedHistory: [] } } as unknown as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(before) : {};
+      const after = {
+        contracts: {
+          completedHistory: [
+            { id: 1, type: 'ore_sale', materialId: 'dirtite', completed: true },
+          ],
+        },
+      } as unknown as GameState;
+      expect(step.isComplete(after, snapshot)).toBe(true);
+    });
+
+    it('does not complete on a rubble_disposal or supply contract alone — the objective is selling ORE', () => {
+      const before = { contracts: { completedHistory: [] } } as unknown as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(before) : {};
+      const after = {
+        contracts: {
+          completedHistory: [
+            { id: 1, type: 'rubble_disposal', materialId: '', completed: true },
+            { id: 2, type: 'supply', materialId: 'dirtite', completed: true },
+          ],
+        },
+      } as unknown as GameState;
+      expect(step.isComplete(after, snapshot)).toBe(false);
+    });
+
+    it('does not complete on an ore_sale contract that was already completed before the step opened', () => {
+      const before = {
+        contracts: {
+          completedHistory: [
+            { id: 1, type: 'ore_sale', materialId: 'dirtite', completed: true },
+          ],
+        },
+      } as unknown as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(before) : {};
+      // Nothing NEW happened since the snapshot — still just the one
+      // pre-existing completed ore_sale contract.
+      expect(step.isComplete(before, snapshot)).toBe(false);
+    });
+
+    it('is repeatable — completing a second ore_sale contract after the first also satisfies it (not capped at exactly one)', () => {
+      const before = { contracts: { completedHistory: [] } } as unknown as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(before) : {};
+      const afterTwo = {
+        contracts: {
+          completedHistory: [
+            { id: 1, type: 'ore_sale', materialId: 'dirtite', completed: true },
+            { id: 2, type: 'ore_sale', materialId: 'rustite', completed: true },
+          ],
+        },
+      } as unknown as GameState;
+      expect(step.isComplete(afterTwo, snapshot)).toBe(true);
+    });
+
+    it('does not throw against a minimal state with no contracts field at all', () => {
+      const state = {} as unknown as GameState;
+      expect(() => {
+        const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+        step.isComplete(state, snapshot);
+      }).not.toThrow();
+    });
+  });
+
   // ── Steps whose completion the simulation owns ───────────────────────────
   describe('steps that finish only once the simulation runs', () => {
     // decideClock holds the clock for good once a step's tick allowance is
@@ -666,7 +775,9 @@ describe('tutorialSteps', () => {
     // (VehicleReservation/ArrivalGate), so these three steps complete
     // synchronously on the purchase itself and no longer need to wait on the
     // simulation to run a driver's walk-and-board.
-    const SIMULATION_OWNED = ['survey', 'train-driller', 'train-digger', 'haul-debris', 'contract-deliver', 'evacuate-zone'];
+    // #959: 'sell-ore' replaces 'contract-deliver' here — haul+sell cycles
+    // are queued, real work the same way delivering to a contract always was.
+    const SIMULATION_OWNED = ['survey', 'train-driller', 'train-digger', 'haul-debris', 'sell-ore', 'evacuate-zone'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {
