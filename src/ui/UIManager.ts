@@ -96,7 +96,9 @@ export class UIManager {
     container.appendChild(leftCol);
     container.appendChild(rightCol);
 
-    // Shell
+    // Shell — each of these self-registers its on-screen bounds with
+    // shellLayoutRegistry (src/ui/shell/LayoutRegistry.ts, #956) on
+    // construction, and unregisters on dispose().
     this.topBar = new TopBar(container);
     this.toolRail = new ToolRail(container, (panel) => this.togglePanel(panel));
     this.toasts = new Toasts(container);

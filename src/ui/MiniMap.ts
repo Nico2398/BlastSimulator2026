@@ -24,8 +24,25 @@ import {
 } from './miniMapLayers.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid } from '../core/nav/NavGrid.js';
+import { shellLayoutRegistry, type Viewport, type Rect } from './shell/LayoutRegistry.js';
+import { MINIMAP_WIDTH_PX, MINIMAP_HEIGHT_PX, MINIMAP_EDGE_OFFSET_PX } from './tokens.js';
 
 const LEGEND_HEIGHT = 16;
+
+/**
+ * Bottom-right corner panel (#983). Fixed size in both axes — see the
+ * MINIMAP_* tokens for why the width is pinned rather than content-driven —
+ * so the ToolRail can reserve the strip and the matrix test can prove they
+ * never collide.
+ */
+function miniMapBounds(viewport: Viewport): Rect {
+  return {
+    x: viewport.width - MINIMAP_EDGE_OFFSET_PX - MINIMAP_WIDTH_PX,
+    y: viewport.height - MINIMAP_EDGE_OFFSET_PX - MINIMAP_HEIGHT_PX,
+    width: MINIMAP_WIDTH_PX,
+    height: MINIMAP_HEIGHT_PX,
+  };
+}
 
 export class MiniMap {
   private readonly el: HTMLElement;
@@ -44,7 +61,14 @@ export class MiniMap {
     this.el = document.createElement('div');
     this.el.id = 'bs-minimap';
     this.el.classList.add('bs-ui', 'bs-panel', 'bsx-root');
-    this.el.style.cssText = 'padding:0;width:fit-content;overflow:hidden;border-radius:var(--bsx-r-card);background:rgba(16,20,26,.95)';
+    // Placement lives here rather than in styles.ts's `#bs-minimap` rule so
+    // the painted box and the declared region (miniMapBounds above) read the
+    // same constants.
+    this.el.style.cssText = [
+      'position:fixed', `right:${MINIMAP_EDGE_OFFSET_PX}px`, `bottom:${MINIMAP_EDGE_OFFSET_PX}px`,
+      `width:${MINIMAP_WIDTH_PX}px`, 'padding:0', 'overflow:hidden',
+      'border-radius:var(--bsx-r-card)', 'background:rgba(16,20,26,.95)',
+    ].join(';');
 
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:7px;height:26px;padding:0 8px;border-bottom:1px solid var(--bsx-hairline)';
@@ -97,6 +121,8 @@ export class MiniMap {
     this.ctx2d = this.canvas.getContext('2d')!;
     this.el.append(header, this.canvas, legend);
     container.appendChild(this.el);
+
+    shellLayoutRegistry.register({ id: 'minimap', layer: 'hud', bounds: miniMapBounds });
     this.syncLayerButton(navBtn);
   }
 
@@ -202,7 +228,10 @@ export class MiniMap {
     }
   }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void {
+    this.el.remove();
+    shellLayoutRegistry.unregister('minimap');
+  }
 
   get navGridVisible(): boolean { return this._navGridVisible; }
 

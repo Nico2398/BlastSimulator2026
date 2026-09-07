@@ -387,7 +387,8 @@ const CSS = `
 .bs-ore-bar-fill { height: 100%; border-radius: 3px; background: #ffc840; }
 
 /* ─── Mini-map (bottom-right) ─── */
-#bs-minimap { bottom: 10px; right: 10px; width: fit-content; }
+/* Placement and size are set inline in MiniMap.ts, from the MINIMAP_* tokens
+   its declared layout region also reads (#983). */
 #bs-minimap-canvas { display: block; cursor: crosshair; background: #141e10; border-radius: 4px; }
 
 /* ─── Notification toast ─── */
