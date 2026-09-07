@@ -533,26 +533,6 @@
       }
     },
     {
-      "command": "drill_plan remove hole:H8",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
-        }
-      ],
-      "role": "player",
-      "description": "#959 fixer pass: H8 has already landed by this point (re-verified) -- an unrelated upstream vehicle-continuity fix changed drilling order enough that H8 is one of the 5 already-drilled holes rather than one of the 11 still-ordered ones, so removing it now decreases `holeCount` (a real landed hole torn out), not `orderedHoleCount` (nothing left un-landed to cancel).",
-      "expect": {
-        "decreased": [
-          "holeCount"
-        ]
-      }
-    },
-    {
       "command": "drill_plan remove hole:H9",
       "interaction": [
         {
@@ -701,10 +681,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 4
+          "holeCount": 5
         }
       },
-      "description": "Last of the 12 cancellations -- drill plan now holds exactly the 4 already-landed holes and nothing more, matching this file's original, deliberately-truncated pattern."
+      "description": "Last of the 12 cancellations -- drill plan now holds exactly the 4 already-landed holes and nothing more, matching this file's original, deliberately-truncated pattern. #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -738,7 +718,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. `charge-all` only ever reaches the 4 already-drilled holes -- the 12 still-ordered ones are not chargeable yet, matching chargedCount below.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. `charge-all` only ever reaches the 4 already-drilled holes -- the 12 still-ordered ones are not chargeable yet, matching chargedCount below. #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern.",
       "role": "player",
       "expect": {
         "increased": [
@@ -749,7 +729,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
       "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -770,7 +750,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 4,
+          "chargedCount": 5,
           "orderedChargeCount": 0
         }
       }
@@ -798,10 +778,10 @@
         }
       ],
       "role": "player",
-      "description": "This value already matches the Sequence panel's own 25ms default (Sequence.ts DEFAULT_DELAY_STEP_MS) -- 0 stepper clicks needed, asserted rather than assumed (Finding #75).",
+      "description": "This value already matches the Sequence panel's own 25ms default (Sequence.ts DEFAULT_DELAY_STEP_MS) -- 0 stepper clicks needed, asserted rather than assumed (Finding #75). #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern.",
       "expect": {
         "equals": {
-          "sequencedCount": 4
+          "sequencedCount": 5
         }
       }
     },

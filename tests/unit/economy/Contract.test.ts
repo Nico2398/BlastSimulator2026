@@ -61,6 +61,28 @@ describe('Contract system', () => {
       expect(explicit.available).toEqual(baseline.available);
     });
 
+    it('leaves the missed-deadline penalty on the unmultiplied base price, while the early-delivery bonus scales (#959)', () => {
+      const baseline = createContractState();
+      generateContracts(baseline, new Random(42), 0);
+
+      const multiplied = createContractState();
+      generateContracts(multiplied, new Random(42), 0, 16);
+
+      expect(multiplied.available.length).toBe(baseline.available.length);
+      for (let i = 0; i < baseline.available.length; i++) {
+        const base = baseline.available[i]!;
+        const scaled = multiplied.available[i]!;
+        // The fine for missing a deadline is what the buyer is owed, not a bet
+        // scaled by the lever a level pulls to make its own economy closeable:
+        // tutorial_pit runs at 16.0 precisely because it cannot be won at
+        // market rate, and a 16x fine on one unfillable contract would end the
+        // level the tutorial exists to teach.
+        expect(scaled.penaltyAmount).toBe(base.penaltyAmount);
+        // The bonus rides on the price, so it does scale.
+        expect(scaled.earlyBonus).toBe(Math.round(base.quantityKg * base.pricePerKg * 16 * 0.15));
+      }
+    });
+
     it('a sub-1 multiplier (a tight, lowball market) scales prices down, not just up', () => {
       const baseline = createContractState();
       generateContracts(baseline, new Random(42), 0);

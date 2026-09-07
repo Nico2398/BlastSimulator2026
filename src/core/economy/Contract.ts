@@ -142,11 +142,21 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
     description = `Supply ${materialId} (bulk)`;
   }
 
+  // The level's multiplier is what its market PAYS for delivered material, so
+  // it scales the price and the early-delivery bonus that rides on it. The
+  // missed-deadline penalty is deliberately left on the unmultiplied base
+  // (#959): a level raises this lever precisely because its own economy is too
+  // narrow to be closed at market rate, and scaling the fine with it makes one
+  // mis-accepted contract an instant unrecoverable loss on exactly the levels
+  // least able to absorb it — tutorial_pit runs at 16.0, where a single
+  // 500kg gloomium contract nobody can fill would fine a $340,000 mine
+  // $250,000 for the mistake the tutorial exists to let a player make.
+  const basePricePerKg = pricePerKg;
   pricePerKg *= priceMultiplier;
 
   const quantityKg = Math.round(rng.nextFloat(50, 500) / 10) * 10;
   const deadlineTicks = rng.nextInt(30, 100);
-  const penaltyAmount = Math.round(quantityKg * pricePerKg * 0.3);
+  const penaltyAmount = Math.round(quantityKg * basePricePerKg * 0.3);
   const earlyBonus = Math.round(quantityKg * pricePerKg * 0.15);
 
   const id = state.nextId++;
