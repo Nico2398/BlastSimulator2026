@@ -568,12 +568,32 @@ describe('reserveOnePoolActionAhead', () => {
     expect(result.claimed).toEqual([]);
   });
 
-  it('does not reserve ahead a pool candidate whose requiredVehicleRole differs from the busy driver\'s active vehicle-gated action role (#1000)', () => {
+  it('does not reserve ahead an on-foot (requiredVehicleRole: null) pool candidate while busy on a vehicle-gated action (#1000)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const active = pushActive(state, employee.id, 1);
+    active.requiredVehicleRole = 'drill_rig';
+    employee.activeActionId = active.id;
+
+    const poolAction = makeAction({ id: 2, targetX: 1, targetZ: 1, requiredVehicleRole: null });
+    state.pendingActions.push(poolAction);
+    const result = makeResult();
+
+    reserveOnePoolActionAhead(state, employee, result);
+
+    expect(employee.taskQueue).toEqual([]);
+    expect(result.claimed).toEqual([]);
+    expect(poolAction.status).toBe('queued');
+  });
+
+  it('DOES reserve ahead a pool candidate of a DIFFERENT vehicle role the busy driver also holds a licence for (#1000-followup): a mismatched-role reservation is still redeemable via the ordinary idle path once the employee holds that role\'s own licence', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-    purchaseVehicle(state.vehicles, 'debris_hauler', 1, 1); // free, licensed, but the WRONG role
+    purchaseVehicle(state.vehicles, 'debris_hauler', 1, 1); // free, and this driver IS licensed for it
 
     const active = pushActive(state, employee.id, 1);
     active.requiredVehicleRole = 'drill_rig';
@@ -585,9 +605,9 @@ describe('reserveOnePoolActionAhead', () => {
 
     reserveOnePoolActionAhead(state, employee, result);
 
-    expect(employee.taskQueue).toEqual([]);
-    expect(result.claimed).toEqual([]);
-    expect(poolAction.status).toBe('queued');
+    expect(employee.taskQueue).toContain(2);
+    expect(result.claimed).toContain(2);
+    expect(poolAction.status).toBe('assigned');
   });
 });
 
