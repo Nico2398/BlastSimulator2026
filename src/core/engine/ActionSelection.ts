@@ -12,13 +12,14 @@ import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
+import { isEvacuationHoldActive } from './Evacuation.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -328,6 +329,49 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 
   const previous = ramp.segments.find(s => s.index === segmentIndex - 1);
   return previous?.done === true;
+}
+
+/**
+ * The three-clause "is this queued action open to `employee`" check shared
+ * by `findStarvedActionForEmployee` below and VehicleContinuity.ts's
+ * `tryContinueVehicleGatedAction` (its `poolFollowUps` filter): still
+ * `queued`, untargeted or targeted at `employee`, and `employee` holds
+ * `requiredSkill` when one is set. Each caller layers its own extra clauses
+ * on top (vehicle role, evacuation hold, claimability, staleness threshold)
+ * — this helper knows about none of them, so a caller's clause can change
+ * without touching the other's.
+ */
+export function isQueuedActionAvailableToEmployee(employee: Employee, action: PendingAction): boolean {
+  return action.status === 'queued' &&
+    (action.targetEmployeeId === null || action.targetEmployeeId === employee.id) &&
+    (action.requiredSkill === null || employee.qualifications.some(q => q.category === action.requiredSkill));
+}
+
+/**
+ * Finds a queued, unclaimed, `requiredVehicleRole === null` action that has
+ * been waiting at least `ACTION_STARVATION_TICK_THRESHOLD` ticks and is
+ * claimable by `employee` — called from VehicleContinuity.ts's
+ * `completeVehicleGatedActionIfApplicable`, before it would otherwise invoke
+ * `tryContinueVehicleGatedAction`, so a long-starved on-foot action can win
+ * dispatch over the same-role vehicle continuity fast path (#1000).
+ *
+ * Excludes an action under an active evacuation hold (`isEvacuationHoldActive`,
+ * Evacuation.ts) exactly like the other two claim-eligibility filters
+ * (`claimOnePoolCandidate`, `claimActionsTargetedAtEmployee` in
+ * EmployeeDispatchSteps.ts) — `evacuateZone` stamps the hold on every queued
+ * action inside an evacuated zone regardless of `requiredVehicleRole`, so an
+ * on-foot action can be held exactly as often as a vehicle-gated one, and
+ * force-assigning a held one here would send `employee` back into a
+ * still-dangerous zone.
+ */
+export function findStarvedActionForEmployee(state: GameState, employee: Employee): SelectedAction | null {
+  const candidates = state.pendingActions.filter(a =>
+    isQueuedActionAvailableToEmployee(employee, a) &&
+    a.requiredVehicleRole === null &&
+    !isEvacuationHoldActive(state, a) &&
+    state.tickCount - (a.queuedAtTick ?? state.tickCount) >= ACTION_STARVATION_TICK_THRESHOLD);
+
+  return selectBestActionForEmployee(state, employee, candidates);
 }
 
 export function selectBestActionForEmployee(

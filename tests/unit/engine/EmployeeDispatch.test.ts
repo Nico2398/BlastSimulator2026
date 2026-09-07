@@ -12,8 +12,9 @@ import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
 import { completePendingAction, dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
-import { tryContinueVehicleGatedAction } from '../../../src/core/engine/VehicleContinuity.js';
+import { tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../../src/core/engine/VehicleContinuity.js';
 import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
+import { EVACUATION_HOLD_KEY } from '../../../src/core/engine/Evacuation.js';
 import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
@@ -27,6 +28,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities
 import {
   BASE_TASK_DURATION_TICKS,
   MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
+  ACTION_STARVATION_TICK_THRESHOLD,
 } from '../../../src/core/config/balance.js';
 
 /**
@@ -874,6 +876,180 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
 
     expect(employee.activeActionId).toBe(drillAction.id);
     expect(state.pendingActions.find(a => a.id === drillAction.id)!.holderId).toBe(employee.id);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1000 — a long-starved on-foot action (requiredVehicleRole: null) must win
+// dispatch over tryContinueVehicleGatedAction's same-role vehicle-continuity
+// fast path, so a deep same-role backlog (e.g. haul_debris) can never starve
+// out an unclaimed place_building/survey/demolish_building order forever.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('completeVehicleGatedActionIfApplicable — starved on-foot action interrupt (#1000)', () => {
+  const SEED = 42;
+  const STARVED_AT_TICK = 1000;
+
+  function makeFlatNavGrid(width: number, height: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(width, height, cells);
+  }
+
+  /** Block an entire column (every row) — an impassable vertical wall at world x. */
+  function blockColumn(grid: NavGrid, x: number): void {
+    for (let z = 0; z < grid.height; z++) {
+      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+  }
+
+  /**
+   * A driver mid-vehicle-chain on a debris_hauler, having just finished
+   * `completedAction` (id 1): a same-role backlog action (id 2, open,
+   * reachable, no skill required) and an on-foot starved candidate (id 3,
+   * queued, unclaimed, no skill/target-employee restriction, queuedAtTick set
+   * exactly at ACTION_STARVATION_TICK_THRESHOLD) both sit in the pool. Each
+   * test below mutates the returned pieces to probe one boundary of
+   * findStarvedActionForEmployee's filter.
+   */
+  function makeFixture() {
+    const state = createGame({ seed: SEED });
+    state.tickCount = STARVED_AT_TICK;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.driverId = employee.id;
+
+    const completedAction: PendingAction = {
+      id: 1,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: employee.id,
+    };
+    vehicle.reservedForActionId = completedAction.id;
+    employee.activeActionId = completedAction.id;
+
+    const sameRoleBacklog: PendingAction = {
+      id: 2,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 2, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+    };
+
+    const starvedCandidate: PendingAction = {
+      id: 3,
+      type: 'place_building',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 4, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: STARVED_AT_TICK - ACTION_STARVATION_TICK_THRESHOLD,
+    };
+
+    state.pendingActions.push(completedAction, sameRoleBacklog, starvedCandidate);
+
+    return { state, employee, vehicle, completedAction, sameRoleBacklog, starvedCandidate };
+  }
+
+  it('a long-starved unclaimed on-foot action wins dispatch over same-role vehicle continuity', () => {
+    const { state, employee, vehicle, sameRoleBacklog, starvedCandidate } = makeFixture();
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(starvedCandidate.id);
+    const landedStarved = state.pendingActions.find(a => a.id === starvedCandidate.id)!;
+    expect(landedStarved.status).toBe('assigned');
+    expect(landedStarved.holderId).toBe(employee.id);
+
+    // The employee dismounts — the vehicle is fully released, not carried
+    // over onto the starved (on-foot) action.
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBeNull();
+
+    // The same-role backlog candidate that lost out stays open for someone
+    // else — it must not be silently claimed or discarded.
+    expect(state.pendingActions.find(a => a.id === sameRoleBacklog.id)!.status).toBe('queued');
+  });
+
+  it('one tick short of the starvation threshold, same-role vehicle continuity proceeds normally', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    starvedCandidate.queuedAtTick = STARVED_AT_TICK - (ACTION_STARVATION_TICK_THRESHOLD - 1);
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === sameRoleBacklog.id)!.status).toBe('assigned');
+
+    const untouchedStarved = state.pendingActions.find(a => a.id === starvedCandidate.id)!;
+    expect(untouchedStarved.status).toBe('queued');
+    expect(untouchedStarved.holderId).toBeNull();
+  });
+
+  it('a starved candidate the employee is not qualified for is skipped — same-role continuity proceeds as if it did not exist', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    starvedCandidate.requiredSkill = 'geology'; // employee (a hauler driver) holds no geology qualification
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
+  });
+
+  it('an unreachable starved candidate is skipped — same-role continuity proceeds normally', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    const grid = makeFlatNavGrid(30, 5);
+    blockColumn(grid, 10); // isolates x=25 (the starved candidate's target) from x=0 (employee/vehicle)
+    state.navGrid = grid;
+    starvedCandidate.targetX = 25;
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
+  });
+
+  it('a starved candidate targeted at a different employee is never force-assigned to this one, even past threshold', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    starvedCandidate.targetEmployeeId = employee.id + 9999; // some other employee's id
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
+  });
+
+  it('falls through to normal continuity when the starved candidate\'s evacuation hold is active (#1000 review)', () => {
+    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
+    // Employee's own position (0,0) sits inside the active zone, so
+    // isEvacuationHoldActive reads the zone as still occupied.
+    state.zone.activeZone = { x1: 0, z1: 0, x2: 5, z2: 5 };
+    starvedCandidate.payload = { [EVACUATION_HOLD_KEY]: true };
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
   });
 });
 

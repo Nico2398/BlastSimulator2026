@@ -13,7 +13,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, type SelectedAction,
+  isRampSegmentClaimable, findStarvedActionForEmployee, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
@@ -147,6 +147,31 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
     }
   }
 
+  // #1000 (CI follow-up): a queued on-foot action starved past
+  // ACTION_STARVATION_TICK_THRESHOLD wins the open pool outright, ahead of
+  // any cheaper candidate claimOnePoolCandidate's cost ranking would pick.
+  // Ranking alone never rescues it — an idle employee standing in a debris
+  // field of hundreds of nearer haul/fragment actions re-picks one of those
+  // every tick indefinitely, so an ordered building on the far side of the
+  // pit stays unbuilt even while somebody is free to walk to it right now.
+  // VehicleContinuity.ts's own starvation gate does not cover this: it fires
+  // only when a driver *completes* a vehicle-gated action, and an employee
+  // who never completes one — churning on a claim that keeps failing, or
+  // idle between rests — never passes through it at all. Direct-traced via
+  // rock-fragmenter-breaking.json in interaction mode: both `place_building`
+  // orders sat 'queued' and fully claimable (reachable, no required skill,
+  // no vehicle needed) for 3,000 ticks while the one idle driver re-selected
+  // the same haul_debris action on every one of them.
+  const starved = findStarvedActionForEmployee(state, employee);
+  if (starved !== null) {
+    const claimedStarved = claimPendingAction(state, starved.action.id, employee.id);
+    if (claimedStarved !== null) {
+      result.claimed.push(claimedStarved.id);
+      promoteActionToActive(state, employee, claimedStarved);
+      return;
+    }
+  }
+
   const selection = claimOnePoolCandidate(state, employee);
   if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
 
@@ -183,11 +208,48 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * reachability check; that budget is spent entirely on resolveActionCost —
  * generalizes to any action type whose claim can fail this gate, not just
  * haul/fragment ones.
+ *
+ * `excludeOnFootActions` (#1000, corrected by #1000-followup — see
+ * reserveOnePoolActionAhead's own doc comment): when true, a
+ * `requiredVehicleRole === null` candidate is never considered. Without it, a
+ * busy driver could reserve-ahead an on-foot action (e.g. a `place_building`
+ * order) into taskQueue, where it can never be redeemed by the same-tick
+ * continuity fast path (VehicleContinuity.ts's tryContinueVehicleGatedAction
+ * only promotes a taskQueue entry whose role matches the just-finished
+ * action) and, being no longer 'queued', is invisible to
+ * findStarvedActionForEmployee too — so it sits claimed but un-promotable for
+ * as long as the driver keeps finding more same-role vehicle work to chain
+ * onto, defeating the whole point of the starvation override.
+ *
+ * A *different* vehicle-gated candidate (any non-null role) is deliberately
+ * NOT excluded here, even when it doesn't match the employee's current
+ * active-action role: findVehicleForClaim's own isClaimable gate below
+ * already requires the employee to hold that role's licence before it's ever
+ * claimable at all, so — unlike the on-foot case — such a reservation is
+ * always genuinely redeemable once this employee goes idle:
+ * fillIdleEmployeeFromQueueOrPool's step 2 promotes a taskQueue entry through
+ * promoteActionToActive with no role filter of its own. An earlier version of
+ * this restriction excluded any role mismatch outright, which stranded a
+ * dual-licensed driver (e.g. one qualified for both rock_fragmenter and
+ * debris_hauler) mid-chain on one vehicle role, unable to ever reserve ahead
+ * a genuinely drivable action of the other role — direct-traced via
+ * economy-full-loop.json: with the exact-role restriction in place, both of
+ * its two drivers ended up parked (driverId null) deep inside the very debris
+ * field their own work had just produced, each permanently unable to path to
+ * the other's now-abundant backlog, so storedMassKg stopped increasing for
+ * good rather than merely later. Left `false` for step 2 (idle employee),
+ * which promotes taskQueue entries through the ordinary, role-agnostic path
+ * (fillIdleEmployeeFromQueueOrPool) instead.
  */
-export function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAction | null {
+export function claimOnePoolCandidate(
+  state: GameState,
+  employee: Employee,
+  excludeOnFootActions = false,
+): SelectedAction | null {
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
+    (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
     (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
     isHaulOrFragmentActionClaimable(state, a) &&
@@ -230,7 +292,16 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
   const depth = 1 + employee.taskQueue.length;
   if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
 
-  const selection = claimOnePoolCandidate(state, employee);
+  // #1000: while busy on a vehicle-gated action, never reserve ahead an
+  // on-foot candidate — see claimOnePoolCandidate's own doc comment on
+  // excludeOnFootActions for why only the on-foot case is actually
+  // unredeemable, and why an earlier version of this guard excluded any
+  // vehicle-role mismatch too broadly (economy-full-loop.json regression). A
+  // foot-busy employee (activeAction.requiredVehicleRole === null) keeps the
+  // unrestricted pool — nothing about its own eventual idle-promotion
+  // (fillIdleEmployeeFromQueueOrPool) is role-sensitive.
+  const excludeOnFootActions = activeAction.requiredVehicleRole !== null;
+  const selection = claimOnePoolCandidate(state, employee, excludeOnFootActions);
   if (selection === null) return; // nothing reachable within budget — tries again next tick
 
   result.claimed.push(selection.action.id);

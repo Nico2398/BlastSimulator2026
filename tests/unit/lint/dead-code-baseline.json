@@ -62,7 +62,6 @@
     "src/core/economy/Negotiation.ts:NegotiationResult",
     "src/core/economy/Negotiation.ts:REPUTATION_FACTOR",
     "src/core/engine/EntityMovementTick.ts:findPathAvoidingOtherVehicles",
-    "src/core/engine/Evacuation.ts:EVACUATION_HOLD_KEY",
     "src/core/engine/GameLoop.ts:ArrivalGateResult",
     "src/core/engine/GameLoop.ts:CollapseResult",
     "src/core/engine/GameLoop.ts:EmployeeMovementResult",
