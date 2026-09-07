@@ -17,11 +17,12 @@ import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
+import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 
 
 const DEFAULT_SPACING_M = 3;
 const DEFAULT_DEPTH_M = 6;
-const DEFAULT_DIAMETER_M = 0.089; // 89mm, matches the design's sample pattern
+const DEFAULT_DIAMETER_M = DRILL_HOLE_DEFAULT_DIAMETER_M;
 
 export class DrillStep {
   private readonly el: HTMLElement;

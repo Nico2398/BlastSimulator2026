@@ -241,6 +241,10 @@ export const DRILL_HOLE_REFERENCE_DEPTH_M = 8;
 /** Reference hole diameter (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
 export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
 
+/** Diameter (m) used when a drill command/panel doesn't specify one — shared by
+ *  drillPlan.ts's console default and Drill.ts's UI default (#965). */
+export const DRILL_HOLE_DEFAULT_DIAMETER_M = 0.089;
+
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
 /** Reference charge amount (kg) that CHARGE_HOLE_BASE_DURATION_TICKS is calibrated against (#554). */
