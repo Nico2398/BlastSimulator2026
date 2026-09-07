@@ -11,6 +11,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
+import type { VehicleRole } from '../entities/Vehicle.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
   isRampSegmentClaimable, type SelectedAction,
@@ -183,11 +184,30 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * reachability check; that budget is spent entirely on resolveActionCost —
  * generalizes to any action type whose claim can fail this gate, not just
  * haul/fragment ones.
+ *
+ * `restrictToVehicleRole` (#1000): when set, only candidates whose own
+ * `requiredVehicleRole` matches are considered. reserveOnePoolActionAhead
+ * (step 3) passes the employee's current vehicle-gated action's role here —
+ * without it, a busy driver could reserve-ahead a `requiredVehicleRole:
+ * null` action (e.g. a `place_building` order) into taskQueue, where it can
+ * never actually be redeemed: VehicleContinuity.ts's
+ * tryContinueVehicleGatedAction only promotes a taskQueue entry whose role
+ * matches the just-finished action, so a mismatched entry sits claimed
+ * ('assigned') but permanently un-promotable for as long as the driver keeps
+ * chaining same-role haul work — and, being no longer 'queued', invisible to
+ * findStarvedActionForEmployee too. Left `undefined` for step 2 (idle
+ * employee), which promotes taskQueue entries through the ordinary,
+ * role-agnostic path (fillIdleEmployeeFromQueueOrPool) instead.
  */
-export function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAction | null {
+export function claimOnePoolCandidate(
+  state: GameState,
+  employee: Employee,
+  restrictToVehicleRole?: VehicleRole | null,
+): SelectedAction | null {
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
+    (restrictToVehicleRole === undefined || a.requiredVehicleRole === restrictToVehicleRole) &&
     (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
     isHaulOrFragmentActionClaimable(state, a) &&
@@ -230,7 +250,17 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
   const depth = 1 + employee.taskQueue.length;
   if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
 
-  const selection = claimOnePoolCandidate(state, employee);
+  // #1000: while busy on a vehicle-gated action, only reserve ahead a
+  // same-role follow-up — see claimOnePoolCandidate's own doc comment on
+  // restrictToVehicleRole for why a mismatched-role reservation here can
+  // never be redeemed and permanently starves the action it locks up. A
+  // foot-busy employee (activeAction.requiredVehicleRole === null) keeps the
+  // unrestricted pool — nothing about its own eventual idle-promotion
+  // (fillIdleEmployeeFromQueueOrPool) is role-sensitive.
+  const restrictToVehicleRole = activeAction.requiredVehicleRole !== null
+    ? activeAction.requiredVehicleRole
+    : undefined;
+  const selection = claimOnePoolCandidate(state, employee, restrictToVehicleRole);
   if (selection === null) return; // nothing reachable within budget — tries again next tick
 
   result.claimed.push(selection.action.id);
