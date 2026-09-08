@@ -102,8 +102,20 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
  * driven by `employee` themself (the continuity case — lets a claim
  * naturally re-pick the vehicle the employee is already sitting in for their
  * next same-role task).
- * Ties broken by lowest vehicle id. Read-only — never mutates.
- * Returns null when none qualify.
+ * Ties broken by straight-line distance to `employee` (nearest wins — the
+ * employee has to walk there before driving it anywhere, so a farther,
+ * otherwise-identical vehicle is a pure extra cost with nothing gained),
+ * then by lowest vehicle id for any exact-distance tie. Distance-based
+ * (#1002 follow-up): an earlier, id-only tie-break could hand a freshly
+ * released, unboarded reservation's own vehicle to a same-tick claim by an
+ * unrelated employee standing right next to it, while assigning that vehicle
+ * to a DIFFERENT, farther free vehicle instead purely because it happened to
+ * have a lower id — direct-traced via a starvation-override release
+ * (VehicleContinuity.ts's completeVehicleGatedActionIfApplicable) whose own
+ * just-dismounted driver's vehicle (unrelated, farther, lower id) won the
+ * tie-break over the released reservation's own vehicle (right next to the
+ * idle employee actually claiming it). Read-only — never mutates. Returns
+ * null when none qualify.
  */
 export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee): Vehicle | null {
   if (!isLicensedForRole(employee, role)) return null;
@@ -121,7 +133,14 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   const continuity = qualifying.find(v => v.driverId === employee.id);
   if (continuity) return continuity;
 
-  return qualifying.reduce((lowest, v) => (v.id < lowest.id ? v : lowest));
+  const distanceSquared = (v: Vehicle) => (v.x - employee.x) ** 2 + (v.z - employee.z) ** 2;
+  return qualifying.reduce((nearest, v) => {
+    const d = distanceSquared(v);
+    const dNearest = distanceSquared(nearest);
+    if (d < dNearest) return v;
+    if (d === dNearest && v.id < nearest.id) return v;
+    return nearest;
+  });
 }
 
 /**

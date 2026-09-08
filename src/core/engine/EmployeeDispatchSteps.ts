@@ -17,7 +17,7 @@ import {
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation, isLicensedForRole } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
@@ -240,11 +240,30 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * good rather than merely later. Left `false` for step 2 (idle employee),
  * which promotes taskQueue entries through the ordinary, role-agnostic path
  * (fillIdleEmployeeFromQueueOrPool) instead.
+ *
+ * `deferVehicleGatedToIdleAlternative` (#1002): when true, a vehicle-gated
+ * candidate is skipped if a DIFFERENT employee — alive, not injured, not in
+ * training, genuinely idle (activeActionId === null), not resting, and
+ * licensed for that candidate's role — already exists to claim it directly
+ * instead. Used only by reserveOnePoolActionAhead (step 3, a busy employee's
+ * speculative lookahead reservation): without it, a busy employee whose own
+ * active action is on-foot (so the #1000 on-foot exclusion above doesn't
+ * apply) can immediately re-reserve-ahead a vehicle action that
+ * releaseUnboardedTaskQueueVehicleReservations (VehicleContinuity.ts's
+ * starvation override) JUST released back to the pool for exactly this
+ * reason — an idle, already-licensed employee standing by should get it
+ * this same tick, not have it re-locked to the very employee whose own
+ * detour caused the release, defeating the release's whole point. Left
+ * `false` for step 2 (idle employee, fillIdleEmployeeFromQueueOrPool) —
+ * whichever idle employee's own turn reaches a candidate first should claim
+ * it; deferring there just because a different idle employee also exists
+ * would strand the pool item between two willing candidates indefinitely.
  */
 export function claimOnePoolCandidate(
   state: GameState,
   employee: Employee,
   excludeOnFootActions = false,
+  deferVehicleGatedToIdleAlternative = false,
 ): SelectedAction | null {
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
@@ -262,7 +281,10 @@ export function claimOnePoolCandidate(
 
   const selection = selectBestActionForEmployee(
     state, employee, poolCandidates,
-    candidate => findVehicleForClaim(state, candidate, employee).ok && isRampSegmentClaimable(state, candidate),
+    candidate => findVehicleForClaim(state, candidate, employee).ok
+      && isRampSegmentClaimable(state, candidate)
+      && (!deferVehicleGatedToIdleAlternative
+        || !hasIdleLicensedAlternative(state, candidate, employee)),
   );
   if (selection === null) return null;
 
@@ -277,6 +299,29 @@ export function claimOnePoolCandidate(
   if (vehicleCheck.vehicle) reserveVehicle(vehicleCheck.vehicle, claimed.id);
 
   return selection;
+}
+
+/**
+ * True when a DIFFERENT employee than `employee` — alive, not injured, not in
+ * training, genuinely idle, and licensed for `candidate`'s required vehicle
+ * role — exists right now to claim `candidate` directly. `candidate` with no
+ * vehicle role is never deferred (returns false) — this only exists to keep
+ * a busy employee's speculative reserve-ahead from beating an idle,
+ * already-qualified employee to a vehicle-gated pool item. See
+ * claimOnePoolCandidate's `deferVehicleGatedToIdleAlternative` doc comment.
+ */
+function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, employee: Employee): boolean {
+  const role = candidate.requiredVehicleRole;
+  if (role === null) return false;
+  return state.employees.employees.some(other =>
+    other.id !== employee.id
+    && other.alive
+    && !other.injured
+    && other.trainingState === null
+    && other.activeActionId === null
+    && other.restTicksRemaining === null
+    && isLicensedForRole(other, role),
+  );
 }
 
 /**
@@ -301,11 +346,43 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
   // unrestricted pool — nothing about its own eventual idle-promotion
   // (fillIdleEmployeeFromQueueOrPool) is role-sensitive.
   const excludeOnFootActions = activeAction.requiredVehicleRole !== null;
-  const selection = claimOnePoolCandidate(state, employee, excludeOnFootActions);
+  // #1002: see claimOnePoolCandidate's own doc comment on
+  // deferVehicleGatedToIdleAlternative — always deferred for step 3, so an
+  // idle, already-licensed employee never loses a vehicle-gated pool item to
+  // this employee's own speculative lookahead.
+  const selection = claimOnePoolCandidate(state, employee, excludeOnFootActions, true);
   if (selection === null) return; // nothing reachable within budget — tries again next tick
 
   result.claimed.push(selection.action.id);
   employee.taskQueue.push(selection.action.id);
+}
+
+/**
+ * Releases every unboarded, vehicle-gated action in `employee.taskQueue` back to
+ * the open pool. Called when a starvation override is about to send the employee
+ * off on an unrelated on-foot detour of unknown length, so a vehicle reserved
+ * for a not-yet-started taskQueue entry does not sit locked and idle for that
+ * whole detour — another driver can claim it immediately instead.
+ *
+ * Skips a taskQueue entry that is on-foot (`requiredVehicleRole === null`) or
+ * whose reserved vehicle is already boarded (defensive — should not occur for a
+ * taskQueue-only entry). Fully releases matching entries: removes them from
+ * `employee.taskQueue` and hands the action + vehicle back to the pool via the
+ * existing `releaseActionToOpenPool` helper.
+ */
+export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, employee: Employee): void {
+  const queuedIds = [...employee.taskQueue];
+
+  for (const actionId of queuedIds) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    if (!action || action.requiredVehicleRole === null) continue;
+
+    const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+    if (!vehicle || vehicle.driverId !== null) continue;
+
+    employee.taskQueue = employee.taskQueue.filter(id => id !== action.id);
+    releaseActionToOpenPool(state, action);
+  }
 }
 
 /**

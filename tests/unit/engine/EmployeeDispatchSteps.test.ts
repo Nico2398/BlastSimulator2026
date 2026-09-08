@@ -16,6 +16,7 @@ import {
   fillIdleEmployeeFromQueueOrPool,
   claimOnePoolCandidate,
   reserveOnePoolActionAhead,
+  releaseUnboardedTaskQueueVehicleReservations,
   promoteActionToActive,
   type TickEmployeesResult,
 } from '../../../src/core/engine/EmployeeDispatchSteps.js';
@@ -510,6 +511,86 @@ describe('claimOnePoolCandidate', () => {
     expect(claimOnePoolCandidate(state, employee)).toBeNull();
     expect(action.status).toBe('queued');
   });
+
+  // #1002 — deferVehicleGatedToIdleAlternative: see this function's own doc
+  // comment. Exercised end-to-end via tickEmployees in EmployeeDispatch.test.ts;
+  // these isolate the flag directly against claimOnePoolCandidate itself.
+  describe('deferVehicleGatedToIdleAlternative (#1002)', () => {
+    it('skips a vehicle-gated candidate when a different, idle, licensed employee could claim it instead', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const { employee: idleAlternative } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+      assignSkill(state.employees, idleAlternative.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      // idleAlternative stays fully idle: activeActionId null, not resting, not training.
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      expect(claimOnePoolCandidate(state, employee, false, true)).toBeNull();
+      expect(action.status).toBe('queued');
+    });
+
+    it('still claims a vehicle-gated candidate when no OTHER idle licensed employee exists', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false, true);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+
+    it('does not defer an on-foot candidate (requiredVehicleRole: null), even with an idle alternative standing by', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+      hireEmployee(state.employees, 'driller', rng, 1, 1); // fully idle, but irrelevant — action is on-foot
+
+      const action = makeAction({ id: 1, targetX: 5, targetZ: 5 });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false, true);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+
+    it('does NOT defer when the flag is left false (default), even with an idle licensed alternative standing by', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const { employee: idleAlternative } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+      assignSkill(state.employees, idleAlternative.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+  });
 });
 
 describe('reserveOnePoolActionAhead', () => {
@@ -648,6 +729,160 @@ describe('reserveOnePoolActionAhead', () => {
     expect(employee.taskQueue).toContain(2);
     expect(result.claimed).toContain(2);
     expect(poolAction.status).toBe('assigned');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1002 — a starvation-override dismount (VehicleContinuity.ts's
+// completeVehicleGatedActionIfApplicable) bypasses employee.taskQueue
+// entirely, so a vehicle already reserved by reserveOnePoolActionAhead for an
+// earlier, not-yet-started taskQueue entry stays locked-but-idle for the
+// whole on-foot detour unless something explicitly frees it first. This is
+// that something.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
+  it('releases a vehicle-gated, unboarded taskQueue entry fully back to the open pool', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const action = makeAction({
+      id: 1, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
+      status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(action);
+    employee.taskQueue = [1];
+    vehicle.reservedForActionId = 1;
+    // vehicle.driverId stays null — reserved but never boarded.
+
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
+
+    expect(employee.taskQueue).not.toContain(1);
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+  });
+
+  it('leaves an on-foot (requiredVehicleRole: null) taskQueue entry untouched', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const action = makeAction({
+      id: 2, requiredVehicleRole: null, status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(action);
+    employee.taskQueue = [2];
+
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
+
+    expect(employee.taskQueue).toContain(2);
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(employee.id);
+  });
+
+  it('no-ops without throwing on an empty taskQueue', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    expect(() => releaseUnboardedTaskQueueVehicleReservations(state, employee)).not.toThrow();
+    expect(employee.taskQueue).toEqual([]);
+  });
+
+  it('leaves an already-boarded reservation untouched (defensive — should not occur in practice, a taskQueue-only entry is never boarded)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { employee: otherDriver } = hireEmployee(state.employees, 'driller', rng, 10, 10);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.driverId = otherDriver.id; // already boarded, by someone else
+
+    const action = makeAction({
+      id: 3, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
+      status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(action);
+    employee.taskQueue = [3];
+    vehicle.reservedForActionId = 3;
+
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
+
+    expect(employee.taskQueue).toContain(3);
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(employee.id);
+    expect(vehicle.reservedForActionId).toBe(3);
+    expect(vehicle.driverId).toBe(otherDriver.id);
+  });
+
+  it('releases every unboarded vehicle-gated entry among a mixed taskQueue, leaving the on-foot one alone', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const { vehicle: v1 } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const { vehicle: v2 } = purchaseVehicle(state.vehicles, 'debris_hauler', 6, 6);
+
+    const gated1 = makeAction({
+      id: 10, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
+      status: 'assigned', holderId: employee.id,
+    });
+    const gated2 = makeAction({
+      id: 11, requiredVehicleRole: 'debris_hauler', targetX: 6, targetZ: 6,
+      status: 'assigned', holderId: employee.id,
+    });
+    const onFoot = makeAction({
+      id: 12, requiredVehicleRole: null, targetX: 7, targetZ: 7,
+      status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(gated1, gated2, onFoot);
+    employee.taskQueue = [10, 11, 12];
+    v1.reservedForActionId = 10;
+    v2.reservedForActionId = 11;
+
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
+
+    expect(employee.taskQueue).toEqual([12]);
+    expect(gated1.status).toBe('queued');
+    expect(gated1.holderId).toBeNull();
+    expect(v1.reservedForActionId).toBeNull();
+    expect(gated2.status).toBe('queued');
+    expect(gated2.holderId).toBeNull();
+    expect(v2.reservedForActionId).toBeNull();
+    expect(onFoot.status).toBe('assigned');
+    expect(onFoot.holderId).toBe(employee.id);
+  });
+
+  it('skips a taskQueue id whose PendingAction no longer exists in state.pendingActions, without throwing', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    employee.taskQueue = [999]; // no matching PendingAction record at all
+
+    expect(() => releaseUnboardedTaskQueueVehicleReservations(state, employee)).not.toThrow();
+  });
+
+  it('skips a vehicle-gated taskQueue entry whose reservation vehicle no longer exists, without throwing', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const action = makeAction({
+      id: 20, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
+      status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(action);
+    employee.taskQueue = [20];
+    // No vehicle purchased at all — nothing has reservedForActionId === 20.
+
+    expect(() => releaseUnboardedTaskQueueVehicleReservations(state, employee)).not.toThrow();
+    expect(employee.taskQueue).toContain(20);
+    expect(action.status).toBe('assigned');
   });
 });
 

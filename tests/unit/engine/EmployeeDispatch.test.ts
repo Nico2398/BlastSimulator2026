@@ -1053,6 +1053,110 @@ describe('completeVehicleGatedActionIfApplicable — starved on-foot action inte
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// #1002 — the #1000 starvation-override dismount (completeVehicleGatedActionIfApplicable's
+// starved branch) bypasses employee.taskQueue entirely when it sends the
+// employee off on an on-foot detour. If that taskQueue already held an
+// earlier same-role follow-up reserveOnePoolActionAhead reserved a vehicle
+// for, that vehicle must not stay reserved-but-idle for the whole detour — it
+// has to be released back to the open pool so a different, idle, same-role
+// driver can claim it immediately.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('completeVehicleGatedActionIfApplicable — releases a taskQueue-held vehicle reservation on starvation override (#1002)', () => {
+  const SEED = 42;
+  const STARVED_AT_TICK = 1000;
+
+  it("frees the taskQueue-reserved vehicle so a different, idle, same-role employee can claim it the very next tickEmployees call — instead of it sitting locked to the dismounted driver's on-foot detour", () => {
+    const state = createGame({ seed: SEED });
+    state.tickCount = STARVED_AT_TICK;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    const { vehicle: activeVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    activeVehicle.driverId = employee.id;
+
+    const completedAction: PendingAction = {
+      id: 1,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: employee.id,
+    };
+    activeVehicle.reservedForActionId = completedAction.id;
+    employee.activeActionId = completedAction.id;
+
+    // The long-starved on-foot action the override will send `employee` to
+    // instead of continuing the same-role vehicle chain.
+    const starvedCandidate: PendingAction = {
+      id: 2,
+      type: 'place_building',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 4, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: STARVED_AT_TICK - ACTION_STARVATION_TICK_THRESHOLD,
+    };
+
+    // Already reserved one pool action ahead (reserveOnePoolActionAhead, a
+    // prior tick): claimed, sitting in employee.taskQueue, with its own
+    // vehicle reserved but never boarded.
+    const { vehicle: queuedVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 8, 0);
+    const queuedFollowUp: PendingAction = {
+      id: 3,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 8, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'assigned',
+      holderId: employee.id,
+    };
+    queuedVehicle.reservedForActionId = queuedFollowUp.id;
+    employee.taskQueue = [queuedFollowUp.id];
+
+    state.pendingActions.push(completedAction, starvedCandidate, queuedFollowUp);
+
+    // A second, idle, same-role-licensed employee standing by, who should be
+    // able to claim the just-freed vehicle+action immediately.
+    const { employee: other } = hireEmployee(state.employees, 'driller', rng, 8, 0);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    completeVehicleGatedActionIfApplicable(state, employee, 1);
+
+    // The starvation override fired as in #1000.
+    expect(employee.activeActionId).toBe(starvedCandidate.id);
+    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('assigned');
+
+    // The taskQueue-held follow-up is no longer on employee's own queue, and
+    // is fully back in the open pool — not left reserved-but-idle.
+    expect(employee.taskQueue).not.toContain(queuedFollowUp.id);
+    const releasedFollowUp = state.pendingActions.find(a => a.id === queuedFollowUp.id)!;
+    expect(releasedFollowUp.status).toBe('queued');
+    expect(releasedFollowUp.holderId).toBeNull();
+    expect(queuedVehicle.reservedForActionId).toBeNull();
+
+    // A different, idle, same-role employee can claim the freed vehicle+action
+    // on the very next dispatch pass — no need to wait for `employee` to
+    // finish their on-foot detour and return.
+    tickEmployees(state);
+
+    expect(other.activeActionId).toBe(queuedFollowUp.id);
+    expect(state.pendingActions.find(a => a.id === queuedFollowUp.id)!.holderId).toBe(other.id);
+    expect(queuedVehicle.reservedForActionId).toBe(queuedFollowUp.id);
+  });
+});
+
 describe('drill_hole actions — dispatch and landing (#553)', () => {
   const SEED = 42;
 

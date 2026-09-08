@@ -15,7 +15,7 @@ import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import {
   isRampSegmentClaimable, selectBestActionForEmployee, findStarvedActionForEmployee, isQueuedActionAvailableToEmployee,
 } from './ActionSelection.js';
-import { promoteActionToActive } from './EmployeeDispatchSteps.js';
+import { promoteActionToActive, releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 
 /**
  * Vehicle-continuity inline promotion (#550). Called by events.ts's
@@ -147,6 +147,7 @@ export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Em
   const starved = findStarvedActionForEmployee(state, emp);
   if (starved !== null) {
     releaseVehicleOnCompletion(state, emp, actionId);
+    releaseUnboardedTaskQueueVehicleReservations(state, emp);
     clearActiveTaskFields(emp);
     const claimed = claimPendingAction(state, starved.action.id, emp.id);
     if (claimed) {
