@@ -511,6 +511,86 @@ describe('claimOnePoolCandidate', () => {
     expect(claimOnePoolCandidate(state, employee)).toBeNull();
     expect(action.status).toBe('queued');
   });
+
+  // #1002 — deferVehicleGatedToIdleAlternative: see this function's own doc
+  // comment. Exercised end-to-end via tickEmployees in EmployeeDispatch.test.ts;
+  // these isolate the flag directly against claimOnePoolCandidate itself.
+  describe('deferVehicleGatedToIdleAlternative (#1002)', () => {
+    it('skips a vehicle-gated candidate when a different, idle, licensed employee could claim it instead', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const { employee: idleAlternative } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+      assignSkill(state.employees, idleAlternative.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      // idleAlternative stays fully idle: activeActionId null, not resting, not training.
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      expect(claimOnePoolCandidate(state, employee, false, true)).toBeNull();
+      expect(action.status).toBe('queued');
+    });
+
+    it('still claims a vehicle-gated candidate when no OTHER idle licensed employee exists', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false, true);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+
+    it('does not defer an on-foot candidate (requiredVehicleRole: null), even with an idle alternative standing by', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+      hireEmployee(state.employees, 'driller', rng, 1, 1); // fully idle, but irrelevant — action is on-foot
+
+      const action = makeAction({ id: 1, targetX: 5, targetZ: 5 });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false, true);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+
+    it('does NOT defer when the flag is left false (default), even with an idle licensed alternative standing by', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+      const { employee: idleAlternative } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+      assignSkill(state.employees, idleAlternative.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+  });
 });
 
 describe('reserveOnePoolActionAhead', () => {

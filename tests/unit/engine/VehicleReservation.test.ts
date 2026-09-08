@@ -115,6 +115,41 @@ describe('findFreeVehicleForRole', () => {
     expect(picked!.id).toBe(alreadyDriving.id);
   });
 
+  // #1002: an id-only tie-break could hand a nearby, freshly released
+  // reservation's own vehicle to a lower-id but farther one instead — see
+  // findFreeVehicleForRole's own doc comment.
+  it('picks the nearest free vehicle by distance over a farther, lower-id one (#1002)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 10, 10);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+    const { vehicle: fartherLowerId } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle: nearer } = purchaseVehicle(state.vehicles, 'drill_rig', 11, 10);
+    expect(nearer.id).toBeGreaterThan(fartherLowerId.id);
+
+    const picked = findFreeVehicleForRole(state, 'drill_rig', employee);
+
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(nearer.id);
+  });
+
+  it('falls back to lowest id when two free vehicles are exactly equidistant (#1002)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 10, 10);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+    const { vehicle: lowerId } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 10);
+    const { vehicle: higherId } = purchaseVehicle(state.vehicles, 'drill_rig', 15, 10);
+    expect(higherId.id).toBeGreaterThan(lowerId.id);
+
+    const picked = findFreeVehicleForRole(state, 'drill_rig', employee);
+
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(lowerId.id);
+  });
+
   it('returns null when the only matching vehicle is already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
