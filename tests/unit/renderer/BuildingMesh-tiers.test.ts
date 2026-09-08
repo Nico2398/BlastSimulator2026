@@ -49,21 +49,19 @@ describe('BuildingMesh — tier visuals', () => {
     expect(h3).toBeGreaterThan(h2);
   });
 
-  it('T2 building base has a brighter colour than T1', () => {
-    const getBaseColor = (tier: Building['tier']) => {
-      const scene = new THREE.Scene();
-      const bm = new BuildingMesh(scene);
-      bm.addBuilding(makeBuilding(1, 'blasting_academy', tier));
-      const color = bm.getInstance(1)!.tints.get(BODY_TINT)!.color;
-      const rgb = { r: color.r, g: color.g, b: color.b };
-      bm.dispose();
-      return rgb;
-    };
-    const c1 = getBaseColor(1);
-    const c2 = getBaseColor(2);
-    // At least one channel should be brighter for T2
-    const brighter = c2.r > c1.r || c2.g > c1.g || c2.b > c1.b;
-    expect(brighter).toBe(true);
+  it('each tier is its own asset, drawn with its own wall colour rather than a brightened copy', async () => {
+    const library = await loadedModelLibrary(['building_blasting_academy_t2']);
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene, library);
+    bm.addBuilding(makeBuilding(1, 'blasting_academy', 1));
+    bm.addBuilding(makeBuilding(2, 'blasting_academy', 2));
+    bm.addBuilding(makeBuilding(3, 'blasting_academy', 3));
+    expect(bm.getInstance(1)!.isFallback).toBe(true);
+    expect(bm.getInstance(2)!.isFallback).toBe(false);
+    expect(bm.getInstance(3)!.isFallback).toBe(true);
+    // The stand-ins share one wall colour: nothing shifts it per tier.
+    expect(bm.getInstance(1)!.tints.get(BODY_TINT)!.color.getHex()).toBe(bm.getInstance(3)!.tints.get(BODY_TINT)!.color.getHex());
+    bm.dispose();
   });
 });
 

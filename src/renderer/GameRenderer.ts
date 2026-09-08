@@ -127,7 +127,11 @@ export class GameRenderer {
 
   /** Prop ids the ambient layer stood in for when it was last built, for diagnostics. */
   get ambientMissingModelIds(): string[] {
-    return [...(this.vegetation?.missingModelIds ?? []), ...(this.scenery?.missingModelIds ?? [])];
+    return [
+      ...(this.vegetation?.missingModelIds ?? []),
+      ...(this.scenery?.missingModelIds ?? []),
+      ...(this.dustDevils?.missingModelIds ?? []),
+    ];
   }
 
   /** True when the ambient layer was built with stand-ins for props that have since loaded. */

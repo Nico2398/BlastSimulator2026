@@ -48,7 +48,7 @@ describe('preloadModels', () => {
 });
 
 describe('preloadModels — pacing', () => {
-  const ids = ['worker_driller', 'worker_manager', 'vehicle_drill_rig'];
+  const ids = ['worker_driller', 'worker_manager', 'vehicle_drill_rig_t2'];
   const source = async (url: string): Promise<ArrayBuffer> => readModelBytes(url);
 
   async function paced(sliceMs: number): Promise<string[]> {
@@ -61,11 +61,11 @@ describe('preloadModels — pacing', () => {
   }
 
   it('with a zero slice budget parses in id order, one at a time, yielding between parses but not after the last', async () => {
-    expect(await paced(0)).toEqual(['parse:worker_driller', 'yield', 'parse:worker_manager', 'yield', 'parse:vehicle_drill_rig']);
+    expect(await paced(0)).toEqual(['parse:worker_driller', 'yield', 'parse:worker_manager', 'yield', 'parse:vehicle_drill_rig_t2']);
   });
 
   it('with a budget no run of parses exhausts, never yields', async () => {
-    expect(await paced(60_000)).toEqual(['parse:worker_driller', 'parse:worker_manager', 'parse:vehicle_drill_rig']);
+    expect(await paced(60_000)).toEqual(['parse:worker_driller', 'parse:worker_manager', 'parse:vehicle_drill_rig_t2']);
   });
 
   it('defaults to a budget of a fraction of a second, so a page keeps painting through the preload', () => {

@@ -297,7 +297,7 @@ export function buildAmbient(deps: SceneSetupDeps, ctx: MiningContext): void {
   // Per-biome ambient extras (#458 T7.3) — only the module matching this
   // level's biome gets built; the other stays null.
   deps.dustDevils = DUST_DEVIL_BIOMES.has(biome.id)
-    ? new DustDevils(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+    ? new DustDevils(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight, modelLibrary)
     : null;
   deps.fireflies = FIREFLY_BIOMES.has(biome.id)
     ? new Fireflies(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)

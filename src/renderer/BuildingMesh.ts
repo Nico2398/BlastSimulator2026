@@ -7,18 +7,15 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
-import type { Building, BuildingTier, BuildingType } from '../core/entities/Building.js';
+import type { Building, BuildingType } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
-import { brightenColor } from './MeshUtils.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { buildingModelId, BUILDING_RUIN_MODEL_ID } from './models/ModelIds.js';
 import { createToonMaterial } from './models/CartoonMaterial.js';
 
-// ---------- Tier scaling ----------
+// ---------- Stand-ins ----------
 
-/** Colour brightening shift per tier (0 = no shift, 1 = white). */
-const TIER_BRIGHT_SHIFT: Record<BuildingTier, number> = { 1: 0.0, 2: 0.12, 3: 0.26 };
 /** Wall material every building model exposes. */
 export const BODY_TINT = 'TintBody';
 /** Stand-in height while the asset is not loaded: a plinth plus one storey per tier. */
@@ -163,10 +160,6 @@ export class BuildingMesh {
       instance.root.scale.set(sizeX / RUIN_MODEL_FOOTPRINT, height, sizeZ / RUIN_MODEL_FOOTPRINT);
       return { instance, markers: [] };
     }
-
-    const shift = TIER_BRIGHT_SHIFT[building.tier];
-    const walls = instance.tints.get(BODY_TINT);
-    if (walls && shift > 0) walls.color.setHex(brightenColor(walls.color.getHex(), shift));
 
     // Entry / exit pins — group is centred on footprint, so convert def offsets.
     // They sit above the tallest geometry (#410) so no roof can hide them.

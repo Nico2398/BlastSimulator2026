@@ -11,6 +11,7 @@ from building-defs.json, dumped from the game's BuildingDefs by
 """
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 import time
@@ -25,18 +26,34 @@ def _registry() -> dict[str, tuple[str, callable]]:
     reg: dict[str, tuple[str, callable]] = {}
     for role in workers.ROLES:
         reg[f'worker_{role}'] = ('workers', (lambda r: (lambda: workers.build_worker(r)))(role))
-    try:
-        import vehicles
-        for role in vehicles.ROLES:
-            reg[f'vehicle_{role}'] = ('vehicles', (lambda r: (lambda: vehicles.build_vehicle(r)))(role))
-    except ImportError:
-        pass
-    try:
-        import buildings
-        for name, builder in buildings.registry().items():
-            reg[name] = ('buildings', builder)
-    except ImportError:
-        pass
+    # Vehicles: tier 2 is the straight-faced model in vehicles.py; tiers 1 and
+    # 3 are the caricatures in vehicles_t1.py / vehicles_t3.py, each exposing
+    # build_vehicle(role). A tier module still being written is simply absent.
+    import vehicles
+    tier_modules = {2: vehicles}
+    for tier, mod_name in ((1, 'vehicles_t1'), (3, 'vehicles_t3')):
+        try:
+            tier_modules[tier] = importlib.import_module(mod_name)
+        except ImportError:
+            pass
+    for role in vehicles.ROLES:
+        for tier, mod in tier_modules.items():
+            reg[f'vehicle_{role}_t{tier}'] = ('vehicles', (lambda m_, r: (lambda: m_.build_vehicle(r)))(mod, role))
+    # Buildings: buildings.py draws every tier; buildings_t1.py / buildings_t3.py
+    # override the tiers they caricature through build_building(btype).
+    import buildings
+    overrides = {}
+    for tier, mod_name in ((1, 'buildings_t1'), (3, 'buildings_t3')):
+        try:
+            overrides[tier] = importlib.import_module(mod_name)
+        except ImportError:
+            pass
+    for name, builder in buildings.registry().items():
+        reg[name] = ('buildings', builder)
+    for btype in buildings.TYPE_BUILDERS:
+        for tier, mod in overrides.items():
+            if hasattr(mod, 'build_building'):
+                reg[f'building_{btype}_t{tier}'] = ('buildings', (lambda m_, b: (lambda: m_.build_building(b)))(mod, btype))
     import props
     for name, builder in props.registry().items():
         reg[name] = ('props', builder)

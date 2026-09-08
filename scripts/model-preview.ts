@@ -7,7 +7,7 @@
  *
  *   npx tsx scripts/model-preview.ts                       # every model, default views
  *   npx tsx scripts/model-preview.ts worker_driller        # one model
- *   npx tsx scripts/model-preview.ts --views "front:35:20;back:215:20;top:35:70" vehicle_drill_rig
+ *   npx tsx scripts/model-preview.ts --views "front:35:20;back:215:20;top:35:70" vehicle_drill_rig_t2
  *   npx tsx scripts/model-preview.ts --sheet               # also tile the captures into one contact sheet
  *
  * Output: screenshots/models/<id>-<view>.png (and screenshots/models/sheet.png).

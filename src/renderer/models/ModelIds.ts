@@ -4,7 +4,7 @@
 // The Blender generators under assets/models/blender/ write the same names.
 
 import type { EmployeeRole } from '../../core/entities/Employee.js';
-import type { VehicleRole } from '../../core/entities/Vehicle.js';
+import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { BuildingTier, BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
@@ -25,6 +25,10 @@ export const TREE_VARIANTS = 3;
 export const BUSH_VARIANTS = 2;
 export const ROCK_VARIANTS = 3;
 export const HOUSE_VARIANTS = 3;
+export const GRASS_VARIANTS = 3;
+export const FLOWER_VARIANTS = 2;
+/** The cartoon dust devil: one funnel model, spun and wandered by DustDevils. */
+export const TWISTER_MODEL_ID = 'prop_twister';
 
 export function treeModelId(family: TreeFamily, variant: number): string {
   return `prop_tree_${family}_${variant}`;
@@ -43,6 +47,14 @@ export function rockModelId(variant: number): string {
   return `prop_rock_${variant}`;
 }
 
+export function grassModelId(variant: number): string {
+  return `prop_grass_${variant}`;
+}
+
+export function flowerModelId(variant: number): string {
+  return `prop_flower_${variant}`;
+}
+
 export function houseModelId(variant: number): string {
   return `prop_house_${variant}`;
 }
@@ -56,6 +68,9 @@ export function propModelIds(): string[] {
   for (let v = 0; v < BUSH_VARIANTS; v++) ids.push(bushModelId(v));
   for (let v = 0; v < ROCK_VARIANTS; v++) ids.push(rockModelId(v));
   for (let v = 0; v < HOUSE_VARIANTS; v++) ids.push(houseModelId(v));
+  for (let v = 0; v < GRASS_VARIANTS; v++) ids.push(grassModelId(v));
+  for (let v = 0; v < FLOWER_VARIANTS; v++) ids.push(flowerModelId(v));
+  ids.push(TWISTER_MODEL_ID);
   return ids;
 }
 
@@ -63,8 +78,11 @@ export function workerModelId(role: EmployeeRole): string {
   return `worker_${role}`;
 }
 
-export function vehicleModelId(role: VehicleRole): string {
-  return `vehicle_${role}`;
+/** Each tier is its own model: tier 1 a junk caricature, tier 2 the plain machine, tier 3 the corporate monster. */
+export const VEHICLE_TIERS: readonly VehicleTier[] = [1, 2, 3];
+
+export function vehicleModelId(role: VehicleRole, tier: VehicleTier): string {
+  return `vehicle_${role}_t${tier}`;
 }
 
 export function buildingModelId(type: BuildingType, tier: BuildingTier): string {
@@ -75,7 +93,9 @@ export function buildingModelId(type: BuildingType, tier: BuildingTier): string 
 export function allModelIds(): string[] {
   const ids: string[] = [];
   for (const role of EMPLOYEE_ROLES) ids.push(workerModelId(role));
-  for (const role of getAllVehicleRoles()) ids.push(vehicleModelId(role));
+  for (const role of getAllVehicleRoles()) {
+    for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
+  }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
     for (const tier of BUILDING_TIERS) ids.push(buildingModelId(type, tier));
   }

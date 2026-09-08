@@ -18,8 +18,8 @@ import bpy
 from mathutils import Vector
 
 from common import (
-    assign, bend, bevel, box, capsule, cylinder, displace, icosphere, material, pivot, rotate, sphere,
-    subsurf, torus,
+    assign, bend, bevel, box, capsule, cylinder, displace, icosphere, material, pivot, prism, rotate, scale,
+    sphere, subsurf, torus,
 )
 
 TREE_FAMILIES = ['deciduous', 'conifer', 'tropical', 'desert', 'volcanic']
@@ -27,6 +27,8 @@ TREE_VARIANTS = 3
 BUSH_VARIANTS = 2
 ROCK_VARIANTS = 3
 HOUSE_VARIANTS = 3
+GRASS_VARIANTS = 3
+FLOWER_VARIANTS = 2
 
 
 def _materials() -> dict[str, bpy.types.Material]:
@@ -51,6 +53,16 @@ def _materials() -> dict[str, bpy.types.Material]:
         'ash': material('AshLeaf', 0x6A6D68, roughness=0.9),
         'ember': material('Ember', 0xFF6A2A, roughness=0.6, emission=0xFF4A10, emission_strength=1.2),
         'rock': material('TintRock', 0x8E8A84, roughness=0.95),
+        'grass': material('TintGrass', 0x5FA83A, roughness=0.9),
+        'stem': material('Stem', 0x4C9436, roughness=0.9),
+        'petal_y': material('PetalYellow', 0xFFD23F, roughness=0.8),
+        'petal_w': material('PetalWhite', 0xF7F3EA, roughness=0.8),
+        'petal_p': material('PetalPink', 0xFF7FB0, roughness=0.8),
+        'pollen': material('Pollen', 0xFFB300, roughness=0.7),
+        'sand_a': material('SandA', 0xD9B98A, roughness=0.95),
+        'sand_b': material('SandB', 0xC9A46F, roughness=0.95),
+        'sand_c': material('SandC', 0xE8CFA6, roughness=0.95),
+        'grit': material('Grit', 0x7A6A55, roughness=0.95),
         'wall': material('Wall', 0xF1E7D2, roughness=0.9),
         'wall_b': material('WallB', 0xE7D6B8, roughness=0.9),
         'roof_red': material('RoofRed', 0xB9432F, roughness=0.9),
@@ -368,6 +380,164 @@ def house(v: int, m) -> list[bpy.types.Object]:
     return parts
 
 
+# ------------------------------------------------------------- grass ---
+
+def _blade(name: str, height: float, width: float, tilt: float, yaw: float, curl: float, mat,
+           thickness: float = 0.03, samples: int = 3) -> bpy.types.Object:
+    """One chunky cartoon blade, extruded from a curved outline.
+
+    Grass is drawn by the thousand, so the curve is baked into the 2D outline
+    rather than cut in with a subdivision and a Bend modifier: same silhouette,
+    a fifth of the triangles. `curl` is how far the tip leans out, in metres.
+    """
+    spine = []
+    for i in range(samples):
+        t = i / (samples - 1)
+        spine.append((curl * t * t, height * t, width * 0.5 * (1.0 - t ** 1.5)))
+    right = [(cx + half, z) for cx, z, half in spine[:-1]]
+    left = [(cx - half, z) for cx, z, half in spine[:-1]]
+    tip = (spine[-1][0], spine[-1][1])
+    leaf = prism(name, left[:1] + right + [tip] + left[:0:-1], thickness, loc=(0, 0, 0), axis='Y')
+    assign(leaf, mat)
+    rotate(leaf, x=tilt, z=yaw)
+    return leaf
+
+
+def grass(v: int, m) -> list[bpy.types.Object]:
+    """A tuft of fat cartoon blades fanned around the root; `TintGrass` is recoloured per biome."""
+    rng = random.Random(100 + v)
+    parts = []
+    counts = (5, 6, 4)
+    heights = (0.55, 0.72, 0.4)
+    tilts = ((10, 30), (8, 26), (18, 40))
+    for i in range(counts[v]):
+        yaw = i * (360 / counts[v]) + rng.uniform(-16, 16)
+        tilt = rng.uniform(*tilts[v])
+        h = heights[v] * rng.uniform(0.75, 1.15)
+        w = rng.uniform(0.08, 0.12)
+        # Inner blades stand straighter and taller than the outer ring.
+        if i % 3 == 0:
+            tilt *= 0.5
+            h *= 1.15
+        parts.append(_blade(f'Blade{i}', h, w, tilt, yaw, rng.uniform(0.06, 0.13), m['grass']))
+    return parts
+
+
+def flower(v: int, m) -> list[bpy.types.Object]:
+    """A slim stem, two ground-hugging leaves and a fat five-petal head — a yellow daisy or a pink/white clump."""
+    rng = random.Random(200 + v)
+    parts = []
+    heads = 1 if v == 0 else 2
+    for k in range(heads):
+        h = 0.5 if v == 0 else rng.uniform(0.3, 0.42)
+        ox, oy = (0.0, 0.0) if v == 0 else (math.cos(k * 2.1) * 0.13, math.sin(k * 2.1) * 0.13)
+        stem = cylinder(f'Stem{k}', 0.01, h, loc=(ox, oy, h / 2), segments=6)
+        assign(stem, m['stem'])
+        parts.append(stem)
+        petal_mat = m['petal_y'] if v == 0 else (m['petal_p'] if k % 2 == 0 else m['petal_w'])
+        r = 0.2 if v == 0 else 0.13
+        for i in range(5):
+            a = math.radians(i * 72 + k * 20)
+            petal = sphere(f'Petal{k}_{i}', r * 0.6, loc=(ox + math.cos(a) * r * 0.95, oy + math.sin(a) * r * 0.95, h),
+                           scale=(1.2, 0.85, 0.32), segments=8, rings=4)
+            rotate(petal, z=i * 72 + k * 20, y=-8)
+            assign(petal, petal_mat)
+            parts.append(petal)
+        centre = sphere(f'Centre{k}', r * 0.5, loc=(ox, oy, h + 0.03), scale=(1, 1, 0.55), segments=8, rings=4)
+        assign(centre, m['pollen'] if v == 0 else m['petal_y'])
+        parts.append(centre)
+    for i, a in enumerate((40, 220, 130)):
+        if v == 0 and i == 2:
+            break
+        leaf = _blade(f'Leaf{i}', 0.24, 0.1, 62, a, 0.1, m['stem'])
+        parts.append(leaf)
+    return parts
+
+
+# ----------------------------------------------------------- twister ---
+
+TWISTER_HEIGHT = 9.0
+TWISTER_TOP_RADIUS = 2.3
+TWISTER_FOOT_RADIUS = 0.32
+
+
+def _funnel(name: str, mats, levels: int = 40, segments: int = 36, starts: int = 2, turns: float = 2.6,
+            ridge: float = 0.22) -> bpy.types.Object:
+    """A tapered funnel with a helical ridge — the cartoon twister's body. The vertex grid is sheared along
+    the helix, so the two sand tones split on clean spiral lines rather than stair-stepped quads."""
+    import bmesh as _bm
+    bm = _bm.new()
+    rings = []
+    for li in range(levels + 1):
+        t = li / levels
+        z = t * TWISTER_HEIGHT
+        base_r = TWISTER_FOOT_RADIUS + (TWISTER_TOP_RADIUS - TWISTER_FOOT_RADIUS) * (t ** 1.6)
+        # The ridge fades out at the tip so the foot stays a clean point.
+        amp = ridge * min(1.0, t * 3.0)
+        shear = -t * turns * math.pi * 2 / starts
+        ring = []
+        for si in range(segments):
+            local = si / segments * math.pi * 2
+            th = local + shear
+            r = base_r * (1.0 + amp * math.sin(starts * local))
+            ring.append(bm.verts.new((math.cos(th) * r, math.sin(th) * r, z)))
+        rings.append(ring)
+    for li in range(levels):
+        for si in range(segments):
+            a, b = rings[li][si], rings[li][(si + 1) % segments]
+            c, d = rings[li + 1][(si + 1) % segments], rings[li + 1][si]
+            f = bm.faces.new((a, b, c, d))
+            local = (si + 0.5) / segments * math.pi * 2
+            f.material_index = 0 if math.sin(starts * local) > -0.2 else 1
+    bm.faces.new(tuple(reversed(rings[0])))
+    top = bm.faces.new(tuple(rings[-1]))
+    top.material_index = 0
+    for f in bm.faces:
+        f.smooth = True
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    ob = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(ob)
+    for mat in mats:
+        ob.data.materials.append(mat)
+    return ob
+
+
+def twister(m) -> list[bpy.types.Object]:
+    """A cartoon dust devil: a tapered funnel with a two-start helical ridge in two sand tones, a puffy dust
+    cloud at the foot and a domed top. One `Body` node; the game spins, wobbles and leans it."""
+    body = [_funnel('Funnel', (m['sand_c'], m['sand_b']))]
+    rng = random.Random(7)
+    # Dust cloud at the foot: a ring of flattened puffs.
+    for i in range(6):
+        a = i / 6 * math.pi * 2 + rng.uniform(-0.2, 0.2)
+        r = rng.uniform(0.9, 1.35)
+        puff = sphere(f'Puff{i}', rng.uniform(0.55, 0.8), loc=(math.cos(a) * r, math.sin(a) * r, 0.46),
+                      scale=(1, 1, 0.55), segments=14, rings=8)
+        assign(puff, m['sand_c'] if i % 2 else m['sand_a'])
+        body.append(puff)
+    core = sphere('Puff.Core', 0.95, loc=(0, 0, 0.5), scale=(1, 1, 0.5), segments=14, rings=8)
+    assign(core, m['sand_c'])
+    body.append(core)
+    for i in range(7):
+        a = rng.uniform(0, math.pi * 2)
+        r = rng.uniform(1.3, 2.1)
+        g = box(f'Grit{i}', (0.18, 0.13, 0.11), loc=(math.cos(a) * r, math.sin(a) * r, 0.08))
+        rotate(g, z=rng.uniform(0, 90))
+        assign(g, m['grit'])
+        body.append(g)
+    # Domed, cloudy top so the funnel does not end in a flat disc.
+    for i in range(7):
+        a = i / 7 * math.pi * 2
+        r = TWISTER_TOP_RADIUS * 0.62
+        cap = sphere(f'Cap{i}', TWISTER_TOP_RADIUS * 0.5, loc=(math.cos(a) * r, math.sin(a) * r, TWISTER_HEIGHT - 0.2),
+                     scale=(1, 1, 0.45), segments=14, rings=8)
+        assign(cap, m['sand_a'] if i % 2 else m['sand_c'])
+        body.append(cap)
+    return body
+
+
 def registry() -> dict:
     reg = {}
     builders = {
@@ -383,4 +553,9 @@ def registry() -> dict:
         reg[f'prop_rock_{v}'] = (lambda vv: (lambda: pivot('Body', (0, 0, 0), rock(vv, _materials()))))(v)
     for v in range(HOUSE_VARIANTS):
         reg[f'prop_house_{v}'] = (lambda vv: (lambda: pivot('Body', (0, 0, 0), house(vv, _materials()))))(v)
+    for v in range(GRASS_VARIANTS):
+        reg[f'prop_grass_{v}'] = (lambda vv: (lambda: pivot('Body', (0, 0, 0), grass(vv, _materials()))))(v)
+    for v in range(FLOWER_VARIANTS):
+        reg[f'prop_flower_{v}'] = (lambda vv: (lambda: pivot('Body', (0, 0, 0), flower(vv, _materials()))))(v)
+    reg['prop_twister'] = lambda: pivot('Body', (0, 0, 0), twister(_materials()))
     return reg

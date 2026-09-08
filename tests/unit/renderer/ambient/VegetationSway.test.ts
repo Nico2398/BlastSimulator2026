@@ -2,8 +2,12 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { VegetationSway, treeFamilyForBiome, TREE_FAMILY_BY_BIOME, type VegetationModels } from '../../../../src/renderer/ambient/VegetationSway.js';
-import { bushModelId, treeFarModelId, treeModelId } from '../../../../src/renderer/models/ModelIds.js';
+import {
+  VegetationSway, treeFamilyForBiome, TREE_FAMILY_BY_BIOME, FLOWER_BIOMES, GRASS_COLOR_BY_BIOME, type VegetationModels,
+} from '../../../../src/renderer/ambient/VegetationSway.js';
+import {
+  bushModelId, flowerModelId, grassModelId, treeFarModelId, treeModelId, FLOWER_VARIANTS, GRASS_VARIANTS,
+} from '../../../../src/renderer/models/ModelIds.js';
 import { loadedModelLibrary } from '../../../helpers/models.js';
 import { ModelLibrary } from '../../../../src/renderer/models/ModelLibrary.js';
 import { createAmbientUniforms } from '../../../../src/renderer/ambient/AmbientUniforms.js';
@@ -181,13 +185,55 @@ describe('VegetationSway — prop models', () => {
     const scene = new THREE.Scene();
     const trees = [makeTree({ variant: 0 })];
     const bare = new VegetationSway(scene, 42, createAmbientUniforms(), trees, 16, 16, RECT, flatGround, { library: new ModelLibrary(), biomeId: 'alpine_granite' });
-    // Only the variants actually planted are looked up; bushes always are.
-    expect(bare.missingModelIds).toEqual([treeModelId('conifer', 0), bushModelId(0), bushModelId(1)]);
+    // Only the tree variants actually planted are looked up; grass, flowers (an alpine biome grows them) and bushes always are.
+    expect(bare.missingModelIds).toEqual([
+      treeModelId('conifer', 0), grassModelId(0), grassModelId(1), grassModelId(2), flowerModelId(0), flowerModelId(1),
+      bushModelId(0), bushModelId(1),
+    ]);
     bare.dispose();
-    const ids = [0, 1, 2].flatMap(v => [treeModelId('conifer', v), treeFarModelId('conifer', v)]).concat([bushModelId(0), bushModelId(1)]);
+    const ids = [0, 1, 2].flatMap(v => [treeModelId('conifer', v), treeFarModelId('conifer', v)]).concat([
+      bushModelId(0), bushModelId(1), grassModelId(0), grassModelId(1), grassModelId(2), flowerModelId(0), flowerModelId(1),
+    ]);
     const full = new VegetationSway(scene, 42, createAmbientUniforms(), trees, 16, 16, RECT, flatGround, { library: await loadedModelLibrary(ids), biomeId: 'alpine_granite' });
     expect(full.missingModelIds).toEqual([]);
     full.dispose();
+  });
+
+  it('draws grass tufts from the library, tinted for the biome and outlined, with wildflowers where the biome is lush', async () => {
+    const ids = [...Array.from({ length: GRASS_VARIANTS }, (_, v) => grassModelId(v)), ...Array.from({ length: FLOWER_VARIANTS }, (_, v) => flowerModelId(v))];
+    const library = await loadedModelLibrary(ids);
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [], 16, 16, RECT, flatGround, { library, biomeId: 'green_foothills' });
+    expect(veg.grassInstanceCount).toBeGreaterThan(0);
+    expect(veg.flowerInstanceCount).toBeGreaterThan(0);
+    expect(veg.missingModelIds).toEqual([bushModelId(0), bushModelId(1)]); // only the bushes were left out of this library
+    const tufts = scene.children.filter((c): c is THREE.InstancedMesh => c.name === 'vegetation-grass');
+    expect(tufts).toHaveLength(GRASS_VARIANTS);
+    // Grass and flowers are the two props drawn without an outline hull: at a tuft's
+    // on-screen size the line is noise, and skipping it halves their cost.
+    expect(scene.children.filter(c => c.name === 'vegetation-grass-outline')).toHaveLength(0);
+    expect(scene.children.filter(c => c.name === 'vegetation-flowers-outline')).toHaveLength(0);
+    expect(scene.children.some(c => c.name === 'vegetation-flowers')).toBe(true);
+    // The TintGrass surface carries the biome's colour.
+    const tint = new THREE.Color(GRASS_COLOR_BY_BIOME['green_foothills']!);
+    const painted = tufts.flatMap(t => (Array.isArray(t.material) ? t.material : [t.material]) as THREE.MeshToonMaterial[]);
+    expect(painted.some(m => m.color.getHex() === tint.getHex())).toBe(true);
+    veg.dispose();
+    expect(scene.children).toHaveLength(0);
+  });
+
+  it('grows no flowers on a desert rim and tints its grass straw-coloured', async () => {
+    const library = await loadedModelLibrary([grassModelId(0), grassModelId(1), grassModelId(2)]);
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [], 16, 16, RECT, flatGround, { library, biomeId: 'desert_badlands' });
+    expect(FLOWER_BIOMES.has('desert_badlands')).toBe(false);
+    expect(veg.flowerInstanceCount).toBe(0);
+    expect(scene.children.some(c => c.name === 'vegetation-flowers')).toBe(false);
+    expect(veg.grassInstanceCount).toBeGreaterThan(0);
+    const tuft = scene.children.find((c): c is THREE.InstancedMesh => c.name === 'vegetation-grass')!;
+    const mats = (Array.isArray(tuft.material) ? tuft.material : [tuft.material]) as THREE.MeshToonMaterial[];
+    expect(mats.some(m => m.color.getHex() === GRASS_COLOR_BY_BIOME['desert_badlands'])).toBe(true);
+    veg.dispose();
   });
 
   it('maps every biome to a tree family and unknown biomes to deciduous', () => {

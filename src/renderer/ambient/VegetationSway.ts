@@ -1,13 +1,15 @@
 // BlastSimulator2026 — Vegetation: trees, bushes and rim grass, wind sway
 // entirely in the vertex shader (#458 T7.2/D12/A26)
 //
-// Trees and bushes are the biome's prop models from the model library
-// (assets/models/blender/props.py), drawn instanced with a toon surface and
-// an outline hull that bend together. A tree asset that has not loaded
-// falls back to a cone-and-trunk prototype built here, through the same
-// path. Static once built — no per-frame CPU work at all. Sway comes from
-// the shared {uTime, uWind} ambient uniforms, updated once per frame and
-// read by every material that references the same uniform objects.
+// Trees, bushes, grass tufts and wildflowers are the biome's prop models
+// from the model library (assets/models/blender/props.py), drawn instanced
+// with a toon surface and an outline hull that bend together; grass is
+// tinted per biome and flowers grow only where FLOWER_BIOMES says. An asset
+// that has not loaded falls back to a stand-in built here (a cone tree, a
+// crossed-quad blade) through the same path, and its id is recorded so the
+// layer is rebuilt once it arrives. Static once built — no per-frame CPU
+// work at all. Sway comes from the shared {uTime, uWind} ambient uniforms,
+// updated once per frame and read by every material that references them.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -18,7 +20,10 @@ import type { AmbientUniforms } from './AmbientUniforms.js';
 import { modelLibrary, type ModelLibrary } from '../models/ModelLibrary.js';
 import { buildPrototype, type ModelPrototype } from '../models/ModelMerge.js';
 import { InstancedProp } from '../models/InstancedProp.js';
-import { bushModelId, treeFarModelId, treeModelId, BUSH_VARIANTS, TREE_VARIANTS, type TreeFamily } from '../models/ModelIds.js';
+import {
+  bushModelId, flowerModelId, grassModelId, treeFarModelId, treeModelId,
+  BUSH_VARIANTS, FLOWER_VARIANTS, GRASS_VARIANTS, TREE_VARIANTS, type TreeFamily,
+} from '../models/ModelIds.js';
 import type { SwayOptions } from '../models/CartoonMaterial.js';
 
 /** Which tree family a biome grows; biomes not listed get the deciduous set. */
@@ -49,11 +54,52 @@ const CANOPY_HEIGHT_BY_VARIANT = [4.5, 5.5, 3.8];
 const TRUNK_HEIGHT_BY_VARIANT = [1.5, 2.0, 1.2];
 
 const GRASS_RIM_MARGIN = 60;
-const GRASS_CELL = 3;
+/** Grass thickens toward the site: a dense band hugging the playable rect, a thinner one out to the rim margin. */
+const GRASS_NEAR_MARGIN = 24;
+const GRASS_NEAR_CELL = 1.7;
+const GRASS_NEAR_DENSITY = 0.62;
+const GRASS_CELL = 2.6;
 const GRASS_DENSITY = 0.4;
+/** Height of the crossed-quad stand-in blade drawn while the tuft assets are not in the library. */
 const GRASS_BLADE_HEIGHT = 0.6;
 const GRASS_SCALE_MIN = 0.7;
 const GRASS_SCALE_SPREAD = 0.6;
+/** Grass tufts carry an outline like every other prop; flip off to hand a slow GPU the draw back. */
+/**
+ * Grass and flowers are drawn without an outline hull. Every other prop gets
+ * one, but these two are placed by the thousand: at a tuft's on-screen size
+ * the screen-constant line is noise rather than shape, and skipping the hull
+ * halves both their triangle count and their draw calls.
+ */
+const GRASS_OUTLINE = false;
+/**
+ * Ceilings on how many tufts and flowers a level may draw. Both scatter in
+ * bands ringing the playable rect, so their count grows with its perimeter:
+ * bounded, but a very large site would still pay for tufts a pixel wide.
+ * Past the ceiling the points are thinned by an even stride — deterministic,
+ * and it keeps the band's shape rather than clipping one side of it.
+ */
+const GRASS_MAX_INSTANCES = 9000;
+const FLOWER_MAX_INSTANCES = 1200;
+const BUSH_MAX_INSTANCES = 900;
+const FLOWER_CELL = 4;
+const FLOWER_DENSITY = 0.2;
+const FLOWER_SCALE_MIN = 1.0;
+const FLOWER_SCALE_SPREAD = 0.6;
+/** Biomes lush enough for wildflowers among the grass. */
+export const FLOWER_BIOMES: ReadonlySet<string> = new Set(['green_foothills', 'tropical_karst', 'alpine_granite']);
+/** Grass tint per biome (`TintGrass`): lush greens, straw in the deserts, ash on the volcanic flats. */
+export const GRASS_COLOR_BY_BIOME: Readonly<Record<string, number>> = {
+  green_foothills: 0x5fa83a,
+  alpine_granite: 0x5b9a55,
+  tropical_karst: 0x4fb03c,
+  desert_badlands: 0xc2b064,
+  red_canyon: 0xb39a55,
+  volcanic_flats: 0x6f7a5e,
+};
+const GRASS_COLOR_DEFAULT = 0x5fa83a;
+/** Density multiplier per biome — deserts and lava fields grow sparser tufts. */
+const GRASS_DENSITY_BY_BIOME: Readonly<Record<string, number>> = { desert_badlands: 0.4, red_canyon: 0.5, volcanic_flats: 0.45 };
 
 /** Bushes dot the same rim band as the grass, far sparser and bigger. */
 const BUSH_CELL = 7;
@@ -126,6 +172,8 @@ export class VegetationSway {
   private readonly props: InstancedProp[] = [];
   private treeCount = 0;
   private bushCount = 0;
+  private grassCount = 0;
+  private flowerCount = 0;
   private grassMesh: THREE.InstancedMesh | null = null;
   private grassMaterial: THREE.MeshStandardMaterial | null = null;
   private readonly fallbackPrototypes: ModelPrototype[] = [];
@@ -203,55 +251,109 @@ export class VegetationSway {
     const insidePlayable = (x: number, z: number): boolean =>
       x >= playableRect.minX && x <= playableRect.maxX && z >= playableRect.minZ && z <= playableRect.maxZ;
 
-    const grassSeed = subSeed(levelSeed, 'grass');
-    const grassPoints = scatter(grassSeed, outer, GRASS_CELL, GRASS_DENSITY, GRASS_SCALE_MIN, GRASS_SCALE_SPREAD, insidePlayable);
-    if (grassPoints.length > 0) {
-      const geo = buildGrassGeometry();
-      this.grassMaterial = new THREE.MeshStandardMaterial({ color: 0x5a8f3f, roughness: 0.9, side: THREE.DoubleSide });
-      library.applyMaterialSetup(this.grassMaterial);
-      attachGrassSway(this.grassMaterial, ambient);
-      this.grassMesh = new THREE.InstancedMesh(geo, this.grassMaterial, grassPoints.length);
-      this.grassMesh.name = 'vegetation-grass';
-      this.grassMesh.castShadow = false;
-      this.grassMesh.receiveShadow = false;
-      for (let i = 0; i < grassPoints.length; i++) {
-        const g = grassPoints[i]!;
-        dummy.position.set(g.x, sampleGroundHeight(g.x, g.z), g.z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.setScalar(g.scale);
-        dummy.updateMatrix();
-        this.grassMesh.setMatrixAt(i, dummy.matrix);
+    // Grass: modelled tufts per variant, tinted for the biome, thinner where the ground is dry.
+    const biomeId = models.biomeId;
+    const biomeDensity = biomeId !== undefined ? GRASS_DENSITY_BY_BIOME[biomeId] ?? 1 : 1;
+    const nearBand = {
+      minX: playableRect.minX - GRASS_NEAR_MARGIN, maxX: playableRect.maxX + GRASS_NEAR_MARGIN,
+      minZ: playableRect.minZ - GRASS_NEAR_MARGIN, maxZ: playableRect.maxZ + GRASS_NEAR_MARGIN,
+    };
+    const insideNearBand = (x: number, z: number): boolean =>
+      x >= nearBand.minX && x <= nearBand.maxX && z >= nearBand.minZ && z <= nearBand.maxZ;
+    const grassPoints = thinTo([
+      ...scatter(subSeed(levelSeed, 'grass'), nearBand, GRASS_NEAR_CELL, GRASS_NEAR_DENSITY * biomeDensity, GRASS_SCALE_MIN, GRASS_SCALE_SPREAD, insidePlayable),
+      ...scatter(subSeed(levelSeed, 'grass-far'), outer, GRASS_CELL, GRASS_DENSITY * biomeDensity, GRASS_SCALE_MIN, GRASS_SCALE_SPREAD, insideNearBand),
+    ], GRASS_MAX_INSTANCES);
+    const grassTint = new THREE.Color(biomeId !== undefined ? GRASS_COLOR_BY_BIOME[biomeId] ?? GRASS_COLOR_DEFAULT : GRASS_COLOR_DEFAULT);
+    const fallbackGrass: ScatterPoint[] = [];
+    groupByVariant(grassPoints, GRASS_VARIANTS).forEach((points, v) => {
+      if (points.length === 0) return;
+      const proto = library.prototype(grassModelId(v));
+      if (!proto) {
+        this.missingModelIds.push(grassModelId(v));
+        fallbackGrass.push(...points);
+        return;
       }
-      this.grassMesh.instanceMatrix.needsUpdate = true;
-      this.scene.add(this.grassMesh);
+      const prop = new InstancedProp(proto, library, {
+        count: points.length, name: 'vegetation-grass', sway: swayFor(ambient, proto), tint: grassTint, outline: GRASS_OUTLINE,
+      });
+      this.place(prop, points, sampleGroundHeight);
+      this.grassCount += points.length;
+    });
+    if (fallbackGrass.length > 0) this.placeFallbackGrass(fallbackGrass, library, ambient, sampleGroundHeight);
+
+    // Wildflowers, only where the biome is green enough to grow them.
+    if (biomeId !== undefined && FLOWER_BIOMES.has(biomeId)) {
+      const flowerPoints = thinTo(
+        scatter(subSeed(levelSeed, 'flowers'), outer, FLOWER_CELL, FLOWER_DENSITY, FLOWER_SCALE_MIN, FLOWER_SCALE_SPREAD, insidePlayable),
+        FLOWER_MAX_INSTANCES,
+      );
+      groupByVariant(flowerPoints, FLOWER_VARIANTS).forEach((points, v) => {
+        if (points.length === 0) return;
+        const proto = library.prototype(flowerModelId(v));
+        if (!proto) {
+          this.missingModelIds.push(flowerModelId(v));
+          return;
+        }
+        this.place(new InstancedProp(proto, library, {
+          count: points.length, name: 'vegetation-flowers', sway: swayFor(ambient, proto), outline: GRASS_OUTLINE,
+        }), points, sampleGroundHeight);
+        this.flowerCount += points.length;
+      });
     }
 
     const bushSeed = subSeed(levelSeed, 'bushes');
-    const bushPoints = scatter(bushSeed, outer, BUSH_CELL, BUSH_DENSITY, BUSH_SCALE_MIN, BUSH_SCALE_SPREAD, insidePlayable);
-    const byBush: Array<typeof bushPoints> = Array.from({ length: BUSH_VARIANTS }, () => []);
-    for (const b of bushPoints) byBush[b.variant % BUSH_VARIANTS]!.push(b);
-    for (let v = 0; v < BUSH_VARIANTS; v++) {
+    const bushPoints = thinTo(scatter(bushSeed, outer, BUSH_CELL, BUSH_DENSITY, BUSH_SCALE_MIN, BUSH_SCALE_SPREAD, insidePlayable), BUSH_MAX_INSTANCES);
+    groupByVariant(bushPoints, BUSH_VARIANTS).forEach((points, v) => {
+      if (points.length === 0) return;
       const proto = library.prototype(bushModelId(v));
-      const points = byBush[v]!;
-      if (points.length === 0) continue;
       if (!proto) {
         this.missingModelIds.push(bushModelId(v));
-        continue;
+        return;
       }
-      const prop = new InstancedProp(proto, library, { count: points.length, name: 'vegetation-bushes', sway: swayFor(ambient, proto) });
-      for (let i = 0; i < points.length; i++) {
-        const b = points[i]!;
-        dummy.position.set(b.x, sampleGroundHeight(b.x, b.z), b.z);
-        dummy.rotation.set(0, b.yaw, 0);
-        dummy.scale.setScalar(b.scale);
-        dummy.updateMatrix();
-        prop.setMatrixAt(i, dummy.matrix);
-      }
-      prop.commit();
-      prop.addTo(this.scene);
-      this.props.push(prop);
+      this.place(new InstancedProp(proto, library, { count: points.length, name: 'vegetation-bushes', sway: swayFor(ambient, proto) }), points, sampleGroundHeight);
       this.bushCount += points.length;
+    });
+  }
+
+  /** Write one instance per scatter point — on the ground, turned and scaled as rolled — and add the batch to the scene. */
+  private place(prop: InstancedProp, points: readonly ScatterPoint[], sampleGroundHeight: (x: number, z: number) => number): void {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i]!;
+      scratch.position.set(p.x, sampleGroundHeight(p.x, p.z), p.z);
+      scratch.rotation.set(0, p.yaw, 0);
+      scratch.scale.setScalar(p.scale);
+      scratch.updateMatrix();
+      prop.setMatrixAt(i, scratch.matrix);
     }
+    prop.commit();
+    prop.addTo(this.scene);
+    this.props.push(prop);
+  }
+
+  /** Crossed-quad blades for tufts whose asset is not loaded yet — the pre-model grass, kept as the stand-in. */
+  private placeFallbackGrass(
+    points: readonly ScatterPoint[], library: ModelLibrary, ambient: AmbientUniforms,
+    sampleGroundHeight: (x: number, z: number) => number,
+  ): void {
+    const geo = buildGrassGeometry();
+    this.grassMaterial = new THREE.MeshStandardMaterial({ color: 0x5a8f3f, roughness: 0.9, side: THREE.DoubleSide });
+    library.applyMaterialSetup(this.grassMaterial);
+    attachGrassSway(this.grassMaterial, ambient);
+    this.grassMesh = new THREE.InstancedMesh(geo, this.grassMaterial, points.length);
+    this.grassMesh.name = 'vegetation-grass';
+    this.grassMesh.castShadow = false;
+    this.grassMesh.receiveShadow = false;
+    for (let i = 0; i < points.length; i++) {
+      const g = points[i]!;
+      scratch.position.set(g.x, sampleGroundHeight(g.x, g.z), g.z);
+      scratch.rotation.set(0, 0, 0);
+      scratch.scale.setScalar(g.scale);
+      scratch.updateMatrix();
+      this.grassMesh.setMatrixAt(i, scratch.matrix);
+    }
+    this.grassMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.grassMesh);
   }
 
   /** Number of tree instances actually built (sum across variants) — for tests/diagnostics. */
@@ -264,9 +366,14 @@ export class VegetationSway {
     return this.bushCount;
   }
 
-  /** Number of grass instances actually built — for tests/diagnostics. */
+  /** Number of grass tufts built — modelled ones plus any stand-in blades. */
   get grassInstanceCount(): number {
-    return this.grassMesh?.count ?? 0;
+    return this.grassCount + (this.grassMesh?.count ?? 0);
+  }
+
+  /** Number of wildflowers built — zero outside FLOWER_BIOMES or until their assets are in the library. */
+  get flowerInstanceCount(): number {
+    return this.flowerCount;
   }
 
   dispose(): void {
@@ -290,7 +397,25 @@ function swayFor(ambient: AmbientUniforms, proto: ModelPrototype): SwayOptions {
   return { uTime: ambient.uTime, uWind: ambient.uWind, canopyHeight: Math.max(0.5, proto.bounds.max.y) };
 }
 
+/** Evenly thin `points` down to `max`, keeping the spread of the whole band. Returns the input when it already fits. */
+function thinTo<T>(points: T[], max: number): T[] {
+  if (points.length <= max) return points;
+  const stride = points.length / max;
+  const out: T[] = [];
+  for (let i = 0; i < max; i++) out.push(points[Math.floor(i * stride)]!);
+  return out;
+}
+
 interface ScatterPoint { x: number; z: number; scale: number; yaw: number; variant: number }
+
+const scratch = new THREE.Object3D();
+
+/** Split scatter points into `variants` buckets by their rolled variant. */
+function groupByVariant(points: readonly ScatterPoint[], variants: number): ScatterPoint[][] {
+  const buckets: ScatterPoint[][] = Array.from({ length: variants }, () => []);
+  for (const p of points) buckets[p.variant % variants]!.push(p);
+  return buckets;
+}
 
 /** Seeded jittered-grid scatter over `outer`, skipping cells `excluded` and those failing the density roll. */
 function scatter(

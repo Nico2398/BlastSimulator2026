@@ -1,9 +1,10 @@
 # 3D models
 
-Every entity the player sees — the five worker minions, the five vehicles,
-the nine building types at three tiers, the rubble a destroyed building
-turns into, and the scenery around the site (trees for each biome, bushes,
-boulders, village houses) — is a `.glb` under `public/models/`, generated
+Every entity the player sees — the five worker minions, the five vehicles
+and nine building types at three tiers each, the rubble a destroyed
+building turns into, and the scenery around the site (trees for each
+biome, bushes, boulders, grass, wildflowers, village houses, the desert's
+dust devils) — is a `.glb` under `public/models/`, generated
 by Blender from the Python sources in `blender/`. Nothing is hand-modelled:
 re-running the generator reproduces every asset, and the saved `.blend`
 files are there for hand edits on top.
@@ -30,8 +31,31 @@ python3 assets/models/blender/build.py vehicles buildings # categories
 
 Model ids are derived in `src/renderer/models/ModelIds.ts` from the core
 catalogs (`EmployeeRole`, `VehicleRole`, `BuildingDefs`): `worker_<role>`,
-`vehicle_<role>`, `building_<type>_t<tier>`, `building_ruin`. A new role
-or tier needs a builder here and nothing else.
+`vehicle_<role>_t<tier>`, `building_<type>_t<tier>`, `building_ruin`. A new
+role or tier needs a builder here and nothing else.
+
+### Tiers are the satire
+
+Each tier is its own model, never a scaled or recoloured copy of another:
+
+- **Tier 1 is junk.** `vehicles_t1.py` and `buildings_t1.py`: the Dumpster
+  on Wheels is a dumpster on wheels, The Cells are cells, the Think Tank
+  Tent is a tent. Improvised, patched, dented, the wrong tool for the job.
+- **Tier 2 is the plain machine.** `vehicles.py` and `buildings.py`: what
+  the equipment would honestly look like.
+- **Tier 3 is corporate excess.** `vehicles_t3.py` and `buildings_t3.py`:
+  gold trim, chrome, glowing bits, a rooftop pool on the Unnecessarily
+  Luxurious Hotel, a helipad on the Corner Office Supreme.
+
+`build.py`'s registry routes `vehicle_<role>_t1` to `vehicles_t1.py`,
+`_t2` to `vehicles.py`, `_t3` to `vehicles_t3.py`, and a building tier to
+`buildings_t1.py` / `buildings_t3.py` when the module defines it, else to
+`buildings.py`. The runtime asks the same node names of every tier
+(`Body`, `Wheel*`, `Bed`, `Boom`/`Stick`/`Bucket`, `Mast`, `Blade`/`Ripper`,
+`Flywheel`/`Conveyor`; the green entry and orange exit door frames on a
+building's front row), and measures each wheel's radius from the model, so
+a bicycle wheel and a monster tyre both roll true. Tier 1 buildings must be
+lower than tier 2 and tier 3 taller — the game checks it.
 
 ## Previewing
 
@@ -89,6 +113,15 @@ materials matter:
 - `prop_house_<v>`: a unit box — walls 1×1 on the ground, ridge at y = 1 —
   that the renderer scales to each village house's `w × h × d`. The chimney
   sits at the house's (+0.25, −0.25) corner so `ChimneySmoke` puffs from it.
+- `prop_grass_<v>`: fat cartoon tufts, thousands per level, swaying like
+  the trees. Their `TintGrass` material is recoloured per biome
+  (`GRASS_COLOR_BY_BIOME` in `VegetationSway.ts`); keep every blade cheap —
+  a tuft is a few hundred triangles, and it is drawn with an outline hull.
+- `prop_flower_<v>`: wildflowers sprinkled among the grass where
+  `FLOWER_BIOMES` allows.
+- `prop_twister`: the dust devil, a striped funnel on a dust cloud, 9 m
+  tall. Not instanced — `DustDevils.ts` instantiates it per devil and spins,
+  wobbles and breathes the whole `Body`, with grit chunks orbiting it.
 
 ## Editing a .blend by hand
 

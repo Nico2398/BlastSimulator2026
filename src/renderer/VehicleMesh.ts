@@ -1,17 +1,16 @@
 // BlastSimulator2026 — Vehicle Meshes
-// Each vehicle is a model from the library (one .glb per role, built in
-// assets/models/blender/vehicles.py): dump truck, excavator, drill rig,
-// bulldozer, mobile crusher. Tier 2/3 vehicles are scaled up and their
-// `TintBody` paint brightened. Vehicles turn to face their direction of
-// travel; wheel nodes spin with distance covered and the crusher's flywheel
-// turns while it works.
+// Each vehicle is a model from the library, one .glb per role and tier
+// (assets/models/blender/vehicles.py draws the plain tier-2 machines,
+// vehicles_t1.py the junk caricatures, vehicles_t3.py the corporate
+// monsters). Vehicles turn to face their direction of travel; wheel nodes
+// spin with distance covered, each by its own radius, and the crusher's
+// flywheel turns while it works.
 //
 // Vehicles move smoothly to their target position via a duration-aware
 // tween each frame (#520 — see MovementInterpolation.ts).
 
 import * as THREE from 'three';
-import { brightenColor } from './MeshUtils.js';
-import type { Vehicle, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
 import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
@@ -19,10 +18,6 @@ import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
 import { createToonMaterial } from './models/CartoonMaterial.js';
-
-// ---------- Tier variation ----------
-const TIER_SCALE_MULT: Record<VehicleTier, number> = { 1: 1.0, 2: 1.15, 3: 1.3 };
-const TIER_BRIGHT_SHIFT: Record<VehicleTier, number> = { 1: 0.0, 2: 0.12, 3: 0.26 };
 
 /** Paint material every vehicle model exposes. */
 export const BODY_TINT = 'TintBody';
@@ -34,8 +29,10 @@ const FALLBACK_SIZE = [2.6, 1.8, 1.5] as const;
 const MOVE_SPEED_MIN = 0.05;
 /** Turn rate toward the direction of travel (rad/s) — slower than a worker, it is a truck. */
 const TURN_RATE = 4;
-/** Wheel radius the models are built with (m); spin = distance / radius. */
-const WHEEL_RADIUS = 0.42;
+/** Wheel radius when a wheel node's bounds are degenerate (m); spin = distance / radius. */
+const WHEEL_RADIUS_FALLBACK = 0.42;
+/** A wheel node smaller than this across is not a wheel we can measure. */
+const WHEEL_RADIUS_MIN = 0.05;
 /** Flywheel spin while working (rad/s). */
 const FLYWHEEL_RATE = 6;
 
@@ -44,8 +41,14 @@ interface VehicleEntry {
   instance: ModelInstance;
   vehicle: Vehicle;
   tween: MovementTween;
-  wheels: THREE.Object3D[];
+  wheels: Wheel[];
   flywheel: THREE.Object3D | null;
+}
+
+/** A wheel node and the radius it rolls on, measured from the model so a bicycle wheel and a monster tyre both turn true. */
+interface Wheel {
+  node: THREE.Object3D;
+  radius: number;
 }
 
 // ---------- Main class ----------
@@ -64,7 +67,6 @@ export class VehicleMesh {
   addVehicle(vehicle: Vehicle, surfaceY: number = 0): void {
     const group = new THREE.Group();
     const entry = this.attachModel(group, vehicle);
-    applyTierVariation(group, entry.instance, vehicle.tier);
     applyStateIndicator(group, vehicle.state, stateIndicatorHeight(entry.instance));
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
     const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
@@ -155,14 +157,13 @@ export class VehicleMesh {
   /** Swap any stand-in box for the real model once its asset has loaded. */
   refreshModels(): void {
     for (const entry of this.vehicles.values()) {
-      if (!entry.instance.isFallback || !this.library.has(vehicleModelId(entry.vehicle.type))) continue;
+      if (!entry.instance.isFallback || !this.library.has(vehicleModelId(entry.vehicle.type, entry.vehicle.tier))) continue;
       entry.group.remove(entry.instance.root);
       entry.instance.dispose();
       const fresh = this.attachModel(entry.group, entry.vehicle);
       entry.instance = fresh.instance;
       entry.wheels = fresh.wheels;
       entry.flywheel = fresh.flywheel;
-      applyTierVariation(entry.group, entry.instance, entry.vehicle.tier);
       applyStateIndicator(entry.group, entry.vehicle.state, stateIndicatorHeight(entry.instance));
     }
   }
@@ -191,11 +192,11 @@ export class VehicleMesh {
   }
 
   private attachModel(group: THREE.Group, vehicle: Vehicle): Omit<VehicleEntry, 'vehicle' | 'tween'> {
-    const instance = this.library.instantiate(vehicleModelId(vehicle.type), { size: FALLBACK_SIZE, tint: BODY_TINT });
+    const instance = this.library.instantiate(vehicleModelId(vehicle.type, vehicle.tier), { size: FALLBACK_SIZE, tint: BODY_TINT });
     group.add(instance.root);
-    const wheels: THREE.Object3D[] = [];
+    const wheels: Wheel[] = [];
     instance.root.traverse(obj => {
-      if (obj.name.startsWith('Wheel') && obj.parent === instance.root) wheels.push(obj);
+      if (obj.name.startsWith('Wheel') && obj.parent === instance.root) wheels.push({ node: obj, radius: wheelRadius(obj) });
     });
     return { group, instance, wheels, flywheel: instance.node('Flywheel') };
   }
@@ -207,7 +208,7 @@ export class VehicleMesh {
     if (dist / dt > MOVE_SPEED_MIN) {
       entry.group.rotation.y = turnToward(entry.group.rotation.y, headingFromDelta(dx, dz), TURN_RATE * dt);
       // Axles run along the model's Z; rolling forward turns them negative.
-      for (const wheel of entry.wheels) wheel.rotation.z -= dist / WHEEL_RADIUS;
+      for (const wheel of entry.wheels) wheel.node.rotation.z -= dist / wheel.radius;
     }
     if (entry.flywheel && entry.vehicle.state === 'working') entry.flywheel.rotation.z += FLYWHEEL_RATE * dt;
   }
@@ -277,11 +278,8 @@ export function applyStateIndicator(group: THREE.Group, state: VehicleOperationa
   (marker.material as THREE.MeshToonMaterial).color.setHex(color);
 }
 
-function applyTierVariation(group: THREE.Group, instance: ModelInstance, tier: VehicleTier): void {
-  group.scale.setScalar(TIER_SCALE_MULT[tier]);
-  const shift = TIER_BRIGHT_SHIFT[tier];
-  const paint = instance.tints.get(BODY_TINT);
-  if (shift > 0 && paint) {
-    paint.color.setHex(brightenColor(paint.color.getHex(), shift));
-  }
+/** Rolling radius of a wheel node: half its height, since the axle runs level. */
+function wheelRadius(node: THREE.Object3D): number {
+  const size = new THREE.Box3().setFromObject(node).getSize(new THREE.Vector3());
+  return size.y >= WHEEL_RADIUS_MIN ? size.y / 2 : WHEEL_RADIUS_FALLBACK;
 }
