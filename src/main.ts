@@ -3,6 +3,8 @@
 
 import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
+import { modelLibrary } from './renderer/models/ModelLibrary.js';
+import { fetchModelBytes, preloadModels, yieldToEventLoop } from './renderer/models/ModelLoader.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
@@ -49,6 +51,17 @@ import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const scene = new SceneManager(canvas);
+// Entity models share the scene's cascaded shadows: the hook runs on every
+// toon material the library creates, and its teardown drops the material
+// from CSM's bookkeeping when the instance owning it goes away.
+modelLibrary.setMaterialSetup(m => {
+  scene.csm.setupMaterial(m);
+  return () => { scene.csm.shaders.delete(m); };
+});
+// Fetch every model now, alongside the main menu; enterLevel() waits on it
+// as its first phase, and any level entered earlier (a harness driving
+// new_game straight away) catches up through GameRenderer.update().
+const modelsReady = preloadModels(modelLibrary, fetchModelBytes, { yieldBetween: yieldToEventLoop });
 
 // --- Game Renderer (bridges console commands → Three.js) ---
 const gameRenderer = new GameRenderer(scene);
@@ -292,6 +305,7 @@ function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
  * the five. Re-tune against real measurements if they diverge from this.
  */
 const LOAD_PHASE_WEIGHT = {
+  models: 1,
   terrain: 3,
   landscapeMap: 2,
   playableMesh: 3,
@@ -301,6 +315,10 @@ const LOAD_PHASE_WEIGHT = {
 
 function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Promise<void> {
   return loadingScreen.runPhases([
+    // Entity models (workers, vehicles, buildings) must be in the library
+    // before buildPlayableMesh() instantiates them, or the level opens on
+    // stand-in boxes. A cache hit after the first level.
+    { weight: LOAD_PHASE_WEIGHT.models, run: async () => { await modelsReady; } },
     {
       weight: LOAD_PHASE_WEIGHT.terrain,
       run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); },
@@ -680,6 +698,10 @@ window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 // rasterisation. Suspending the draw and forcing one frame per capture keeps
 // the images identical and stops the suites paying for frames nobody sees.
 window.__setRenderEnabled = (enabled: boolean) => { scene.setDrawingEnabled(enabled); };
+// Resolves once every model asset is in (or reported failed). A harness that
+// enters a level through __gameConsole skips enterLevel()'s wait on this, so
+// it awaits it here before capturing a frame it wants to show real assets.
+window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 window.__renderFrame = () => { scene.renderFrame(); };
 
 // Debug: expose grid reference info for diagnostics
@@ -695,6 +717,9 @@ window.__debugGridInfo = () => {
     lastGhostRevisionSynced: gameRenderer.lastGhostRevisionSynced,
     terrainMeshRevisionCount: gameRenderer.terrainMeshRevisionCount,
     lastTerrainRevisionSynced: gameRenderer.lastTerrainRevisionSynced,
+    modelsLoaded: modelLibrary.size,
+    modelRevision: modelLibrary.revision,
+    ambientMissingModelIds: gameRenderer.ambientMissingModelIds,
   };
 };
 

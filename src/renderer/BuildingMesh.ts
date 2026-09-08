@@ -1,70 +1,64 @@
 // BlastSimulator2026 — Building Meshes
-// Each building type is represented by a distinctive colored box placeholder.
-// Tier 2/3 buildings are taller and brightened; entry/exit points shown as markers.
-//
-// Design: bright cartoon colors, distinctive shapes per building type.
+// Each building is a model from the library — one .glb per type and tier,
+// sized to the footprint the game places it on (assets/models/blender/
+// buildings.py reads the same BuildingDefs). Tier 2/3 models are taller and
+// their `TintBody` walls brightened; a destroyed building becomes the shared
+// rubble model stretched over its footprint. Entry/exit pins float above
+// the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
 import type { Building, BuildingType } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
-import { disposeGroup, brightenColor } from './MeshUtils.js';
+import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
+import { buildingModelId, BUILDING_RUIN_MODEL_ID } from './models/ModelIds.js';
+import { createToonMaterial } from './models/CartoonMaterial.js';
 
-// ---------- Per-type visual config ----------
+// ---------- Stand-ins ----------
 
-interface BuildingVisual {
-  /** Base color hex (tier 1). */
-  color: number;
-  /** Base height in game units (1 unit = 1 voxel). */
-  height: number;
-  /** Optional accent element stacked on top (roof, chimney, etc.). */
-  accent?: { color: number; height: number; scaleXZ: number };
-}
-
-const BUILDING_VISUALS: Record<BuildingType, BuildingVisual> = {
-  driving_center:       { color: 0x44aaff, height: 3 },
-  blasting_academy:     { color: 0xff6600, height: 3, accent: { color: 0xff3300, height: 1,   scaleXZ: 0.7  } },
-  management_office:    { color: 0x77bbdd, height: 3, accent: { color: 0xaaddff, height: 0.5, scaleXZ: 0.95 } },
-  geology_lab:          { color: 0x996633, height: 3 },
-  research_center:      { color: 0x9944cc, height: 4, accent: { color: 0xcc66ff, height: 1,   scaleXZ: 0.8  } },
-  living_quarters:      { color: 0x4488cc, height: 4, accent: { color: 0x994422, height: 1.5, scaleXZ: 0.9  } },
-  explosive_warehouse:  { color: 0xff2222, height: 3 },
-  freight_warehouse:    { color: 0x888888, height: 5 },
-  vehicle_depot:        { color: 0xddaa22, height: 4 },
-};
-
-// ---------- Tier scaling ----------
-
-/** Height multiplier per tier: taller buildings at higher tiers. */
-const TIER_HEIGHT_MULT: Record<1 | 2 | 3, number> = { 1: 1.0, 2: 1.5, 3: 2.0 };
-/** Colour brightening shift per tier (0 = no shift, 1 = white). */
-const TIER_BRIGHT_SHIFT: Record<1 | 2 | 3, number> = { 1: 0.0, 2: 0.12, 3: 0.26 };
+/** Wall material every building model exposes. */
+export const BODY_TINT = 'TintBody';
+/** Stand-in height while the asset is not loaded: a plinth plus one storey per tier. */
+const FALLBACK_STOREY = 1.45;
+const FALLBACK_BASE = 0.6;
 
 // ---------- Entry / exit markers ----------
 
 const ENTRY_COLOR  = 0x00cc44;
 const EXIT_COLOR   = 0xff4400;
-const MARKER_SIZE   = 0.35;
-const MARKER_HEIGHT = 0.5;
+const MARKER_RADIUS = 0.18;
+const MARKER_CLEARANCE = 0.35;
 
 // ---------- Destroyed state ----------
 
-const DESTROYED_COLOR = 0x333333;
+/** The rubble model is built on a 2×2 footprint; height follows the shorter side within these bounds. */
+const RUIN_MODEL_FOOTPRINT = 2;
+const RUIN_HEIGHT_MIN = 0.6;
+const RUIN_HEIGHT_MAX = 1.4;
+
+interface BuildingEntry {
+  group: THREE.Group;
+  instance: ModelInstance;
+  markers: THREE.Mesh[];
+  building: Building;
+}
 
 // ---------- Main class ----------
 
 export class BuildingMesh {
   private readonly scene: THREE.Scene;
-  private readonly buildings = new Map<number, THREE.Group>();
+  private readonly library: ModelLibrary;
+  private readonly buildings = new Map<number, BuildingEntry>();
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
     this.scene = scene;
+    this.library = library;
   }
 
   /**
    * Add a building mesh to the scene.
    * Tier 2/3 buildings are taller and slightly brighter.
-   * Entry (green) and exit (orange) markers are added at ground level.
+   * Entry (green) and exit (orange) markers are added above the roof.
    *
    * @param surfaceY - Terrain surface height under the building's footprint
    *   centre. Buildings are static once placed, so unlike vehicles/characters
@@ -74,65 +68,16 @@ export class BuildingMesh {
    */
   addBuilding(building: Building, surfaceY = 0): void {
     const def = getBuildingDef(building.type, building.tier);
-    const vis = BUILDING_VISUALS[building.type];
-    const group = new THREE.Group();
-
-    const isDestroyed = building.hp <= 0;
-    const tier = building.tier as 1 | 2 | 3;
-    const heightMult  = TIER_HEIGHT_MULT[tier];
-    const brightShift = TIER_BRIGHT_SHIFT[tier];
-    const scaledHeight = vis.height * heightMult;
-
-    const baseColor = isDestroyed ? DESTROYED_COLOR : brightenColor(vis.color, brightShift);
-
-    // Use cached bounding-box size derived from the def's footprint
     const { sizeX, sizeZ } = getDefSize(def);
-
-    // Base box — spans the full footprint
-    const baseGeo = new THREE.BoxGeometry(sizeX, scaledHeight, sizeZ);
-    const baseMat = new THREE.MeshPhongMaterial({ color: baseColor, shininess: 20 });
-    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-    baseMesh.position.y = scaledHeight / 2;
-    group.add(baseMesh);
-
-    // Accent element (roof, chimney, etc.) — only for intact buildings.
-    // Track its top Y so markers can clear it too (#410 follow-up: an accent
-    // that covers the marker's footprint corner re-occludes it otherwise).
-    let markerBaseY = scaledHeight;
-    if (vis.accent && !isDestroyed) {
-      const ac = vis.accent;
-      const acHeight = ac.height * heightMult;
-      const acGeo = new THREE.BoxGeometry(sizeX * ac.scaleXZ, acHeight, sizeZ * ac.scaleXZ);
-      const acMat = new THREE.MeshPhongMaterial({
-        color: brightenColor(ac.color, brightShift),
-        shininess: 15,
-      });
-      const acMesh = new THREE.Mesh(acGeo, acMat);
-      acMesh.position.y = scaledHeight + acHeight / 2;
-      group.add(acMesh);
-      markerBaseY = scaledHeight + acHeight;
-    }
-
-    // Entry / exit markers — group is centred on footprint, so convert def offsets.
-    // Sit above the tallest geometry at that footprint (base box, or the roof
-    // accent when present — #410) rather than at y=0..0.5, which buries them
-    // fully inside the opaque base box and makes them invisible from any
-    // external camera angle (#410).
-    if (!isDestroyed) {
-      const ex = def.entryPoint[0] + 0.5 - sizeX / 2;
-      const ez = def.entryPoint[1] + 0.5 - sizeZ / 2;
-      const xx = def.exitPoint[0]  + 0.5 - sizeX / 2;
-      const xz = def.exitPoint[1]  + 0.5 - sizeZ / 2;
-      group.add(makeMarker(ex, ez, ENTRY_COLOR, markerBaseY));
-      group.add(makeMarker(xx, xz, EXIT_COLOR, markerBaseY));
-    }
+    const group = new THREE.Group();
+    const { instance, markers } = this.attachModel(group, building);
 
     // Position: grid cell centre in world coords, resting on the terrain surface
     group.position.set(building.x + sizeX / 2, surfaceY, building.z + sizeZ / 2);
 
     tagPickable(group, 'building', building.id);
     this.scene.add(group);
-    this.buildings.set(building.id, group);
+    this.buildings.set(building.id, { group, instance, markers, building });
   }
 
   /**
@@ -146,21 +91,33 @@ export class BuildingMesh {
 
   /** Remove a building mesh from the scene. */
   removeBuilding(id: number): void {
-    const group = this.buildings.get(id);
-    if (group) {
-      this.scene.remove(group);
-      disposeGroup(group);
+    const entry = this.buildings.get(id);
+    if (entry) {
+      this.scene.remove(entry.group);
+      disposeEntry(entry);
       this.buildings.delete(id);
     }
   }
 
   /** Remove all building meshes. */
   clearAll(): void {
-    for (const group of this.buildings.values()) {
-      this.scene.remove(group);
-      disposeGroup(group);
+    for (const entry of this.buildings.values()) {
+      this.scene.remove(entry.group);
+      disposeEntry(entry);
     }
     this.buildings.clear();
+  }
+
+  /** Swap any stand-in box for the real model once its asset has loaded. */
+  refreshModels(): void {
+    for (const entry of this.buildings.values()) {
+      if (!entry.instance.isFallback || !this.library.has(modelIdFor(entry.building))) continue;
+      entry.group.clear();
+      disposeEntry(entry);
+      const fresh = this.attachModel(entry.group, entry.building);
+      entry.instance = fresh.instance;
+      entry.markers = fresh.markers;
+    }
   }
 
   get count(): number {
@@ -169,33 +126,82 @@ export class BuildingMesh {
 
   /** Root objects raycastable for scene picking — one Group per building, tagged in addBuilding(). */
   pickables(): THREE.Object3D[] {
-    return Array.from(this.buildings.values());
+    return Array.from(this.buildings.values(), e => e.group);
   }
 
   /** Current world-space position of a building's root Group, or null if it isn't rendered. */
   getPosition(id: number): THREE.Vector3 | null {
-    return this.buildings.get(id)?.position.clone() ?? null;
+    return this.buildings.get(id)?.group.position.clone() ?? null;
+  }
+
+  /** The model instance drawn for a building, or null — exposes tint materials to tests. */
+  getInstance(id: number): ModelInstance | null {
+    return this.buildings.get(id)?.instance ?? null;
   }
 
   dispose(): void {
     this.clearAll();
   }
+
+  /** Instantiate the building's model (or the ruin at hp 0), tint it, and pin its doors. */
+  private attachModel(group: THREE.Group, building: Building): { instance: ModelInstance; markers: THREE.Mesh[] } {
+    const def = getBuildingDef(building.type, building.tier);
+    const { sizeX, sizeZ } = getDefSize(def);
+    const isDestroyed = building.hp <= 0;
+    const instance = this.library.instantiate(modelIdFor(building), {
+      size: [sizeX, isDestroyed ? RUIN_HEIGHT_MIN : FALLBACK_BASE + FALLBACK_STOREY * building.tier, sizeZ],
+      tint: BODY_TINT,
+    });
+    group.add(instance.root);
+
+    if (isDestroyed) {
+      // Rubble stretched over the footprint; taller for a bigger building.
+      const height = THREE.MathUtils.clamp(Math.min(sizeX, sizeZ) / 2.5, RUIN_HEIGHT_MIN, RUIN_HEIGHT_MAX);
+      instance.root.scale.set(sizeX / RUIN_MODEL_FOOTPRINT, height, sizeZ / RUIN_MODEL_FOOTPRINT);
+      return { instance, markers: [] };
+    }
+
+    // Entry / exit pins — group is centred on footprint, so convert def offsets.
+    // They sit above the tallest geometry (#410) so no roof can hide them.
+    const roofY = instance.bounds.max.y;
+    const ex = def.entryPoint[0] + 0.5 - sizeX / 2;
+    const ez = def.entryPoint[1] + 0.5 - sizeZ / 2;
+    const xx = def.exitPoint[0]  + 0.5 - sizeX / 2;
+    const xz = def.exitPoint[1]  + 0.5 - sizeZ / 2;
+    const markers = [makeMarker(ex, ez, ENTRY_COLOR, roofY), makeMarker(xx, xz, EXIT_COLOR, roofY)];
+    for (const marker of markers) group.add(marker);
+    return { instance, markers };
+  }
 }
 
 // ---------- Helpers ----------
 
+function modelIdFor(building: Building): string {
+  return building.hp <= 0
+    ? BUILDING_RUIN_MODEL_ID
+    : buildingModelId(building.type as BuildingType, building.tier);
+}
+
+function disposeEntry(entry: BuildingEntry): void {
+  entry.instance.dispose();
+  for (const marker of entry.markers) {
+    marker.geometry.dispose();
+    (marker.material as THREE.Material).dispose();
+  }
+}
+
 /**
- * Small flat cube marking an entry or exit point, sitting on top of the
- * building's roof so it is never enclosed by the opaque base box.
+ * A small toon-shaded pin floating over an entry or exit cell, above the
+ * roof so it is never enclosed by the building.
  * @param localX  - X in the building group's local coordinate space (centred on footprint).
  * @param localZ  - Z in the building group's local coordinate space.
  * @param color   - 0x00cc44 for entry (green), 0xff4400 for exit (orange).
- * @param roofY   - Y of the building's roof (top of the base box) in local space.
+ * @param roofY   - Y of the building's highest point in local space.
  */
 function makeMarker(localX: number, localZ: number, color: number, roofY: number): THREE.Mesh {
-  const geo = new THREE.BoxGeometry(MARKER_SIZE, MARKER_HEIGHT, MARKER_SIZE);
-  const mat = new THREE.MeshPhongMaterial({ color, shininess: 60 });
+  const geo = new THREE.SphereGeometry(MARKER_RADIUS, 12, 8);
+  const mat = createToonMaterial({ color: new THREE.Color(color), name: 'doorMarker' });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(localX, roofY + MARKER_HEIGHT / 2, localZ);
+  mesh.position.set(localX, roofY + MARKER_CLEARANCE, localZ);
   return mesh;
 }

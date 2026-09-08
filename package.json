@@ -29,7 +29,10 @@
     "screenshot": "tsx scripts/screenshot.ts",
     "a11y": "tsx scripts/a11y-check.ts",
     "ui:diagnostic": "tsx scripts/ui-diagnostic.ts",
-    "validate:state": "tsx scripts/validate-state-schema.ts"
+    "validate:state": "tsx scripts/validate-state-schema.ts",
+    "models:defs": "tsx scripts/export-model-defs.ts",
+    "models:build": "npm run models:defs && python3 assets/models/blender/build.py",
+    "models:preview": "tsx scripts/model-preview.ts"
   },
   "dependencies": {
     "simplex-noise": "^4.0.3",

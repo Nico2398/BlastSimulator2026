@@ -30,6 +30,8 @@ import { WaterSurface } from './ambient/WaterSurface.js';
 import { VegetationSway } from './ambient/VegetationSway.js';
 import { DustDevils } from './ambient/DustDevils.js';
 import { Fireflies } from './ambient/Fireflies.js';
+import { Scenery } from './ambient/Scenery.js';
+import { modelLibrary } from './models/ModelLibrary.js';
 import type { AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { FragmentAnimator } from './FragmentAnimator.js';
@@ -74,6 +76,7 @@ export interface SceneSetupDeps {
   vegetation: VegetationSway | null;
   dustDevils: DustDevils | null;
   fireflies: Fireflies | null;
+  scenery: Scenery | null;
   readonly ambientUniforms: AmbientUniforms;
   fragments: FragmentMesh | null;
   fragmentAnimator: FragmentAnimator | null;
@@ -249,13 +252,14 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
  * the previous grid don't pile up in the scene. Pre-existing duplication in
  * the original monolith, extracted here (#767 refactor pass).
  */
-function disposeAmbientModules(deps: Pick<SceneSetupDeps, 'birds' | 'smoke' | 'water' | 'vegetation' | 'dustDevils' | 'fireflies'>): void {
+function disposeAmbientModules(deps: Pick<SceneSetupDeps, 'birds' | 'smoke' | 'water' | 'vegetation' | 'dustDevils' | 'fireflies' | 'scenery'>): void {
   deps.birds?.dispose();
   deps.smoke?.dispose();
   deps.water?.dispose();
   deps.vegetation?.dispose();
   deps.dustDevils?.dispose();
   deps.fireflies?.dispose();
+  deps.scenery?.dispose();
 }
 
 /**
@@ -284,11 +288,16 @@ export function buildAmbient(deps: SceneSetupDeps, ctx: MiningContext): void {
   deps.vegetation = new VegetationSway(
     deps.sm.scene, ctx.state.seed, deps.ambientUniforms, handle.structureSet.trees,
     centerX, centerZ, handle.playableRect, sampleHeight,
+    { library: modelLibrary, biomeId: biome.id },
+  );
+  deps.scenery = new Scenery(
+    deps.sm.scene, ctx.state.seed, modelLibrary, handle.structureSet.villages,
+    handle.playableRect, centerX, centerZ, sampleHeight, biome.id,
   );
   // Per-biome ambient extras (#458 T7.3) — only the module matching this
   // level's biome gets built; the other stays null.
   deps.dustDevils = DUST_DEVIL_BIOMES.has(biome.id)
-    ? new DustDevils(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+    ? new DustDevils(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight, modelLibrary)
     : null;
   deps.fireflies = FIREFLY_BIOMES.has(biome.id)
     ? new Fireflies(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
@@ -373,6 +382,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.vegetation = null;
   deps.dustDevils = null;
   deps.fireflies = null;
+  deps.scenery = null;
   deps.fragments = null;
   deps.blastEffects = null;
   deps.landscape = null;

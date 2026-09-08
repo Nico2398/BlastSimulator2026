@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { ROLE_COLORS, ROLE_TINT } from '../../../src/renderer/CharacterMesh.js';
+import { loadedModelLibrary } from '../../helpers/models.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
 function makeEmployee(id: number, overrides: Partial<Employee> = {}): Employee {
@@ -40,12 +42,16 @@ function makeEmployee(id: number, overrides: Partial<Employee> = {}): Employee {
 }
 
 describe('CharacterMesh', () => {
-  it('addEmployee adds a group with 3 children (body + head + hat)', () => {
+  it('addEmployee adds a group holding the worker model (a stand-in box until the asset is loaded)', () => {
     const scene = new THREE.Scene();
     const cm = new CharacterMesh(scene);
     cm.addEmployee(makeEmployee(1));
     const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBe(3);
+    const instance = cm.getInstance(1)!;
+    expect(group.children).toEqual([instance.root]);
+    expect(instance.root.name).toBe('worker_driller');
+    expect(instance.isFallback).toBe(true);
+    expect(instance.tints.get(ROLE_TINT)!.color.getHex()).toBe(ROLE_COLORS.driller);
     cm.dispose();
   });
 
@@ -64,12 +70,11 @@ describe('CharacterMesh', () => {
     cm.addEmployee(makeEmployee(1, { role: 'driller', injured: false }));
     cm.addEmployee(makeEmployee(2, { role: 'driller', injured: true }));
 
-    const g1 = scene.children[0] as THREE.Group;
-    const g2 = scene.children[1] as THREE.Group;
-    const c1 = (g1.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
-    const c2 = (g2.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+    const c1 = cm.getInstance(1)!.tints.get(ROLE_TINT)!;
+    const c2 = cm.getInstance(2)!.tints.get(ROLE_TINT)!;
     // Injured should be darker/more red
     expect(c2.color.getHex()).not.toBe(c1.color.getHex());
+    expect(c1.color.getHex()).toBe(ROLE_COLORS.driller);
     cm.dispose();
   });
 
@@ -349,5 +354,70 @@ describe('CharacterMesh', () => {
       expect(indicatorWorldPos.z).toBeCloseTo(groupPos.z);
       cm.dispose();
     });
+  });
+});
+
+describe('CharacterMesh — model animation (real assets)', () => {
+  const load = () => loadedModelLibrary(['worker_driller', 'worker_manager']);
+
+  it('draws the exported worker with its six pivot nodes and the role tint', async () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, await load());
+    cm.addEmployee(makeEmployee(1, { role: 'manager' }));
+    const inst = cm.getInstance(1)!;
+    expect(inst.isFallback).toBe(false);
+    for (const n of ['Head', 'Torso', 'ArmL', 'ArmR', 'LegL', 'LegR']) expect(inst.node(n)).not.toBeNull();
+    expect(inst.tints.get(ROLE_TINT)!.color.getHex()).toBe(ROLE_COLORS.manager);
+    cm.dispose();
+  });
+
+  it('turns to face the direction of travel and swings legs and arms while walking, then settles at rest', async () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, await load());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    const group = cm.getGroup(1)!;
+    const inst = cm.getInstance(1)!;
+    const legL = inst.node('LegL')!;
+    const armL = inst.node('ArmL')!;
+
+    // Walk toward +Z: the model faces +X at rest, so it must turn to -π/2.
+    emp.z = 4;
+    let maxSwing = 0;
+    for (let i = 0; i < 20; i++) {
+      cm.update([emp], 0.05);
+      maxSwing = Math.max(maxSwing, Math.abs(legL.rotation.z));
+    }
+    expect(group.rotation.y).toBeCloseTo(-Math.PI / 2, 1);
+    expect(maxSwing).toBeGreaterThan(0.1);
+    // Arms counter-swing the legs.
+    expect(Math.sign(armL.rotation.z)).toBe(-Math.sign(legL.rotation.z));
+
+    // Arrived: the gait blends out and the limbs return to rest.
+    for (let i = 0; i < 40; i++) cm.update([emp], 0.05);
+    expect(legL.rotation.z).toBeCloseTo(0, 5);
+    expect(armL.rotation.z).toBeCloseTo(0, 5);
+    expect(inst.root.position.y).toBeCloseTo(0, 5);
+    cm.dispose();
+  });
+
+  it('refreshModels swaps a stand-in for the real model once the library has it', async () => {
+    const library = await loadedModelLibrary([]);
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, library);
+    cm.addEmployee(makeEmployee(1, { role: 'driller', injured: true }));
+    expect(cm.getInstance(1)!.isFallback).toBe(true);
+    cm.refreshModels(); // nothing loaded yet — still the stand-in
+    expect(cm.getInstance(1)!.isFallback).toBe(true);
+    const loaded = await loadedModelLibrary(['worker_driller']);
+    library.register('worker_driller', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('worker_driller')!);
+    cm.refreshModels();
+    const inst = cm.getInstance(1)!;
+    expect(inst.isFallback).toBe(false);
+    expect(inst.node('Head')).not.toBeNull();
+    // The injury tint carries over to the real model.
+    expect(inst.tints.get(ROLE_TINT)!.color.getHex()).not.toBe(ROLE_COLORS.driller);
+    expect(cm.getGroup(1)!.children).toEqual([inst.root]);
+    cm.dispose();
   });
 });

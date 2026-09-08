@@ -19,6 +19,8 @@ declare global {
     __setAutoTick: (enabled: boolean) => void;
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
+    /** Settles when the model preload started at boot is done — see ModelLoader.preloadModels. */
+    __modelsReady: () => Promise<{ loaded: number; failed: string[] }>;
     __debugGridInfo: () => Record<string, unknown>;
     __entityWorldPosition: (kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number) => { x: number; z: number } | null;
     /** Scenario-harness hooks for the P3 in-scene placement tool — see PlacementController.paintRect for why this bypasses real pointer events. */

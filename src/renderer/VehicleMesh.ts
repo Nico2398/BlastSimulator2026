@@ -1,172 +1,79 @@
 // BlastSimulator2026 — Vehicle Meshes
-// Recognizable silhouettes, cartoon yellow. Tier 2/3 vehicles are scaled up
-// and color-brightened via applyTierVariation().
-//
-// Shapes:
-//   debris_hauler     → yellow box body + 4 wheel cylinders
-//   rock_digger       → yellow box body + arm (cylinder) + bucket (small box)
-//   drill_rig         → tall grey cylinder with yellow top
-//   building_destroyer → low yellow box + front blade (flat box)
-//   rock_fragmenter   → yellow box body + crusher head
+// Each vehicle is a model from the library, one .glb per role and tier
+// (assets/models/blender/vehicles.py draws the plain tier-2 machines,
+// vehicles_t1.py the junk caricatures, vehicles_t3.py the corporate
+// monsters). Vehicles turn to face their direction of travel; wheel nodes
+// spin with distance covered, each by its own radius, and the crusher's
+// flywheel turns while it works.
 //
 // Vehicles move smoothly to their target position via a duration-aware
 // tween each frame (#520 — see MovementInterpolation.ts).
 
 import * as THREE from 'three';
-import { disposeGroup, brightenColor } from './MeshUtils.js';
-import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
 import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { headingFromDelta, turnToward } from './Heading.js';
+import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
+import { vehicleModelId } from './models/ModelIds.js';
+import { createToonMaterial } from './models/CartoonMaterial.js';
 
-// ---------- Colors ----------
-const YELLOW = 0xf5c518;   // Caterpillar yellow
-const DARK_GREY = 0x444444; // Tracks / wheels
-const STEEL = 0x8888aa;     // Drill rig body
-const ORANGE = 0xff7700;    // Accent / active highlight
+/** Paint material every vehicle model exposes. */
+export const BODY_TINT = 'TintBody';
+/** Stand-in box while the asset is not loaded: a truck-sized envelope. */
+const FALLBACK_SIZE = [2.6, 1.8, 1.5] as const;
 
-// ---------- Tier variation ----------
-const TIER_SCALE_MULT: Record<VehicleTier, number> = { 1: 1.0, 2: 1.15, 3: 1.3 };
-const TIER_BRIGHT_SHIFT: Record<VehicleTier, number> = { 1: 0.0, 2: 0.12, 3: 0.26 };
+// ---------- Motion ----------
+/** Below this ground speed (m/s) a vehicle is parked. */
+const MOVE_SPEED_MIN = 0.05;
+/** Turn rate toward the direction of travel (rad/s) — slower than a worker, it is a truck. */
+const TURN_RATE = 4;
+/** Wheel radius when a wheel node's bounds are degenerate (m); spin = distance / radius. */
+const WHEEL_RADIUS_FALLBACK = 0.42;
+/** A wheel node smaller than this across is not a wheel we can measure. */
+const WHEEL_RADIUS_MIN = 0.05;
+/** Flywheel spin while working (rad/s). */
+const FLYWHEEL_RATE = 6;
 
-// ---------- Vehicle visual builders ----------
+interface VehicleEntry {
+  group: THREE.Group;
+  instance: ModelInstance;
+  vehicle: Vehicle;
+  tween: MovementTween;
+  wheels: Wheel[];
+  flywheel: THREE.Object3D | null;
+}
 
-type GroupBuilder = () => THREE.Group;
-
-const VEHICLE_BUILDERS: Record<VehicleRole, GroupBuilder> = {
-  debris_hauler: () => {
-    const g = new THREE.Group();
-    // Body
-    const body = boxMesh(2.5, 1.2, 1.4, YELLOW);
-    body.position.set(0, 0.8, 0);
-    g.add(body);
-    // Cabin
-    const cab = boxMesh(0.9, 0.8, 1.3, YELLOW);
-    cab.position.set(-0.6, 1.8, 0);
-    g.add(cab);
-    // 4 wheels
-    for (const [wx, wz] of [[0.8, 0.8], [0.8, -0.8], [-0.8, 0.8], [-0.8, -0.8]] as const) {
-      const wheel = cylinderMesh(0.35, 0.25, DARK_GREY);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(wx, 0.35, wz);
-      g.add(wheel);
-    }
-    return g;
-  },
-
-  rock_digger: () => {
-    const g = new THREE.Group();
-    // Tracks (flat boxes)
-    for (const wz of [0.7, -0.7] as const) {
-      const track = boxMesh(2.2, 0.3, 0.4, DARK_GREY);
-      track.position.set(0, 0.15, wz);
-      g.add(track);
-    }
-    // Cab body
-    const body = boxMesh(1.2, 1.0, 1.2, YELLOW);
-    body.position.set(0, 0.8, 0);
-    g.add(body);
-    // Arm (cylinder pointing forward-up)
-    const arm = cylinderMesh(0.12, 1.6, STEEL);
-    arm.rotation.z = -Math.PI / 4;
-    arm.position.set(0.9, 1.5, 0);
-    g.add(arm);
-    // Bucket
-    const bucket = boxMesh(0.4, 0.25, 0.5, STEEL);
-    bucket.position.set(1.7, 0.8, 0);
-    g.add(bucket);
-    return g;
-  },
-
-  drill_rig: () => {
-    const g = new THREE.Group();
-    // Base platform
-    const base = boxMesh(1.5, 0.4, 1.5, DARK_GREY);
-    base.position.y = 0.2;
-    g.add(base);
-    // Tower (tall cylinder)
-    const tower = cylinderMesh(0.2, 5.0, STEEL);
-    tower.position.y = 2.7;
-    g.add(tower);
-    // Top drum
-    const drum = cylinderMesh(0.4, 0.4, YELLOW);
-    drum.position.y = 5.4;
-    g.add(drum);
-    // Cross-struts
-    for (const angle of [0, Math.PI / 2]) {
-      const strut = boxMesh(0.06, 3.0, 0.06, DARK_GREY);
-      strut.rotation.y = angle;
-      strut.position.y = 2.5;
-      g.add(strut);
-    }
-    return g;
-  },
-
-  building_destroyer: () => {
-    const g = new THREE.Group();
-    // Tracks
-    for (const wz of [0.6, -0.6] as const) {
-      const track = boxMesh(2.4, 0.35, 0.35, DARK_GREY);
-      track.position.set(0, 0.175, wz);
-      g.add(track);
-    }
-    // Body
-    const body = boxMesh(1.6, 0.9, 1.0, YELLOW);
-    body.position.set(0, 0.75, 0);
-    g.add(body);
-    // Engine hood
-    const hood = boxMesh(0.7, 0.5, 0.9, ORANGE);
-    hood.position.set(-0.65, 1.05, 0);
-    g.add(hood);
-    // Blade
-    const blade = boxMesh(0.15, 0.9, 1.6, STEEL);
-    blade.position.set(0.95, 0.65, 0);
-    g.add(blade);
-    return g;
-  },
-
-  rock_fragmenter: () => {
-    const g = new THREE.Group();
-    // Tracks
-    for (const wz of [0.6, -0.6] as const) {
-      const track = boxMesh(2.2, 0.35, 0.35, DARK_GREY);
-      track.position.set(0, 0.175, wz);
-      g.add(track);
-    }
-    // Body
-    const body = boxMesh(1.5, 0.85, 1.0, YELLOW);
-    body.position.set(0, 0.7, 0);
-    g.add(body);
-    // Crusher head
-    const crusher = boxMesh(0.5, 0.7, 1.4, STEEL);
-    crusher.position.set(0.9, 0.6, 0);
-    g.add(crusher);
-    return g;
-  },
-};
+/** A wheel node and the radius it rolls on, measured from the model so a bicycle wheel and a monster tyre both turn true. */
+interface Wheel {
+  node: THREE.Object3D;
+  radius: number;
+}
 
 // ---------- Main class ----------
 
 export class VehicleMesh {
   private readonly scene: THREE.Scene;
-  private readonly vehicles = new Map<number, { group: THREE.Group; vehicle: Vehicle; tween: MovementTween }>();
+  private readonly library: ModelLibrary;
+  private readonly vehicles = new Map<number, VehicleEntry>();
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
     this.scene = scene;
+    this.library = library;
   }
 
   /** Add a vehicle mesh to the scene at its position, optionally on a terrain surface. */
   addVehicle(vehicle: Vehicle, surfaceY: number = 0): void {
-    const builder = VEHICLE_BUILDERS[vehicle.type];
-    const group = builder();
-    applyTierVariation(group, vehicle.tier);
-    applyStateIndicator(group, vehicle.state);
+    const group = new THREE.Group();
+    const entry = this.attachModel(group, vehicle);
+    applyStateIndicator(group, vehicle.state, stateIndicatorHeight(entry.instance));
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
     const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
     group.position.set(renderX, surfaceY, renderZ);
     tagPickable(group, 'vehicle', vehicle.id);
     this.scene.add(group);
-    this.vehicles.set(vehicle.id, { group, vehicle, tween: createTween(renderX, renderZ) });
+    this.vehicles.set(vehicle.id, { ...entry, vehicle, tween: createTween(renderX, renderZ) });
   }
 
   /**
@@ -182,9 +89,12 @@ export class VehicleMesh {
       entry.vehicle = v;
       // Ease toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
-      const eased = stepTween(entry.tween, entry.group.position.x, entry.group.position.z, targetX, targetZ, dt);
+      const fromX = entry.group.position.x;
+      const fromZ = entry.group.position.z;
+      const eased = stepTween(entry.tween, fromX, fromZ, targetX, targetZ, dt);
       entry.group.position.x = eased.x;
       entry.group.position.z = eased.z;
+      this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt);
       applyStateIndicator(entry.group, v.state);
     }
   }
@@ -231,17 +141,31 @@ export class VehicleMesh {
     const entry = this.vehicles.get(vehicleId);
     if (entry) {
       this.scene.remove(entry.group);
-      disposeGroup(entry.group);
+      disposeEntry(entry);
       this.vehicles.delete(vehicleId);
     }
   }
 
   clearAll(): void {
-    for (const { group } of this.vehicles.values()) {
-      this.scene.remove(group);
-      disposeGroup(group);
+    for (const entry of this.vehicles.values()) {
+      this.scene.remove(entry.group);
+      disposeEntry(entry);
     }
     this.vehicles.clear();
+  }
+
+  /** Swap any stand-in box for the real model once its asset has loaded. */
+  refreshModels(): void {
+    for (const entry of this.vehicles.values()) {
+      if (!entry.instance.isFallback || !this.library.has(vehicleModelId(entry.vehicle.type, entry.vehicle.tier))) continue;
+      entry.group.remove(entry.instance.root);
+      entry.instance.dispose();
+      const fresh = this.attachModel(entry.group, entry.vehicle);
+      entry.instance = fresh.instance;
+      entry.wheels = fresh.wheels;
+      entry.flywheel = fresh.flywheel;
+      applyStateIndicator(entry.group, entry.vehicle.state, stateIndicatorHeight(entry.instance));
+    }
   }
 
   get count(): number {
@@ -258,23 +182,52 @@ export class VehicleMesh {
     return this.vehicles.get(id)?.group.position.clone() ?? null;
   }
 
+  /** The model instance drawn for a vehicle, or null — exposes tint materials and nodes to tests. */
+  getInstance(id: number): ModelInstance | null {
+    return this.vehicles.get(id)?.instance ?? null;
+  }
+
   dispose(): void {
     this.clearAll();
+  }
+
+  private attachModel(group: THREE.Group, vehicle: Vehicle): Omit<VehicleEntry, 'vehicle' | 'tween'> {
+    const instance = this.library.instantiate(vehicleModelId(vehicle.type, vehicle.tier), { size: FALLBACK_SIZE, tint: BODY_TINT });
+    group.add(instance.root);
+    const wheels: Wheel[] = [];
+    instance.root.traverse(obj => {
+      if (obj.name.startsWith('Wheel') && obj.parent === instance.root) wheels.push({ node: obj, radius: wheelRadius(obj) });
+    });
+    return { group, instance, wheels, flywheel: instance.node('Flywheel') };
+  }
+
+  /** Turn toward the direction of travel, spin wheels by distance, run the flywheel while working. */
+  private animateMotion(entry: VehicleEntry, dx: number, dz: number, dt: number): void {
+    if (dt <= 0) return;
+    const dist = Math.hypot(dx, dz);
+    if (dist / dt > MOVE_SPEED_MIN) {
+      entry.group.rotation.y = turnToward(entry.group.rotation.y, headingFromDelta(dx, dz), TURN_RATE * dt);
+      // Axles run along the model's Z; rolling forward turns them negative.
+      for (const wheel of entry.wheels) wheel.node.rotation.z -= dist / wheel.radius;
+    }
+    if (entry.flywheel && entry.vehicle.state === 'working') entry.flywheel.rotation.z += FLYWHEEL_RATE * dt;
   }
 }
 
 // ---------- Helpers ----------
 
-function boxMesh(w: number, h: number, d: number, color: number): THREE.Mesh {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const mat = new THREE.MeshPhongMaterial({ color, shininess: 25 });
-  return new THREE.Mesh(geo, mat);
+function disposeEntry(entry: VehicleEntry): void {
+  entry.instance.dispose();
+  const marker = findStateIndicator(entry.group);
+  if (marker) {
+    marker.geometry.dispose();
+    (marker.material as THREE.Material).dispose();
+  }
 }
 
-function cylinderMesh(radius: number, height: number, color: number): THREE.Mesh {
-  const geo = new THREE.CylinderGeometry(radius, radius, height, 8);
-  const mat = new THREE.MeshPhongMaterial({ color, shininess: 20 });
-  return new THREE.Mesh(geo, mat);
+/** Where the state marker floats: just above the model, in the group's unscaled space. */
+function stateIndicatorHeight(instance: ModelInstance): number {
+  return instance.bounds.max.y + STATE_INDICATOR_CLEARANCE;
 }
 
 // ---------- State indicator ----------
@@ -289,42 +242,44 @@ export const STATE_COLOR_MAP: Record<VehicleOperationalState, number> = {
 };
 
 const STATE_INDICATOR_RADIUS = 0.25;
+/** Gap between the model's top and the marker. */
+const STATE_INDICATOR_CLEARANCE = 0.5;
+/** Marker height when no model bounds are known (the legacy placeholder's roof line). */
+const STATE_INDICATOR_DEFAULT_Y = 3.2;
+
+function findStateIndicator(group: THREE.Group): THREE.Mesh | undefined {
+  return group.children.find(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isStateIndicator'] === true,
+  );
+}
 
 /**
  * Adds or updates a small colored marker on a vehicle's group reflecting its
- * operational state, following the same material-color-manipulation pattern
- * as applyTierVariation below. Idempotent — reuses the existing marker mesh
- * (tagged group.userData.isStateIndicator) rather than adding a duplicate.
+ * operational state. Idempotent — reuses the existing marker mesh (tagged
+ * group.userData.isStateIndicator) rather than adding a duplicate; `y`
+ * repositions it when given.
  */
-export function applyStateIndicator(group: THREE.Group, state: VehicleOperationalState): void {
+export function applyStateIndicator(group: THREE.Group, state: VehicleOperationalState, y?: number): void {
   const color = STATE_COLOR_MAP[state];
-  let marker = group.children.find(
-    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isStateIndicator'] === true,
-  );
+  let marker = findStateIndicator(group);
 
   if (!marker) {
     marker = new THREE.Mesh(
-      new THREE.SphereGeometry(STATE_INDICATOR_RADIUS, 8, 8),
-      new THREE.MeshPhongMaterial({ color }),
+      new THREE.SphereGeometry(STATE_INDICATOR_RADIUS, 12, 8),
+      createToonMaterial({ color: new THREE.Color(color), name: 'stateIndicator' }),
     );
     marker.userData['isStateIndicator'] = true;
-    marker.position.set(0, 3.2, 0);
+    marker.position.set(0, y ?? STATE_INDICATOR_DEFAULT_Y, 0);
     group.add(marker);
     return;
   }
 
-  (marker.material as THREE.MeshPhongMaterial).color.setHex(color);
+  if (y !== undefined) marker.position.y = y;
+  (marker.material as THREE.MeshToonMaterial).color.setHex(color);
 }
 
-function applyTierVariation(group: THREE.Group, tier: VehicleTier): void {
-  group.scale.setScalar(TIER_SCALE_MULT[tier]);
-  const shift = TIER_BRIGHT_SHIFT[tier];
-  if (shift > 0) {
-    group.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        const mat = obj.material as THREE.MeshPhongMaterial;
-        mat.color.setHex(brightenColor(mat.color.getHex(), shift));
-      }
-    });
-  }
+/** Rolling radius of a wheel node: half its height, since the axle runs level. */
+function wheelRadius(node: THREE.Object3D): number {
+  const size = new THREE.Box3().setFromObject(node).getSize(new THREE.Vector3());
+  return size.y >= WHEEL_RADIUS_MIN ? size.y / 2 : WHEEL_RADIUS_FALLBACK;
 }

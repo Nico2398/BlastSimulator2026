@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlastSimulator2026 — model viewer</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #87ceeb; overflow: hidden; }
+      #viewer-canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only page: renders one public/models/*.glb through the game's own
+         scene pipeline. Query: ?model=<id>&yaw=<deg>&pitch=<deg>&zoom=<f>.
+         Captured by `npm run models:preview`. Not part of the production build. -->
+    <canvas id="viewer-canvas"></canvas>
+    <script type="module" src="/src/model-viewer.ts"></script>
+  </body>
+</html>

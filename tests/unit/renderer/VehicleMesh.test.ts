@@ -3,9 +3,10 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Vehicle, VehicleTier, VehicleOperationalState } from '../../../src/core/entities/Vehicle.js';
-import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator } from '../../../src/renderer/VehicleMesh.js';
+import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator, BODY_TINT } from '../../../src/renderer/VehicleMesh.js';
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
+import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
   return { id, type, x, z, hp: 100, task: 'idle', state: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
@@ -198,66 +199,36 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
   });
 });
 
-// ── Task 2.13: tier-specific scale and color variation ────────────────────────
-// Role used throughout: debris_hauler.
-//   • children[0] of its group is the yellow body mesh — the first part built,
-//     and the one whose material color reflects the tier tint.
-//   • group.scale.x reflects the uniform scale applied via group.scale.setScalar().
+// ── Tiers: each tier is its own model asset, drawn at model scale ────────────
+// Role used throughout: debris_hauler. No runtime scaling or tinting shift
+// stands in for tier any more — the tier-1 junk heap and the tier-3 monster
+// are different .glb files, so a library holding only the tier-2 asset draws
+// tier 2 for real and the other two as stand-ins.
 
-describe('VehicleMesh — tier scale variation', () => {
-  /** Helper: add a debris_hauler at the given tier, return group.scale.x. */
-  const getScale = (tier: VehicleTier): number => {
+describe('VehicleMesh — tier picks the model asset', () => {
+  it('draws the tier whose asset is loaded and a stand-in for the others, all at unit scale', async () => {
+    const library = await loadedModelLibrary(['vehicle_debris_hauler_t2']);
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene, library);
+    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, 1));
+    vm.addVehicle(makeVehicle(2, 'debris_hauler', 4, 0, 2));
+    vm.addVehicle(makeVehicle(3, 'debris_hauler', 8, 0, 3));
+    expect(vm.getInstance(1)!.isFallback).toBe(true);
+    expect(vm.getInstance(2)!.isFallback).toBe(false);
+    expect(vm.getInstance(3)!.isFallback).toBe(true);
+    for (const group of scene.children) expect((group as THREE.Group).scale.x).toBe(1);
+    vm.dispose();
+  });
+
+  it('keeps the model\'s own paint colour at every tier', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, tier));
-    const group = scene.children[0] as THREE.Group;
-    const sx = group.scale.x;
+    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, 1));
+    vm.addVehicle(makeVehicle(2, 'debris_hauler', 4, 0, 3));
+    const c1 = vm.getInstance(1)!.tints.get(BODY_TINT)!.color;
+    const c3 = vm.getInstance(2)!.tints.get(BODY_TINT)!.color;
+    expect(c1.getHex()).toBe(c3.getHex());
     vm.dispose();
-    return sx;
-  };
-
-  it('T2 vehicle group scale is larger than T1', () => {
-    // Higher tier → bigger vehicle → setScalar(value > 1) for T2 relative to T1.
-    expect(getScale(2)).toBeGreaterThan(getScale(1));
-  });
-
-  it('T3 vehicle group scale is larger than T2', () => {
-    // T3 must be strictly larger than T2.
-    expect(getScale(3)).toBeGreaterThan(getScale(2));
-  });
-});
-
-describe('VehicleMesh — tier color brightening', () => {
-  /**
-   * Helper: add a debris_hauler at the given tier and return the RGB components
-   * of the first child mesh's MeshPhongMaterial color.
-   * The first child of debris_hauler is the yellow body (children[0]).
-   */
-  const getBodyColor = (tier: VehicleTier): { r: number; g: number; b: number } => {
-    const scene = new THREE.Scene();
-    const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, tier));
-    const group = scene.children[0] as THREE.Group;
-    const bodyMesh = group.children[0] as THREE.Mesh;
-    const color = (bodyMesh.material as THREE.MeshPhongMaterial).color;
-    vm.dispose();
-    return { r: color.r, g: color.g, b: color.b };
-  };
-
-  it('T2 debris_hauler body color is brighter than T1', () => {
-    // Higher tier → brighter tint on the body material.
-    const c1 = getBodyColor(1);
-    const c2 = getBodyColor(2);
-    const brighter = c2.r > c1.r || c2.g > c1.g || c2.b > c1.b;
-    expect(brighter).toBe(true);
-  });
-
-  it('T3 debris_hauler body color is brighter than T2', () => {
-    // T3 must be strictly brighter than T2 on at least one channel.
-    const c2 = getBodyColor(2);
-    const c3 = getBodyColor(3);
-    const brighter = c3.r > c2.r || c3.g > c2.g || c3.b > c2.b;
-    expect(brighter).toBe(true);
   });
 });
 
@@ -490,5 +461,67 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
       expect(vm.getPosition(999)).toBeNull();
       vm.dispose();
     });
+  });
+});
+
+// ── Model-driven rendering: heading, wheel spin, flywheel, stand-in refresh ──
+
+describe('VehicleMesh — model animation (real assets)', () => {
+  it('turns toward the direction of travel and spins the hauler wheels by distance covered', async () => {
+    const library = await loadedModelLibrary(['vehicle_debris_hauler_t2']);
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene, library);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0, 2);
+    vm.addVehicle(v);
+    const inst = vm.getInstance(1)!;
+    expect(inst.isFallback).toBe(false);
+    const wheel = inst.node('WheelFL')!;
+    const group = scene.children[0] as THREE.Group;
+
+    // Drive toward -Z: a +X-facing model must yaw to +π/2 and its wheels must roll.
+    v.x = 0; v.z = -6; v.targetX = 0; v.targetZ = -6;
+    for (let i = 0; i < 30; i++) vm.update([v], 0.05);
+    expect(group.rotation.y).toBeCloseTo(Math.PI / 2, 1);
+    expect(wheel.rotation.z).toBeLessThan(-1);
+    // Parked: no further spin.
+    const spun = wheel.rotation.z;
+    vm.update([v], 0.05);
+    expect(wheel.rotation.z).toBe(spun);
+    vm.dispose();
+  });
+
+  it('runs the crusher flywheel only while working', async () => {
+    const library = await loadedModelLibrary(['vehicle_rock_fragmenter_t2']);
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene, library);
+    const v = makeVehicle(1, 'rock_fragmenter', 0, 0, 2);
+    vm.addVehicle(v);
+    const flywheel = vm.getInstance(1)!.node('Flywheel')!;
+    vm.update([v], 0.1);
+    expect(flywheel.rotation.z).toBeCloseTo(0);
+    (v as { state: VehicleOperationalState }).state = 'working';
+    vm.update([v], 0.1);
+    expect(flywheel.rotation.z).toBeGreaterThan(0);
+    vm.dispose();
+  });
+
+  it('refreshModels swaps a stand-in for the real model, keeping the state marker above it', async () => {
+    const library = await loadedModelLibrary([]);
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene, library);
+    vm.addVehicle(makeVehicle(1, 'drill_rig', 0, 0, 2));
+    expect(vm.getInstance(1)!.isFallback).toBe(true);
+    vm.refreshModels(); // asset still missing — no change
+    expect(vm.getInstance(1)!.isFallback).toBe(true);
+    const loaded = await loadedModelLibrary(['vehicle_drill_rig_t2']);
+    library.register('vehicle_drill_rig_t2', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('vehicle_drill_rig_t2')!);
+    vm.refreshModels();
+    const inst = vm.getInstance(1)!;
+    expect(inst.isFallback).toBe(false);
+    expect(inst.node('Mast')).not.toBeNull();
+    const group = scene.children[0] as THREE.Group;
+    const marker = group.children.find(c => c.userData['isStateIndicator']) as THREE.Mesh;
+    expect(marker.position.y).toBeGreaterThan(inst.bounds.max.y);
+    vm.dispose();
   });
 });

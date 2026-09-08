@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { CSM } from 'three/examples/jsm/csm/CSM.js';
 import { CameraController } from './CameraController.js';
 import { PostPipeline } from './post/PostPipeline.js';
+import { OUTLINE_UNIFORMS } from './models/CartoonMaterial.js';
 
 // Sky color for the default empty scene — cheerful daytime blue
 const SKY_COLOR = 0x87ceeb;
@@ -108,6 +109,7 @@ export class SceneManager {
     this.renderer = new THREE.WebGLRenderer({ canvas });
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.syncOutlineViewport();
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // T5.1 set this to 1.8 purely to clear ACES's black-crush floor, deferring
     // real calibration to this task (T8.1). 1.8 turned out to overshoot: every
@@ -243,5 +245,11 @@ export class SceneManager {
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(w, h, false);
     this.postPipeline.setSize(w, h, pixelRatio);
+    this.syncOutlineViewport();
+  }
+
+  /** Model outlines are sized in render-target pixels; tell them how tall that target is. */
+  private syncOutlineViewport(): void {
+    OUTLINE_UNIFORMS.viewportHeight.value = this.renderer.getDrawingBufferSize(new THREE.Vector2()).y;
   }
 }

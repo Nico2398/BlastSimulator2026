@@ -545,7 +545,8 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
     const renderer = new GameRenderer(sm as any);
     renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
 
-    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+    expect(sm.scene.children.filter((c) => c.name === 'dust-devil').length).toBeGreaterThan(0);
+    expect(sm.scene.children.find((c) => c.name === 'dust-devil-debris')).toBeDefined();
     expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
   });
 
@@ -555,7 +556,7 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
     renderer.syncFromContext(await makeLandscapeCtx('tropical_karst'));
 
     expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeDefined();
-    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devil')).toBeUndefined();
   });
 
   it('builds neither extra on a biome outside both sets', async () => {
@@ -563,7 +564,7 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
     const renderer = new GameRenderer(sm as any);
     renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
 
-    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devil')).toBeUndefined();
     expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
   });
 
@@ -577,14 +578,15 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
     }).not.toThrow();
   });
 
-  it('swapping from an arid to a non-arid biome disposes the stale dust-devils mesh instead of leaving it behind', async () => {
+  it('swapping from an arid to a non-arid biome disposes the stale dust devils instead of leaving them behind', async () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
     renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
-    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+    expect(sm.scene.children.filter((c) => c.name === 'dust-devil').length).toBeGreaterThan(0);
 
     renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
-    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devil')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devil-debris')).toBeUndefined();
   });
 });
 

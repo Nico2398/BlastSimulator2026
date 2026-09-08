@@ -41,5 +41,8 @@ npm-debug.log*
 # Save files (local persistence)
 saves/
 
+# Blender generator bytecode
+__pycache__/
+
 # `npm run long` handles — runner-local pid/log/exit files, never a deliverable
 .agentic/
