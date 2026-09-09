@@ -4,7 +4,7 @@ Axes: the model is centred on its footprint, x spanning ±sizeX/2 and y
 spanning ±sizeZ/2 (game +Z is Blender −Y, so the FRONT — the row holding
 the entry and exit cells — is +Y). The entry door is green-framed, the exit
 door orange-framed, matching the roof markers the game draws. `TintBody`
-is the type colour, brightened per tier by the game.
+is the type colour, recoloured per instance by the game.
 """
 from __future__ import annotations
 

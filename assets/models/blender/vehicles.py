@@ -1,9 +1,9 @@
 """Vehicles — one model per VehicleRole, facing +X, ground at z = 0.
 
 Chunky machines with rounded bodies, oversized wheels/tracks and a cab with
-real windows. `TintBody` is the Caterpillar-yellow paint the game brightens
-per tier. Nodes the runtime animates: Wheel* (spin on the Y axis while
-moving), plus role-specific ones (Bed, Boom, Mast, Blade…) left for later.
+real windows. `TintBody` is the Caterpillar-yellow paint the game recolours
+per instance. Nodes the runtime animates: Wheel* (spin on the Y axis while
+moving), plus role-specific ones (Bed, Boom, Mast, Blade…).
 """
 from __future__ import annotations
 

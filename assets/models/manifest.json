@@ -1,0 +1,6100 @@
+{
+  "note": "Generated from public/models/*.glb by `npm run models:manifest`. Edit a builder under assets/models/blender/, rebuild, regenerate.",
+  "models": {
+    "building_blasting_academy_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 5864,
+      "glbKb": 210,
+      "size": [
+        3.01,
+        2.71,
+        2.12
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Board",
+        "Char",
+        "Chrome",
+        "Dark",
+        "Dirt",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Lamp",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "Smoke",
+        "Steel",
+        "Tin",
+        "TinDark",
+        "TintBody",
+        "White",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5864,
+          "parts": [
+            "BenchBand",
+            "BenchBox",
+            "BenchStick0Band",
+            "BenchStick0Fuse",
+            "BenchStick0Stick",
+            "BenchStick1Band",
+            "BenchStick1Fuse",
+            "BenchStick1Stick",
+            "BenchStick2Band",
+            "BenchStick2Fuse",
+            "BenchStick2Stick",
+            "BoardFace",
+            "BoardFrame",
+            "BoardText2Stroke",
+            "BoardTextStroke",
+            "Bucket",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "ExitLintel",
+            "Fuse0",
+            "Fuse1",
+            "Fuse2",
+            "Fuse3",
+            "Hole",
+            "Lot",
+            "Pipe",
+            "PipeBent",
+            "PipeElbow",
+            "PlanksBGroove",
+            "PlanksFGroove",
+            "PlanksLGroove",
+            "PlanksRGroove",
+            "Rafter0",
+            "Rafter1",
+            "Ridge",
+            "RoofBChar",
+            "RoofBRidge",
+            "RoofBSheet",
+            "RoofFRidge",
+            "RoofFSheet",
+            "Scorch0",
+            "Scorch1",
+            "Scorch2",
+            "Scorch3",
+            "Scorch4",
+            "Scorch5",
+            "Scorch6",
+            "Scorch7",
+            "Shard0",
+            "Shard1",
+            "Shard2",
+            "Shard3",
+            "Shard4",
+            "Smoke0",
+            "Smoke1",
+            "Smoke2",
+            "WallChar0",
+            "WallChar1",
+            "WallChar2",
+            "Walls",
+            "Window",
+            "WindowSlat0",
+            "WindowSlat1"
+          ]
+        }
+      }
+    },
+    "building_blasting_academy_t2": {
+      "builder": "buildings.py",
+      "triangles": 5964,
+      "glbKb": 152,
+      "size": [
+        3.94,
+        5.18,
+        2.11
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Roof",
+        "RoofRed",
+        "StripeBlack",
+        "StripeYellow",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5964,
+          "parts": [
+            "BoomCone",
+            "BoomRing",
+            "Drum1Drum",
+            "Drum1Ring",
+            "Drum2Drum",
+            "Drum2Ring",
+            "Dynamite",
+            "DynamiteBand",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Fuse",
+            "HazardSeg",
+            "Plinth",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "Walls",
+            "Win0Frame",
+            "Win0Pane",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_blasting_academy_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 11964,
+      "glbKb": 294,
+      "size": [
+        4.38,
+        7.8,
+        3.61
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Gold",
+        "Ivory",
+        "Lamp",
+        "Orange",
+        "Red",
+        "RoofRed",
+        "StripeBlack",
+        "StripeYellow",
+        "TintBody",
+        "Water"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 11964,
+          "parts": [
+            "Banner",
+            "Banner!",
+            "BannerTail",
+            "BoomBurst",
+            "BoomCore",
+            "BoomInner",
+            "BoomInnerB",
+            "BoomPost",
+            "CloudCap",
+            "CloudFire",
+            "CloudPuff",
+            "CloudRing",
+            "CloudStem",
+            "CloudTopPuff",
+            "Column",
+            "ColumnBase",
+            "ColumnCap",
+            "Cornice",
+            "CrestDisc",
+            "CrestStar",
+            "Drum1Drum",
+            "Drum1Ring",
+            "Drum2Drum",
+            "Drum2Ring",
+            "Drum3Drum",
+            "Drum3Ring",
+            "Entablature",
+            "EntablatureBand",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "FountainBall",
+            "FountainBasin",
+            "FountainJet",
+            "FountainRim",
+            "FountainStem",
+            "FountainTop",
+            "FountainWater",
+            "HazardBK",
+            "HazardBY",
+            "HazardFK",
+            "HazardFY",
+            "HazardLK",
+            "HazardLY",
+            "HazardRK",
+            "HazardRY",
+            "Pediment",
+            "PedimentApex",
+            "PedimentFinial",
+            "PedimentStar",
+            "Roof",
+            "RoofFlagBall",
+            "RoofFlagCloth",
+            "RoofFlagPole",
+            "RoofInner",
+            "Step0",
+            "Step1",
+            "Step2",
+            "Stylobate",
+            "Walls",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinBFrame",
+            "WinBPane",
+            "WinS1Frame",
+            "WinS1Pane",
+            "WinSFrame",
+            "WinSPane"
+          ]
+        }
+      }
+    },
+    "building_driving_center_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 6724,
+      "glbKb": 179,
+      "size": [
+        3.28,
+        2,
+        2.35
+      ],
+      "groundY": -0.02,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Blue",
+        "Brick",
+        "Chrome",
+        "Cone",
+        "Dark",
+        "Dirt",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "Lamp",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "Smoke",
+        "Steel",
+        "Tin",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6724,
+          "parts": [
+            "BarrierLeg0",
+            "BarrierLeg1",
+            "BarrierSeg",
+            "Booth",
+            "BoothCounter",
+            "BoothFGroove",
+            "BoothHatch",
+            "BoothLGroove",
+            "BoothRGroove",
+            "BoothRoofRidge",
+            "BoothRoofSheet",
+            "Cone1Band",
+            "Cone1Base",
+            "Cone1Cone",
+            "Cone2Band",
+            "Cone2Base",
+            "Cone2Cone",
+            "Cone3Band",
+            "Cone3Base",
+            "Cone3Cone",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "ExitLintel",
+            "Lot",
+            "Plate",
+            "PlateLStroke",
+            "Rail",
+            "RailLow",
+            "RailPost",
+            "Skid0",
+            "Skid1",
+            "Skid2",
+            "Skid3",
+            "Steam0",
+            "Steam1",
+            "Steam2",
+            "TyreLooseTyre",
+            "Tyres0Tyre",
+            "Tyres1Tyre",
+            "Tyres2Tyre",
+            "WreckBody",
+            "WreckBumper",
+            "WreckCabin",
+            "WreckCrack",
+            "WreckDent",
+            "WreckHub",
+            "WreckLPlate",
+            "WreckLStroke",
+            "WreckProp2Brick",
+            "WreckPropBrick",
+            "WreckScreen",
+            "WreckSideGlass",
+            "WreckWheel-1-1Tyre",
+            "WreckWheel1-1Tyre",
+            "WreckWheel11Tyre"
+          ]
+        }
+      }
+    },
+    "building_driving_center_t2": {
+      "builder": "buildings.py",
+      "triangles": 4544,
+      "glbKb": 119,
+      "size": [
+        3.29,
+        4.23,
+        2.77
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Cone",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Roof",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 4544,
+          "parts": [
+            "BayDoor",
+            "BaySlat",
+            "Cone1Band",
+            "Cone1Base",
+            "Cone1Cone",
+            "Cone2Band",
+            "Cone2Base",
+            "Cone2Cone",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "LampGlow",
+            "LampHead",
+            "LampPost",
+            "Plinth",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "SignHub",
+            "SignPost",
+            "SignSpoke",
+            "SignWheel",
+            "Walls",
+            "Win0Frame",
+            "Win0Pane",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_driving_center_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 10296,
+      "glbKb": 312,
+      "size": [
+        5.07,
+        6.99,
+        3.76
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowScreen",
+        "Lamp"
+      ],
+      "materials": [
+        "Asphalt",
+        "Black",
+        "Bronze",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "GlowScreen",
+        "Gold",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Silver",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 10296,
+          "parts": [
+            "CarBody",
+            "CarCockpit",
+            "CarNose",
+            "CarNumber",
+            "CarRoundel",
+            "CarStripe",
+            "CarWheel0",
+            "CarWheel1",
+            "CarWheel2",
+            "CarWheel3",
+            "CarWing",
+            "CarWingPost",
+            "EntryCanopy",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitCanopy",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "FlagBall",
+            "FlagCell",
+            "FlagPole",
+            "GB0Glass",
+            "GB0Mullion",
+            "GB0Rail",
+            "GB1Glass",
+            "GB1Mullion",
+            "GB1Rail",
+            "GF0Glass",
+            "GF0Mullion",
+            "GF0Rail",
+            "GF1Glass",
+            "GF1Mullion",
+            "GF1Rail",
+            "GL0Glass",
+            "GL0Mullion",
+            "GL0Rail",
+            "GL1Glass",
+            "GL1Mullion",
+            "GL1Rail",
+            "GR0Glass",
+            "GR0Mullion",
+            "GR0Rail",
+            "GR1Glass",
+            "GR1Mullion",
+            "GR1Rail",
+            "JumboBackStar",
+            "JumboBar",
+            "JumboBar2",
+            "JumboFrame",
+            "JumboIconCell",
+            "JumboPost",
+            "JumboScreen",
+            "JumboTrim",
+            "JumboTrim2",
+            "Kerb",
+            "Kerb2",
+            "ParapetBlack",
+            "ParapetWhite",
+            "Plinth",
+            "Podium",
+            "Podium1",
+            "PodiumTop",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "Track",
+            "TrophyBase",
+            "TrophyCup",
+            "TrophyHandle",
+            "TrophyPlinth",
+            "TrophyStar",
+            "TrophyStem",
+            "Tyre",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_explosive_warehouse_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 5088,
+      "glbKb": 143,
+      "size": [
+        2.57,
+        2.24,
+        2.06
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowSpark"
+      ],
+      "materials": [
+        "Char",
+        "Chrome",
+        "Dark",
+        "Dirt",
+        "EntryFrame",
+        "ExitFrame",
+        "GlowSpark",
+        "PlankDark",
+        "Red",
+        "Sandbag",
+        "StripeBlack",
+        "StripeYellow",
+        "TinDark",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5088,
+          "parts": [
+            "Bags00Bag",
+            "Bags01Bag",
+            "Bags02Bag",
+            "Bags03Bag",
+            "Bags04Bag",
+            "Bags10Bag",
+            "Bags11Bag",
+            "Bags12Bag",
+            "Bags13Bag",
+            "Bags14Bag",
+            "BagsR00Bag",
+            "BagsR01Bag",
+            "DangerBoard",
+            "DangerPost",
+            "DangerStroke",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLeaf",
+            "ExitLintel",
+            "Fuse0",
+            "Fuse1",
+            "Fuse2",
+            "Fuse3",
+            "Fuse4",
+            "Fuse5",
+            "Fuse6",
+            "Lot",
+            "PlanksBGroove",
+            "PlanksFGroove",
+            "PlanksLGroove",
+            "PlanksRGroove",
+            "RoofRidge",
+            "RoofSheet",
+            "RoofStick0Band",
+            "RoofStick0Fuse",
+            "RoofStick0Stick",
+            "RoofStick1Band",
+            "RoofStick1Fuse",
+            "RoofStick1Stick",
+            "RoofStick2Band",
+            "RoofStick2Fuse",
+            "RoofStick2Spark",
+            "RoofStick2Stick",
+            "RoofStick3Band",
+            "RoofStick3Fuse",
+            "RoofStick3Stick",
+            "TNTStroke",
+            "Vent0Inner",
+            "Vent0Outer",
+            "Vent1Inner",
+            "Vent1Outer",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_explosive_warehouse_t2": {
+      "builder": "buildings.py",
+      "triangles": 3680,
+      "glbKb": 101,
+      "size": [
+        4.28,
+        3.15,
+        2.58
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Roof",
+        "Steel",
+        "StripeBlack",
+        "StripeYellow",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3680,
+          "parts": [
+            "Bollard",
+            "Drum0Drum",
+            "Drum0Ring",
+            "Drum1Drum",
+            "Drum1Ring",
+            "Drum2Drum",
+            "Drum2Ring",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "HazardSeg",
+            "LampGlow",
+            "LampHead",
+            "LampPost",
+            "Plinth",
+            "RoofBarrel",
+            "SignBolt",
+            "SignPlate",
+            "SignPost",
+            "Vent",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_explosive_warehouse_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 8556,
+      "glbKb": 253,
+      "size": [
+        5.5,
+        6.67,
+        4.57
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowOrange",
+        "GlowWarm",
+        "Lamp"
+      ],
+      "materials": [
+        "Black",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "GlowOrange",
+        "GlowWarm",
+        "Gold",
+        "Lamp",
+        "Red",
+        "Roof",
+        "Steel",
+        "StripeBlack",
+        "StripeYellow",
+        "TintBody",
+        "Water",
+        "White",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 8556,
+          "parts": [
+            "Bomb",
+            "BombCap",
+            "BombFuse",
+            "BombShine",
+            "BombSpark",
+            "BombSparkStar",
+            "BombSparkStar2",
+            "CannonBarrel",
+            "CannonCarriage",
+            "CannonWheel",
+            "Drawbridge",
+            "DrawbridgeBand",
+            "DrawbridgeChain",
+            "Drum0Drum",
+            "Drum0Ring",
+            "Drum1Drum",
+            "Drum1Ring",
+            "Drum2Drum",
+            "Drum2Ring",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "FlagDot",
+            "FlagMark",
+            "GateFlagBall",
+            "GateFlagCloth",
+            "GateFlagPole",
+            "GateTower",
+            "GateTowerRoof",
+            "HazardSeg",
+            "Keep",
+            "KeepMerlon",
+            "Moat",
+            "Portcullis",
+            "PortcullisBar",
+            "SearchBase",
+            "SearchHead",
+            "SearchLens",
+            "Tower",
+            "TowerBand",
+            "TowerFlagBall",
+            "TowerFlagCloth",
+            "TowerFlagPole",
+            "TowerRoof",
+            "WallMerlon",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_freight_warehouse_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 4028,
+      "glbKb": 127,
+      "size": [
+        4.06,
+        2.08,
+        4.06
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Cardboard",
+        "Char",
+        "Chrome",
+        "Dirt",
+        "EntryFrame",
+        "ExitFrame",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "Rust",
+        "Steel",
+        "Tarp",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 4028,
+          "parts": [
+            "Barrel",
+            "BikeSpoke0",
+            "BikeSpoke1",
+            "BikeSpoke2",
+            "BikeSpoke3",
+            "BikeSpoke4",
+            "BikeSpoke5",
+            "BikeWheel",
+            "Crate0",
+            "Crate0Band",
+            "Crate1",
+            "Crate1Band",
+            "Crate2",
+            "Crate2Band",
+            "Crate3",
+            "Crate3Band",
+            "Crate4",
+            "Crate4Band",
+            "Crate5",
+            "Crate5Band",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLeaf",
+            "ExitLintel",
+            "Lot",
+            "Pole0",
+            "Pole1",
+            "Pole2",
+            "Pole3",
+            "ScaleDial",
+            "ScalePlate",
+            "ScaleStem",
+            "Sign",
+            "SignTextStroke",
+            "Tarp",
+            "TarpSag0",
+            "TarpSag1",
+            "TarpSag2",
+            "TarpSag3",
+            "Tub",
+            "TubFoot0",
+            "TubFoot1",
+            "TubHollow"
+          ]
+        }
+      }
+    },
+    "building_freight_warehouse_t2": {
+      "builder": "buildings.py",
+      "triangles": 3216,
+      "glbKb": 78,
+      "size": [
+        6.21,
+        4.25,
+        4.74
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Roof",
+        "Steel",
+        "StripeYellow",
+        "TintBody",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3216,
+          "parts": [
+            "BigDoor",
+            "BigDoorFrame",
+            "BigDoorRail",
+            "BigDoorSplit",
+            "Crate1Band",
+            "Crate1Box",
+            "Crate2Band",
+            "Crate2Box",
+            "Crate3Band",
+            "Crate3Box",
+            "Dock",
+            "DrumDrum",
+            "DrumRing",
+            "Eave",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "HighWinFrame",
+            "HighWinPane",
+            "Plinth",
+            "RoofBarrel",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_freight_warehouse_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 9748,
+      "glbKb": 312,
+      "size": [
+        7.59,
+        8.27,
+        5.84
+      ],
+      "groundY": -0.02,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Blue",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Gold",
+        "Lamp",
+        "Orange",
+        "Plinth",
+        "Red",
+        "Roof",
+        "Steel",
+        "StripeBlack",
+        "StripeYellow",
+        "TintBody",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 9748,
+          "parts": [
+            "Belt",
+            "BeltCrateBand",
+            "BeltCrateBox",
+            "BigDoor",
+            "BigDoorFrame",
+            "BigDoorSlat",
+            "Cont1",
+            "Cont1Rib",
+            "Cont2",
+            "Cont2Lid",
+            "Cont2Rib",
+            "Cont3",
+            "Cont3Rib",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "ForkBody",
+            "ForkLoadBand",
+            "ForkLoadBox",
+            "ForkMast",
+            "ForkPost",
+            "ForkRoof",
+            "ForkSeat",
+            "ForkTine",
+            "ForkWheel",
+            "GantryBeam",
+            "GantryCable",
+            "GantryFoot",
+            "GantryHook",
+            "GantryLeg",
+            "GantryTrolley",
+            "HangingBand",
+            "HangingBox",
+            "HazardSeg",
+            "Lean0Band",
+            "Lean0Box",
+            "Lean1Band",
+            "Lean1Box",
+            "Lean2Band",
+            "Lean2Box",
+            "Lean3Band",
+            "Lean3Box",
+            "Lean4Band",
+            "Lean4Box",
+            "Lean5Band",
+            "Lean5Box",
+            "Plinth",
+            "Pour1Band",
+            "Pour1Box",
+            "Pour2Band",
+            "Pour2Box",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "SignArrowHead",
+            "SignArrowStem",
+            "SignE",
+            "SignM",
+            "SignO",
+            "SignPanel",
+            "SignPost",
+            "SignR",
+            "Spill1Band",
+            "Spill1Box",
+            "Spill2Band",
+            "Spill2Box",
+            "Spill3Band",
+            "Spill3Box",
+            "Spill4Band",
+            "Spill4Box",
+            "T10Band",
+            "T10Box",
+            "T11Band",
+            "T11Box",
+            "T12Band",
+            "T12Box",
+            "T13Band",
+            "T13Box",
+            "T14Band",
+            "T14Box",
+            "T15Band",
+            "T15Box",
+            "T16Band",
+            "T16Box",
+            "T20Band",
+            "T20Box",
+            "T21Band",
+            "T21Box",
+            "T22Band",
+            "T22Box",
+            "T23Band",
+            "T23Box",
+            "T24Band",
+            "T24Box",
+            "T30Band",
+            "T30Box",
+            "T31Band",
+            "T31Box",
+            "T32Band",
+            "T32Box",
+            "T33Band",
+            "T33Box",
+            "T40Band",
+            "T40Box",
+            "T41Band",
+            "T41Box",
+            "T50Band",
+            "T50Box",
+            "T51Band",
+            "T51Box",
+            "T52Band",
+            "T52Box",
+            "T60Band",
+            "T60Box",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_geology_lab_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 5332,
+      "glbKb": 186,
+      "size": [
+        2.85,
+        1.93,
+        2.81
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Char",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "Green",
+        "Lamp",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "Rock",
+        "Rubble",
+        "RubbleDark",
+        "Rust",
+        "Steel",
+        "StripeYellow",
+        "Tin",
+        "TinDark",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5332,
+          "parts": [
+            "Attic",
+            "BarrowHandle-1",
+            "BarrowHandle1",
+            "BarrowInner",
+            "BarrowLeg-1",
+            "BarrowLeg1",
+            "BarrowTub",
+            "BarrowWheelTyre",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "ExitLintel",
+            "HammerHandle",
+            "HammerHead",
+            "HammerPick",
+            "Hole",
+            "HoleJag0",
+            "HoleJag1",
+            "HoleJag2",
+            "Jar",
+            "LensGlass",
+            "LensGlint",
+            "LensHandle",
+            "LensRing",
+            "Load0Rock",
+            "Load1Rock",
+            "Load2Rock",
+            "Load3Rock",
+            "Lot",
+            "NuggetRock",
+            "Patch",
+            "PatchBolt0",
+            "PatchBolt1",
+            "PatchBolt2",
+            "PatchBolt3",
+            "PlanksBGroove",
+            "PlanksFGroove",
+            "PlanksLGroove",
+            "PlanksRGroove",
+            "RoofLRidge",
+            "RoofLSheet",
+            "RoofRRidge",
+            "RoofRSheet",
+            "RoofRidge",
+            "Sample00Rock",
+            "Sample01Rock",
+            "Sample02Rock",
+            "Sample03Rock",
+            "Sample10Rock",
+            "Sample11Rock",
+            "Sample12Rock",
+            "Sample13Rock",
+            "Shelf0",
+            "Shelf0Bracket",
+            "Shelf1",
+            "Shelf1Bracket",
+            "Sign",
+            "SignTextStroke",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_geology_lab_t2": {
+      "builder": "buildings.py",
+      "triangles": 5216,
+      "glbKb": 123,
+      "size": [
+        4.03,
+        4.31,
+        3
+      ],
+      "groundY": -0.14,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Rock",
+        "Roof",
+        "Steel",
+        "TintBody",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5216,
+          "parts": [
+            "ChimneyCap",
+            "ChimneyStack",
+            "CrateBand",
+            "CrateBox",
+            "Dome",
+            "DomeSlit",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Plinth",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "Sample0",
+            "Sample1",
+            "Sample2",
+            "Sample3",
+            "Sample4",
+            "Walls",
+            "Win0Frame",
+            "Win0Pane",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_geology_lab_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 7158,
+      "glbKb": 207,
+      "size": [
+        4.44,
+        6.99,
+        3.66
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowCyan",
+        "GlowRed",
+        "Lamp"
+      ],
+      "materials": [
+        "Carpet",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "GlowCyan",
+        "GlowRed",
+        "Gold",
+        "Green",
+        "Ivory",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Rock",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 7158,
+          "parts": [
+            "Case0GemHigh",
+            "Case0GemLow",
+            "Case0Lid",
+            "Case0Pedestal",
+            "Case0Post",
+            "Case0Top",
+            "Case1GemHigh",
+            "Case1GemLow",
+            "Case1Lid",
+            "Case1Pedestal",
+            "Case1Post",
+            "Case1Top",
+            "Cornice",
+            "DiamondCrown",
+            "DiamondGirdle",
+            "DiamondPavilion",
+            "EntryCanopy",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitCanopy",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "LaserBeam",
+            "LaserCap",
+            "LaserDiag",
+            "LaserPost",
+            "MastBall",
+            "MastCloth",
+            "MastPole",
+            "Pedestal",
+            "PedestalCup",
+            "Pilaster",
+            "Plinth",
+            "Pyramid",
+            "PyramidRib",
+            "PyramidSill",
+            "Roof",
+            "Rope",
+            "RopeBall",
+            "RopeFoot",
+            "RopePost",
+            "Sample0Pedestal",
+            "Sample0Rock",
+            "Sample1Pedestal",
+            "Sample1Rock",
+            "Sample2Pedestal",
+            "Sample2Rock",
+            "Tag",
+            "Tag$",
+            "TagDigit",
+            "TagHole",
+            "TagString",
+            "Walls",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinBFrame",
+            "WinBPane",
+            "WinSFrame",
+            "WinSPane"
+          ]
+        }
+      }
+    },
+    "building_living_quarters_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 4212,
+      "glbKb": 138,
+      "size": [
+        3.06,
+        2.97,
+        3.42
+      ],
+      "groundY": -0.02,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Glow"
+      ],
+      "materials": [
+        "Brick",
+        "Char",
+        "Chrome",
+        "Concrete",
+        "Dark",
+        "EntryFrame",
+        "ExitFrame",
+        "Glow",
+        "Plank",
+        "PlankDark",
+        "RubbleDark",
+        "Steel",
+        "TinDark",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 4212,
+          "parts": [
+            "Ball",
+            "Cell2Sealed",
+            "Chain0",
+            "Chain1",
+            "Chain2",
+            "Chain3",
+            "CourseBGroove",
+            "CourseFGroove",
+            "CourseLGroove",
+            "CourseRGroove",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLeaf",
+            "ExitLintel",
+            "Lot",
+            "Num0Stroke",
+            "Num1Stroke",
+            "Num2Stroke",
+            "RoofSlab",
+            "Tally0",
+            "Tally1",
+            "Tally2",
+            "Tally3",
+            "Tally4",
+            "TowerCab",
+            "TowerCap",
+            "TowerGlass",
+            "TowerLeg0",
+            "TowerLeg1",
+            "TowerLeg2",
+            "TowerLeg3",
+            "TowerLens",
+            "TowerLight",
+            "Walls",
+            "WinF0Bar",
+            "WinF0Slit",
+            "WinF1Bar",
+            "WinF1Slit",
+            "WinS-1-1Bar",
+            "WinS-1-1Slit",
+            "WinS-10Bar",
+            "WinS-10Slit",
+            "WinS1-1Bar",
+            "WinS1-1Slit",
+            "WinS10Bar",
+            "WinS10Slit",
+            "WireCoil0",
+            "WireCoil1",
+            "WireCoil2",
+            "WireCoil3",
+            "WireCoil4",
+            "WireCoil5",
+            "WireCoil6",
+            "WireCoil7",
+            "WireCoil8"
+          ]
+        }
+      }
+    },
+    "building_living_quarters_t2": {
+      "builder": "buildings.py",
+      "triangles": 5340,
+      "glbKb": 132,
+      "size": [
+        4.32,
+        5.06,
+        3.62
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Green",
+        "Lamp",
+        "Plinth",
+        "RoofBrown",
+        "Steel",
+        "TintBody",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5340,
+          "parts": [
+            "Bench",
+            "BenchLeg",
+            "Bush",
+            "ChimneyCap",
+            "ChimneyStack",
+            "Dormer0",
+            "Dormer0Pane",
+            "Dormer1",
+            "Dormer1Pane",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Planter",
+            "Plinth",
+            "RoofGable",
+            "RoofRidge",
+            "Walls",
+            "Win0Frame",
+            "Win0Pane",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_living_quarters_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 13156,
+      "glbKb": 377,
+      "size": [
+        5.35,
+        7.42,
+        4.82
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Blue",
+        "Carpet",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Gold",
+        "Green",
+        "Ivory",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "StripeYellow",
+        "TintBody",
+        "Water",
+        "White",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 13156,
+          "parts": [
+            "Awning",
+            "BalcFrame",
+            "BalcPost",
+            "BalcRail",
+            "BalcSlab",
+            "BalcWin",
+            "Board",
+            "BoardLeg",
+            "BoardLeg2",
+            "Carpet",
+            "Carpet2",
+            "Chair0",
+            "Chair0Back",
+            "Chair0Stripe",
+            "Chair1",
+            "Chair1Back",
+            "Chair1Stripe",
+            "Cornice1",
+            "Cornice2",
+            "Deck",
+            "EntryCanopy",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitCanopy",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "FountainBasin",
+            "FountainJet",
+            "FountainStem",
+            "FountainTop",
+            "FountainWater",
+            "LobbyFrame",
+            "LobbyGlass",
+            "PalmCoco",
+            "PalmCoco2",
+            "PalmLeaf",
+            "PalmTrunk",
+            "Parasol",
+            "ParasolBand",
+            "ParasolPole",
+            "Plinth",
+            "PoolCoping",
+            "PoolEdge",
+            "PoolEdgeRail",
+            "PoolWater",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "RopeBall",
+            "RopePost",
+            "SignE",
+            "SignH",
+            "SignL",
+            "SignO",
+            "SignPanel",
+            "SignPost",
+            "SignStar",
+            "SignT",
+            "SignTrim",
+            "Slide",
+            "SlideCap",
+            "SlidePlatform",
+            "SlidePost",
+            "SlideRail",
+            "SlideRail2",
+            "Step",
+            "Valet",
+            "ValetSign",
+            "Walls",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinB2Frame",
+            "WinB2Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinL2Frame",
+            "WinL2Pane",
+            "WinR1Frame",
+            "WinR1Pane",
+            "WinR2Frame",
+            "WinR2Pane"
+          ]
+        }
+      }
+    },
+    "building_management_office_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 6484,
+      "glbKb": 204,
+      "size": [
+        3,
+        2.7,
+        1.78
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Glow",
+        "Lamp"
+      ],
+      "materials": [
+        "Blue",
+        "Char",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glow",
+        "Lamp",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "RoofRed",
+        "Sandbag",
+        "Smoke",
+        "Steel",
+        "TinDark",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6484,
+          "parts": [
+            "BackPlyGroove",
+            "BattenB0",
+            "BattenB1",
+            "BattenS0",
+            "BattenS1",
+            "Cabinet",
+            "CabinetDrawer",
+            "CabinetFiles",
+            "CabinetFront0",
+            "CabinetFront1",
+            "CabinetFront2",
+            "CabinetHandle0",
+            "CabinetHandle1",
+            "CabinetHandle2",
+            "CabinetTab",
+            "Carcass",
+            "Cavity",
+            "Cornice",
+            "Crown",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "EntryLintel",
+            "EntryPanel0",
+            "EntryPanel1",
+            "EntryPanelIn0",
+            "EntryPanelIn1",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "ExitLintel",
+            "Folder0",
+            "Folder1",
+            "Folder2",
+            "Foot",
+            "LampArm1",
+            "LampArm2",
+            "LampBulb",
+            "LampClamp",
+            "LampJoint",
+            "LampShade",
+            "Loose0",
+            "Loose1",
+            "Loose2",
+            "Mug",
+            "MugCoffee",
+            "MugHandle",
+            "MugStain",
+            "MugSteam0",
+            "MugSteam1",
+            "Paper00",
+            "Paper01",
+            "Paper10",
+            "Paper11",
+            "Paper12",
+            "Paper20",
+            "Paper21",
+            "Phone",
+            "PhoneCord0",
+            "PhoneCord1",
+            "PhoneCord2",
+            "PhoneCord3",
+            "PhoneCup-1",
+            "PhoneCup1",
+            "PhoneDial",
+            "PhoneHandset",
+            "Rug",
+            "Shelf0",
+            "Shelf1",
+            "Shelf2",
+            "Sign",
+            "SignTextStroke",
+            "Skirt",
+            "StoolLeg0",
+            "StoolLeg1",
+            "StoolLeg2",
+            "StoolSeat",
+            "Tape0",
+            "Tape1"
+          ]
+        }
+      }
+    },
+    "building_management_office_t2": {
+      "builder": "buildings.py",
+      "triangles": 4224,
+      "glbKb": 101,
+      "size": [
+        2.9,
+        3.93,
+        3.52
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 4224,
+          "parts": [
+            "ACBox",
+            "ACFan",
+            "Canopy",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "FlagCloth",
+            "FlagPole",
+            "Plinth",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "Walls",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_management_office_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 7760,
+      "glbKb": 193,
+      "size": [
+        3.78,
+        8.2,
+        3.86
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Black",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Gold",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "TintBody",
+        "Water",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 7760,
+          "parts": [
+            "Cornice",
+            "Dollar$",
+            "EntryCanopy",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitCanopy",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "HeliBlade",
+            "HeliBlade2",
+            "HeliBoom",
+            "HeliCabin",
+            "HeliFin",
+            "HeliGlass",
+            "HeliHub",
+            "HeliMast",
+            "HeliSkid",
+            "HeliStrut",
+            "HeliTailRotor",
+            "Helipad",
+            "HelipadH",
+            "HelipadRing",
+            "LimoBody",
+            "LimoCabin",
+            "LimoLamp",
+            "LimoTrim",
+            "LimoWheel",
+            "LimoWindows",
+            "LobbyFrame",
+            "LobbyGlass",
+            "Penthouse",
+            "PenthouseGlass",
+            "PenthouseRoof",
+            "Plinth",
+            "Rail00",
+            "Rail01",
+            "Rail02",
+            "Rail03",
+            "Rail10",
+            "Rail11",
+            "Rail12",
+            "Rail13",
+            "Rail20",
+            "Rail21",
+            "Rail22",
+            "Rail23",
+            "Rail30",
+            "Rail31",
+            "Rail32",
+            "Rail33",
+            "RoofFountainBasin",
+            "RoofFountainJet",
+            "RoofFountainStem",
+            "RoofFountainTop",
+            "RoofFountainWater",
+            "StatueArm",
+            "StatueArmL",
+            "StatueBody",
+            "StatueHead",
+            "StatueMug",
+            "StatueMugHandle",
+            "StatuePlaque",
+            "StatuePlinth",
+            "StatueTie",
+            "Strip00",
+            "Strip01",
+            "Strip02",
+            "Strip10",
+            "Strip11",
+            "Strip12",
+            "Strip20",
+            "Strip21",
+            "Strip22",
+            "Strip30",
+            "Strip31",
+            "Strip32",
+            "Tower",
+            "TowerRoof",
+            "TowerRoofInner",
+            "TowerRoofLip"
+          ]
+        }
+      }
+    },
+    "building_research_center_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 3458,
+      "glbKb": 124,
+      "size": [
+        2.97,
+        1.9,
+        3.06
+      ],
+      "groundY": -0.05,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Glow",
+        "GlowSpark"
+      ],
+      "materials": [
+        "Canvas",
+        "Char",
+        "Chrome",
+        "Dark",
+        "Dirt",
+        "EntryFrame",
+        "ExitFrame",
+        "Glow",
+        "GlowSpark",
+        "Plank",
+        "PlankDark",
+        "Rubble",
+        "Steel",
+        "Tarp",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3458,
+          "parts": [
+            "Attic",
+            "Board",
+            "BoardLeg0",
+            "BoardLeg1",
+            "BoardScribble0",
+            "BoardScribble1",
+            "BoardScribble2",
+            "ChairBack",
+            "ChairLeg0",
+            "ChairLeg1",
+            "ChairLeg2",
+            "ChairLeg3",
+            "ChairSeat",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLeaf",
+            "ExitLintel",
+            "FireFlame",
+            "FireLog0",
+            "FireLog1",
+            "FireStone0Rock",
+            "FireStone1Rock",
+            "FireStone2Rock",
+            "FireStone3Rock",
+            "FireStone4Rock",
+            "FireStone5Rock",
+            "IdeaBulb",
+            "IdeaHolder",
+            "IdeaPole",
+            "Lot",
+            "Patch0",
+            "Patch1",
+            "Patch2",
+            "Peg-1-1",
+            "Peg-11",
+            "Peg1-1",
+            "Peg11",
+            "RoofLRidge",
+            "RoofLSheet",
+            "RoofRRidge",
+            "RoofRSheet",
+            "RoofRidge",
+            "Rope-1-1",
+            "Rope-11",
+            "Rope1-1",
+            "Rope11",
+            "Skirt",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_research_center_t2": {
+      "builder": "buildings.py",
+      "triangles": 6332,
+      "glbKb": 145,
+      "size": [
+        3.32,
+        5.27,
+        3.35
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Frame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Roof",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6332,
+          "parts": [
+            "ACBox",
+            "ACFan",
+            "AntBall",
+            "AntMast",
+            "AntRing",
+            "DishBase",
+            "DishDish",
+            "DishFeed",
+            "Dome",
+            "DomeRib",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Plinth",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "Walls",
+            "Win0Frame",
+            "Win0Pane",
+            "Win1Frame",
+            "Win1Pane",
+            "WinB0Frame",
+            "WinB0Pane",
+            "WinB1Frame",
+            "WinB1Pane",
+            "WinL0Frame",
+            "WinL0Pane",
+            "WinL1Frame",
+            "WinL1Pane",
+            "WinR0Frame",
+            "WinR0Pane",
+            "WinR1Frame",
+            "WinR1Pane"
+          ]
+        }
+      }
+    },
+    "building_research_center_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 9872,
+      "glbKb": 216,
+      "size": [
+        4.6,
+        8.9,
+        4.58
+      ],
+      "groundY": -0.02,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowWarm",
+        "Lamp"
+      ],
+      "materials": [
+        "Blue",
+        "Carpet",
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "GlowWarm",
+        "Gold",
+        "Ivory",
+        "Lamp",
+        "Pink",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 9872,
+          "parts": [
+            "Brain",
+            "BrainFold",
+            "BrainGroove",
+            "BrainPedestal",
+            "BrainPlinth",
+            "BulbGlass",
+            "BulbNeck",
+            "BulbScrew",
+            "BulbThread",
+            "Crater",
+            "CraterRim",
+            "Dish1Base",
+            "Dish1Dish",
+            "Dish1Feed",
+            "Dish2Base",
+            "Dish2Dish",
+            "Dish2Feed",
+            "Dish3Base",
+            "Dish3Dish",
+            "Dish3Feed",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Gatehouse",
+            "GatehouseFrame",
+            "GatehouseGlass",
+            "GatehouseTop",
+            "Ramp",
+            "RampPost",
+            "SatBody",
+            "SatDish",
+            "SatPanel",
+            "SatStick",
+            "Tower",
+            "TowerBand",
+            "TowerCap",
+            "TowerWin"
+          ]
+        }
+      }
+    },
+    "building_ruin": {
+      "builder": "buildings.py",
+      "triangles": 1752,
+      "glbKb": 37,
+      "size": [
+        2.03,
+        1.28,
+        2
+      ],
+      "groundY": -0.37,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Dark",
+        "Plinth",
+        "Rubble",
+        "RubbleDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1752,
+          "parts": [
+            "Beam0",
+            "Beam1",
+            "Beam2",
+            "BrokenWall",
+            "Mound",
+            "Slab0",
+            "Slab1",
+            "Slab2",
+            "Slab3",
+            "Slab4",
+            "Slab5",
+            "Slab6",
+            "Slab7",
+            "Slab8",
+            "Slab9"
+          ]
+        }
+      }
+    },
+    "building_vehicle_depot_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 6016,
+      "glbKb": 197,
+      "size": [
+        4.06,
+        2.51,
+        3.06
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Glow"
+      ],
+      "materials": [
+        "Blue",
+        "Brick",
+        "Char",
+        "Chrome",
+        "Dark",
+        "Dirt",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "Glow",
+        "PlankDark",
+        "Red",
+        "Rust",
+        "Steel",
+        "StripeYellow",
+        "Tin",
+        "TinDark",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6016,
+          "parts": [
+            "CarBody",
+            "CarBumper",
+            "CarCabin",
+            "CarCrack",
+            "CarDent",
+            "CarEngine",
+            "CarHood",
+            "CarHub",
+            "CarProp2Brick",
+            "CarPropBrick",
+            "CarScreen",
+            "CarSideGlass",
+            "CarWheel-1-1Tyre",
+            "CarWheel-11Tyre",
+            "CarWheel11Tyre",
+            "Drum",
+            "DrumHoop0",
+            "DrumHoop1",
+            "EntryJamb",
+            "EntryKnob",
+            "EntryLeaf",
+            "EntryLintel",
+            "ExitJamb",
+            "ExitKnob",
+            "ExitLeaf",
+            "ExitLintel",
+            "LampFoot",
+            "LampGlow",
+            "LampShade",
+            "LampStand",
+            "Lot",
+            "Oil",
+            "Post0",
+            "Post1",
+            "RoofLip",
+            "RoofRidge",
+            "RoofSheet",
+            "Sign",
+            "SignFallenA",
+            "SignTextStroke",
+            "Streak0",
+            "Streak1",
+            "Streak2",
+            "Streak3",
+            "Toolbox",
+            "ToolboxLid",
+            "WallBRidge",
+            "WallBSheet",
+            "WallS-1",
+            "WallS1"
+          ]
+        }
+      }
+    },
+    "building_vehicle_depot_t2": {
+      "builder": "buildings.py",
+      "triangles": 3992,
+      "glbKb": 80,
+      "size": [
+        6.55,
+        2.64,
+        3.39
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "Glass",
+        "Lamp",
+        "Plinth",
+        "Red",
+        "Roof",
+        "Steel",
+        "StripeYellow",
+        "TintBody",
+        "Wood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3992,
+          "parts": [
+            "Bay0",
+            "Bay0Arch",
+            "Bay1",
+            "Bay1Arch",
+            "CrateBand",
+            "CrateBox",
+            "Drum1Drum",
+            "Drum1Ring",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Plinth",
+            "Pump",
+            "PumpHose",
+            "PumpScreen",
+            "RoofInner",
+            "RoofParapet",
+            "RoofSlab",
+            "SignPlate",
+            "SignPost",
+            "Tyre0",
+            "Tyre1",
+            "Tyre2",
+            "Walls"
+          ]
+        }
+      }
+    },
+    "building_vehicle_depot_t3": {
+      "builder": "buildings_t3.py",
+      "triangles": 8076,
+      "glbKb": 210,
+      "size": [
+        6.12,
+        7.34,
+        4.93
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowCyan",
+        "GlowOrange",
+        "GlowRed",
+        "GlowWhite",
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Door",
+        "EntryFrame",
+        "ExitFrame",
+        "GlowCyan",
+        "GlowOrange",
+        "GlowRed",
+        "GlowWhite",
+        "Lamp",
+        "Orange",
+        "Plinth",
+        "Roof",
+        "Steel",
+        "StripeYellow",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 8076,
+          "parts": [
+            "Beacon",
+            "BeaconBase",
+            "BlastDoor",
+            "BlastDoorBar",
+            "BlastDoorBar2",
+            "BlastDoorStripe",
+            "DeckOne",
+            "DeckOneFoot",
+            "DeckZero",
+            "DoorRail",
+            "EntryFrame",
+            "EntryKnob",
+            "EntryLamp",
+            "EntryLeaf",
+            "ExitFrame",
+            "ExitKnob",
+            "ExitLamp",
+            "ExitLeaf",
+            "Floor",
+            "GantryBeam",
+            "GantryCable",
+            "GantryHook",
+            "GantryLeg",
+            "GantryTrolley",
+            "Lintel",
+            "LintelStripe",
+            "Mast",
+            "MastLight",
+            "MastRing",
+            "MechChest",
+            "MechClaw",
+            "MechCore",
+            "MechElbow",
+            "MechFoot",
+            "MechForearm",
+            "MechHead",
+            "MechLeg",
+            "MechShoulder",
+            "MechTorso",
+            "MechUpperArm",
+            "MechVisor",
+            "MechWrist",
+            "Pad",
+            "Pad0",
+            "Pad1",
+            "Plinth",
+            "Roof",
+            "RoofDeck",
+            "RoofStrip",
+            "StripChevron",
+            "StripChevron2",
+            "StripLight",
+            "VentBlade",
+            "VentHousing",
+            "VentHub",
+            "VentRing",
+            "WallBack",
+            "WallFront",
+            "WallSide"
+          ]
+        }
+      }
+    },
+    "prop_bush_0": {
+      "builder": "props.py",
+      "triangles": 960,
+      "glbKb": 16,
+      "size": [
+        1.81,
+        1.27,
+        1.4
+      ],
+      "groundY": -0.01,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafB",
+        "LeafC"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 960,
+          "parts": [
+            "BushA",
+            "BushB",
+            "BushC"
+          ]
+        }
+      }
+    },
+    "prop_bush_1": {
+      "builder": "props.py",
+      "triangles": 640,
+      "glbKb": 14,
+      "size": [
+        1.31,
+        1.08,
+        1.29
+      ],
+      "groundY": -0.04,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Berry",
+        "LeafA"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 640,
+          "parts": [
+            "Berry0",
+            "Berry1",
+            "Berry2",
+            "Berry3",
+            "Berry4",
+            "BushA"
+          ]
+        }
+      }
+    },
+    "prop_flower_0": {
+      "builder": "props.py",
+      "triangles": 340,
+      "glbKb": 13,
+      "size": [
+        0.67,
+        0.6,
+        0.71
+      ],
+      "groundY": -0.01,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "PetalYellow",
+        "Pollen",
+        "Stem"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 340,
+          "parts": [
+            "Centre0",
+            "Leaf0",
+            "Leaf1",
+            "Petal0",
+            "Stem0"
+          ]
+        }
+      }
+    },
+    "prop_flower_1": {
+      "builder": "props.py",
+      "triangles": 664,
+      "glbKb": 24,
+      "size": [
+        0.64,
+        0.42,
+        0.56
+      ],
+      "groundY": -0.01,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "PetalPink",
+        "PetalWhite",
+        "PetalYellow",
+        "Stem"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 664,
+          "parts": [
+            "Centre0",
+            "Centre1",
+            "Leaf0",
+            "Leaf1",
+            "Leaf2",
+            "Petal0",
+            "Petal1",
+            "Stem0",
+            "Stem1"
+          ]
+        }
+      }
+    },
+    "prop_grass_0": {
+      "builder": "props.py",
+      "triangles": 80,
+      "glbKb": 7,
+      "size": [
+        0.51,
+        0.67,
+        0.44
+      ],
+      "groundY": -0.01,
+      "tints": [
+        "TintGrass"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintGrass"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 80,
+          "parts": [
+            "Blade0",
+            "Blade1",
+            "Blade2",
+            "Blade3",
+            "Blade4"
+          ]
+        }
+      }
+    },
+    "prop_grass_1": {
+      "builder": "props.py",
+      "triangles": 96,
+      "glbKb": 8,
+      "size": [
+        0.49,
+        0.94,
+        0.39
+      ],
+      "groundY": -0.01,
+      "tints": [
+        "TintGrass"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintGrass"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 96,
+          "parts": [
+            "Blade0",
+            "Blade1",
+            "Blade2",
+            "Blade3",
+            "Blade4",
+            "Blade5"
+          ]
+        }
+      }
+    },
+    "prop_grass_2": {
+      "builder": "props.py",
+      "triangles": 64,
+      "glbKb": 5,
+      "size": [
+        0.34,
+        0.5,
+        0.37
+      ],
+      "groundY": -0.01,
+      "tints": [
+        "TintGrass"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintGrass"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 64,
+          "parts": [
+            "Blade0",
+            "Blade1",
+            "Blade2",
+            "Blade3"
+          ]
+        }
+      }
+    },
+    "prop_house_0": {
+      "builder": "props.py",
+      "triangles": 296,
+      "glbKb": 17,
+      "size": [
+        1.1,
+        1.12,
+        1.1
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Char",
+        "Chimney",
+        "Door",
+        "RoofRed",
+        "Timber",
+        "Wall",
+        "Window"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 296,
+          "parts": [
+            "Chimney",
+            "ChimneyCap",
+            "Door",
+            "Ridge",
+            "Roof",
+            "Walls",
+            "Window",
+            "WindowFrame",
+            "WindowFront"
+          ]
+        }
+      }
+    },
+    "prop_house_1": {
+      "builder": "props.py",
+      "triangles": 216,
+      "glbKb": 15,
+      "size": [
+        2.21,
+        1.12,
+        2.21
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Char",
+        "Chimney",
+        "Door",
+        "RoofBrown",
+        "Timber",
+        "Wall",
+        "Window"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 216,
+          "parts": [
+            "Chimney",
+            "ChimneyCap",
+            "Door",
+            "Roof",
+            "Walls",
+            "Window",
+            "WindowFrame",
+            "WindowFront"
+          ]
+        }
+      }
+    },
+    "prop_house_2": {
+      "builder": "props.py",
+      "triangles": 348,
+      "glbKb": 21,
+      "size": [
+        1.1,
+        1.12,
+        1.24
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Char",
+        "Chimney",
+        "Door",
+        "RoofGrey",
+        "Timber",
+        "WallB",
+        "Window"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 348,
+          "parts": [
+            "Awning",
+            "Chimney",
+            "ChimneyCap",
+            "Door",
+            "Post",
+            "Ridge",
+            "Roof",
+            "Walls",
+            "Window",
+            "WindowFrame",
+            "WindowFront"
+          ]
+        }
+      }
+    },
+    "prop_rock_0": {
+      "builder": "props.py",
+      "triangles": 1280,
+      "glbKb": 24,
+      "size": [
+        2.61,
+        1.79,
+        2.02
+      ],
+      "groundY": -0.21,
+      "tints": [
+        "TintRock"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintRock"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1280,
+          "parts": [
+            "Boulder"
+          ]
+        }
+      }
+    },
+    "prop_rock_1": {
+      "builder": "props.py",
+      "triangles": 1280,
+      "glbKb": 24,
+      "size": [
+        4.03,
+        1.89,
+        3.44
+      ],
+      "groundY": -0.39,
+      "tints": [
+        "TintRock"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintRock"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1280,
+          "parts": [
+            "Slab"
+          ]
+        }
+      }
+    },
+    "prop_rock_2": {
+      "builder": "props.py",
+      "triangles": 1280,
+      "glbKb": 20,
+      "size": [
+        2.81,
+        1.32,
+        2.16
+      ],
+      "groundY": -0.12,
+      "tints": [
+        "TintRock"
+      ],
+      "emissive": [],
+      "materials": [
+        "TintRock"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1280,
+          "parts": [
+            "Stone0",
+            "Stone1",
+            "Stone2",
+            "Stone3"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_0": {
+      "builder": "props.py",
+      "triangles": 472,
+      "glbKb": 15,
+      "size": [
+        3.04,
+        5.03,
+        3.12
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 472,
+          "parts": [
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_0_far": {
+      "builder": "props.py",
+      "triangles": 60,
+      "glbKb": 5,
+      "size": [
+        3.05,
+        5.03,
+        3.04
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 60,
+          "parts": [
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_1": {
+      "builder": "props.py",
+      "triangles": 688,
+      "glbKb": 22,
+      "size": [
+        3.43,
+        6.33,
+        3.52
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Snow",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 688,
+          "parts": [
+            "SnowCap",
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Tier3",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_1_far": {
+      "builder": "props.py",
+      "triangles": 76,
+      "glbKb": 7,
+      "size": [
+        3.53,
+        6.33,
+        3.44
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Snow",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 76,
+          "parts": [
+            "SnowCap",
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Tier3",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_2": {
+      "builder": "props.py",
+      "triangles": 416,
+      "glbKb": 13,
+      "size": [
+        3.62,
+        4.23,
+        3.71
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 416,
+          "parts": [
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_conifer_2_far": {
+      "builder": "props.py",
+      "triangles": 46,
+      "glbKb": 5,
+      "size": [
+        3.63,
+        4.23,
+        3.64
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Pine",
+        "PineLight",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 46,
+          "parts": [
+            "Tier0",
+            "Tier1",
+            "Tier2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_0": {
+      "builder": "props.py",
+      "triangles": 676,
+      "glbKb": 13,
+      "size": [
+        3.82,
+        5.79,
+        3.8
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 676,
+          "parts": [
+            "Crown",
+            "CrownTop",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_0_far": {
+      "builder": "props.py",
+      "triangles": 80,
+      "glbKb": 4,
+      "size": [
+        3.83,
+        5.79,
+        3.62
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 80,
+          "parts": [
+            "Crown",
+            "CrownTop",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_1": {
+      "builder": "props.py",
+      "triangles": 704,
+      "glbKb": 15,
+      "size": [
+        3.53,
+        6.8,
+        3.35
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafB",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 704,
+          "parts": [
+            "Branch",
+            "CrownHigh",
+            "CrownLow",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_1_far": {
+      "builder": "props.py",
+      "triangles": 82,
+      "glbKb": 5,
+      "size": [
+        3.49,
+        6.83,
+        3.31
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafB",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 82,
+          "parts": [
+            "Branch",
+            "CrownHigh",
+            "CrownLow",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_2": {
+      "builder": "props.py",
+      "triangles": 996,
+      "glbKb": 18,
+      "size": [
+        5,
+        5.2,
+        3.3
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafB",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 996,
+          "parts": [
+            "CrownL",
+            "CrownMid",
+            "CrownR",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_deciduous_2_far": {
+      "builder": "props.py",
+      "triangles": 118,
+      "glbKb": 6,
+      "size": [
+        4.92,
+        5.13,
+        3.41
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafB",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 118,
+          "parts": [
+            "CrownL",
+            "CrownMid",
+            "CrownR",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_0": {
+      "builder": "props.py",
+      "triangles": 836,
+      "glbKb": 22,
+      "size": [
+        2.56,
+        4.04,
+        0.86
+      ],
+      "groundY": -0.02,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Cactus",
+        "CactusDark",
+        "Flower"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 836,
+          "parts": [
+            "Arm-1",
+            "Arm1",
+            "Elbow-1",
+            "Elbow1",
+            "Flower",
+            "Rib0",
+            "Rib1",
+            "Rib2",
+            "Rib3",
+            "Rib4",
+            "Stem"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_0_far": {
+      "builder": "props.py",
+      "triangles": 100,
+      "glbKb": 10,
+      "size": [
+        2.54,
+        4.03,
+        0.86
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Cactus",
+        "CactusDark",
+        "Flower"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 100,
+          "parts": [
+            "Arm-1",
+            "Arm1",
+            "Elbow-1",
+            "Elbow1",
+            "Flower",
+            "Rib0",
+            "Rib1",
+            "Rib2",
+            "Rib3",
+            "Rib4",
+            "Stem"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_1": {
+      "builder": "props.py",
+      "triangles": 128,
+      "glbKb": 9,
+      "size": [
+        1.57,
+        4.16,
+        1.96
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "DeadWood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 128,
+          "parts": [
+            "Branch0",
+            "Branch1",
+            "Branch2",
+            "Branch3",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_1_far": {
+      "builder": "props.py",
+      "triangles": 10,
+      "glbKb": 5,
+      "size": [
+        1.5,
+        4.12,
+        1.92
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "DeadWood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 10,
+          "parts": [
+            "Branch0",
+            "Branch1",
+            "Branch2",
+            "Branch3",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_2": {
+      "builder": "props.py",
+      "triangles": 236,
+      "glbKb": 18,
+      "size": [
+        2.86,
+        2.34,
+        3.05
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Agave",
+        "Cactus",
+        "DeadWood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 236,
+          "parts": [
+            "Spike0",
+            "Spike1",
+            "Spike2",
+            "Spike3",
+            "Spike4",
+            "Spike5",
+            "Spike6",
+            "Spike7",
+            "Spike8",
+            "Spike9",
+            "Stump"
+          ]
+        }
+      }
+    },
+    "prop_tree_desert_2_far": {
+      "builder": "props.py",
+      "triangles": 24,
+      "glbKb": 9,
+      "size": [
+        2.82,
+        2.31,
+        2.93
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Agave",
+        "Cactus",
+        "DeadWood"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 24,
+          "parts": [
+            "Spike0",
+            "Spike1",
+            "Spike2",
+            "Spike3",
+            "Spike4",
+            "Spike5",
+            "Spike6",
+            "Spike7",
+            "Spike8",
+            "Spike9",
+            "Stump"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_0": {
+      "builder": "props.py",
+      "triangles": 1192,
+      "glbKb": 26,
+      "size": [
+        4.72,
+        5.5,
+        4.84
+      ],
+      "groundY": -0.03,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Coconut",
+        "Frond",
+        "FrondDark",
+        "PalmTrunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1192,
+          "parts": [
+            "Coconut0",
+            "Coconut1",
+            "Coconut2",
+            "Frond0",
+            "Frond1",
+            "Frond2",
+            "Frond3",
+            "Frond4",
+            "Frond5",
+            "Frond6",
+            "Trunk",
+            "TrunkRing"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_0_far": {
+      "builder": "props.py",
+      "triangles": 148,
+      "glbKb": 12,
+      "size": [
+        4.69,
+        5.46,
+        4.81
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Coconut",
+        "Frond",
+        "FrondDark",
+        "PalmTrunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 148,
+          "parts": [
+            "Coconut0",
+            "Coconut1",
+            "Coconut2",
+            "Frond0",
+            "Frond1",
+            "Frond2",
+            "Frond3",
+            "Frond4",
+            "Frond5",
+            "Frond6",
+            "Trunk",
+            "TrunkRing"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_1": {
+      "builder": "props.py",
+      "triangles": 712,
+      "glbKb": 17,
+      "size": [
+        5.54,
+        6.51,
+        5.53
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 712,
+          "parts": [
+            "Crown",
+            "CrownTop",
+            "Root0",
+            "Root1",
+            "Root2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_1_far": {
+      "builder": "props.py",
+      "triangles": 86,
+      "glbKb": 6,
+      "size": [
+        5.48,
+        6.47,
+        5.62
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "LeafA",
+        "LeafC",
+        "Trunk"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 86,
+          "parts": [
+            "Crown",
+            "CrownTop",
+            "Root0",
+            "Root1",
+            "Root2",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_2": {
+      "builder": "props.py",
+      "triangles": 684,
+      "glbKb": 15,
+      "size": [
+        2.4,
+        3.47,
+        2.28
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Frond",
+        "FrondDark",
+        "LeafC"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 684,
+          "parts": [
+            "Leaf0",
+            "Leaf1",
+            "Leaf2",
+            "Leaf3",
+            "Leaf4",
+            "Leaf5",
+            "Stem"
+          ]
+        }
+      }
+    },
+    "prop_tree_tropical_2_far": {
+      "builder": "props.py",
+      "triangles": 76,
+      "glbKb": 7,
+      "size": [
+        2.34,
+        3.44,
+        2.22
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Frond",
+        "FrondDark",
+        "LeafC"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 76,
+          "parts": [
+            "Leaf0",
+            "Leaf1",
+            "Leaf2",
+            "Leaf3",
+            "Leaf4",
+            "Leaf5",
+            "Stem"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_0": {
+      "builder": "props.py",
+      "triangles": 84,
+      "glbKb": 7,
+      "size": [
+        0.89,
+        3.21,
+        1.19
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [
+        "Ember"
+      ],
+      "materials": [
+        "Char",
+        "Ember"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 84,
+          "parts": [
+            "Ember",
+            "Stub0",
+            "Stub1",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_0_far": {
+      "builder": "props.py",
+      "triangles": 8,
+      "glbKb": 4,
+      "size": [
+        0.82,
+        3.18,
+        1.2
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [
+        "Ember"
+      ],
+      "materials": [
+        "Char",
+        "Ember"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 8,
+          "parts": [
+            "Ember",
+            "Stub0",
+            "Stub1",
+            "Trunk"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_1": {
+      "builder": "props.py",
+      "triangles": 996,
+      "glbKb": 18,
+      "size": [
+        2.7,
+        4.61,
+        2.29
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "AshLeaf",
+        "Char"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 996,
+          "parts": [
+            "Trunk",
+            "TuftA",
+            "TuftB",
+            "TuftC"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_1_far": {
+      "builder": "props.py",
+      "triangles": 118,
+      "glbKb": 6,
+      "size": [
+        2.74,
+        4.59,
+        2.38
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "AshLeaf",
+        "Char"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 118,
+          "parts": [
+            "Trunk",
+            "TuftA",
+            "TuftB",
+            "TuftC"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_2": {
+      "builder": "props.py",
+      "triangles": 1292,
+      "glbKb": 22,
+      "size": [
+        2.31,
+        1.87,
+        2.26
+      ],
+      "groundY": -0.16,
+      "tints": [],
+      "emissive": [
+        "Ember"
+      ],
+      "materials": [
+        "AshLeaf",
+        "Char",
+        "Ember"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1292,
+          "parts": [
+            "Crack",
+            "LavaRock",
+            "Scrub0",
+            "Scrub1",
+            "Scrub2"
+          ]
+        }
+      }
+    },
+    "prop_tree_volcanic_2_far": {
+      "builder": "props.py",
+      "triangles": 154,
+      "glbKb": 7,
+      "size": [
+        2.32,
+        1.92,
+        2.3
+      ],
+      "groundY": -0.2,
+      "tints": [],
+      "emissive": [
+        "Ember"
+      ],
+      "materials": [
+        "AshLeaf",
+        "Char",
+        "Ember"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 154,
+          "parts": [
+            "Crack",
+            "LavaRock",
+            "Scrub0",
+            "Scrub1",
+            "Scrub2"
+          ]
+        }
+      }
+    },
+    "prop_twister": {
+      "builder": "props.py",
+      "triangles": 5776,
+      "glbKb": 113,
+      "size": [
+        4.95,
+        9.32,
+        5.36
+      ],
+      "groundY": 0,
+      "tints": [],
+      "emissive": [],
+      "materials": [
+        "Grit",
+        "SandA",
+        "SandB",
+        "SandC"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5776,
+          "parts": [
+            "Cap0",
+            "Cap1",
+            "Cap2",
+            "Cap3",
+            "Cap4",
+            "Cap5",
+            "Cap6",
+            "Funnel",
+            "Grit0",
+            "Grit1",
+            "Grit2",
+            "Grit3",
+            "Grit4",
+            "Grit5",
+            "Grit6",
+            "Puff0",
+            "Puff1",
+            "Puff2",
+            "Puff3",
+            "Puff4",
+            "Puff5",
+            "PuffCore"
+          ]
+        }
+      }
+    },
+    "vehicle_building_destroyer_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 10464,
+      "glbKb": 267,
+      "size": [
+        3.18,
+        2.02,
+        1.5
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Canvas",
+        "Chrome",
+        "Dark",
+        "DuctTape",
+        "Lamp",
+        "Plastic",
+        "Rubber",
+        "Rust",
+        "Steel",
+        "Stripe",
+        "TintBody",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6252,
+          "parts": [
+            "BagChute",
+            "BagFrame",
+            "BagSack",
+            "CraneBall",
+            "CraneChainLink",
+            "CraneElbow",
+            "CraneFoot",
+            "CraneHole",
+            "CraneHook",
+            "CraneHookTip",
+            "CranePole",
+            "CraneTape",
+            "Deck",
+            "DeckSkirt",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Grille",
+            "Hood",
+            "HoodRust",
+            "Lamp",
+            "SeatBack",
+            "SeatPan",
+            "SteeringColumn",
+            "SteeringSpoke",
+            "SteeringWheel",
+            "Tub",
+            "TubRust"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 704,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 704,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 704,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 704,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        },
+        "Blade": {
+          "triangles": 1068,
+          "parts": [
+            "BladeArm",
+            "BladeBrace",
+            "BladeNail",
+            "BladePlank",
+            "BladeTape"
+          ]
+        },
+        "Ripper": {
+          "triangles": 328,
+          "parts": [
+            "RipperHandle",
+            "RipperHead",
+            "RipperTape",
+            "RipperTine"
+          ]
+        }
+      }
+    },
+    "vehicle_building_destroyer_t2": {
+      "builder": "vehicles.py",
+      "triangles": 10324,
+      "glbKb": 199,
+      "size": [
+        3.8,
+        2.29,
+        2.11
+      ],
+      "groundY": -0.04,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Lamp",
+        "Rubber",
+        "Steel",
+        "Stripe",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 9356,
+          "parts": [
+            "AirFilter",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Frame",
+            "Grille",
+            "HeadLamp",
+            "HeadRim",
+            "Hood",
+            "PushArm",
+            "RopsBeacon",
+            "RopsPost",
+            "RopsRoof",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel"
+          ]
+        },
+        "Blade": {
+          "triangles": 644,
+          "parts": [
+            "BladeEdge",
+            "BladeLiftBarrel",
+            "BladeLiftRod",
+            "BladeShell",
+            "BladeStripe",
+            "BladeWing"
+          ]
+        },
+        "Ripper": {
+          "triangles": 324,
+          "parts": [
+            "RipperBeam",
+            "RipperShank",
+            "RipperTip"
+          ]
+        }
+      }
+    },
+    "vehicle_building_destroyer_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 15976,
+      "glbKb": 363,
+      "size": [
+        4.03,
+        3.53,
+        2.22
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "GlowGreen",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Black",
+        "Chrome",
+        "ChromeHub",
+        "Dark",
+        "Glass",
+        "GlowGreen",
+        "Gold",
+        "Hazard",
+        "Lamp",
+        "Rubber",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 14428,
+          "parts": [
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "CraneArm",
+            "CraneArmTrim",
+            "CraneBase",
+            "CraneChain",
+            "CraneCylBarrel",
+            "CraneCylRod",
+            "CraneLink",
+            "CraneStarBall",
+            "CraneStarSpike",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "FlagFlag",
+            "FlagKnob",
+            "FlagLogo",
+            "FlagPole",
+            "HeadLamp",
+            "HeadRim",
+            "Hull",
+            "HullGlacis",
+            "HullGrille",
+            "HullTrim",
+            "HullUpper",
+            "LaserBarrel",
+            "LaserBase",
+            "LaserBlock",
+            "LaserCoil",
+            "LaserLens",
+            "PushArm",
+            "Skirt",
+            "SkirtHazardBase",
+            "SkirtHazardRearBase",
+            "SkirtHazardRearStripe",
+            "SkirtHazardStripe",
+            "SkirtTrim",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel"
+          ]
+        },
+        "Blade": {
+          "triangles": 1008,
+          "parts": [
+            "BladeBrow",
+            "BladeEdge",
+            "BladeEye",
+            "BladeLiftBarrel",
+            "BladeLiftRod",
+            "BladeMouth",
+            "BladePupil",
+            "BladeRail",
+            "BladeShell",
+            "BladeTooth",
+            "BladeWing"
+          ]
+        },
+        "Ripper": {
+          "triangles": 540,
+          "parts": [
+            "RipperBeam",
+            "RipperClaw",
+            "RipperShank"
+          ]
+        }
+      }
+    },
+    "vehicle_debris_hauler_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 11428,
+      "glbKb": 292,
+      "size": [
+        2.54,
+        1.96,
+        1.29
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Cream",
+        "Dark",
+        "DuctTape",
+        "Lamp",
+        "Plastic",
+        "Red",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Rust",
+        "RustDark",
+        "TintBody",
+        "White",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3624,
+          "parts": [
+            "BarsBar",
+            "BarsBell",
+            "BarsGrip",
+            "BarsStem",
+            "ChairLeg",
+            "ChairPost",
+            "ChairSeat",
+            "ChairSlat",
+            "EngineBlock",
+            "EngineElbow",
+            "EngineFin",
+            "EnginePipe",
+            "EnginePullHandle",
+            "EngineReel",
+            "EngineTank",
+            "EngineTankCap",
+            "EngineTip",
+            "FrameAxle",
+            "FrameCross",
+            "FrameDrop",
+            "FrameFloor",
+            "FrameNose",
+            "FrameRail",
+            "FrameShelf",
+            "TorchBody",
+            "TorchBracket",
+            "TorchHead",
+            "TorchLens",
+            "TorchTape"
+          ]
+        },
+        "Bed": {
+          "triangles": 4820,
+          "parts": [
+            "SkipDent",
+            "SkipForkPocket",
+            "SkipHinge",
+            "SkipLid",
+            "SkipLidGrip",
+            "SkipLidRib",
+            "SkipLip",
+            "SkipLoadRock",
+            "SkipPlate",
+            "SkipProp",
+            "SkipPropTape",
+            "SkipRail",
+            "SkipRib",
+            "SkipRust",
+            "SkipSpill",
+            "SkipTub"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 704,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 924,
+          "parts": [
+            "WheelFRHub",
+            "WheelFRRim",
+            "WheelFRSpoke",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 652,
+          "parts": [
+            "WheelRLCap",
+            "WheelRLDish",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 704,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
+    "vehicle_debris_hauler_t2": {
+      "builder": "vehicles.py",
+      "triangles": 10288,
+      "glbKb": 231,
+      "size": [
+        3.05,
+        2.4,
+        1.9
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Lamp",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Bed": {
+          "triangles": 2992,
+          "parts": [
+            "BedCanopy",
+            "BedFloor",
+            "BedHeadboard",
+            "BedLoadRock",
+            "BedRib",
+            "BedSide",
+            "BedTailgate"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        },
+        "Body": {
+          "triangles": 2704,
+          "parts": [
+            "Bumper",
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Fender",
+            "Grille",
+            "HeadLamp",
+            "HeadRim",
+            "Hood"
+          ]
+        }
+      }
+    },
+    "vehicle_debris_hauler_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 15628,
+      "glbKb": 377,
+      "size": [
+        4.18,
+        3.53,
+        2.17
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "GlowFlame",
+        "GlowNeon",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Black",
+        "Chrome",
+        "ChromeHub",
+        "Dark",
+        "Glass",
+        "GlowFlame",
+        "GlowNeon",
+        "Gold",
+        "Lamp",
+        "Red",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 6544,
+          "parts": [
+            "BadgeL",
+            "BadgeX",
+            "Bumper",
+            "BumperLip",
+            "BumperNeon",
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "Deck",
+            "DeckPost",
+            "DeckRail",
+            "DishDish",
+            "DishFeed",
+            "DishKnob",
+            "DishRim",
+            "DishStem",
+            "Fender",
+            "Flap",
+            "Grille",
+            "GrilleSlat",
+            "HeadHiLamp",
+            "HeadHiRim",
+            "HeadLoLamp",
+            "HeadLoRim",
+            "Hood",
+            "HoodScoop",
+            "HoodScoopMouth",
+            "HoodTrim",
+            "HoodTrimTop",
+            "MirrorGlass",
+            "MirrorStalk",
+            "RearNeon",
+            "Skirt",
+            "SkirtNeon",
+            "StackBase",
+            "StackCollar",
+            "StackFlame",
+            "StackFlame2",
+            "StackPipe",
+            "Step",
+            "Tower",
+            "TowerTrim",
+            "Underglow"
+          ]
+        },
+        "Bed": {
+          "triangles": 4404,
+          "parts": [
+            "BedFloor",
+            "BedGateTrim",
+            "BedHeadTrim",
+            "BedHeadboard",
+            "BedLoadRock",
+            "BedNugget",
+            "BedRib",
+            "BedSide",
+            "BedSpoiler",
+            "BedSpoilerEnd",
+            "BedSpoilerPost",
+            "BedSpoilerTrim",
+            "BedTailgate",
+            "BedTrim"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 780,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 780,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelML": {
+          "triangles": 780,
+          "parts": [
+            "WheelMLBolt",
+            "WheelMLCap",
+            "WheelMLHub",
+            "WheelMLTyre"
+          ]
+        },
+        "WheelMR": {
+          "triangles": 780,
+          "parts": [
+            "WheelMRBolt",
+            "WheelMRCap",
+            "WheelMRHub",
+            "WheelMRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 780,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 780,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
+    "vehicle_drill_rig_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 6096,
+      "glbKb": 183,
+      "size": [
+        1.84,
+        3.95,
+        1.18
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Chrome",
+        "Cream",
+        "Dark",
+        "DuctTape",
+        "Eraser",
+        "Pencil",
+        "Plastic",
+        "Red",
+        "Rope",
+        "Rust",
+        "RustDark",
+        "Steel",
+        "TintBody",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3220,
+          "parts": [
+            "BasketRim",
+            "BasketRust",
+            "BasketTub",
+            "BasketWire",
+            "BasketWireF",
+            "BasketWireH",
+            "BucketBody",
+            "BucketHook",
+            "BucketHoop",
+            "BucketStub",
+            "BucketStubTip",
+            "CasterFork",
+            "CasterWheel",
+            "ChassisRail",
+            "ChassisShelf",
+            "ChassisUpright",
+            "HandleGrip",
+            "HandlePost"
+          ]
+        },
+        "Mast": {
+          "triangles": 2876,
+          "parts": [
+            "MastArm",
+            "MastBelt",
+            "MastChuck",
+            "MastClamp",
+            "MastCrank",
+            "MastCrankKnob",
+            "MastGear",
+            "MastGearHole",
+            "MastHousing",
+            "MastPencilBite",
+            "MastPencilCone",
+            "MastPencilEraser",
+            "MastPencilFerrule",
+            "MastPencilPoint",
+            "MastPencilRope",
+            "MastPencilShaft",
+            "MastPinion",
+            "MastRail",
+            "MastRope",
+            "MastRung",
+            "MastShaft",
+            "MastTape"
+          ]
+        }
+      }
+    },
+    "vehicle_drill_rig_t2": {
+      "builder": "vehicles.py",
+      "triangles": 9620,
+      "glbKb": 188,
+      "size": [
+        2.97,
+        5.23,
+        1.72
+      ],
+      "groundY": -0.04,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 8220,
+          "parts": [
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Deck",
+            "DustHood",
+            "Engine",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Tank",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel"
+          ]
+        },
+        "Mast": {
+          "triangles": 1400,
+          "parts": [
+            "MastBit",
+            "MastBrace",
+            "MastCrown",
+            "MastMotor",
+            "MastRail",
+            "MastRod",
+            "MastRotaryHead",
+            "MastRung",
+            "MastStayBarrel",
+            "MastStayRod"
+          ]
+        }
+      }
+    },
+    "vehicle_drill_rig_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 12132,
+      "glbKb": 364,
+      "size": [
+        4.26,
+        6.41,
+        2.17
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "GlowFlame",
+        "GlowLava",
+        "GlowRed"
+      ],
+      "materials": [
+        "Beacon",
+        "Black",
+        "Chrome",
+        "ChromeHub",
+        "Crimson",
+        "Dark",
+        "Glass",
+        "GlowFlame",
+        "GlowLava",
+        "GlowRed",
+        "Gold",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5064,
+          "parts": [
+            "Bumper",
+            "CabBeacon",
+            "CabHorn",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "Deck",
+            "DeckTrim",
+            "DustHood",
+            "Engine",
+            "EngineVent",
+            "Fender",
+            "Frame",
+            "Grille",
+            "GrilleEye",
+            "MastFoot",
+            "PitchforkBar",
+            "PitchforkShaft",
+            "PitchforkTine",
+            "StackBase",
+            "StackCollar",
+            "StackFlame",
+            "StackFlame2",
+            "StackPipe",
+            "TailHead",
+            "TailSeg"
+          ]
+        },
+        "Mast": {
+          "triangles": 3052,
+          "parts": [
+            "MastBitCore",
+            "MastBitThread",
+            "MastBitTip",
+            "MastColumn",
+            "MastCrown",
+            "MastCrownEye",
+            "MastCrownTrim",
+            "MastHorn",
+            "MastMotor",
+            "MastRail",
+            "MastRod",
+            "MastRotaryHead",
+            "MastSideVent",
+            "MastSideVentGlow",
+            "MastStayBarrel",
+            "MastStayRod",
+            "MastTrim",
+            "MastVent",
+            "MastVentGlow"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 1004,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLSpike",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 1004,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRSpike",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 1004,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLSpike",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 1004,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRSpike",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_digger_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 5840,
+      "glbKb": 149,
+      "size": [
+        3.57,
+        2.28,
+        1.63
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "DuctTape",
+        "Plastic",
+        "Red",
+        "Rock",
+        "RockDark",
+        "Rope",
+        "Rubber",
+        "Rust",
+        "RustDark",
+        "Steel",
+        "Straw",
+        "TintBody",
+        "White",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3644,
+          "parts": [
+            "Counterweight",
+            "CounterweightHole",
+            "Foot",
+            "Fork",
+            "Handle",
+            "HandleGrip",
+            "Leg",
+            "Lever",
+            "LeverKnob",
+            "StoolBack",
+            "StoolBase",
+            "StoolPost",
+            "StoolSeat",
+            "TrayFloor",
+            "TrayLip",
+            "TrayRust",
+            "TrayTub",
+            "UmbrellaCanopy",
+            "UmbrellaFinial",
+            "UmbrellaPole",
+            "UmbrellaRim",
+            "UmbrellaTape",
+            "WheelCap",
+            "WheelDish",
+            "WheelTyre"
+          ]
+        },
+        "Boom": {
+          "triangles": 528,
+          "parts": [
+            "BoomBracket",
+            "BoomBristles",
+            "BoomBrushBlock",
+            "BoomHandle",
+            "BoomPin",
+            "BoomRope",
+            "BoomTape"
+          ]
+        },
+        "Stick": {
+          "triangles": 316,
+          "parts": [
+            "StickHandle",
+            "StickKnot",
+            "StickTape"
+          ]
+        },
+        "Bucket": {
+          "triangles": 1352,
+          "parts": [
+            "BucketHandle",
+            "BucketPan",
+            "BucketRim",
+            "BucketScoopRock",
+            "BucketTape",
+            "BucketWall"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_digger_t2": {
+      "builder": "vehicles.py",
+      "triangles": 10872,
+      "glbKb": 204,
+      "size": [
+        4.69,
+        2.4,
+        1.96
+      ],
+      "groundY": -0.04,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Rubber",
+        "Steel",
+        "Stripe",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 9344,
+          "parts": [
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Carriage",
+            "Counterweight",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "House",
+            "Slew",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel",
+            "Vent"
+          ]
+        },
+        "Boom": {
+          "triangles": 384,
+          "parts": [
+            "BoomBeam",
+            "BoomLiftBarrel",
+            "BoomLiftRod",
+            "BoomPin"
+          ]
+        },
+        "Stick": {
+          "triangles": 432,
+          "parts": [
+            "StickBeam",
+            "StickCylBarrel",
+            "StickCylRod",
+            "StickPin"
+          ]
+        },
+        "Bucket": {
+          "triangles": 712,
+          "parts": [
+            "BucketCylBarrel",
+            "BucketCylRod",
+            "BucketShell",
+            "BucketTooth"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_digger_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 13496,
+      "glbKb": 295,
+      "size": [
+        6.19,
+        2.98,
+        2.21
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowRed"
+      ],
+      "materials": [
+        "Black",
+        "Bone",
+        "Chrome",
+        "ChromeHub",
+        "Dark",
+        "GlowRed",
+        "Orange",
+        "Red",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 11744,
+          "parts": [
+            "Carriage",
+            "Counterweight",
+            "CounterweightGlow",
+            "FlameLick0",
+            "FlameLick1",
+            "Horn",
+            "HornBase",
+            "House",
+            "HouseBand",
+            "HouseLightBar",
+            "HouseLightBarLamp",
+            "HouseRib",
+            "HouseWhip",
+            "SkullBrow",
+            "SkullCranium",
+            "SkullEye",
+            "SkullHorn",
+            "SkullJaw",
+            "SkullMouth",
+            "SkullNose",
+            "SkullSocket",
+            "SkullTooth",
+            "Slew",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel",
+            "TrackSpike",
+            "Vent"
+          ]
+        },
+        "Boom": {
+          "triangles": 888,
+          "parts": [
+            "BoomBeam",
+            "BoomLiftBarrel",
+            "BoomLiftRod",
+            "BoomPin",
+            "BoomScythe",
+            "BoomScytheEdge",
+            "BoomScytheMount",
+            "BoomStripe"
+          ]
+        },
+        "Stick": {
+          "triangles": 432,
+          "parts": [
+            "StickBeam",
+            "StickCylBarrel",
+            "StickCylRod",
+            "StickPin"
+          ]
+        },
+        "Bucket": {
+          "triangles": 432,
+          "parts": [
+            "BucketCylBarrel",
+            "BucketCylRod",
+            "BucketLip",
+            "BucketShell",
+            "BucketTooth"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_fragmenter_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 8144,
+      "glbKb": 200,
+      "size": [
+        3.88,
+        1.67,
+        1.46
+      ],
+      "groundY": -0.04,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "BandAid",
+        "Chrome",
+        "Cream",
+        "Dark",
+        "DuctTape",
+        "Plastic",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Rust",
+        "Steel",
+        "Stripe",
+        "TintBody",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5836,
+          "parts": [
+            "Axle",
+            "CartWheelCap",
+            "CartWheelDish",
+            "CartWheelTyre",
+            "Crate",
+            "CrateLoad",
+            "CrateSlat",
+            "FulcrumLeg",
+            "FulcrumPin",
+            "HammerBandAid",
+            "HammerBandAidPad",
+            "HammerCrack",
+            "HammerHandle",
+            "HammerHead",
+            "HammerTape",
+            "Handle",
+            "HandleGrip",
+            "PropFoot",
+            "PropLeg",
+            "Spring",
+            "SpringBase",
+            "SpringCap",
+            "Tray",
+            "TrayRail",
+            "TrayRocksRock",
+            "TrayRust",
+            "TrayStake"
+          ]
+        },
+        "Flywheel": {
+          "triangles": 940,
+          "parts": [
+            "FlywheelCrankArm",
+            "FlywheelCutout",
+            "FlywheelHub",
+            "FlywheelPedal",
+            "FlywheelRing"
+          ]
+        },
+        "Conveyor": {
+          "triangles": 1368,
+          "parts": [
+            "ConveyorHeapRock",
+            "ConveyorPlank",
+            "ConveyorProp",
+            "ConveyorRail",
+            "ConveyorRock"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_fragmenter_t2": {
+      "builder": "vehicles.py",
+      "triangles": 11084,
+      "glbKb": 227,
+      "size": [
+        4.53,
+        2.14,
+        2.04
+      ],
+      "groundY": -0.04,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Chrome",
+        "Dark",
+        "Hub",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Steel",
+        "Stripe",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 10056,
+          "parts": [
+            "ControlPanel",
+            "Crusher",
+            "CrusherBolt",
+            "Engine",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Frame",
+            "HopperBack",
+            "HopperFront",
+            "HopperGrate",
+            "HopperLoadRock",
+            "HopperSide",
+            "LadderRail",
+            "LadderRung",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel"
+          ]
+        },
+        "Flywheel": {
+          "triangles": 500,
+          "parts": [
+            "FlywheelDisc",
+            "FlywheelHub",
+            "FlywheelSpoke"
+          ]
+        },
+        "Conveyor": {
+          "triangles": 528,
+          "parts": [
+            "ConveyorBelt",
+            "ConveyorLeg",
+            "ConveyorPulley",
+            "ConveyorRail",
+            "ConveyorRoller"
+          ]
+        }
+      }
+    },
+    "vehicle_rock_fragmenter_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 17588,
+      "glbKb": 349,
+      "size": [
+        4.52,
+        3.42,
+        2.19
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "GlowBlue",
+        "GlowCyan",
+        "GlowWarn"
+      ],
+      "materials": [
+        "Black",
+        "Blue",
+        "Chrome",
+        "ChromeHub",
+        "Dark",
+        "GlowBlue",
+        "GlowCyan",
+        "GlowWarn",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 15428,
+          "parts": [
+            "Crusher",
+            "CrusherTrim",
+            "FlywheelAxle",
+            "Frame",
+            "FrameBeacon",
+            "HopperBand",
+            "HopperFunnel",
+            "HopperLamp",
+            "HopperLoadRock",
+            "HopperOpening",
+            "HopperRim",
+            "HopperThroat",
+            "LogoFrontNucleus",
+            "LogoFrontOrbit",
+            "LogoNucleus",
+            "LogoOrbit",
+            "Panel",
+            "PanelScreen",
+            "ReactorCollar",
+            "ReactorDome",
+            "ReactorLamp",
+            "ReactorOrb",
+            "ReactorPipe",
+            "ReactorRing",
+            "ReactorSpire",
+            "SideConveyorBelt",
+            "SideConveyorLeg",
+            "SideConveyorPulley",
+            "SideConveyorRail",
+            "SideConveyorRoller",
+            "TrackBelt",
+            "TrackFrame",
+            "TrackPad",
+            "TrackRoadWheel"
+          ]
+        },
+        "Flywheel": {
+          "triangles": 1644,
+          "parts": [
+            "FlywheelCore",
+            "FlywheelHub",
+            "FlywheelMagnet",
+            "FlywheelRing",
+            "FlywheelSpoke"
+          ]
+        },
+        "Conveyor": {
+          "triangles": 516,
+          "parts": [
+            "ConveyorArch",
+            "ConveyorBelt",
+            "ConveyorLeg",
+            "ConveyorPulley",
+            "ConveyorRail",
+            "ConveyorRoller",
+            "ConveyorScanner"
+          ]
+        }
+      }
+    },
+    "worker_blaster": {
+      "builder": "workers.py",
+      "triangles": 10154,
+      "glbKb": 197,
+      "size": [
+        0.72,
+        1.31,
+        0.75
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintRole"
+      ],
+      "emissive": [],
+      "materials": [
+        "Belt",
+        "Boot",
+        "Brow",
+        "Cheek",
+        "Dark",
+        "EyeWhite",
+        "Glove",
+        "Lens",
+        "Metal",
+        "Pupil",
+        "Red",
+        "Skin",
+        "SkinShade",
+        "TintRole"
+      ],
+      "nodes": {
+        "Torso": {
+          "triangles": 1712,
+          "parts": [
+            "TorsoBelt",
+            "TorsoBody",
+            "TorsoBuckle",
+            "TorsoButton",
+            "TorsoPouch"
+          ]
+        },
+        "Head": {
+          "triangles": 4950,
+          "parts": [
+            "HeadBrow",
+            "HeadCheek",
+            "HeadEye",
+            "HeadGoggle",
+            "HeadGoggleBridge",
+            "HeadGoggleLens",
+            "HeadGoggleStrap",
+            "HeadHatBrim",
+            "HeadHatDome",
+            "HeadHatRidge",
+            "HeadHatVisor",
+            "HeadNose",
+            "HeadPupil",
+            "HeadShine",
+            "HeadSkull"
+          ]
+        },
+        "ArmL": {
+          "triangles": 860,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper"
+          ]
+        },
+        "ArmR": {
+          "triangles": 1152,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper",
+            "PropDetBox",
+            "PropPlunger",
+            "PropPlungerKnob"
+          ]
+        },
+        "LegL": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        },
+        "LegR": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        }
+      }
+    },
+    "worker_driller": {
+      "builder": "workers.py",
+      "triangles": 10342,
+      "glbKb": 200,
+      "size": [
+        0.76,
+        1.31,
+        0.75
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintRole"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Belt",
+        "Boot",
+        "Brow",
+        "Cheek",
+        "Dark",
+        "EyeWhite",
+        "Glove",
+        "Lamp",
+        "Metal",
+        "Pupil",
+        "Skin",
+        "SkinShade",
+        "Steel",
+        "TintRole"
+      ],
+      "nodes": {
+        "Torso": {
+          "triangles": 1712,
+          "parts": [
+            "TorsoBelt",
+            "TorsoBody",
+            "TorsoBuckle",
+            "TorsoButton",
+            "TorsoPouch"
+          ]
+        },
+        "Head": {
+          "triangles": 5090,
+          "parts": [
+            "HeadBrow",
+            "HeadCheek",
+            "HeadEye",
+            "HeadHatBrim",
+            "HeadHatDome",
+            "HeadHatRidge",
+            "HeadHatVisor",
+            "HeadLamp",
+            "HeadLampLens",
+            "HeadMuff",
+            "HeadMuffBand",
+            "HeadMuffPad",
+            "HeadNose",
+            "HeadPupil",
+            "HeadShine",
+            "HeadSkull"
+          ]
+        },
+        "ArmL": {
+          "triangles": 860,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper"
+          ]
+        },
+        "ArmR": {
+          "triangles": 1200,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper",
+            "PropDrillBit",
+            "PropDrillBody",
+            "PropDrillGrip"
+          ]
+        },
+        "LegL": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        },
+        "LegR": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        }
+      }
+    },
+    "worker_driver": {
+      "builder": "workers.py",
+      "triangles": 9734,
+      "glbKb": 181,
+      "size": [
+        0.72,
+        1.31,
+        0.75
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintRole"
+      ],
+      "emissive": [],
+      "materials": [
+        "Belt",
+        "Boot",
+        "Brow",
+        "Cheek",
+        "Dark",
+        "DriverGlove",
+        "EyeWhite",
+        "Metal",
+        "Pupil",
+        "Skin",
+        "SkinShade",
+        "TintRole"
+      ],
+      "nodes": {
+        "Torso": {
+          "triangles": 1712,
+          "parts": [
+            "TorsoBelt",
+            "TorsoBody",
+            "TorsoBuckle",
+            "TorsoButton",
+            "TorsoPouch"
+          ]
+        },
+        "Head": {
+          "triangles": 4606,
+          "parts": [
+            "HeadBrow",
+            "HeadCheek",
+            "HeadEye",
+            "HeadHatBrim",
+            "HeadHatDome",
+            "HeadHatRidge",
+            "HeadHatVisor",
+            "HeadNose",
+            "HeadPupil",
+            "HeadShade",
+            "HeadShadeArm",
+            "HeadShadeBridge",
+            "HeadShine",
+            "HeadSkull"
+          ]
+        },
+        "ArmL": {
+          "triangles": 1076,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper",
+            "PropWrench",
+            "PropWrenchJaw"
+          ]
+        },
+        "ArmR": {
+          "triangles": 860,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper"
+          ]
+        },
+        "LegL": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        },
+        "LegR": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        }
+      }
+    },
+    "worker_manager": {
+      "builder": "workers.py",
+      "triangles": 10054,
+      "glbKb": 192,
+      "size": [
+        0.72,
+        1.31,
+        0.75
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintRole"
+      ],
+      "emissive": [],
+      "materials": [
+        "Belt",
+        "Boot",
+        "Brow",
+        "Cheek",
+        "Coffee",
+        "Dark",
+        "EyeWhite",
+        "HatWhite",
+        "Metal",
+        "Mug",
+        "Pupil",
+        "Shirt",
+        "Skin",
+        "SkinShade",
+        "Tie",
+        "TintRole"
+      ],
+      "nodes": {
+        "Torso": {
+          "triangles": 2312,
+          "parts": [
+            "TorsoBelt",
+            "TorsoBody",
+            "TorsoBuckle",
+            "TorsoButton",
+            "TorsoCollar",
+            "TorsoPouch",
+            "TorsoTie",
+            "TorsoTieKnot"
+          ]
+        },
+        "Head": {
+          "triangles": 4198,
+          "parts": [
+            "HeadBadge",
+            "HeadBrow",
+            "HeadCheek",
+            "HeadEye",
+            "HeadHatBrim",
+            "HeadHatDome",
+            "HeadHatRidge",
+            "HeadHatVisor",
+            "HeadNose",
+            "HeadPupil",
+            "HeadShine",
+            "HeadSkull"
+          ]
+        },
+        "ArmL": {
+          "triangles": 860,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper"
+          ]
+        },
+        "ArmR": {
+          "triangles": 1204,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper",
+            "PropCoffee",
+            "PropMug",
+            "PropMugHandle"
+          ]
+        },
+        "LegL": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        },
+        "LegR": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        }
+      }
+    },
+    "worker_surveyor": {
+      "builder": "workers.py",
+      "triangles": 10514,
+      "glbKb": 195,
+      "size": [
+        0.72,
+        1.31,
+        0.78
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintRole"
+      ],
+      "emissive": [],
+      "materials": [
+        "Belt",
+        "Boot",
+        "Brow",
+        "Cheek",
+        "Dark",
+        "EyeWhite",
+        "HiVis",
+        "Metal",
+        "Paper",
+        "Pupil",
+        "Skin",
+        "SkinShade",
+        "TintRole"
+      ],
+      "nodes": {
+        "Torso": {
+          "triangles": 2160,
+          "parts": [
+            "TorsoBelt",
+            "TorsoBody",
+            "TorsoBuckle",
+            "TorsoButton",
+            "TorsoHiVis",
+            "TorsoPouch"
+          ]
+        },
+        "Head": {
+          "triangles": 4926,
+          "parts": [
+            "HeadBrow",
+            "HeadCheek",
+            "HeadEye",
+            "HeadHatBrim",
+            "HeadHatDome",
+            "HeadHatRidge",
+            "HeadHatVisor",
+            "HeadNose",
+            "HeadPupil",
+            "HeadShine",
+            "HeadSkull",
+            "HeadSpecArm",
+            "HeadSpecBridge",
+            "HeadSpecRing"
+          ]
+        },
+        "ArmL": {
+          "triangles": 1088,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper",
+            "PropClip",
+            "PropClipboard",
+            "PropPaper"
+          ]
+        },
+        "ArmR": {
+          "triangles": 860,
+          "parts": [
+            "ArmCuff",
+            "ArmHand",
+            "ArmUpper"
+          ]
+        },
+        "LegL": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        },
+        "LegR": {
+          "triangles": 740,
+          "parts": [
+            "LegBoot",
+            "LegSole",
+            "LegUpper"
+          ]
+        }
+      }
+    }
+  }
+}

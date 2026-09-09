@@ -23,7 +23,7 @@ AGENTS.md, agent definitions, rules, and skills all use this convention. Two kin
 
 Skills in `.opencode/skills/` auto-load based on task relevance. Prefix categories:
 - `gameplay-*` — Game mechanics
-- `dev-*` — Software development (architecture, design principles, conventions, testing, visual testing, scenario authoring)
+- `dev-*` — Software development (architecture, design principles, conventions, testing, visual testing, scenario authoring, 3D models)
 - `agentic-*` — Agentic workflow automation
 
 ## Rules
