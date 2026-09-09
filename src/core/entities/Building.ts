@@ -7,9 +7,7 @@
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
-// `getSurfaceY` is imported for the implementer to wire into
-// `checkFootprintPlacement`'s flatness branch (#1008); not called yet.
-import { type VoxelGrid, getSurfaceY as _getSurfaceY } from './BuildingPlacement.js';
+import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
 
 // ── Building types ──
 
@@ -127,11 +125,20 @@ export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
  * (`checkFootprintPlacement`) is missing (#1008).
  */
 export function isFootprintFlat(
-  _footprint: ReadonlyArray<readonly [number, number]>,
-  _x: number, _z: number,
-  _heightAt: (cx: number, cz: number) => number,
+  footprint: ReadonlyArray<readonly [number, number]>,
+  x: number, z: number,
+  heightAt: (cx: number, cz: number) => number,
 ): boolean {
-  throw new Error('not implemented');
+  let referenceHeight: number | undefined;
+  for (const [dx, dz] of footprint) {
+    const h = heightAt(x + dx, z + dz);
+    if (referenceHeight === undefined) {
+      referenceHeight = h;
+    } else if (h !== referenceHeight) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // ── Building instance ──
@@ -221,7 +228,6 @@ export function placeBuilding(
     return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
   }
 
-  // TODO(#1008): thread voxelGrid into checkFootprintPlacement's flatness check.
   const check = checkFootprintPlacement(
     state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
     type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
@@ -331,7 +337,6 @@ export function moveBuilding(
     ...state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
     ...plannedOccupants,
   ];
-  // TODO(#1008): thread voxelGrid into checkFootprintPlacement's flatness check.
   const check = checkFootprintPlacement(
     occupants,
     building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
@@ -422,8 +427,11 @@ export interface FootprintOccupant {
  * Whether a building of `type`/`tier` can be placed at (x, z) given the
  * current occupants (live buildings AND planned-but-not-yet-built ones) —
  * bounds + occupancy check shared by `placeBuilding` and the new
- * order-then-build path. Stub: implementation phase moves the real checks
- * here from `placeBuilding`'s inline bounds/`isOccupied` calls.
+ * order-then-build path.
+ *
+ * When `voxelGrid` is supplied, and only after bounds/occupancy pass, the
+ * footprint's ground must also be flat (#1008) — omitting `voxelGrid` skips
+ * that check entirely, for call sites with no grid to check against.
  */
 export function checkFootprintPlacement(
   occupants: ReadonlyArray<FootprintOccupant>,
@@ -435,7 +443,7 @@ export function checkFootprintPlacement(
   gridSizeZ: number,
   originX: number,
   originZ: number,
-  _voxelGrid?: VoxelGrid,
+  voxelGrid?: VoxelGrid,
 ): { valid: boolean; error?: string } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
@@ -453,15 +461,19 @@ export function checkFootprintPlacement(
     }
   }
 
+  if (voxelGrid !== undefined) {
+    const flat = isFootprintFlat(def.footprint, x, z, (cx, cz) => getSurfaceY(voxelGrid, cx, cz));
+    if (!flat) {
+      return { valid: false, error: 'Uneven surface' };
+    }
+  }
+
   return { valid: true };
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
-export {
-  BUSY, buildPlacementGrid, getSurfaceY, canPlaceBuilding, isBuildingFootprintCell,
-  type SurfaceY, type PlacementCell, type CanPlaceBuildingResult, type PlacementGrid,
-} from './BuildingPlacement.js';
+export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
 export {
   queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,

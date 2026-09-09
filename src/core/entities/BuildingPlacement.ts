@@ -1,99 +1,15 @@
-// BlastSimulator2026 — Building placement grid
-// Derives a 2D surface grid from the VoxelGrid and marks cells occupied by
-// building footprints. Used for placement validation and rendering hints.
+// BlastSimulator2026 — Building placement helpers
+// `getSurfaceY`: ground-truth surface height a footprint check samples.
+// `isBuildingFootprintCell`: absolute-cell membership test for rendering hints.
+// Flatness/occupancy validation itself lives in `Building.ts`'s
+// `checkFootprintPlacement` (#1008) — this file no longer duplicates it.
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
-import type { BuildingType, BuildingTier } from './Building.js';
-import { getBuildingDef, type BuildingState, type Building } from './Building.js';
+import { getBuildingDef, type Building } from './Building.js';
 
 // Re-exported so `Building.ts` (the real placement path) can take a `VoxelGrid`
 // parameter without importing `../world/VoxelGrid.js` directly (#1008).
 export type { VoxelGrid };
-
-// ── Types ──
-
-/** Sentinel value: this cell is under an existing building's footprint. */
-export const BUSY = -1 as const;
-
-export type SurfaceY = number | typeof BUSY;
-
-export interface PlacementCell {
-  /** World-space X coordinate. */
-  worldX: number;
-  /** World-space Z coordinate. */
-  worldZ: number;
-  /**
-   * Y of the highest solid voxel + 1 (i.e. the first empty layer above ground).
-   * Set to BUSY if the cell is occupied by a building footprint.
-   */
-  surfaceY: SurfaceY;
-}
-
-export interface CanPlaceBuildingResult {
-  valid: boolean;
-  reason?: string;
-}
-
-/** A 2-D grid indexed as [z][x] of PlacementCell. */
-export type PlacementGrid = PlacementCell[][];
-
-// ── Functions ──
-
-/**
- * Build a placement grid by scanning every (x, z) column of the VoxelGrid for
- * its surface height, then marking cells covered by building footprints as BUSY.
- *
- * `plannedBuildings` (#556) additionally marks cells occupied by an
- * ordered-but-not-yet-built construction site as BUSY, so a second building
- * can't be placed on top of one still under construction. Defaults to `[]`
- * so every pre-#556 call site keeps compiling unchanged.
- */
-export function buildPlacementGrid(
-  voxelGrid: VoxelGrid,
-  buildingState: BuildingState,
-  plannedBuildings: ReadonlyArray<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [],
-): PlacementGrid {
-  const grid: PlacementGrid = [];
-
-  for (let z = 0; z < voxelGrid.sizeZ; z++) {
-    const row: PlacementCell[] = [];
-    for (let x = 0; x < voxelGrid.sizeX; x++) {
-      row.push({ worldX: x, worldZ: z, surfaceY: getSurfaceY(voxelGrid, x, z) });
-    }
-    grid.push(row);
-  }
-
-  // Mark every cell that falls under a building footprint as BUSY.
-  for (const building of buildingState.buildings) {
-    const def = getBuildingDef(building.type, building.tier);
-    for (const [dx, dz] of def.footprint) {
-      const cx = building.x + dx;
-      const cz = building.z + dz;
-      const row = grid[cz];
-      if (row !== undefined && cx >= 0 && cx < row.length) {
-        const cell = row[cx];
-        if (cell !== undefined) cell.surfaceY = BUSY;
-      }
-    }
-  }
-
-  // Mark every cell under a construction site's footprint as BUSY too, so a
-  // second order can't be placed on top of a site still under construction.
-  for (const planned of plannedBuildings) {
-    const def = getBuildingDef(planned.type, planned.tier);
-    for (const [dx, dz] of def.footprint) {
-      const cx = planned.x + dx;
-      const cz = planned.z + dz;
-      const row = grid[cz];
-      if (row !== undefined && cx >= 0 && cx < row.length) {
-        const cell = row[cx];
-        if (cell !== undefined) cell.surfaceY = BUSY;
-      }
-    }
-  }
-
-  return grid;
-}
 
 /**
  * Return the Y coordinate of the first empty layer above the highest solid
@@ -101,58 +17,6 @@ export function buildPlacementGrid(
  */
 export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
   return computeVoxelColumnSurfaceY(voxelGrid, x, z) + 1;
-}
-
-/**
- * Check whether a building of the given type and tier can be placed at (x, z)
- * on the provided PlacementGrid.
- *
- * Checks (in order per footprint cell):
- *   1. All cells are within grid bounds.
- *   2. No cell is marked BUSY (occupied by an existing building).
- *   3. All cells share the same surfaceY (flat surface required).
- *
- * Returns `{ valid: true }` when all checks pass, or `{ valid: false, reason }`
- * describing the first failure encountered.
- */
-export function canPlaceBuilding(
-  grid: PlacementGrid,
-  type: BuildingType,
-  x: number,
-  z: number,
-  tier: BuildingTier = 1,
-): CanPlaceBuildingResult {
-  const def = getBuildingDef(type, tier);
-  const gridSizeZ = grid.length;
-
-  let referenceSurfaceY: number | undefined;
-
-  for (const [dx, dz] of def.footprint) {
-    const cx = x + dx;
-    const cz = z + dz;
-
-    if (cz < 0 || cz >= gridSizeZ) {
-      return { valid: false, reason: 'Out of bounds' };
-    }
-    const row = grid[cz]!;
-    if (cx < 0 || cx >= row.length) {
-      return { valid: false, reason: 'Out of bounds' };
-    }
-
-    const cell = row[cx]!;
-
-    if (cell.surfaceY === BUSY) {
-      return { valid: false, reason: 'Space is occupied' };
-    }
-
-    if (referenceSurfaceY === undefined) {
-      referenceSurfaceY = cell.surfaceY;
-    } else if (cell.surfaceY !== referenceSurfaceY) {
-      return { valid: false, reason: 'Uneven surface' };
-    }
-  }
-
-  return { valid: true };
 }
 
 /**

@@ -138,9 +138,12 @@ const REGION = {
   // ghost shows the rest. In the level's clear north-west quarter, but pulled
   // off the map's own corner: at (4,4) the camera ray through that tile's
   // pixel skims past the edge of the terrain mesh and hits nothing, so the
-  // click resolved to no tile at all. (6,6) picks cleanly at every framing
-  // distance, and leaves room for the footprint to sit on the map.
-  warehouse: { x1: 6, z1: 6, x2: 6, z2: 6, exact: true },
+  // click resolved to no tile at all. (6,9) picks cleanly at every framing
+  // distance and leaves room for the footprint to sit on the map — still the
+  // clear north-west quarter. #1008: moved off (6,6), which the real
+  // placement path (now flatness-checked, not just bounds/occupancy) rejects
+  // on tutorial_pit seed 42 — (6,9) is flat for the full 4×4 footprint there.
+  warehouse: { x1: 6, z1: 9, x2: 6, z2: 9, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
@@ -148,21 +151,29 @@ const REGION = {
   // candidate lines: the console hint names this exact ramp.
   boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
   // One tile, same origin-corner placement as the warehouse above. Sits in
-  // the same clear north-west quarter as the warehouse (6,6) but well clear
-  // of it and of the box-cut/drill footprints further east and south (#553:
-  // drilling is now vehicle-gated — the driller needs somewhere to train for
-  // and park a drill_rig before drill-plan can ever land a hole).
-  drivingCenter: { x1: 10, z1: 8, x2: 10, z2: 8, exact: true },
+  // the same clear north-west quarter as the warehouse but well clear of the
+  // box-cut/drill footprints further east and south (#553: drilling is now
+  // vehicle-gated — the driller needs somewhere to train for and park a
+  // drill_rig before drill-plan can ever land a hole). #1008: moved off
+  // (10,8), which the now-flatness-checked real placement path rejects on
+  // tutorial_pit seed 42 — (6,7) is flat for the full 2×2 footprint there.
+  // That puts it just north of the warehouse's own (6,9) site, the two
+  // sitting close together in the same corner rather than spread across it.
+  drivingCenter: { x1: 6, z1: 7, x2: 6, z2: 7, exact: true },
   // One tile, same origin-corner convention. #689-followup: (13,4) sat far
   // enough from the drill grid (20-26,20-26) that the crew's own commute
   // there and back roughly broke even against the rest gained, leaving them
   // to oscillate near collapse instead of recovering — the mitigation these
-  // steps exist to teach couldn't actually keep up. Moved to (18,14): north
-  // of the box-cut ramp (x=16, z19-31 — 3 tiles of x clearance, well clear on
-  // z) and the drill grid itself (footprint 3×3 lands at x:18-20, z:14-16,
-  // bordering but not overlapping the grid's own x1:20/z1:20), cutting the
-  // round trip enough for a genuine net recovery instead of a near-wash.
-  livingQuarters: { x1: 18, z1: 14, x2: 18, z2: 14, exact: true },
+  // steps exist to teach couldn't actually keep up. Moved to (18,14) (later
+  // #1008), north of the box-cut ramp (x=16, z19-31 — 3 tiles of x clearance,
+  // well clear on z) and the drill grid itself, cutting the round trip enough
+  // for a genuine net recovery instead of a near-wash. #1008: (18,14) is not
+  // flat for the full 3×3 footprint on tutorial_pit seed 42 under the
+  // now-flatness-checked real placement path — (18,18) is the nearest flat
+  // 3×3 spot, footprint x:18-20/z:18-20, directly bordering (not overlapping)
+  // the drill grid's own x1:22/z1:20 — closer to the drill grid than (18,14)
+  // was, so the rest-trip argument above holds even more strongly here.
+  livingQuarters: { x1: 18, z1: 18, x2: 18, z2: 18, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */

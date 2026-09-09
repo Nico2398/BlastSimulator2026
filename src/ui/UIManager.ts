@@ -225,8 +225,8 @@ export class UIManager {
   }
 
   /** Passes the terrain-height sampler down to the Build panel, for the flatness refusal check (#1008). */
-  setBuildSurfaceSampler(_fn: (x: number, z: number) => number): void {
-    // TODO: implement
+  setBuildSurfaceSampler(fn: (x: number, z: number) => number): void {
+    this.buildMenu.setSurfaceHeightSampler(fn);
   }
 
   /** Wire the survey confidence overlay's player-facing visibility toggle (#496) — SurveyPanel's button drives this. */

@@ -40,6 +40,7 @@ import {
   getMoveCost,
   isTierUnlocked,
   isResearchQueued,
+  isFootprintFlat,
   type BuildingType,
   type BuildingTier,
   type Building,
@@ -55,6 +56,8 @@ export class BuildMenu extends PanelBase {
   private readonly placedEl: HTMLElement;
   private readonly statusEl: HTMLElement;
   private placementKit: PlacementKit | null = null;
+  /** Ground-truth height sampler (#1008) used to refuse a footprint over uneven ground; unset means no footprint check runs. */
+  private surfaceHeightSampler: ((x: number, z: number) => number) | null = null;
   private rampDepth = 8;
   private gameConsole?: GameConsoleFn;
   /** Latest state, for tier-unlock checks before arming the placement tool. */
@@ -122,8 +125,8 @@ export class BuildMenu extends PanelBase {
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
   /** Register the terrain-height sampler used to refuse a footprint over uneven ground (#1008). */
-  setSurfaceHeightSampler(_fn: (x: number, z: number) => number): void {
-    // TODO: implement
+  setSurfaceHeightSampler(fn: (x: number, z: number) => number): void {
+    this.surfaceHeightSampler = fn;
   }
 
   /** Re-render locale-dependent text (catalog, placed list, sections) after a language change. */
@@ -306,6 +309,11 @@ export class BuildMenu extends PanelBase {
     });
     controller.setChangeHandler(refresh);
     controller.arm({ shape: 'point' });
+    controller.setFootprintCheck(
+      this.surfaceHeightSampler
+        ? (x, z) => isFootprintFlat(def.footprint, x, z, this.surfaceHeightSampler!)
+        : null,
+    );
     refresh();
   }
 

@@ -172,9 +172,13 @@ export function resolveTaskCompletion(
     // the order was confirmed (#556, mirrors the 'dig_ramp_segment' branch
     // above). The footprint stays reserved for the order's whole lifetime
     // (checkFootprintPlacement counts every PlannedBuilding as an occupant),
-    // so placeBuilding failing here should be unreachable — defensive-only,
-    // mirroring how tick.ts refunds a Research Center task cancelled
-    // mid-flight (destroyed while its task was still queued).
+    // so bounds/occupancy failing here should be unreachable — but a reserved
+    // (planned, not-yet-built) site is not blast-protected the way a
+    // completed building is: a blast that reshapes the ground under a site
+    // mid-construction can make the flatness check (#1008) newly fail here.
+    // The refund/cancel branch below already handles that gracefully, same
+    // as it does the (unreachable) bounds/occupancy case — no new
+    // control-flow needed, just passing the grid through.
     if (progress.actionType === 'place_building' && progress.actionPayload) {
       const buildingOrderId = progress.actionPayload['buildingOrderId'] as number;
       const orderIdx = state.plannedBuildings.findIndex(pb => pb.id === buildingOrderId);
@@ -185,7 +189,7 @@ export function resolveTaskCompletion(
         const result = placeBuilding(
           state.buildings, order.type, order.x, order.z,
           bounds.width, bounds.depth, order.tier, bounds.originX, bounds.originZ,
-          order.buildingId,
+          order.buildingId, ctx.grid ?? undefined,
         );
 
         if (result.success) {

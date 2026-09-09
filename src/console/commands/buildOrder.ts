@@ -76,7 +76,7 @@ export function orderBuildingCommand(
     ...state.plannedBuildings.map(pb => ({ type: pb.type, tier: pb.tier, x: pb.x, z: pb.z })),
   ];
   const check = checkFootprintPlacement(
-    occupants, type, x, z, tier, bounds.width, bounds.depth, bounds.originX, bounds.originZ,
+    occupants, type, x, z, tier, bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
   );
   if (!check.valid) return { success: false, output: check.error! };
 

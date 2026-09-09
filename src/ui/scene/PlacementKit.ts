@@ -38,6 +38,7 @@ export interface PlacementKit {
 export function placementRefusalReason(controller: PlacementController): string | undefined {
   if (controller.canConfirm) return undefined;
   if (controller.refusalReason) return t(CLAIM_REFUSAL_KEY[controller.refusalReason]);
+  if (controller.footprintInvalid) return t('shell.placement.refused_uneven_ground');
   if (controller.refusedTile) return t('shell.placement.outside_region');
   if (!controller.selection) return t('shell.placement.pick_first');
   return t('shell.placement.outside_region');
