@@ -4,7 +4,8 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
-      "timeout": 40,
+      "description": "40s is not enough headroom for a level load plus this file's 4 multi-angle `shots` on a GPU-less renderer (~6-10s/frame, #475) — pre-existing on main, not introduced by #1010, but it was blocking this scenario's own interaction-mode run so fixed here rather than filed separately.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "command",
@@ -181,7 +182,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:2 max_ticks:400",
-      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first. #1010: the trailing focusTile+screenshot below frames the just-completed tier-1 living quarters at the camera distance the game actually plays at, for visual inspection of the model. Added as a step-scoped action here rather than as a global `shots` entry, since every `shots` entry re-captures on every step in the file (including step 0, before any building exists) and this file's per-step timeouts already run close to the per-frame cost of a GPU-less renderer (#475) — a 5th global shot would only add cost with nothing to show this early.",
       "timeout": 130,
       "interaction": [
         {
@@ -190,6 +191,15 @@
           "equals": 2,
           "maxTicks": 400,
           "timeoutMs": 120000
+        },
+        {
+          "type": "focusTile",
+          "x": 5,
+          "z": 5,
+          "distance": 16
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
