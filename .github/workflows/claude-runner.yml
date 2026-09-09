@@ -181,7 +181,18 @@ jobs:
           # absolute deadline goes to the retry, which therefore starts with its
           # loops already closed and does linear work only.
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
-        uses: anthropics/claude-code-action@v1
+        # Pinned to a SHA, not the moving `v1` tag. The action hardcodes the
+        # Claude Code build it installs (`base-action/action.yml`), so `v1`
+        # silently changes the agent binary under every run: the tag moved to
+        # Claude Code 2.1.265 on 2026-09-08 and that build's installer printed
+        # "✔ Claude Code successfully installed!" while leaving no executable
+        # behind. #1006 and #1007 died on it 48 seconds apart, four attempts,
+        # never reading a word of their prompts (runs 34292640758, 34292715511).
+        # 9c5ddab is v1.0.217 / Claude Code 2.1.263 — the last build this
+        # repository finished a run on (run 34129897957). Every commit between
+        # it and the broken one is a pure version bump, so the pin costs no fix.
+        # Moving it is a deliberate act: read the action's diff first.
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1.0.217
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The PAT, not GITHUB_TOKEN. The action exports its own `github_token`
@@ -249,6 +260,47 @@ jobs:
           # publish anything a Bash step happened to echo.
           show_full_output: true
 
+      # The pin above stops one known-bad agent build from returning; this stops
+      # the next one from being misreported. When the installer leaves nothing
+      # behind, every downstream signal in this job is indistinguishable from an
+      # agent that ran and produced nothing: the step fails in seconds, no
+      # branch exists, and `agentic-rescue` tells the issue the run "concluded
+      # that no code change was needed without saying so" — which is what #1006
+      # and #1007 were both told. The prompt was never read.
+      #
+      # State, not a duration: is the executable on disk, and did the SDK name
+      # the reason. `always()` because the case worth catching is the failed
+      # attempt above.
+      - name: Verify the agent binary the action installed
+        id: binary
+        if: always() && steps.claude.outcome != 'skipped'
+        run: |
+          set -uo pipefail
+
+          CLAUDE_BIN="${HOME}/.local/bin/claude"
+          SDK_OUTPUT="${RUNNER_TEMP}/claude-execution-output.json"
+
+          MISSING=false
+          [ -x "${CLAUDE_BIN}" ] || MISSING=true
+          # The action can also be handed an executable elsewhere, so the SDK's
+          # own verdict is the authority when it wrote one: `executable_not_found`
+          # is the class it raises for exactly this, whatever the path was.
+          if [ -f "${SDK_OUTPUT}" ] && grep -q 'executable_not_found' "${SDK_OUTPUT}"; then
+            MISSING=true
+          fi
+
+          echo "missing=${MISSING}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${MISSING}" != "true" ]; then
+            echo "Agent binary present at ${CLAUDE_BIN} — this run's outcome is the agent's own."
+            exit 0
+          fi
+
+          # An annotation rather than a second red step: the agent step above is
+          # already failing, and one failure should not be reported twice. This
+          # is the line that says which failure it was.
+          echo "::error::The agent never started. claude-code-action reported a successful install but left no executable at ${CLAUDE_BIN} (SDK errorClass: executable_not_found). This is an infrastructure failure, not a task the agent could not do — the prompt was never read, so nothing about this issue is proven. Re-running is safe. If it recurs, the pinned claude-code-action SHA in this workflow is the thing to move."
+
       # `always()`: a crashed, failed, timed-out or early-ended attempt is
       # exactly the case this gate exists to catch. A cancelled job (the
       # 360-minute outer bound) reaches it with no clock left, and the budget
@@ -276,15 +328,25 @@ jobs:
       # fire on an attempt that exited 0 — a crash or a step timeout skipped it.
       # The budget check in `agentic-run-state` is what keeps a cancelled job
       # from starting an attempt here with no clock to finish it.
+      #
+      # Except when the binary was never there. The failures this retry is for
+      # are the ones that leave the budget behind; a missing executable is not
+      # one of them, because the second attempt installs the same pinned build
+      # the same way and reaches the identical ENOENT. On #1006 it did, seven
+      # seconds later, and both halts fed the cascade brake that then parked the
+      # queue. Retrying a deterministic install failure buys nothing and costs a
+      # halt.
       - name: Retry the run when the first attempt settled nothing
         id: claude_retry
-        if: always() && steps.state.outputs.retry == 'true'
+        if: always() && steps.state.outputs.retry == 'true' && steps.binary.outputs.missing != 'true'
         # What is left after the first attempt's 270 and the steps around it.
         timeout-minutes: 80
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
-        uses: anthropics/claude-code-action@v1
+        # Same pin as the first attempt, and it has to stay the same one: a
+        # retry on a different agent build is a different run, not a second try.
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1.0.217
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Same PAT as the first attempt, for the same reason: the retry is the

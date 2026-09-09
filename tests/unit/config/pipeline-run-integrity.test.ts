@@ -352,12 +352,17 @@ describe('an unfinished run releases the assignment chain', () => {
     expect(rescue).toContain('"${RESCUE_LABEL[@]}"');
   });
 
+  // Both halves match the step, not the bare name: prose above either step is
+  // free to say `agentic-rescue`, and a comment that named the mechanism it was
+  // deliberately ordered against used to fail this as if the steps had moved.
   it('runs after the retry, so it judges the last attempt', () => {
     for (const name of RUNNERS) {
       const text = workflow(name);
-      expect(text.indexOf('agentic-rescue'), name).toBeGreaterThan(
-        text.indexOf('Retry the run when the first attempt settled nothing')
-      );
+      const rescue = text.indexOf('uses: ./.github/actions/agentic-rescue');
+      const retry = text.indexOf('- name: Retry the run when the first attempt settled nothing');
+      expect(rescue, `${name}: no rescue step`).toBeGreaterThan(-1);
+      expect(retry, `${name}: no retry step`).toBeGreaterThan(-1);
+      expect(rescue, name).toBeGreaterThan(retry);
     }
   });
 });

@@ -1468,6 +1468,76 @@ describe('auto-merge hands back what it refuses to merge', () => {
   });
 });
 
+// #1006 and #1007, 48 seconds apart: `anthropics/claude-code-action@v1` moved to
+// a Claude Code build whose installer reported success and left no executable,
+// and four attempts died ENOENT without reading a word of either prompt. The
+// action hardcodes the agent build it installs, so a floating tag is a floating
+// agent binary — and the failure is indistinguishable downstream from an agent
+// that ran and produced nothing, which is what both issues were told.
+describe('the agent binary cannot change underneath a run', () => {
+  const CALLERS = ['claude-runner.yml', 'claude-code-review.yml'];
+  // v1.0.217 / Claude Code 2.1.263, the last build a run finished on here.
+  const PINNED = '9c5ddab2e6d17b83ea679153b31f1d5f023cf636';
+
+  it.each(CALLERS)('%s pins claude-code-action to a SHA, never a tag', (name) => {
+    const uses = workflow(name)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('uses: anthropics/claude-code-action@'));
+
+    expect(uses.length, `${name} calls the action but no longer matches — update this test`)
+      .toBeGreaterThan(0);
+    for (const line of uses) {
+      expect(line, `${name} floats on a moving ref. Pin the 40-character SHA.`)
+        .toMatch(/^uses: anthropics\/claude-code-action@[0-9a-f]{40}( #.*)?$/);
+    }
+  });
+
+  // Both runner attempts and the reviewer run the same build, or a "retry" is
+  // a different run and a review is written by an agent no run was proven on.
+  it('pins every call site to the same SHA', () => {
+    for (const name of CALLERS) {
+      const refs = [...workflow(name).matchAll(/uses: anthropics\/claude-code-action@(\S+)/g)]
+        .map((match) => match[1]);
+      expect(new Set(refs), `${name} mixes action versions`).toEqual(new Set([PINNED]));
+    }
+  });
+});
+
+// The pin stops one known-bad build returning; this stops the next one being
+// reported as an agent that had nothing to say.
+describe('an agent that never started is not an agent that produced nothing', () => {
+  const runner = workflow('claude-runner.yml');
+  const check = runner.slice(
+    runner.indexOf('- name: Verify the agent binary the action installed'),
+    runner.indexOf('- name: Did the run settle its issue?')
+  );
+
+  it('runs on the failed attempt it exists for', () => {
+    expect(check).toContain("if: always() && steps.claude.outcome != 'skipped'");
+  });
+
+  // State, not a duration: the file on disk, and the class the SDK named.
+  it('decides on the executable and the SDK verdict', () => {
+    expect(check).toContain('[ -x "${CLAUDE_BIN}" ] || MISSING=true');
+    expect(check).toContain('executable_not_found');
+  });
+
+  // A job-log warning is not somewhere anyone is watching; an annotation is.
+  it('says which failure it was, where a human reads it', () => {
+    expect(check).toContain('::error::The agent never started.');
+  });
+
+  // An output nothing reads is dead the day it lands. This one has to gate the
+  // retry, or the second attempt repeats a deterministic install failure and
+  // spends a second halt on the cascade brake.
+  it('is what stops the pointless retry', () => {
+    expect(runner).toContain(
+      "if: always() && steps.state.outputs.retry == 'true' && steps.binary.outputs.missing != 'true'"
+    );
+  });
+});
+
 // The one list that decides, in three places, whether a workflow run on a PR
 // head is a channel or the merge machinery. `scripts/await-pr-ci.ts` decides
 // whether a run may end on it, the fail-safe whether to hand it back, the
