@@ -7,7 +7,8 @@ import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
-import { GroundTintLayer, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { confidenceToColor } from './SurveyConfidenceOverlay.js';
 
 // ---------- Config ----------
 
@@ -95,18 +96,16 @@ export class BlastPlanOverlay {
    * compiling unchanged; falls back to a per-hole flat height (every lattice
    * corner the hole's own disc could reach, pinned to its recorded
    * surfaceY) so an un-migrated caller still sees a flat disc, not a
-   * bilinear blend against an unrelated neighbouring hole.
+   * bilinear blend against an unrelated neighbouring hole. Sampler-selection
+   * scaffolding is shared with SurveyConfidenceOverlay via FallbackSurfaceSampler.
    */
-  private readonly smoothSurfaceYAt: SurfaceHeightSampler | undefined;
-  private readonly flatHeightByCorner = new Map<string, number>();
+  private readonly fallbackSampler: FallbackSurfaceSampler;
   private readonly heatmapLayer: GroundTintLayer;
 
   constructor(scene: THREE.Scene, smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
-    this.smoothSurfaceYAt = smoothSurfaceYAt;
-    const sampler: SurfaceHeightSampler = (x, z) =>
-      this.smoothSurfaceYAt ? this.smoothSurfaceYAt(x, z) : (this.flatHeightByCorner.get(`${x},${z}`) ?? 0);
-    this.heatmapLayer = new GroundTintLayer(scene, sampler, { epsilon: 0.1 });
+    this.fallbackSampler = new FallbackSurfaceSampler(smoothSurfaceYAt);
+    this.heatmapLayer = new GroundTintLayer(scene, this.fallbackSampler.sample, { epsilon: 0.1 });
     this.heatmapLayer.setVisible(false);
     this.scene.add(this.group);
     this.group.visible = false;
@@ -158,7 +157,7 @@ export class BlastPlanOverlay {
 
   clear(): void {
     this.heatmapLayer.clear();
-    this.flatHeightByCorner.clear();
+    this.fallbackSampler.clearFlat();
     for (const child of [...this.group.children]) {
       this.group.remove(child);
       if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
@@ -289,12 +288,12 @@ export class BlastPlanOverlay {
       const radius = Math.min(HEATMAP_MAX_RADIUS, 1 + energy * 3);
       const intensity = Math.min(1, energy / 4);
 
-      // Color: green (low) → yellow → red (high)
-      const r = Math.min(1, intensity * 2);
-      const g = Math.min(1, 2 - intensity * 2);
-      const color = new THREE.Color(r, g, 0);
+      // Color: green (low) → yellow → red (high) — same red→yellow→green
+      // ramp as confidenceToColor, domain mirrored (low intensity = high
+      // confidence-like green, high intensity = low-confidence-like red).
+      const color = confidenceToColor(1 - intensity);
 
-      if (!this.smoothSurfaceYAt) {
+      if (this.fallbackSampler.usesFlatFallback) {
         // No sampler installed: pin every lattice corner the disc's own rim
         // could reach to this hole's recorded surfaceY, so
         // bilinearSurfaceHeight's per-vertex blend resolves to one flat
@@ -305,7 +304,7 @@ export class BlastPlanOverlay {
         const reach = Math.ceil(radius) + 1;
         for (let dz = -reach; dz <= reach; dz++) {
           for (let dx = -reach; dx <= reach; dx++) {
-            this.flatHeightByCorner.set(`${cx + dx},${cz + dz}`, hd.surfaceY);
+            this.fallbackSampler.setFlatCorner(cx + dx, cz + dz, hd.surfaceY);
           }
         }
       }

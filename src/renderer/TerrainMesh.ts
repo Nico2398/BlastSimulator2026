@@ -12,7 +12,7 @@
 // (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
-import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid } from '../core/world/VoxelGrid.js';
+import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import { surfaceDensityAt } from '../core/world/TerrainGen.js';
 import { haloSurfaceHeight, meshedCellRect } from './terrain/PlayableCoverage.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
@@ -20,7 +20,6 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
 import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
-import { getSmoothTerrainSurfaceY } from './GameRendererTerrain.js';
 
 // Re-export survey overlay types/class so consumers can import from either location.
 export { SurveyConfidenceOverlay, confidenceToColor } from './SurveyConfidenceOverlay.js';
@@ -393,9 +392,9 @@ export class TerrainMesh {
       // The smoothed (marching-cubes) surface height for the currently-bound
       // grid — read through `this.grid` at call time (not captured once) so
       // a later setGrid() is picked up without recreating the overlay. Reuses
-      // GameRendererTerrain's clamp-then-sample wrapper rather than a second
-      // copy of the same clamp logic (its own import of TerrainMesh is
-      // type-only, so this does not close a runtime cycle).
+      // VoxelGrid's clamp-then-sample helper (#1006 finding 4 — a leaf core
+      // module, so this stays a core import rather than reaching sideways
+      // into GameRendererTerrain's much larger runtime import graph).
       this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
     }
     return this.surveyOverlay;

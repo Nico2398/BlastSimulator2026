@@ -4,7 +4,7 @@
 // Stale (expired) points = grey.
 
 import * as THREE from 'three';
-import { GroundTintLayer, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
 
@@ -85,15 +85,14 @@ export class SurveyConfidenceOverlay {
    * point's own `surfaceY` field (registered for every corner of its cell)
    * so an un-migrated caller still sees a flat quad at the same height it
    * always did, not a bilinear blend against an unrelated neighbour.
+   * Sampler-selection scaffolding is shared with BlastPlanOverlay via
+   * FallbackSurfaceSampler.
    */
-  private readonly smoothSurfaceYAt: SurfaceHeightSampler | undefined;
-  private readonly flatHeightByCorner = new Map<string, number>();
+  private readonly fallbackSampler: FallbackSurfaceSampler;
 
   constructor(scene: THREE.Scene, smoothSurfaceYAt?: SurfaceHeightSampler) {
-    this.smoothSurfaceYAt = smoothSurfaceYAt;
-    const sampler: SurfaceHeightSampler = (x, z) =>
-      this.smoothSurfaceYAt ? this.smoothSurfaceYAt(x, z) : (this.flatHeightByCorner.get(`${x},${z}`) ?? 0);
-    this.layer = new GroundTintLayer(scene, sampler, { epsilon: OVERLAY_Y_OFFSET, renderOrder: 100 });
+    this.fallbackSampler = new FallbackSurfaceSampler(smoothSurfaceYAt);
+    this.layer = new GroundTintLayer(scene, this.fallbackSampler.sample, { epsilon: OVERLAY_Y_OFFSET, renderOrder: 100 });
     this.layer.setVisible(false);
   }
 
@@ -104,7 +103,7 @@ export class SurveyConfidenceOverlay {
   show(options: SurveyConfidenceOverlayOptions): void {
     const { points, opacity } = options;
 
-    this.flatHeightByCorner.clear();
+    this.fallbackSampler.clearFlat();
     const patches: GroundTintPatch[] = points.map((pt): GroundTintPatch => {
       // Determine color: grey for stale, confidence-colour for fresh
       let color: THREE.Color;
@@ -117,13 +116,13 @@ export class SurveyConfidenceOverlay {
         quadOpacity = 1.0;
       }
 
-      if (!this.smoothSurfaceYAt) {
+      if (this.fallbackSampler.usesFlatFallback) {
         // No sampler installed: pin every corner of this point's own cell to
         // its recorded surfaceY, so bilinearSurfaceHeight's per-corner reads
         // resolve to one flat height across the whole quad, exactly as the
         // old fixed-offset plane did.
         for (const [dx, dz] of [[0, 0], [1, 0], [1, 1], [0, 1]] as const) {
-          this.flatHeightByCorner.set(`${pt.x + dx},${pt.z + dz}`, pt.surfaceY);
+          this.fallbackSampler.setFlatCorner(pt.x + dx, pt.z + dz, pt.surfaceY);
         }
       }
 
@@ -147,7 +146,7 @@ export class SurveyConfidenceOverlay {
   /** Remove all overlay patches. */
   clear(): void {
     this.layer.clear();
-    this.flatHeightByCorner.clear();
+    this.fallbackSampler.clearFlat();
   }
 
   /** Remove overlay and release all GPU resources. */

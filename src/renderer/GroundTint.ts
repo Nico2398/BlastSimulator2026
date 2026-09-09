@@ -13,6 +13,46 @@ import * as THREE from 'three';
 export type SurfaceHeightSampler = (x: number, z: number) => number;
 
 /**
+ * The sampler-selection scaffolding shared by every ground-tint overlay
+ * constructor (BlastPlanOverlay, SurveyConfidenceOverlay): an optionally
+ * injected `SurfaceHeightSampler` (the ground-conforming path, #1006), with
+ * a flat-height-per-corner fallback for callers that don't supply one — so
+ * un-migrated construction sites keep seeing a flat patch at their own
+ * recorded height, not a bilinear blend against an unrelated neighbour.
+ *
+ * The caller still owns POPULATING the flat-height map (disc corners for a
+ * blast heatmap, quad corners for a survey point) — only which sampler wins
+ * lives here.
+ */
+export class FallbackSurfaceSampler {
+  private readonly override: SurfaceHeightSampler | undefined;
+  private readonly flatHeightByCorner = new Map<string, number>();
+
+  constructor(override?: SurfaceHeightSampler) {
+    this.override = override;
+  }
+
+  /** True when no override sampler was installed — caller populates the flat-height fallback via `setFlatCorner`. */
+  get usesFlatFallback(): boolean {
+    return !this.override;
+  }
+
+  /** Record a flat height for one grid corner. Only read back when no override sampler was installed. */
+  setFlatCorner(x: number, z: number, height: number): void {
+    this.flatHeightByCorner.set(`${x},${z}`, height);
+  }
+
+  /** Discard every recorded flat-corner height — call before repopulating on a fresh `show()`. */
+  clearFlat(): void {
+    this.flatHeightByCorner.clear();
+  }
+
+  /** The sampler to pass to a GroundTintLayer: the override when installed, else the flat-height fallback. */
+  readonly sample: SurfaceHeightSampler = (x, z) =>
+    this.override ? this.override(x, z) : (this.flatHeightByCorner.get(`${x},${z}`) ?? 0);
+}
+
+/**
  * Bilinear blend of the four grid-corner heights around (x, z), using
  * `cornerSampler` for the corner values — a conforming ground tint's shape
  * (cell or disc) samples through this at each of its own vertices rather

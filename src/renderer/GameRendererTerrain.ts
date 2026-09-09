@@ -15,6 +15,7 @@ import type { LandscapeHandle } from '../console/commands/world.js';
 import { ensureLandscape } from '../console/commands/world.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight } from '../core/world/VoxelGrid.js';
+export { getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import type { SceneManager } from './SceneManager.js';
 import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
@@ -177,20 +178,3 @@ export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number)
   return computeVoxelColumnSurfaceY(grid, x, z) + 1;
 }
 
-/**
- * Smoothed (marching-cubes) terrain surface Y at the given (x, z) column —
- * the height a ground tint patch (#1006) conforms to, unlike
- * getTerrainSurfaceY's per-voxel-column step height. Takes `grid` directly
- * for the same reason getTerrainSurfaceY does (see above).
- */
-export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number): number {
-  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
-  // Same clamp-to-edge convention as computeVoxelColumnSurfaceY, above —
-  // computeVoxelColumnSurfaceHeight itself returns NaN outside the grid
-  // rather than clamping (#559, it needs an honest "no data" signal at the
-  // live claim edge), so the clamp has to happen here instead.
-  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
-  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
-  const h = computeVoxelColumnSurfaceHeight(grid, cx, cz);
-  return Number.isNaN(h) ? 0 : h;
-}
