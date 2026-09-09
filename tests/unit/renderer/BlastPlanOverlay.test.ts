@@ -6,11 +6,17 @@ import { BlastPlanOverlay, type BlastPlanOverlayOptions, type HoleOverlayData } 
 import { holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import type { SurfaceHeightSampler } from '../../../src/renderer/GroundTint.js';
 
-/** Every THREE.Mesh in the scene, whole-tree — the #1006 ground-tint heatmap patch may live outside `this.group`. */
-function sceneMeshCount(scene: THREE.Scene): number {
-  let n = 0;
-  scene.traverse((o) => { if (o instanceof THREE.Mesh) n++; });
-  return n;
+/**
+ * BlastPlanOverlay's own hole/label/arc/wave group, found by type rather
+ * than by scene-child index. The #1006 heatmap GroundTintLayer adds its own
+ * persistent Mesh directly to the scene from its own constructor — sibling
+ * to `this.group`, not nested inside it — so `scene.children[0]` is no
+ * longer reliably the group (it is that heatmap mesh, added first).
+ */
+function overlayGroup(scene: THREE.Scene): THREE.Group {
+  const group = scene.children.find((c): c is THREE.Group => c instanceof THREE.Group);
+  if (!group) throw new Error('BlastPlanOverlay group not found in scene');
+  return group;
 }
 
 /**
@@ -67,7 +73,7 @@ describe('BlastPlanOverlay', () => {
   it('starts hidden', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     expect(group.visible).toBe(false);
     overlay.dispose();
   });
@@ -76,7 +82,7 @@ describe('BlastPlanOverlay', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);
     overlay.show(makeOptions(0));
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     expect(group.visible).toBe(true);
     overlay.dispose();
   });
@@ -86,7 +92,7 @@ describe('BlastPlanOverlay', () => {
     const overlay = new BlastPlanOverlay(scene);
     overlay.show(makeOptions(0));
     overlay.hide();
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     expect(group.visible).toBe(false);
     overlay.dispose();
   });
@@ -95,7 +101,7 @@ describe('BlastPlanOverlay', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);
     overlay.show(makeOptions(0, 5));
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     // Each hole has: ring + fill + line + label = ~4 children minimum
     expect(group.children.length).toBeGreaterThanOrEqual(5);
     overlay.dispose();
@@ -105,16 +111,17 @@ describe('BlastPlanOverlay', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene, () => 0);
     overlay.show(makeOptions(0, 3)); // no software
-    const countTier0 = sceneMeshCount(scene);
+    // The heatmap's GroundTintLayer owns one persistent Mesh for the
+    // overlay's whole lifetime (#1006), rebuilt in place rather than added
+    // fresh per tier — so mesh *count* is constant regardless of tier, and
+    // the geometry it actually carries is what has to scale.
+    const vertsTier0 = nonHoleMeshYs(scene).length;
 
     overlay.clear();
     overlay.show(makeOptions(1, 3)); // tier 1
-    const countTier1 = sceneMeshCount(scene);
+    const vertsTier1 = nonHoleMeshYs(scene).length;
 
-    // Whole-scene mesh count (not `group.children.length`): a GroundTintLayer
-    // patch (issue #1006) is added directly to the scene by its own
-    // constructor, not nested inside BlastPlanOverlay's own `group`.
-    expect(countTier1).toBeGreaterThan(countTier0);
+    expect(vertsTier1).toBeGreaterThan(vertsTier0);
     overlay.dispose();
   });
 
@@ -137,11 +144,11 @@ describe('BlastPlanOverlay', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);
     overlay.show(makeOptions(3, 2)); // tier 3
-    const countTier3 = (scene.children[0] as THREE.Group).children.length;
+    const countTier3 = overlayGroup(scene).children.length;
 
     overlay.clear();
     overlay.show(makeOptions(4, 2)); // tier 4
-    const countTier4 = (scene.children[0] as THREE.Group).children.length;
+    const countTier4 = overlayGroup(scene).children.length;
 
     expect(countTier4).toBeGreaterThan(countTier3);
     overlay.dispose();
@@ -152,7 +159,7 @@ describe('BlastPlanOverlay', () => {
     const overlay = new BlastPlanOverlay(scene);
     overlay.show(makeOptions(4, 4));
     overlay.clear();
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     expect(group.children.length).toBe(0);
     overlay.dispose();
   });
@@ -172,7 +179,7 @@ describe('BlastPlanOverlay', () => {
     // actually reads origin.y.
     const options: BlastPlanOverlayOptions = { ...makeOptions(4, 2), origin: new THREE.Vector3(20, 12, 20) };
     overlay.show(options);
-    const group = scene.children[0] as THREE.Group;
+    const group = overlayGroup(scene);
     const rings = group.children.filter(
       (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.geometry instanceof THREE.RingGeometry,
     );
@@ -250,7 +257,7 @@ describe('BlastPlanOverlay', () => {
     const overlay = new BlastPlanOverlay(scene);
     const options = makeOptions(2, 2); // tier 2 — no arcs
     overlay.show(options);
-    const countTier2 = (scene.children[0] as THREE.Group).children.length;
+    const countTier2 = overlayGroup(scene).children.length;
 
     overlay.clear();
     // Add high-speed projection hole
@@ -260,7 +267,7 @@ describe('BlastPlanOverlay', () => {
       holes: options.holes.map((h) => ({ ...h, projectionSpeed: 20 })), // trigger arcs
     };
     overlay.show(opts3);
-    const countTier3 = (scene.children[0] as THREE.Group).children.length;
+    const countTier3 = overlayGroup(scene).children.length;
 
     expect(countTier3).toBeGreaterThan(countTier2);
     overlay.dispose();

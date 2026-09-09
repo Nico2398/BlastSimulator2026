@@ -1210,8 +1210,38 @@ describe('TerrainMesh', () => {
 
 // ─── Survey Confidence Overlay ──────────────────────────────────────────────────
 
+// Every SurveyConfidenceOverlay patch is a single grid cell, and GroundTintLayer's
+// emitCell always pushes exactly 2 triangles (6 vertices) per cell (#1006) —
+// so "one marker per point" is now "6 vertices per point" inside one merged
+// mesh, in the same order `show()`'s points array was given.
+const VERTS_PER_CELL_PATCH = 6;
+
+/** The single merged GroundTintLayer mesh a SurveyConfidenceOverlay draws into — its only scene child. */
+function overlayMesh(scene: THREE.Scene): THREE.Mesh {
+  return scene.children[0] as THREE.Mesh;
+}
+
+/** World-space Y and RGBA vertex color for every vertex belonging to the Nth point passed to the last `show()` call. */
+function pointVertices(scene: THREE.Scene, pointIndex: number): { ys: number[]; colors: [number, number, number, number][] } {
+  const mesh = overlayMesh(scene);
+  mesh.updateMatrixWorld(true);
+  const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+  const colorAttr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const ys: number[] = [];
+  const colors: [number, number, number, number][] = [];
+  const v = new THREE.Vector3();
+  for (let i = 0; i < VERTS_PER_CELL_PATCH; i++) {
+    const idx = pointIndex * VERTS_PER_CELL_PATCH + i;
+    v.fromBufferAttribute(posAttr, idx);
+    v.applyMatrix4(mesh.matrixWorld);
+    ys.push(v.y);
+    colors.push([colorAttr.getX(idx), colorAttr.getY(idx), colorAttr.getZ(idx), colorAttr.getW(idx)]);
+  }
+  return { ys, colors };
+}
+
 describe('SurveyConfidenceOverlay', () => {
-  it('constructor adds a group to the scene', () => {
+  it('constructor adds its merged ground-tint mesh to the scene', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     expect(scene.children.length).toBe(1);
@@ -1221,8 +1251,7 @@ describe('SurveyConfidenceOverlay', () => {
   it('starts hidden', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(false);
+    expect(overlayMesh(scene).visible).toBe(false);
     overlay.dispose();
   });
 
@@ -1230,8 +1259,7 @@ describe('SurveyConfidenceOverlay', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions());
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(true);
+    expect(overlayMesh(scene).visible).toBe(true);
     overlay.dispose();
   });
 
@@ -1240,12 +1268,11 @@ describe('SurveyConfidenceOverlay', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions());
     overlay.hide();
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(false);
+    expect(overlayMesh(scene).visible).toBe(false);
     overlay.dispose();
   });
 
-  it('show adds one marker per confidence point', () => {
+  it('show renders geometry for every confidence point, merged into one mesh (#1006)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     const points: SurveyConfidencePoint[] = [
@@ -1254,40 +1281,23 @@ describe('SurveyConfidenceOverlay', () => {
       makeConfidencePoint(30, 30),
     ];
     overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    // Each point should add at least one mesh child (e.g. a quad or sprite)
-    expect(group.children.length).toBeGreaterThanOrEqual(points.length);
+    const posAttr = overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute;
+    // One merged mesh now, not one child per point — its vertex count still
+    // scales with point count (6 per cell), which is what "one marker per point" meant.
+    expect(scene.children.length).toBe(1);
+    expect(posAttr.count).toBe(points.length * VERTS_PER_CELL_PATCH);
     overlay.dispose();
   });
 
   it('high confidence points render green', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    const points: SurveyConfidencePoint[] = [
-      makeConfidencePoint(5, 5, { confidence: 0.95, fresh: true }),
-    ];
-    overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.Material;
-    // If vertex-colored, check the geometry color attribute;
-    // if single-colored, check material.color
-    const colorAttr = (mesh.geometry as THREE.BufferGeometry)?.getAttribute('color');
-    if (colorAttr) {
-      // Vertex-colored: green channel should dominate (g > r and g > b)
-      const colors = colorAttr.array as Float32Array;
-      let greenDominant = true;
-      for (let i = 1; i < colors.length; i += 3) {
-        if (colors[i]! <= colors[i - 1]! || colors[i]! <= colors[i + 1]!) {
-          greenDominant = false;
-        }
-      }
-      expect(greenDominant).toBe(true);
-    } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-      // Single-colored material
-      expect(mat.color.g).toBeGreaterThan(mat.color.r);
-      expect(mat.color.g).toBeGreaterThan(mat.color.b);
+    overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5, { confidence: 0.95, fresh: true })] }));
+    const { colors } = pointVertices(scene, 0);
+    expect(colors.length).toBeGreaterThan(0);
+    for (const [r, g, b] of colors) {
+      expect(g).toBeGreaterThan(r);
+      expect(g).toBeGreaterThan(b);
     }
     overlay.dispose();
   });
@@ -1295,27 +1305,12 @@ describe('SurveyConfidenceOverlay', () => {
   it('low confidence points render red', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    const points: SurveyConfidencePoint[] = [
-      makeConfidencePoint(5, 5, { confidence: 0.1, fresh: true }),
-    ];
-    overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.Material;
-    const colorAttr = (mesh.geometry as THREE.BufferGeometry)?.getAttribute('color');
-    if (colorAttr) {
-      const colors = colorAttr.array as Float32Array;
-      let redDominant = true;
-      for (let i = 0; i < colors.length; i += 3) {
-        if (colors[i]! <= colors[i + 1]! || colors[i]! <= colors[i + 2]!) {
-          redDominant = false;
-        }
-      }
-      expect(redDominant).toBe(true);
-    } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-      expect(mat.color.r).toBeGreaterThan(mat.color.g);
-      expect(mat.color.r).toBeGreaterThan(mat.color.b);
+    overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5, { confidence: 0.1, fresh: true })] }));
+    const { colors } = pointVertices(scene, 0);
+    expect(colors.length).toBeGreaterThan(0);
+    for (const [r, g, b] of colors) {
+      expect(r).toBeGreaterThan(g);
+      expect(r).toBeGreaterThan(b);
     }
     overlay.dispose();
   });
@@ -1323,30 +1318,14 @@ describe('SurveyConfidenceOverlay', () => {
   it('medium confidence points render yellow/orange (warning)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    const points: SurveyConfidencePoint[] = [
-      makeConfidencePoint(5, 5, { confidence: 0.5, fresh: true }),
-    ];
-    overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.Material;
-    const colorAttr = (mesh.geometry as THREE.BufferGeometry)?.getAttribute('color');
-    if (colorAttr) {
-      const colors = colorAttr.array as Float32Array;
-      // Yellow/orange: red and green should both be high, blue low
-      for (let i = 0; i < colors.length; i += 3) {
-        const r = colors[i]!;
-        const g = colors[i + 1]!;
-        const b = colors[i + 2]!;
-        expect(r).toBeGreaterThan(0.4);
-        expect(g).toBeGreaterThan(0.4);
-        expect(b).toBeLessThan(r);
-      }
-    } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-      expect(mat.color.r).toBeGreaterThan(0.4);
-      expect(mat.color.g).toBeGreaterThan(0.4);
-      expect(mat.color.b).toBeLessThan(mat.color.r);
+    overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5, { confidence: 0.5, fresh: true })] }));
+    const { colors } = pointVertices(scene, 0);
+    expect(colors.length).toBeGreaterThan(0);
+    // Yellow/orange: red and green should both be high, blue low
+    for (const [r, g, b] of colors) {
+      expect(r).toBeGreaterThan(0.4);
+      expect(g).toBeGreaterThan(0.4);
+      expect(b).toBeLessThan(r);
     }
     overlay.dispose();
   });
@@ -1354,48 +1333,25 @@ describe('SurveyConfidenceOverlay', () => {
   it('stale points (fresh=false) render grey regardless of confidence', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    const points: SurveyConfidencePoint[] = [
-      makeConfidencePoint(5, 5, { confidence: 0.9, fresh: false }),
-    ];
-    overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.Material;
-    const colorAttr = (mesh.geometry as THREE.BufferGeometry)?.getAttribute('color');
-    if (colorAttr) {
-      const colors = colorAttr.array as Float32Array;
-      // Grey: all channels roughly equal (within 0.15 tolerance)
-      for (let i = 0; i < colors.length; i += 3) {
-        const diffRG = Math.abs(colors[i]! - colors[i + 1]!);
-        const diffRB = Math.abs(colors[i]! - colors[i + 2]!);
-        const diffGB = Math.abs(colors[i + 1]! - colors[i + 2]!);
-        expect(diffRG).toBeLessThan(0.15);
-        expect(diffRB).toBeLessThan(0.15);
-        expect(diffGB).toBeLessThan(0.15);
-      }
-    } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-      const diffRG = Math.abs(mat.color.r - mat.color.g);
-      const diffRB = Math.abs(mat.color.r - mat.color.b);
-      const diffGB = Math.abs(mat.color.g - mat.color.b);
-      expect(diffRG).toBeLessThan(0.15);
-      expect(diffRB).toBeLessThan(0.15);
-      expect(diffGB).toBeLessThan(0.15);
+    overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5, { confidence: 0.9, fresh: false })] }));
+    const { colors } = pointVertices(scene, 0);
+    expect(colors.length).toBeGreaterThan(0);
+    // Grey: all channels roughly equal (within 0.15 tolerance)
+    for (const [r, g, b] of colors) {
+      expect(Math.abs(r - g)).toBeLessThan(0.15);
+      expect(Math.abs(r - b)).toBeLessThan(0.15);
+      expect(Math.abs(g - b)).toBeLessThan(0.15);
     }
     overlay.dispose();
   });
 
-  it('opacity parameter is reflected in material opacity', () => {
+  it('opacity parameter is reflected in per-vertex alpha', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5)], opacity: 0.6 }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.Material;
-    if (mat.transparent !== undefined) {
-      expect(mat.opacity).toBeCloseTo(0.6, 1);
-    }
+    const { colors } = pointVertices(scene, 0);
+    expect(colors.length).toBeGreaterThan(0);
+    for (const [, , , a] of colors) expect(a).toBeCloseTo(0.6, 1);
     overlay.dispose();
   });
 
@@ -1403,29 +1359,29 @@ describe('SurveyConfidenceOverlay', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5)] }));
-    const countAfterFirst = (scene.children[0] as THREE.Group).children.length;
+    const countAfterFirst = (overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
     overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(10, 10)] }));
-    const countAfterSecond = (scene.children[0] as THREE.Group).children.length;
+    const countAfterSecond = (overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
     // Second show should replace, not add to, the previous data
     expect(countAfterSecond).toBeLessThanOrEqual(countAfterFirst);
     overlay.dispose();
   });
 
-  it('clear removes all children from the group', () => {
+  it('clear leaves nothing rendered', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(1, 1), makeConfidencePoint(2, 2), makeConfidencePoint(3, 3)],
     }));
     overlay.clear();
-    const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBe(0);
+    const posAttr = overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(posAttr.count).toBe(0);
     overlay.dispose();
   });
 
-  it('dispose removes group from scene', () => {
+  it('dispose removes the merged mesh from the scene', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions());
@@ -1440,11 +1396,14 @@ describe('SurveyConfidenceOverlay', () => {
       makeConfidencePoint(15, 25, { surfaceY: 7 }),
     ];
     overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh.position.x).toBeCloseTo(15, 0);
-    expect(mesh.position.z).toBeCloseTo(25, 0);
-    expect(mesh.position.y).toBeCloseTo(7, 0);
+    const mesh = overlayMesh(scene);
+    mesh.updateMatrixWorld(true);
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // The cell's own (x, z) corner is the patch's first emitted vertex.
+    const v = new THREE.Vector3().fromBufferAttribute(posAttr, 0).applyMatrix4(mesh.matrixWorld);
+    expect(v.x).toBeCloseTo(15, 0);
+    expect(v.z).toBeCloseTo(25, 0);
+    expect(v.y).toBeCloseTo(7, 0);
     overlay.dispose();
   });
 
@@ -1459,9 +1418,9 @@ describe('SurveyConfidenceOverlay', () => {
       makeConfidencePoint(25, 5, { confidence: 0.7, fresh: false }),
     ];
     overlay.show(makeOverlayOptions({ points }));
-    const group = scene.children[0] as THREE.Group;
-    // Each point should contribute at least one mesh
-    expect(group.children.length).toBeGreaterThanOrEqual(points.length);
+    const posAttr = overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute;
+    // Every point contributes its own cell's vertices to the merged mesh.
+    expect(posAttr.count).toBe(points.length * VERTS_PER_CELL_PATCH);
     overlay.dispose();
   });
 
@@ -1470,9 +1429,9 @@ describe('SurveyConfidenceOverlay', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     expect(() => overlay.show(makeOverlayOptions({ points: [] }))).not.toThrow();
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(true);
-    expect(group.children.length).toBe(0);
+    const mesh = overlayMesh(scene);
+    expect(mesh.visible).toBe(true);
+    expect((mesh.geometry.getAttribute('position') as THREE.BufferAttribute).count).toBe(0);
     overlay.dispose();
   });
 
@@ -1480,34 +1439,30 @@ describe('SurveyConfidenceOverlay', () => {
   it('stale point has opacity multiplied by STALE_OPACITY (0.6)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    // Fresh point with opacity 0.6 → material opacity = 0.6 * 1.0 = 0.6
+    // Fresh point with opacity 0.6 → per-vertex alpha = 0.6 * 1.0 = 0.6
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { fresh: true, confidence: 0.5 })],
       opacity: 0.6,
     }));
-    const group = scene.children[0] as THREE.Group;
-    const freshMesh = group.children[0] as THREE.Mesh;
-    const freshMat = freshMesh.material as THREE.MeshBasicMaterial;
-    const freshOpacity = freshMat.opacity;
+    const freshAlpha = pointVertices(scene, 0).colors[0]![3];
 
     // Now show a stale point with same global opacity
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { fresh: false, confidence: 0.5 })],
       opacity: 0.6,
     }));
-    const staleMesh = group.children[0] as THREE.Mesh;
-    const staleMat = staleMesh.material as THREE.MeshBasicMaterial;
+    const staleAlpha = pointVertices(scene, 0).colors[0]![3];
 
     // Stale opacity should be 0.6x the fresh opacity
     // Fresh: 0.6 * 1.0 = 0.6
     // Stale: 0.6 * 0.6 = 0.36
-    expect(freshOpacity).toBeCloseTo(0.6, 2);
-    expect(staleMat.opacity).toBeCloseTo(0.36, 2);
+    expect(freshAlpha).toBeCloseTo(0.6, 2);
+    expect(staleAlpha).toBeCloseTo(0.36, 2);
     overlay.dispose();
   });
 
   // ── renderOrder ──
-  it('each overlay quad has renderOrder set to 100', () => {
+  it('the merged overlay mesh has renderOrder set to 100', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions({
@@ -1516,24 +1471,20 @@ describe('SurveyConfidenceOverlay', () => {
         makeConfidencePoint(10, 10),
       ],
     }));
-    const group = scene.children[0] as THREE.Group;
-    for (const child of group.children) {
-      const mesh = child as THREE.Mesh;
-      expect(mesh.renderOrder).toBe(100);
-    }
+    expect(overlayMesh(scene).renderOrder).toBe(100);
     overlay.dispose();
   });
 
-  // ── Quad rotation ──
-  it('each overlay quad is rotated to lie flat (rotation.x = -PI/2)', () => {
+  // ── Flatness on uniform terrain ──
+  it('a point on uniform terrain renders a flat cell (all four corners share one Y)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show(makeOverlayOptions({
-      points: [makeConfidencePoint(5, 5)],
+      points: [makeConfidencePoint(5, 5, { surfaceY: 9 })],
     }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh.rotation.x).toBeCloseTo(-Math.PI / 2, 5);
+    // +0.05 is SurveyConfidenceOverlay's OVERLAY_Y_OFFSET (z-fighting epsilon).
+    const { ys } = pointVertices(scene, 0);
+    for (const y of ys) expect(y).toBeCloseTo(9.05, 2);
     overlay.dispose();
   });
 
@@ -1544,12 +1495,11 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { confidence: 0, fresh: true })],
     }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
-    expect(mat.color.r).toBeCloseTo(1, 2);
-    expect(mat.color.g).toBeCloseTo(0, 2);
-    expect(mat.color.b).toBeCloseTo(0, 2);
+    for (const [r, g, b] of pointVertices(scene, 0).colors) {
+      expect(r).toBeCloseTo(1, 2);
+      expect(g).toBeCloseTo(0, 2);
+      expect(b).toBeCloseTo(0, 2);
+    }
     overlay.dispose();
   });
 
@@ -1559,12 +1509,11 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { confidence: 1, fresh: true })],
     }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
-    expect(mat.color.r).toBeCloseTo(0, 2);
-    expect(mat.color.g).toBeCloseTo(1, 2);
-    expect(mat.color.b).toBeCloseTo(0, 2);
+    for (const [r, g, b] of pointVertices(scene, 0).colors) {
+      expect(r).toBeCloseTo(0, 2);
+      expect(g).toBeCloseTo(1, 2);
+      expect(b).toBeCloseTo(0, 2);
+    }
     overlay.dispose();
   });
 
@@ -1574,12 +1523,11 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { confidence: 0.5, fresh: true })],
     }));
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
-    expect(mat.color.r).toBeCloseTo(1, 2);
-    expect(mat.color.g).toBeCloseTo(1, 2);
-    expect(mat.color.b).toBeCloseTo(0, 2);
+    for (const [r, g, b] of pointVertices(scene, 0).colors) {
+      expect(r).toBeCloseTo(1, 2);
+      expect(g).toBeCloseTo(1, 2);
+      expect(b).toBeCloseTo(0, 2);
+    }
     overlay.dispose();
   });
 
@@ -1594,9 +1542,9 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(10, 10), makeConfidencePoint(20, 20)],
     }));
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(true);
-    expect(group.children.length).toBe(2);
+    const mesh = overlayMesh(scene);
+    expect(mesh.visible).toBe(true);
+    expect((mesh.geometry.getAttribute('position') as THREE.BufferAttribute).count).toBe(2 * VERTS_PER_CELL_PATCH);
     overlay.dispose();
   });
 });

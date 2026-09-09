@@ -163,6 +163,24 @@ describe('survey-seismic-side-effects — seismic execution', () => {
 
 // ── Seismic side effects visual rendering ──────────────────────────────────
 
+// GroundTintLayer (#1006) merges every confidence point's marker into ONE
+// mesh instead of one mesh per point — a point's own cell patch is always 2
+// triangles (6 vertices), in `show()`'s points order, and its first vertex
+// sits exactly at the point's own (x, z) (the cell's own corner).
+const VERTS_PER_POINT = 6;
+
+function overlayMesh(scene: THREE.Scene): THREE.Mesh {
+  return scene.children[0] as THREE.Mesh;
+}
+
+function pointWorldXZ(scene: THREE.Scene, pointIndex: number): { x: number; z: number } {
+  const mesh = overlayMesh(scene);
+  mesh.updateMatrixWorld(true);
+  const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+  const v = new THREE.Vector3().fromBufferAttribute(posAttr, pointIndex * VERTS_PER_POINT).applyMatrix4(mesh.matrixWorld);
+  return { x: v.x, z: v.z };
+}
+
 describe('survey-seismic-side-effects — visual rendering', () => {
   it('overlay shows seismic coverage area with confidence markers', () => {
     const scene = new THREE.Scene();
@@ -175,9 +193,10 @@ describe('survey-seismic-side-effects — visual rendering', () => {
       { x: 20, z: 19, surfaceY: 4, confidence: 0.81, fresh: true },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    expect(group.visible).toBe(true);
-    expect(group.children.length).toBe(5);
+    const mesh = overlayMesh(scene);
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(mesh.visible).toBe(true);
+    expect(posAttr.count).toBe(points.length * VERTS_PER_POINT);
     overlay.dispose();
   });
 
@@ -203,14 +222,12 @@ describe('survey-seismic-side-effects — visual rendering', () => {
       }
     }
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBeGreaterThanOrEqual(points.length);
+    const posAttr = overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(posAttr.count).toBeGreaterThanOrEqual(points.length * VERTS_PER_POINT);
     // All points should be within radius 20
-    for (const child of group.children) {
-      const mesh = child as THREE.Mesh;
-      const dx = mesh.position.x - centerX;
-      const dz = mesh.position.z - centerZ;
-      const dist = Math.sqrt(dx * dx + dz * dz);
+    for (let i = 0; i < points.length; i++) {
+      const { x, z } = pointWorldXZ(scene, i);
+      const dist = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
       expect(dist).toBeLessThanOrEqual(20);
     }
     overlay.dispose();
@@ -230,9 +247,9 @@ describe('survey-seismic-side-effects — visual rendering', () => {
       { x: 30, z: 20, surfaceY: 4, confidence: 0.80, fresh: true },
     ];
     overlay.show({ points: points2, opacity: 0.5 });
-    const count2 = (scene.children[0] as THREE.Group).children.length;
+    const count2 = (overlayMesh(scene).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
-    expect(count2).toBe(1);
+    expect(count2).toBe(VERTS_PER_POINT);
     overlay.dispose();
   });
 });

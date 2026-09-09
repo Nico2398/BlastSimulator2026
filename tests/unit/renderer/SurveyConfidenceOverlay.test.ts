@@ -98,15 +98,21 @@ describe('SurveyConfidenceOverlay — stale points', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show({ points: [point({ confidence: 0.9, fresh: false })], opacity: 1 });
 
-    const greys: THREE.Color[] = [];
+    // Colour is per-vertex (GroundTintLayer's merged mesh uses vertexColors,
+    // not a per-mesh material.color), so read the geometry's `color`
+    // attribute rather than each mesh's own material (#1006).
+    const greys: [number, number, number][] = [];
     scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
-        const mat = o.material as THREE.Material & { color?: THREE.Color };
-        if (mat.color) greys.push(mat.color);
+        const colorAttr = o.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+        if (!colorAttr) return;
+        for (let i = 0; i < colorAttr.count; i++) {
+          greys.push([colorAttr.getX(i), colorAttr.getY(i), colorAttr.getZ(i)]);
+        }
       }
     });
     expect(greys.length).toBeGreaterThan(0);
-    expect(greys.some((c) => Math.abs(c.r - 0.5) < 0.05 && Math.abs(c.g - 0.5) < 0.05 && Math.abs(c.b - 0.5) < 0.05)).toBe(true);
+    expect(greys.some(([r, g, b]) => Math.abs(r - 0.5) < 0.05 && Math.abs(g - 0.5) < 0.05 && Math.abs(b - 0.5) < 0.05)).toBe(true);
   });
 });
 
@@ -166,21 +172,17 @@ describe('SurveyConfidenceOverlay — visibility toggle (unchanged)', () => {
 });
 
 describe('SurveyConfidenceOverlay — dispose/clear', () => {
-  it('clear() removes all overlay meshes', () => {
+  it('clear() renders nothing (the merged ground-tint mesh stays in the scene, empty — #1006)', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show({ points: [point({}), point({ x: 5, z: 5 })], opacity: 1 });
     overlay.clear();
 
-    const meshes: THREE.Mesh[] = [];
-    scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
-    expect(meshes).toHaveLength(0);
+    expect(allPositionYs()).toHaveLength(0);
   });
 
   it('rejection: show() with an empty points array renders nothing but does not throw', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
     expect(() => overlay.show({ points: [], opacity: 1 })).not.toThrow();
-    const meshes: THREE.Mesh[] = [];
-    scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
-    expect(meshes).toHaveLength(0);
+    expect(allPositionYs()).toHaveLength(0);
   });
 });

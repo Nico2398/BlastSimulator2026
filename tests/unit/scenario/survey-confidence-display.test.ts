@@ -189,6 +189,20 @@ describe('confidence display — multiple surveyors', () => {
 
 // ── Overlay with mixed confidence levels ───────────────────────────────────
 
+// GroundTintLayer (#1006) merges every confidence point into one mesh with
+// per-vertex colour (vertexColors: true) instead of one mesh-per-point with
+// its own material.color — a point's own cell patch is always 2 triangles
+// (6 vertices), in `show()`'s points order, inside the shared geometry.
+const VERTS_PER_POINT = 6;
+
+/** RGB of the Nth point's first vertex in the overlay's single merged mesh. */
+function pointColor(scene: THREE.Scene, pointIndex: number): { r: number; g: number; b: number } {
+  const mesh = scene.children[0] as THREE.Mesh;
+  const colorAttr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const idx = pointIndex * VERTS_PER_POINT;
+  return { r: colorAttr.getX(idx), g: colorAttr.getY(idx), b: colorAttr.getZ(idx) };
+}
+
 describe('confidence display — mixed confidence overlay', () => {
   it('overlay renders green markers for high confidence points', () => {
     const scene = new THREE.Scene();
@@ -197,11 +211,9 @@ describe('confidence display — mixed confidence overlay', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.95, fresh: true },
     ];
     overlay.show({ points, opacity: 1.0 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g } = pointColor(scene, 0);
     // High confidence → green dominant
-    expect(mat.color.g).toBeGreaterThan(mat.color.r);
+    expect(g).toBeGreaterThan(r);
     overlay.dispose();
   });
 
@@ -212,13 +224,11 @@ describe('confidence display — mixed confidence overlay', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.5, fresh: true },
     ];
     overlay.show({ points, opacity: 1.0 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g, b } = pointColor(scene, 0);
     // Medium confidence → yellow (r=1, g=1, b=0)
-    expect(mat.color.r).toBeCloseTo(1, 1);
-    expect(mat.color.g).toBeCloseTo(1, 1);
-    expect(mat.color.b).toBeCloseTo(0, 1);
+    expect(r).toBeCloseTo(1, 1);
+    expect(g).toBeCloseTo(1, 1);
+    expect(b).toBeCloseTo(0, 1);
     overlay.dispose();
   });
 
@@ -229,11 +239,9 @@ describe('confidence display — mixed confidence overlay', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.1, fresh: true },
     ];
     overlay.show({ points, opacity: 1.0 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g } = pointColor(scene, 0);
     // Low confidence → red dominant
-    expect(mat.color.r).toBeGreaterThan(mat.color.g);
+    expect(r).toBeGreaterThan(g);
     overlay.dispose();
   });
 
@@ -244,13 +252,11 @@ describe('confidence display — mixed confidence overlay', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.9, fresh: false },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g, b } = pointColor(scene, 0);
     // Stale → grey (all channels ~0.5)
-    expect(mat.color.r).toBeCloseTo(0.5, 1);
-    expect(mat.color.g).toBeCloseTo(0.5, 1);
-    expect(mat.color.b).toBeCloseTo(0.5, 1);
+    expect(r).toBeCloseTo(0.5, 1);
+    expect(g).toBeCloseTo(0.5, 1);
+    expect(b).toBeCloseTo(0.5, 1);
     overlay.dispose();
   });
 
@@ -264,19 +270,16 @@ describe('confidence display — mixed confidence overlay', () => {
       { x: 20, z: 20, surfaceY: 4, confidence: 0.8, fresh: false },  // grey
     ];
     overlay.show({ points, opacity: 0.7 });
-    const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBe(4);
-
-    // Verify each mesh has different color characteristics
-    const colors = group.children.map(child => {
-      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
-      return { r: mat.color.r, g: mat.color.g, b: mat.color.b };
-    });
+    const mesh = scene.children[0] as THREE.Mesh;
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // Merged into one mesh (#1006) — its vertex count still scales with
+    // point count, which is what "one mesh per point" meant.
+    expect(posAttr.count).toBe(points.length * VERTS_PER_POINT);
 
     // First point (green): g > r
-    expect(colors[0]!.g).toBeGreaterThan(colors[0]!.r);
+    expect(pointColor(scene, 0).g).toBeGreaterThan(pointColor(scene, 0).r);
     // Third point (red): r > g
-    expect(colors[2]!.r).toBeGreaterThan(colors[2]!.g);
+    expect(pointColor(scene, 2).r).toBeGreaterThan(pointColor(scene, 2).g);
 
     overlay.dispose();
   });

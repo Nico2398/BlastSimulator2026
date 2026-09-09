@@ -45,6 +45,21 @@ function totalVertexCount(meshes: THREE.Mesh[]): number {
   }, 0);
 }
 
+/**
+ * SelectionOverlay owns TWO GroundTintLayer instances — one for the live
+ * selection, one for the pinned region/blocked-tile — each with its own
+ * persistent Mesh added to the scene for the overlay's whole lifetime (same
+ * design GroundTint.test.ts covers: a layer's mesh survives an empty patch
+ * set so a later replace() has something to draw into). `sceneMeshes()`
+ * therefore never drops to 0 or 1 — it is always exactly these two meshes,
+ * empty or not. "how many meshes carry a region/selection tint right now"
+ * means filtering to the ones with actual vertices, not counting scene
+ * children (#1006).
+ */
+function meshesWithGeometry(): THREE.Mesh[] {
+  return sceneMeshes().filter((m) => totalVertexCount([m]) > 0);
+}
+
 beforeEach(() => {
   scene = new THREE.Scene();
   overlay = new SelectionOverlay(scene, () => 0);
@@ -54,13 +69,13 @@ describe('the guided region is drawn before anything is selected', () => {
   it('draws nothing until a region is published', () => {
     expect(regionGroup()).toBeDefined();
     expect(regionGroup().children).toHaveLength(0);
-    expect(sceneMeshes()).toHaveLength(0);
+    expect(totalVertexCount(sceneMeshes()), 'the persistent ground-tint meshes should carry no geometry yet').toBe(0);
   });
 
   it('merges a 3x3 region\'s cell tint into a single conforming mesh, not one mesh per cell (#1006)', () => {
     overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
 
-    const meshes = sceneMeshes();
+    const meshes = meshesWithGeometry();
     expect(meshes, '3x3 region tint should merge into a single conforming mesh, not nine separate meshes').toHaveLength(1);
     // Border group + four corner lines + beacon still live in regionGroup as plain Line objects.
     expect(regionGroup().children.length).toBeGreaterThan(0);
@@ -89,25 +104,25 @@ describe('the guided region is drawn before anything is selected', () => {
 
   it('draws a one-tile region as a single conforming patch — the shape the survey and warehouse steps use', () => {
     overlay.setRegion({ x1: 23, z1: 23, x2: 23, z2: 23 });
-    expect(sceneMeshes()).toHaveLength(1);
+    expect(meshesWithGeometry()).toHaveLength(1);
   });
 
   it('replaces the previous region rather than stacking on it', () => {
     overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
     const firstRegionGroupCount = regionGroup().children.length;
-    const firstMeshCount = sceneMeshes().length;
+    const firstMeshCount = meshesWithGeometry().length;
 
     overlay.setRegion({ x1: 4, z1: 4, x2: 6, z2: 6 });
 
     expect(regionGroup().children).toHaveLength(firstRegionGroupCount);
-    expect(sceneMeshes(), 'replacing a region should not stack a second merged tint mesh').toHaveLength(firstMeshCount);
+    expect(meshesWithGeometry(), 'replacing a region should not stack a second merged tint mesh').toHaveLength(firstMeshCount);
   });
 
   it('takes the region off on null', () => {
     overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
     overlay.setRegion(null);
     expect(regionGroup().children).toHaveLength(0);
-    expect(sceneMeshes()).toHaveLength(0);
+    expect(totalVertexCount(sceneMeshes()), 'no ground-tint geometry should remain once the region is taken off').toBe(0);
   });
 
   it('survives a selection update, which draws into its own group', () => {
@@ -122,21 +137,20 @@ describe('the guided region is drawn before anything is selected', () => {
     overlay.update({ shape: 'point', x: 21, z: 21 });
     overlay.clear();
     expect(regionGroup().children).toHaveLength(0);
-    expect(sceneMeshes()).toHaveLength(0);
+    expect(totalVertexCount(sceneMeshes()), 'no ground-tint geometry should remain after clear()').toBe(0);
   });
 });
 
 describe('a refused tile is marked', () => {
   it('folds the blocked-tile mark into the shared ground-tint mesh rather than adding a new mesh (#1006)', () => {
     overlay.setRegion({ x1: 20, z1: 20, x2: 20, z2: 20 });
-    const before = sceneMeshes();
-    expect(before.length, 'the 1x1 region tint should already be a single merged mesh').toBeLessThanOrEqual(1);
-    const beforeVerts = totalVertexCount(before);
+    const beforeMeshCount = sceneMeshes().length;
+    expect(meshesWithGeometry().length, 'the 1x1 region tint should already be a single merged mesh').toBe(1);
+    const beforeVerts = totalVertexCount(sceneMeshes());
 
     overlay.setBlockedTile({ x: 2, z: 2 });
-    const after = sceneMeshes();
-    expect(after.length, 'the blocked-tile mark should not add a second mesh').toBe(before.length);
-    const afterVerts = totalVertexCount(after);
+    expect(sceneMeshes().length, 'the blocked-tile mark should not add a second mesh').toBe(beforeMeshCount);
+    const afterVerts = totalVertexCount(sceneMeshes());
     expect(afterVerts, 'the blocked-tile mark should add vertices to the shared geometry').toBeGreaterThan(beforeVerts);
 
     overlay.setBlockedTile(null);

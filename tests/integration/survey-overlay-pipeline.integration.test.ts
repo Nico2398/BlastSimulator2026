@@ -146,6 +146,19 @@ describe('GameRenderer — syncSurveyOverlay pipeline (issue #386)', () => {
 
 // ── Test Suite: syncSurveyOverlay implementation ───────────────────────────
 
+/**
+ * SurveyConfidenceOverlay's own GroundTintLayer mesh (#1006) — TS-private,
+ * not runtime-private, so a narrow structural cast reaches it directly
+ * instead of guessing which scene child it is. Reliable regardless of how
+ * many other meshes (terrain chunks, landscape skirt, other overlays)
+ * `renderer.syncFromContext` also populates the scene with.
+ */
+type SurveyOverlayInternals = { layer: { mesh: THREE.Mesh } };
+function overlayMesh(renderer: GameRenderer): THREE.Mesh {
+  const overlay = renderer.terrain!.getSurveyOverlay() as unknown as SurveyOverlayInternals;
+  return overlay.layer.mesh;
+}
+
 describe('GameRenderer.syncSurveyOverlay — implementation (issue #386)', () => {
   /**
    * syncSurveyOverlay must wire TerrainMesh.getSurveyOverlay().show() / .hide().
@@ -160,9 +173,11 @@ describe('GameRenderer.syncSurveyOverlay — implementation (issue #386)', () =>
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
-    // The overlay group is added to the scene in the SurveyConfidenceOverlay constructor,
-    // so scene.children.length doesn't change. Instead, we check that the overlay
-    // group becomes visible and contains mesh children for each confidence point.
+    // The overlay's merged ground-tint Mesh is added to the scene in the
+    // SurveyConfidenceOverlay constructor (via GroundTintLayer, #1006), so
+    // scene.children.length doesn't change here either — and it is no
+    // longer a THREE.Group, so find it via TerrainMesh.getSurveyOverlay()
+    // rather than scanning the scene for a Group instance.
     const options: SurveyConfidenceOverlayOptions = {
       points: [
         { x: 10, z: 10, surfaceY: 5, confidence: 0.85, fresh: true },
@@ -171,16 +186,10 @@ describe('GameRenderer.syncSurveyOverlay — implementation (issue #386)', () =>
     };
     renderer.syncSurveyOverlay(options);
 
-    // Find the overlay group and verify it's visible
-    const overlayGroups = sm.scene.children.filter(
-      (child) => child instanceof THREE.Group,
-    ) as THREE.Group[];
-    expect(overlayGroups.length).toBeGreaterThan(0);
-    const overlayGroup = overlayGroups[overlayGroups.length - 1]!;
-    expect(overlayGroup.visible).toBe(true);
-    
-    // The overlay group should contain mesh children for each confidence point
-    expect(overlayGroup.children.length).toBeGreaterThan(0);
+    const mesh = overlayMesh(renderer);
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    expect(mesh.visible).toBe(true);
+    expect(pos?.count ?? 0, 'the overlay mesh should carry geometry for the shown point').toBeGreaterThan(0);
   });
 
   it('syncSurveyOverlay with null hides the overlay group', () => {
@@ -191,26 +200,20 @@ describe('GameRenderer.syncSurveyOverlay — implementation (issue #386)', () =>
     renderer.syncFromContext(ctx);
 
     // First, show the overlay by calling syncSurveyOverlay with options.
-    // This must create a visible overlay group in the scene.
+    // This must create a visible, non-empty overlay mesh in the scene.
     renderer.syncSurveyOverlay({
       points: [{ x: 10, z: 10, surfaceY: 5, confidence: 0.85, fresh: true }],
       opacity: 0.6,
     });
-
-    // The overlay MUST exist as a THREE.Group in the scene after show().
-    // This FAILS because syncSurveyOverlay is a no-op stub — nothing is created.
-    const overlayGroups = sm.scene.children.filter(
-      (child) => child instanceof THREE.Group,
-    ) as THREE.Group[];
-    expect(overlayGroups.length).toBeGreaterThan(0);
-    const overlayGroup = overlayGroups[overlayGroups.length - 1]!;
-    expect(overlayGroup.visible).toBe(true);
+    expect(overlayMesh(renderer).visible).toBe(true);
 
     // Now hide it
     renderer.syncSurveyOverlay(null);
 
-    // After hide(), the overlay group must be invisible
-    expect(overlayGroup.visible).toBe(false);
+    // hide() only toggles visibility — the merged mesh itself, and its last
+    // geometry, stay in the scene (#1006) so a later show() has something to
+    // rebuild into.
+    expect(overlayMesh(renderer).visible).toBe(false);
   });
 });
 

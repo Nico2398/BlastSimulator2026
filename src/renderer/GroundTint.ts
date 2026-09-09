@@ -42,7 +42,7 @@ export function bilinearSurfaceHeight(cornerSampler: SurfaceHeightSampler, x: nu
 }
 
 /** One ground-tint patch's footprint: a single grid cell, or a disc (survey radius rings, blast energy heatmap). */
-export type GroundTintShape =
+type GroundTintShape =
   | { kind: 'cell'; x: number; z: number }
   | { kind: 'disc'; cx: number; cz: number; radius: number; segments?: number };
 
@@ -119,6 +119,7 @@ export class GroundTintLayer {
 
   /** Remove every patch and release GPU resources. */
   dispose(): void {
+    this.patches.clear();
     this.scene.remove(this.mesh);
     this.geometry.dispose();
     this.material.dispose();

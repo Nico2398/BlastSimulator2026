@@ -146,7 +146,14 @@ describe('survey-result-visualization — overlay rendering', () => {
     overlay.dispose();
   });
 
-  it('overlay.show() creates a mesh for each confidence point', () => {
+  // GroundTintLayer (#1006) merges every confidence point into ONE
+  // BufferGeometry mesh instead of one mesh per point — a point's own marker
+  // is now its own 6-vertex cell patch (2 triangles) inside that shared
+  // geometry, so "one marker per point" is checked via vertex count instead
+  // of child-mesh count.
+  const VERTS_PER_POINT = 6;
+
+  it('overlay.show() renders geometry for each confidence point, merged into one mesh (#1006)', () => {
     const scene = new THREE.Scene();
     const overlay = new SurveyConfidenceOverlay(scene);
     const points: SurveyConfidencePoint[] = [
@@ -155,8 +162,10 @@ describe('survey-result-visualization — overlay rendering', () => {
       { x: 15, z: 15, surfaceY: 3, confidence: 0.3, fresh: false },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBe(3);
+    const mesh = scene.children[0] as THREE.Mesh;
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(scene.children.length).toBe(1);
+    expect(posAttr.count).toBe(points.length * VERTS_PER_POINT);
     overlay.dispose();
   });
 
@@ -167,11 +176,14 @@ describe('survey-result-visualization — overlay rendering', () => {
       { x: 10, z: 20, surfaceY: 5, confidence: 0.9, fresh: true },
     ];
     overlay.show({ points, opacity: 0.7 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    expect(mesh.position.x).toBe(10);
-    expect(mesh.position.z).toBe(20);
-    expect(mesh.position.y).toBeCloseTo(5.05, 2); // surfaceY + offset
+    const mesh = scene.children[0] as THREE.Mesh;
+    mesh.updateMatrixWorld(true);
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // The cell's own (x, z) corner is the patch's first emitted vertex.
+    const v = new THREE.Vector3().fromBufferAttribute(posAttr, 0).applyMatrix4(mesh.matrixWorld);
+    expect(v.x).toBe(10);
+    expect(v.z).toBe(20);
+    expect(v.y).toBeCloseTo(5.05, 2); // surfaceY + offset
     overlay.dispose();
   });
 
@@ -185,17 +197,17 @@ describe('survey-result-visualization — overlay rendering', () => {
       { x: 10, z: 10, surfaceY: 4, confidence: 0.5, fresh: true },
     ];
     overlay.show({ points: points1, opacity: 0.5 });
-    const countAfterFirst = (scene.children[0] as THREE.Group).children.length;
+    const countAfterFirst = ((scene.children[0] as THREE.Mesh).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
     // Second show with fewer points
     const points2: SurveyConfidencePoint[] = [
       { x: 15, z: 15, surfaceY: 4, confidence: 0.6, fresh: true },
     ];
     overlay.show({ points: points2, opacity: 0.5 });
-    const countAfterSecond = (scene.children[0] as THREE.Group).children.length;
+    const countAfterSecond = ((scene.children[0] as THREE.Mesh).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
     // Should replace, not accumulate
-    expect(countAfterSecond).toBe(1);
+    expect(countAfterSecond).toBe(VERTS_PER_POINT);
     expect(countAfterSecond).toBeLessThanOrEqual(countAfterFirst);
     overlay.dispose();
   });

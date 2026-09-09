@@ -199,12 +199,21 @@ describe('GroundTintLayer — patch-set semantics', () => {
     expect(layer.patchCount).toBe(2);
   });
 
-  it('clear() removes every patch and leaves no mesh children in the scene', () => {
+  it('clear() removes every patch and leaves nothing rendered in the scene', () => {
+    // GroundTintLayer owns one persistent Mesh for its whole lifetime
+    // (rebuilt in place by replace()/add()/clear(), see class docs) rather
+    // than adding/removing a mesh per call — every overlay's clear()/replace()
+    // cycle (SelectionOverlay.buildRect, SurveyConfidenceOverlay.show, …)
+    // depends on that mesh staying in the scene across an empty patch set so
+    // a later replace() has something to draw into. So "leaves no mesh
+    // children" means the mesh renders zero geometry, not that the mesh
+    // itself is gone (#1006).
     const layer = new GroundTintLayer(scene, () => 0);
     layer.replace([cellPatch('a', 0, 0), cellPatch('b', 1, 0)]);
     layer.clear();
     expect(layer.patchCount).toBe(0);
-    expect(allMeshes()).toHaveLength(0);
+    expect(allMeshes()).toHaveLength(1);
+    expect(allPositionYs()).toHaveLength(0);
   });
 
   it('boundary: replace() with an empty array clears everything', () => {
