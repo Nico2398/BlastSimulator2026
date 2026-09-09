@@ -81,6 +81,25 @@ assign_by(ob, mat, lambda c: c.z > 1.2)   # by face-centre predicate
 | `finish(name)` | Both of the above, then prints triangles, glb KB and blend KB |
 | `finish_far(name, ratio=0.12)` | Adds a Decimate to every mesh and exports `<name>_far` — the distant tree LOD. Runs after `finish()`, so the `.blend` keeps full detail. `build.py` calls it for every `prop_tree_*` |
 
+## Geometry Nodes
+
+No generator uses them yet; the door is open where they beat a loop. A node
+tree built through `bpy` is verbose, so it pays only when the effect is
+genuinely surface-driven — points distributed over a roof and instanced with
+crates, rivets walked along an edge, debris scattered inside a boundary — where
+the Python alternative is hundreds of objects created just to be merged.
+
+Mechanics that matter here:
+
+- Add the modifier (`ob.modifiers.new('GN', 'NODES')`) and build its tree, then
+  leave it live. `export_glb()` exports with `export_apply=True`, so the
+  evaluated mesh ships and the `.blend` keeps the knobs.
+- Instanced geometry must carry its material: the export bakes a realized mesh,
+  and a part with no material slot lands in the merge with no colour.
+- The result still obeys the node rule — everything a Geometry Nodes modifier
+  produces belongs to the object it is on, so put that object under the right
+  animation node.
+
 ## Gotchas the generators were built around
 
 - `matrix_world` only refreshes on a depsgraph update, so it reads as identity
@@ -95,3 +114,7 @@ assign_by(ob, mat, lambda c: c.z > 1.2)   # by face-centre predicate
   rebuild is reproducible. Keep any new randomness seeded.
 - A model is one scene. Reuse across models happens by importing the other
   module's builder functions, never by appending from a `.blend`.
+- Blender's object names survive the export (dots dropped, duplicates suffixed
+  `001`), which is what `assets/models/manifest.json` lists as a node's parts.
+  Name a part for what it is (`HeadHatBrim`, `BedTailgate`) — that name is how
+  the next editor finds it.

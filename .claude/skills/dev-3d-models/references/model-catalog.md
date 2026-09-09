@@ -3,6 +3,11 @@
 Ids come from `src/renderer/models/ModelIds.ts`, derived from the core
 catalogs. The Blender registry in `build.py` writes the same names.
 
+This page is the prose: what each family is and what its tiers joke about.
+The per-id data — nodes, parts, materials, size, triangles, builder module —
+is generated into `assets/models/manifest.json`; read that entry before
+editing a model.
+
 ## Workers — `workers.py`
 
 `worker_<role>` for `driller`, `blaster`, `driver`, `surveyor`, `manager`.

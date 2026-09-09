@@ -16,6 +16,8 @@ assets/models/
 │                     build.py = CLI; sheet.py = contact sheet of previews;
 │                     building-defs.json = footprints dumped from the game.
 ├── blend/            Editable sources, one .blend per model, modifiers live.
+├── manifest.json     Generated map of every exported model: nodes, parts,
+│                     materials, size, triangles, builder module.
 └── README.md
 public/models/        Exports the game loads, one .glb per model id.
 ```
@@ -27,7 +29,12 @@ pip install bpy                     # Blender as a Python module (once)
 npm run models:build                # dumps building-defs.json, builds every model
 python3 assets/models/blender/build.py worker_driller     # one model
 python3 assets/models/blender/build.py vehicles buildings # categories
+npm run models:manifest             # refresh manifest.json after a build
 ```
+
+`manifest.json` is what to read before editing a model — it says which node
+owns which parts, what each model is made of and how big it came out, without
+opening Blender. A unit test fails when it no longer matches `public/models/`.
 
 ## Previewing
 

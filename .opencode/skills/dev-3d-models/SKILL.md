@@ -32,15 +32,53 @@ assets/models/blender/<family>.py   source of truth — edit here
 
 Buildings read their footprint from `building-defs.json`, dumped from the game's own `BuildingDefs` by `npm run models:defs` (which `models:build` runs first), so both sides agree on size.
 
+## ▶ Know what you are editing
+
+A generator is several hundred lines of Python, and the shape it writes is not obvious from reading it. Two sources answer "what is actually in this model" before any of that:
+
+**`assets/models/manifest.json`** — one entry per exported id: the generator module that writes it, every animation node with the Blender part names merged into it and that node's triangle count, the materials it uses (tints and emissive listed separately), its bounding size, its ground contact and its file size. Which node owns the hard hat, how tall the thing came out, what `TintBody` covers here — all of it without opening Blender.
+
+```bash
+npm run models:manifest   # regenerate from public/models/ after a rebuild
+```
+
+It is derived data, and a rebuilt model with a stale manifest fails `ModelManifest.test.ts` rather than drifting.
+
+**The module docstring** — every generator opens with its axes, its node layout and one line per model saying what it caricatures. It is what the next editor reads after the manifest, so keep it true: a model that grows a part, loses a node or changes its joke updates the docstring in the same edit.
+
+Reading order: manifest entry → module docstring → builder function → a preview capture of the current model.
+
+## ▶ Build it with the right tool
+
+The builder describes intent; Blender computes the result. An effect a modifier or a generator expresses belongs there, not in hand-placed geometry — hand-placing what a modifier would generate is what makes a model unmaintainable, because changing the count, the spacing or the curvature then means editing every copy.
+
+| To get | Reach for | Rather than |
+|--------|-----------|-------------|
+| Repeats in a row or a ring — bolts, sleepers, palings, crates | `array()` (constant offset; `apply_transform()` first when the object is rotated) | N literal `box()` calls |
+| A symmetric pair — limbs, fenders, headlights | `mirror()` | a second hand-placed copy that drifts on the next edit |
+| Rounded edges | `bevel()` | loop cuts or hand-chamfered corners |
+| A lumpy natural surface — rock, canopy, spoil | `displace()` with a seed | dozens of hand-jittered spheres |
+| A curved trunk, a tapered tower | `bend()`, `taper()` | a stack of shifted segments |
+| A hole, notch or cut — a window in a wall, a door in a slab | `boolean()` with a hidden cutter | modelling around the hole face by face |
+| Sheet thickness — tarp, panel, tent wall | `solidify()` | two parallel surfaces plus edge strips |
+| A swept or extruded profile — track outline, roof section, blade | `prism()` with a computed point list | many small boxes approximating the curve |
+| A distant LOD | `finish_far()`'s decimate | a second, hand-simplified model |
+| Scatter that follows a surface — rivets along an edge, debris on a roof, crates in a yard | a Geometry Nodes modifier (distribute points, instance on them); `export_apply=True` bakes it, the `.blend` keeps it live | a loop creating hundreds of objects to merge |
+
+Where a loop still wins: when every copy genuinely differs (a seeded jitter, a per-index colour or size), and when the loop is shorter than the node tree that would replace it. Geometry Nodes earn their verbosity at scatter scale and when the result must follow the mesh it sits on. No generator uses them yet, so a first use documents itself in its module docstring.
+
+Numbers that describe the model — a count, a radius, a floor height, a tier multiplier — go in a named constant at the top of the module, so the next edit is one value rather than a search.
+
 ## ▶ PROCEDURE — change an existing model
 
-1. Find the builder: the id's prefix and tier name the module through `build.py`'s registry.
-2. Edit the Python. Shape helpers and modifiers: `references/blender-helpers.md`.
+1. Read what is there, in this order: the model's entry in `assets/models/manifest.json`, then its module docstring, then the builder function. See **Know what you are editing** below.
+2. Edit the Python. Shape helpers and modifiers: `references/blender-helpers.md`. Express the change with the tool that generates it — see **Build it with the right tool**.
 3. Rebuild that id alone: `npm run models:build -- <id>`. Needs Blender as a Python module (`pip install bpy`, ~1 GB, once). When `bpy` is unavailable, state the model channel is blocked rather than hand-editing a `.glb`.
-4. Prove the contract: `npm run test -- ModelAssets` — ids exist, parse, fit the budget, carry their nodes, tints and bounds.
-5. Look at it: `npm run dev &` then `npm run models:preview -- <id>`, and **open every PNG with the Read tool**. The viewer draws through the game's own `SceneManager`, so what it shows is what the player gets.
-6. Anything a player sees in place — a building on its footprint, a vehicle beside a worker — also needs an in-game capture (`dev-visual-testing`).
-7. Commit the `.py`, the `.blend` and the `.glb` in one commit.
+4. Regenerate the map: `npm run models:manifest`.
+5. Prove the contract: `npm run test -- ModelAssets ModelManifest` — ids exist, parse, fit the budget, carry their nodes, tints and bounds, and the manifest matches what was exported.
+6. Look at it: `npm run dev &` then `npm run models:preview -- <id>`, and **open every PNG with the Read tool**. The viewer draws through the game's own `SceneManager`, so what it shows is what the player gets.
+7. Anything a player sees in place — a building on its footprint, a vehicle beside a worker — also needs an in-game capture (`dev-visual-testing`).
+8. Commit the `.py`, the `.blend`, the `.glb` and the manifest in one commit.
 
 A `.py` edit without a rebuilt `.glb` changes nothing the game or the tests can see: `ModelAssets.test.ts` parses the committed binary, not the source.
 
@@ -51,7 +89,8 @@ A `.py` edit without a rebuilt `.glb` changes nothing the game or the tests can 
 3. Add it to `allModelIds()` if it is a new *kind* of asset, so the loading screen preloads it.
 4. Give the renderer a fallback size where it instantiates the model — a missing asset must cost one stand-in box, never the level.
 5. Extend `ModelAssets.test.ts` with what the new family guarantees (nodes, tints, height, footprint).
-6. Then follow the change procedure above from step 3.
+6. Open the builder with a docstring naming what it caricatures, its node layout and its axes.
+7. Then follow the change procedure above from step 3.
 
 ## Art direction
 
@@ -146,5 +185,5 @@ The `.blend` files exist for hand iteration, and the next `models:build` overwri
 | File | Answers |
 |------|---------|
 | `references/blender-helpers.md` | The `common.py` API — primitives, modifiers, hierarchy, materials, output — and the bpy gotchas the generators were built around |
-| `references/model-catalog.md` | Every model id, its builder module, its animation nodes and its caricature |
+| `references/model-catalog.md` | Every model family, its builder module, its nodes and its caricature — the prose companion to `assets/models/manifest.json`'s per-id data |
 | `references/runtime-contract.md` | How the exported `.glb` is consumed: merge buckets, per-instance tints, instanced props, wind sway, wheel radius, the stand-in path |
