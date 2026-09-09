@@ -4,6 +4,44 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { BlastPlanOverlay, type BlastPlanOverlayOptions, type HoleOverlayData } from '../../../src/renderer/BlastPlanOverlay.js';
 import { holeNumericId } from '../../../src/core/mining/DrillPlan.js';
+import type { SurfaceHeightSampler } from '../../../src/renderer/GroundTint.js';
+
+/** Every THREE.Mesh in the scene, whole-tree — the #1006 ground-tint heatmap patch may live outside `this.group`. */
+function sceneMeshCount(scene: THREE.Scene): number {
+  let n = 0;
+  scene.traverse((o) => { if (o instanceof THREE.Mesh) n++; });
+  return n;
+}
+
+/**
+ * WORLD-space vertex Y of every mesh NOT tagged as a hole marker — isolates
+ * heatmap/frag/vibration geometry from hole-marker shafts/rings/labels, all
+ * of which carry `entityKind: 'hole'` (tagPickable). Reading
+ * `geometry.attributes.position` directly gives LOCAL coordinates — the
+ * heatmap's existing circle is rotated flat via `mesh.rotation.x`, so its
+ * local Y spans its own radius (up to HEATMAP_MAX_RADIUS) regardless of
+ * terrain height, which would make a still-flat (buggy) disc look like it
+ * conforms. Applying `matrixWorld` covers both that legacy rotated-local
+ * disc and a conforming mesh that bakes world height directly into local
+ * coordinates at identity transform (a no-op transform in that case).
+ */
+function nonHoleMeshYs(scene: THREE.Scene): number[] {
+  scene.updateMatrixWorld(true);
+  const ys: number[] = [];
+  const v = new THREE.Vector3();
+  scene.traverse((o) => {
+    if (o instanceof THREE.Mesh && o.userData['entityKind'] !== 'hole') {
+      const pos = o.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!pos) return;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        v.applyMatrix4(o.matrixWorld);
+        ys.push(v.y);
+      }
+    }
+  });
+  return ys;
+}
 
 function makeHole(id: string, x: number, z: number): HoleOverlayData {
   return {
@@ -63,17 +101,35 @@ describe('BlastPlanOverlay', () => {
     overlay.dispose();
   });
 
-  it('tier 1 software adds heatmap circles', () => {
+  it('tier 1 software adds heatmap geometry (retargeted at the shared ground-tint unit, #1006)', () => {
     const scene = new THREE.Scene();
-    const overlay = new BlastPlanOverlay(scene);
+    const overlay = new BlastPlanOverlay(scene, () => 0);
     overlay.show(makeOptions(0, 3)); // no software
-    const countTier0 = (scene.children[0] as THREE.Group).children.length;
+    const countTier0 = sceneMeshCount(scene);
 
     overlay.clear();
     overlay.show(makeOptions(1, 3)); // tier 1
-    const countTier1 = (scene.children[0] as THREE.Group).children.length;
+    const countTier1 = sceneMeshCount(scene);
 
+    // Whole-scene mesh count (not `group.children.length`): a GroundTintLayer
+    // patch (issue #1006) is added directly to the scene by its own
+    // constructor, not nested inside BlastPlanOverlay's own `group`.
     expect(countTier1).toBeGreaterThan(countTier0);
+    overlay.dispose();
+  });
+
+  it('tier 1 heatmap discs conform to sloped terrain instead of one flat Y (#1006)', () => {
+    const scene = new THREE.Scene();
+    const sampler: SurfaceHeightSampler = (x, _z) => x * 2; // strong local slope
+    const overlay = new BlastPlanOverlay(scene, sampler);
+    overlay.show(makeOptions(1, 3)); // tier 1 — energy heatmap only
+
+    const ys = nonHoleMeshYs(scene);
+    expect(ys.length, 'tier 1 should draw energy-heatmap geometry').toBeGreaterThan(0);
+    expect(
+      Math.max(...ys) - Math.min(...ys),
+      'the heatmap disc should conform to the slope beneath it, not sit at one flat Y (#1006)',
+    ).toBeGreaterThan(1);
     overlay.dispose();
   });
 
