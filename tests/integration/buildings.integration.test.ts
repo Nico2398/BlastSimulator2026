@@ -847,3 +847,67 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
     expect(backlogStillOpenDuringTheRun).toBe(true);
   });
 });
+
+// ── Terrain flatness gate, real console entry point (#1008) ──────────────────
+// checkFootprintPlacement never checked terrain flatness — only bounds and
+// occupancy — so `build <type> at:x,z` (buildCommand's default case ->
+// orderBuildingCommand, the only console entry point that reaches it) ordered
+// a building on any slope. These exercise that real command, not
+// checkFootprintPlacement directly, against the real generated ctx.grid.
+
+/**
+ * Force every column under `type`/`tier`'s footprint at (x,z) to a uniform
+ * surface height on the real ctx.grid — the generated terrain at any given
+ * coordinate isn't guaranteed flat OR uneven, so these tests carve a
+ * deterministic step directly into the grid rather than search for one.
+ */
+function flattenFootprint(
+  ctx: GameContext, type: BuildingType, tier: 1 | 2 | 3, x: number, z: number, height: number,
+): void {
+  const def = getBuildingDef(type, tier);
+  const grid = ctx.grid!;
+  const rock = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
+  for (const [dx, dz] of def.footprint) {
+    const cx = x + dx;
+    const cz = z + dz;
+    for (let y = 0; y < grid.sizeY; y++) {
+      if (y < height) grid.setVoxel(cx, y, cz, rock);
+      else grid.clearVoxel(cx, y, cz);
+    }
+  }
+}
+
+/** Same as flattenFootprint, but raises one footprint cell a layer higher than the rest — leaves the footprint uneven. */
+function unevenFootprint(
+  ctx: GameContext, type: BuildingType, tier: 1 | 2 | 3, x: number, z: number, baseHeight: number,
+): void {
+  flattenFootprint(ctx, type, tier, x, z, baseHeight);
+  const def = getBuildingDef(type, tier);
+  const [dx0, dz0] = def.footprint[0]!;
+  ctx.grid!.setVoxel(x + dx0, baseHeight, z + dz0, {
+    composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1,
+  });
+}
+
+describe('build command — terrain flatness gate (#1008)', () => {
+  it('refuses to order a building on uneven ground', () => {
+    const ctx = makeCtx();
+    unevenFootprint(ctx, 'management_office', 1, 20, 2, 5);
+
+    const result = buildCommand(ctx, ['management_office'], { at: '20,2' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedBuildings.length).toBe(0);
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+  });
+
+  it('orders a building successfully on flat ground', () => {
+    const ctx = makeCtx();
+    flattenFootprint(ctx, 'management_office', 1, 20, 2, 5);
+
+    const result = buildCommand(ctx, ['management_office'], { at: '20,2' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedBuildings.length).toBe(1);
+  });
+});

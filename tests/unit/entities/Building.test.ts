@@ -21,6 +21,7 @@ import {
   BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
 import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 describe('Building system', () => {
   it('placing a building deducts cost and adds it to state', () => {
@@ -571,5 +572,150 @@ describe('moveBuilding — exact error strings stay stable (#556 regression)', (
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Space is occupied');
+  });
+});
+
+// ── checkFootprintPlacement — terrain flatness gate (#1008) ──────────────────
+// checkFootprintPlacement never checked terrain flatness — only bounds and
+// occupancy — so every real placement path (placeBuilding, moveBuilding,
+// buildOrder.ts, entities.ts's build/upgrade/move commands) accepted a
+// footprint straddling a height step. A voxelGrid is threaded through as an
+// optional trailing param: passed, flatness is checked (via isFootprintFlat);
+// omitted, behaviour is unchanged from before #1008 (bounds/occupancy only) —
+// this is what lets every pre-#1008 caller that never passes a grid keep
+// compiling and behaving exactly as it did.
+
+/**
+ * Build a VoxelGrid where every (x, z) column's surface height is whatever
+ * `heightAt` returns for it — deterministic terrain for flatness tests,
+ * independent of the real terrain generator.
+ */
+function makeVoxelGridWithHeights(
+  sizeX: number, sizeY: number, sizeZ: number,
+  heightAt: (x: number, z: number) => number,
+): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const rock = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      const h = heightAt(x, z);
+      for (let y = 0; y < h; y++) {
+        grid.setVoxel(x, y, z, rock);
+      }
+    }
+  }
+  return grid;
+}
+
+describe('checkFootprintPlacement — terrain flatness (#1008)', () => {
+  it('rejects a footprint spanning two different surface heights with "Uneven surface" when a voxelGrid is passed', () => {
+    // management_office T1 (2x2) at (0,0) covers (0,0),(1,0),(0,1),(1,1) — one cell is a step higher.
+    const vg = makeVoxelGridWithHeights(10, 8, 10, (x, z) => (x === 1 && z === 0) ? 4 : 3);
+
+    const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Uneven surface');
+  });
+
+  it('accepts a footprint on uniformly flat ground when a voxelGrid is passed', () => {
+    const vg = makeVoxelGridWithHeights(10, 8, 10, () => 3);
+
+    const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('does not check flatness when no voxelGrid is passed — pre-#1008 callers keep working unchanged', () => {
+    // No grid at all — an uneven footprint elsewhere would refuse it (see
+    // above), but omitting the grid must fall back to bounds/occupancy only.
+    const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('reports "Out of bounds" even when the footprint is also uneven — bounds take priority over flatness', () => {
+    // management_office T1 (2x2) at x=63 on a 64-wide grid overflows AND is uneven.
+    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 63 && z === 0) ? 4 : 3);
+
+    const result = checkFootprintPlacement([], 'management_office', 63, 0, 1, 64, 64, 0, 0, vg);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('reports "Space is occupied" even when the footprint is also uneven — occupancy takes priority over flatness', () => {
+    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 1 && z === 1) ? 4 : 3);
+    const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 0, z: 0 }];
+
+    const result = checkFootprintPlacement(occupants, 'management_office', 1, 1, 1, 64, 64, 0, 0, vg);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Space is occupied');
+  });
+
+  it('rejects a tier-3 placement uneven only in the cells the larger tier adds beyond tier 1', () => {
+    // management_office T1 is 2x2 at (0,0): cells (0,0),(1,0),(0,1),(1,1) — all flat.
+    // T3 is 3x3: adds column x=2 and row z=2, including cell (2,2), which steps up.
+    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 2 && z === 2) ? 9 : 3);
+
+    const t1 = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
+    expect(t1.valid).toBe(true); // T1's footprint never touches the uneven cell
+
+    const t3 = checkFootprintPlacement([], 'management_office', 0, 0, 3, 64, 64, 0, 0, vg);
+    expect(t3.valid).toBe(false);
+    expect(t3.error).toBe('Uneven surface');
+  });
+});
+
+describe('placeBuilding — terrain flatness gate (#1008)', () => {
+  it('refuses placement on uneven ground when a voxelGrid is passed', () => {
+    const state = createBuildingState();
+    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 1 && z === 0) ? 4 : 3);
+
+    const result = placeBuilding(state, 'management_office', 0, 0, 64, 64, 1, 0, 0, undefined, vg);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Uneven surface');
+    expect(state.buildings.length).toBe(0);
+  });
+
+  it('places successfully on flat ground when a voxelGrid is passed', () => {
+    const state = createBuildingState();
+    const vg = makeVoxelGridWithHeights(64, 8, 64, () => 3);
+
+    const result = placeBuilding(state, 'management_office', 0, 0, 64, 64, 1, 0, 0, undefined, vg);
+
+    expect(result.success).toBe(true);
+    expect(state.buildings.length).toBe(1);
+  });
+});
+
+describe('moveBuilding — terrain flatness gate (#1008)', () => {
+  it('refuses moving onto an uneven footprint when a voxelGrid is passed', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const id = state.buildings[0]!.id;
+    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 21 && z === 20) ? 4 : 3);
+
+    const result = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], vg);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Uneven surface');
+    expect(state.buildings[0]!.x).toBe(0); // unmoved
+    expect(state.buildings[0]!.z).toBe(0);
+  });
+
+  it('moves successfully onto flat ground when a voxelGrid is passed', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const id = state.buildings[0]!.id;
+    const vg = makeVoxelGridWithHeights(64, 8, 64, () => 3);
+
+    const result = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], vg);
+
+    expect(result.success).toBe(true);
+    expect(state.buildings[0]!.x).toBe(20);
+    expect(state.buildings[0]!.z).toBe(20);
   });
 });

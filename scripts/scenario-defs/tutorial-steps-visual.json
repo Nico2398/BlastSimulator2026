@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:18,14",
+      "command": "build living_quarters at:18,18",
       "timeout": 90,
       "interaction": [
         {
@@ -256,7 +256,7 @@
         {
           "type": "pickTile",
           "x": 18,
-          "z": 14
+          "z": 18
         },
         {
           "type": "screenshot"
@@ -287,7 +287,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (18,14) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (18,18) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
       "expect": {
         "equals": {
           "buildingCount": 1
@@ -330,7 +330,7 @@
       }
     },
     {
-      "command": "build driving_center at:10,8",
+      "command": "build driving_center at:6,7",
       "timeout": 90,
       "interaction": [
         {
@@ -347,8 +347,8 @@
         },
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 8
+          "x": 6,
+          "z": 7
         },
         {
           "type": "screenshot"
@@ -1387,7 +1387,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:6,6",
+      "command": "build freight_warehouse at:6,9",
       "timeout": 90,
       "interaction": [
         {
@@ -1409,7 +1409,7 @@
         {
           "type": "pickTile",
           "x": 6,
-          "z": 6
+          "z": 9
         },
         {
           "type": "screenshot"
@@ -1420,7 +1420,7 @@
         }
       ],
       "role": "player",
-      "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,9) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
