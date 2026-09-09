@@ -16,7 +16,8 @@ Models are generated, not hand-modelled. The Python builders under `assets/model
 3. Rebuild the ids you touched: `npm run models:build -- <id>` (needs `pip install bpy`), then `npm run models:manifest`.
 4. `npm run test -- ModelAssets ModelManifest` — they parse the committed `.glb`, so an unbuilt source change proves nothing.
 5. `npm run dev &` then `npm run models:preview -- <id>`, and **open every PNG with the Read tool**.
-6. Commit the `.py`, the `.blend`, the `.glb` and the manifest together.
+6. Fix what the image showed and go back to step 2. The first render is a draft, and one capture is not the loop.
+7. Commit the `.py`, the `.blend`, the `.glb` and the manifest together.
 
 A hand edit made in a `.blend` is ported back into its Python builder before the change is done.
 
@@ -29,5 +30,6 @@ A hand edit made in a `.blend` is ported back into its Python builder before the
 - Each tier is its own model — tier 1 improvised junk, tier 2 the plain machine, tier 3 corporate excess — and a building is taller than the tier below it.
 - Instanced props (trees, grass, bushes, rocks, houses) are a single `Body` node with the base at the origin.
 - `assets/models/manifest.json` is generated, never hand-edited, and a module docstring naming a model's nodes and caricature stays true when the model changes.
+- A model is done when an inspected image shows what was intended, not when the build succeeds. Clipping, backwards parts and shapes a reader cannot name are found in the image or not at all — the checklist is in the skill.
 
 Art direction, per-family triangle and file budgets, the full node and material contract, and the `common.py` helper catalog: `dev-3d-models` skill.
