@@ -552,7 +552,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     7: 'state',
     8: 'employee hire role:driller',
     9: 'employee assign_skill 2 skill:blasting level:3',
-    10: 'build living_quarters at:18,18',
+    10: 'build living_quarters at:12,15',
     13: 'build driving_center at:6,7',
     15: 'employee train 2 skill:driving.drill_rig',
     16: 'tick 25',

@@ -355,7 +355,7 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
     const engine = createGameEngine();
 
     expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:18,18').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);

@@ -48,7 +48,7 @@ interface PinnedRegion {
 const PINNED_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
   warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 9 },
   drivingCenter: { type: 'driving_center', tier: 1, x: 6, z: 7 },
-  livingQuarters: { type: 'living_quarters', tier: 1, x: 18, z: 18 },
+  livingQuarters: { type: 'living_quarters', tier: 1, x: 12, z: 15 },
 };
 
 /**
@@ -233,7 +233,7 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
       [10, 10, 'survey target'],
       [6, 9, 'warehouse footprint origin'],
       [6, 7, 'driving center footprint origin'],
-      [18, 18, 'living quarters footprint origin'],
+      [12, 15, 'living quarters footprint origin'],
       [10, 16, 'ramp origin'],
     ];
 

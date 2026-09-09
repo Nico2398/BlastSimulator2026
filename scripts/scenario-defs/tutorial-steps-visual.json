@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:18,18",
+      "command": "build living_quarters at:12,15",
       "timeout": 90,
       "interaction": [
         {
@@ -255,8 +255,8 @@
         },
         {
           "type": "pickTile",
-          "x": 18,
-          "z": 18
+          "x": 12,
+          "z": 15
         },
         {
           "type": "screenshot"
@@ -267,7 +267,7 @@
         }
       ],
       "role": "player",
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. (12,15) is flat for the full 3x3 footprint and sits comfortably clear (6+ tiles) of (20,20) and the whole drill/box-cut ramp working area, not just that one cell.",
       "expect": {
         "increased": [
           "orderedBuildingCount"
@@ -287,7 +287,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (18,18) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (12,15) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
       "expect": {
         "equals": {
           "buildingCount": 1

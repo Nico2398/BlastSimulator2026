@@ -169,11 +169,30 @@ const REGION = {
   // well clear on z) and the drill grid itself, cutting the round trip enough
   // for a genuine net recovery instead of a near-wash. #1008: (18,14) is not
   // flat for the full 3×3 footprint on tutorial_pit seed 42 under the
-  // now-flatness-checked real placement path — (18,18) is the nearest flat
-  // 3×3 spot, footprint x:18-20/z:18-20, directly bordering (not overlapping)
-  // the drill grid's own x1:22/z1:20 — closer to the drill grid than (18,14)
-  // was, so the rest-trip argument above holds even more strongly here.
-  livingQuarters: { x1: 18, z1: 18, x2: 18, z2: 18, exact: true },
+  // now-flatness-checked real placement path, so this moved to (18,18),
+  // footprint x:18-20/z:18-20 — directly bordering the drill grid's own
+  // x1:22/z1:20 corner. That placement carried a latent deadlock (found
+  // post-merge, same issue): footprint cell (20,20) is exactly the grid cell
+  // a fatigue-interrupted employee near the drill grid can freeze at
+  // (`clampToGrid`, `src/core/nav/Pathfinding.ts`, floors a continuous
+  // position), and once a building occupies that cell `findPath` from the
+  // frozen position never resolves — a permanent stranding that deadlocks
+  // the charge step. A nearby flat spot bordering the drill grid isn't
+  // actually safe here: (19,22) (footprint x:19-21/z:22-24, 2 tiles clear of
+  // (20,20) itself) was tried and directly reproduced the same stranding
+  // class one cell over — a rock_digger driver dismounted mid box-cut-ramp
+  // dig at a frozen position flooring to (21,24), inside that footprint, and
+  // the ramp dig never completed. The drill/ramp work area throws off
+  // fatigue-interrupt freezes across a wider radius than just (20,20), so
+  // (12,15) — one of #1008's own 33 known-flat candidates, comfortably 6+
+  // tiles clear of (20,20) and of the whole drill-grid/box-cut-ramp working
+  // area rather than merely outside it — is the actual fix. It sits farther
+  // from the drill grid than (18,14)/(18,18) did, but still close enough
+  // (within 6 tiles of the original (18,14) pin) for the rest round-trip
+  // argument above to hold, confirmed directly: the box-cut ramp and the
+  // full charge/blast sequence both complete against this coordinate with
+  // no employee or vehicle ever left permanently stranded.
+  livingQuarters: { x1: 12, z1: 15, x2: 12, z2: 15, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
