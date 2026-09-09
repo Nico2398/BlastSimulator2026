@@ -5,9 +5,10 @@
 * management_office  The Cupboard: an oversized wardrobe, door ajar on paper stacks, desk lamp, MANAGER sign, phone on a stool.
 * geology_lab        Rock Shed: a garden shed, rock shelf, giant magnifying-glass sign, hammer, wheelbarrow, patched roof.
 * research_center    Think Tank Tent: a patched wall tent with guy ropes, lightbulb sign, whiteboard, lawn chair, campfire.
-* living_quarters    The Cells: a dark, stained concrete block with bold barred windows, a jagged spiked
-                     roofline, a scavenged watchtower with a cold spotlight, cell doors 1 and 3
-                     (2 bricked up), ball and chain.
+* living_quarters    The Cells: an open-topped cage of cheap galvanized bars on a low steel kick plate,
+                     no roof so the mattress and open steel toilet inside are visible from above, a
+                     scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut),
+                     ball and chain.
 * explosive_warehouse Boom Closet: a two-seat outhouse stuffed with dynamite, TNT stencil, lit fuse, danger sign, sandbags.
 * freight_warehouse  The Pile: a junk heap under a tarp on crooked poles, bathtub, bent bike, scale, STUFF sign, rats.
 * vehicle_depot      Rusty Garage: a rusted tin lean-to, car on bricks with the hood up, oil puddle, GAR GE sign, work lamp.
@@ -38,7 +39,7 @@ DULL = {
     'management_office': 0x9C7B55,
     'geology_lab': 0x8C6A48,
     'research_center': 0x8E7A9E,
-    'living_quarters': 0x2A2924,
+    'living_quarters': 0xAEB4B8,
     'explosive_warehouse': 0xA55A4A,
     'freight_warehouse': 0x7A756E,
     'vehicle_depot': 0xA08C4A,
@@ -78,6 +79,7 @@ def _t1_materials(btype: str, m: dict) -> dict:
         'glow': material('Glow', 0xFFE9A0, roughness=0.3, emission=0xFFD24A, emission_strength=1.2),
         'spark': material('GlowSpark', 0xFFB040, roughness=0.3, emission=0xFF7A10, emission_strength=1.5),
         'spot': material('Spot', 0xCFE8FF, roughness=0.25, emission=0xCFE8FF, emission_strength=2.4),
+        'mattress': material('Mattress', 0x7D8A93, roughness=0.9),
     })
     return m
 
@@ -1082,76 +1084,115 @@ def build_research_center(sx, sz, ex, xx, m):
 
 
 def build_living_quarters(sx, sz, ex, xx, m):
-    """The Cells: a dark, grime-streaked concrete block with bold barred windows, a jagged spiked
-    roofline on every edge, a scavenged watchtower with a pyramidal cap and a cold spotlight beam
-    aimed at the entry, cell doors 1 and 3 with a crossed-strap sealed door 2, and a ball and chain."""
+    """The Cells: an open-topped cage of cheap galvanized bars on a low welded kick plate — no solid walls
+    and no roof, so the mattress and the open steel toilet inside are visible from the game camera. The
+    middle cell is a rusty welded plate instead of a bar wall. A scavenged watchtower with a pyramidal cap
+    and a cold spotlight beam aimed at the entry, and a dumped ball and chain, complete the yard."""
     parts = dirt_lot(sx, sz, m, mat=m['concrete'])
-    w, d, h = 2.7, 2.5, 1.85
+    w, d = 2.7, 2.5
     cy = -0.1
     yf = cy + d / 2
+    back_y = cy - d / 2
     z0 = 0.08
-    parts.append(B.block('Walls', w, d, h, z0, m, radius=0.04, loc_xy=(0, cy)))
-    top = z0 + h
+    kick_h = 0.22
+    bar_h = 1.55
+    top = z0 + kick_h + bar_h
     # Shared per-face layout: front, back, left, right — position, outward yaw, edge length.
-    edges = {'F': (0, yf, 0, w), 'B': (0, cy - d / 2, 180, w),
+    edges = {'F': (0, yf, 0, w), 'B': (0, back_y, 180, w),
              'L': (-w / 2, cy, -90, d), 'R': (w / 2, cy, 90, d)}
-    # Block courses scored into every face, and a dark grime skirt streaked along the base.
+
+    def cage_wall(name, cx, cy_, yaw, length):
+        """A row of round vertical bars plus low/high rails, spanning `length` centred at (cx, cy_) with
+        outward normal `yaw`. Every 6th bar is rust-patched — cheap, mismatched scrap metal."""
+        out = []
+        n = max(4, round(length / 0.16))
+        for k in range(n + 1):
+            t = (k / n) - 0.5
+            bx, by = _yawed((cx, cy_, 0), yaw, (t * length, 0, 0))[:2]
+            bar = cylinder(f'{name}.Bar{k}', 0.025, bar_h, loc=(bx, by, z0 + kick_h + bar_h / 2), axis='Z',
+                          segments=6)
+            assign(bar, m['rust'] if k % 6 == 0 else m['body'])
+            out.append(bar)
+        for rz, suf in ((z0 + kick_h + 0.06, 'RailLo'), (top - 0.06, 'RailHi')):
+            rail = box(f'{name}.{suf}', (length, 0.05, 0.05), loc=(cx, cy_, rz), rot=(0, 0, yaw))
+            assign(rail, m['body'])
+            out.append(rail)
+        return out
+
+    # Low welded kick plate around the base on three sides, then open bars above it.
     for face, (px, py, yaw, length) in edges.items():
-        parts += plank_lines(f'Course{face}', length - 0.1, h - 0.2, (px, py, z0 + h / 2), m, yaw=yaw, gap=0.42,
-                             mat=m['rubble2'])
-        skirt = box(f'Grime{face}', (length - 0.1, 0.05, 0.42), loc=(px, py, z0 + 0.23), rot=(0, 0, yaw))
-        assign(skirt, m['rubble2'])
-        parts.append(skirt)
-    # Heavy dark roof slab, overhanging enough to read as a solid shadow line capping the block.
-    slab = box('Roof.Slab', (w + 0.5, d + 0.5, 0.2), loc=(0, cy, top + 0.1))
-    bevel(slab, 0.02, 2)
-    assign(slab, m['char'])
-    parts.append(slab)
-    # Jagged spiked crown along every roof edge — a bold sawtooth silhouette, not a thread of wire.
-    slab_top = top + 0.2
-    for face, (px, py, yaw, length) in edges.items():
-        n = max(3, round(length / 0.55))
-        for k in range(n):
-            t = (k + 0.5) / n - 0.5
-            spike_loc = _yawed((px, py, slab_top + 0.13), yaw, (t * (length - 0.4), 0, 0))
-            spike = cylinder(f'Spike{face}{k}', 0.05, 0.26, loc=spike_loc, axis='Z', segments=6, radius2=0.01,
-                             rot=(18 + 9 * (k % 2), 0, yaw))
-            assign(spike, m['rust'] if k % 3 == 0 else m['dark'])
-            parts.append(spike)
-    # Three cell doors on the front: the entry, the exit, and one bricked-up in the middle.
+        if face == 'F':
+            continue
+        plate = box(f'Kick{face}', (length, 0.06, kick_h), loc=(px, py, z0 + kick_h / 2), rot=(0, 0, yaw))
+        bevel(plate, 0.015, 2)
+        assign(plate, m['body'])
+        parts.append(plate)
+        parts += cage_wall(face, px, py, yaw, length)
+
+    # Front: two barred doors and a welded-shut middle plate, with bar fill between them.
+    door_half, plate_half = 0.32, 0.4
+    for i, (x0, x1) in enumerate(((-w / 2, ex - door_half), (ex + door_half, -plate_half),
+                                   (plate_half, xx - door_half), (xx + door_half, w / 2))):
+        length = x1 - x0
+        if length <= 0.05:
+            continue
+        parts += cage_wall(f'F{i}', (x0 + x1) / 2, yf, 0, length)
     parts += swing_door('Entry', ex, yf, z0, m, m['entry'], leaf_mat=m['steel'], height=1.1, lamp=False)
     parts += swing_door('Exit', xx, yf, z0, m, m['exit'], leaf_mat=m['steel'], height=1.1, hinge=1, lamp=False)
-    mid = box('Cell2.Sealed', (0.75, 0.12, 1.3), loc=(0, yf + 0.04, z0 + 0.65))
-    bevel(mid, 0.02, 2)
-    assign(mid, m['rubble2'])
-    parts.append(mid)
+    plate = box('Cell2.Plate', (plate_half * 2 - 0.1, 0.08, 1.3), loc=(0, yf + 0.03, z0 + kick_h + 0.75))
+    bevel(plate, 0.02, 2)
+    assign(plate, m['rust'])
+    parts.append(plate)
     for ang in (32, -32):
-        strap = box('Cell2.Strap', (1.5, 0.06, 0.09), loc=(0, yf + 0.1, z0 + 0.65), rot=(0, ang, 0))
+        strap = box('Cell2.Strap', (1.5, 0.06, 0.09), loc=(0, yf + 0.09, z0 + kick_h + 0.75), rot=(0, ang, 0))
         assign(strap, m['steel'])
         parts.append(strap)
+
+    # Corner posts, thicker than the bars, each capped with a single accent spike — a cage frame, not a
+    # crown, so nothing blocks the view straight down into the cage.
+    for name, (px, py) in {'FL': (-w / 2, yf), 'FR': (w / 2, yf), 'BL': (-w / 2, back_y),
+                            'BR': (w / 2, back_y)}.items():
+        post = cylinder(f'Post{name}', 0.045, top - z0, loc=(px, py, (top + z0) / 2), axis='Z', segments=8)
+        assign(post, m['body'])
+        parts.append(post)
+        spike = cylinder(f'Post{name}.Spike', 0.05, 0.16, loc=(px, py, top + 0.08), axis='Z', segments=6,
+                         radius2=0.01)
+        assign(spike, m['dark'])
+        parts.append(spike)
+
     # One bold stencilled digit per real door, stamped on the steel leaf itself.
     for nx, num in ((ex, '1'), (xx, '3')):
         plaque = box(f'Num{num}.Plaque', (0.5, 0.04, 0.5), loc=(nx, yf + 0.07, z0 + 0.55))
         assign(plaque, m['char'])
         parts.append(plaque)
         parts += text(f'Num{num}', num, (nx, yf + 0.1, z0 + 0.55), 0.36, m['white'], yaw=180)
-    # Barred windows: a near-black recess with two thick steel bars standing proud of the wall.
-    def barred(name, loc, yaw):
-        out = []
-        slit = box(f'{name}.Slit', (0.6, 0.12, 0.55), loc=loc, rot=(0, 0, yaw))
-        assign(slit, m['char'])
-        out.append(slit)
-        for i in (-1, 1):
-            bar = box(f'{name}.Bar', (0.09, 0.1, 0.55), loc=_yawed(loc, yaw, (i * 0.16, 0.05, 0)), rot=(0, 0, yaw))
-            assign(bar, m['steel'])
-            out.append(bar)
-        return out
-    parts += barred('WinF0', (ex, yf + 0.02, z0 + 1.5), 0)
-    parts += barred('WinF1', (xx, yf + 0.02, z0 + 1.5), 0)
-    for side in (-1, 1):
-        parts += barred(f'WinS{side}', (side * (w / 2 + 0.02), cy, z0 + 1.2), 90 * side)
+
+    # Inside the cage: one thin mattress and one open steel toilet — enough squalor for one cell, visible
+    # straight down through the open top.
+    mx, my = ex * 0.55, back_y + 0.4
+    mattress = box('Mattress', (0.62, 1.3, 0.1), loc=(mx, my, z0 + kick_h + 0.05))
+    bevel(mattress, 0.03, 2)
+    assign(mattress, m['mattress'])
+    parts.append(mattress)
+    pillow = box('Pillow', (0.5, 0.24, 0.06), loc=(mx, my - 0.5, z0 + kick_h + 0.13))
+    bevel(pillow, 0.02, 2)
+    assign(pillow, m['white'])
+    parts.append(pillow)
+    wx, wy = xx * 0.55, back_y + 0.35
+    bowl = cylinder('WC.Bowl', 0.19, 0.34, loc=(wx, wy, z0 + kick_h + 0.17), axis='Z', segments=14, radius2=0.11)
+    bevel(bowl, 0.02, 2)
+    assign(bowl, m['steel'])
+    parts.append(bowl)
+    seat = torus('WC.Seat', 0.17, 0.03, loc=(wx, wy, z0 + kick_h + 0.35), major_segments=16, minor_segments=6)
+    assign(seat, m['dark'])
+    parts.append(seat)
+    tank = box('WC.Tank', (0.26, 0.14, 0.32), loc=(wx, wy + 0.2, z0 + kick_h + 0.5))
+    bevel(tank, 0.02, 2)
+    assign(tank, m['steel'])
+    parts.append(tank)
+
     # Guard tower on the back-left corner: scavenged scaffold legs, a dark cabin and a pyramidal cap.
-    tx, ty = -w / 2 + 0.3, cy - d / 2 + 0.3
+    tx, ty = -w / 2 + 0.3, back_y + 0.3
     leg_h = top + 0.35
     for k, (px, py) in enumerate(((-0.16, -0.16), (0.16, -0.16), (-0.16, 0.16), (0.16, 0.16))):
         leg = box(f'Tower.Leg{k}', (0.1, 0.1, leg_h), loc=(tx + px, ty + py, leg_h / 2))
@@ -1176,17 +1217,17 @@ def build_living_quarters(sx, sz, ex, xx, m):
     lens = cylinder('Tower.Lens', 0.09, 0.04, loc=(tx, ty + 0.44, leg_h + 0.04), axis='Y', segments=10,
                     rot=(-25, 0, 0))
     assign(lens, m['spot'])
-    beam = cylinder('Tower.Beam', 0.1, 1.1, loc=(tx, ty + 0.95, leg_h - 0.42), axis='Y', segments=10,
-                    radius2=0.38, rot=(-25, 0, 0))
+    beam = cylinder('Tower.Beam', 0.06, 0.55, loc=(tx, ty + 0.68, leg_h - 0.18), axis='Y', segments=10,
+                    radius2=0.16, rot=(-25, 0, 0))
     assign(beam, m['spot'])
     parts += [lampbox, lens, beam]
-    # Ball and chain, dumped fully in the open beside the entry.
-    ball = sphere('Ball', 0.32, loc=(w / 2 - 0.3, yf + 0.35, 0.32), segments=14, rings=8)
+    # Ball and chain, dumped in the open middle of the cage, clear of the doors and the tower.
+    ball = sphere('Ball', 0.26, loc=(0, yf - 0.35, 0.26), segments=14, rings=8)
     assign(ball, m['dark'])
     parts.append(ball)
     for k in range(2):
-        link = torus(f'Chain{k}', 0.09, 0.03, loc=(w / 2 - 0.55 - k * 0.16, yf + 0.3, 0.09),
-                     rot=(0, 90, 20 * (k % 2)), major_segments=10, minor_segments=5)
+        link = torus(f'Chain{k}', 0.07, 0.024, loc=(0, yf - 0.62 - k * 0.13, 0.07),
+                     rot=(90, 0, 0), major_segments=10, minor_segments=5)
         assign(link, m['steel'])
         parts.append(link)
     pivot('Body', (0, 0, 0), parts)
