@@ -151,8 +151,10 @@ function driveConstructionOrders(steps: ScenarioStepDef[]): ScenarioStepDef[] {
  * living_quarters upgraded T1->T2->T3 in place: its bench must fit the T3
  * 5x4 footprint even though it starts at T1's 3x3, and a T3 target whose walk
  * from spawn squeezes past another building's own footprint can strand the
- * assigned employee indefinitely instead of ever reaching the site — #1008
- * Finding, reported separately).
+ * assigned employee indefinitely instead of ever reaching the site — found
+ * during this run's coordinate relocation but not filed as an issue: this
+ * run's one-issue budget went to #1022; noted in the PR's follow-up comment
+ * instead).
  */
 const FOOTPRINT_RELOCATIONS: Record<string, ReadonlyArray<readonly [number, number]>> = {
   'building-tier-system-visual': [

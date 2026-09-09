@@ -1,6 +1,6 @@
 {
   "name": "nav-path-following-visual",
-  "description": "Tests path following and stuck state with building obstacles",
+  "description": "Tests path following with building obstacles; stuck-state coverage disabled pending #1022 — see TODO comments below",
   "steps": [
     {
       "command": "new_game seed:42 cash:80000",
@@ -386,7 +386,7 @@
     },
     {
       "command": "tick 15",
-      "description": "Advance ticks after demolition — the stuck agent should resume moving toward its destination.",
+      "description": "Advance ticks after demolition. TODO(#1022): no agent was ever stuck — the three `build destroy` calls above are themselves refused (\"Building #N not found\"), since nothing was ever built.",
       "interaction": [
         {
           "type": "command",
