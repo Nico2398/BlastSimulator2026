@@ -77,8 +77,9 @@ Numbers that describe the model — a count, a radius, a floor height, a tier mu
 4. Regenerate the map: `npm run models:manifest`.
 5. Prove the contract: `npm run test -- ModelAssets ModelManifest` — ids exist, parse, fit the budget, carry their nodes, tints and bounds, and the manifest matches what was exported.
 6. Look at it: `npm run dev &` then `npm run models:preview -- <id>`, and **open every PNG with the Read tool**. The viewer draws through the game's own `SceneManager`, so what it shows is what the player gets.
-7. Anything a player sees in place — a building on its footprint, a vehicle beside a worker — also needs an in-game capture (`dev-visual-testing`).
-8. Commit the `.py`, the `.blend`, the `.glb` and the manifest in one commit.
+7. Anything a player sees in place — a building on its footprint, a vehicle beside a worker — also needs an in-game capture at the camera distance the game actually plays at (`dev-visual-testing`).
+8. **Fix what the image showed, and go back to step 2.** One pass is a draft. **The visual loop** below is what says when it is finished.
+9. Commit the `.py`, the `.blend`, the `.glb` and the manifest in one commit.
 
 A `.py` edit without a rebuilt `.glb` changes nothing the game or the tests can see: `ModelAssets.test.ts` parses the committed binary, not the source.
 
@@ -91,6 +92,48 @@ A `.py` edit without a rebuilt `.glb` changes nothing the game or the tests can 
 5. Extend `ModelAssets.test.ts` with what the new family guarantees (nodes, tints, height, footprint).
 6. Open the builder with a docstring naming what it caricatures, its node layout and its axes.
 7. Then follow the change procedure above from step 3.
+
+## ▶ The visual loop — the first render is a draft
+
+Steps 6 to 8 above are not one capture. They are a loop, and it closes only when the image shows
+what you intended:
+
+```
+edit the .py → npm run models:build -- <id> → capture → READ the image → name what is wrong → edit again
+```
+
+**Budget at least two rebuilds.** Issue #1010 took three rounds, and every round was opened by
+something only the image could say. Round 1's dark concrete bunker was the wrong idea outright.
+Round 2 read as the cage it was meant to be, but its searchlight beam rendered as a white blob
+swallowing the tower and its tower cap was so shallow it read as a mortarboard. Round 3 fixed a
+mattress running 0.25 m out through the back wall, a toilet with its cistern facing into the room
+and its bowl tapered like a bucket, and a ball-and-chain a reader could only describe as "a black
+circle on the ground". None of that is visible in the Python, in the triangle count, or in a green
+`ModelAssets` run.
+
+### ▶ What to check, because "does it look good" fails nobody
+
+Open the capture and answer these one at a time. Each one has cost a round.
+
+| Ask | The failure it catches |
+|-----|------------------------|
+| **Name every shape.** Can you say what each object *is* without reading the builder? | A prop that reads as nothing. #1010's ball and chain read as "a black circle" — its chain was too thin to see, so the sphere explained nothing, and cutting it beat enlarging it |
+| **Trace each part against its neighbours.** Does anything cross a wall, a floor, a roof, another part? | Geometry poking through — **Containment is arithmetic** below is how to catch it before the render does |
+| **Say which way each part faces.** Is its front where a real one's front would be? | A part built backwards. #1010's toilet had its cistern toward the room and its bowl toward the wall, and an inverted taper (`radius` wider than `radius2`) made the bowl read as a bucket |
+| **Look for anything dominating the frame.** Is one part swallowing the ones around it? | Scale and emissive blowouts. A beam cone of `radius2=0.38` over 1.1 m covered the whole tower; `0.16` over 0.55 m reads as a beam |
+| **Turn the camera onto what it nearly hides.** The roof, the interior, the far side, whatever a taller part stands in front of | A defect that ships because no capture ever pointed at it |
+
+### ▶ Containment is arithmetic, not eyeballing
+
+A part placed relative to a wall is inside it only when **its own half-extent** clears the gap.
+Check it in the builder, before the rebuild:
+
+```
+|offset from the wall| > half the part's own size on that axis + its bevel
+```
+
+`Mattress` at `back_y + 0.4` with a length of `1.3` fails that by 0.25 m, and the render is where
+it turned up. Run it on every part placed against a wall, a floor edge or another part.
 
 ## Art direction
 
@@ -174,7 +217,9 @@ Where the triangles go:
 
 `npm run test` runs ~500 s — detach it through `npm run long -- start models npm run test` and wait it out in the same turn. Capture rules, focus flags and the model-viewer URL parameters: `dev-visual-testing`.
 
-A model change is unverified until an image has been inspected. A green `ModelAssets` run proves the contract, not the picture.
+A model change is unverified until an image has been inspected, and **one inspection is not the loop** — **The visual loop** above is, and it reports the round it took. A green `ModelAssets` run proves the contract, not the picture.
+
+**A model change earns no `full-ci` label.** The interaction-mode suite replays click flows an asset diff never reaches, so it says nothing about the model while buying its flaky shards a place on the merge path. The capture you read is the stronger evidence, because it looks at the thing that changed. `agentic-issue-creation` rule 10 holds the boundary.
 
 ## Editing a `.blend` by hand
 
