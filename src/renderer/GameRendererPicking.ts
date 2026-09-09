@@ -90,8 +90,8 @@ export function surfaceYAt(deps: PickingDeps, x: number, z: number): number {
  * need to conform to the same height the terrain mesh renders, not the
  * stepped voxel-column height.
  */
-export function smoothSurfaceYAt(_deps: PickingDeps, _x: number, _z: number): number {
-  throw new Error('not implemented');
+export function smoothSurfaceYAt(deps: PickingDeps, x: number, z: number): number {
+  return deps.getSmoothTerrainSurfaceY(x, z);
 }
 
 /**

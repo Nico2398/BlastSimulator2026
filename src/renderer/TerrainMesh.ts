@@ -20,6 +20,7 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
 import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
+import { getSmoothTerrainSurfaceY } from './GameRendererTerrain.js';
 
 // Re-export survey overlay types/class so consumers can import from either location.
 export { SurveyConfidenceOverlay, confidenceToColor } from './SurveyConfidenceOverlay.js';
@@ -389,10 +390,13 @@ export class TerrainMesh {
    */
   getSurveyOverlay(): SurveyConfidenceOverlay {
     if (!this.surveyOverlay) {
-      // TODO(implementer, #1006): wire the smoothed ground-tint sampler
-      // through once GameRenderer threads it to TerrainMesh — this stub
-      // keeps the overlay's quads at their pre-#1006 flat, fixed-offset height.
-      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, () => 0);
+      // The smoothed (marching-cubes) surface height for the currently-bound
+      // grid — read through `this.grid` at call time (not captured once) so
+      // a later setGrid() is picked up without recreating the overlay. Reuses
+      // GameRendererTerrain's clamp-then-sample wrapper rather than a second
+      // copy of the same clamp logic (its own import of TerrainMesh is
+      // type-only, so this does not close a runtime cycle).
+      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
     }
     return this.surveyOverlay;
   }

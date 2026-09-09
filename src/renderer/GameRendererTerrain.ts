@@ -183,6 +183,14 @@ export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number)
  * getTerrainSurfaceY's per-voxel-column step height. Takes `grid` directly
  * for the same reason getTerrainSurfaceY does (see above).
  */
-export function getSmoothTerrainSurfaceY(_grid: VoxelGrid | null, _x: number, _z: number): number {
-  throw new Error('not implemented');
+export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number): number {
+  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
+  // Same clamp-to-edge convention as computeVoxelColumnSurfaceY, above —
+  // computeVoxelColumnSurfaceHeight itself returns NaN outside the grid
+  // rather than clamping (#559, it needs an honest "no data" signal at the
+  // live claim edge), so the clamp has to happen here instead.
+  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
+  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
+  const h = computeVoxelColumnSurfaceHeight(grid, cx, cz);
+  return Number.isNaN(h) ? 0 : h;
 }
