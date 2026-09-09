@@ -249,7 +249,12 @@ describe('console-api', () => {
       // each walk to and complete one management_office order, boxing in the
       // (0,0)-(1,1) pocket (grid corner + the three offices' footprints seal
       // every side).
-      runner.runner.run('new_game seed:42 cash:500000');
+      // Seed 77, not 42 (#1008): `checkFootprintPlacement` now refuses a
+      // sloped footprint, and none of (2,0)/(0,2)/(2,2) is flat on seed 42's
+      // terrain at this corner (exhaustively checked — no nearby 3-building
+      // seal exists on that seed at any reasonable board size/mine type).
+      // Seed 77 keeps this exact box flat at the exact same coordinates.
+      runner.runner.run('new_game seed:77 cash:500000');
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');

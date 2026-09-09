@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:5,5",
+      "command": "build explosive_warehouse at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -36,7 +36,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {
@@ -58,7 +58,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:10,5",
+      "command": "build freight_warehouse at:3,8",
       "interaction": [
         {
           "type": "clickSelector",
@@ -70,8 +70,8 @@
         },
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 5
+          "x": 3,
+          "z": 8
         },
         {
           "type": "screenshot"

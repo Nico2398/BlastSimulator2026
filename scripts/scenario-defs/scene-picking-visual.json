@@ -11,7 +11,7 @@
       "name": "closeup",
       "yaw": 30,
       "pitch": 35,
-      "target": [11, 11],
+      "target": [11, 14],
       "distance": 12
     }
   ],
@@ -63,9 +63,9 @@
       }
     },
     {
-      "command": "build management_office at:10,10 tier:1",
+      "command": "build management_office at:10,13 tier:1",
       "timeout": 30,
-      "description": "Setup: place a building at a known tile — its footprint centre (11, 11) is the click target",
+      "description": "Setup: place a building at a known tile — its footprint centre (11, 14) is the click target",
       "interaction": [
         {
           "type": "clickSelector",
@@ -82,7 +82,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 10
+          "z": 13
         },
         {
           "type": "screenshot"
@@ -166,7 +166,7 @@
         {
           "type": "cameraFocus",
           "x": 11,
-          "z": 11,
+          "z": 14,
           "distance": 15
         },
         {
@@ -196,7 +196,7 @@
         {
           "type": "cameraFocus",
           "x": 11,
-          "z": 11,
+          "z": 14,
           "distance": 15
         },
         {
@@ -234,7 +234,7 @@
         {
           "type": "cameraFocus",
           "x": 11,
-          "z": 11,
+          "z": 14,
           "distance": 15
         },
         {

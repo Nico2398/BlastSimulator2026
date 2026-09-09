@@ -22,13 +22,13 @@
       "expect": { "decreased": ["cash"], "equals": { "employeeCount": 1 } }
     },
     {
-      "command": "build driving_center at:5,5",
+      "command": "build driving_center at:3,5",
       "description": "The only school that teaches driving.drill_rig — no role starts with it (ROLE_STARTING_QUALIFICATION).",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
         { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn" },
         { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
-        { "type": "pickTile", "x": 5, "z": 5 },
+        { "type": "pickTile", "x": 3, "z": 5 },
         { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
       "role": "player",

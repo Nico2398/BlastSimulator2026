@@ -37,11 +37,19 @@ describe('Level 2 — Lose — Bankruptcy', () => {
     // geology_lab T1: $12,000
     // Total buildings: $70,000
     // Total spent: $5,000 + $70,000 = $75,000 -> remaining $0
-    buildCommand(ctx, ['research_center'], { at: '5,5' });
+    //
+    // Coordinates below are not the original (5,5)/(10,5)/(15,5)/(20,5)/
+    // (25,5): #1008 wired a flatness check into the real placement path, and
+    // most of those five spots sit on sloped ground on grumpstone_ridge's own
+    // mountainous terrain (terrainSeed 2277) — an order refused there charges
+    // nothing, so cash would never actually reach $0 and bankruptcy would
+    // never trigger. These are the nearest flat, non-overlapping spots for
+    // each building's own footprint ((10,5) happens to already be flat).
+    buildCommand(ctx, ['research_center'], { at: '7,1' });
     buildCommand(ctx, ['management_office'], { at: '10,5' });
-    buildCommand(ctx, ['living_quarters'], { at: '15,5' });
-    buildCommand(ctx, ['freight_warehouse'], { at: '20,5' });
-    buildCommand(ctx, ['geology_lab'], { at: '25,5' });
+    buildCommand(ctx, ['living_quarters'], { at: '14,1' });
+    buildCommand(ctx, ['freight_warehouse'], { at: '17,13' });
+    buildCommand(ctx, ['geology_lab'], { at: '25,4' });
 
     // Verify cash is below $5,000
     expect(ctx.state!.cash).toBeLessThan(5000);

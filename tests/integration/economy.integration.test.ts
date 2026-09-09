@@ -495,7 +495,7 @@ describe('Economy', () => {
     const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
     expect(hireResult.success).toBe(true);
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '6,9' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
@@ -793,7 +793,7 @@ describe('Economy', () => {
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,15' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
@@ -862,7 +862,7 @@ describe('Economy', () => {
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,15' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
@@ -1029,7 +1029,7 @@ describe('Economy', () => {
     // completes, so storageCapacityKg stays at LogisticsState's pre-building
     // 5000 default (createLogisticsState) until an idle staffed employee
     // finishes the work.
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '11,14' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);

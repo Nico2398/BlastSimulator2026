@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:5,5",
+      "command": "build freight_warehouse at:2,7",
       "interaction": [
         {
           "type": "clickSelector",
@@ -36,8 +36,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 7
         },
         {
           "type": "screenshot"

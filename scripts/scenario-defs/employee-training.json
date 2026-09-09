@@ -97,7 +97,7 @@
       }
     },
     {
-      "command": "build driving_center at:5,5",
+      "command": "build driving_center at:3,5",
       "description": "Real UI training gap (parity with the deleted playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (20,20)-(23,23).",
       "interaction": [
         {
@@ -114,7 +114,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {

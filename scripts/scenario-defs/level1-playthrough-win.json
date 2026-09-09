@@ -883,7 +883,7 @@
       "commandOutcome": "either"
     },
     {
-      "command": "build freight_warehouse at:5,5",
+      "command": "build freight_warehouse at:20,24",
       "interaction": [
         {
           "type": "clickSelector",
@@ -899,8 +899,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 20,
+          "z": 24
         },
         {
           "type": "screenshot"
@@ -910,7 +910,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Finding #47 (unchanged): the only warehouse type is `freight_warehouse` (Building.ts/balance.ts). Placed at (5,5), outside the blast footprint -- see Finding #47's original note for the full reasoning (a first attempt closer to the blast site got destroyed by a blast's clear radius). Ordered after the blast rather than before the drilling (#556). A construction site is open-pool work no skill gates, so a crew member — including the one driving the drill rig — claims it; ordered up front, the warehouse ate the drilling block this file checkpoints (0 of 4 holes landed in 60 ticks instead of 4). The warehouse is not read until the rubble_disposal delivery below, so it is ordered where it is needed.",
+      "description": "Finding #47 (unchanged): the only warehouse type is `freight_warehouse` (Building.ts/balance.ts). Placed at (20,24), outside the blast footprint -- see Finding #47's original note for the full reasoning (a first attempt closer to the blast site got destroyed by a blast's clear radius). Moved from (5,5) to (20,24) for #1008: the footprint-flatness check now enforced on placement found (5,5)'s ground uneven, and (20,24) is the nearest 4x4 flat site this map's terrain actually offers once the blast crater has carved it. Ordered after the blast rather than before the drilling (#556). A construction site is open-pool work no skill gates, so a crew member — including the one driving the drill rig — claims it; ordered up front, the warehouse ate the drilling block this file checkpoints (0 of 4 holes landed in 60 ticks instead of 4). The warehouse is not read until the rubble_disposal delivery below, so it is ordered where it is needed.",
       "role": "player",
       "expect": {
         "equals": {

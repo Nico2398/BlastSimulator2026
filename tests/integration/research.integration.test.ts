@@ -404,7 +404,7 @@ describe('research → tick → unlock end-to-end (#410, #442)', () => {
     expect(queueResult.success, queueResult.output).toBe(true);
 
     // Tier 2 is not yet buildable — the research task has not completed.
-    const early = buildCommand(ctx, ['driving_center'], { at: '5,5', tier: '2' });
+    const early = buildCommand(ctx, ['driving_center'], { at: '6,9', tier: '2' });
     expect(early.success).toBe(false);
 
     // Generously tick-pad past any plausible research duration.
@@ -412,7 +412,7 @@ describe('research → tick → unlock end-to-end (#410, #442)', () => {
 
     expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 2)).toBe(true);
 
-    const late = buildCommand(ctx, ['driving_center'], { at: '5,5', tier: '2' });
+    const late = buildCommand(ctx, ['driving_center'], { at: '6,9', tier: '2' });
     expect(late.success, late.output).toBe(true);
   });
 
@@ -425,13 +425,13 @@ describe('research → tick → unlock end-to-end (#410, #442)', () => {
     const queueResult = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '3' });
     expect(queueResult.success, queueResult.output).toBe(true);
 
-    const early = buildCommand(ctx, ['driving_center'], { at: '5,5', tier: '3' });
+    const early = buildCommand(ctx, ['driving_center'], { at: '6,9', tier: '3' });
     expect(early.success).toBe(false);
 
     tickCommand(ctx, ['500'], {});
 
     expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(true);
-    const late = buildCommand(ctx, ['driving_center'], { at: '5,5', tier: '3' });
+    const late = buildCommand(ctx, ['driving_center'], { at: '6,9', tier: '3' });
     expect(late.success, late.output).toBe(true);
   });
 

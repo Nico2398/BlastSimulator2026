@@ -272,7 +272,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:13,13",
+      "command": "build freight_warehouse at:12,17",
       "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
       "interaction": [
         {
@@ -289,8 +289,8 @@
         },
         {
           "type": "pickTile",
-          "x": 13,
-          "z": 13
+          "x": 12,
+          "z": 17
         },
         {
           "type": "clickSelector",

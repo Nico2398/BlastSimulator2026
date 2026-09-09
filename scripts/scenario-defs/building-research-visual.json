@@ -21,7 +21,7 @@
       "description": "Opening cash raised 280000 -> 300000 (#556): the two research centers below are queued construction now, and the staffed roster draws salary across the ticks that build them — which used to leave the tier-3 centre short of its own $120,000."
     },
     {
-      "command": "build research_center at:5,5",
+      "command": "build research_center at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -37,7 +37,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {
@@ -165,7 +165,7 @@
       "role": "setup"
     },
     {
-      "command": "build research_center at:15,5 tier:2",
+      "command": "build research_center at:15,1 tier:2",
       "interaction": [
         {
           "type": "set",
@@ -183,7 +183,7 @@
         {
           "type": "pickTile",
           "x": 15,
-          "z": 5
+          "z": 1
         },
         {
           "type": "screenshot"
@@ -258,7 +258,7 @@
       "role": "setup"
     },
     {
-      "command": "build research_center at:25,5 tier:3",
+      "command": "build research_center at:26,2 tier:3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -270,8 +270,8 @@
         },
         {
           "type": "pickTile",
-          "x": 25,
-          "z": 5
+          "x": 26,
+          "z": 2
         },
         {
           "type": "screenshot"

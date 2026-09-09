@@ -529,7 +529,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build freight_warehouse at:5,5",
+      "command": "build freight_warehouse at:1,8",
       "interaction": [
         {
           "type": "clickSelector",
@@ -545,8 +545,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 1,
+          "z": 8
         },
         {
           "type": "screenshot"

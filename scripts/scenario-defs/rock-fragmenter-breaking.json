@@ -583,7 +583,7 @@
       "role": "observe"
     },
     {
-      "command": "build freight_warehouse at:13,13",
+      "command": "build freight_warehouse at:11,13",
       "description": "#697-followup: no longer bracketed by a `time pause`/`time resume` pair -- that #697 fix addressed real-time wall-clock drift, which this scenario never actually has (`?scenarioMode=1` disables main.ts's auto-tick loop in every interaction-mode harness that runs this file). The real deficit is the tick-count divergence the 'new_game' step's own description now explains; the bigger cash cushion there is the actual fix.",
       "interaction": [
         {
@@ -600,7 +600,7 @@
         },
         {
           "type": "pickTile",
-          "x": 13,
+          "x": 11,
           "z": 13
         },
         {
@@ -623,7 +623,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:8,13",
+      "command": "build freight_warehouse at:4,14",
       "description": "#554: a second T1 freight_warehouse (2000kg capacity each, 4000kg combined) -- charging is real work now, and the extra real ticks the charge-order wait spends before this point let the single debris_hauler above make enough round trips that one 2000kg warehouse alone reaches ~1800/2000kg stored by the final tick-40 step below, with every remaining on-ground fragment too large (262.5kg+) to fit the last ~200kg of headroom -- storedMassKg then genuinely cannot grow further no matter how many more ticks pass, which is exactly the kind of stall this step's own 'increased' assertion exists to catch. The extra capacity removes that ceiling instead of chasing an exact mass figure that depends on which specific fragments the hauler happens to reach first.",
       "interaction": [
         {
@@ -636,8 +636,8 @@
         },
         {
           "type": "pickTile",
-          "x": 8,
-          "z": 13
+          "x": 4,
+          "z": 14
         },
         {
           "type": "clickSelector",

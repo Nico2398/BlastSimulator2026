@@ -93,7 +93,7 @@
       "role": "observe"
     },
     {
-      "command": "build living_quarters at:10,10",
+      "command": "build living_quarters at:10,13",
       "interaction": [
         {
           "type": "clickSelector",
@@ -110,7 +110,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 10
+          "z": 13
         },
         {
           "type": "screenshot"

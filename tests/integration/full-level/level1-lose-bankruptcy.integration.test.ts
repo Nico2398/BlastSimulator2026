@@ -41,10 +41,16 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // Build research_center ($25k) -> $12,000
     // Build living_quarters ($10k) -> $2,000
     // That should be under $5k.
-
-    buildCommand(ctx, ['management_office'], { at: '5,5' });
-    buildCommand(ctx, ['research_center'], { at: '10,5' });
-    buildCommand(ctx, ['living_quarters'], { at: '15,5' });
+    //
+    // Coordinates below are not the original (5,5)/(10,5)/(15,5): #1008 wired
+    // a flatness check into the real placement path, and none of those three
+    // sit on flat ground on dusty_hollow's own terrain (terrainSeed 1138) —
+    // an order refused there charges nothing, so cash would stay at $45,000
+    // and bankruptcy would never trigger. These are the nearest flat,
+    // non-overlapping spots for each building's own footprint.
+    buildCommand(ctx, ['management_office'], { at: '9,4' });
+    buildCommand(ctx, ['research_center'], { at: '12,3' });
+    buildCommand(ctx, ['living_quarters'], { at: '14,0' });
 
     // Verify cash is below $5,000
     expect(ctx.state!.cash).toBeLessThan(5000);

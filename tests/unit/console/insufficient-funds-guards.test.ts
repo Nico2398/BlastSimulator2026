@@ -84,9 +84,12 @@ function snapshot(ctx: MiningContext): Record<string, unknown> {
  * console layer entirely, so setting up a building to destroy/upgrade/move
  * never touches the cash balance a guard test is trying to control.
  */
-function placeTestBuilding(ctx: MiningContext, type: BuildingType = 'management_office', tier: BuildingTier = 1): number {
+function placeTestBuilding(
+  ctx: MiningContext, type: BuildingType = 'management_office', tier: BuildingTier = 1,
+  x = 0, z = 0,
+): number {
   const grid = ctx.grid!;
-  const result = placeBuilding(ctx.state!.buildings, type, 0, 0, grid.sizeX, grid.sizeZ, tier, grid.minX, grid.minZ);
+  const result = placeBuilding(ctx.state!.buildings, type, x, z, grid.sizeX, grid.sizeZ, tier, grid.minX, grid.minZ);
   if (!result.success) throw new Error(`setup: failed to place test building — ${result.error}`);
   return result.building!.id;
 }
@@ -227,7 +230,8 @@ describe('build <type> at: — insufficient funds guard', () => {
 
   it('builds when cash exactly equals the construction cost', () => {
     const ctx = makeCtx(COST_T1);
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // (0,0) is sloped on this seed/size/mineType (#1008); (2,0) is flat.
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
     expect(result.success).toBe(true);
     // Confirming placement only queues a construction site (#556) — the
     // order is charged and accepted immediately, but nothing is built yet.
@@ -343,7 +347,9 @@ describe('build upgrade — insufficient funds guard', () => {
   it('upgrades when cash exactly equals the upgrade cost', () => {
     const ctx = makeCtx(UPGRADE_COST);
     unlockTier2(ctx);
-    const id = placeTestBuilding(ctx);
+    // Upgrade re-places at (2,0), flat across T1/T2 footprints on this
+    // seed/size/mineType — (0,0) is sloped (#1008).
+    const id = placeTestBuilding(ctx, 'management_office', 1, 2, 0);
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
@@ -391,11 +397,13 @@ describe('build move — insufficient funds guard', () => {
   it('moves when cash exactly equals the move cost', () => {
     const ctx = makeCtx(MOVE_COST);
     const id = placeTestBuilding(ctx);
-    const result = buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    // (5,5) is sloped on this seed/size/mineType (#1008); (4,4) is a flat
+    // T1-footprint spot nearby.
+    const result = buildCommand(ctx, ['move', String(id)], { to: '4,4' });
     expect(result.success).toBe(true);
     const building = ctx.state!.buildings.buildings.find(b => b.id === id)!;
-    expect(building.x).toBe(5);
-    expect(building.z).toBe(5);
+    expect(building.x).toBe(4);
+    expect(building.z).toBe(4);
     expect(ctx.state!.cash).toBe(0);
   });
 });

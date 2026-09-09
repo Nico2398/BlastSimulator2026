@@ -240,7 +240,7 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,15' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);

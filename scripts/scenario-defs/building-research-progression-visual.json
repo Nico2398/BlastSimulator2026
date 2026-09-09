@@ -21,7 +21,7 @@
       }
     },
     {
-      "command": "build research_center at:5,5",
+      "command": "build research_center at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -37,7 +37,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {
@@ -213,7 +213,7 @@
       "role": "observe"
     },
     {
-      "command": "build research_center at:15,5 tier:2",
+      "command": "build research_center at:15,1 tier:2",
       "description": "A real player click now: Tier 2 is researched and the $60,000 cost is affordable, so the Place button is enabled and the tile picker completes the purchase. This is the step the old, underfunded version of this file could only pass by overdrawing through the console — with the funds guard in place and enough starting cash, the same build succeeds legitimately through the UI.",
       "interaction": [
         {
@@ -232,7 +232,7 @@
         {
           "type": "pickTile",
           "x": 15,
-          "z": 5
+          "z": 1
         },
         {
           "type": "screenshot"
@@ -348,7 +348,7 @@
       "role": "observe"
     },
     {
-      "command": "build research_center at:25,5 tier:3",
+      "command": "build research_center at:26,2 tier:3",
       "description": "A real player click: tier 3 is researched, so the Place button is enabled and the $120,000 build completes. The full T1->T2->T3 progression this file is named for now genuinely runs end to end.",
       "interaction": [
         {
@@ -366,8 +366,8 @@
         },
         {
           "type": "pickTile",
-          "x": 25,
-          "z": 5
+          "x": 26,
+          "z": 2
         },
         {
           "type": "screenshot"

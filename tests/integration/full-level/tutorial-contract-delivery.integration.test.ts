@@ -178,8 +178,10 @@ describe('Tutorial Level — Contract Delivery', () => {
     // racing this test's own manual haul step — and (13,13)'s 4×4 footprint
     // reaches exactly that corner, trapping the parked vehicle inside its own
     // now-blocked tile (NavGrid.computeReachableSet from (16,16) returns
-    // empty). (9,13) is on the same bench without touching (16,16).
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '9,13' });
+    // empty). Nudged to (8,13) (#1008): building placement now refuses an
+    // uneven 4x4 footprint and (9,13) no longer sits flat post-blast — (8,13)
+    // is the nearest flat spot on the same bench, still clear of (16,16).
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '8,13' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);

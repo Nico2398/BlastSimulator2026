@@ -57,7 +57,7 @@
       }
     },
     {
-      "command": "build management_office at:5,5",
+      "command": "build management_office at:5,6",
       "description": "Placed by clicking the real Build panel — the building destroy/upgrade/move guards below all act on this one (#1). getBuildingDef('management_office', 1).constructionCost is 8000.",
       "role": "player",
       "interaction": [
@@ -76,7 +76,7 @@
         {
           "type": "pickTile",
           "x": 5,
-          "z": 5
+          "z": 6
         },
         {
           "type": "wait",

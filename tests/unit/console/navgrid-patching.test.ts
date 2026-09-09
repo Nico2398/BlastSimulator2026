@@ -95,8 +95,9 @@ function expectPassable(cell: { type: string; moveCost: number }): void {
 describe('NavGrid patching — building placement', () => {
   it('blocks NavGrid cells under building footprint after placement', () => {
     const ctx = makeCtx();
-    // management_office T1 has a 2×2 footprint — cells (0,0),(1,0),(0,1),(1,1)
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // management_office T1 has a 2×2 footprint — placed at (2,0) (flat on this
+    // seed/size/mineType; (0,0) is sloped, #1008) — cells (2,0),(3,0),(2,1),(3,1)
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
     expect(result.success).toBe(true);
     tickUntilConstructionDone(ctx);
 
@@ -105,35 +106,36 @@ describe('NavGrid patching — building placement', () => {
     // Cells under footprint must be blocked with Infinity moveCost
     // BEFORE the patchNavGrid wire-up this will FAIL because the cells
     // are still their original 'walkable' type.
-    expect(nav.cells[0]![0]!.type).toBe('blocked');
-    expect(nav.cells[0]![0]!.moveCost).toBe(Infinity);
-    expect(nav.cells[1]![0]!.type).toBe('blocked');
-    expect(nav.cells[0]![1]!.type).toBe('blocked');
-    expect(nav.cells[1]![1]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.moveCost).toBe(Infinity);
+    expect(nav.cells[1]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![3]!.type).toBe('blocked');
+    expect(nav.cells[1]![3]!.type).toBe('blocked');
 
     // Cells outside the footprint remain passable
-    expectPassable(nav.cells[2]![0]!);
-    expectPassable(nav.cells[0]![2]!);
     expectPassable(nav.cells[2]![2]!);
+    expectPassable(nav.cells[0]![4]!);
+    expectPassable(nav.cells[2]![4]!);
   });
 
   it('blocks NavGrid cells for multi-tile buildings at a non-origin location', () => {
     const ctx = makeCtx();
-    // Place a management_office T1 at (5,5) — footprint covers (5,5)-(6,6)
-    buildCommand(ctx, ['management_office'], { at: '5,5' });
+    // Place a management_office T1 at (4,4) — flat on this seed/size/mineType
+    // ((5,5) is sloped, #1008) — footprint covers (4,4)-(5,5)
+    buildCommand(ctx, ['management_office'], { at: '4,4' });
     tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Cells under footprint are blocked
+    expect(nav.cells[4]![4]!.type).toBe('blocked');
+    expect(nav.cells[4]![5]!.type).toBe('blocked');
+    expect(nav.cells[5]![4]!.type).toBe('blocked');
     expect(nav.cells[5]![5]!.type).toBe('blocked');
-    expect(nav.cells[6]![5]!.type).toBe('blocked');
-    expect(nav.cells[5]![6]!.type).toBe('blocked');
-    expect(nav.cells[6]![6]!.type).toBe('blocked');
 
     // Adjacent cells outside the footprint remain walkable
-    expect(nav.cells[4]![5]!.type).toBe('walkable');
-    expect(nav.cells[7]![5]!.type).toBe('walkable');
-    expect(nav.cells[5]![7]!.type).toBe('walkable');
+    expect(nav.cells[3]![4]!.type).toBe('walkable');
+    expect(nav.cells[6]![4]!.type).toBe('walkable');
+    expect(nav.cells[4]![6]!.type).toBe('walkable');
   });
 
   it('does not patch NavGrid when building placement fails (unreachable ground)', () => {
@@ -155,11 +157,12 @@ describe('NavGrid patching — building placement', () => {
   it('does not patch NavGrid when building placement fails (occupied tile)', () => {
     const ctx = makeCtx();
 
-    // Place first building at (0,0)
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // Place first building at (2,0) — flat on this seed/size/mineType ((0,0)
+    // is sloped, #1008)
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
 
     // Try to place a second building at the same location — should fail
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
     expect(result.success).toBe(false);
 
     // The NavGrid should still be unchanged from the initial buildGameNavGrid state
@@ -178,15 +181,16 @@ describe('NavGrid patching — building demolition', () => {
   it('reverts NavGrid cells to walkable after demolition', () => {
     const ctx = makeCtx();
 
-    // Place a building
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // Place a building at (2,0) — flat on this seed/size/mineType ((0,0) is
+    // sloped, #1008)
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Confirm cells are blocked after placement (this assertion fails BEFORE
     // the patchNavGrid wire-up, but passes after it — making the whole test fail
     // until the implementer adds the patch call).
-    expect(nav.cells[0]![0]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
 
@@ -195,10 +199,10 @@ describe('NavGrid patching — building demolition', () => {
     expect(demolishResult.success).toBe(true);
 
     // After demolition, footprint cells revert to passable natural terrain
-    expectPassable(nav.cells[0]![0]!);
-    expectPassable(nav.cells[1]![0]!);
-    expectPassable(nav.cells[0]![1]!);
-    expectPassable(nav.cells[1]![1]!);
+    expectPassable(nav.cells[0]![2]!);
+    expectPassable(nav.cells[1]![2]!);
+    expectPassable(nav.cells[0]![3]!);
+    expectPassable(nav.cells[1]![3]!);
   });
 
   it('does not patch NavGrid when destroy fails (unknown building ID)', () => {
@@ -224,21 +228,22 @@ describe('NavGrid patching — building demolition', () => {
 describe('NavGrid patching — building upgrade', () => {
   it('blocks new footprint cells after upgrading T1→T2', () => {
     const ctx = makeCtx();
-    // management_office T1: rect(2,2) footprint at (0,0)
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // management_office T1: rect(2,2) footprint at (2,0) — flat across T1/T2
+    // footprints on this seed/size/mineType ((0,0) is sloped, #1008)
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // T1 footprint (2×2) cells should be blocked
-    expect(nav.cells[0]![0]!.type).toBe('blocked');
-    expect(nav.cells[1]![0]!.type).toBe('blocked');
-    expect(nav.cells[0]![1]!.type).toBe('blocked');
-    expect(nav.cells[1]![1]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![3]!.type).toBe('blocked');
+    expect(nav.cells[1]![2]!.type).toBe('blocked');
+    expect(nav.cells[1]![3]!.type).toBe('blocked');
 
     // T2 footprint is rect(2,3) — extra cells at z=2
     // Before upgrade, these are walkable
-    expect(nav.cells[0]![2]!.type).toBe('walkable');
-    expect(nav.cells[1]![2]!.type).toBe('walkable');
+    expect(nav.cells[2]![2]!.type).toBe('walkable');
+    expect(nav.cells[2]![3]!.type).toBe('walkable');
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
 
@@ -250,28 +255,29 @@ describe('NavGrid patching — building upgrade', () => {
     expect(upgradeResult.success).toBe(true);
 
     // After upgrade, the new T2 footprint cells are blocked
-    expect(nav.cells[0]![0]!.type).toBe('blocked');
-    expect(nav.cells[1]![0]!.type).toBe('blocked');
-    expect(nav.cells[0]![1]!.type).toBe('blocked');
-    expect(nav.cells[1]![1]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![3]!.type).toBe('blocked');
+    expect(nav.cells[1]![2]!.type).toBe('blocked');
+    expect(nav.cells[1]![3]!.type).toBe('blocked');
 
     // New footprint cells (z=2 row from the 2×3 footprint) must be blocked
     // NavGrid stores cells[z][x] → cells[dz+building.z][dx+building.x]
-    expect(nav.cells[2]![0]!.type).toBe('blocked');
-    expect(nav.cells[2]![1]!.type).toBe('blocked');
+    expect(nav.cells[2]![2]!.type).toBe('blocked');
+    expect(nav.cells[2]![3]!.type).toBe('blocked');
   });
 
   it('does not patch NavGrid when upgrade fails (already at max tier)', () => {
     const ctx = makeCtx();
     // #410: tier 3 placement is research-gated — unlock it for this setup step.
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
-    // Start with a T3 management_office (3×3 footprint at 10,10)
-    buildCommand(ctx, ['management_office'], { at: '10,10', tier: '3' });
+    // Start with a T3 management_office (3×3 footprint at 8,8 — flat on this
+    // seed/size/mineType; (10,10) is sloped, #1008)
+    buildCommand(ctx, ['management_office'], { at: '8,8', tier: '3' });
     tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Verify T3 blocked some cells
-    expect(nav.cells[10]![10]!.type).toBe('blocked');
+    expect(nav.cells[8]![8]!.type).toBe('blocked');
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
 
@@ -291,44 +297,47 @@ describe('NavGrid patching — building upgrade', () => {
 describe('NavGrid patching — building move', () => {
   it('blocks new footprint and clears old footprint when moving a building', () => {
     const ctx = makeCtx();
-    // Place management_office T1 at (0,0) — 2×2 footprint
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // Place management_office T1 at (2,0) — flat on this seed/size/mineType
+    // ((0,0) is sloped, #1008) — 2×2 footprint
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Verify original footprint is blocked
-    expect(nav.cells[0]![0]!.type).toBe('blocked');
-    expect(nav.cells[1]![1]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    expect(nav.cells[1]![3]!.type).toBe('blocked');
 
-    // Move to (5,5) — new footprint (5,5)-(6,6)
+    // Move to (4,4) — flat destination ((5,5) is sloped, #1008) — new
+    // footprint (4,4)-(5,5)
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
-    const moveResult = buildCommand(ctx, ['move', String(buildingId)], { to: '5,5' });
+    const moveResult = buildCommand(ctx, ['move', String(buildingId)], { to: '4,4' });
     expect(moveResult.success).toBe(true);
 
     // Old footprint cells should now be passable natural terrain again
-    expectPassable(nav.cells[0]![0]!);
-    expectPassable(nav.cells[1]![0]!);
-    expectPassable(nav.cells[0]![1]!);
-    expectPassable(nav.cells[1]![1]!);
+    expectPassable(nav.cells[0]![2]!);
+    expectPassable(nav.cells[0]![3]!);
+    expectPassable(nav.cells[1]![2]!);
+    expectPassable(nav.cells[1]![3]!);
 
     // New footprint cells should be blocked
+    expect(nav.cells[4]![4]!.type).toBe('blocked');
+    expect(nav.cells[4]![4]!.moveCost).toBe(Infinity);
+    expect(nav.cells[4]![5]!.type).toBe('blocked');
+    expect(nav.cells[5]![4]!.type).toBe('blocked');
     expect(nav.cells[5]![5]!.type).toBe('blocked');
-    expect(nav.cells[5]![5]!.moveCost).toBe(Infinity);
-    expect(nav.cells[6]![5]!.type).toBe('blocked');
-    expect(nav.cells[5]![6]!.type).toBe('blocked');
-    expect(nav.cells[6]![6]!.type).toBe('blocked');
   });
 
   it('does not patch NavGrid when move fails (target tile occupied)', () => {
     const ctx = makeCtx();
-    // Place two buildings
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
-    buildCommand(ctx, ['management_office'], { at: '5,5' });
+    // Place two buildings — both on flat spots on this seed/size/mineType
+    // ((0,0) and (5,5) are sloped, #1008)
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    buildCommand(ctx, ['management_office'], { at: '4,4' });
     tickUntilConstructionDone(ctx);
 
     // Try moving the first building onto the second's location
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
-    const result = buildCommand(ctx, ['move', String(buildingId)], { to: '5,5' });
+    const result = buildCommand(ctx, ['move', String(buildingId)], { to: '4,4' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('occupied');
 

@@ -77,13 +77,17 @@ describe('site expansion — buildings and ramps', () => {
 
   it('claims the ground a building straddling the edge needs', () => {
     // A 2x2 footprint at x=31 reaches x=32, one metre past the 32 m site.
-    const result = buildCommand(ctx, ['management_office'], { at: '31,10' });
+    // z=6, not 10: #1008 wired flatness into checkFootprintPlacement, and
+    // (31,10)-(32,11) is not flat on this seed's terrain — (31,6)-(32,7) is,
+    // and still straddles the same edge.
+    const result = buildCommand(ctx, ['management_office'], { at: '31,6' });
     expect(result.success).toBe(true);
-    expect(ctx.grid!.containsColumn(32, 10)).toBe(true);
+    expect(ctx.grid!.containsColumn(32, 6)).toBe(true);
   });
 
   it('places a building on freshly claimed ground', () => {
-    const result = buildCommand(ctx, ['management_office'], { at: '34,10' });
+    // z=6, not 10: same #1008 flatness reason as the test above.
+    const result = buildCommand(ctx, ['management_office'], { at: '34,6' });
     expect(result.success).toBe(true);
     // Confirming placement only queues a construction site (#556) — nothing
     // is built yet, but the ground is claimed immediately.

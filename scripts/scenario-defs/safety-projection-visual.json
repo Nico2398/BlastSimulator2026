@@ -66,7 +66,7 @@
       "role": "observe"
     },
     {
-      "command": "build freight_warehouse at:35,25",
+      "command": "build freight_warehouse at:33,26",
       "interaction": [
         {
           "type": "clickSelector",
@@ -82,8 +82,8 @@
         },
         {
           "type": "pickTile",
-          "x": 35,
-          "z": 25
+          "x": 33,
+          "z": 26
         },
         {
           "type": "screenshot"
