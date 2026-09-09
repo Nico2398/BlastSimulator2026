@@ -388,8 +388,8 @@
       "role": "observe"
     },
     {
-      "command": "build management_office at:90,20",
-      "description": "#558: targets ground well outside the default 64x64 site (chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it. #556: land is claimed and cash charged at order time exactly as before (worldSizeX grows on this step); only the building itself is now a queued site rather than an instant placement.",
+      "command": "build management_office at:94,20",
+      "description": "#558: targets ground well outside the default 64x64 site (chunk index for x=94 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it. #556: land is claimed and cash charged at order time exactly as before (worldSizeX grows on this step); only the building itself is now a queued site rather than an instant placement. #1008: relocated from (90,20) to (94,20) -- (90,20)'s 2x2 footprint straddles uneven ground once the chunk is actually claimed and generated (pre-claim sampling of unclaimed ground reads a flat placeholder, not the real terrain), while (94,20) is genuinely flat post-claim and keeps the same outside-the-original-grid intent.",
       "timeout": 100,
       "interaction": [
         {
@@ -402,7 +402,7 @@
         },
         {
           "type": "pickTile",
-          "x": 90,
+          "x": 94,
           "z": 20
         },
         {
