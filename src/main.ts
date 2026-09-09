@@ -95,7 +95,11 @@ const placementFramingDistance = (region: TileRegion): number =>
 
 // --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
 const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
-const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
+const selectionOverlay = new SelectionOverlay(
+  scene.scene,
+  (x, z) => gameRenderer.surfaceYAt(x, z),
+  (x, z) => gameRenderer.smoothSurfaceYAt(x, z),
+);
 const paramStrip = new ParamStrip(uiContainer);
 placementController.setArmedStateHandler((armed) => {
   // Entity hover/select would otherwise fight the placement tool for the same clicks.

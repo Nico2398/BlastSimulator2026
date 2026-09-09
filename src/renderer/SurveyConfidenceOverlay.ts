@@ -4,16 +4,14 @@
 // Stale (expired) points = grey.
 
 import * as THREE from 'three';
+import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
-
-/** Size of each confidence indicator quad in world units. */
-const CONFIDENCE_QUAD_SIZE = 1.0;
 
 /** Opacity multiplier for stale (expired) survey points. */
 const STALE_OPACITY = 0.6;
 
-/** Z-fighting offset above terrain surface. */
+/** Z-fighting offset above terrain surface — this overlay's GroundTintLayer epsilon. */
 const OVERLAY_Y_OFFSET = 0.05;
 
 // ---------- Types ----------
@@ -78,13 +76,24 @@ export function confidenceToColor(confidence: number): THREE.Color {
  * activate or `hide()` to remove from view.
  */
 export class SurveyConfidenceOverlay {
-  private readonly scene: THREE.Scene;
-  private readonly group = new THREE.Group();
+  private readonly layer: GroundTintLayer;
+  /**
+   * `smoothSurfaceYAt`, when given, is the ground-tint sampler (#1006) each
+   * confidence quad conforms to instead of the flat, fixed-offset quad it
+   * drew before. Optional so every pre-#1006 call site keeps compiling
+   * unchanged; falling back to a per-point flat height read from each
+   * point's own `surfaceY` field (registered for every corner of its cell)
+   * so an un-migrated caller still sees a flat quad at the same height it
+   * always did, not a bilinear blend against an unrelated neighbour.
+   * Sampler-selection scaffolding is shared with BlastPlanOverlay via
+   * FallbackSurfaceSampler.
+   */
+  private readonly fallbackSampler: FallbackSurfaceSampler;
 
-  constructor(scene: THREE.Scene) {
-    this.scene = scene;
-    this.scene.add(this.group);
-    this.group.visible = false;
+  constructor(scene: THREE.Scene, smoothSurfaceYAt?: SurfaceHeightSampler) {
+    this.fallbackSampler = new FallbackSurfaceSampler(smoothSurfaceYAt);
+    this.layer = new GroundTintLayer(scene, this.fallbackSampler.sample, { epsilon: OVERLAY_Y_OFFSET, renderOrder: 100 });
+    this.layer.setVisible(false);
   }
 
   /**
@@ -92,71 +101,56 @@ export class SurveyConfidenceOverlay {
    * Replaces any previously shown overlay data.
    */
   show(options: SurveyConfidenceOverlayOptions): void {
-    this.clear();
-    this.group.visible = true;
-
     const { points, opacity } = options;
 
-    for (const pt of points) {
+    this.fallbackSampler.clearFlat();
+    const patches: GroundTintPatch[] = points.map((pt): GroundTintPatch => {
       // Determine color: grey for stale, confidence-colour for fresh
       let color: THREE.Color;
       let quadOpacity: number;
-
       if (!pt.fresh) {
-        // Stale survey point — grey
-        color = new THREE.Color(0.5, 0.5, 0.5);
+        color = new THREE.Color(0.5, 0.5, 0.5); // stale — grey
         quadOpacity = STALE_OPACITY;
       } else {
-        // Fresh — colour-map confidence
         color = confidenceToColor(pt.confidence);
         quadOpacity = 1.0;
       }
 
-      // Build a flat quad at the terrain surface, oriented horizontally
-      const geo = new THREE.PlaneGeometry(CONFIDENCE_QUAD_SIZE, CONFIDENCE_QUAD_SIZE);
-      const mat = new THREE.MeshBasicMaterial({
+      if (this.fallbackSampler.usesFlatFallback) {
+        // No sampler installed: pin every corner of this point's own cell to
+        // its recorded surfaceY, so bilinearSurfaceHeight's per-corner reads
+        // resolve to one flat height across the whole quad, exactly as the
+        // old fixed-offset plane did.
+        for (const [dx, dz] of [[0, 0], [1, 0], [1, 1], [0, 1]] as const) {
+          this.fallbackSampler.setFlatCorner(pt.x + dx, pt.z + dz, pt.surfaceY);
+        }
+      }
+
+      return {
+        id: `${pt.x},${pt.z}`,
+        shape: { kind: 'cell', x: pt.x, z: pt.z },
         color,
-        transparent: true,
         opacity: opacity * quadOpacity,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
+      };
+    });
 
-      const mesh = new THREE.Mesh(geo, mat);
-      // Rotate quad to lie flat on the terrain surface (default PlaneGeometry faces +Z)
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(pt.x, pt.surfaceY + OVERLAY_Y_OFFSET, pt.z);
-      mesh.renderOrder = 100; // render above terrain
-
-      this.group.add(mesh);
-    }
+    this.layer.replace(patches);
+    this.layer.setVisible(true);
   }
 
   /** Hide the overlay without clearing data. */
   hide(): void {
-    this.group.visible = false;
+    this.layer.setVisible(false);
   }
 
-  /** Remove all overlay meshes from the scene. */
+  /** Remove all overlay patches. */
   clear(): void {
-    for (const child of [...this.group.children]) {
-      this.group.remove(child);
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        // Material can be Material or Material[] — handle both safely
-        const mat = child.material;
-        if (Array.isArray(mat)) {
-          mat.forEach(m => m.dispose());
-        } else {
-          mat.dispose();
-        }
-      }
-    }
+    this.layer.clear();
+    this.fallbackSampler.clearFlat();
   }
 
   /** Remove overlay and release all GPU resources. */
   dispose(): void {
-    this.clear();
-    this.scene.remove(this.group);
+    this.layer.dispose();
   }
 }

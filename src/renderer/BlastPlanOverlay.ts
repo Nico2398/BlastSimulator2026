@@ -7,6 +7,8 @@ import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
+import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { confidenceToColor } from './SurveyConfidenceOverlay.js';
 
 // ---------- Config ----------
 
@@ -86,8 +88,25 @@ export class BlastPlanOverlay {
   /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
   private readonly holePositions = new Map<number, THREE.Vector3>();
 
-  constructor(scene: THREE.Scene) {
+  /**
+   * `smoothSurfaceYAt`, when given, is the ground-tint sampler (#1006) the
+   * energy heatmap conforms to instead of the flat, fixed-offset circles it
+   * drew before. Optional so every pre-#1006 call site (tests constructing
+   * an overlay with no ground-conforming overlays to exercise) keeps
+   * compiling unchanged; falls back to a per-hole flat height (every lattice
+   * corner the hole's own disc could reach, pinned to its recorded
+   * surfaceY) so an un-migrated caller still sees a flat disc, not a
+   * bilinear blend against an unrelated neighbouring hole. Sampler-selection
+   * scaffolding is shared with SurveyConfidenceOverlay via FallbackSurfaceSampler.
+   */
+  private readonly fallbackSampler: FallbackSurfaceSampler;
+  private readonly heatmapLayer: GroundTintLayer;
+
+  constructor(scene: THREE.Scene, smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
+    this.fallbackSampler = new FallbackSurfaceSampler(smoothSurfaceYAt);
+    this.heatmapLayer = new GroundTintLayer(scene, this.fallbackSampler.sample, { epsilon: 0.1 });
+    this.heatmapLayer.setVisible(false);
     this.scene.add(this.group);
     this.group.visible = false;
   }
@@ -111,6 +130,7 @@ export class BlastPlanOverlay {
   show(options: BlastPlanOverlayOptions): void {
     this.clear();
     this.group.visible = true;
+    this.heatmapLayer.setVisible(true);
 
     for (const hd of options.holes) {
       this.addHoleMarker(hd);
@@ -132,9 +152,12 @@ export class BlastPlanOverlay {
 
   hide(): void {
     this.group.visible = false;
+    this.heatmapLayer.setVisible(false);
   }
 
   clear(): void {
+    this.heatmapLayer.clear();
+    this.fallbackSampler.clearFlat();
     for (const child of [...this.group.children]) {
       this.group.remove(child);
       if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
@@ -149,6 +172,7 @@ export class BlastPlanOverlay {
 
   dispose(): void {
     this.clear();
+    this.heatmapLayer.dispose();
     this.scene.remove(this.group);
   }
 
@@ -257,30 +281,42 @@ export class BlastPlanOverlay {
   // ---------- Software overlays ----------
 
   private addEnergyHeatmap(options: BlastPlanOverlayOptions): void {
+    const patches: GroundTintPatch[] = [];
     for (const hd of options.holes) {
       if (!hd.charge) continue;
       const energy = hd.charge.amountKg / 50; // rough scale
       const radius = Math.min(HEATMAP_MAX_RADIUS, 1 + energy * 3);
       const intensity = Math.min(1, energy / 4);
 
-      // Color: green (low) → yellow → red (high)
-      const r = Math.min(1, intensity * 2);
-      const g = Math.min(1, 2 - intensity * 2);
-      const color = new THREE.Color(r, g, 0);
+      // Color: green (low) → yellow → red (high) — same red→yellow→green
+      // ramp as confidenceToColor, domain mirrored (low intensity = high
+      // confidence-like green, high intensity = low-confidence-like red).
+      const color = confidenceToColor(1 - intensity);
 
-      const geo = new THREE.CircleGeometry(radius, HEATMAP_SEGMENTS);
-      const mat = new THREE.MeshBasicMaterial({
+      if (this.fallbackSampler.usesFlatFallback) {
+        // No sampler installed: pin every lattice corner the disc's own rim
+        // could reach to this hole's recorded surfaceY, so
+        // bilinearSurfaceHeight's per-vertex blend resolves to one flat
+        // height across the whole disc, exactly as the old fixed-offset
+        // circle did.
+        const cx = Math.round(hd.hole.x);
+        const cz = Math.round(hd.hole.z);
+        const reach = Math.ceil(radius) + 1;
+        for (let dz = -reach; dz <= reach; dz++) {
+          for (let dx = -reach; dx <= reach; dx++) {
+            this.fallbackSampler.setFlatCorner(cx + dx, cz + dz, hd.surfaceY);
+          }
+        }
+      }
+
+      patches.push({
+        id: hd.hole.id,
+        shape: { kind: 'disc', cx: hd.hole.x, cz: hd.hole.z, radius, segments: HEATMAP_SEGMENTS },
         color,
-        transparent: true,
         opacity: 0.35,
-        depthWrite: false,
-        side: THREE.DoubleSide,
       });
-      const circle = new THREE.Mesh(geo, mat);
-      circle.rotation.x = -Math.PI / 2;
-      circle.position.set(hd.hole.x, hd.surfaceY + 0.1, hd.hole.z); // just above terrain surface
-      this.group.add(circle);
     }
+    this.heatmapLayer.replace(patches);
   }
 
   private addFragSizeOverlay(options: BlastPlanOverlayOptions): void {

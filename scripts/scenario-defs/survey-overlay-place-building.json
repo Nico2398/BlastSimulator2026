@@ -1,0 +1,296 @@
+{
+  "name": "survey-overlay-place-building",
+  "description": "Ground-tint overlays overlapping on sloped terrain (#1006): a seismic survey leaves its confidence overlay on screen, then a living_quarters placement is armed right over it — the placement's selection tint, the survey's confidence quads, and (once picked) the tile picker's own conforming ring all have to sit on the marching-cubes surface together rather than as flat plates floating at a fixed Y. Screenshot captures the overlapping state for visual inspection; this is not a rendering assertion (state JSON can't see a floating quad) but the interaction-mode run that proves a player can actually arm a placement while the survey overlay is up.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit cash:100000",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit cash:100000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 100000
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for a tighter survey estimate. The player-facing path is `employee train`.",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:3"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:12 z:12",
+      "description": "Real click path: open the Survey panel, pick seismic (the method a geology-skilled surveyor can actually run), dispatch, target the tile.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 12
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "description": "Padding for the seismic survey to resolve.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "description": "Frame and screenshot the survey confidence overlay by itself first, so the before/after comparison against the next (overlapping) shot is legible. The Survey panel opened above stays open across the tick/event padding, so this only needs to re-frame the camera and capture.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-role=\"overlay-toggle\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 14,
+          "z": 12,
+          "distance": 25
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 1,
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:16,12",
+      "description": "Arms a living_quarters placement — Build panel, buy button, tile picker — while the seismic survey's confidence overlay from the step above is still on screen and rendered right beside the placement footprint (4 tiles from the surveyed column). The screenshot right after the tile picker opens is the whole point of this scenario: both ground-tint overlays (survey confidence and the placement's selection tint/picker ring) conforming to the same sloped terrain at once, rather than two flat plates floating at their own fixed Y and clipping through each other or the ground (#1006). Only confirms the order lands (orderedBuildingCount increases); construction itself is out of scope for this scenario.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 14,
+          "z": 12,
+          "distance": 25
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "pickTile",
+          "x": 16,
+          "z": 12
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "timeout": 95,
+      "description": "Drives the ordered living_quarters to completion so the scenario proves the placement armed over the survey overlay was actually reachable end-to-end, not just clickable.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    }
+  ]
+}

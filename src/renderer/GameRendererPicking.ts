@@ -22,6 +22,8 @@ export interface PickingDeps {
   fragments: FragmentMesh | null;
   blastOverlay: BlastPlanOverlay | null;
   getTerrainSurfaceY: (x: number, z: number) => number;
+  /** Smoothed (marching-cubes) terrain surface Y sampler — ground tints (#1006) conform to this, not the stepped voxel-column height. */
+  getSmoothTerrainSurfaceY: (x: number, z: number) => number;
 }
 
 /**
@@ -80,6 +82,16 @@ export function raycastTerrainOrLandscape(
  */
 export function surfaceYAt(deps: PickingDeps, x: number, z: number): number {
   return deps.getTerrainSurfaceY(x, z);
+}
+
+/**
+ * Public wrapper around `getSmoothTerrainSurfaceY`, mirroring surfaceYAt
+ * above — the smoothed-surface counterpart for ground tints (#1006) that
+ * need to conform to the same height the terrain mesh renders, not the
+ * stepped voxel-column height.
+ */
+export function smoothSurfaceYAt(deps: PickingDeps, x: number, z: number): number {
+  return deps.getSmoothTerrainSurfaceY(x, z);
 }
 
 /**

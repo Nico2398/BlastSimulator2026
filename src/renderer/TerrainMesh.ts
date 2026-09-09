@@ -12,7 +12,7 @@
 // (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
-import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid } from '../core/world/VoxelGrid.js';
+import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import { surfaceDensityAt } from '../core/world/TerrainGen.js';
 import { haloSurfaceHeight, meshedCellRect } from './terrain/PlayableCoverage.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
@@ -389,7 +389,13 @@ export class TerrainMesh {
    */
   getSurveyOverlay(): SurveyConfidenceOverlay {
     if (!this.surveyOverlay) {
-      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene);
+      // The smoothed (marching-cubes) surface height for the currently-bound
+      // grid — read through `this.grid` at call time (not captured once) so
+      // a later setGrid() is picked up without recreating the overlay. Reuses
+      // VoxelGrid's clamp-then-sample helper (#1006 finding 4 — a leaf core
+      // module, so this stays a core import rather than reaching sideways
+      // into GameRendererTerrain's much larger runtime import graph).
+      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
     }
     return this.surveyOverlay;
   }

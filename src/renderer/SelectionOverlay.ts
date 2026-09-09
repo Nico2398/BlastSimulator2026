@@ -14,6 +14,7 @@
 // full-scene dim shader.
 
 import * as THREE from 'three';
+import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -80,13 +81,30 @@ export class SelectionOverlay {
    */
   private readonly regionGroup: THREE.Group;
   private readonly surfaceYAt: (x: number, z: number) => number;
+  /**
+   * Smoothed (marching-cubes) ground-tint sampler (#1006) — the region tint,
+   * blocked-tile mark, and any conforming ring drawn against this overlay's
+   * ground follow this height instead of `surfaceYAt`'s stepped voxel-column
+   * height. Optional so every pre-#1006 call site keeps compiling unchanged;
+   * falls back to `surfaceYAt` itself, which is already a real per-column
+   * sampler (just stepped, not sloped) so no separate fallback bookkeeping
+   * is needed the way the single-height overlays (survey, heatmap) need.
+   */
+  private readonly sampler: SurfaceHeightSampler;
+  /** Cell tint for the rect/point selection group (`this.group`) — rebuilt in full on every `update()`. */
+  private readonly selectionTintLayer: GroundTintLayer;
+  /** Cell tint for the pinned-region + blocked-tile group (`this.regionGroup`) — rebuilt in full on every `rebuildRegion()`. */
+  private readonly regionTintLayer: GroundTintLayer;
   private flashUntil = 0;
   private region: OverlayRegion | null = null;
   private blockedTile: { x: number; z: number } | null = null;
 
-  constructor(scene: THREE.Scene, surfaceYAt: (x: number, z: number) => number) {
+  constructor(scene: THREE.Scene, surfaceYAt: (x: number, z: number) => number, smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
     this.surfaceYAt = surfaceYAt;
+    this.sampler = smoothSurfaceYAt ?? surfaceYAt;
+    this.selectionTintLayer = new GroundTintLayer(scene, this.sampler, { epsilon: Y_OFFSET });
+    this.regionTintLayer = new GroundTintLayer(scene, this.sampler, { epsilon: Y_OFFSET });
     this.group = new THREE.Group();
     this.group.name = 'placement-selection-overlay';
     this.regionGroup = new THREE.Group();
@@ -126,11 +144,12 @@ export class SelectionOverlay {
       this.regionGroup.remove(child);
       disposeObject(child);
     }
+    const patches: GroundTintPatch[] = [];
     const r = this.region;
     if (r) {
       for (let z = r.z1; z <= r.z2; z++) {
         for (let x = r.x1; x <= r.x2; x++) {
-          this.regionGroup.add(this.makeCell(x, z, COLOR_PINNED, false, REGION_FILL_OPACITY));
+          patches.push(cellPatch(`region:${x}:${z}`, x, z, COLOR_PINNED, REGION_FILL_OPACITY));
         }
       }
       this.regionGroup.add(this.makeBorder(r.x1, r.z1, r.x2, r.z2, COLOR_PINNED));
@@ -138,8 +157,9 @@ export class SelectionOverlay {
       this.regionGroup.add(this.makeBeacon(r));
     }
     if (this.blockedTile) {
-      this.regionGroup.add(this.makeCell(this.blockedTile.x, this.blockedTile.z, COLOR_BLOCKED, false, 0.4));
+      patches.push(cellPatch('blocked', this.blockedTile.x, this.blockedTile.z, COLOR_BLOCKED, 0.4));
     }
+    this.regionTintLayer.replace(patches);
   }
 
   /** Rebuild the overlay for the current placement state. Call from PlacementController's onChange, not per-frame. */
@@ -169,20 +189,24 @@ export class SelectionOverlay {
       this.group.remove(child);
       disposeObject(child);
     }
+    this.selectionTintLayer.clear();
   }
 
   private buildRect(u: OverlayCellsUpdate, flashing: boolean): void {
     const x0 = Math.min(u.x1, u.x2), x1 = Math.max(u.x1, u.x2);
     const z0 = Math.min(u.z1, u.z2), z1 = Math.max(u.z1, u.z2);
     const region = u.region ?? null;
+    const opacity = flashing ? 0.6 : CELL_FILL_OPACITY;
 
+    const patches: GroundTintPatch[] = [];
     for (let z = z0; z <= z1; z++) {
       for (let x = x0; x <= x1; x++) {
         const inRegion = region !== null && x >= region.x1 && x <= region.x2 && z >= region.z1 && z <= region.z2;
         const color = region ? (inRegion ? COLOR_PINNED : COLOR_SELECTION) : COLOR_SELECTION;
-        this.group.add(this.makeCell(x, z, color, flashing));
+        patches.push(cellPatch(`${x}:${z}`, x, z, color, opacity));
       }
     }
+    this.selectionTintLayer.replace(patches);
 
     this.group.add(this.makeBorder(x0, z0, x1, z1, region ? COLOR_PINNED : COLOR_SELECTION));
     this.group.add(...this.makeCorners(x0, z0, x1, z1, region ? COLOR_PINNED : COLOR_SELECTION));
@@ -212,44 +236,31 @@ export class SelectionOverlay {
   private buildPoint(u: OverlayPointUpdate, flashing: boolean): void {
     const color = u.tone === 'survey' ? COLOR_SURVEY : COLOR_SELECTION;
     const cells = u.footprintCells ?? [[0, 0]] as const;
-    for (const [dx, dz] of cells) this.group.add(this.makeCell(u.x + dx, u.z + dz, color, flashing));
+    const opacity = flashing ? 0.6 : CELL_FILL_OPACITY;
+    const patches: GroundTintPatch[] = cells.map(
+      ([dx, dz]): GroundTintPatch => cellPatch(`${u.x + dx}:${u.z + dz}`, u.x + dx, u.z + dz, color, opacity),
+    );
+    this.selectionTintLayer.replace(patches);
 
     if (u.radius !== undefined) {
-      const y = this.surfaceYAt(u.x, u.z) + Y_OFFSET;
-      const points: THREE.Vector3[] = [];
-      for (let i = 0; i <= HOLE_RING_SEGMENTS * 2; i++) {
-        const angle = (i / (HOLE_RING_SEGMENTS * 2)) * Math.PI * 2;
-        points.push(new THREE.Vector3(u.x + 0.5 + Math.cos(angle) * u.radius, y, u.z + 0.5 + Math.sin(angle) * u.radius));
-      }
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const material = new THREE.LineBasicMaterial({ color: COLOR_SURVEY, transparent: true, opacity: 0.7 });
-      this.group.add(new THREE.LineLoop(geometry, material));
+      const ring = buildConformingRing(
+        this.sampler, u.x + 0.5, u.z + 0.5, u.radius, HOLE_RING_SEGMENTS * 2, COLOR_SURVEY, 0.7,
+      );
+      this.group.add(ring);
     }
-  }
-
-  private makeCell(x: number, z: number, color: number, flashing: boolean, opacity = CELL_FILL_OPACITY): THREE.Mesh {
-    const y = this.surfaceYAt(x, z) + Y_OFFSET;
-    const geometry = new THREE.PlaneGeometry(1, 1);
-    const material = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: flashing ? 0.6 : opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x + 0.5, y, z + 0.5);
-    return mesh;
   }
 
   /** Rectangle outline at each tile's own surface height (steps down a bench face rather than shearing through it). */
   private makeBorder(x0: number, z0: number, x1: number, z1: number, color: number): THREE.Object3D {
     const group = new THREE.Group();
     const seg = (ax: number, az: number, bx: number, bz: number) => {
+      // Each endpoint samples its own (x, z) height rather than a corner
+      // shared across both — the fill beneath is now a sloped, per-corner
+      // ground tint (#1006), and a shared-corner segment would draw the
+      // outline dead flat across a slope the fill visibly follows.
       const geometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(ax, this.surfaceYAt(Math.min(ax, bx), Math.min(az, bz)) + Y_OFFSET, az),
-        new THREE.Vector3(bx, this.surfaceYAt(Math.min(ax, bx), Math.min(az, bz)) + Y_OFFSET, bz),
+        new THREE.Vector3(ax, this.sampler(ax, az) + Y_OFFSET, az),
+        new THREE.Vector3(bx, this.sampler(bx, bz) + Y_OFFSET, bz),
       ]);
       group.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color })));
     };
@@ -309,6 +320,8 @@ export class SelectionOverlay {
   dispose(): void {
     this.clearChildren();
     this.setRegion(null);
+    this.selectionTintLayer.dispose();
+    this.regionTintLayer.dispose();
     this.scene.remove(this.group);
     this.scene.remove(this.regionGroup);
   }
@@ -322,6 +335,11 @@ function disposeObject(obj: THREE.Object3D): void {
     if (Array.isArray(material)) material.forEach(m => m.dispose());
     else if (material) material.dispose();
   });
+}
+
+/** A single ground-tint patch for one selection/region/blocked-tile cell — id, footprint, colour and opacity, ready for a GroundTintLayer.replace()/add(). */
+function cellPatch(id: string, x: number, z: number, color: number, opacity: number): GroundTintPatch {
+  return { id, shape: { kind: 'cell', x, z }, color, opacity };
 }
 
 // Building-valid and survey tokens exported for callers that want the exact

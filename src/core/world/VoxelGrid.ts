@@ -807,6 +807,19 @@ export class VoxelGrid {
 }
 
 /**
+ * Clamp a world (x, z) column to the grid's own column bounds — shared by
+ * computeVoxelColumnSurfaceY and getSmoothTerrainSurfaceY below, both of
+ * which need "nearest column inside the grid" rather than
+ * computeVoxelColumnSurfaceHeight's honest out-of-bounds NaN (#559).
+ */
+export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: number; cz: number } {
+  return {
+    cx: Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x))),
+    cz: Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z))),
+  };
+}
+
+/**
  * Resolve the surface Y for column (x, z) — the highest voxel with density
  * >= 0.5. Returns -1 if the column is entirely void. Out-of-bounds (x, z)
  * coordinates are clamped to the grid limits.
@@ -828,8 +841,7 @@ export class VoxelGrid {
 export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
 
-  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
-  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
+  const { cx, cz } = clampToGridColumn(grid, x, z);
   for (let y = grid.sizeY - 1; y >= 0; y--) {
     if (grid.isSolidAt(cx, y, cz)) return y;
   }
@@ -874,4 +886,26 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
     }
   }
   return 0;
+}
+
+/**
+ * Smoothed (marching-cubes) terrain surface Y at the given (x, z) column —
+ * the height a ground tint patch (#1006) conforms to, unlike
+ * computeVoxelColumnSurfaceY's per-voxel-column step height. Clamps
+ * out-of-bounds (x, z) to the nearest edge column via clampToGridColumn
+ * (computeVoxelColumnSurfaceHeight itself returns NaN outside the grid
+ * rather than clamping — #559, it needs an honest "no data" signal at the
+ * live claim edge — so the clamp happens here instead).
+ *
+ * Lives here rather than in a renderer module so both TerrainMesh (a leaf
+ * rendering primitive) and GameRendererTerrain (which re-exports it for its
+ * own larger call graph) can depend on it without a coupling-direction
+ * smell — it needs only the grid and computeVoxelColumnSurfaceHeight, both
+ * already core (#1006 finding 4).
+ */
+export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number): number {
+  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
+  const { cx, cz } = clampToGridColumn(grid, x, z);
+  const h = computeVoxelColumnSurfaceHeight(grid, cx, cz);
+  return Number.isNaN(h) ? 0 : h;
 }

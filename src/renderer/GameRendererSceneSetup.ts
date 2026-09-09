@@ -95,6 +95,8 @@ export interface SceneSetupDeps {
   renderedVehicleIds: Set<number>;
   renderedEmployeeIds: Set<number>;
   getTerrainSurfaceY: (x: number, z: number) => number;
+  /** Smoothed (marching-cubes) terrain surface Y sampler — the BlastPlanOverlay's ground tints (#1006) conform to this, not the stepped voxel-column height. */
+  getSmoothTerrainSurfaceY: (x: number, z: number) => number;
   landscapeEdgeHeightSampler: (ctx: MiningContext) => ((x: number, z: number) => number) | null;
   playableCut: (grid: VoxelGrid, edgeHeight?: (x: number, z: number) => number) => PlayableCut;
   rebuildBorderWall: (ctx: MiningContext) => void;
@@ -185,7 +187,7 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   deps.blastEffects = new BlastEffects(scene, deps.sm.camera);
 
   // Blast plan overlay (hidden until shown)
-  deps.blastOverlay = new BlastPlanOverlay(scene);
+  deps.blastOverlay = new BlastPlanOverlay(scene, deps.getSmoothTerrainSurfaceY);
 
   // Ghost previews (initially empty)
   deps.ghosts = new GhostMesh(scene);

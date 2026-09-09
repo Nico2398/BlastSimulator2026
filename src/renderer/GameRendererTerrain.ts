@@ -21,6 +21,12 @@ import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 
+// Re-exported so GameRenderer.ts can pull the smoothed-surface sampler
+// through this module's existing terrain-helpers import, alongside
+// getTerrainSurfaceY below, instead of adding a second import line for a
+// sibling function that lives in core for the same reason (#1006 finding 4).
+export { getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
+
 /**
  * Mutable GameRenderer fields these terrain helpers read/write, passed in
  * place of `this` (#767). `refreshPanLeash` is threaded through as a

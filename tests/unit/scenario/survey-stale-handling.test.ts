@@ -150,6 +150,20 @@ describe('survey-stale-handling — stale detection', () => {
 
 // ── Stale visual rendering ─────────────────────────────────────────────────
 
+// GroundTintLayer (#1006) merges every confidence point into ONE mesh with
+// per-vertex colour AND per-vertex alpha (the color attribute's w channel)
+// instead of one mesh-per-point with its own material.color/opacity — a
+// point's own cell patch is always 2 triangles (6 vertices), in `show()`'s
+// points order, inside the shared geometry.
+const VERTS_PER_POINT = 6;
+
+function pointRGBA(scene: THREE.Scene, pointIndex: number): { r: number; g: number; b: number; a: number } {
+  const mesh = scene.children[0] as THREE.Mesh;
+  const colorAttr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const idx = pointIndex * VERTS_PER_POINT;
+  return { r: colorAttr.getX(idx), g: colorAttr.getY(idx), b: colorAttr.getZ(idx), a: colorAttr.getW(idx) };
+}
+
 describe('survey-stale-handling — stale visual rendering', () => {
   it('fresh survey renders with confidence-coloured marker', () => {
     const scene = new THREE.Scene();
@@ -158,11 +172,9 @@ describe('survey-stale-handling — stale visual rendering', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.85, fresh: true },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g } = pointRGBA(scene, 0);
     // High confidence → green dominant (g > r)
-    expect(mat.color.g).toBeGreaterThan(mat.color.r);
+    expect(g).toBeGreaterThan(r);
     overlay.dispose();
   });
 
@@ -173,13 +185,11 @@ describe('survey-stale-handling — stale visual rendering', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.85, fresh: false },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    const mesh = group.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
+    const { r, g, b } = pointRGBA(scene, 0);
     // Grey → all channels ~0.5
-    expect(mat.color.r).toBeCloseTo(0.5, 1);
-    expect(mat.color.g).toBeCloseTo(0.5, 1);
-    expect(mat.color.b).toBeCloseTo(0.5, 1);
+    expect(r).toBeCloseTo(0.5, 1);
+    expect(g).toBeCloseTo(0.5, 1);
+    expect(b).toBeCloseTo(0.5, 1);
     overlay.dispose();
   });
 
@@ -192,21 +202,16 @@ describe('survey-stale-handling — stale visual rendering', () => {
       { x: 5, z: 5, surfaceY: 4, confidence: 0.8, fresh: true },
     ];
     overlay.show({ points: freshPoints, opacity: 0.7 });
-    const group = scene.children[0] as THREE.Group;
-    const freshMesh = group.children[0] as THREE.Mesh;
-    const freshMat = freshMesh.material as THREE.MeshBasicMaterial;
-    const freshOpacity = freshMat.opacity;
+    const freshOpacity = pointRGBA(scene, 0).a;
 
     // Stale point
     const stalePoints: SurveyConfidencePoint[] = [
       { x: 5, z: 5, surfaceY: 4, confidence: 0.8, fresh: false },
     ];
     overlay.show({ points: stalePoints, opacity: 0.7 });
-    const staleMesh = group.children[0] as THREE.Mesh;
-    const staleMat = staleMesh.material as THREE.MeshBasicMaterial;
-    const staleOpacity = staleMat.opacity;
+    const staleOpacity = pointRGBA(scene, 0).a;
 
-    // Stale should have lower effective opacity (0.25 multiplier)
+    // Stale should have lower effective opacity (STALE_OPACITY multiplier)
     expect(staleOpacity).toBeLessThan(freshOpacity);
     overlay.dispose();
   });
@@ -219,18 +224,18 @@ describe('survey-stale-handling — stale visual rendering', () => {
       { x: 10, z: 10, surfaceY: 4, confidence: 0.85, fresh: false },
     ];
     overlay.show({ points, opacity: 0.6 });
-    const group = scene.children[0] as THREE.Group;
-    expect(group.children.length).toBe(2);
+    const mesh = scene.children[0] as THREE.Mesh;
+    const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // Merged into one mesh (#1006) — its vertex count still scales with point count.
+    expect(posAttr.count).toBe(points.length * VERTS_PER_POINT);
 
     // Fresh point should be green-dominant
-    const freshMesh = group.children[0] as THREE.Mesh;
-    const freshMat = freshMesh.material as THREE.MeshBasicMaterial;
-    expect(freshMat.color.g).toBeGreaterThan(freshMat.color.r);
+    const fresh = pointRGBA(scene, 0);
+    expect(fresh.g).toBeGreaterThan(fresh.r);
 
     // Stale point should be grey
-    const staleMesh = group.children[1] as THREE.Mesh;
-    const staleMat = staleMesh.material as THREE.MeshBasicMaterial;
-    expect(staleMat.color.r).toBeCloseTo(0.5, 1);
+    const stale = pointRGBA(scene, 1);
+    expect(stale.r).toBeCloseTo(0.5, 1);
 
     overlay.dispose();
   });
