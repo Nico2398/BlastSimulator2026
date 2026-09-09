@@ -1510,14 +1510,14 @@
     },
     "building_living_quarters_t1": {
       "builder": "buildings_t1.py",
-      "triangles": 4612,
-      "glbKb": 195,
+      "triangles": 4216,
+      "glbKb": 187,
       "size": [
         3.17,
-        2.69,
+        2.67,
         3.17
       ],
-      "groundY": -0.02,
+      "groundY": 0,
       "tints": [
         "TintBody"
       ],
@@ -1540,7 +1540,7 @@
       ],
       "nodes": {
         "Body": {
-          "triangles": 4612,
+          "triangles": 4216,
           "parts": [
             "BBar0",
             "BBar1",
@@ -1562,11 +1562,8 @@
             "BBar9",
             "BRailHi",
             "BRailLo",
-            "Ball",
             "Cell2Plate",
             "Cell2Strap",
-            "Chain0",
-            "Chain1",
             "EntryJamb",
             "EntryKnob",
             "EntryLeaf",

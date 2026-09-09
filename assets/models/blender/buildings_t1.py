@@ -7,8 +7,7 @@
 * research_center    Think Tank Tent: a patched wall tent with guy ropes, lightbulb sign, whiteboard, lawn chair, campfire.
 * living_quarters    The Cells: an open-topped cage of cheap galvanized bars on a low steel kick plate,
                      no roof so the mattress and open steel toilet inside are visible from above, a
-                     scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut),
-                     ball and chain.
+                     scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut).
 * explosive_warehouse Boom Closet: a two-seat outhouse stuffed with dynamite, TNT stencil, lit fuse, danger sign, sandbags.
 * freight_warehouse  The Pile: a junk heap under a tarp on crooked poles, bathtub, bent bike, scale, STUFF sign, rats.
 * vehicle_depot      Rusty Garage: a rusted tin lean-to, car on bricks with the hood up, oil puddle, GAR GE sign, work lamp.
@@ -1086,8 +1085,8 @@ def build_research_center(sx, sz, ex, xx, m):
 def build_living_quarters(sx, sz, ex, xx, m):
     """The Cells: an open-topped cage of cheap galvanized bars on a low welded kick plate — no solid walls
     and no roof, so the mattress and the open steel toilet inside are visible from the game camera. The
-    middle cell is a rusty welded plate instead of a bar wall. A scavenged watchtower with a pyramidal cap
-    and a cold spotlight beam aimed at the entry, and a dumped ball and chain, complete the yard."""
+    middle cell is a rusty welded plate instead of a bar wall. A scavenged watchtower with a pyramidal
+    cap and a cold spotlight beam aimed at the entry stands over the yard."""
     parts = dirt_lot(sx, sz, m, mat=m['concrete'])
     w, d = 2.7, 2.5
     cy = -0.1
@@ -1168,25 +1167,29 @@ def build_living_quarters(sx, sz, ex, xx, m):
         parts += text(f'Num{num}', num, (nx, yf + 0.1, z0 + 0.55), 0.36, m['white'], yaw=180)
 
     # Inside the cage: one thin mattress and one open steel toilet — enough squalor for one cell, visible
-    # straight down through the open top.
-    mx, my = ex * 0.55, back_y + 0.4
-    mattress = box('Mattress', (0.62, 1.3, 0.1), loc=(mx, my, z0 + kick_h + 0.05))
+    # straight down through the open top. Both are sized and placed to sit clear of every wall, with a
+    # margin at least as wide as their own bevel, so nothing pokes through the bars.
+    mx, my = ex * 0.55, back_y + 0.6
+    mattress = box('Mattress', (0.6, 1.0, 0.1), loc=(mx, my, z0 + kick_h + 0.05))
     bevel(mattress, 0.03, 2)
     assign(mattress, m['mattress'])
     parts.append(mattress)
-    pillow = box('Pillow', (0.5, 0.24, 0.06), loc=(mx, my - 0.5, z0 + kick_h + 0.13))
+    pillow = box('Pillow', (0.46, 0.22, 0.06), loc=(mx, back_y + 0.24, z0 + kick_h + 0.13))
     bevel(pillow, 0.02, 2)
     assign(pillow, m['white'])
     parts.append(pillow)
-    wx, wy = xx * 0.55, back_y + 0.35
-    bowl = cylinder('WC.Bowl', 0.19, 0.34, loc=(wx, wy, z0 + kick_h + 0.17), axis='Z', segments=14, radius2=0.11)
+    # The toilet faces out into the cage with its tank flush against the back wall behind it, like a real
+    # fixture rather than a bowl floating in the middle of the room; the bowl flares wider toward the
+    # rim (radius2), narrower at the floor, instead of the tapered-bucket shape a flipped radius gives.
+    wx, wy = xx * 0.55, back_y + 0.55
+    bowl = cylinder('WC.Bowl', 0.12, 0.34, loc=(wx, wy, z0 + kick_h + 0.17), axis='Z', segments=14, radius2=0.19)
     bevel(bowl, 0.02, 2)
     assign(bowl, m['steel'])
     parts.append(bowl)
     seat = torus('WC.Seat', 0.17, 0.03, loc=(wx, wy, z0 + kick_h + 0.35), major_segments=16, minor_segments=6)
     assign(seat, m['dark'])
     parts.append(seat)
-    tank = box('WC.Tank', (0.26, 0.14, 0.32), loc=(wx, wy + 0.2, z0 + kick_h + 0.5))
+    tank = box('WC.Tank', (0.26, 0.14, 0.32), loc=(wx, wy - 0.24, z0 + kick_h + 0.5))
     bevel(tank, 0.02, 2)
     assign(tank, m['steel'])
     parts.append(tank)
@@ -1221,15 +1224,6 @@ def build_living_quarters(sx, sz, ex, xx, m):
                     radius2=0.16, rot=(-25, 0, 0))
     assign(beam, m['spot'])
     parts += [lampbox, lens, beam]
-    # Ball and chain, dumped in the open middle of the cage, clear of the doors and the tower.
-    ball = sphere('Ball', 0.26, loc=(0, yf - 0.35, 0.26), segments=14, rings=8)
-    assign(ball, m['dark'])
-    parts.append(ball)
-    for k in range(2):
-        link = torus(f'Chain{k}', 0.07, 0.024, loc=(0, yf - 0.62 - k * 0.13, 0.07),
-                     rot=(90, 0, 0), major_segments=10, minor_segments=5)
-        assign(link, m['steel'])
-        parts.append(link)
     pivot('Body', (0, 0, 0), parts)
 
 
