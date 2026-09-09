@@ -14,6 +14,7 @@
 // full-scene dim shader.
 
 import * as THREE from 'three';
+import type { SurfaceHeightSampler } from './GroundTint.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -80,13 +81,22 @@ export class SelectionOverlay {
    */
   private readonly regionGroup: THREE.Group;
   private readonly surfaceYAt: (x: number, z: number) => number;
+  /**
+   * Smoothed (marching-cubes) ground-tint sampler (#1006) — the region tint,
+   * blocked-tile mark, and any conforming ring drawn against this overlay's
+   * ground follow this height instead of `surfaceYAt`'s stepped voxel-column
+   * height. Optional so every pre-#1006 call site keeps compiling unchanged.
+   */
+  private readonly smoothSurfaceYAt: SurfaceHeightSampler | undefined;
   private flashUntil = 0;
   private region: OverlayRegion | null = null;
   private blockedTile: { x: number; z: number } | null = null;
 
-  constructor(scene: THREE.Scene, surfaceYAt: (x: number, z: number) => number) {
+  constructor(scene: THREE.Scene, surfaceYAt: (x: number, z: number) => number, smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
     this.surfaceYAt = surfaceYAt;
+    this.smoothSurfaceYAt = smoothSurfaceYAt;
+    void this.smoothSurfaceYAt; // TODO(implementer, #1006): read once conforming shapes are drawn against it
     this.group = new THREE.Group();
     this.group.name = 'placement-selection-overlay';
     this.regionGroup = new THREE.Group();

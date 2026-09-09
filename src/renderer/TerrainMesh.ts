@@ -389,7 +389,10 @@ export class TerrainMesh {
    */
   getSurveyOverlay(): SurveyConfidenceOverlay {
     if (!this.surveyOverlay) {
-      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene);
+      // TODO(implementer, #1006): wire the smoothed ground-tint sampler
+      // through once GameRenderer threads it to TerrainMesh — this stub
+      // keeps the overlay's quads at their pre-#1006 flat, fixed-offset height.
+      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, () => 0);
     }
     return this.surveyOverlay;
   }

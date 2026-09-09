@@ -7,6 +7,7 @@ import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
+import type { SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Config ----------
 
@@ -86,7 +87,14 @@ export class BlastPlanOverlay {
   /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
   private readonly holePositions = new Map<number, THREE.Vector3>();
 
-  constructor(scene: THREE.Scene) {
+  /**
+   * `smoothSurfaceYAt`, when given, is the ground-tint sampler (#1006) the
+   * energy heatmap conforms to instead of the flat, fixed-offset circles it
+   * drew before. Optional so every pre-#1006 call site (tests constructing
+   * an overlay with no ground-conforming overlays to exercise) keeps
+   * compiling unchanged.
+   */
+  constructor(scene: THREE.Scene, _smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
     this.scene.add(this.group);
     this.group.visible = false;

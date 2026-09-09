@@ -176,3 +176,13 @@ export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number)
   if (!grid) return 0;
   return computeVoxelColumnSurfaceY(grid, x, z) + 1;
 }
+
+/**
+ * Smoothed (marching-cubes) terrain surface Y at the given (x, z) column —
+ * the height a ground tint patch (#1006) conforms to, unlike
+ * getTerrainSurfaceY's per-voxel-column step height. Takes `grid` directly
+ * for the same reason getTerrainSurfaceY does (see above).
+ */
+export function getSmoothTerrainSurfaceY(_grid: VoxelGrid | null, _x: number, _z: number): number {
+  throw new Error('not implemented');
+}

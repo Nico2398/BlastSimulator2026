@@ -44,7 +44,7 @@ import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.j
 import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions } from './GameRendererSync.js';
 import {
   rebuildTerrain, remeshTerrainRegion, siteBoundsChanged, playableCut,
-  landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY,
+  landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
   type TerrainDeps,
 } from './GameRendererTerrain.js';
 import {
@@ -55,7 +55,7 @@ import {
 import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
-  raycastSurfaceY, raycastTerrainFromNDC, surfaceYAt, pickables,
+  raycastSurfaceY, raycastTerrainFromNDC, surfaceYAt, smoothSurfaceYAt, pickables,
   resolveFragmentId, entityWorldPosition, type PickingDeps,
 } from './GameRendererPicking.js';
 
@@ -409,6 +409,11 @@ export class GameRenderer {
     return surfaceYAt(this.pickingDeps(), x, z);
   }
 
+  /** Public wrapper around `getSmoothTerrainSurfaceY`, mirroring surfaceYAt above — the sampler ground tints (#1006) conform to. See GameRendererPicking.ts. */
+  smoothSurfaceYAt(x: number, z: number): number {
+    return smoothSurfaceYAt(this.pickingDeps(), x, z);
+  }
+
   /** Exact rendered-mesh height at (x, z) via a vertical raycast. Returns null off the terrain. See GameRendererPicking.ts. */
   raycastSurfaceY(x: number, z: number): number | null {
     return raycastSurfaceY(this.pickingDeps(), x, z);
@@ -437,6 +442,11 @@ export class GameRenderer {
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
     return getTerrainSurfaceY(this.lastGrid, x, z);
+  }
+
+  /** Smoothed (marching-cubes) terrain surface Y at (x, z) — the sampler ground tints (#1006) conform to. */
+  private getSmoothTerrainSurfaceY(x: number, z: number): number {
+    return getSmoothTerrainSurfaceY(this.lastGrid, x, z);
   }
 
   /** A blast fired at (originX, originZ) — scatters any nearby bird flock (#458 T7.2/D12/A26). See GameRendererBlastVisuals.ts. */
@@ -637,12 +647,14 @@ export class GameRenderer {
       // intermediate applySceneSetupDeps(), so a `this`-bound callback would
       // read fields `deps` had already moved past (#767 regression).
       getTerrainSurfaceY: () => 0,
+      getSmoothTerrainSurfaceY: () => 0,
       landscapeEdgeHeightSampler: ctx => landscapeEdgeHeightSampler(ctx),
       playableCut: (grid, edgeHeight) => playableCut(grid, edgeHeight),
       rebuildBorderWall: () => {},
       siteBoundsChanged: () => false,
     };
     deps.getTerrainSurfaceY = (x, z) => getTerrainSurfaceY(deps.lastGrid, x, z);
+    deps.getSmoothTerrainSurfaceY = (x, z) => getSmoothTerrainSurfaceY(deps.lastGrid, x, z);
     deps.rebuildBorderWall = ctx => this.rebuildBorderWallCallback(deps, ctx);
     deps.siteBoundsChanged = grid => this.siteBoundsChangedCallback(deps, grid);
     return deps;
@@ -702,6 +714,7 @@ export class GameRenderer {
       fragments: this.fragments,
       blastOverlay: this.blastOverlay,
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+      getSmoothTerrainSurfaceY: (x, z) => this.getSmoothTerrainSurfaceY(x, z),
     };
   }
 }

@@ -4,6 +4,7 @@
 // Stale (expired) points = grey.
 
 import * as THREE from 'three';
+import type { SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
 
@@ -81,7 +82,13 @@ export class SurveyConfidenceOverlay {
   private readonly scene: THREE.Scene;
   private readonly group = new THREE.Group();
 
-  constructor(scene: THREE.Scene) {
+  /**
+   * `smoothSurfaceYAt`, when given, is the ground-tint sampler (#1006) each
+   * confidence quad conforms to instead of the flat, fixed-offset quad it
+   * drew before. Optional so every pre-#1006 call site keeps compiling
+   * unchanged.
+   */
+  constructor(scene: THREE.Scene, _smoothSurfaceYAt?: SurfaceHeightSampler) {
     this.scene = scene;
     this.scene.add(this.group);
     this.group.visible = false;
