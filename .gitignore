@@ -46,3 +46,6 @@ __pycache__/
 
 # `npm run long` handles — runner-local pid/log/exit files, never a deliverable
 .agentic/
+
+# Blender auto-backups (written beside each .blend on save)
+*.blend1

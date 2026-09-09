@@ -32,6 +32,7 @@
     "validate:state": "tsx scripts/validate-state-schema.ts",
     "models:defs": "tsx scripts/export-model-defs.ts",
     "models:build": "npm run models:defs && python3 assets/models/blender/build.py",
+    "models:manifest": "tsx scripts/model-manifest.ts",
     "models:preview": "tsx scripts/model-preview.ts"
   },
   "dependencies": {

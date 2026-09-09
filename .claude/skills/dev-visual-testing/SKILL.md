@@ -93,8 +93,8 @@ npm run models:preview -- worker_driller vehicle_drill_rig   # → screenshots/m
 python3 assets/models/blender/sheet.py --cols 4 worker        # tile captures into one sheet
 ```
 
-`assets/models/README.md` holds the build/preview workflow and the naming
-conventions the renderer relies on.
+The `dev-3d-models` skill holds the generator pipeline, the art direction and
+the naming conventions the renderer relies on.
 
 ## Scenario Testing (State Dumps + Optional Screenshots)
 

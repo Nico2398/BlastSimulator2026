@@ -1,8 +1,8 @@
 // BlastSimulator2026 — Building Meshes
 // Each building is a model from the library — one .glb per type and tier,
 // sized to the footprint the game places it on (assets/models/blender/
-// buildings.py reads the same BuildingDefs). Tier 2/3 models are taller and
-// their `TintBody` walls brightened; a destroyed building becomes the shared
+// buildings.py reads the same BuildingDefs). Each tier is its own model,
+// taller than the tier below it; a destroyed building becomes the shared
 // rubble model stretched over its footprint. Entry/exit pins float above
 // the roof corners so the two doors read from any camera angle.
 
