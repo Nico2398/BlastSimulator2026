@@ -807,6 +807,19 @@ export class VoxelGrid {
 }
 
 /**
+ * Clamp a world (x, z) column to the grid's own column bounds — shared by
+ * computeVoxelColumnSurfaceY and getSmoothTerrainSurfaceY below, both of
+ * which need "nearest column inside the grid" rather than
+ * computeVoxelColumnSurfaceHeight's honest out-of-bounds NaN (#559).
+ */
+export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: number; cz: number } {
+  return {
+    cx: Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x))),
+    cz: Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z))),
+  };
+}
+
+/**
  * Resolve the surface Y for column (x, z) — the highest voxel with density
  * >= 0.5. Returns -1 if the column is entirely void. Out-of-bounds (x, z)
  * coordinates are clamped to the grid limits.
@@ -825,19 +838,6 @@ export class VoxelGrid {
  * can be outside grid bounds mid-flight, and needs "no ground" (-1) rather
  * than this function's clamp-to-edge-column behaviour in that case.
  */
-/**
- * Clamp a world (x, z) column to the grid's own column bounds — shared by
- * computeVoxelColumnSurfaceY and getSmoothTerrainSurfaceY below, both of
- * which need "nearest column inside the grid" rather than
- * computeVoxelColumnSurfaceHeight's honest out-of-bounds NaN (#559).
- */
-export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: number; cz: number } {
-  return {
-    cx: Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x))),
-    cz: Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z))),
-  };
-}
-
 export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
 

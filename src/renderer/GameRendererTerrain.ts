@@ -15,12 +15,17 @@ import type { LandscapeHandle } from '../console/commands/world.js';
 import { ensureLandscape } from '../console/commands/world.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight } from '../core/world/VoxelGrid.js';
-export { getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import type { SceneManager } from './SceneManager.js';
 import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
+
+// Re-exported so GameRenderer.ts can pull the smoothed-surface sampler
+// through this module's existing terrain-helpers import, alongside
+// getTerrainSurfaceY below, instead of adding a second import line for a
+// sibling function that lives in core for the same reason (#1006 finding 4).
+export { getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 
 /**
  * Mutable GameRenderer fields these terrain helpers read/write, passed in
@@ -177,4 +182,3 @@ export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number)
   if (!grid) return 0;
   return computeVoxelColumnSurfaceY(grid, x, z) + 1;
 }
-
