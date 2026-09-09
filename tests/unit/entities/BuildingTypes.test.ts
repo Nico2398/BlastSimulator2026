@@ -3,11 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   BUILDING_DEFS,
-  createBuildingState,
   getAllBuildingTypes,
   getBuildingDef,
   getSurfaceY,
-  placeBuilding,
   type BuildingTier,
   type BuildingType,
   type RampVoxelType,
