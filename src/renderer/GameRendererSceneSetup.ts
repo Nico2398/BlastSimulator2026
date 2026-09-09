@@ -40,7 +40,7 @@ import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
-import { buildingCenterSurfaceY } from './EntitySync.js';
+import { buildingFootprintSurfaceY } from './EntitySync.js';
 
 /**
  * How far past the playable rect manual panning may wander (#458 T6.1/D13).
@@ -147,7 +147,7 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Buildings
   deps.buildings = new BuildingMesh(scene);
   for (const b of state.buildings.buildings) {
-    const surfaceY = buildingCenterSurfaceY(b, deps.getTerrainSurfaceY);
+    const surfaceY = buildingFootprintSurfaceY(b, deps.getTerrainSurfaceY);
     deps.buildings.addBuilding(b, surfaceY);
   }
 

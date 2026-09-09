@@ -60,11 +60,13 @@ export class BuildingMesh {
    * Tier 2/3 buildings are taller and slightly brighter.
    * Entry (green) and exit (orange) markers are added above the roof.
    *
-   * @param surfaceY - Terrain surface height under the building's footprint
-   *   centre. Buildings are static once placed, so unlike vehicles/characters
-   *   this is baked into the mesh at construction rather than corrected every
-   *   frame — pass the same `getTerrainSurfaceY` sample used for them, or the
-   *   building renders at y=0 and sits buried underground (#408).
+   * @param surfaceY - Terrain surface height under the building's footprint,
+   *   as the lowest of its 4 bounding-box corners (`buildingFootprintSurfaceY`
+   *   in EntitySync.ts) — a footprint spanning multiple voxel levels sits on
+   *   its lowest corner rather than floating or burying the opposite one.
+   *   Buildings are static once placed, so unlike vehicles/characters this is
+   *   baked into the mesh at construction rather than corrected every frame,
+   *   or the building renders at y=0 and sits buried underground (#408).
    */
   addBuilding(building: Building, surfaceY = 0): void {
     const def = getBuildingDef(building.type, building.tier);
