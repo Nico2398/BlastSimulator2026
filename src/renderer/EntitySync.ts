@@ -24,6 +24,25 @@ export function buildingCenterSurfaceY(
 }
 
 /**
+ * Terrain surface height for a building's whole footprint, not just its
+ * center — a footprint spanning multiple voxel columns can straddle a level
+ * change, so `buildingCenterSurfaceY`'s single center sample is wrong for
+ * those. Replaces `buildingCenterSurfaceY` under #1007.
+ *
+ * TODO(#1007): sample every voxel column the footprint covers and combine
+ * (e.g. max) instead of the single center point.
+ */
+export function buildingFootprintSurfaceY(
+  b: Building,
+  getSurfaceY: (x: number, z: number) => number,
+): number {
+  void b;
+  void getSurfaceY;
+  // TODO(#1007): implement — sample every voxel column the footprint covers.
+  return 0;
+}
+
+/**
  * Incrementally sync three entity collections against the current game state.
  * Adds new entities, removes gone ones, and updates existing buildings.
  * Mutates the three rendered-ID sets in place.

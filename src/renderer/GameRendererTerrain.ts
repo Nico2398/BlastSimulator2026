@@ -178,6 +178,7 @@ export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
  * on every sync), so it skips building a throwaway deps object just to read
  * one field.
  */
+// TODO(skeleton): body will be rewired to delegate to getSmoothTerrainSurfaceY under #1007
 export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number): number {
   if (!grid) return 0;
   return computeVoxelColumnSurfaceY(grid, x, z) + 1;
