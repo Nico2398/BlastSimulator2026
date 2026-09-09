@@ -9,18 +9,25 @@ import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 
 /**
- * Terrain surface height at a building's footprint center. Buildings are
- * placed by top-left corner (b.x, b.z), so the center offsets by half the
- * footprint size before sampling — shared by GameRenderer's initial load and
- * EntitySync's incremental add/update so both snap buildings identically.
+ * Terrain surface height for a building's whole footprint, not just its
+ * center — a footprint spanning multiple voxel levels buries one corner and
+ * floats the opposite one under a single center sample. Samples the
+ * footprint's 4 bounding-box corners and takes the lowest, so the building's
+ * flat base sits on (or below) every corner of the ground beneath it rather
+ * than clipping into a rising corner (#1007).
  */
-export function buildingCenterSurfaceY(
+export function buildingFootprintSurfaceY(
   b: Building,
   getSurfaceY: (x: number, z: number) => number,
 ): number {
   const def = getBuildingDef(b.type, b.tier);
   const { sizeX, sizeZ } = getDefSize(def);
-  return getSurfaceY(b.x + sizeX / 2, b.z + sizeZ / 2);
+  return Math.min(
+    getSurfaceY(b.x, b.z),
+    getSurfaceY(b.x + sizeX, b.z),
+    getSurfaceY(b.x, b.z + sizeZ),
+    getSurfaceY(b.x + sizeX, b.z + sizeZ),
+  );
 }
 
 /**
@@ -45,7 +52,7 @@ export function syncEntitySets(
 ): void {
   if (buildings) {
     for (const b of state.buildings.buildings) {
-      const surfaceY = buildingCenterSurfaceY(b, getSurfaceY);
+      const surfaceY = buildingFootprintSurfaceY(b, getSurfaceY);
       if (!renderedBuildingIds.has(b.id)) {
         buildings.addBuilding(b, surfaceY);
         renderedBuildingIds.add(b.id);

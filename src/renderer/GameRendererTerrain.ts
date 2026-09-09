@@ -14,7 +14,7 @@ import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
 import { ensureLandscape } from '../console/commands/world.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
-import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight } from '../core/world/VoxelGrid.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceHeight, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import type { SceneManager } from './SceneManager.js';
 import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
@@ -172,13 +172,18 @@ export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
 }
 
 /**
- * Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no
- * grid. Takes `grid` directly rather than the full `TerrainDeps` — this is
- * the hottest of these helpers (called per building/vehicle/employee/ghost
- * on every sync), so it skips building a throwaway deps object just to read
- * one field.
+ * Ground-contact height at the given (x, z) column, for entity placement.
+ * Returns 0 if no grid. Takes `grid` directly rather than the full
+ * `TerrainDeps` — this is the hottest of these helpers (called per
+ * building/vehicle/employee/ghost on every sync), so it skips building a
+ * throwaway deps object just to read one field.
+ *
+ * Delegates to getSmoothTerrainSurfaceY (#1006's fractional marching-cubes
+ * crossing height) rather than the old integer computeVoxelColumnSurfaceY+1
+ * — the terrain the player sees is marching cubes, so entities placed at the
+ * integer voxel top floated or sank up to ~1m off the rendered surface
+ * (#1007).
  */
 export function getTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: number): number {
-  if (!grid) return 0;
-  return computeVoxelColumnSurfaceY(grid, x, z) + 1;
+  return getSmoothTerrainSurfaceY(grid, x, z);
 }

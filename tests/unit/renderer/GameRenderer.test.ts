@@ -235,7 +235,10 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
     const ctx = makeCtx();
-    // Solid column at (5, z) up to y=3 — surface sits at y=4 (getTerrainSurfaceY returns y+1).
+    // Solid column at (5, z) up to y=3, air from y=4 up — getTerrainSurfaceY
+    // (#1007) now returns the fractional marching-cubes solid/air crossing,
+    // not the old integer voxel-top+1. Density steps 1 -> 0 exactly between
+    // y=3 and y=4, so the crossing (density == 0.5) sits at y=3.5.
     for (let y = 0; y <= 3; y++) {
       ctx.grid!.setVoxel(5, y, 5, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     }
@@ -252,7 +255,7 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
     expect(renderer.ghostCount).toBe(1);
     const mesh = sm.scene.children.find(c => !before.has(c)) as THREE.Mesh;
     expect(mesh).toBeDefined();
-    expect(mesh.position.y).toBeGreaterThan(4); // above the y=4 surface, not buried at raw targetY:0
+    expect(mesh.position.y).toBeGreaterThan(3.5); // above the fractional y=3.5 surface (#1007), not buried at raw targetY:0
   });
 });
 
@@ -365,8 +368,10 @@ describe('GameRenderer — camera framing', () => {
     const renderer = new GameRenderer(sm as any);
     const ctx = makeCtx();
     // Solid column under the grid's center (16, 16, the point
-    // frameCameraOnGrid frames on) up to y=9 — surface sits at y=10
-    // (getTerrainSurfaceY returns the topmost solid voxel + 1).
+    // frameCameraOnGrid frames on) up to y=9, air from y=10 up —
+    // getTerrainSurfaceY (#1007) now returns the fractional marching-cubes
+    // solid/air crossing, not the old integer voxel-top+1. Density steps
+    // 1 -> 0 exactly between y=9 and y=10, so the crossing sits at y=9.5.
     for (let y = 0; y <= 9; y++) {
       ctx.grid!.setVoxel(16, y, 16, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     }
@@ -378,7 +383,7 @@ describe('GameRenderer — camera framing', () => {
     expect(cx).toBe(16);
     expect(cz).toBe(16);
     expect(span).toBe(32);
-    expect(y).toBe(10); // not 0 — the stale-closure regression's symptom
+    expect(y).toBe(9.5); // not 0 — the stale-closure regression's symptom; not 10 — #1007's fractional crossing
   });
 });
 
