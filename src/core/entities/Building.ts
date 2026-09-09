@@ -7,6 +7,9 @@
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
+// `getSurfaceY` is imported for the implementer to wire into
+// `checkFootprintPlacement`'s flatness branch (#1008); not called yet.
+import { type VoxelGrid, getSurfaceY as _getSurfaceY } from './BuildingPlacement.js';
 
 // ── Building types ──
 
@@ -118,6 +121,19 @@ export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
   return size;
 }
 
+/**
+ * Whether every cell of a footprint placed at (x, z) sits at the same terrain
+ * height, per `heightAt` — the flatness rule the real placement path
+ * (`checkFootprintPlacement`) is missing (#1008).
+ */
+export function isFootprintFlat(
+  _footprint: ReadonlyArray<readonly [number, number]>,
+  _x: number, _z: number,
+  _heightAt: (cx: number, cz: number) => number,
+): boolean {
+  throw new Error('not implemented');
+}
+
 // ── Building instance ──
 
 export interface Building {
@@ -197,6 +213,7 @@ export function placeBuilding(
   originX: number = 0,
   originZ: number = 0,
   reservedId?: number,
+  voxelGrid?: VoxelGrid,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
 
@@ -204,9 +221,10 @@ export function placeBuilding(
     return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
   }
 
+  // TODO(#1008): thread voxelGrid into checkFootprintPlacement's flatness check.
   const check = checkFootprintPlacement(
     state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
-    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ,
+    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
   );
   if (!check.valid) {
     return { success: false, error: check.error! };
@@ -304,6 +322,7 @@ export function moveBuilding(
   originX: number = 0,
   originZ: number = 0,
   plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
+  voxelGrid?: VoxelGrid,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
@@ -312,9 +331,10 @@ export function moveBuilding(
     ...state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
     ...plannedOccupants,
   ];
+  // TODO(#1008): thread voxelGrid into checkFootprintPlacement's flatness check.
   const check = checkFootprintPlacement(
     occupants,
-    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ,
+    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
   );
   if (!check.valid) {
     return { success: false, error: check.error! };
@@ -415,6 +435,7 @@ export function checkFootprintPlacement(
   gridSizeZ: number,
   originX: number,
   originZ: number,
+  _voxelGrid?: VoxelGrid,
 ): { valid: boolean; error?: string } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);

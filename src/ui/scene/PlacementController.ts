@@ -120,6 +120,17 @@ export class PlacementController {
    */
   get refusalReason(): ClaimRefusalReason | null { return this.claimRefusalReason; }
 
+  /**
+   * Register the predicate the controller asks whether the live footprint
+   * covers only flat ground (#1008) — separate from `claimCheck`, which asks
+   * about site-claim ownership rather than terrain shape.
+   */
+  setFootprintCheck(_fn: ((x: number, z: number) => boolean) | null): void {
+    // TODO: implement
+  }
+  /** True when the live footprint fails the flatness check (#1008). Backs the red cell / refused strip line. */
+  get footprintInvalid(): boolean { return false; }
+
   /** The live selection, or null before an anchor exists. */
   get selection(): PlacementSelection | null {
     if (!this.anchor) return null;

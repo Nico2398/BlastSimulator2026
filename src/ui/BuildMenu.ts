@@ -121,6 +121,10 @@ export class BuildMenu extends PanelBase {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
+  /** Register the terrain-height sampler used to refuse a footprint over uneven ground (#1008). */
+  setSurfaceHeightSampler(_fn: (x: number, z: number) => number): void {
+    // TODO: implement
+  }
 
   /** Re-render locale-dependent text (catalog, placed list, sections) after a language change. */
   refreshLocale(): void {

@@ -6,6 +6,10 @@ import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.j
 import type { BuildingType, BuildingTier } from './Building.js';
 import { getBuildingDef, type BuildingState, type Building } from './Building.js';
 
+// Re-exported so `Building.ts` (the real placement path) can take a `VoxelGrid`
+// parameter without importing `../world/VoxelGrid.js` directly (#1008).
+export type { VoxelGrid };
+
 // ── Types ──
 
 /** Sentinel value: this cell is under an existing building's footprint. */
