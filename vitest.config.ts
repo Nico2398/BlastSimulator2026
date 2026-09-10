@@ -75,6 +75,7 @@ export default defineConfig({
         'src/console/commands/mining/ramp.ts': { statements: 95, branches: 65, functions: 100, lines: 95 },
         'src/core/nav/Pathfinding.ts': { statements: 80, branches: 90, functions: 90, lines: 80 },
         'src/core/weather/WeatherEffects.ts': { statements: 70, branches: 75, functions: 75, lines: 70 },
+        'src/renderer/EmployeePictograms.ts': { statements: 60, branches: 90, functions: 80, lines: 60 },
         'src/renderer/GameRendererBlastVisuals.ts': { statements: 85, branches: 65, functions: 100, lines: 85 },
         'src/renderer/GameRendererPicking.ts': { statements: 75, branches: 100, functions: 40, lines: 75 },
         'src/renderer/GameRendererTerrain.ts': { statements: 85, branches: 55, functions: 70, lines: 85 },
