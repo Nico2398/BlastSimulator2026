@@ -112,6 +112,7 @@ export class BuildMenu extends PanelBase {
     this.bodyEl.append(
       this.catalogEl,
       this.makeRampSection(),
+      this.makeLevelGroundSection(),
       this.sectionLabel('ui.build.placed_buildings'),
       this.placedEl,
       this.statusEl,
@@ -240,6 +241,19 @@ export class BuildMenu extends PanelBase {
     btn.addEventListener('click', () => this.armRampTool());
 
     wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
+    return wrap;
+  }
+
+  // ── Level ground (carved terrain, not a building) ──────────────────────────
+  // TODO(#1009): implement — stub kept unwired from the section list until
+  // the ordering flow (armLevelGroundTool or equivalent) exists, matching how
+  // makeRampSection was staged. Returns an empty, non-rendering element so
+  // the method compiles and stays callable without altering the panel today.
+
+  /** Mirrors {@link makeRampSection}'s shape for a rectangular level-ground order. */
+  private makeLevelGroundSection(): HTMLElement {
+    const wrap = el('div');
+    wrap.style.display = 'none';
     return wrap;
   }
 

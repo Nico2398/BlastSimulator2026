@@ -722,8 +722,19 @@ export const VEHICLE_BASE_STATS = {
  */
 export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 
-/** Base excavation voxels/tick for a tier-1 rock digger (#555 ramp excavation — matches VEHICLE_BASE_STATS.rock_digger.workRate). */
+/**
+ * Base excavation voxels/tick for a tier-1 rock digger (#555 ramp
+ * excavation — matches VEHICLE_BASE_STATS.rock_digger.workRate). Shared by
+ * ramp excavation and ground levelling (#1009) — both are `rock_digger`
+ * work carved by the same driver/vehicle role.
+ */
 export const RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8;
+
+/** Largest rectangle area (voxels) `level_ground` will accept in one order (#1009, mirrors MAX_RAMP_LENGTH above). */
+export const MAX_LEVEL_GROUND_AREA = 400;
+
+/** Cost per voxel levelled, in game dollars (#1009, mirrors RAMP_COST_PER_METER in Ramp.ts). */
+export const LEVEL_GROUND_COST_PER_VOXEL = 12;
 
 /** Base duration (ticks) of a `place_building` action before the per-tier multiplier (#556 construction sites). */
 /**

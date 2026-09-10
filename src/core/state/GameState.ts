@@ -83,7 +83,9 @@ import type { RampDef } from '../mining/Ramp.js';
 // creating the building instantly). See SaveLoad.ts's migrateV13ToV14 stub.
 // v14 -> v15: Employee.hunger/breakNeed removed, fatigue is the sole need
 // gauge (#928). See SaveLoad.ts's migrateV14ToV15.
-export const SAVE_VERSION = 15;
+// v15 -> v16: ActionType gained 'level_ground' (#1009 — order-then-work
+// ground levelling, mirrors #555's 'dig_ramp_segment').
+export const SAVE_VERSION = 16;
 
 export interface GameConfig {
   seed: number;
@@ -108,6 +110,7 @@ export type ActionType =
   | 'drill_hole'
   | 'charge_hole'
   | 'dig_ramp_segment'
+  | 'level_ground'
   | 'set_sequence'
   | 'place_building'
   | 'demolish_building'
