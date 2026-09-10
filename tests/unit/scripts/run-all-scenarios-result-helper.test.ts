@@ -42,6 +42,7 @@ const {
   initBrowserMock,
   executeInteractionActionsMock,
   suspendDrawingMock,
+  resetOriginStorageMock,
   checkGoalMock,
   gameStateMock,
   fakePage,
@@ -56,10 +57,6 @@ const {
   };
   const fakeBrowser = {
     newPage: vi.fn(async () => fakePage),
-    createBrowserContext: vi.fn(async () => ({
-      newPage: vi.fn(async () => fakePage),
-      close: vi.fn(async () => {}),
-    })),
     close: vi.fn(async () => {}),
   };
   return {
@@ -73,6 +70,7 @@ const {
       uiState: {},
     })),
     suspendDrawingMock: vi.fn(async () => {}),
+    resetOriginStorageMock: vi.fn(async () => {}),
     checkGoalMock: vi.fn(async () => {}),
     gameStateMock: vi.fn(async () => ({})),
   };
@@ -105,6 +103,8 @@ vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   initBrowser: initBrowserMock,
   executeInteractionActions: executeInteractionActionsMock,
   suspendDrawing: suspendDrawingMock,
+  resetOriginStorage: resetOriginStorageMock,
+  CANVAS_READY_TIMEOUT_MS: 30000,
   DEFAULT_STEP_TIMEOUT: 60,
   SCREENSHOT_DIR: '/tmp/bs2026-run-all-scenarios-result-helper-fixture-screenshots',
 }));
