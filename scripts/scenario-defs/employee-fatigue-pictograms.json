@@ -1,0 +1,247 @@
+{
+  "name": "employee-fatigue-pictograms",
+  "description": "Visual check for #1013's non-working activity pictograms: stages three drillers at once so that at a single checkpoint tick, one (Bob, dispatched to a nearby target) is already RESTING at a living_quarters while another (Stan, dispatched to a farther target) is still WALKING toward the same building — the two states the issue exists to make visually distinguishable (Zzz vs a walking icon). Command-mode assertions pin this via pendingActionCount/collapsedCount alone (the state dump has no per-employee activity-kind field — SerializableGameState in src/console-api.ts, confirmed by reading it ahead of writing this file), so this scenario proves the ENGINE reaches the dual state deterministically; the actual pictogram rendering is only provable once #1013 lands and this file is re-run with --screenshots (dev-visual-testing's Visual Validation Protocol) — it cannot be proven at Red phase since EmployeePictograms.ts is still a stub.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:100000",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:100000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "employeeCount": 0
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:32,32",
+      "description": "Ordered before any employee exists — the first idle hire below (Walt) auto-claims and builds it (#556), landing him right next to it once done, which is what makes his own later rest near-instant and keeps him out of the way of the Stan/Bob pair this file is actually about. (32,32) is flat ground at this seed — confirmed live; (10,10)/(50,50) are not.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 32,
+          "z": 32
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Walt (#1) — builds the quarters above, ends up idle right beside it. Not part of the walking/resting pair; kept well above the warning threshold for the whole file by that near-zero-distance own rest cycle staying brief.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Stan (#2) — dispatched far below (48,48), the WALKING member of the pair at the checkpoint.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Bob (#3) — dispatched nearby below (38,34), the RESTING member of the pair at the checkpoint.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 2 x:48 z:48",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- same test-hook class as needs-collapse-visual's own dispatch steps (employees.ts's `dispatch` case comment). Sixteen tiles from Stan's spawn point -- travel(1/tick) + work(20 ticks, BASE_TASK_DURATION_TICKS) drains fatigue past the NEED_WARNING_THRESHOLDS.fatigue (25) crossing around cumulative tick ~81-82 (confirmed live against this exact seed/command sequence), after which the walk BACK to the living_quarters (16 tiles) is what the checkpoint below catches mid-flight.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:48 z:48"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 3 x:38 z:34",
+      "description": "Much closer than Stan's target -- Bob crosses the warning threshold and completes his short walk back to the living_quarters (confirmed live: fully arrived and resting by cumulative tick ~85, several ticks before Stan finishes his own longer walk back), so he is already RESTING while Stan is still WALKING at this file's checkpoint below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:38 z:34"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 80",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
+        "equals": {
+          "collapsedCount": 0,
+          "buildingCount": 1
+        },
+        "note": "By tick 80 the living_quarters Walt built stands complete (buildingCount:1, no separate wait_until needed -- construction finishes well inside this batch), Bob has already crossed his warning threshold and is mid-walk-or-arrived, and Stan is still working/travelling. No one has collapsed (all three stay well above NEED_COLLAPSE_THRESHOLDS.fatigue=5 through this batch, confirmed live)."
+      }
+    },
+    {
+      "command": "tick 7",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 7"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0,
+          "pendingActionCount": 2
+        },
+        "note": "Cumulative tick 87 -- the checkpoint this whole file is staged for. pendingActionCount:2 is two live rest PendingActions (Bob's and Stan's own), confirmed live at this exact tick against this exact command sequence: Bob is already resting at the living_quarters (arrived ~tick 85, RestActionHelpers.ts's rest duration holds him there for NEED_REST_DURATIONS.fatigue ticks) while Stan is still mid-walk back from (48,48), not due to arrive until several ticks later -- exactly the walking_to_rest + resting pair #1013's pictograms exist to tell apart. Once EmployeePictograms.ts is implemented, re-running this file with --screenshots should show a Zzz icon over Bob and a walking icon over Stan in the same frame; state-dump fields alone (no per-employee activity-kind field exists in SerializableGameState) are as far as command mode can pin this without it. Staging a fourth employee through to an actual collapse in the same window was tried and abandoned -- the three-way stagger above is already tuned tightly enough (a handful of ticks) that adding a fourth trajectory reliably knocked the Bob/Stan overlap this file depends on out of alignment; the visual feedback loop that lands with the implementation is better placed to add a collapsed-pictogram checkpoint on its own terms."
+      }
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ],
+      "role": "observe",
+      "description": "Textual confirmation of the three fatigue readings at the checkpoint -- Walt comfortably rested, Bob resting near the floor his rest will lift him from, Stan lower still and dropping (mid-walk)."
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "pictogram-pair",
+      "yaw": 30,
+      "pitch": 25,
+      "target": [32, 32],
+      "distance": 25
+    }
+  ]
+}

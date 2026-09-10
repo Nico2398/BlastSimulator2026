@@ -13,6 +13,7 @@ import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -179,6 +180,29 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(restAction!.targetX).toBe(nearResult.building!.x);
     expect(restAction!.targetZ).toBe(nearResult.building!.z);
     expect(restAction!.targetX).not.toBe(farResult.building!.x);
+  });
+
+  // #1013: computeEmployeeActivity must report actionType: 'rest' the
+  // instant a warning-threshold employee starts walking to a living_quarters
+  // — this is what lets EmployeePictograms.ts's pictogramKindFor distinguish
+  // a walk-to-rest from an ordinary task walk. Before beginRestWalk is wired
+  // in here, tickNeedRestoration sets destinationX/destinationZ directly
+  // without touching pendingActionType, so this reads null instead — the bug
+  // this test pins the fix for.
+  it('#1013: a routed employee reports actionType "rest" via computeEmployeeActivity while walking to the living_quarters', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    employee.fatigue = 20; // below the NEED_WARNING_THRESHOLDS.fatigue = 25 threshold
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    tickNeedRestoration(state);
+
+    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    expect(activity.kind).toBe('walking');
+    expect(activity.actionType).toBe('rest');
   });
 });
 
@@ -585,4 +609,37 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction).toBeDefined();
   });
 
+  // #1013: unlike tickNeedRestoration's proactive routing (mirrored test
+  // above), checkCollapse sets employee.collapsing = true for the whole walk
+  // AND rest — computeEmployeeActivity checks that flag first (it takes
+  // priority over every other state, EmployeeActivity.ts's own doc comment),
+  // so a collapse-triggered rest walk reports kind 'collapsed', never
+  // 'walking', and the 'collapsed' branch never surfaces actionType (it
+  // spreads IDLE, whose actionType is always null). The pictogram this drives
+  // (EmployeePictograms.ts's pictogramKindFor) is unambiguous either way — it
+  // maps 'collapsed' straight to the 'collapsed' pictogram regardless of
+  // actionType — so what this test pins is the underlying field directly:
+  // pendingActionType must still read 'rest' once tickCollapse wires
+  // beginRestWalk in, for every OTHER consumer of that field (e.g. the Crew
+  // panel's "current task" line) even though the pictogram layer itself
+  // never needs to read it for this particular kind.
+  it('#1013: a collapsed employee routed to a distant living_quarters gets pendingActionType "rest" while walking there (kind stays "collapsed", not "walking" — collapsing takes priority)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 3;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Within NEED_REST_SEARCH_RADIUS but not at the employee's own position —
+    // a genuine walk, not an instant rest-in-place.
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    tickCollapse(state);
+
+    expect(employee.pendingActionType).toBe('rest');
+    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    expect(activity.kind).toBe('collapsed');
+  });
 });

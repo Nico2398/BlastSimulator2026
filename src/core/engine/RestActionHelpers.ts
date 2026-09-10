@@ -189,3 +189,16 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
   emp.restNeedKey = null;
   emp.activeActionId = null;
 }
+
+/**
+ * Start `emp` walking toward (x, z) as a rest destination — lets the
+ * renderer distinguish a walk-to-rest from an ordinary task walk (#1013
+ * pictograms). Sets pendingActionType alongside the destination so
+ * computeEmployeeActivity (EmployeeActivity.ts) reports actionType: 'rest'
+ * for the whole walk, not just once the rest itself is executing.
+ */
+export function beginRestWalk(emp: Employee, x: number, z: number): void {
+  emp.destinationX = x;
+  emp.destinationZ = z;
+  emp.pendingActionType = 'rest';
+}

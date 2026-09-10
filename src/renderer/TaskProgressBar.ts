@@ -16,6 +16,8 @@ import type { PendingAction } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 import { GHOST_SIZE } from './GhostMesh.js';
+import { faceCamera } from './Billboard.js';
+import { EmployeeBillboardRoster, forEachEmployeeActivity } from './EmployeeBillboardRoster.js';
 
 // ---------- Config ----------
 
@@ -25,7 +27,7 @@ const FILL_COLOR  = 0x4fc76b; // --bsx-positive
 const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.4-wide capsule
 const BAR_HEIGHT = 0.08;
 /** Height above the anchor's local origin — clears the worker model's hard hat (ridge top ~1.33). */
-const BAR_Y_OFFSET = 1.55;
+export const BAR_Y_OFFSET = 1.55;
 /** Height above a construction site's ghost-mesh anchor — clears the ghost volume so the bar isn't occluded by it (#1012). */
 const SITE_BAR_Y_OFFSET = GHOST_SIZE / 2 + 0.5;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
@@ -45,9 +47,14 @@ interface Bar {
 export class TaskProgressBar {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.Camera;
-  private readonly bars = new Map<number, Bar>();
-  /** Bars anchored to a construction site (`place_building` PendingAction id) rather than a worker (#1012). */
-  private readonly siteBars = new Map<number, Bar>();
+  private readonly bars = new EmployeeBillboardRoster<Bar>(bar => bar.group);
+  /**
+   * Bars anchored to a construction site (`place_building` PendingAction id)
+   * rather than a worker (#1012). Same keyed-billboard lifecycle as `bars`, so
+   * it reuses the same roster type — only the id space differs (action id, not
+   * employee id).
+   */
+  private readonly siteBars = new EmployeeBillboardRoster<Bar>(bar => bar.group);
 
   // ---------- Shared resources (built once per instance, reused across every bar) ----------
   private readonly trackGeometry: THREE.PlaneGeometry;
@@ -83,7 +90,7 @@ export class TaskProgressBar {
 
   /** Number of progress bars currently rendered. */
   get count(): number {
-    return this.bars.size + this.siteBars.size;
+    return this.bars.count + this.siteBars.count;
   }
 
   /**
@@ -105,18 +112,15 @@ export class TaskProgressBar {
     const liveIds = new Set<number>();
     const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
 
-    for (const employee of employees) {
-      liveIds.add(employee.id);
-
-      const activity = computeEmployeeActivity(employee, vehicles);
+    forEachEmployeeActivity(employees, vehicles, liveIds, (employee, activity) => {
       const anchor = getWorkerAnchor(employee.id);
       const fraction = activity.kind === 'working' && activity.actionType !== 'place_building'
         ? taskProgressFraction(activity)
         : null;
 
       if (fraction === null || anchor === null) {
-        this.removeBar(employee.id);
-        continue;
+        this.bars.remove(employee.id);
+        return;
       }
 
       // getOrCreateBar snaps a fresh bar immediately, no easing-in from zero.
@@ -128,12 +132,10 @@ export class TaskProgressBar {
       // re-dispatched) — stepFillTween's backward branch ignores dt, so this
       // doesn't have to wait for the next update().
       this.retargetBar(bar, fraction, anchor);
-    }
+    });
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).
-    for (const id of Array.from(this.bars.keys())) {
-      if (!liveIds.has(id)) this.removeBar(id);
-    }
+    this.bars.sweep(liveIds);
 
     // Site-anchored bars for in-progress `place_building` actions (#1012) —
     // keyed by the action's own id rather than the claiming employee's, so
@@ -146,7 +148,7 @@ export class TaskProgressBar {
       const anchor = getSiteAnchor(action.id);
       if (anchor === null) {
         // Site not synced yet this frame, or gone.
-        this.removeSiteBar(action.id);
+        this.siteBars.remove(action.id);
         continue;
       }
 
@@ -174,9 +176,7 @@ export class TaskProgressBar {
     }
 
     // Sweep any site bar whose action is no longer an active place_building action.
-    for (const id of Array.from(this.siteBars.keys())) {
-      if (!liveSiteIds.has(id)) this.removeSiteBar(id);
-    }
+    this.siteBars.sweep(liveSiteIds);
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
@@ -191,12 +191,8 @@ export class TaskProgressBar {
 
   /** Remove all progress-bar meshes from the scene. */
   clearAll(): void {
-    for (const id of Array.from(this.bars.keys())) {
-      this.removeBar(id);
-    }
-    for (const id of Array.from(this.siteBars.keys())) {
-      this.removeSiteBar(id);
-    }
+    this.bars.clearAll();
+    this.siteBars.clearAll();
   }
 
   dispose(): void {
@@ -228,24 +224,24 @@ export class TaskProgressBar {
   private stepBar(bar: Bar, dt: number): void {
     bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
     bar.fillMesh.scale.x = bar.easedFraction;
-    bar.group.quaternion.copy(this.camera.quaternion);
+    faceCamera(bar.group, this.camera);
   }
 
   /**
-   * Look up an existing bar in `map` for `id`, or create and register one via
-   * `createBar`, snapped immediately to `fraction` (no easing-in from zero
+   * Look up an existing bar in `roster` for `id`, or create and register one
+   * via `createBar`, snapped immediately to `fraction` (no easing-in from zero
    * on first appearance). Shared by the worker-loop and site-loop
    * create-or-update branches in `sync()` (#1012).
    */
-  private getOrCreateBar(map: Map<number, Bar>, id: number, yOffset: number, fraction: number): Bar {
-    let bar = map.get(id);
+  private getOrCreateBar(roster: EmployeeBillboardRoster<Bar>, id: number, yOffset: number, fraction: number): Bar {
+    let bar = roster.get(id);
     if (!bar) {
       bar = this.createBar(yOffset);
       bar.tween = createFillTween(fraction);
       bar.easedFraction = fraction;
       bar.targetFraction = fraction;
       bar.fillMesh.scale.x = fraction;
-      map.set(id, bar);
+      roster.set(id, bar);
     }
     return bar;
   }
@@ -269,22 +265,5 @@ export class TaskProgressBar {
     group.add(fillMesh);
 
     return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
-  }
-
-  /** Detach and forget the bar for `id` in `map`, if any. Shared by removeBar/removeSiteBar. */
-  private removeFromMap(map: Map<number, Bar>, id: number): void {
-    const bar = map.get(id);
-    if (!bar) return;
-    bar.group.removeFromParent();
-    map.delete(id);
-  }
-
-  private removeBar(id: number): void {
-    this.removeFromMap(this.bars, id);
-  }
-
-  /** Remove the site-anchored bar for pending-action id `id`, if any (#1012). Mirrors removeBar(). */
-  private removeSiteBar(id: number): void {
-    this.removeFromMap(this.siteBars, id);
   }
 }

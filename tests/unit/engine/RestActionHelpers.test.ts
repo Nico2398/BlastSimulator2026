@@ -8,7 +8,7 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import {
-  deductRestCost, findNearestBuildingOfType, completeRestForEmployee,
+  deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestWalk,
 } from '../../../src/core/engine/RestActionHelpers.js';
 import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
 
@@ -232,5 +232,66 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.restNeedKey).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+});
+
+// #1013: beginRestWalk lets the renderer's pictogram lookup
+// (EmployeePictograms.ts's pictogramKindFor) tell a walk-to-rest apart from
+// an ordinary task walk — both report EmployeeActivityKind 'walking' from
+// computeEmployeeActivity, distinguished only by actionType. Every rest-
+// dispatch call site (tickNeedRestoration/tickCollapse, finishForceRest,
+// promoteActionToActive's rest branch) is meant to route through this helper
+// instead of setting destinationX/destinationZ directly, so pendingActionType
+// reads 'rest' the instant the walk starts, not just once the employee
+// arrives and pendingRestDuration/pendingRestNeedKey take over.
+describe('beginRestWalk (#1013)', () => {
+  const SEED = 42;
+
+  it('sets destinationX/destinationZ to the given coordinates', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    beginRestWalk(employee, 12, 34);
+
+    expect(employee.destinationX).toBe(12);
+    expect(employee.destinationZ).toBe(34);
+  });
+
+  it('sets pendingActionType to \'rest\'', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    beginRestWalk(employee, 12, 34);
+
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  it('boundary: (0, 0) is a valid rest destination (resting in place) — not mistaken for "unset"', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+
+    beginRestWalk(employee, 0, 0);
+
+    expect(employee.destinationX).toBe(0);
+    expect(employee.destinationZ).toBe(0);
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  it('overwrites a previously-set destination/pendingActionType (re-routing, e.g. a fresh collapse superseding a proactive-warning walk)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.destinationX = 1;
+    employee.destinationZ = 1;
+    employee.pendingActionType = 'drill_hole';
+
+    beginRestWalk(employee, 20, 21);
+
+    expect(employee.destinationX).toBe(20);
+    expect(employee.destinationZ).toBe(21);
+    expect(employee.pendingActionType).toBe('rest');
   });
 });

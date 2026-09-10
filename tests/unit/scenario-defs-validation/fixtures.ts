@@ -120,6 +120,7 @@ export const VISUAL_SCENARIO_NAMES = [
   'safety-projection-visual',
   'save-load-visual',
   'i18n-display-visual',
+  'employee-fatigue-pictograms',
   'main-menu-visual',
   'tutorial-steps-visual',
   'building-menu-visual',

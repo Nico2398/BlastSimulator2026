@@ -13,6 +13,7 @@ import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
+import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
@@ -39,6 +40,7 @@ export interface SyncDeps {
   terrainMeshRevision: number;
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
+  pictograms: EmployeePictograms | null;
   skybox: SkyboxWeather | null;
   clouds: CloudLayer | null;
   zone: ZoneBounds | null;
@@ -129,6 +131,15 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
       state.pendingActions,
       id => deps.characters!.getGroup(id),
       id => deps.ghosts?.getGroup(id) ?? null,
+    );
+  }
+
+  // Non-working activity pictograms — reflect the current working/idle state each sync (#1013)
+  if (deps.pictograms && deps.characters) {
+    deps.pictograms.sync(
+      state.employees.employees,
+      state.vehicles.vehicles,
+      id => deps.characters!.getGroup(id),
     );
   }
 

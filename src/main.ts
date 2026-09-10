@@ -721,6 +721,7 @@ window.__debugGridInfo = () => {
     terrainGridId: gameRenderer.terrain?.gridId ?? null,
     ghostCount: gameRenderer.ghostCount,
     taskProgressBarCount: gameRenderer.taskProgressBarCount,
+    pictogramCount: gameRenderer.pictogramCount,
     ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
     surveyOverlayVisible: gameRenderer.surveyOverlayVisible,
     lastGhostRevisionSynced: gameRenderer.lastGhostRevisionSynced,
