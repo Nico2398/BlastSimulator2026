@@ -462,6 +462,7 @@ describe('GameRenderer — lastWeather guard, no skybox (#767)', () => {
       renderedVehicleIds: new Set(),
       characters: null,
       renderedEmployeeIds: new Set(),
+      pictograms: null,
       lastGrid: null,
       ghosts: null,
       lastGhostRevision: -1,

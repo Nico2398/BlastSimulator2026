@@ -144,6 +144,7 @@ function makeZoneSyncDeps(state: GameState, characters: CharacterMesh): SyncDeps
     renderedVehicleIds: new Set(),
     characters,
     renderedEmployeeIds: new Set(),
+    pictograms: null,
     lastGrid: null,
     ghosts: null,
     lastGhostRevision: -1,
