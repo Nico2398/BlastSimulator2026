@@ -14,7 +14,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 import { interruptActiveAction, completePendingAction } from './TaskDispatch.js';
 import {
-  createRestPendingAction, findNearestBuildingOfType, findNearestLivingQuarters, resolveBuildingApproach,
+  createRestPendingAction, findNearestBuildingOfType, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk,
 } from './RestActionHelpers.js';
 import { isMidEvacuationWalk } from './Evacuation.js';
 import {
@@ -78,8 +78,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // confirms the employee has walked to the building (#437).
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = needKey;
-    emp.destinationX = approach.x;
-    emp.destinationZ = approach.z;
+    beginRestWalk(emp, approach.x, approach.z);
     result.routed.push(emp.id);
   }
 
@@ -192,8 +191,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // above) the employee is already "arrived" and the gate resolves next tick.
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = collapsedGauge;
-    emp.destinationX = targetX;
-    emp.destinationZ = targetZ;
+    beginRestWalk(emp, targetX, targetZ);
   }
 
   return result;

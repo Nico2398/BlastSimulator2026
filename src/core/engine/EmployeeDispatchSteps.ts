@@ -16,6 +16,7 @@ import {
   isRampSegmentClaimable, findStarvedActionForEmployee, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
+import { beginRestWalk } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation, isLicensedForRole } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
@@ -412,6 +413,11 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // payload, so resolveRestNeedKey returns null for it and this block is a
   // no-op there.
   if (action.type === 'rest') {
+    // destinationX/Z are already set above (common to every non-vehicle-gated
+    // action); beginRestWalk's own re-set of the same values is redundant but
+    // harmless — what this call actually adds is pendingActionType: 'rest',
+    // so computeEmployeeActivity (#1013) reports the walk-to-rest correctly.
+    beginRestWalk(employee, action.targetX, action.targetZ);
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {

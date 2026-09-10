@@ -5,14 +5,13 @@
 // anchor precedent TaskProgressBar.ts established for the progress bar shown
 // while an employee IS working (#546). The two are mutually exclusive per
 // employee: 'working' keeps the progress bar and shows no pictogram here.
-//
-// skeleton-writer (#1013): stubs only, no logic yet — see this file's
-// TODO markers. Implementation lands in the TDD implementer step.
 
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
+import { computeEmployeeActivity } from '../core/entities/EmployeeActivity.js';
+import { BAR_Y_OFFSET } from './TaskProgressBar.js';
 
 /**
  * Which non-working pictogram an employee shows. Mirrors
@@ -28,21 +27,180 @@ export type PictogramKind = 'collapsed' | 'resting' | 'walking_to_rest' | 'walki
  * Which pictogram (if any) `activity` should show. Null for 'working' —
  * that state keeps the progress bar, never an icon.
  */
-export function pictogramKindFor(_activity: EmployeeActivity): PictogramKind | null {
-  // TODO: implement
-  throw new Error('not implemented');
+export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | null {
+  switch (activity.kind) {
+    case 'working':
+      return null;
+    case 'collapsed':
+      return 'collapsed';
+    case 'resting':
+      return 'resting';
+    case 'idle':
+      return 'idle';
+    case 'driving':
+    case 'driving_to_task':
+      return 'driving';
+    case 'walking':
+      return activity.actionType === 'rest' ? 'walking_to_rest' : 'walking';
+  }
+}
+
+const ICON_SIZE = 0.5; // world units — matches TaskProgressBar's proportion to the ~0.4-wide capsule
+const CANVAS_SIZE = 128;
+
+/** Draw a glyph for `kind` onto a fresh canvas and wrap it as a shared material. */
+function buildIconMaterial(kind: PictogramKind): THREE.MeshBasicMaterial {
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  const ctx = canvas.getContext('2d')!;
+  drawGlyph(ctx, kind);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+}
+
+function drawGlyph(ctx: CanvasRenderingContext2D, kind: PictogramKind): void {
+  const c = CANVAS_SIZE;
+  ctx.clearRect(0, 0, c, c);
+
+  switch (kind) {
+    case 'collapsed': {
+      // Stark warning mark — a red X, visually opposite the calm 'resting' Zzz.
+      ctx.strokeStyle = '#e53935';
+      ctx.lineWidth = c * 0.14;
+      ctx.lineCap = 'round';
+      const pad = c * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(c - pad, c - pad);
+      ctx.moveTo(c - pad, pad);
+      ctx.lineTo(pad, c - pad);
+      ctx.stroke();
+      break;
+    }
+    case 'resting': {
+      // Calm "Z Z Z" sleep pictogram, full size/opacity — "there".
+      ctx.fillStyle = '#4fc3f7';
+      ctx.font = `bold ${c * 0.34}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Z', c * 0.28, c * 0.72);
+      ctx.font = `bold ${c * 0.26}px sans-serif`;
+      ctx.fillText('Z', c * 0.55, c * 0.48);
+      ctx.font = `bold ${c * 0.18}px sans-serif`;
+      ctx.fillText('Z', c * 0.75, c * 0.28);
+      break;
+    }
+    case 'walking_to_rest': {
+      // Same colour family as 'resting', but fainter and smaller — "en route",
+      // not "there yet" — plus a small arrow to read as travel.
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#4fc3f7';
+      ctx.font = `bold ${c * 0.24}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Z', c * 0.42, c * 0.55);
+      ctx.font = `bold ${c * 0.16}px sans-serif`;
+      ctx.fillText('Z', c * 0.66, c * 0.32);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#4fc3f7';
+      ctx.lineWidth = c * 0.05;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(c * 0.18, c * 0.82);
+      ctx.lineTo(c * 0.4, c * 0.82);
+      ctx.moveTo(c * 0.32, c * 0.74);
+      ctx.lineTo(c * 0.4, c * 0.82);
+      ctx.lineTo(c * 0.32, c * 0.9);
+      ctx.stroke();
+      break;
+    }
+    case 'walking': {
+      // Simple footsteps glyph — two offset ovals.
+      ctx.fillStyle = '#eceff1';
+      ctx.beginPath();
+      ctx.ellipse(c * 0.36, c * 0.62, c * 0.1, c * 0.18, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(c * 0.64, c * 0.38, c * 0.1, c * 0.18, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'driving': {
+      // Steering-wheel glyph — ring + spokes + hub.
+      ctx.strokeStyle = '#ffb300';
+      ctx.lineWidth = c * 0.08;
+      const r = c * 0.32;
+      ctx.beginPath();
+      ctx.arc(c / 2, c / 2, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(c / 2 - r, c / 2);
+      ctx.lineTo(c / 2 + r, c / 2);
+      ctx.moveTo(c / 2, c / 2 - r);
+      ctx.lineTo(c / 2 - r * 0.4, c / 2 + r * 0.7);
+      ctx.moveTo(c / 2, c / 2 - r);
+      ctx.lineTo(c / 2 + r * 0.4, c / 2 + r * 0.7);
+      ctx.stroke();
+      ctx.fillStyle = '#ffb300';
+      ctx.beginPath();
+      ctx.arc(c / 2, c / 2, c * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'idle': {
+      // Three neutral static dots ("...").
+      ctx.fillStyle = '#b0bec5';
+      const y = c * 0.5;
+      const r = c * 0.08;
+      for (const x of [c * 0.28, c * 0.5, c * 0.72]) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+  }
+}
+
+const PICTOGRAM_KINDS: readonly PictogramKind[] = ['collapsed', 'resting', 'walking_to_rest', 'walking', 'driving', 'idle'];
+
+interface Pictogram {
+  mesh: THREE.Mesh;
+  kind: PictogramKind;
 }
 
 /** Billboarded non-working-activity pictograms, one per employee, keyed by employee id. */
 export class EmployeePictograms {
-  // TODO: implement — store scene/camera and shared mesh resources here,
-  // mirroring TaskProgressBar's constructor (#1013).
-  constructor(_scene: THREE.Scene, _camera: THREE.Camera) {}
+  private readonly camera: THREE.Camera;
+  private readonly pictograms = new Map<number, Pictogram>();
+
+  // ---------- Shared resources (built once per instance, reused across every icon) ----------
+  private readonly geometry: THREE.PlaneGeometry;
+  private readonly materials: Record<PictogramKind, THREE.MeshBasicMaterial>;
+
+  // scene is unused: each icon mesh is parented directly under its resolved
+  // anchor group (sync() below), never the scene root — unlike
+  // TaskProgressBar, which needs a transient scene-root home for a freshly
+  // created bar group before its first sync() reparents it.
+  constructor(_scene: THREE.Scene, camera: THREE.Camera) {
+    this.camera = camera;
+
+    this.geometry = new THREE.PlaneGeometry(ICON_SIZE, ICON_SIZE);
+
+    const materials = {} as Record<PictogramKind, THREE.MeshBasicMaterial>;
+    for (const kind of PICTOGRAM_KINDS) {
+      materials[kind] = buildIconMaterial(kind);
+    }
+    this.materials = materials;
+  }
 
   /** Number of pictograms currently rendered. */
   get count(): number {
-    // TODO: implement
-    throw new Error('not implemented');
+    return this.pictograms.size;
   }
 
   /**
@@ -52,24 +210,77 @@ export class EmployeePictograms {
    * employee id to the CharacterMesh Group to billboard above.
    */
   sync(
-    _employees: readonly Employee[],
-    _vehicles: readonly Vehicle[],
-    _getAnchor: (id: number) => THREE.Group | null,
+    employees: readonly Employee[],
+    vehicles: readonly Vehicle[],
+    getAnchor: (id: number) => THREE.Group | null,
   ): void {
-    // TODO: implement
+    const liveIds = new Set<number>();
+
+    for (const employee of employees) {
+      liveIds.add(employee.id);
+
+      const activity = computeEmployeeActivity(employee, vehicles);
+      const kind = pictogramKindFor(activity);
+      const anchor = kind !== null ? getAnchor(employee.id) : null;
+
+      if (kind === null || anchor === null) {
+        this.removePictogram(employee.id);
+        continue;
+      }
+
+      let pictogram = this.pictograms.get(employee.id);
+      if (!pictogram) {
+        const mesh = new THREE.Mesh(this.geometry, this.materials[kind]);
+        mesh.position.set(0, BAR_Y_OFFSET, 0);
+        anchor.add(mesh);
+        pictogram = { mesh, kind };
+        this.pictograms.set(employee.id, pictogram);
+      } else {
+        if (pictogram.kind !== kind) {
+          pictogram.mesh.material = this.materials[kind];
+          pictogram.kind = kind;
+        }
+        if (pictogram.mesh.parent !== anchor) {
+          anchor.add(pictogram.mesh);
+        }
+      }
+    }
+
+    // Sweep any pictogram whose employee is no longer in the roster at all (death/removal).
+    for (const id of Array.from(this.pictograms.keys())) {
+      if (!liveIds.has(id)) this.removePictogram(id);
+    }
   }
 
   /** Animate/refresh billboard orientation. Call every frame with elapsed seconds. */
   update(_dt: number): void {
-    // TODO: implement
+    for (const pictogram of this.pictograms.values()) {
+      pictogram.mesh.quaternion.copy(this.camera.quaternion);
+    }
   }
 
   /** Remove all pictogram meshes from the scene. */
   clearAll(): void {
-    // TODO: implement
+    for (const id of Array.from(this.pictograms.keys())) {
+      this.removePictogram(id);
+    }
   }
 
   dispose(): void {
-    // TODO: implement
+    this.clearAll();
+    this.geometry.dispose();
+    for (const kind of PICTOGRAM_KINDS) {
+      this.materials[kind].map?.dispose();
+      this.materials[kind].dispose();
+    }
+  }
+
+  // ---------- Helpers ----------
+
+  private removePictogram(id: number): void {
+    const pictogram = this.pictograms.get(id);
+    if (!pictogram) return;
+    pictogram.mesh.removeFromParent();
+    this.pictograms.delete(id);
   }
 }
