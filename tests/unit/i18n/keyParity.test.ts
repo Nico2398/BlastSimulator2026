@@ -301,8 +301,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3476 (up from 3475): #1008 adds 1 key,
     // shell.placement.refused_uneven_ground, for the flat-footprint
     // placement refusal message, both locales.
+    // Baseline is now 3484 (up from 3476): #1009 adds 8 keys for the
+    // ground-levelling order feature — ui.crew.action_level_ground,
+    // ui.build.level_ground, ui.build.level_ground_ordered,
+    // ui.build.level_ground_instruction, mining.level_ground.cancel_usage,
+    // mining.level_ground.invalid_area, mining.level_ground.too_large,
+    // mining.level_ground.refused_building_overlap — both locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3476);
+    expect(Object.keys(en).length).toBe(3484);
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "level-ground-then-build",
-  "description": "#1009: ordering `level_ground` over a rectangle of uneven ground queues excavation work for a qualified rock_digger driver instead of carving anything synchronously. For seed:42's default staffed map, the 2x2 rect (14,17)-(15,18) sits on a genuine one-voxel step (surface Y=36 at x:14, Y=35 at x:15, across both z rows) — exactly management_office tier1's own 2x2 footprint. `build management_office at:14,17` is refused first (baseline: #1008's flat-footprint rule is live), then `level_ground minX:14 maxX:15 minZ:17 maxZ:18` is ordered and ticked to completion, after which the identical build order succeeds. `level_ground`/`build` steps are deliberately left untagged (no role) rather than 'player': BuildMenu.ts's ground-levelling section (`makeLevelGroundSection`) is still a skeleton stub with no real drag-a-rectangle control wired yet, so no click sequence exists to replay here — the visual-tester phase converts these to real `dragTiles` interactions once that UI lands.",
+  "description": "#1009: ordering `level_ground` over a rectangle of uneven ground queues excavation work for a qualified rock_digger driver instead of carving anything synchronously. For seed:42's default staffed map, the 2x2 rect (14,17)-(15,18) sits on a genuine one-voxel step (surface Y=36 at x:14, Y=35 at x:15, across both z rows) — exactly management_office tier1's own 2x2 footprint. `build management_office at:14,17` is refused first (baseline: #1008's flat-footprint rule is live), then `level_ground minX:14 maxX:15 minZ:17 maxZ:18` is ordered and drained to completion via a `pendingActionCount`-gated wait, after which the identical build order succeeds. All three of these steps click through the real BuildMenu.ts controls (`makeLevelGroundSection`/`armLevelGroundTool` wired a genuine drag-a-rectangle tool, mirroring the ramp tool) rather than falling back to console commands — `role: 'player'` throughout. The excavation wait is bounded to 100 ticks (the job itself completes in ~21 on this map/seed — 2 voxels plus travel) rather than a flat `tick 200`: staffed payroll (PAY_CYCLE_TICKS=10, 5 salaried employees) legitimately drains cash every pay cycle it runs through, and a needlessly long fixed pad drove cash negative before the second build's $8,000 could be charged, refusing it for insufficient funds instead of proving #1008's flat-footprint fix.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -30,10 +30,16 @@
     },
     {
       "command": "build management_office at:14,17",
-      "description": "Baseline: the rect is genuinely uneven (Y=36 at x:14, Y=35 at x:15) so #1008's flat-footprint rule refuses the order outright, before any level_ground order exists to make this pass.",
+      "description": "Baseline: the rect is genuinely uneven (Y=36 at x:14, Y=35 at x:15) so #1008's flat-footprint rule refuses the order outright, before any level_ground order exists to make this pass. Clicks through the real BuildMenu catalog + tile picker (mirrors nav-path-following-visual.json's identical uneven-footprint refusal pattern).",
       "interaction": [
-        { "type": "command", "command": "build management_office at:14,17" }
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 14, "z": 17 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
+      "role": "player",
       "commandOutcome": "refused",
       "expect": {
         "equals": {
@@ -44,30 +50,39 @@
     },
     {
       "command": "level_ground minX:14 maxX:15 minZ:17 maxZ:18",
-      "description": "Order ground-levelling over the same uneven rect. No BuildMenu control exists for this yet (see the scenario-level description), so this step stays untagged rather than 'player' until that UI lands.",
+      "description": "Order ground-levelling over the same uneven rect via the real BuildMenu control — armLevelGroundTool arms a rectangle drag exactly like armRampTool's line drag (makeLevelGroundSection, #1009).",
       "interaction": [
-        { "type": "command", "command": "level_ground minX:14 maxX:15 minZ:17 maxZ:18" }
+        { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-level-ground-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "dragTiles", "x1": 14, "z1": 17, "x2": 15, "z2": 18 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
+      "role": "player",
       "expect": {
         "decreased": ["cash"],
         "note": "Order-time cost (2 excess voxels x LEVEL_GROUND_COST_PER_VOXEL) is charged immediately, mirroring build_ramp's own order-then-work pattern."
       }
     },
     {
-      "command": "tick 200",
-      "description": "Drain the queued level_ground work — a qualified rock_digger driver walks to the rect and carves the 2 excess voxels down to the lower bench. Generously padded: the job itself is tiny (2 voxels), so this bounds travel time, not excavation time.",
-      "timeout": 60,
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:100",
+      "description": "Drain the queued level_ground work — a qualified rock_digger driver walks to the rect and carves the 2 excess voxels down to the lower bench. Gated on pendingActionCount reaching 0 (the level_ground action is the only one in flight at this point) rather than a flat `tick 200`: the job itself completes in ~21 ticks on this map/seed, and padding far past that needlessly burns staffed payroll (PAY_CYCLE_TICKS=10) against the second build's $8,000 below.",
+      "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 200" }
+        { "type": "waitUntil", "field": "pendingActionCount", "equals": 0, "maxTicks": 100, "timeoutMs": 30000 }
       ],
       "role": "setup"
     },
     {
       "command": "build management_office at:14,17",
-      "description": "The identical build order that was refused before levelling now succeeds — the rect reads as flat once the level_ground action has landed.",
+      "description": "The identical build order that was refused before levelling now succeeds — the rect reads as flat once the level_ground action has landed. Clicks through the real BuildMenu catalog + tile picker again (mirrors building-placement-visual.json's management_office placement).",
       "interaction": [
-        { "type": "command", "command": "build management_office at:14,17" }
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 14, "z": 17 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
+      "role": "player",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
