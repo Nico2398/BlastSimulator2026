@@ -58,11 +58,17 @@
     },
     {
       "command": "tick 10",
-      "description": "Mid-construction checkpoint: a staffed roster member has had time to walk to (2,6) and start work, but the tier-1 base duration is nowhere near spent -- the site is genuinely mid-in_progress, not finished. This is the capture point the visual-tester phase judges the site-anchored bar against (#1012): the bar should sit on the ghost at (2,6), not float above wherever the builder happens to be standing.",
+      "description": "Mid-construction checkpoint: a staffed roster member has had time to walk to (2,6) and start work, but the tier-1 base duration is nowhere near spent -- the site is genuinely mid-in_progress, not finished. This is the capture point the visual-tester phase judges the site-anchored bar against (#1012): the bar should sit on the ghost at (2,6), not float above wherever the builder happens to be standing. cameraFocus targets (2,6) at a close distance (matching the visual-tester's manual `--focus \"2,6,6\"` probe) so the world-space progress bar (0.6m x 0.08m) actually fills enough of the frame to be legible against the ghost's own shading, instead of the couple of pixels it renders as under the default wide top-down orbiting camera (#1012 visual-loop finding).",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 2,
+          "z": 6,
+          "distance": 6
         },
         {
           "type": "wait",
