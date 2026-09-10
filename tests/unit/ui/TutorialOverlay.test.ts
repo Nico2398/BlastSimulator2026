@@ -4,7 +4,7 @@ import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 
@@ -823,6 +823,89 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       setLocale('fr');
       expect(() => tut.refreshLocale()).not.toThrow();
+    });
+  });
+
+  describe('waiting state (#1014)', () => {
+    /** Drive the (private) advanceToNextStep forward until the given step id is showing. */
+    function advanceToStep(tut: any, id: string): void {
+      while (TUTORIAL_STEPS[tut.stepIndex]!.id !== id) {
+        tut.advanceToNextStep();
+      }
+    }
+
+    it('shows the WAITING chip and swaps the stage line to the waiting sentence once the buy order lands (build-living-quarters)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceToStep(tut, 'build-living-quarters');
+
+      state.plannedBuildings = [
+        { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 },
+      ];
+      tut.refreshGuide();
+
+      const waitingChip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
+      const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+      expect(waitingChip.style.display).not.toBe('none');
+      expect(stageEl.textContent).toBe(t('tutorial.waiting.building'));
+    });
+
+    it('keeps the WAITING chip hidden and the click instruction showing before the order is issued', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceToStep(tut, 'build-living-quarters');
+
+      tut.refreshGuide();
+
+      const waitingChip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
+      const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+      expect(waitingChip.style.display).toBe('none');
+      expect(stageEl.textContent).not.toBe(t('tutorial.waiting.building'));
+      expect(stageEl.textContent).not.toBe('');
+    });
+
+    it('hides the WAITING chip again once the order clears (building lands, plannedBuildings emptied)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceToStep(tut, 'build-living-quarters');
+
+      state.plannedBuildings = [
+        { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 },
+      ];
+      tut.refreshGuide();
+      const waitingChip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
+      expect(waitingChip.style.display).not.toBe('none');
+
+      state.plannedBuildings = [];
+      tut.refreshGuide();
+      expect(waitingChip.style.display).toBe('none');
+    });
+
+    it('never shows the WAITING chip on a genuinely one-click step (contract-accept), whatever the state holds', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceToStep(tut, 'contract-accept');
+
+      // Every "spent" domain lit up at once — contract-accept's stages carry
+      // no spentWhen at all, so none of this should matter.
+      state.plannedDrillHoles = [{} as never];
+      state.plannedChargesByHole = { '1': {} as never };
+      state.plannedRamps = [{} as never];
+      state.plannedBuildings = [
+        { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, actionId: 1, cost: 100 },
+      ];
+      tut.refreshGuide();
+
+      const waitingChip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
+      expect(waitingChip.style.display).toBe('none');
     });
   });
 });

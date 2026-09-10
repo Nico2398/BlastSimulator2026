@@ -13,8 +13,10 @@
 // tutorialSteps.test.ts exercises step-specific completion logic.
 
 import { describe, it, expect } from 'vitest';
-import { createHireStep } from '../../../src/ui/tutorialStepHelpers.js';
-import type { GameState } from '../../../src/core/state/GameState.js';
+import {
+  createHireStep, hasPendingActionOfType, hasPlannedBuildingOfType,
+} from '../../../src/ui/tutorialStepHelpers.js';
+import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import type { EmployeeRole } from '../../../src/core/entities/Employee.js';
 
 /** Minimal employee shape sufficient for getEmployees() in tutorialStepHelpers.ts. */
@@ -133,5 +135,79 @@ describe('tutorialStepHelpers — hire step completion (#409 regression)', () =>
     expect(snap.prevIdsWithRole).toEqual(expect.arrayContaining([1, 3]));
     expect(snap.prevIdsWithRole).not.toContain(2);
     expect(snap.prevIdsWithRole.length).toBe(2);
+  });
+});
+
+// #1014: hasPendingActionOfType / hasPlannedBuildingOfType back the tutorial
+// waiting-state's `spentWhen` checks (tutorialStages.ts) — a step's issued
+// order counts as "spent" once the simulation genuinely owns it.
+
+function stateWithPendingActions(actions: Partial<PendingAction>[]): GameState {
+  return {
+    pendingActions: actions.map((a, i) => ({
+      id: i + 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null,
+      ...a,
+    })),
+  } as unknown as GameState;
+}
+
+describe('hasPendingActionOfType (#1014)', () => {
+  it('reports true when a pending action of the given type is queued', () => {
+    const state = stateWithPendingActions([{ type: 'survey' }]);
+    expect(hasPendingActionOfType(state, 'survey')).toBe(true);
+  });
+
+  it('reports false when no pending action of that type exists', () => {
+    const state = stateWithPendingActions([{ type: 'drill_hole' }]);
+    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
+  });
+
+  it('reports false for an empty pendingActions array', () => {
+    const state = stateWithPendingActions([]);
+    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
+  });
+
+  it('counts a claimed (assigned/in_progress) action too, not only a queued one', () => {
+    const state = stateWithPendingActions([{ type: 'haul_debris', status: 'in_progress', holderId: 7 }]);
+    expect(hasPendingActionOfType(state, 'haul_debris')).toBe(true);
+  });
+
+  it('does not confuse two different action types present at once', () => {
+    const state = stateWithPendingActions([{ type: 'drill_hole' }, { type: 'charge_hole' }]);
+    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
+    expect(hasPendingActionOfType(state, 'charge_hole')).toBe(true);
+  });
+});
+
+function stateWithPlannedBuildings(types: string[]): GameState {
+  return {
+    plannedBuildings: types.map((type, i) => ({
+      id: i + 1, buildingId: i + 1, type, tier: 1, x: 0, z: 0, actionId: i + 1, cost: 100,
+    })),
+  } as unknown as GameState;
+}
+
+describe('hasPlannedBuildingOfType (#1014)', () => {
+  it('reports true when a building of the given type is ordered but not yet built', () => {
+    const state = stateWithPlannedBuildings(['living_quarters']);
+    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(true);
+  });
+
+  it('reports false when no planned building of that type exists', () => {
+    const state = stateWithPlannedBuildings(['freight_warehouse']);
+    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
+  });
+
+  it('reports false once the plannedBuildings list is empty (order landed, or never issued)', () => {
+    const state = stateWithPlannedBuildings([]);
+    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
+  });
+
+  it('does not confuse two different building types present at once', () => {
+    const state = stateWithPlannedBuildings(['driving_center', 'freight_warehouse']);
+    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
+    expect(hasPlannedBuildingOfType(state, 'freight_warehouse')).toBe(true);
   });
 });

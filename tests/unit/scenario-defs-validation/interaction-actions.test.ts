@@ -553,25 +553,31 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     8: 'employee hire role:driller',
     9: 'employee assign_skill 2 skill:blasting level:3',
     10: 'build living_quarters at:29,12',
-    13: 'build driving_center at:6,7',
-    15: 'employee train 2 skill:driving.drill_rig',
-    16: 'tick 25',
-    17: 'vehicle buy drill_rig',
-    18: 'employee train 1 skill:driving.excavator',
-    19: 'tick 25',
-    20: 'vehicle buy rock_digger',
-    21: 'build_ramp start:16,19 end:16,31 depth:8',
+    // #1014 inserts one new observe-only step here (index 11, "state" —
+    // asserts the tutorial card's waiting state once the order above lands,
+    // already declaring its own timeout >= 90 is not required since it has
+    // no heavy render of its own; excluded from this map on purpose) between
+    // the living_quarters order and its wait_until, shifting every index
+    // below down by 1 from the #923 numbering.
+    14: 'build driving_center at:6,7',
+    16: 'employee train 2 skill:driving.drill_rig',
+    17: 'tick 25',
+    18: 'vehicle buy drill_rig',
+    19: 'employee train 1 skill:driving.excavator',
+    20: 'tick 25',
+    21: 'vehicle buy rock_digger',
+    22: 'build_ramp start:16,19 end:16,31 depth:8',
     // #923 inserts three new steps here (time speed:8, wait_until
-    // orderedRampSegmentCount, time speed:1 — indices 22-24, each already
+    // orderedRampSegmentCount, time speed:1 — indices 23-25, each already
     // declaring its own timeout >= 90) between box-cut and drill_plan,
     // shifting every index below down further (net +2 from the #921
     // numbering: -1 for the removed 'time speed 2' step, +3 for these three).
     // #949 retunes the tutorial's own scripted plan (spacing:3/depth:6/(20,20)
     // -> spacing:4/depth:8/(22,20); amount:5/stemming:2 -> amount:4/stemming:2.5)
     // so the shot rates good-or-better instead of catastrophic.
-    25: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
-    35: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    39: 'sequence auto delay_step:25',
+    26: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
+    36: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
+    40: 'sequence auto delay_step:25',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

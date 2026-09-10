@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TutorialRails } from '../../../src/ui/tutorialRails.js';
 import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS } from '../../../src/ui/tutorialGuide.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
@@ -495,5 +496,104 @@ describe('TutorialRails — doneTarget survives at the rails level (#903)', () =
     const view = rails.refresh();
     expect(view.stageIndex).toBe(2);
     expect(view.stageTarget).toBe('.bs-train-btn');
+  });
+});
+
+// #1014: once a stage's own order is issued (spentWhen fires), the card
+// switches from "click this" to "waiting on the simulation", and the rails
+// release the highlight on the spent control without blocking it.
+describe('TutorialRails — waiting state (#1014)', () => {
+  function toolbarBuild(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const btn = document.createElement('button');
+    btn.dataset['panel'] = 'build';
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+    return withBox(btn);
+  }
+
+  /** Stand in for the Build panel's living_quarters buy button. */
+  function buyLivingQuartersButton(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-build-panel';
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-build-type', 'living_quarters');
+    const btn = document.createElement('button');
+    btn.className = 'bs-build-buy-btn';
+    wrap.appendChild(btn);
+    panel.appendChild(wrap);
+    document.body.appendChild(panel);
+    return withBox(btn);
+  }
+
+  it('build-living-quarters (issue\'s own example): reports waiting and releases the buy button\'s highlight once the order lands, keeping it clickable', () => {
+    toolbarBuild();
+    const buyBtn = buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+
+    const before = rails.refresh(s);
+    expect(before.waiting).toBe(false);
+    expect(buyBtn.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    const after = rails.refresh(s);
+
+    expect(after.waiting).toBe(true);
+    expect(after.waitingHint).toBe(t('tutorial.waiting.building'));
+    expect(buyBtn.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    expect(buyBtn.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('build-living-quarters: waiting clears once the building actually lands (plannedBuildings emptied)', () => {
+    toolbarBuild();
+    const buyBtn = buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    expect(rails.refresh(s).waiting).toBe(true);
+
+    s.plannedBuildings = [];
+    const cleared = rails.refresh(s);
+    expect(cleared.waiting).toBe(false);
+    expect(cleared.waitingHint).toBe('');
+    // Once the order is no longer outstanding, the control the stage
+    // resolves to is highlighted normally again — no residual "spent" state.
+    expect(buyBtn.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('refresh() called with no state argument stays exactly as it was before this issue (never reports waiting)', () => {
+    toolbarBuild();
+    buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+
+    const view = rails.refresh();
+    expect(view.waiting).toBe(false);
+    expect(view.waitingHint).toBe('');
+  });
+
+  it('a step whose stages carry no spentWhen (hire-surveyor) never reports waiting, however the state looks', () => {
+    const open = toolbarCrew();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'hire-surveyor' }, s);
+
+    const view = rails.refresh(s);
+    expect(view.waiting).toBe(false);
+    expect(view.waitingHint).toBe('');
+    expect(open.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
   });
 });
