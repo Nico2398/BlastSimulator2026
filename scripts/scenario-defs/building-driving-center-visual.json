@@ -1,14 +1,14 @@
 {
   "name": "building-driving-center-visual",
-  "description": "Frames a built tier-1 driving centre (Learner's Lot) at the camera distance the game actually plays at, so the model can be inspected: the chalkboard, the restraint chair under its lamp, and the pupil benches have to read as a classroom rather than as a junk lot (#1011). Yaw 180 looks at the door row (+Y), which is the only side the classroom is open from \u2014 the back wall carries the chalkboard, so any yaw near 0 photographs the outside of that wall. Distance 7 is what the building fills the frame at without leaving normal play framing.",
+  "description": "Frames a built tier-1 driving centre (Learner's Lot) at the camera distance the game actually plays at, so the model can be inspected: the chalkboard, the restraint chair under its lamp and the pupil bench have to read as a classroom rather than as a junk lot (#1011). Yaw 180 looks at the door row (+Y), which is the only side the classroom is open from \u2014 the back wall carries the chalkboard, so any yaw near 0 photographs the outside of that wall. Distance 7 is what the building fills the frame at without leaving normal play framing.",
   "shots": [
     {
       "name": "classroom",
       "yaw": 180,
       "pitch": 32,
       "target": [
-        25,
-        15
+        20,
+        5
       ],
       "distance": 7
     }
@@ -81,8 +81,8 @@
       }
     },
     {
-      "command": "build driving_center at:25,15",
-      "description": "Placed at 25,15 rather than on the 5,5 row the other building-visual files use: 5,5 sits on the face of a dune under seed 42, and the ridge in front of it hides everything below the door lintels from any camera the shot can reach.",
+      "command": "build driving_center at:20,5",
+      "description": "Placed at 20,5. Two other tiles were tried first and both failed for reasons only a screenshot or CI could show: 5,5 \u2014 the row the other building-visual files use \u2014 sits on the face of a dune under seed 42, and the ridge in front of it hides everything below the door lintels from any camera the shot can reach; 25,15 placed fine on every local run but CI refused it with 'Uneven surface', so the voxel column heights there differ between the two environments. 20,5 is where building-training-visual already puts a tier-1 geology_lab, which has the same 2x2 footprint and passes CI, and it frames flat.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -98,8 +98,8 @@
         },
         {
           "type": "pickTile",
-          "x": 25,
-          "z": 15
+          "x": 20,
+          "z": 5
         },
         {
           "type": "clickSelector",
@@ -134,8 +134,8 @@
         },
         {
           "type": "focusTile",
-          "x": 25,
-          "z": 15,
+          "x": 20,
+          "z": 5,
           "distance": 7
         },
         {
