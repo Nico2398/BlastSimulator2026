@@ -122,19 +122,14 @@ export class TaskProgressBar {
         bar.targetFraction = fraction;
         bar.fillMesh.scale.x = fraction;
         this.bars.set(employee.id, bar);
-      } else {
-        // Existing bar: only retarget here. dt=0 makes this a no-op for a
-        // forward retarget (actual easing happens per-frame in update()) but
-        // still snaps immediately for a backward retarget (task changed,
-        // cancelled, or re-dispatched) — stepFillTween's backward branch
-        // ignores dt, so this doesn't have to wait for the next update().
-        bar.targetFraction = fraction;
-        bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
-        bar.fillMesh.scale.x = bar.easedFraction;
       }
-      if (bar.group.parent !== anchor) {
-        anchor.add(bar.group);
-      }
+      // Retarget (no-op for a fresh bar, since it's already snapped above) and
+      // reparent. dt=0 makes a forward retarget a no-op for an existing bar
+      // (actual easing happens per-frame in update()) but still snaps
+      // immediately for a backward retarget (task changed, cancelled, or
+      // re-dispatched) — stepFillTween's backward branch ignores dt, so this
+      // doesn't have to wait for the next update().
+      this.retargetBar(bar, fraction, anchor);
     }
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).
@@ -184,14 +179,8 @@ export class TaskProgressBar {
         bar.targetFraction = fraction;
         bar.fillMesh.scale.x = fraction;
         this.siteBars.set(action.id, bar);
-      } else {
-        bar.targetFraction = fraction;
-        bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
-        bar.fillMesh.scale.x = bar.easedFraction;
       }
-      if (bar.group.parent !== anchor) {
-        anchor.add(bar.group);
-      }
+      this.retargetBar(bar, fraction, anchor);
     }
 
     // Sweep any site bar whose action is no longer an active place_building action.
@@ -203,14 +192,10 @@ export class TaskProgressBar {
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
   update(dt: number): void {
     for (const bar of this.bars.values()) {
-      bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
-      bar.fillMesh.scale.x = bar.easedFraction;
-      bar.group.quaternion.copy(this.camera.quaternion);
+      this.stepBar(bar, dt);
     }
     for (const bar of this.siteBars.values()) {
-      bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
-      bar.fillMesh.scale.x = bar.easedFraction;
-      bar.group.quaternion.copy(this.camera.quaternion);
+      this.stepBar(bar, dt);
     }
   }
 
@@ -233,6 +218,28 @@ export class TaskProgressBar {
   }
 
   // ---------- Helpers ----------
+
+  /**
+   * Retarget an existing bar to `fraction` (snap via dt=0 — actual easing
+   * happens per-frame in `update()` via `stepBar`) and reparent it under
+   * `anchor` if it isn't already there. Shared by the worker-loop and
+   * site-loop create-or-update branches in `sync()` (#1012).
+   */
+  private retargetBar(bar: Bar, fraction: number, anchor: THREE.Object3D): void {
+    bar.targetFraction = fraction;
+    bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
+    bar.fillMesh.scale.x = bar.easedFraction;
+    if (bar.group.parent !== anchor) {
+      anchor.add(bar.group);
+    }
+  }
+
+  /** Per-frame easing step, fill-scale update and billboard orientation. Shared by both bar maps in `update()`. */
+  private stepBar(bar: Bar, dt: number): void {
+    bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
+    bar.fillMesh.scale.x = bar.easedFraction;
+    bar.group.quaternion.copy(this.camera.quaternion);
+  }
 
   private createBar(yOffset: number): Bar {
     const group = new THREE.Group();
