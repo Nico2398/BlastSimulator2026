@@ -45,6 +45,7 @@ const {
   initBrowserMock,
   executeInteractionActionsMock,
   suspendDrawingMock,
+  resetOriginStorageMock,
   checkGoalMock,
   gameStateMock,
   fakePage,
@@ -72,6 +73,7 @@ const {
       uiState: {},
     })),
     suspendDrawingMock: vi.fn(async () => {}),
+    resetOriginStorageMock: vi.fn(async () => {}),
     checkGoalMock: vi.fn(async () => {}),
     gameStateMock: vi.fn(async () => ({})),
   };
@@ -104,6 +106,8 @@ vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   initBrowser: initBrowserMock,
   executeInteractionActions: executeInteractionActionsMock,
   suspendDrawing: suspendDrawingMock,
+  resetOriginStorage: resetOriginStorageMock,
+  CANVAS_READY_TIMEOUT_MS: 30000,
   DEFAULT_STEP_TIMEOUT: 60,
   SCREENSHOT_DIR: '/tmp/bs2026-run-all-scenarios-repeat-fixture-screenshots',
 }));
@@ -128,7 +132,7 @@ async function registerFixtureScenario(steps: ScenarioStepDef[]): Promise<void> 
 
 const ORIGINAL_ARGV = process.argv;
 
-describe('run-all-scenarios.ts batch interaction loop honors repeat: N (#696)', () => {
+describe('run-all-scenarios.ts batch interaction loop: repeat: N (#696) and per-scenario storage isolation (#1030)', () => {
   let exitSpy: MockInstance<Parameters<typeof process.exit>, ReturnType<typeof process.exit>>;
 
   beforeEach(() => {
@@ -148,6 +152,8 @@ describe('run-all-scenarios.ts batch interaction loop honors repeat: N (#696)', 
     gameStateMock.mockReset();
     gameStateMock.mockImplementation(async () => ({}));
     fakePage.evaluate.mockClear();
+    fakePage.goto.mockClear();
+    resetOriginStorageMock.mockClear();
     process.argv = ['node', 'run-all-scenarios.js', '--mode', 'interaction', FIXTURE_NAME];
     // main() ends every path in process.exit(...); a real exit would kill
     // the test worker mid-run, so this spy neuters it while still recording
@@ -169,6 +175,21 @@ describe('run-all-scenarios.ts batch interaction loop honors repeat: N (#696)', 
     await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
 
     expect(executeInteractionActionsMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('clears the origin\'s storage before navigating, so a shard\'s earlier scenario cannot leave a saved game behind (#1030)', async () => {
+    await registerFixtureScenario([
+      { command: 'employee hire role:driller', role: 'bootstrap', interaction: [{ type: 'command', command: 'employee hire role:driller' }] },
+    ]);
+
+    await import('../../../scripts/run-all-scenarios.js');
+    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
+
+    expect(resetOriginStorageMock).toHaveBeenCalledTimes(1);
+    // Order is the whole point: clearing after the app has booted would leave
+    // it holding whatever it already read from the previous scenario.
+    expect(resetOriginStorageMock.mock.invocationCallOrder[0]!)
+      .toBeLessThan(fakePage.goto.mock.invocationCallOrder[0]!);
   });
 
   it('absent repeat calls executeInteractionActions exactly once, as today (regression guard alongside the N-times case)', async () => {

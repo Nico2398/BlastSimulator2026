@@ -20,6 +20,21 @@ import type { ScenarioStepDef } from './scenario-types.js';
 /** Default timeout for scenario steps in seconds. */
 export const DEFAULT_STEP_TIMEOUT = 60;
 
+/**
+ * How long to wait for the game canvas after `domcontentloaded` (#1021).
+ *
+ * Not a game-behaviour budget — it is a cold-start budget. Every
+ * interaction-mode shard launches its own browser, and up to ten of them run
+ * concurrently on a 2-core `ubuntu-latest` runner with no GPU, so Chrome +
+ * Vite + the first WebGL context can take well past ten seconds to paint a
+ * canvas that is not in any way broken. At the previous flat `10000` this
+ * failed whole shards before a single scenario step ran — reproduced on
+ * `main` itself (run `34335332230`), on PR #1019 twice, and on PR #1030's
+ * shard 7/10. The scenarios' own per-step timeouts still bound real hangs;
+ * this one only has to outlast a slow start.
+ */
+export const CANVAS_READY_TIMEOUT_MS = 30000;
+
 /** Screenshot directory path. */
 export const SCREENSHOT_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', '..', 'screenshots');
 
@@ -43,6 +58,8 @@ export interface BrowserInitOptions {
   port: number;
   puppeteerPath?: string;
   viewport?: { width: number; height: number };
+  /** Canvas-ready budget; defaults to `CANVAS_READY_TIMEOUT_MS`. */
+  canvasTimeoutMs?: number;
 }
 
 /**
@@ -62,7 +79,12 @@ export interface BrowserInitResult {
  * @returns Browser and page objects.
  */
 export async function initBrowser(options: BrowserInitOptions): Promise<BrowserInitResult> {
-  const { port, puppeteerPath, viewport = { width: 1280, height: 720 } } = options;
+  const {
+    port,
+    puppeteerPath,
+    viewport = { width: 1280, height: 720 },
+    canvasTimeoutMs = CANVAS_READY_TIMEOUT_MS,
+  } = options;
   const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
     args: LAUNCH_ARGS,
@@ -88,7 +110,7 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   // canvas-selector wait immediately below is the real readiness signal
   // anyway and has proven reliable in every manual repro.
   await page.goto(devServerUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
+  await page.waitForSelector('#game-canvas, canvas', { timeout: canvasTimeoutMs });
   console.log('Game canvas detected. Waiting for initialization...');
 
   // The main menu overlay starts visible, same as a real player would see it.
@@ -98,6 +120,40 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   // the menu itself (main-menu-visual.json, #408).
 
   return { browser, page };
+}
+
+/**
+ * Wipe localStorage/IndexedDB/cache for the dev server's origin on `page`.
+ *
+ * Call it before navigating, so the app boots against clean storage rather
+ * than reading a previous scenario's leftovers.
+ *
+ * Why this exists: a batch shard runs many scenario files through tabs of one
+ * browser, and tabs of the same origin share storage no matter how fresh the
+ * tab is. A saved game written by one scenario therefore survives into the
+ * next one — `blast-report-save-load-visual` leaving a slot_1 save that made
+ * `save-load-visual` miss its own "save here" button once PR #1030's new
+ * scenario file shifted the two into the same shard.
+ *
+ * A fresh `browser.createBrowserContext()` per scenario also isolates storage
+ * and was tried first, but it costs a full renderer cold start on every
+ * scenario instead of once per shard — per-scenario time roughly quadrupled
+ * (16.7s to 71.3s on shard 1) and pushed unrelated scenarios past their step
+ * timeouts. Clearing the origin keeps the shared context's warm renderer.
+ *
+ * @param page - Page to clear storage on, before its first navigation.
+ * @param port - Dev server port, which with localhost forms the origin.
+ */
+export async function resetOriginStorage(page: Page, port: number): Promise<void> {
+  const cdp = await page.createCDPSession();
+  try {
+    await cdp.send('Storage.clearDataForOrigin', {
+      origin: `http://localhost:${port}`,
+      storageTypes: 'all',
+    });
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /**
