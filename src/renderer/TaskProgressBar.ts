@@ -1,8 +1,13 @@
-// BlastSimulator2026 — Task Progress Bar Renderer (#546)
-// Billboarded fill-bar floating above each currently-working employee,
-// keyed by employee id. Progress is read off computeEmployeeActivity()'s
-// 'working' kind (ticksRemaining / totalTicks) — the same fields the Crew
-// panel's "current task" line uses.
+// BlastSimulator2026 — Task Progress Bar Renderer (#546, #1012)
+// Two bar families, both billboarded fill-bars whose progress is read off
+// computeEmployeeActivity()'s 'working' kind (ticksRemaining / totalTicks) —
+// the same fields the Crew panel's "current task" line uses:
+// - Worker-anchored bars, floating above each currently-working employee for
+//   every `working` kind except `place_building`, keyed by employee id.
+// - Site-anchored bars (#1012), for `place_building` construction actions,
+//   keyed by the `PendingAction`'s own id and anchored to the site's ghost
+//   mesh instead of the worker — so the bar survives the claiming employee
+//   walking away or being reassigned mid-build.
 
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
@@ -98,6 +103,7 @@ export class TaskProgressBar {
     getSiteAnchor: (actionId: number) => THREE.Object3D | null,
   ): void {
     const liveIds = new Set<number>();
+    const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
 
     for (const employee of employees) {
       liveIds.add(employee.id);
@@ -113,16 +119,8 @@ export class TaskProgressBar {
         continue;
       }
 
-      let bar = this.bars.get(employee.id);
-      if (!bar) {
-        // First appearance — snap immediately, no easing-in from zero.
-        bar = this.createBar(BAR_Y_OFFSET);
-        bar.tween = createFillTween(fraction);
-        bar.easedFraction = fraction;
-        bar.targetFraction = fraction;
-        bar.fillMesh.scale.x = fraction;
-        this.bars.set(employee.id, bar);
-      }
+      // getOrCreateBar snaps a fresh bar immediately, no easing-in from zero.
+      const bar = this.getOrCreateBar(this.bars, employee.id, BAR_Y_OFFSET, fraction);
       // Retarget (no-op for a fresh bar, since it's already snapped above) and
       // reparent. dt=0 makes a forward retarget a no-op for an existing bar
       // (actual easing happens per-frame in update()) but still snaps
@@ -153,7 +151,7 @@ export class TaskProgressBar {
       }
 
       const holder = action.holderId !== null
-        ? employees.find(e => e.id === action.holderId) ?? null
+        ? employeeById.get(action.holderId) ?? null
         : null;
       const activity = holder ? computeEmployeeActivity(holder, vehicles) : null;
       const fraction = activity && activity.kind === 'working' && activity.actionType === 'place_building'
@@ -171,15 +169,7 @@ export class TaskProgressBar {
         continue;
       }
 
-      let bar = existing;
-      if (!bar) {
-        bar = this.createBar(SITE_BAR_Y_OFFSET);
-        bar.tween = createFillTween(fraction);
-        bar.easedFraction = fraction;
-        bar.targetFraction = fraction;
-        bar.fillMesh.scale.x = fraction;
-        this.siteBars.set(action.id, bar);
-      }
+      const bar = this.getOrCreateBar(this.siteBars, action.id, SITE_BAR_Y_OFFSET, fraction);
       this.retargetBar(bar, fraction, anchor);
     }
 
@@ -241,6 +231,25 @@ export class TaskProgressBar {
     bar.group.quaternion.copy(this.camera.quaternion);
   }
 
+  /**
+   * Look up an existing bar in `map` for `id`, or create and register one via
+   * `createBar`, snapped immediately to `fraction` (no easing-in from zero
+   * on first appearance). Shared by the worker-loop and site-loop
+   * create-or-update branches in `sync()` (#1012).
+   */
+  private getOrCreateBar(map: Map<number, Bar>, id: number, yOffset: number, fraction: number): Bar {
+    let bar = map.get(id);
+    if (!bar) {
+      bar = this.createBar(yOffset);
+      bar.tween = createFillTween(fraction);
+      bar.easedFraction = fraction;
+      bar.targetFraction = fraction;
+      bar.fillMesh.scale.x = fraction;
+      map.set(id, bar);
+    }
+    return bar;
+  }
+
   private createBar(yOffset: number): Bar {
     const group = new THREE.Group();
     group.position.set(0, yOffset, 0);
@@ -262,18 +271,20 @@ export class TaskProgressBar {
     return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
   }
 
-  private removeBar(id: number): void {
-    const bar = this.bars.get(id);
+  /** Detach and forget the bar for `id` in `map`, if any. Shared by removeBar/removeSiteBar. */
+  private removeFromMap(map: Map<number, Bar>, id: number): void {
+    const bar = map.get(id);
     if (!bar) return;
     bar.group.removeFromParent();
-    this.bars.delete(id);
+    map.delete(id);
+  }
+
+  private removeBar(id: number): void {
+    this.removeFromMap(this.bars, id);
   }
 
   /** Remove the site-anchored bar for pending-action id `id`, if any (#1012). Mirrors removeBar(). */
   private removeSiteBar(id: number): void {
-    const bar = this.siteBars.get(id);
-    if (!bar) return;
-    bar.group.removeFromParent();
-    this.siteBars.delete(id);
+    this.removeFromMap(this.siteBars, id);
   }
 }

@@ -197,7 +197,7 @@ export class GhostMesh {
    * without duplicating GhostMesh's own footprint-centering math (#1012).
    */
   getGroup(id: number): THREE.Object3D | null {
-    return this.meshes.get(id) ?? null; // TODO: stub, no logic yet — skeleton phase
+    return this.meshes.get(id) ?? null;
   }
 
   dispose(): void {
