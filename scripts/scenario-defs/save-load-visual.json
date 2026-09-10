@@ -213,7 +213,8 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]",
+          "timeout": 15000
         },
         {
           "type": "wait",
@@ -412,7 +413,8 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]"
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]",
+          "timeout": 15000
         },
         {
           "type": "wait",
