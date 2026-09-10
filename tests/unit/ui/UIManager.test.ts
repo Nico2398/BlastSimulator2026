@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
+import { BuildMenu } from '../../../src/ui/BuildMenu.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { CrewPanel } from '../../../src/ui/panels/CrewPanel.js';
 import { SurveyPanel } from '../../../src/ui/panels/SurveyPanel.js';
@@ -106,6 +107,45 @@ describe('UIManager — NavGrid overlay wiring', () => {
     uiManager.toggleNavGridOverlay();
 
     expect(setVisibleSpy).toHaveBeenNthCalledWith(3, true);
+  });
+});
+
+// ── Build panel surface-height sampler wiring (#1008) ─────────────────────────
+
+describe('UIManager — setBuildSurfaceSampler (#1008)', () => {
+  let container: HTMLElement;
+  let uiManager: UIManager | null;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    uiManager = null;
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('setBuildSurfaceSampler(fn) forwards fn to the Build panel\'s setSurfaceHeightSampler', () => {
+    const setSurfaceHeightSamplerSpy = vi.spyOn(BuildMenu.prototype, 'setSurfaceHeightSampler');
+    uiManager = new UIManager(container);
+    const sampler = (x: number, z: number) => x + z;
+
+    uiManager.setBuildSurfaceSampler(sampler);
+
+    expect(setSurfaceHeightSamplerSpy).toHaveBeenCalledWith(sampler);
+  });
+
+  it('show()/hide() toggle HUD chrome visibility, reflected by the visible getter', () => {
+    uiManager = new UIManager(container);
+    uiManager.hide();
+    expect(uiManager.visible).toBe(false);
+
+    uiManager.show();
+
+    expect(uiManager.visible).toBe(true);
   });
 });
 

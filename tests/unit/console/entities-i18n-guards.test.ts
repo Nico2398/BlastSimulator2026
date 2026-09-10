@@ -269,7 +269,11 @@ describe('entities.ts — build upgrade failure (re-placement rejected by an ove
 describe('entities.ts — build upgrade success message', () => {
   function setupUpgradableBuilding(ctx: GameContext): number {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
-    return placeTestBuilding(ctx, 'management_office', 1);
+    // Upgrade re-places through the real console path, which checks the
+    // new tier's footprint against terrain flatness (#1008) — (0,0) sits on
+    // sloped ground on this seed/size/mineType, so place at a flat spot
+    // that stays flat across T1/T2/T3 footprints instead.
+    return placeAt(ctx, 'management_office', 1, 2, 0);
   }
 
   const OLD_DEF = getBuildingDef('management_office', 1);
@@ -304,7 +308,10 @@ describe('entities.ts — build move success message', () => {
   it('matches the exact English literal, embedding the real id and raw cost', () => {
     const ctx = makeCtx();
     const id = placeTestBuilding(ctx);
-    const result = buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    // Move re-places at the destination through the real console path, which
+    // checks flatness (#1008) — (5,5) is sloped on this seed/size/mineType;
+    // (4,4) is a flat T1-footprint spot nearby.
+    const result = buildCommand(ctx, ['move', String(id)], { to: '4,4' });
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Building #${id} moved. Cost: $${MOVE_COST}`);
   });
@@ -313,7 +320,7 @@ describe('entities.ts — build move success message', () => {
     const ctx = makeCtx();
     const id = placeTestBuilding(ctx);
     setLocale('fr');
-    const result = buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    const result = buildCommand(ctx, ['move', String(id)], { to: '4,4' });
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(`Building #${id} moved. Cost: $${MOVE_COST}`);
   });

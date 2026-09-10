@@ -7,6 +7,7 @@
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
+import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
 
 // ── Building types ──
 
@@ -118,6 +119,28 @@ export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
   return size;
 }
 
+/**
+ * Whether every cell of a footprint placed at (x, z) sits at the same terrain
+ * height, per `heightAt` — the flatness rule the real placement path
+ * (`checkFootprintPlacement`) is missing (#1008).
+ */
+export function isFootprintFlat(
+  footprint: ReadonlyArray<readonly [number, number]>,
+  x: number, z: number,
+  heightAt: (cx: number, cz: number) => number,
+): boolean {
+  let referenceHeight: number | undefined;
+  for (const [dx, dz] of footprint) {
+    const h = heightAt(x + dx, z + dz);
+    if (referenceHeight === undefined) {
+      referenceHeight = h;
+    } else if (h !== referenceHeight) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // ── Building instance ──
 
 export interface Building {
@@ -197,6 +220,7 @@ export function placeBuilding(
   originX: number = 0,
   originZ: number = 0,
   reservedId?: number,
+  voxelGrid?: VoxelGrid,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
 
@@ -206,7 +230,7 @@ export function placeBuilding(
 
   const check = checkFootprintPlacement(
     state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
-    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ,
+    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
   );
   if (!check.valid) {
     return { success: false, error: check.error! };
@@ -304,6 +328,7 @@ export function moveBuilding(
   originX: number = 0,
   originZ: number = 0,
   plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
+  voxelGrid?: VoxelGrid,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
@@ -314,7 +339,7 @@ export function moveBuilding(
   ];
   const check = checkFootprintPlacement(
     occupants,
-    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ,
+    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
   );
   if (!check.valid) {
     return { success: false, error: check.error! };
@@ -402,8 +427,11 @@ export interface FootprintOccupant {
  * Whether a building of `type`/`tier` can be placed at (x, z) given the
  * current occupants (live buildings AND planned-but-not-yet-built ones) —
  * bounds + occupancy check shared by `placeBuilding` and the new
- * order-then-build path. Stub: implementation phase moves the real checks
- * here from `placeBuilding`'s inline bounds/`isOccupied` calls.
+ * order-then-build path.
+ *
+ * When `voxelGrid` is supplied, and only after bounds/occupancy pass, the
+ * footprint's ground must also be flat (#1008) — omitting `voxelGrid` skips
+ * that check entirely, for call sites with no grid to check against.
  */
 export function checkFootprintPlacement(
   occupants: ReadonlyArray<FootprintOccupant>,
@@ -415,6 +443,7 @@ export function checkFootprintPlacement(
   gridSizeZ: number,
   originX: number,
   originZ: number,
+  voxelGrid?: VoxelGrid,
 ): { valid: boolean; error?: string } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
@@ -432,15 +461,19 @@ export function checkFootprintPlacement(
     }
   }
 
+  if (voxelGrid !== undefined) {
+    const flat = isFootprintFlat(def.footprint, x, z, (cx, cz) => getSurfaceY(voxelGrid, cx, cz));
+    if (!flat) {
+      return { valid: false, error: 'Uneven surface' };
+    }
+  }
+
   return { valid: true };
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
-export {
-  BUSY, buildPlacementGrid, getSurfaceY, canPlaceBuilding, isBuildingFootprintCell,
-  type SurfaceY, type PlacementCell, type CanPlaceBuildingResult, type PlacementGrid,
-} from './BuildingPlacement.js';
+export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
 export {
   queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,

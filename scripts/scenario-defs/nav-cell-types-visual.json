@@ -82,7 +82,7 @@
       }
     },
     {
-      "command": "build management_office at:2,2",
+      "command": "build management_office at:0,3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -98,8 +98,8 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
-          "z": 2
+          "x": 0,
+          "z": 3
         },
         {
           "type": "screenshot"

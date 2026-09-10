@@ -55,7 +55,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:5,5",
+      "command": "build freight_warehouse at:6,9",
       "interaction": [
         {
           "type": "clickSelector",
@@ -71,8 +71,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 6,
+          "z": 9
         },
         {
           "type": "screenshot"
@@ -91,7 +91,7 @@
       }
     },
     {
-      "command": "build vehicle_depot at:15,5",
+      "command": "build vehicle_depot at:13,0",
       "interaction": [
         {
           "type": "clickSelector",
@@ -103,8 +103,8 @@
         },
         {
           "type": "pickTile",
-          "x": 15,
-          "z": 5
+          "x": 13,
+          "z": 0
         },
         {
           "type": "screenshot"

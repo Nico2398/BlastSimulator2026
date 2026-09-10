@@ -61,6 +61,10 @@ export class PlacementController {
   private claimCheck: ((x: number, z: number) => ClaimRefusalReason | null) | null = null;
   /** Reason the last checked tile's claim would be refused, or null. Backs {@link refusalReason}. */
   private claimRefusalReason: ClaimRefusalReason | null = null;
+  /** Predicate (#1008) asking whether the footprint at (x, z) covers only flat ground. Set per-arm by BuildMenu; independent of claimCheck. */
+  private footprintCheck: ((x: number, z: number) => boolean) | null = null;
+  /** Whether the live footprint fails {@link footprintCheck}. Backs {@link footprintInvalid}. */
+  private footprintCheckFailed = false;
 
   private onConfirmHandler: PlacementConfirmHandler | null = null;
   private onCancelHandler: (() => void) | null = null;
@@ -120,6 +124,17 @@ export class PlacementController {
    */
   get refusalReason(): ClaimRefusalReason | null { return this.claimRefusalReason; }
 
+  /**
+   * Register the predicate the controller asks whether the live footprint
+   * covers only flat ground (#1008) — separate from `claimCheck`, which asks
+   * about site-claim ownership rather than terrain shape.
+   */
+  setFootprintCheck(fn: ((x: number, z: number) => boolean) | null): void {
+    this.footprintCheck = fn;
+  }
+  /** True when the live footprint fails the flatness check (#1008). Backs the red cell / refused strip line. */
+  get footprintInvalid(): boolean { return this.footprintCheckFailed; }
+
   /** The live selection, or null before an anchor exists. */
   get selection(): PlacementSelection | null {
     if (!this.anchor) return null;
@@ -146,6 +161,7 @@ export class PlacementController {
     const sel = this.selection;
     if (!sel) return false;
     if (this.claimRefusalReason !== null) return false;
+    if (this.footprintCheckFailed) return false;
     if (!this.region) return true;
     return regionAccepts(this.region, sel);
   }
@@ -157,6 +173,8 @@ export class PlacementController {
     this.hoverTile = null;
     this.blockedTile = null;
     this.claimRefusalReason = null;
+    this.footprintCheck = null;
+    this.footprintCheckFailed = false;
     // A guided step drops the pre-fill entirely. The survey panel pre-fills the
     // middle of the map, which sits outside every guided region — so the strip
     // opened showing a tile the step would never accept and a Confirm that was
@@ -180,6 +198,8 @@ export class PlacementController {
     this.hoverTile = null;
     this.blockedTile = null;
     this.claimRefusalReason = null;
+    this.footprintCheck = null;
+    this.footprintCheckFailed = false;
     this.anchor = null;
     this.current = null;
     this.region = null;
@@ -261,6 +281,9 @@ export class PlacementController {
     this.claimRefusalReason = tile !== null && regionLive
       ? (this.claimCheck?.(tile.x, tile.z) ?? null)
       : null;
+    this.footprintCheckFailed = tile !== null && regionLive && this.claimRefusalReason === null && this.footprintCheck !== null
+      ? !this.footprintCheck(tile.x, tile.z)
+      : false;
     const live = regionLive && this.claimRefusalReason === null;
     // Out-of-bounds (region OR claim refusal) reads as refused rather than as
     // nothing at all: the overlay paints this tile red and the strip says why.
@@ -276,6 +299,9 @@ export class PlacementController {
     const tile = this.tileUnderCursor(e);
     const regionLive = tile !== null && this.isLive(tile);
     const claimReason = tile !== null && regionLive ? (this.claimCheck?.(tile.x, tile.z) ?? null) : null;
+    this.footprintCheckFailed = tile !== null && regionLive && claimReason === null && this.footprintCheck !== null
+      ? !this.footprintCheck(tile.x, tile.z)
+      : false;
     if (!tile || !regionLive || claimReason !== null) {
       // Anchor outside the pinned region, or refused a site claim: no
       // rectangle starts, but the refusal is shown. Returning in silence here

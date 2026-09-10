@@ -253,7 +253,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build management_office at:5,5",
+      "command": "build management_office at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -269,7 +269,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {

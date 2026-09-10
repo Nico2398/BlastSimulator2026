@@ -131,11 +131,91 @@ function driveConstructionOrders(steps: ScenarioStepDef[]): ScenarioStepDef[] {
   return out;
 }
 
+/**
+ * These building-*-visual scenario JSON files (`scripts/scenario-defs/`,
+ * shared broadly by `npm run scenarios`/`scenarios:interaction` well outside
+ * this issue's own file list — so patched here in-memory rather than edited
+ * on disk, same rationale as `driveConstructionOrders` above) place buildings
+ * at coordinates that were never checked for flatness before #1008 wired the
+ * "Uneven surface" rule into the real placement path
+ * (`checkFootprintPlacement`). Each of these now sits on genuinely sloped
+ * ground on the 64x64 desert_badlands/seed:42 terrain every one of these
+ * files generates (`new_game seed:42 ... staffed:true` — no `size`/`mine_type`
+ * override, so desert_badlands/64 is the default).
+ *
+ * Positional, not literal-coordinate-keyed: each entry is consumed in the
+ * order its `build <type> at:x,z` command appears in the step list, and
+ * overwrites whatever coordinate is already there — so this still lands the
+ * verified-flat target below even if the JSON file on disk has already been
+ * hand-edited to some other coordinate (verified empirically against a
+ * living_quarters upgraded T1->T2->T3 in place: its bench must fit the T3
+ * 5x4 footprint even though it starts at T1's 3x3, and a T3 target whose walk
+ * from spawn squeezes past another building's own footprint can strand the
+ * assigned employee indefinitely instead of ever reaching the site — found
+ * during this run's coordinate relocation but not filed as an issue: this
+ * run's one-issue budget went to #1022; noted in the PR's follow-up comment
+ * instead).
+ */
+const FOOTPRINT_RELOCATIONS: Record<string, ReadonlyArray<readonly [number, number]>> = {
+  'building-tier-system-visual': [
+    [26, 14], // research_center T1
+    [2, 8],   // living_quarters, upgraded T1 -> T2 -> T3 in place — bench sized for the T3 5x4 footprint
+    [14, 5],  // management_office T1
+  ],
+  'building-research-visual': [
+    [3, 5],   // research_center T1
+    [22, 22], // research_center T2 attempt #1 (refused before the footprint check — research gate) — same target as #2 so both name the same command text
+    [22, 22], // research_center T2 attempt #2, placed as its own building
+    // research_center T3, placed as its own building, off the surveyed
+    // corridor between spawn and the T2 building above (a target whose walk
+    // squeezes past an existing footprint can strand the assigned employee
+    // indefinitely — #1008 Finding).
+    [40, 37],
+  ],
+  'building-research-progression-visual': [
+    [3, 5],
+    [22, 22],
+    [22, 22],
+    [40, 37],
+  ],
+};
+
+function relocateFootprints(name: string, steps: ScenarioStepDef[]): ScenarioStepDef[] {
+  const targets = FOOTPRINT_RELOCATIONS[name];
+  if (!targets) return steps;
+
+  let nextTarget = 0;
+  const buildAtPattern = /^(build \S+) at:\d+,\d+/;
+
+  return steps.map(step => {
+    const match = step.command.match(buildAtPattern);
+    if (!match || nextTarget >= targets.length) return step;
+
+    const [to] = [targets[nextTarget]!];
+    nextTarget++;
+    const toAt = `at:${to[0]},${to[1]}`;
+
+    const command = step.command.replace(/at:\d+,\d+/, toAt);
+    const interaction = step.interaction?.map(action => {
+      if (action.type === 'command') {
+        return { ...action, command: action.command.replace(/at:\d+,\d+/, toAt) };
+      }
+      if (action.type === 'pickTile') {
+        return { ...action, x: to[0], z: to[1] };
+      }
+      return action;
+    });
+
+    return { ...step, command, ...(interaction ? { interaction } : {}) };
+  });
+}
+
 function runScenarioSteps(name: string) {
   const engine = createGameEngine();
   const scenario = loadScenarioDef(name, SCENARIO_DIR);
   const outDir = resolve(tmpdir(), `bs2026-scenario-410-${name}`);
-  const results = runSteps(engine, driveConstructionOrders(scenario.steps), outDir);
+  const relocated = relocateFootprints(name, scenario.steps);
+  const results = runSteps(engine, driveConstructionOrders(relocated), outDir);
   return { engine, results };
 }
 
@@ -217,7 +297,7 @@ describe('building-tier-system-visual — scenario-runner (#410)', () => {
 describe('building-research-visual — scenario-runner (#410)', () => {
   it('the first direct tier-2 attempt is rejected — demonstrates the gate', () => {
     const { results } = runScenarioSteps('building-research-visual');
-    const firstAttempt = stepForNth(results, 'build research_center at:15,5 tier:2', 0);
+    const firstAttempt = stepForNth(results, 'build research_center at:22,22 tier:2', 0);
     // #556: "ordered" is the fixed prefix of a successful order confirmation
     // (buildOrder.ts's orderBuildingCommand) — a rejection never contains it.
     // Note the building TYPE itself is "research_center", so matching
@@ -232,7 +312,7 @@ describe('building-research-visual — scenario-runner (#410)', () => {
     // idle employee actually finishes it; assert against the post-wait
     // state, not the order step's own "ordered" confirmation text.
     const { engine, results } = runScenarioSteps('building-research-visual');
-    const orderIdx = stepIndexForNth(results, 'build research_center at:15,5 tier:2', 1);
+    const orderIdx = stepIndexForNth(results, 'build research_center at:22,22 tier:2', 1);
     const orderStep = results[orderIdx]!;
     expect(orderStep.error).toBeUndefined();
     expect(orderStep.commandOutput).toMatch(/ordered/);
@@ -243,13 +323,13 @@ describe('building-research-visual — scenario-runner (#410)', () => {
 
     const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 2);
     expect(built).toBeDefined();
-    expect(built!.x).toBe(15);
-    expect(built!.z).toBe(5);
+    expect(built!.x).toBe(22);
+    expect(built!.z).toBe(22);
   });
 
   it('the tier-3 build succeeds after tier-3 research completes', () => {
     const { engine, results } = runScenarioSteps('building-research-visual');
-    const orderIdx = stepIndexForNth(results, 'build research_center at:25,5 tier:3', 0);
+    const orderIdx = stepIndexForNth(results, 'build research_center at:40,37 tier:3', 0);
     const orderStep = results[orderIdx]!;
     expect(orderStep.error).toBeUndefined();
     expect(orderStep.commandOutput).toMatch(/ordered/);
@@ -260,8 +340,8 @@ describe('building-research-visual — scenario-runner (#410)', () => {
 
     const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 3);
     expect(built).toBeDefined();
-    expect(built!.x).toBe(25);
-    expect(built!.z).toBe(5);
+    expect(built!.x).toBe(40);
+    expect(built!.z).toBe(37);
   });
 });
 
@@ -269,10 +349,10 @@ describe('building-research-progression-visual — scenario-runner (#410)', () =
   it('a direct tier-2 build is rejected before research, then succeeds after', () => {
     const { engine, results } = runScenarioSteps('building-research-progression-visual');
 
-    const rejected = stepForNth(results, 'build research_center at:15,5 tier:2', 0);
+    const rejected = stepForNth(results, 'build research_center at:22,22 tier:2', 0);
     expect(rejected.commandOutput).not.toMatch(/ordered/);
 
-    const orderIdx = stepIndexForNth(results, 'build research_center at:15,5 tier:2', 1);
+    const orderIdx = stepIndexForNth(results, 'build research_center at:22,22 tier:2', 1);
     const acceptedStep = results[orderIdx]!;
     expect(acceptedStep.error).toBeUndefined();
     expect(acceptedStep.commandOutput).toMatch(/ordered/);

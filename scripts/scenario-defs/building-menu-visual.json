@@ -43,7 +43,7 @@
       "role": "observe"
     },
     {
-      "command": "build living_quarters at:5,5",
+      "command": "build living_quarters at:2,6",
       "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). This step's own auto-captured screenshot is the 'ghost appears at order' checkpoint.",
       "interaction": [
         {
@@ -60,8 +60,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 6
         },
         {
           "type": "screenshot"
@@ -105,7 +105,7 @@
       }
     },
     {
-      "command": "build management_office at:10,5",
+      "command": "build management_office at:10,3",
       "description": "#556: same order-then-build semantics as the order above.",
       "interaction": [
         {
@@ -119,7 +119,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 5
+          "z": 3
         },
         {
           "type": "screenshot"
@@ -163,7 +163,7 @@
       }
     },
     {
-      "command": "build driving_center at:15,5",
+      "command": "build driving_center at:14,5",
       "description": "#556: same order-then-build semantics as the orders above.",
       "interaction": [
         {
@@ -176,7 +176,7 @@
         },
         {
           "type": "pickTile",
-          "x": 15,
+          "x": 14,
           "z": 5
         },
         {
@@ -277,7 +277,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:5,10",
+      "command": "build freight_warehouse at:4,14",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -293,8 +293,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 10
+          "x": 4,
+          "z": 14
         },
         {
           "type": "screenshot"
@@ -338,7 +338,7 @@
       }
     },
     {
-      "command": "build vehicle_depot at:10,10",
+      "command": "build vehicle_depot at:10,13",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -355,7 +355,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 10
+          "z": 13
         },
         {
           "type": "screenshot"

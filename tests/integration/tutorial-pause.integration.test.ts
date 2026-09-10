@@ -133,7 +133,7 @@ describe('Tutorial pause behaviour (#371)', () => {
     const { runner, ctx } = createRunner();
 
     expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(runner.run('build freight_warehouse at:6,6').success).toBe(true);
+    expect(runner.run('build freight_warehouse at:6,9').success).toBe(true);
     expect(runner.run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     // drill_plan grid now queues one drill_hole PendingAction per hole
     // instead of writing them straight into state.drillHoles (#553) — the

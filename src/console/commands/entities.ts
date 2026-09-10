@@ -110,6 +110,7 @@ export function buildCommand(
       const upgradeResult = placeBuilding(
         state.buildings, upgradeType, x, z,
         upBounds.width, upBounds.depth, nextTier, upBounds.originX, upBounds.originZ,
+        undefined, ctx.grid ?? undefined,
       );
       if (!upgradeResult.success) {
         return { success: false, output: t('entities.build_upgrade_failed', { error: upgradeResult.error! }) };
@@ -163,7 +164,7 @@ export function buildCommand(
       const result = moveBuilding(
         state.buildings, id, toCoords[0]!, toCoords[1]!,
         moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
-        plannedOccupants,
+        plannedOccupants, ctx.grid ?? undefined,
       );
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;

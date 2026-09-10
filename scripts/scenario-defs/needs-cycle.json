@@ -98,7 +98,7 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5",
+      "command": "build living_quarters at:10,3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -114,8 +114,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 10,
+          "z": 3
         },
         {
           "type": "screenshot"

@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5",
+      "command": "build living_quarters at:2,6",
       "description": "Place a living quarters, tier 1, with no Research Center on site — the building this scenario will try (and fail, then succeed) to queue research on.",
       "role": "player",
       "interaction": [
@@ -38,8 +38,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 6
         },
         {
           "type": "screenshot"
@@ -101,7 +101,7 @@
       "commandOutcome": "refused"
     },
     {
-      "command": "build research_center at:14,14",
+      "command": "build research_center at:13,15",
       "description": "Place a Research Center, tier 1 — the prerequisite the previous step was missing.",
       "role": "player",
       "interaction": [
@@ -115,8 +115,8 @@
         },
         {
           "type": "pickTile",
-          "x": 14,
-          "z": 14
+          "x": 13,
+          "z": 15
         },
         {
           "type": "screenshot"
@@ -183,7 +183,7 @@
       ]
     },
     {
-      "command": "build living_quarters at:22,22 tier:2",
+      "command": "build living_quarters at:20,24 tier:2",
       "description": "Proof the unlock is real, not just queued: tier 2 living quarters actually builds now, in both modes. Goes one step further than the playtest's own beat 7 (which stops at asserting the Place button is usable) so command mode has a real completion to check against — equals/increased have no interaction-only exemption (unlike usable/blocked/tutorialStep, scenario-types.ts's ScenarioStepGoal), so a step whose interaction only set the tier selector without clicking Buy would assert a buildingCount increase interaction mode never produced.",
       "role": "player",
       "interaction": [
@@ -206,8 +206,8 @@
         },
         {
           "type": "pickTile",
-          "x": 22,
-          "z": 22
+          "x": 20,
+          "z": 24
         },
         {
           "type": "screenshot"

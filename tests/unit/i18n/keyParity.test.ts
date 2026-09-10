@@ -298,8 +298,11 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.stage.sell_ore, and tutorial.defeat.{bankruptcy,arrest,
     // ecological_shutdown,worker_revolt}.{title,text} (4 reasons x 2 fields
     // = 8), both locales.
+    // Baseline is now 3476 (up from 3475): #1008 adds 1 key,
+    // shell.placement.refused_uneven_ground, for the flat-footprint
+    // placement refusal message, both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3475);
+    expect(Object.keys(en).length).toBe(3476);
   });
 });
 

@@ -722,16 +722,20 @@ describe('Survey system — seismic building side effects', () => {
 
   it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
     hireSurveyor();
-    // Building at (21,15), survey center at (19,14) → Euclidean distance ≈
-    // 2.2 (within 5). Both sit inside the stretch of NavGrid the surveyor's
-    // spawn area is on the same bench level as (#458 T6.1/D14): bigger
-    // levels carry far more natural terrain relief than the old ones, and a
-    // route crossing onto a different bench mid-walk can hit a pathfinding
-    // instability where two near-equal routes flip from tick to tick and
-    // the surveyor never arrives — confirmed via direct reproduction at the
-    // original (20,20)/(22,20) coordinates. A deeper general fix belongs to
-    // T6.2 (pathfinding at scale); this sidesteps it for the test.
-    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '21,15' });
+    // Building at (14,15), survey center at (19,14) → footprint-centre
+    // Euclidean distance ≈ 4.30 (within 5). #1008 moved this off the
+    // original (21,15) — not flat on this seed's terrain once
+    // checkFootprintPlacement enforces it — to the nearest flat 3x3 bench
+    // that keeps the same within-radius relationship. Both sit inside the
+    // stretch of NavGrid the surveyor's spawn area is on the same bench
+    // level as (#458 T6.1/D14): bigger levels carry far more natural
+    // terrain relief than the old ones, and a route crossing onto a
+    // different bench mid-walk can hit a pathfinding instability where two
+    // near-equal routes flip from tick to tick and the surveyor never
+    // arrives — confirmed via direct reproduction at the original
+    // (20,20)/(22,20) coordinates. A deeper general fix belongs to T6.2
+    // (pathfinding at scale); this sidesteps it for the test.
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '14,15' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
@@ -745,8 +749,11 @@ describe('Survey system — seismic building side effects', () => {
 
   it('does not damage a building farther than 5 cells from the seismic survey center', () => {
     hireSurveyor();
-    // Building at (25,25), survey center at (5,5) → distance ≈ 28 (outside 5-cell radius).
-    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '25,25' });
+    // Building at (24,27), survey center at (5,5) → distance ≈ 31 (outside
+    // 5-cell radius). #1008: relocated off (25,25), not flat here, to the
+    // nearest flat 3x3 bench — the distance only needs to clear 5, so the
+    // move changes nothing about what this test proves.
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '24,27' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
@@ -760,7 +767,7 @@ describe('Survey system — seismic building side effects', () => {
 
   it('does not damage a nearby building for a core_sample survey (seismic-only side effect)', () => {
     hireSurveyor();
-    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '11,14' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
@@ -774,7 +781,7 @@ describe('Survey system — seismic building side effects', () => {
 
   it('does not damage a nearby building for an aerial survey (seismic-only side effect)', () => {
     hireSurveyor();
-    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '11,14' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
@@ -795,10 +802,12 @@ describe('Survey system — seismic building side effects', () => {
     // reason: the surveyor must actually walk there and stand on it (#437) or
     // no seismic side effect fires at all, and that route is the one confirmed
     // to work from the spawn without changing bench level mid-walk
-    // (#458 T6.1/D14). Both buildings are within 5 cells of (19, 14) — 2.2 and
-    // 4.2 — and neither footprint sits on the way.
-    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '21,15' });
-    const b2Result = buildCommand(ctx, ['management_office'], { at: '22,11' });
+    // (#458 T6.1/D14). Both buildings are within 5 cells of (19, 14) — ≈4.30
+    // and ≈4.12 — and neither footprint sits on the way. #1008 moved both off
+    // (21,15)/(22,11) (not flat here) to the nearest flat spots that keep
+    // both within-radius and off the surveyor's own path, on the same bench.
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '14,15' });
+    const b2Result = buildCommand(ctx, ['management_office'], { at: '17,17' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);
     resolveConstruction();

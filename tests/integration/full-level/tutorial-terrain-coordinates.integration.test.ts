@@ -1,7 +1,9 @@
 // BlastSimulator2026 — Integration test: Tutorial level terrain coordinate verification
-// Verifies that the tutorial level (tutorial_pit) has proper terrain at specific
-// coordinates for survey, building placement, and ramp construction.
-// Issue #333
+// Verifies the tutorial's guided-build regions land on genuinely flat ground
+// on tutorial_pit seed 42 — the real placement path checks per-footprint
+// flatness (#1008), so a region the tutorial steers the player into must
+// itself be flat for the building it asks them to place there.
+// Issues #333, #1008
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeCampaignCtx, driveConstructionToCompletion } from './helpers.js';
@@ -10,9 +12,11 @@ import { surveyCommand } from '../../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import { buildRampCommand } from '../../../src/console/commands/mining.js';
 import {
-  buildPlacementGrid,
-  canPlaceBuilding,
+  isFootprintFlat,
   getSurfaceY,
+  BUILDING_DEFS,
+  type BuildingType,
+  type BuildingTier,
 } from '../../../src/core/entities/Building.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
@@ -25,36 +29,49 @@ const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
-/**
- * The tutorial's real guided build area (`REGION.warehouse` in
- * src/ui/tutorialStages.ts, duplicated here rather than imported — this is
- * an integration test for core/console behaviour, not a UI dependency).
- * `canPlaceBuilding` requires an exactly flat footprint (#458 T9.1/D15) —
- * the terrain generator no longer guarantees a specific hardcoded
- * coordinate like (16,16) is that flat, so these tests search the tutorial's
- * own build region for a spot that qualifies rather than assuming one.
- */
-const WAREHOUSE_REGION = { x1: 2, z1: 2, x2: 9, z2: 9 };
-
-/** First (x, z) within `region` where a `type`/`tier` footprint is flat and clear, or null if none exists. */
-function findBuildableSpot(
-  ctx: ReturnType<typeof makeCampaignCtx>,
-  type: string,
-  tier: number,
-  region: { x1: number; z1: number; x2: number; z2: number },
-): { x: number; z: number } | null {
-  const placementGrid = buildPlacementGrid(ctx.grid!, ctx.state!.buildings);
-  for (let x = region.x1; x <= region.x2; x++) {
-    for (let z = region.z1; z <= region.z2; z++) {
-      if (canPlaceBuilding(placementGrid, type as any, x, z, tier as any).valid) {
-        return { x, z };
-      }
-    }
-  }
-  return null;
+interface PinnedRegion {
+  type: BuildingType;
+  tier: BuildingTier;
+  x: number;
+  z: number;
 }
 
-describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
+/**
+ * The tutorial's guided-build regions (`REGION.warehouse`/`drivingCenter`/
+ * `livingQuarters` in src/ui/tutorialStages.ts, duplicated here rather than
+ * imported — this is an integration test for core/console behaviour, not a
+ * UI dependency). Pinned to coordinates verified flat against the real
+ * generated tutorial_pit seed-42 terrain for their own building's footprint
+ * (#1008 — the real placement path now enforces flatness, and the tutorial
+ * must land on ground that actually satisfies it).
+ */
+const PINNED_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
+  warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 9 },
+  drivingCenter: { type: 'driving_center', tier: 1, x: 6, z: 7 },
+  // #1008-followup (PR #1023): moved from (12,15) to (6,16) — flat (this
+  // test's own Test 2 proves that), then to (29,12) — also flat — after a
+  // second real interaction-mode CI run showed (6,16) deadlocks box-cut too,
+  // just a different way (a fatigue/rest round-trip livelock, not a
+  // stranding). Flatness alone was never sufficient; see tutorialStages.ts's
+  // own REGION comment for the full trace and the new coordinate's
+  // clearance margin against every hazard this file's history has actually
+  // reproduced a deadlock at.
+  livingQuarters: { type: 'living_quarters', tier: 1, x: 29, z: 12 },
+};
+
+/**
+ * The tutorial's OLD guided-build coordinates, before #1008 — kept only as a
+ * regression check documenting why the move above was necessary: the
+ * placement path didn't check flatness before #1008, so these coordinates
+ * silently ordered a building on a height step and nothing caught it.
+ */
+const OLD_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
+  warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 6 },
+  drivingCenter: { type: 'driving_center', tier: 1, x: 10, z: 8 },
+  livingQuarters: { type: 'living_quarters', tier: 1, x: 18, z: 14 },
+};
+
+describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
 
   beforeEach(() => {
@@ -110,26 +127,37 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     expect(rockType!.hardnessTier).toBeGreaterThanOrEqual(1);
   });
 
-  // ── Test 2: Building placement ────────────────────────────────────────────
+  // ── Test 2: pinned regions are flat for their own building's footprint (#1008) ──
 
-  it('a freight_warehouse places successfully somewhere in the tutorial build area', () => {
+  describe.each([
+    ['warehouse', PINNED_REGIONS.warehouse],
+    ['drivingCenter', PINNED_REGIONS.drivingCenter],
+    ['livingQuarters', PINNED_REGIONS.livingQuarters],
+  ] as const)('pinned %s region', (_name, region) => {
+    it(`is flat for a ${region.type} T${region.tier} footprint at (${region.x},${region.z})`, () => {
+      const def = BUILDING_DEFS[region.type][region.tier];
+      const heightAt = (cx: number, cz: number): number => getSurfaceY(ctx.grid!, cx, cz);
+
+      expect(isFootprintFlat(def.footprint, region.x, region.z, heightAt)).toBe(true);
+    });
+  });
+
+  // ── Test 3: building placement at the pinned warehouse coordinates ────────
+
+  it('a freight_warehouse orders and completes at the pinned warehouse coordinates', () => {
     // Arrange: fresh tutorial context
     expect(ctx.grid).not.toBeNull();
     expect(ctx.state!.cash).toBeGreaterThanOrEqual(15000); // freight_warehouse T1 cost
-
-    // The tutorial guides the player to build inside WAREHOUSE_REGION, not at
-    // one specific hardcoded coordinate — a flat 4x4 footprint must exist
-    // somewhere in it (#458 T9.1/D15), not necessarily at (16,16).
-    const spot = findBuildableSpot(ctx, 'freight_warehouse', 1, WAREHOUSE_REGION);
-    expect(spot).not.toBeNull();
 
     // #556: confirming a placement only queues a construction site — an idle
     // employee must exist to finish it before it becomes a real building.
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
+    const { x, z } = PINNED_REGIONS.warehouse;
+
     // ── Act: order the building ──
-    const result: CommandResult = buildCommand(ctx, ['freight_warehouse'], { at: `${spot!.x},${spot!.z}` });
+    const result: CommandResult = buildCommand(ctx, ['freight_warehouse'], { at: `${x},${z}` });
 
     // Assert: command succeeds — order confirmation, not an instant build.
     expect(result.success).toBe(true);
@@ -145,19 +173,18 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     // Building exists in state
     expect(ctx.state!.buildings.buildings.length).toBe(1);
     const building = ctx.state!.buildings.buildings[0]!;
-    expect(building.x).toBe(spot!.x);
-    expect(building.z).toBe(spot!.z);
+    expect(building.x).toBe(x);
+    expect(building.z).toBe(z);
     expect(building.type).toBe('freight_warehouse');
     expect(building.tier).toBe(1);
 
     // Construction cost + the builder's hiring cost deducted from cash, at
     // minimum — the exact figure also includes payroll/upkeep for however
-    // many ticks the walk + build actually took, which varies with the
-    // buildable spot found above.
+    // many ticks the walk + build actually took.
     expect(ctx.state!.cash).toBeLessThanOrEqual(TUTORIAL_START_CASH - 15000 - HIRING_COSTS.manager);
   });
 
-  // ── Test 3: Ramp construction ─────────────────────────────────────────────
+  // ── Test 4: Ramp construction ─────────────────────────────────────────────
 
   it('ramp at (10,16) direction south builds successfully', () => {
     // Arrange: fresh tutorial context
@@ -188,65 +215,33 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     expect(ctx.state!.cash).toBeLessThan(TUTORIAL_START_CASH);
   });
 
-  // ── Test 4: Surface height uniformity ─────────────────────────────────────
+  // ── Test 5: regression — the OLD coordinates were NOT flat (#1008) ────────
+  // Documents why the tutorial's guided-build regions moved: the placement
+  // path didn't check flatness before #1008, so these coordinates silently
+  // ordered a building straddling a height step.
 
-  it('surface height is uniform at a buildable footprint in the tutorial build area', () => {
-    // A flat 4x4 spot must exist somewhere in WAREHOUSE_REGION (#458 T9.1/D15)
-    // — not necessarily at (16,16), which the terrain generator no longer
-    // guarantees is flat. Reuses the same search buildCommand's own
-    // canPlaceBuilding gate would perform.
-    const spot = findBuildableSpot(ctx, 'freight_warehouse', 1, WAREHOUSE_REGION);
-    expect(spot).not.toBeNull();
-    const { x: ox, z: oz } = spot!;
+  describe.each([
+    ['warehouse', OLD_REGIONS.warehouse],
+    ['drivingCenter', OLD_REGIONS.drivingCenter],
+    ['livingQuarters', OLD_REGIONS.livingQuarters],
+  ] as const)('old %s region (regression)', (_name, region) => {
+    it(`is NOT flat for a ${region.type} T${region.tier} footprint at (${region.x},${region.z})`, () => {
+      const def = BUILDING_DEFS[region.type][region.tier];
+      const heightAt = (cx: number, cz: number): number => getSurfaceY(ctx.grid!, cx, cz);
 
-    // Inspect all 16 cells of the found 4×4 footprint.
-    const surfaceYValues: number[] = [];
-
-    for (let dx = 0; dx < 4; dx++) {
-      for (let dz = 0; dz < 4; dz++) {
-        const x = ox + dx;
-        const z = oz + dz;
-        const sy = getSurfaceY(ctx.grid!, x, z);
-        surfaceYValues.push(sy);
-
-        // Each footprint cell must have solid ground beneath it
-        if (sy > 0) {
-          const voxel = ctx.grid!.getVoxel(x, sy - 1, z);
-          expect(voxel).toBeDefined();
-          expect(voxel!.density).toBeGreaterThan(0);
-        } else {
-          // Entire column is empty — no ground at this cell
-          expect(sy).toBeGreaterThan(0);
-        }
-      }
-    }
-
-    // All 16 surface heights must be identical — this is exactly what made
-    // findBuildableSpot pick this spot (canPlaceBuilding requires exact
-    // equality across the footprint), confirmed directly here too.
-    const uniqueHeights = new Set(surfaceYValues);
-    expect(uniqueHeights.size).toBe(1);
-
-    // The common surface height should be within the grid Y range (0–12)
-    const commonSurfaceY = surfaceYValues[0]!;
-    expect(commonSurfaceY).toBeGreaterThanOrEqual(0);
-    expect(commonSurfaceY).toBeLessThan(12);
+      expect(isFootprintFlat(def.footprint, region.x, region.z, heightAt)).toBe(false);
+    });
   });
 
-  // ── Test 5: Diagnostics dump for terrain debug (always passes) ────────────
+  // ── Test 6: Diagnostics dump for terrain debug (always passes) ────────────
 
   it('diagnostics: terrain surface heights at key coordinates', () => {
     // Helper to collect surface height info for diagnostic purposes
     const coords: Array<[number, number, string]> = [
       [10, 10, 'survey target'],
-      [16, 16, 'building footprint origin'],
-      [17, 16, 'building footprint'],
-      [18, 16, 'building footprint'],
-      [19, 16, 'building footprint'],
-      [16, 17, 'building footprint'],
-      [16, 18, 'building footprint'],
-      [16, 19, 'building footprint'],
-      [19, 19, 'building footprint corner'],
+      [6, 9, 'warehouse footprint origin'],
+      [6, 7, 'driving center footprint origin'],
+      [29, 12, 'living quarters footprint origin'],
       [10, 16, 'ramp origin'],
     ];
 

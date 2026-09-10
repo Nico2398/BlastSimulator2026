@@ -3,13 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   BUILDING_DEFS,
-  BUSY,
-  buildPlacementGrid,
-  createBuildingState,
   getAllBuildingTypes,
   getBuildingDef,
   getSurfaceY,
-  placeBuilding,
   type BuildingTier,
   type BuildingType,
   type RampVoxelType,
@@ -263,123 +259,5 @@ describe('getSurfaceY', () => {
     // Add a zero-density voxel above the solid surface — surface should still be 3
     grid.setVoxel(1, 3, 1, { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1 });
     expect(getSurfaceY(grid, 1, 1)).toBe(3);
-  });
-});
-
-// ── Placement grid — buildPlacementGrid ─────────────────────────────────────
-
-describe('buildPlacementGrid', () => {
-  it('has correct dimensions matching the VoxelGrid', () => {
-    const vg = makeFilledGrid(6, 8, 5, 2);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    expect(pg.length).toBe(5);            // sizeZ rows
-    expect(pg[0]!.length).toBe(6);        // sizeX cols
-  });
-
-  it('worldX and worldZ match grid positions', () => {
-    const vg = makeFilledGrid(4, 8, 4, 2);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    expect(pg[0]![0]!.worldX).toBe(0);
-    expect(pg[0]![0]!.worldZ).toBe(0);
-    expect(pg[2]![3]!.worldX).toBe(3);
-    expect(pg[2]![3]!.worldZ).toBe(2);
-  });
-
-  it('surfaceY reflects solid voxel height for each column', () => {
-    const vg = makeFilledGrid(4, 8, 4, 3);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    for (let z = 0; z < 4; z++) {
-      for (let x = 0; x < 4; x++) {
-        expect(pg[z]![x]!.surfaceY).toBe(3);
-      }
-    }
-  });
-
-  it('cells under a building footprint are marked BUSY', () => {
-    const vg = makeFilledGrid(20, 8, 20, 2);
-    const state = createBuildingState();
-    // management_office T1: 2×2 footprint at (3, 4)
-    placeBuilding(state, 'management_office', 3, 4, 20, 20);
-    const pg = buildPlacementGrid(vg, state);
-
-    // All 4 cells of the 2×2 footprint should be BUSY
-    expect(pg[4]![3]!.surfaceY).toBe(BUSY);
-    expect(pg[4]![4]!.surfaceY).toBe(BUSY);
-    expect(pg[5]![3]!.surfaceY).toBe(BUSY);
-    expect(pg[5]![4]!.surfaceY).toBe(BUSY);
-
-    // Adjacent cells should NOT be BUSY
-    expect(pg[3]![3]!.surfaceY).not.toBe(BUSY);
-    expect(pg[4]![5]!.surfaceY).not.toBe(BUSY);
-  });
-
-  it('cells under multiple buildings are all marked BUSY', () => {
-    const vg = makeFilledGrid(30, 8, 30, 2);
-    const state = createBuildingState();
-    placeBuilding(state, 'management_office', 0, 0, 30, 30);  // 2×2 at (0,0)
-    placeBuilding(state, 'living_quarters', 5, 5, 30, 30);    // 3×3 at (5,5)
-    const pg = buildPlacementGrid(vg, state);
-
-    // management_office footprint
-    expect(pg[0]![0]!.surfaceY).toBe(BUSY);
-    expect(pg[1]![1]!.surfaceY).toBe(BUSY);
-
-    // living_quarters footprint
-    expect(pg[5]![5]!.surfaceY).toBe(BUSY);
-    expect(pg[7]![7]!.surfaceY).toBe(BUSY);
-
-    // Gap between them should not be BUSY
-    expect(pg[3]![3]!.surfaceY).not.toBe(BUSY);
-  });
-
-  it('returns all-zero surfaceY for empty VoxelGrid', () => {
-    const vg = new VoxelGrid(5, 8, 5);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    for (let z = 0; z < 5; z++) {
-      for (let x = 0; x < 5; x++) {
-        expect(pg[z]![x]!.surfaceY).toBe(0);
-      }
-    }
-  });
-
-  it('grid with no buildings has no BUSY cells', () => {
-    const vg = makeFilledGrid(8, 8, 8, 4);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    for (let z = 0; z < 8; z++) {
-      for (let x = 0; x < 8; x++) {
-        expect(pg[z]![x]!.surfaceY).not.toBe(BUSY);
-      }
-    }
-  });
-
-  it('BUSY cells from large (freight_warehouse T1: 4×4) cover all footprint cells', () => {
-    const vg = makeFilledGrid(30, 8, 30, 1);
-    const state = createBuildingState();
-    // freight_warehouse T1 is 4×4
-    placeBuilding(state, 'freight_warehouse', 10, 10, 30, 30);
-    const pg = buildPlacementGrid(vg, state);
-
-    for (let dz = 0; dz < 4; dz++) {
-      for (let dx = 0; dx < 4; dx++) {
-        expect(pg[10 + dz]![10 + dx]!.surfaceY).toBe(BUSY);
-      }
-    }
-    // Just outside the footprint
-    expect(pg[10]![14]!.surfaceY).not.toBe(BUSY);
-    expect(pg[14]![10]!.surfaceY).not.toBe(BUSY);
-  });
-
-  it('handles a 1×1 VoxelGrid without error', () => {
-    const vg = new VoxelGrid(1, 4, 1);
-    const state = createBuildingState();
-    const pg = buildPlacementGrid(vg, state);
-    expect(pg).toHaveLength(1);
-    expect(pg[0]).toHaveLength(1);
-    expect(pg[0]![0]!.surfaceY).toBe(0);
   });
 });

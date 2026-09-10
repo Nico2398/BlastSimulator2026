@@ -329,9 +329,9 @@ describe('#928 — an employee walking toward rest drains at the traveling rate,
 
     // Same distance/tick budget as the "does not decrement restTicksRemaining
     // while the employee is still travelling" test above (proven safe: a few
-    // ticks in, the employee is still mid-walk, not yet at (20,20)).
+    // ticks in, the employee is still mid-walk, not yet at (18,20)).
     state.cash = 100_000;
-    buildLivingQuartersAndComplete(ctx, '20,20');
+    buildLivingQuartersAndComplete(ctx, '18,20');
 
     emp.x = 0;
     emp.z = 0;
@@ -351,14 +351,14 @@ describe('#928 — an employee walking toward rest drains at the traveling rate,
 
     const fatigueAfterFirstTick = emp.fatigue;
 
-    // A few more ticks — still travelling (distance from (0,0) to (20,20) is
+    // A few more ticks — still travelling (distance from (0,0) to (18,20) is
     // well beyond a few ticks at AGENT_WALK_SPEED), rest still has not started.
     const TRAVEL_SAMPLE_TICKS = 3;
     for (let i = 0; i < TRAVEL_SAMPLE_TICKS; i++) tickCommand(ctx, ['1'], {});
 
     // Confirms the test's own distance/tick budget is sized correctly,
     // independent of the drain-rate bug under test.
-    expect(emp.x === 20 && emp.z === 20).toBe(false); // still travelling
+    expect(emp.x === 18 && emp.z === 20).toBe(false); // still travelling
     expect(emp.restTicksRemaining).toBeNull(); // rest has not started
 
     // Assert a band, not just an upper bound, so this test is RED against
@@ -416,7 +416,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     const emp = getEmployee(ctx, empId);
 
     state.cash = 100_000;
-    buildLivingQuartersAndComplete(ctx, '5,5');
+    buildLivingQuartersAndComplete(ctx, '2,8');
 
     emp.x = 0;
     emp.z = 0;
@@ -433,7 +433,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.destinationZ).not.toBeNull();
     expect(emp.restTicksRemaining).toBeNull();
 
-    // Long enough for the walk to (5,5) plus the full rest duration, with slack,
+    // Long enough for the walk to (2,8) plus the full rest duration, with slack,
     // but short of the ~14-tick idle fatigue decay (NEED_DRAIN_RATES.fatigue.idle)
     // that would otherwise dip the gauge below the warning threshold a second
     // time and start an unrelated second rest cycle — this test is only about
@@ -461,7 +461,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     const emp = getEmployee(ctx, empId);
 
     state.cash = 100_000;
-    buildLivingQuartersAndComplete(ctx, '20,20');
+    buildLivingQuartersAndComplete(ctx, '18,20');
 
     emp.x = 0;
     emp.z = 0;
@@ -481,13 +481,13 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     // building is well beyond a few ticks at AGENT_WALK_SPEED), rest still
     // has not started.
     for (let i = 0; i < 3; i++) tickCommand(ctx, ['1'], {});
-    expect(emp.x === 20 && emp.z === 20).toBe(false);
+    expect(emp.x === 18 && emp.z === 20).toBe(false);
     expect(emp.restTicksRemaining).toBeNull();
 
-    // Enough ticks to arrive (distance (0,0)→(20,20) ≈ 28.3 cells / AGENT_WALK_SPEED)
+    // Enough ticks to arrive (distance (0,0)→(18,20) ≈ 26.9 cells / AGENT_WALK_SPEED)
     // and finish the rest (NEED_REST_DURATIONS.fatigue ticks of work once
     // arrival gates the timer open), with slack.
-    const travelTicks = Math.ceil(Math.hypot(20, 20) / AGENT_WALK_SPEED);
+    const travelTicks = Math.ceil(Math.hypot(18, 20) / AGENT_WALK_SPEED);
     for (let i = 0; i < travelTicks + NEED_REST_DURATIONS.fatigue + 10; i++) tickCommand(ctx, ['1'], {});
 
     expect(emp.restTicksRemaining).toBeNull(); // completed and cleared
@@ -558,7 +558,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
     state.cash = 1_000_000;
     const empId = hireOne(ctx, 'driller');
 
-    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    const build = buildCommand(ctx, ['living_quarters'], { at: '2,6', tier: '1' });
     expect(build.success).toBe(true);
 
     const policyResult = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
@@ -587,7 +587,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
     state.cash = 1_000_000;
     const empId = hireOne(ctx, 'driller');
 
-    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    const build = buildCommand(ctx, ['living_quarters'], { at: '2,6', tier: '1' });
     expect(build.success).toBe(true);
 
     // No set_policy call — revision stays 0, the opt-in gate stays closed.
@@ -665,7 +665,7 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
     state.cash = 1_000_000;
     const empId = hireOne(ctx, 'driller');
 
-    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    const build = buildCommand(ctx, ['living_quarters'], { at: '2,6', tier: '1' });
     expect(build.success).toBe(true);
 
     const policyResult = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
@@ -768,7 +768,7 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
     const engine = createGameEngine();
 
     expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
@@ -907,7 +907,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 2 ti
     const engine = createGameEngine();
 
     expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);

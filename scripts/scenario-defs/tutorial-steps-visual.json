@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:18,14",
+      "command": "build living_quarters at:29,12",
       "timeout": 90,
       "interaction": [
         {
@@ -255,8 +255,8 @@
         },
         {
           "type": "pickTile",
-          "x": 18,
-          "z": 14
+          "x": 29,
+          "z": 12
         },
         {
           "type": "screenshot"
@@ -267,7 +267,7 @@
         }
       ],
       "role": "player",
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023, CI): (12,15), while flat, deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31). A first fix attempt moved it to (6,16) (10 tiles clear of those hazards), which traded that deadlock for a different one: a fatigue/rest round-trip livelock -- the walk out to (6,16) and back is long enough that the excavator's fatigue crosses back over the rest threshold before a single box-cut ramp segment carves (confirmed live: `state full`'s navGrid.cellTypeCounts.ramp count never moved across 5000 ticks of direct observation). (29,12) clears the vehicle spawn, the box-cut corridor, and the drill grid by >=5 tiles each while sitting only 12 tiles (Chebyshev) from the dig site, roughly half (6,16)'s round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace.",
       "expect": {
         "increased": [
           "orderedBuildingCount"
@@ -287,7 +287,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (18,14) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,12) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
       "expect": {
         "equals": {
           "buildingCount": 1
@@ -330,7 +330,7 @@
       }
     },
     {
-      "command": "build driving_center at:10,8",
+      "command": "build driving_center at:6,7",
       "timeout": 90,
       "interaction": [
         {
@@ -347,8 +347,8 @@
         },
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 8
+          "x": 6,
+          "z": 7
         },
         {
           "type": "screenshot"
@@ -1387,7 +1387,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:6,6",
+      "command": "build freight_warehouse at:6,9",
       "timeout": 90,
       "interaction": [
         {
@@ -1409,7 +1409,7 @@
         {
           "type": "pickTile",
           "x": 6,
-          "z": 6
+          "z": 9
         },
         {
           "type": "screenshot"
@@ -1420,7 +1420,7 @@
         }
       ],
       "role": "player",
-      "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,9) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
@@ -1531,14 +1531,14 @@
       }
     },
     {
-      "command": "tick 200",
+      "command": "tick 80",
       "timeout": 120,
-      "description": "#959: the hauler keeps bringing blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so the dirtite ore_sale offer the next step accepts has to be waited for. `role: setup` with a plain `tick` rather than a `waitUntil`: what is being waited on -- an ore_sale offer for a material this pit's own blast actually produced, with enough hauled in to fill it -- is not a single state-dump field `waitUntil`'s strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock unless a step asks.",
+      "description": "#959: the hauler keeps bringing blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so the dirtite ore_sale offer the next step accepts has to be waited for. `role: setup` with a plain `tick` rather than a `waitUntil`: what is being waited on -- an ore_sale offer for a material this pit's own blast actually produced, with enough hauled in to fill it -- is not a single state-dump field `waitUntil`'s strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock unless a step asks. #1008-followup (PR #1023): 200 -> 80 -- the living_quarters relocation (tutorialStages.ts's own REGION.livingQuarters comment) shifts every tick this file spends from box-cut onward, so the fixed 200-tick pad this step used to land on now overshoots: direct-traced (a headless replay of this file's own steps 0-59, ticking `contract list` every 20 ticks and reading its raw output), a `Deliver dirtite ore` ore_sale offer is already in the pool at tick 0 of this step's own pad and stays through +100 ticks (gone by +120, the pool's own rotation evicting it), while storedMassKg clears the 500kg step 62 delivers by +60. 80 sits inside both windows with margin on either side.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 200"
+          "command": "tick 80"
         }
       ],
       "expect": {

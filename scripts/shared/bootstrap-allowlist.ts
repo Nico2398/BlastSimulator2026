@@ -76,6 +76,16 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // disabled (present) button.
   'build move 2',
   'build destroy 2',
+  // nav-path-following-visual.json (#1022 TODO, filed against #1008): all
+  // three wall-segment builds this file orders are refused outright by
+  // #1008's flatness rule (seed 42's (0,0) corner is not flat, and no other
+  // map corner is both flat and on the driller spawn's benchLevel), so no
+  // building #1/#2/#3 is ever placed and there is no row/button in the DOM
+  // for these demolitions to click either — same bad-id-rejection shape as
+  // `build destroy 2` above, just for the other two ids this file's trap
+  // needs. Remove once #1022 redesigns the trap and these builds succeed.
+  'build destroy 1',
+  'build destroy 3',
   // `office`/`medical_bay`/`canteen`/`storage_depot`/`break_room`/`bunkhouse`
   // are not, and have never been, real `BuildingType` values (Building.ts) —
   // several playthrough/bankruptcy scenarios attempt them anyway and each

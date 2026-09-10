@@ -190,7 +190,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // fleet — exactly the roster/fleet automatic haul dispatch needs, with
     // no vehicle pre-assigned to anyone.
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('build freight_warehouse at:6,6').success).toBe(true);
+    expect(run('build freight_warehouse at:6,9').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     // drill_plan grid now queues one drill_hole PendingAction per hole
     // instead of writing them straight into state.drillHoles (#553) — the
@@ -379,7 +379,7 @@ function makeDrillingCenterReady(
   // surveyor hired first is employee #1, the driller hired next is #2.
   expect(run('employee hire role:surveyor').success).toBe(true);
   expect(run('employee hire role:driller').success).toBe(true);
-  expect(run('build driving_center at:10,8').success).toBe(true);
+  expect(run('build driving_center at:6,7').success).toBe(true);
 
   for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
     for (const emp of ctx.state!.employees.employees) {

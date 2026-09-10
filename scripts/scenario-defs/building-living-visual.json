@@ -88,7 +88,7 @@
       "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
-      "command": "build research_center at:30,5",
+      "command": "build research_center at:30,3",
       "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
       "interaction": [
         {
@@ -106,7 +106,7 @@
         {
           "type": "pickTile",
           "x": 30,
-          "z": 5
+          "z": 3
         },
         {
           "type": "screenshot"
@@ -146,7 +146,7 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5 tier:1",
+      "command": "build living_quarters at:2,6 tier:1",
       "interaction": [
         {
           "type": "clickSelector",
@@ -158,8 +158,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 6
         },
         {
           "type": "screenshot"
@@ -245,7 +245,7 @@
       "role": "setup"
     },
     {
-      "command": "build living_quarters at:12,5 tier:2",
+      "command": "build living_quarters at:13,0 tier:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -257,8 +257,8 @@
         },
         {
           "type": "pickTile",
-          "x": 12,
-          "z": 5
+          "x": 13,
+          "z": 0
         },
         {
           "type": "screenshot"
@@ -332,7 +332,7 @@
       "role": "setup"
     },
     {
-      "command": "build living_quarters at:20,5 tier:3",
+      "command": "build living_quarters at:16,17 tier:3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -344,8 +344,8 @@
         },
         {
           "type": "pickTile",
-          "x": 20,
-          "z": 5
+          "x": 16,
+          "z": 17
         },
         {
           "type": "screenshot"

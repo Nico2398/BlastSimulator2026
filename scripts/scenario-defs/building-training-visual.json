@@ -70,7 +70,7 @@
       "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
-      "command": "build driving_center at:5,5",
+      "command": "build driving_center at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -86,7 +86,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {
@@ -108,7 +108,7 @@
       }
     },
     {
-      "command": "build blasting_academy at:10,5",
+      "command": "build blasting_academy at:10,3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -121,7 +121,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 5
+          "z": 3
         },
         {
           "type": "screenshot"
@@ -142,7 +142,7 @@
       }
     },
     {
-      "command": "build management_office at:15,5",
+      "command": "build management_office at:14,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -154,7 +154,7 @@
         },
         {
           "type": "pickTile",
-          "x": 15,
+          "x": 14,
           "z": 5
         },
         {

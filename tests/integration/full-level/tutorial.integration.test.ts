@@ -253,11 +253,13 @@ describe('Tutorial Level — Full Walkthrough', () => {
     const assignDriver = vehicleCommand(ctx, ['driver', String(haulerId), '4'], {});
     expect(assignDriver.success).toBe(true);
 
-    // 21. Build a freight_warehouse at (5,5). #556: confirming the order
+    // 21. Build a freight_warehouse at (0,8) — flat ground post-blast (#1008
+    // requires a level footprint; the terrain at the old (5,5) spot is no
+    // longer flat by this point in the sequence). #556: confirming the order
     // only queues a construction site — drive it to completion (the
     // surveyor, idle since step 4, picks up the unskilled `place_building`
     // work) before asserting a real building exists.
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '0,8' });
     expect(buildResult.success).toBe(true);
     expect(ctx.state!.buildings.buildings.length).toBe(0);
     driveConstructionToCompletion(ctx);
@@ -353,7 +355,7 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
     const engine = createGameEngine();
 
     expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:18,14').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);

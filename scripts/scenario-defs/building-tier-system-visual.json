@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build research_center at:25,15",
+      "command": "build research_center at:26,14",
       "description": "Placed first \u2014 a research_center is a hard prerequisite (#442) to queue any research task below.",
       "interaction": [
         {
@@ -37,8 +37,8 @@
         },
         {
           "type": "pickTile",
-          "x": 25,
-          "z": 15
+          "x": 26,
+          "z": 14
         },
         {
           "type": "wait",
@@ -83,8 +83,8 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5 tier:1",
-      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above \u2014 re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row.",
+      "command": "build living_quarters at:2,8 tier:1",
+      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above \u2014 re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row. #1008: relocated from (2,6) to (2,8) -- (2,6)'s tier 1 (3x3) footprint is flat, but the tier 2 (4x3) and tier 3 (5x4) footprints it grows into downstream are not, which fails the tier-3 upgrade step below with 'Uneven surface' (a grown-cells edge case, since a tier upgrade never moves the building). (2,8) is flat for the base footprint and every upgraded tier's larger footprint.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -96,8 +96,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 8
         },
         {
           "type": "wait",
@@ -266,7 +266,7 @@
       }
     },
     {
-      "command": "build management_office at:15,5 tier:1",
+      "command": "build management_office at:14,5 tier:1",
       "description": "Placed by clicking the Build panel's catalog row for management_office and picking the tile.",
       "interaction": [
         {
@@ -279,7 +279,7 @@
         },
         {
           "type": "pickTile",
-          "x": 15,
+          "x": 14,
           "z": 5
         },
         {

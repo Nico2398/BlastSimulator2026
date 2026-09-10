@@ -22,7 +22,7 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5",
+      "command": "build living_quarters at:2,6",
       "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). The screenshot is taken AFTER Confirm, not before it: before Confirm the scene still shows the placement tool's own footprint preview, which existed long before this issue — what #556 adds, and what has to be seen, is the blue site ghost that stays on those exact tiles once the order is placed.",
       "timeout": 90,
       "interaction": [
@@ -40,8 +40,8 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 5
+          "x": 2,
+          "z": 6
         },
         {
           "type": "clickSelector",
@@ -69,7 +69,7 @@
     },
     {
       "command": "tick 10",
-      "description": "#556: mid-construction checkpoint -- an unskilled roster member has had time to walk to (5,5) and start work, but tier 1's 40-tick base duration is nowhere near spent yet. This step's own auto-captured screenshot is the mid-build checkpoint (ghost still present, no building). Screenshot: the mid-build checkpoint of #556’s order → build → stand sequence.",
+      "description": "#556: mid-construction checkpoint -- an unskilled roster member has had time to walk to (2,6) and start work, but tier 1's 40-tick base duration is nowhere near spent yet. This step's own auto-captured screenshot is the mid-build checkpoint (ghost still present, no building). Screenshot: the mid-build checkpoint of #556’s order → build → stand sequence.",
       "timeout": 90,
       "interaction": [
         {
@@ -132,7 +132,7 @@
       "role": "observe"
     },
     {
-      "command": "build blasting_academy at:10,10",
+      "command": "build blasting_academy at:10,11",
       "description": "#556: same order-then-build semantics as the first order above.",
       "timeout": 90,
       "interaction": [
@@ -147,7 +147,7 @@
         {
           "type": "pickTile",
           "x": 10,
-          "z": 10
+          "z": 11
         },
         {
           "type": "screenshot"
@@ -218,7 +218,7 @@
       "role": "observe"
     },
     {
-      "command": "build geology_lab at:15,15",
+      "command": "build geology_lab at:14,15",
       "description": "#556: same order-then-build semantics as the orders above.",
       "timeout": 90,
       "interaction": [
@@ -232,7 +232,7 @@
         },
         {
           "type": "pickTile",
-          "x": 15,
+          "x": 14,
           "z": 15
         },
         {
@@ -388,8 +388,8 @@
       "role": "observe"
     },
     {
-      "command": "build management_office at:90,20",
-      "description": "#558: targets ground well outside the default 64x64 site (chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it. #556: land is claimed and cash charged at order time exactly as before (worldSizeX grows on this step); only the building itself is now a queued site rather than an instant placement.",
+      "command": "build management_office at:94,20",
+      "description": "#558: targets ground well outside the default 64x64 site (chunk index for x=94 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it. #556: land is claimed and cash charged at order time exactly as before (worldSizeX grows on this step); only the building itself is now a queued site rather than an instant placement. #1008: relocated from (90,20) to (94,20) -- (90,20)'s 2x2 footprint straddles uneven ground once the chunk is actually claimed and generated (pre-claim sampling of unclaimed ground reads a flat placeholder, not the real terrain), while (94,20) is genuinely flat post-claim and keeps the same outside-the-original-grid intent.",
       "timeout": 100,
       "interaction": [
         {
@@ -402,7 +402,7 @@
         },
         {
           "type": "pickTile",
-          "x": 90,
+          "x": 94,
           "z": 20
         },
         {

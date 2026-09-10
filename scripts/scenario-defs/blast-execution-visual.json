@@ -48,8 +48,8 @@
       }
     },
     {
-      "command": "build living_quarters at:2,58",
-      "description": "#928: the single-gauge fatigue model concentrates all morale damage into fatigue alone, so a driller working continuously with nowhere to rest (NEED_REST_NO_BUILDING_CAP=70, double duration with no building in range) tanks well-being to a sustained 0 and triggers a genuine worker_revolt well before this file's actual blast-execution assertions are reached (sandbox-measured: by tick ~380, inside the very first drill/blast cycle). A living_quarters lets collapse-rest fully replenish fatigue in normal time instead of capping/doubling it, keeping well-being off the revolt floor for the rest of this ~1000-tick file. Placed in a far corner (2,58), deliberately clear of grid centre (32,32) -- every purchased vehicle spawns staggered outward from grid centre (VehiclePlacement's own spawn-ring logic), and this file's cycle-4 8x8 grid alone buys 8 more rigs into that same small cluster; a living_quarters footprint dropped into that cluster (sandbox-confirmed at 32,32) walls off some of those tightly packed spawn tiles from each other, and the drillers assigned to them go permanently isMoveStuck trying to board -- a real dispatch/pathing defect (any obstacle shares this risk when dropped into that cluster, not something specific to this building type), tracked as a follow-up rather than fixed here since this file only needs to place the building somewhere that isn't the vehicle spawn cluster. Also clear of every cycle's own hole grid (20,20 / 45,20 / 5,5 / 59,59).",
+      "command": "build living_quarters at:8,58",
+      "description": "#928: the single-gauge fatigue model concentrates all morale damage into fatigue alone, so a driller working continuously with nowhere to rest (NEED_REST_NO_BUILDING_CAP=70, double duration with no building in range) tanks well-being to a sustained 0 and triggers a genuine worker_revolt well before this file's actual blast-execution assertions are reached (sandbox-measured: by tick ~380, inside the very first drill/blast cycle). A living_quarters lets collapse-rest fully replenish fatigue in normal time instead of capping/doubling it, keeping well-being off the revolt floor for the rest of this ~1000-tick file. Placed in a far corner (8,58) (#1008: nearest flat 3x3 to the original (2,58) -- checkFootprintPlacement now refuses an uneven footprint), deliberately clear of grid centre (32,32) -- every purchased vehicle spawns staggered outward from grid centre (VehiclePlacement's own spawn-ring logic), and this file's cycle-4 8x8 grid alone buys 8 more rigs into that same small cluster; a living_quarters footprint dropped into that cluster (sandbox-confirmed at 32,32) walls off some of those tightly packed spawn tiles from each other, and the drillers assigned to them go permanently isMoveStuck trying to board -- a real dispatch/pathing defect (any obstacle shares this risk when dropped into that cluster, not something specific to this building type), tracked as a follow-up rather than fixed here since this file only needs to place the building somewhere that isn't the vehicle spawn cluster. Also clear of every cycle's own hole grid (20,20 / 45,20 / 5,5 / 59,59).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -65,7 +65,7 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
+          "x": 8,
           "z": 58
         },
         {

@@ -67,7 +67,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const vehicle = state.vehicles.vehicles.find(v => v.id === 1)!;
     const interruptedActionId = driver.activeActionId;
 
-    expect(run('build living_quarters at:12,12 tier:1')).toMatchObject({ success: true });
+    expect(run('build living_quarters at:11,14 tier:1')).toMatchObject({ success: true });
     driver.fatigue = 4;
 
     tickUntil(run, () => driver.collapsing, 50);
@@ -104,7 +104,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const driver = state.employees.employees.find(e => e.id === 1)!;
     const vehicle = state.vehicles.vehicles.find(v => v.id === 1)!;
 
-    expect(run('build living_quarters at:12,12 tier:1')).toMatchObject({ success: true });
+    expect(run('build living_quarters at:11,14 tier:1')).toMatchObject({ success: true });
     driver.fatigue = 4;
 
     tickUntil(run, () => driver.collapsing, 50);

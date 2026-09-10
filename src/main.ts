@@ -47,6 +47,7 @@ import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRe
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
+import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -141,6 +142,10 @@ placementController.setClaimCheck((x, z) => {
 paramStrip.setConfirmHandler(() => placementController.confirm());
 paramStrip.setCancelHandler(() => placementController.cancel());
 uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
+// Build panel's footprint-flatness preview (#1008) reads the same ground
+// truth checkFootprintPlacement does — the raw voxel surface, not a
+// smoothed/rendered height — so the strip and the console never disagree.
+uiManager.setBuildSurfaceSampler((x, z) => ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0);
 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current

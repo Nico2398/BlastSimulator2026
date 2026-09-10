@@ -45,7 +45,7 @@
       "description": "Hired before the offices are ordered (#556): a build order is queued work now, so the site needs someone on the roster to walk over and build it. This is the same driller the dispatch below paths around those offices."
     },
     {
-      "command": "build management_office at:5,5",
+      "command": "build management_office at:3,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -61,7 +61,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 5
         },
         {
@@ -81,7 +81,7 @@
       }
     },
     {
-      "command": "build management_office at:5,7",
+      "command": "build management_office at:3,7",
       "interaction": [
         {
           "type": "clickSelector",
@@ -93,7 +93,7 @@
         },
         {
           "type": "pickTile",
-          "x": 5,
+          "x": 3,
           "z": 7
         },
         {
@@ -113,7 +113,7 @@
       }
     },
     {
-      "command": "build management_office at:7,5",
+      "command": "build management_office at:5,8",
       "interaction": [
         {
           "type": "clickSelector",
@@ -125,8 +125,8 @@
         },
         {
           "type": "pickTile",
-          "x": 7,
-          "z": 5
+          "x": 5,
+          "z": 8
         },
         {
           "type": "screenshot"

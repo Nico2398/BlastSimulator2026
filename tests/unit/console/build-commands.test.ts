@@ -33,7 +33,7 @@ describe('build command — ordered ids (#556)', () => {
     // Two orders back to back, far enough apart that the staffed crew builds
     // them in parallel and finishes them in whichever order it reaches them.
     expect(buildCommand(ctx, ['management_office'], { at: '20,20' }).success).toBe(true);
-    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,2' }).success).toBe(true);
+    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,1' }).success).toBe(true);
     tickUntilConstructionDone(ctx);
 
     const office = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
@@ -46,7 +46,7 @@ describe('build command — ordered ids (#556)', () => {
     const ctx = makeCtx();
     ctx.state!.buildings.unlockedTiers.freight_warehouse = 3;
     expect(buildCommand(ctx, ['management_office'], { at: '20,20' }).success).toBe(true);
-    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,2' }).success).toBe(true);
+    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,1' }).success).toBe(true);
     tickUntilConstructionDone(ctx);
 
     const ids = ctx.state!.buildings.buildings.map(b => b.id);
@@ -55,7 +55,7 @@ describe('build command — ordered ids (#556)', () => {
 
   it('claims the finished building id at order time', () => {
     const ctx = makeCtx();
-    expect(buildCommand(ctx, ['management_office'], { at: '0,0' }).success).toBe(true);
+    expect(buildCommand(ctx, ['management_office'], { at: '2,0' }).success).toBe(true);
     const order = ctx.state!.plannedBuildings[0]!;
     expect(order.buildingId).toBe(1);
     tickUntilConstructionDone(ctx);
@@ -66,7 +66,7 @@ describe('build command — ordered ids (#556)', () => {
 describe('build command — tier placement', () => {
   it('places a T1 building by default', () => {
     const ctx = makeCtx();
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T1');
     // Confirming placement only queues a construction site (#556) — nothing
@@ -82,7 +82,7 @@ describe('build command — tier placement', () => {
     // #410: tier 2+ placement is gated on Research Center unlock — pre-unlock so
     // this test still exercises tier placement, not the research gate itself.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '2' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T2');
     tickUntilConstructionDone(ctx);
@@ -92,7 +92,7 @@ describe('build command — tier placement', () => {
   it('places a T3 building when tier:3 is supplied', () => {
     const ctx = makeCtx();
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '3' });
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '3' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T3');
     tickUntilConstructionDone(ctx);
@@ -103,7 +103,7 @@ describe('build command — tier placement', () => {
     const ctx = makeCtx();
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
     const cashBefore = ctx.state!.cash;
-    buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
+    buildCommand(ctx, ['management_office'], { at: '2,0', tier: '2' });
     const def = getBuildingDef('management_office', 2);
     // The order confirms and charges immediately (#556) — cost is deducted
     // at order time, not on construction completion.
@@ -112,7 +112,7 @@ describe('build command — tier placement', () => {
 
   it('treats an invalid tier param as tier 1', () => {
     const ctx = makeCtx();
-    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '9' });
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '9' });
     expect(result.success).toBe(true);
     tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
@@ -120,7 +120,7 @@ describe('build command — tier placement', () => {
 
   it('#816: relocates every employee standing on a footprint tile that just closed over them, not only the one who built it', () => {
     const ctx = makeCtx();
-    const result = buildCommand(ctx, ['management_office'], { at: '5,5' });
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4' });
     expect(result.success).toBe(true);
 
     // Let dispatch settle onto whichever staffed employee ends up building
@@ -164,7 +164,7 @@ describe('build command — upgrade', () => {
   let ctx: MiningContext;
   beforeEach(() => {
     ctx = makeCtx();
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
   });
 
@@ -230,7 +230,7 @@ describe('build command — research gate', () => {
   it('rejects upgrade past T1 when the tier has not been researched', () => {
     const ctx = makeCtx();
     ctx.state!.buildings.unlockedTiers.management_office = 1;
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
     const id = ctx.state!.buildings.buildings[0]!.id;
 
@@ -244,7 +244,7 @@ describe('build command — research gate', () => {
 describe('build command — demolish with cost', () => {
   it('deducts demolish cost and removes the building', () => {
     const ctx = makeCtx();
-    buildCommand(ctx, ['management_office'], { at: '0,0' });
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;

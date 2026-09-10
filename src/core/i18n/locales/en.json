@@ -3301,6 +3301,7 @@
   "shell.placement.outside_region": "Outside the highlighted area — click inside the blue outline.",
   "shell.placement.pick_first": "Click the highlighted area in the scene first.",
   "shell.placement.refused_protected_ground": "Protected ground — a village, river or landmark stands there.",
+  "shell.placement.refused_uneven_ground": "Uneven ground — every tile the building covers must be the same height.",
   "shell.placement.refused_expansion_disabled": "Outside the site, and this site cannot be expanded.",
   "shell.placement.refused_too_far": "Too far from the site to claim in one action.",
   "console.no_game_loaded": "No game loaded. Use new_game first.",
