@@ -89,6 +89,23 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
   return 0;
 }
 
+/** What the card should show about a stage whose order was issued but not yet resolved. */
+export interface StageWaitStatus {
+  /** True once some stage's `spentWhen` has fired and its work is still outstanding. */
+  waiting: boolean;
+  /** The waiting stage's own `waitingKey`, or null when `waiting` is false. */
+  waitingKey: string | null;
+}
+
+/**
+ * Whether any stage's `spentWhen` has fired — the sibling check to
+ * `resolveStageIndex`, run independently of which stage that function
+ * resolved to (see `TutorialStage.spentWhen`).
+ */
+export function resolveWaitStatus(_stages: TutorialStage[], _state: GameState | null): StageWaitStatus {
+  return { waiting: false, waitingKey: null }; // TODO: implement
+}
+
 /**
  * Modal overlays. Their controls stay live no matter which stage is active: a
  * modal covers the whole screen, so blocking its own buttons would seal the
@@ -160,6 +177,10 @@ export function applyRails(
   // done) left permanently clickable — stay live across every later stage,
   // stage present or not.
   extraAllowed: string[] = [],
+  // True once the active stage's own `spentWhen` has fired — the DOM-side
+  // half of the waiting state (chip + stage-line style), unused until the
+  // implementation phase wires it in.
+  _spent: boolean = false,
 ): void {
   for (const el of Array.from(root.querySelectorAll(`.${ALLOWED_CLASS}`))) {
     el.classList.remove(ALLOWED_CLASS);

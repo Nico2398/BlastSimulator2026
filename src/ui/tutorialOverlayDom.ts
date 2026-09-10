@@ -13,6 +13,8 @@ export interface TutorialCardElements {
   titleEl: HTMLElement;
   textEl: HTMLElement;
   stageEl: HTMLElement;
+  /** The stage-line row (chevron + `stageEl`) — carries the waiting style once a stage's order is spent. */
+  stageLine: HTMLElement;
   pausedEl: HTMLElement;
   /**
    * The "CLOCK HELD" chip's own text node, inside `pausedEl`. `pausedEl`
@@ -21,6 +23,8 @@ export interface TutorialCardElements {
    * tearing down and rebuilding the chip.
    */
   pausedChipEl: HTMLElement;
+  /** The "waiting" chip, sibling of `pausedEl` — hidden until a stage's issued order is spent. */
+  waitingChipEl: HTMLElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
@@ -95,12 +99,25 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   locale.bindText(pausedChipEl, 'tutorial.clock_held_chip');
   pausedEl.appendChild(pausedChipEl);
 
+  // "Order issued, simulation working on it" chip — sibling of `pausedEl`,
+  // hidden until a stage's `spentWhen` fires (#1014). Left permanently
+  // hidden in the skeleton phase; the implementation phase wires its display
+  // and text to `resolveWaitStatus`'s result.
+  const waitingChipEl = el('span', {
+    className: 'bs-tutorial-waiting',
+    attrs: { style: 'display:none' },
+  });
+  locale.bindTitle(waitingChipEl, 'tutorial.waiting_tooltip');
+  const waitingChipTextEl = el('span', {});
+  locale.bindText(waitingChipTextEl, 'tutorial.waiting_chip');
+  waitingChipEl.appendChild(waitingChipTextEl);
+
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
 
   const titleRow = el('div', {
     attrs: { style: 'display:flex;align-items:center;gap:9px;flex-wrap:wrap' },
-    children: [titleEl, pausedEl, stepCounter],
+    children: [titleEl, pausedEl, waitingChipEl, stepCounter],
   });
 
   const textEl = document.createElement('p');
@@ -112,6 +129,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   const stageEl = document.createElement('span');
   stageEl.className = 'bs-tutorial-stage';
   const stageLine = el('div', {
+    className: 'bs-tutorial-stage-line',
     attrs: { style: 'display:flex;align-items:center;gap:6px;color:var(--bsx-amber)' },
     children: [chevron, stageEl],
   });
@@ -140,7 +158,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   container.appendChild(overlay);
 
   return {
-    overlay, box, titleEl, textEl, stageEl, pausedEl, pausedChipEl, stepCounter,
+    overlay, box, titleEl, textEl, stageEl, stageLine, pausedEl, pausedChipEl, waitingChipEl, stepCounter,
     progressEl, commandsLabel, commandsHint, locale,
   };
 }

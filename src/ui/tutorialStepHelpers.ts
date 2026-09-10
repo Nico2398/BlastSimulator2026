@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Tutorial step helper functions
 // Extracted from tutorialSteps.ts to keep each file under 300 lines.
 
-import type { GameState } from '../core/state/GameState.js';
+import type { ActionType, GameState } from '../core/state/GameState.js';
 import type { NavCell } from '../core/nav/NavGrid.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
@@ -231,6 +231,16 @@ export function getBuildings(state: GameState): { type: string }[] {
 /** Count buildings of a given type. */
 export function countBuildingsOfType(state: GameState, buildingType: string): number {
   return getBuildings(state).filter(b => b.type === buildingType).length;
+}
+
+/** Whether a pending action of the given type is currently queued or in flight. */
+export function hasPendingActionOfType(_state: GameState, _type: ActionType): boolean {
+  return false; // TODO: implement
+}
+
+/** Whether a building of the given type is planned/under construction (not yet complete). */
+export function hasPlannedBuildingOfType(_state: GameState, _buildingType: string): boolean {
+  return false; // TODO: implement
 }
 
 /** Count vehicles with a driver assigned. */

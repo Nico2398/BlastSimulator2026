@@ -15,6 +15,7 @@ import {
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
+import type { GameState } from '../core/state/GameState.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -41,6 +42,18 @@ export interface TutorialStage {
    * replaced by a status view once its own action starts (#903).
    */
   doneTarget?: string;
+  /**
+   * True once this stage's own action has been issued and the simulation now
+   * owns the result — the sibling of `doneTarget` for a control that stays
+   * reachable after being clicked (a buy/confirm/run button) instead of
+   * disappearing. Checked independently of which stage `resolveStageIndex`
+   * resolved to (see `resolveWaitStatus`, tutorialGuide.ts) so a control that
+   * becomes unreachable for an unrelated reason (e.g. insufficient cash for a
+   * second order) doesn't mask the wait.
+   */
+  spentWhen?: (state: GameState) => boolean;
+  /** i18n key for the waiting line shown once `spentWhen` fires. Required whenever `spentWhen` is set. */
+  waitingKey?: string;
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the

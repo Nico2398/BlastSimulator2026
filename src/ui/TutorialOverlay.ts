@@ -39,8 +39,10 @@ export class TutorialOverlay {
   private readonly titleEl: HTMLElement;
   private readonly textEl: HTMLElement;
   private readonly stageEl: HTMLElement;
+  private readonly stageLine: HTMLElement;
   private readonly pausedEl: HTMLElement;
   private readonly pausedChipEl: HTMLElement;
+  private readonly waitingChipEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
@@ -63,11 +65,18 @@ export class TutorialOverlay {
     this.titleEl = els.titleEl;
     this.textEl = els.textEl;
     this.stageEl = els.stageEl;
+    this.stageLine = els.stageLine;
     this.pausedEl = els.pausedEl;
     this.pausedChipEl = els.pausedChipEl;
+    this.waitingChipEl = els.waitingChipEl;
     // Its text is owned by `this.locale` now (bound in buildTutorialCard()); kept as
     // a field only so direct DOM introspection (tests, debugging) can still reach it.
     void this.pausedChipEl;
+    // Not yet wired to `resolveWaitStatus` — skeleton phase (#1014). Kept as
+    // fields, like `pausedChipEl` above, so direct DOM introspection can
+    // still reach them ahead of the implementation phase.
+    void this.stageLine;
+    void this.waitingChipEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
