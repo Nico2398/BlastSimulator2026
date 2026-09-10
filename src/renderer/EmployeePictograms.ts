@@ -10,9 +10,9 @@ import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { computeEmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { BAR_Y_OFFSET } from './TaskProgressBar.js';
 import { faceCamera } from './Billboard.js';
+import { EmployeeBillboardRoster, forEachEmployeeActivity } from './EmployeeBillboardRoster.js';
 
 /**
  * Which non-working pictogram an employee shows. Mirrors
@@ -90,6 +90,30 @@ function buildIconMaterial(kind: PictogramKind): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
 }
 
+/** One shrinking "Z" glyph to place, in canvas-fraction coordinates (0-1 of CANVAS_SIZE). */
+interface ZGlyph {
+  x: number;
+  y: number;
+  size: number;
+}
+
+/**
+ * Draw each of `zs` as a bold 'Z' character at its own position/size —
+ * shared by the 'resting' and 'walking_to_rest' glyphs below, which differ
+ * only in how many Zs they draw, at what sizes, and (for walking_to_rest)
+ * an alpha/arrow wrapped around the call.
+ */
+function drawZs(ctx: CanvasRenderingContext2D, zs: readonly ZGlyph[], color: string): void {
+  const c = CANVAS_SIZE;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const z of zs) {
+    ctx.font = `bold ${c * z.size}px sans-serif`;
+    ctx.fillText('Z', c * z.x, c * z.y);
+  }
+}
+
 function drawGlyph(ctx: CanvasRenderingContext2D, kind: PictogramKind): void {
   const c = CANVAS_SIZE;
   ctx.clearRect(0, 0, c, c);
@@ -111,28 +135,21 @@ function drawGlyph(ctx: CanvasRenderingContext2D, kind: PictogramKind): void {
     }
     case 'resting': {
       // Calm "Z Z Z" sleep pictogram, full size/opacity — "there".
-      ctx.fillStyle = '#4fc3f7';
-      ctx.font = `bold ${c * 0.34}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Z', c * 0.28, c * 0.72);
-      ctx.font = `bold ${c * 0.26}px sans-serif`;
-      ctx.fillText('Z', c * 0.55, c * 0.48);
-      ctx.font = `bold ${c * 0.18}px sans-serif`;
-      ctx.fillText('Z', c * 0.75, c * 0.28);
+      drawZs(ctx, [
+        { x: 0.28, y: 0.72, size: 0.34 },
+        { x: 0.55, y: 0.48, size: 0.26 },
+        { x: 0.75, y: 0.28, size: 0.18 },
+      ], '#4fc3f7');
       break;
     }
     case 'walking_to_rest': {
       // Same colour family as 'resting', but fainter and smaller — "en route",
       // not "there yet" — plus a small arrow to read as travel.
       ctx.globalAlpha = 0.55;
-      ctx.fillStyle = '#4fc3f7';
-      ctx.font = `bold ${c * 0.24}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Z', c * 0.42, c * 0.55);
-      ctx.font = `bold ${c * 0.16}px sans-serif`;
-      ctx.fillText('Z', c * 0.66, c * 0.32);
+      drawZs(ctx, [
+        { x: 0.42, y: 0.55, size: 0.24 },
+        { x: 0.66, y: 0.32, size: 0.16 },
+      ], '#4fc3f7');
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#4fc3f7';
       ctx.lineWidth = c * 0.05;
@@ -204,7 +221,7 @@ interface Pictogram {
 /** Billboarded non-working-activity pictograms, one per employee, keyed by employee id. */
 export class EmployeePictograms {
   private readonly camera: THREE.Camera;
-  private readonly pictograms = new Map<number, Pictogram>();
+  private readonly pictograms = new EmployeeBillboardRoster<Pictogram>(pictogram => pictogram.mesh);
 
   // ---------- Shared resources (built once per instance, reused across every icon) ----------
   private readonly geometry: THREE.PlaneGeometry;
@@ -228,7 +245,7 @@ export class EmployeePictograms {
 
   /** Number of pictograms currently rendered. */
   get count(): number {
-    return this.pictograms.size;
+    return this.pictograms.count;
   }
 
   /**
@@ -244,16 +261,13 @@ export class EmployeePictograms {
   ): void {
     const liveIds = new Set<number>();
 
-    for (const employee of employees) {
-      liveIds.add(employee.id);
-
-      const activity = computeEmployeeActivity(employee, vehicles);
+    forEachEmployeeActivity(employees, vehicles, liveIds, (employee, activity) => {
       const kind = pictogramKindFor(activity);
       const anchor = kind !== null ? getAnchor(employee.id) : null;
 
       if (kind === null || anchor === null) {
-        this.removePictogram(employee.id);
-        continue;
+        this.pictograms.remove(employee.id);
+        return;
       }
 
       let pictogram = this.pictograms.get(employee.id);
@@ -272,12 +286,10 @@ export class EmployeePictograms {
           anchor.add(pictogram.mesh);
         }
       }
-    }
+    });
 
     // Sweep any pictogram whose employee is no longer in the roster at all (death/removal).
-    for (const id of Array.from(this.pictograms.keys())) {
-      if (!liveIds.has(id)) this.removePictogram(id);
-    }
+    this.pictograms.sweep(liveIds);
   }
 
   /** Animate/refresh billboard orientation. Call every frame with elapsed seconds. */
@@ -289,9 +301,7 @@ export class EmployeePictograms {
 
   /** Remove all pictogram meshes from the scene. */
   clearAll(): void {
-    for (const id of Array.from(this.pictograms.keys())) {
-      this.removePictogram(id);
-    }
+    this.pictograms.clearAll();
   }
 
   dispose(): void {
@@ -301,14 +311,5 @@ export class EmployeePictograms {
       this.materials[kind].map?.dispose();
       this.materials[kind].dispose();
     }
-  }
-
-  // ---------- Helpers ----------
-
-  private removePictogram(id: number): void {
-    const pictogram = this.pictograms.get(id);
-    if (!pictogram) return;
-    pictogram.mesh.removeFromParent();
-    this.pictograms.delete(id);
   }
 }

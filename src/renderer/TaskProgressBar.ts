@@ -7,9 +7,10 @@
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
-import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
+import { taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 import { faceCamera } from './Billboard.js';
+import { EmployeeBillboardRoster, forEachEmployeeActivity } from './EmployeeBillboardRoster.js';
 
 // ---------- Config ----------
 
@@ -35,7 +36,7 @@ interface Bar {
 export class TaskProgressBar {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.Camera;
-  private readonly bars = new Map<number, Bar>();
+  private readonly bars = new EmployeeBillboardRoster<Bar>(bar => bar.group);
 
   // ---------- Shared resources (built once per instance, reused across every bar) ----------
   private readonly trackGeometry: THREE.PlaneGeometry;
@@ -69,7 +70,7 @@ export class TaskProgressBar {
 
   /** Number of progress bars currently rendered. */
   get count(): number {
-    return this.bars.size;
+    return this.bars.count;
   }
 
   /**
@@ -85,16 +86,13 @@ export class TaskProgressBar {
   ): void {
     const liveIds = new Set<number>();
 
-    for (const employee of employees) {
-      liveIds.add(employee.id);
-
-      const activity = computeEmployeeActivity(employee, vehicles);
+    forEachEmployeeActivity(employees, vehicles, liveIds, (employee, activity) => {
       const anchor = getAnchor(employee.id);
       const fraction = activity.kind === 'working' ? taskProgressFraction(activity) : null;
 
       if (fraction === null || anchor === null) {
-        this.removeBar(employee.id);
-        continue;
+        this.bars.remove(employee.id);
+        return;
       }
 
       let bar = this.bars.get(employee.id);
@@ -119,12 +117,10 @@ export class TaskProgressBar {
       if (bar.group.parent !== anchor) {
         anchor.add(bar.group);
       }
-    }
+    });
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).
-    for (const id of Array.from(this.bars.keys())) {
-      if (!liveIds.has(id)) this.removeBar(id);
-    }
+    this.bars.sweep(liveIds);
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
@@ -138,9 +134,7 @@ export class TaskProgressBar {
 
   /** Remove all progress-bar meshes from the scene. */
   clearAll(): void {
-    for (const id of Array.from(this.bars.keys())) {
-      this.removeBar(id);
-    }
+    this.bars.clearAll();
   }
 
   dispose(): void {
@@ -170,12 +164,5 @@ export class TaskProgressBar {
     group.add(fillMesh);
 
     return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
-  }
-
-  private removeBar(id: number): void {
-    const bar = this.bars.get(id);
-    if (!bar) return;
-    bar.group.removeFromParent();
-    this.bars.delete(id);
   }
 }
