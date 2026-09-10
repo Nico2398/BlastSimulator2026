@@ -18,7 +18,7 @@ const FILL_COLOR  = 0x4fc76b; // --bsx-positive
 const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.4-wide capsule
 const BAR_HEIGHT = 0.08;
 /** Height above the anchor's local origin — clears the worker model's hard hat (ridge top ~1.33). */
-const BAR_Y_OFFSET = 1.55;
+export const BAR_Y_OFFSET = 1.55;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
 
 interface Bar {

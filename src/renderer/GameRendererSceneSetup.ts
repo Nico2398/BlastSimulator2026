@@ -21,6 +21,7 @@ import { BuildingMesh } from './BuildingMesh.js';
 import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { TaskProgressBar } from './TaskProgressBar.js';
+import { EmployeePictograms } from './EmployeePictograms.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
 import { CloudLayer } from './ambient/CloudLayer.js';
@@ -67,6 +68,7 @@ export interface SceneSetupDeps {
   vehicles: VehicleMesh | null;
   characters: CharacterMesh | null;
   taskProgress: TaskProgressBar | null;
+  pictograms: EmployeePictograms | null;
   skybox: SkyboxWeather | null;
   windState: WindState | null;
   clouds: CloudLayer | null;
@@ -167,6 +169,10 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Task progress bars — billboarded above working employees (#546)
   deps.taskProgress = new TaskProgressBar(scene, deps.sm.camera);
+
+  // Non-working activity pictograms — billboarded above employees who
+  // aren't working, naming why (#1013)
+  deps.pictograms = new EmployeePictograms(scene, deps.sm.camera);
 
   // Weather sky
   deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
@@ -361,6 +367,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.blastOverlay?.dispose();
   deps.ghosts?.dispose();
   deps.taskProgress?.dispose();
+  deps.pictograms?.dispose();
 
   deps.terrain = null;
   deps.landscapeHandle = null;
@@ -391,6 +398,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.blastOverlay = null;
   deps.ghosts = null;
   deps.taskProgress = null;
+  deps.pictograms = null;
   deps.lastGrid = null;
 
   deps.renderedBuildingIds.clear();
