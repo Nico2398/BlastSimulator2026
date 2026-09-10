@@ -1,0 +1,154 @@
+{
+  "name": "building-driving-center-visual",
+  "description": "Frames a built tier-1 driving centre (Learner's Lot) at the camera distance the game actually plays at, so the model can be inspected: the chalkboard, the restraint chair under its lamp, and the pupil benches have to read as a classroom rather than as a junk lot (#1011). Yaw 180 looks at the door row (+Y), which is the only side the classroom is open from \u2014 the back wall carries the chalkboard, so any yaw near 0 photographs the outside of that wall. Distance 7 is what the building fills the frame at without leaving normal play framing.",
+  "shots": [
+    {
+      "name": "classroom",
+      "yaw": 180,
+      "pitch": 32,
+      "target": [
+        25,
+        15
+      ],
+      "distance": 7
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:150000",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:150000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Hired before the build order: ordering a building only queues the work, so someone has to be on the roster to walk over and put it up.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "build driving_center at:25,15",
+      "description": "Placed at 25,15 rather than on the 5,5 row the other building-visual files use: 5,5 sits on the face of a dune under seed 42, and the ridge in front of it hides everything below the door lintels from any camera the shot can reach.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 15
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Lets the queued site be walked to and built out, so the shot above frames a finished building rather than its scaffold. The toolbar's Build tab is clicked first to toggle the build panel shut, so the shot frames the building rather than a third of a screen of menu.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "focusTile",
+          "x": 25,
+          "z": 15,
+          "distance": 7
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    }
+  ]
+}
