@@ -48,8 +48,35 @@ export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | nu
 const ICON_SIZE = 0.5; // world units — matches TaskProgressBar's proportion to the ~0.4-wide capsule
 const CANVAS_SIZE = 128;
 
-/** Draw a glyph for `kind` onto a fresh canvas and wrap it as a shared material. */
+/**
+ * Fallback flat color per kind, matching each glyph's dominant stroke/fill
+ * color above — used only when no `document` is available to draw the real
+ * glyph onto a canvas texture (see buildIconMaterial below).
+ */
+const FALLBACK_COLOR: Record<PictogramKind, number> = {
+  collapsed: 0xe53935,
+  resting: 0x4fc3f7,
+  walking_to_rest: 0x4fc3f7,
+  walking: 0xeceff1,
+  driving: 0xffb300,
+  idle: 0xb0bec5,
+};
+
+/**
+ * Draw a glyph for `kind` onto a fresh canvas and wrap it as a shared
+ * material. `document` is unavailable in this project's Node-only Vitest
+ * suites (no jsdom) — TaskProgressBar's own precedent never touches the DOM
+ * at all, using flat-color materials instead of a texture. Pictograms need a
+ * distinct glyph per kind, which a flat color alone can't carry, so canvas
+ * drawing stays the browser-context behaviour and a flat-color material
+ * (still one shared instance per kind, matching the real glyph's color)
+ * stands in wherever `document` doesn't exist.
+ */
 function buildIconMaterial(kind: PictogramKind): THREE.MeshBasicMaterial {
+  if (typeof document === 'undefined') {
+    return new THREE.MeshBasicMaterial({ color: FALLBACK_COLOR[kind], transparent: true, depthWrite: false });
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
