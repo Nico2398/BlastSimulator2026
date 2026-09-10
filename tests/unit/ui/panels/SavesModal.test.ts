@@ -195,6 +195,7 @@ describe('SavesModal', () => {
 
     expect(backend.store.has('slot_1')).toBe(true);
     expect(backend.store.get('slot_1')!.meta.campaignSummary).toContain('12,345');
+    expect(modal.visible).toBe(false);
   });
 
   it('clicking SAVE HERE with no active game reports no_game rather than throwing', async () => {
