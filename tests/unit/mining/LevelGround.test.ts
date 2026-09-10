@@ -12,7 +12,7 @@ import {
   type LevelOrderDef,
 } from '../../../src/core/mining/LevelGround.js';
 import {
-  MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL,
+  LEVEL_GROUND_COST_PER_VOXEL,
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, NAV_BENCH_HEIGHT,
 } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -33,15 +33,6 @@ function makeElevatedGrid(sizeX: number, sizeY: number, sizeZ: number, surfaceY:
     }
   }
   return grid;
-}
-
-/** Scan a column top-down for the highest voxel with density >= 0.5 — same rule NavGrid.computeSurfaceY uses. */
-function localSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const voxel = grid.getVoxel(x, y, z);
-    if (voxel && voxel.density >= 0.5) return y;
-  }
-  return -1;
 }
 
 /**
