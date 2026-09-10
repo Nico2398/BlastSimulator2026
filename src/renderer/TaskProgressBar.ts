@@ -9,6 +9,7 @@ import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
+import { faceCamera } from './Billboard.js';
 
 // ---------- Config ----------
 
@@ -131,7 +132,7 @@ export class TaskProgressBar {
     for (const bar of this.bars.values()) {
       bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
       bar.fillMesh.scale.x = bar.easedFraction;
-      bar.group.quaternion.copy(this.camera.quaternion);
+      faceCamera(bar.group, this.camera);
     }
   }
 

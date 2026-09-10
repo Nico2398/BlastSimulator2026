@@ -12,6 +12,7 @@ import type { Vehicle } from '../core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { computeEmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { BAR_Y_OFFSET } from './TaskProgressBar.js';
+import { faceCamera } from './Billboard.js';
 
 /**
  * Which non-working pictogram an employee shows. Mirrors
@@ -282,7 +283,7 @@ export class EmployeePictograms {
   /** Animate/refresh billboard orientation. Call every frame with elapsed seconds. */
   update(_dt: number): void {
     for (const pictogram of this.pictograms.values()) {
-      pictogram.mesh.quaternion.copy(this.camera.quaternion);
+      faceCamera(pictogram.mesh, this.camera);
     }
   }
 
