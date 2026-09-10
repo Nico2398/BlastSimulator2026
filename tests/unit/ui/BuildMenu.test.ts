@@ -19,6 +19,7 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building } from '../../../src/core/entities/Building.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
+import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 
 /** Minimal GameState that won't crash the panel update loop. */
 function makeMockState(overrides?: Partial<GameState>): GameState {
@@ -251,11 +252,11 @@ function makeMockKit() {
 describe('BuildMenu — catalog placement, terrain tools, and research flow (#1009 coverage)', () => {
   let container: HTMLDivElement;
   let menu: BuildMenu;
-  let gameConsole: ReturnType<typeof vi.fn>;
+  let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
 
   beforeEach(() => {
     ({ container, menu } = setupMenu());
-    gameConsole = vi.fn().mockReturnValue({ success: true, output: '' });
+    gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' });
     menu.setGameConsole(gameConsole);
   });
 
