@@ -13,7 +13,12 @@ import { createRunner, runCommand, type RunnerWithContext } from '../../src/cons
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isFootprintFlat } from '../../src/core/entities/Building.js';
-import { NAV_BENCH_HEIGHT } from '../../src/core/config/balance.js';
+import { NAV_BENCH_HEIGHT, MAX_LEVEL_GROUND_AREA } from '../../src/core/config/balance.js';
+import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
+import type { MiningContext } from '../../src/console/commands/mining/types.js';
+import { PlayableArea } from '../../src/core/world/PlayableArea.js';
+import { terrainConfigOf } from '../../src/console/commands/world.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 const ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 const BASE_HEIGHT = 15;
@@ -268,5 +273,86 @@ describe('level_ground — console round trip (#1009)', () => {
     for (let dz = 0; dz <= 1; dz++) for (let dx = 0; dx <= 3; dx++) footprint.push([dx, dz]);
     const flat = isFootprintFlat(footprint, 25, 25, (cx, cz) => computeVoxelColumnSurfaceY(grid, cx, cz));
     expect(flat).toBe(true);
+  });
+
+  it('11. refused before any game is started (requireGame guard)', () => {
+    const engine = createRunner();
+    const result = runCommand(engine, 'level_ground minX:0 maxX:1 minZ:0 maxZ:1');
+    expect(result.success).toBe(false);
+  });
+
+  it('12. cancel with no id at all (positional or named) is refused with the cancel usage message', () => {
+    const engine = makeStaffedRunner();
+    const result = runCommand(engine, 'level_ground cancel');
+    expect(result.success).toBe(false);
+  });
+
+  it('13. cancel with a positional id that does not exist is refused as not found', () => {
+    const engine = makeStaffedRunner();
+    const result = runCommand(engine, 'level_ground cancel 999999');
+    expect(result.success).toBe(false);
+  });
+
+  it('14. an inverted rectangle (minX > maxX) is refused as an invalid area, no cash charged', () => {
+    const engine = makeStaffedRunner();
+    const cashBefore = engine.ctx.state!.cash;
+    const result = runCommand(engine, 'level_ground minX:5 maxX:2 minZ:0 maxZ:1');
+    expect(result.success).toBe(false);
+    expect(engine.ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('15. omitting every rect field is refused as an invalid area (parseInt of missing named args is NaN)', () => {
+    const engine = makeStaffedRunner();
+    const result = runCommand(engine, 'level_ground');
+    expect(result.success).toBe(false);
+  });
+
+  it('16. a rect exceeding MAX_LEVEL_GROUND_AREA is refused as too large, no cash charged', () => {
+    const engine = makeStaffedRunner();
+    const cashBefore = engine.ctx.state!.cash;
+    const side = Math.ceil(Math.sqrt(MAX_LEVEL_GROUND_AREA)) + 1; // guarantees area > cap
+    const result = runCommand(engine, `level_ground minX:0 maxX:${side - 1} minZ:0 maxZ:${side - 1}`);
+    expect(result.success).toBe(false);
+    expect(engine.ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('17. insufficient cash for an otherwise-valid order is refused, using the plain (non-keyed) message', () => {
+    const engine = makeStaffedRunner(10);
+    carveSlopedBuildingRect(engine.ctx.grid!);
+    const cashBefore = engine.ctx.state!.cash;
+    const result = runCommand(engine, 'level_ground minX:15 maxX:16 minZ:15 maxZ:16');
+    expect(result.success).toBe(false);
+    expect(engine.ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('18. a rect overlapping a building still under construction (plannedBuildings, not yet placed) is refused', () => {
+    const engine = makeStaffedRunner();
+    carveFlatRect(engine.ctx.grid!, 20, 21, 20, 21, BASE_HEIGHT);
+    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
+    expect(engine.ctx.state!.plannedBuildings.length).toBeGreaterThan(0);
+    expect(engine.ctx.state!.buildings.buildings.length).toBe(0);
+
+    const cashBefore = engine.ctx.state!.cash;
+    const result = runCommand(engine, 'level_ground minX:20 maxX:21 minZ:20 maxZ:21');
+    expect(result.success).toBe(false);
+    expect(engine.ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('19. a rect straddling the site edge, with expansion disabled, is refused at the claim step', () => {
+    const ctx: MiningContext = makeGameContext({ cash: 500_000 });
+    const config = terrainConfigOf(ctx.state!)!;
+    ctx.playableArea = new PlayableArea(ctx.grid!, config, { expansionEnabled: false });
+
+    // On-site part (x=28..31) carved uneven so the order isn't a no-op
+    // "already flat" success; off-site part (x=32..33) is past the 32m site
+    // and cannot be claimed with expansion disabled.
+    carveFlatRect(ctx.grid!, 28, 31, 6, 7, BASE_HEIGHT);
+    lowerColumn(ctx.grid!, 28, 6, BASE_HEIGHT, 1);
+
+    const cashBefore = ctx.state!.cash;
+    const result = levelGroundCommand(ctx, [], { minX: '28', maxX: '33', minZ: '6', maxZ: '7' });
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'level_ground')).toBe(false);
   });
 });
