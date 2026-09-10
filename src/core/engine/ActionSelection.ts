@@ -14,6 +14,7 @@ import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
+import { computeLevelGroundDurationTicks } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
@@ -87,6 +88,16 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
     const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
     return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
+  }
+
+  if (action.type === 'level_ground') {
+    const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
+    const voxelCount = grid !== undefined
+      ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
+      : cells.length;
+    const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+    const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
+    return computeLevelGroundDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
   }
 
   if (typeof action.payload['durationTicks'] === 'number') {

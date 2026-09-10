@@ -245,16 +245,53 @@ export class BuildMenu extends PanelBase {
   }
 
   // ── Level ground (carved terrain, not a building) ──────────────────────────
-  // TODO(#1009): implement — stub kept unwired from the section list until
-  // the ordering flow (armLevelGroundTool or equivalent) exists, matching how
-  // makeRampSection was staged. Returns an empty, non-rendering element so
-  // the method compiles and stays callable without altering the panel today.
 
   /** Mirrors {@link makeRampSection}'s shape for a rectangular level-ground order. */
   private makeLevelGroundSection(): HTMLElement {
     const wrap = el('div');
-    wrap.style.display = 'none';
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+
+    const btn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-level-ground-btn' });
+    btn.style.cssText = 'width:100%';
+    this.locale.bindText(btn, 'ui.build.level_ground');
+    btn.addEventListener('click', () => this.armLevelGroundTool());
+
+    wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
     return wrap;
+  }
+
+  /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
+  private armLevelGroundTool(): void {
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+    if (controller.isArmed) { controller.cancel(); return; }
+
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      overlay.update(sel ? { shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
+      const area = sel ? (sel.x2 - sel.x1 + 1) * (sel.z2 - sel.z1 + 1) : 0;
+      strip.show({
+        icon: 'grid',
+        title: t('ui.build.level_ground'),
+        subtitle: '',
+        fields: [],
+        result: sel ? `${area}` : '—',
+        confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
+        instruction: t('ui.build.level_ground_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      const cmd = this.gameConsole?.(`level_ground minX:${sel.x1} maxX:${sel.x2} minZ:${sel.z1} maxZ:${sel.z2}`);
+      this.setStatus(cmd?.success ? t('ui.build.level_ground_ordered') : (cmd?.output ?? ''));
+      overlay.flashConfirm();
+    });
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape: 'rect' });
+    refresh();
   }
 
   /** Ramps are a line drag (start → end), not a rectangle — the corridor width comes from the vehicle profile, not the drag. */

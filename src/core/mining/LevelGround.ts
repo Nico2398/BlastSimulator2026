@@ -3,12 +3,16 @@
 // footprint building-placement rule (#1008). Mirrors the order-then-work
 // shape `dig_ramp_segment`/Ramp.ts established: validate at order time,
 // carve progressively as a `level_ground` PendingAction.
-//
-// TODO: implement — skeleton phase only, every export below throws.
 
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { formatMoney } from '../economy/formatMoney.js';
+import {
+  MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL,
+  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS,
+} from '../config/balance.js';
 
 // ── Types ──
 
@@ -33,70 +37,156 @@ export interface LevelOrderValidation {
 // ── Core functions ──
 
 /**
- * Target Y the rectangle should be levelled to.
- * TODO: implement.
+ * Target Y the rectangle should be levelled to — the minimum column surface
+ * height (computeVoxelColumnSurfaceY) across every column in `rect`
+ * (inclusive minX..maxX, minZ..maxZ). Levelling always cuts down to the
+ * lowest point in the footprint, never fills.
  */
-export function computeLevelTargetY(_grid: VoxelGrid, _rect: LevelOrderDef): number {
-  throw new Error('not implemented');
+export function computeLevelTargetY(grid: VoxelGrid, rect: LevelOrderDef): number {
+  let targetY = Infinity;
+  for (let z = rect.minZ; z <= rect.maxZ; z++) {
+    for (let x = rect.minX; x <= rect.maxX; x++) {
+      targetY = Math.min(targetY, computeVoxelColumnSurfaceY(grid, x, z));
+    }
+  }
+  return targetY;
 }
 
 /**
- * Cells to carve (or fill) so every column in `rect` reaches `targetY`.
- * TODO: implement.
+ * Cells to carve so every column in `rect` reaches `targetY` — for each
+ * column, every solid voxel strictly above `targetY` (a column already at or
+ * below `targetY` contributes nothing). The scan per column is bounded by
+ * that column's own surface height (computeVoxelColumnSurfaceY), never the
+ * whole grid height.
  */
 export function computeLevelCells(
-  _grid: VoxelGrid,
-  _rect: LevelOrderDef,
-  _targetY: number,
+  grid: VoxelGrid,
+  rect: LevelOrderDef,
+  targetY: number,
 ): { x: number; y: number; z: number }[] {
-  throw new Error('not implemented');
+  const cells: { x: number; y: number; z: number }[] = [];
+  for (let z = rect.minZ; z <= rect.maxZ; z++) {
+    for (let x = rect.minX; x <= rect.maxX; x++) {
+      const surfaceY = computeVoxelColumnSurfaceY(grid, x, z);
+      if (surfaceY <= targetY) continue;
+      for (let y = surfaceY; y > targetY; y--) {
+        if (grid.densityAt(x, y, z) > 0) {
+          cells.push({ x, y, z });
+        }
+      }
+    }
+  }
+  return cells;
 }
 
 /**
  * Bounding box of `cells`, or null when empty — mirrors the `region` shape
  * ramp segments compute for `terrain:updated`.
- * TODO: implement.
  */
 export function computeLevelRegion(
-  _cells: { x: number; y: number; z: number }[],
+  cells: { x: number; y: number; z: number }[],
 ): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
-  throw new Error('not implemented');
+  if (cells.length === 0) return null;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const cell of cells) {
+    minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
+    minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
+  }
+  return { minX, maxX, minZ, maxZ };
 }
 
 /**
  * Validate a level-ground order against `cash` without carving anything —
  * mirrors `validateRampOrder` (Ramp.ts): area/cash checks run before any
  * caller claims a footprint or queues work.
- * TODO: implement.
+ *
+ * Checks run in order: (1) finite, non-inverted rect coordinates; (2) rect
+ * area against MAX_LEVEL_GROUND_AREA, rejected before any cell array is
+ * built; (3) cost, from the actual cells that need clearing; (4) cash
+ * against that cost.
  */
-export function validateLevelOrder(_rect: LevelOrderDef, _cash: number, _grid: VoxelGrid): LevelOrderValidation {
-  throw new Error('not implemented');
+export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: VoxelGrid): LevelOrderValidation {
+  if (
+    !Number.isFinite(rect.minX) || !Number.isFinite(rect.maxX) ||
+    !Number.isFinite(rect.minZ) || !Number.isFinite(rect.maxZ) ||
+    !Number.isInteger(rect.minX) || !Number.isInteger(rect.maxX) ||
+    !Number.isInteger(rect.minZ) || !Number.isInteger(rect.maxZ) ||
+    rect.minX > rect.maxX || rect.minZ > rect.maxZ
+  ) {
+    return {
+      success: false,
+      message: 'Invalid area: minX/maxX/minZ/maxZ must be finite whole numbers describing a non-empty rectangle.',
+      cost: 0,
+      messageKey: 'mining.level_ground.invalid_area',
+    };
+  }
+
+  const area = (rect.maxX - rect.minX + 1) * (rect.maxZ - rect.minZ + 1);
+  if (area > MAX_LEVEL_GROUND_AREA) {
+    return {
+      success: false,
+      message: `Area too large: ${area} voxels exceeds the ${MAX_LEVEL_GROUND_AREA} voxel limit per order.`,
+      cost: 0,
+      messageKey: 'mining.level_ground.too_large',
+      messageParams: { area, limit: MAX_LEVEL_GROUND_AREA },
+    };
+  }
+
+  const targetY = computeLevelTargetY(grid, rect);
+  const cost = computeLevelCells(grid, rect, targetY).length * LEVEL_GROUND_COST_PER_VOXEL;
+
+  if (cash < cost) {
+    return { success: false, message: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}`, cost: 0 };
+  }
+
+  return { success: true, message: `Ground levelling: ${cost > 0 ? `$${formatMoney(cost)}` : 'already flat'}`, cost };
 }
 
 /**
  * Carve `cells` into `grid`, emitting `terrain:updated` for the affected
- * region — mirrors `carveRampSegment` (Ramp.ts).
- * TODO: implement.
+ * region — mirrors `carveRampSegment` (Ramp.ts). Density is re-checked per
+ * cell at carve time: a cell already cleared by something else since the
+ * cell list was computed is silently skipped, not double-counted.
  */
 export function carveLevelCells(
-  _grid: VoxelGrid,
-  _cells: { x: number; y: number; z: number }[],
-  _emitter?: EventEmitter,
+  grid: VoxelGrid,
+  cells: { x: number; y: number; z: number }[],
+  emitter?: EventEmitter,
 ): { voxelsCleared: number } {
-  throw new Error('not implemented');
+  let voxelsCleared = 0;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+  for (const cell of cells) {
+    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
+      grid.clearVoxel(cell.x, cell.y, cell.z);
+      voxelsCleared++;
+      minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
+      minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
+      minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
+    }
+  }
+
+  if (voxelsCleared > 0) {
+    emitter?.emit('terrain:updated', { region: { minX, maxX, minY, maxY, minZ, maxZ } });
+  }
+
+  return { voxelsCleared };
 }
 
 /**
  * Work-duration ticks for a `rock_digger` of `tier` to level `voxelCount`
- * voxels — mirrors `computeRampSegmentDurationTicks` (Ramp.ts).
- * TODO: implement.
+ * voxels — mirrors `computeRampSegmentDurationTicks` (Ramp.ts) exactly,
+ * sharing the same tier-1 baseline rate (RAMP_DIG_VOXELS_PER_TICK_TIER1)
+ * rather than introducing a new one.
  */
 export function computeLevelGroundDurationTicks(
-  _voxelCount: number,
-  _tier: VehicleTier,
-  _proficiencyLevel?: number,
-  _needMultiplier?: number,
-  _lqMultiplier?: number,
+  voxelCount: number,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier: number = 1,
+  lqMultiplier: number = 1,
 ): number {
-  throw new Error('not implemented');
+  const tierWorkRateMultiplier = VEHICLE_TIER_MULTIPLIERS[tier].workRate;
+  const baseTicks = voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier);
+  return computeTaskDuration(baseTicks, proficiencyLevel, needMultiplier, lqMultiplier, 1);
 }
