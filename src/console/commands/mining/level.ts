@@ -7,7 +7,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  validateLevelOrder, computeLevelTargetY, computeLevelCells, computeLevelRegion,
+  validateLevelOrder,
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
@@ -92,14 +92,16 @@ export function levelGroundCommand(
   const claim = claimForAction(ctx, cellsInRect(rect.minX, rect.minZ, rect.maxX, rect.maxZ), 'level ground');
   if (!claim.ok) return { success: false, output: claim.output! };
 
-  const targetY = computeLevelTargetY(ctx.grid!, rect);
-  const cells = computeLevelCells(ctx.grid!, rect, targetY);
+  // targetY/cells come straight from validateLevelOrder above — it already
+  // scanned `grid` for this rect (validation.success guarantees both are
+  // set), so the dispatch below reuses that instead of re-scanning it.
+  const targetY = validation.targetY!;
+  const cells = validation.cells!;
+  const region = validation.region ?? null;
 
   if (cells.length === 0) {
     return { success: true, output: t('mining.level_ground.already_flat') };
   }
-
-  const region = computeLevelRegion(cells);
 
   // Cost is charged in full at order time — refunded via
   // actionOrderCost/cancelAction on cancel (mirrors #555/#556's

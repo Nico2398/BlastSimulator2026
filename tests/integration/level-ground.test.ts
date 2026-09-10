@@ -7,10 +7,6 @@
 // vehicles.integration.test.ts's "#924: dig_ramp_segment work duration
 // scales with live voxel count" suite uses (createRunner/runCommand,
 // new_game ... staffed:true, tick N).
-//
-// Every scenario below is RED today: levelGroundCommand/cancelLevelGroundCommand
-// (src/console/commands/mining/level.ts) and the core LevelGround.ts functions
-// they call are skeleton stubs that throw 'not implemented'.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';

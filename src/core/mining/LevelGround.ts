@@ -28,6 +28,14 @@ export interface LevelOrderValidation {
   /** Translation key for `message`, present on translatable failures — mirrors RampOrderValidation. */
   messageKey?: string;
   messageParams?: Record<string, string | number>;
+  /**
+   * `computeLevelTargetY`/`computeLevelCells` output, present on success only
+   * — the caller dispatching the order reuses these instead of re-scanning
+   * `grid` for the same rect right after validating it.
+   */
+  targetY?: number;
+  cells?: { x: number; y: number; z: number }[];
+  region?: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
 }
 
 // ── Core functions ──
@@ -129,13 +137,21 @@ export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: Voxe
   }
 
   const targetY = computeLevelTargetY(grid, rect);
-  const cost = computeLevelCells(grid, rect, targetY).length * LEVEL_GROUND_COST_PER_VOXEL;
+  const cells = computeLevelCells(grid, rect, targetY);
+  const cost = cells.length * LEVEL_GROUND_COST_PER_VOXEL;
 
   if (cash < cost) {
     return { success: false, message: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}`, cost: 0 };
   }
 
-  return { success: true, message: `Ground levelling: ${cost > 0 ? `$${formatMoney(cost)}` : 'already flat'}`, cost };
+  return {
+    success: true,
+    message: `Ground levelling: ${cost > 0 ? `$${formatMoney(cost)}` : 'already flat'}`,
+    cost,
+    targetY,
+    cells,
+    region: computeLevelRegion(cells),
+  };
 }
 
 /**

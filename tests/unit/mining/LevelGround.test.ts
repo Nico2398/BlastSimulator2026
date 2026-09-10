@@ -2,9 +2,7 @@
 //
 // Mirrors tests/unit/mining/Ramp.test.ts's own conventions (grid setup
 // helpers, seeded-nothing pure functions, one positive/boundary/rejection
-// case per exported function). Every function under test is a stub in
-// src/core/mining/LevelGround.ts (`throw new Error('not implemented')`), so
-// every test here is expected to be RED until the implementer phase lands.
+// case per exported function).
 
 import { describe, it, expect, vi } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
