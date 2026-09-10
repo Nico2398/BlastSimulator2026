@@ -94,10 +94,8 @@ export class TutorialRails {
 
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
-    // TODO: implement — wire resolveWaitStatus's result into applyRails's `spent`
-    // param and into the returned waiting/waitingHint fields.
-    void resolveWaitStatus(this.stages, state);
-    applyRails(stage, document, Array.from(this.permanentlyAllowed));
+    const waitStatus = resolveWaitStatus(this.stages, state);
+    applyRails(stage, document, Array.from(this.permanentlyAllowed), waitStatus.waiting);
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
@@ -108,8 +106,8 @@ export class TutorialRails {
       stageIndex: this.stageIndex,
       stageTotal: this.stages.length,
       stageTarget: stage?.target ?? null,
-      waiting: false,
-      waitingHint: '',
+      waiting: waitStatus.waiting,
+      waitingHint: waitStatus.waitingKey ? t(waitStatus.waitingKey) : '',
     };
   }
 

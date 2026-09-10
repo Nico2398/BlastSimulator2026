@@ -530,21 +530,27 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
   font: 700 10px/1.4 var(--bsx-font-ui);
   letter-spacing: .04em;
 }
-/* WAITING chip (#1014) — placeholder pill styling, sibling of .bs-tutorial-paused. */
+/* IN PROGRESS chip (#1014) — an issued order's work is now the simulation's,
+   sibling of .bs-tutorial-paused. Blue (--bsx-info), not amber: the two chips
+   can show at once (an order can be spent while the clock is still held on a
+   later stage), and a shared color would read as one state. */
 .bs-tutorial-waiting {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255,176,46,.16);
-  color: var(--bsx-amber);
+  background: rgba(85,168,255,.16);
+  color: var(--bsx-info);
   font: 700 10px/1.4 var(--bsx-font-ui);
   letter-spacing: .04em;
 }
-/* Stage line while its issued order is spent and waiting on the simulation (#1014) — placeholder color override. */
-.bs-tutorial-stage-line--waiting {
+.bs-tutorial-stage-line {
   color: var(--bsx-amber);
+}
+/* Stage line while its issued order is spent and waiting on the simulation (#1014). */
+.bs-tutorial-stage-line--waiting {
+  color: var(--bsx-info-text);
 }
 
 /* ─── Reduced motion (P10): pip pulse → static ───

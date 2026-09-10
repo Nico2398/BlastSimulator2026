@@ -130,7 +130,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   stageEl.className = 'bs-tutorial-stage';
   const stageLine = el('div', {
     className: 'bs-tutorial-stage-line',
-    attrs: { style: 'display:flex;align-items:center;gap:6px;color:var(--bsx-amber)' },
+    attrs: { style: 'display:flex;align-items:center;gap:6px' },
     children: [chevron, stageEl],
   });
 

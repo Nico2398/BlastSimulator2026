@@ -72,11 +72,6 @@ export class TutorialOverlay {
     // Its text is owned by `this.locale` now (bound in buildTutorialCard()); kept as
     // a field only so direct DOM introspection (tests, debugging) can still reach it.
     void this.pausedChipEl;
-    // Not yet wired to `resolveWaitStatus` — skeleton phase (#1014). Kept as
-    // fields, like `pausedChipEl` above, so direct DOM introspection can
-    // still reach them ahead of the implementation phase.
-    void this.stageLine;
-    void this.waitingChipEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
@@ -364,7 +359,10 @@ export class TutorialOverlay {
   /** Move the rails onto whichever control the player should be using now. */
   private refreshGuide(): void {
     if (!this._active) return;
-    this.stageEl.textContent = this.rails.refresh().hint;
+    const view = this.rails.refresh(this.gameState);
+    this.stageEl.textContent = view.waiting ? view.waitingHint : view.hint;
+    this.stageLine.classList.toggle('bs-tutorial-stage-line--waiting', view.waiting);
+    this.waitingChipEl.style.display = view.waiting ? '' : 'none';
   }
 
   private clearAutoAdvance(): void {

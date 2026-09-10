@@ -90,7 +90,7 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
 }
 
 /** What the card should show about a stage whose order was issued but not yet resolved. */
-export interface StageWaitStatus {
+interface StageWaitStatus {
   /** True once some stage's `spentWhen` has fired and its work is still outstanding. */
   waiting: boolean;
   /** The waiting stage's own `waitingKey`, or null when `waiting` is false. */
@@ -102,8 +102,14 @@ export interface StageWaitStatus {
  * `resolveStageIndex`, run independently of which stage that function
  * resolved to (see `TutorialStage.spentWhen`).
  */
-export function resolveWaitStatus(_stages: TutorialStage[], _state: GameState | null): StageWaitStatus {
-  return { waiting: false, waitingKey: null }; // TODO: implement
+export function resolveWaitStatus(stages: TutorialStage[], state: GameState | null): StageWaitStatus {
+  if (!state) return { waiting: false, waitingKey: null };
+  for (const stage of stages) {
+    if (stage.spentWhen && stage.spentWhen(state)) {
+      return { waiting: true, waitingKey: stage.waitingKey ?? null };
+    }
+  }
+  return { waiting: false, waitingKey: null };
 }
 
 /**
@@ -177,10 +183,12 @@ export function applyRails(
   // done) left permanently clickable — stay live across every later stage,
   // stage present or not.
   extraAllowed: string[] = [],
-  // True once the active stage's own `spentWhen` has fired — the DOM-side
-  // half of the waiting state (chip + stage-line style), unused until the
-  // implementation phase wires it in.
-  _spent: boolean = false,
+  // True once some stage's `spentWhen` has fired (see `resolveWaitStatus`) —
+  // the DOM-side half of the waiting state: the issued order's control stays
+  // allowed (so a player free-clicking around the panel doesn't get blocked
+  // by rails pointing nowhere) but stops glowing, since it is no longer the
+  // next thing to do.
+  spent: boolean = false,
 ): void {
   for (const el of Array.from(root.querySelectorAll(`.${ALLOWED_CLASS}`))) {
     el.classList.remove(ALLOWED_CLASS);
@@ -216,6 +224,7 @@ export function applyRails(
       el.classList.add(ALLOWED_CLASS);
     }
   }
+  if (spent) return;
   const target = root.querySelector(stage.target);
   if (target) target.classList.add(HIGHLIGHT_CLASS);
 }
@@ -289,7 +298,7 @@ function hasActiveTraining(state: GameState): boolean {
  * WORK_GRACE_TICKS window would time out mid-trip and hold the clock on a
  * haul that is still visibly making progress.
  */
-function hasOutstandingVehicleWork(v: Vehicle): boolean {
+export function hasOutstandingVehicleWork(v: Vehicle): boolean {
   return v.haulingPhase !== null || v.breakPhase !== null;
 }
 
