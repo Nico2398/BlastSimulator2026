@@ -1,6 +1,8 @@
 """Tier-1 buildings — improvised shacks, one caricature per type.
 
-* driving_center     Learner's Lot: a dirt lot, plywood booth, wrecked car on a brick, cones, tyres, wobbly barrier.
+* driving_center     Learner's Lot: a torture classroom on a scavenged stage — chalkboard on a plywood
+                     wall, a restraint chair facing it with a wheel in the pupil's hands, an electrode
+                     cap cabled to a car battery, a rusted interrogation lamp, one scorched pad, one bench.
 * blasting_academy   Boom Shack: a shack whose roof was blown half off, scorched window, dynamite bench, KA-BOOM board.
 * management_office  The Cupboard: an oversized wardrobe, door ajar on paper stacks, desk lamp, MANAGER sign, phone on a stool.
 * geology_lab        Rock Shed: a garden shed, rock shelf, giant magnifying-glass sign, hammer, wheelbarrow, patched roof.
@@ -439,20 +441,6 @@ def cone_down(name: str, loc, m, yaw: float = 0.0) -> list:
     return [c, base, band]
 
 
-def striped_bar(name: str, length: float, loc, m, rot=(0, 0, 0), r: float = 0.045, mats=None) -> list:
-    """A red/white striped pole along local X."""
-    a, b = mats or (m['red'], m['white'])
-    n = max(2, int(length / 0.2))
-    seg = length / n
-    out = []
-    for i in range(n):
-        s = cylinder(f'{name}.Seg', r, seg + 0.002, loc=loc, axis='X', segments=10, rot=rot)
-        _shift(s, (-length / 2 + seg * (i + 0.5), 0, 0))
-        assign(s, a if i % 2 == 0 else b)
-        out.append(s)
-    return out
-
-
 def rock(name: str, loc, r: float, m, seed: int = 0, mat=None) -> list:
     rnd = random.Random(seed)
     k = icosphere(f'{name}.Rock', r, loc=loc, subdivisions=1,
@@ -485,74 +473,205 @@ def dirt_lot(sx: float, sz: float, m, h: float = 0.08, mat=None) -> list:
 # ----------------------------------------------------------- builders ---
 
 def build_driving_center(sx, sz, ex, xx, m):
-    """Learner's Lot: dirt, a plywood booth with an L plate, a wreck on a brick, cones, tyres, a wobbly barrier."""
+    """Learner's Lot: a torture classroom on a scavenged stage. The pupil is strapped into a restraint
+    chair FACING the chalkboard, a steering wheel in reach and an electrode cap on the head, cabled down
+    to a car battery; a rusted interrogation lamp cranes over the headrest and the concrete pad under the
+    chair is scorched black. One bench behind for whoever is next.
+
+    The whole lesson stands on a 0.54 m stage. The two door leaves are 1.0 m tall and 0.68 m wide each,
+    so at the pitch the game camera sits at they hide everything on the ground behind them; the stage is
+    what lifts the chair, the pad and the bench into the sightline over their tops."""
     parts = dirt_lot(sx, sz, m)
-    # Booth at the back-left: plywood walls, corrugated lean-to roof, service hatch, hand-painted L plate.
-    bx, by = -0.5, -0.45
-    bw, bd, bh = 0.95, 0.85, 1.6
-    booth = B.block('Booth', bw, bd, bh, 0.08, m, radius=0.05, loc_xy=(bx, by))
-    parts.append(booth)
-    parts += plank_lines('Booth.F', bw - 0.06, bh - 0.25, (bx, by + bd / 2 + 0.005, 0.08 + bh / 2), m, gap=0.32)
-    parts += plank_lines('Booth.R', bd - 0.06, bh - 0.25, (bx + bw / 2 + 0.005, by, 0.08 + bh / 2), m, yaw=90, gap=0.32)
-    parts += plank_lines('Booth.L', bd - 0.06, bh - 0.25, (bx - bw / 2 - 0.005, by, 0.08 + bh / 2), m, yaw=-90, gap=0.32)
-    hatch = box('Booth.Hatch', (0.5, 0.05, 0.36), loc=(bx, by + bd / 2 + 0.02, 0.08 + 1.1))
-    assign(hatch, m['dark'])
-    counter = box('Booth.Counter', (0.62, 0.16, 0.05), loc=(bx, by + bd / 2 + 0.08, 0.08 + 0.9))
-    bevel(counter, 0.015, 2)
-    assign(counter, m['plank'])
-    parts += [hatch, counter]
-    parts += tin_sheet('Booth.Roof', bw + 0.35, bd + 0.35, (bx + 0.05, by, 0.08 + bh + 0.08), m, rot=(6, -10, 0))
-    # L plate on the front of the booth.
-    plate = box('Plate', (0.34, 0.04, 0.4), loc=(bx + 0.02, by + bd / 2 + 0.035, 0.08 + 0.42), rot=(0, 0, 0))
-    plate.rotation_euler = (0, math.radians(-7), 0)
-    bevel(plate, 0.01, 2)
+    z0 = 0.08
+    yf = sz / 2 - 0.12          # the front line, where the two doors stand
+    wy = -sz / 2 + 0.14         # the back wall's centre
+    wall_face = wy + 0.06       # -0.80
+    wall_h = 2.05
+    zs = z0 + 0.54              # the stage top, 0.62 — the classroom floor
+
+    def cable(name, a, b, segs=4, r=0.032):
+        """A limp cable from `a` to `b` as `segs` capsules laid end to end along the straight run."""
+        out = []
+        dx, dy, dz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+        flat = math.hypot(dx, dy)
+        rot = (0, math.degrees(math.atan2(-dz, flat)), math.degrees(math.atan2(dy, dx)))
+        length = math.hypot(flat, dz)
+        for k in range(segs):
+            t = (k + 0.5) / segs
+            seg = capsule(f'{name}{k}', r, length / segs, axis='X', segments=8, rings=4, rot=rot,
+                          loc=(a[0] + dx * t, a[1] + dy * t, a[2] + dz * t))
+            assign(seg, m['dark'])
+            out.append(seg)
+        return out
+
+    # Back wall — the classroom's one solid surface, and what carries the type colour.
+    parts.append(B.block('Wall', sx - 0.1, 0.12, wall_h, z0, m, radius=0.04, loc_xy=(0, wy)))
+    for s_ in (-1, 1):          # rust bleeding down from the board's fixings
+        streak = box('Wall.Rust', (0.06, 0.02, 0.5), loc=(s_ * 0.64, wall_face + 0.01, 0.72))
+        assign(streak, m['rust'])
+        parts.append(streak)
+
+    # The stage: scrap decking the class stands on, and the only reason any of it clears the doors.
+    stage = box('Stage', (1.84, 1.54, 0.54), loc=(0, -0.15, z0 + 0.27))
+    bevel(stage, 0.02, 2)
+    assign(stage, m['plank2'])
+    parts.append(stage)
+    parts += plank_lines('StageFace', 1.7, 0.42, (0, 0.617, z0 + 0.28), m, gap=0.3, vertical=True,
+                         mat=m['plank'])
+
+    # The chalkboard, high enough that the chair's backrest crosses only its middle.
+    bz = 1.50
+    frame = box('Board.Frame', (1.62, 0.06, 1.04), loc=(0, wall_face + 0.04, bz))
+    bevel(frame, 0.02, 2)
+    assign(frame, m['plank'])
+    face = box('Board.Face', (1.5, 0.05, 0.92), loc=(0, wall_face + 0.06, bz))
+    assign(face, m['board'])
+    parts += [frame, face]
+    # One chalk device on the half the chair does not stand in front of: a steering wheel with a bolt
+    # striking INTO it from above right. Struck through the middle it read as a prohibition sign.
+    cz = wall_face + 0.095
+    gx = -0.52
+    ring = torus('Chalk.Wheel', 0.22, 0.026, loc=(gx, cz, bz), rot=(90, 0, 0),
+                 major_segments=18, minor_segments=6)
+    assign(ring, m['white'])
+    parts.append(ring)
+    for size in ((0.44, 0.03, 0.05), (0.05, 0.03, 0.44)):
+        spoke = box('Chalk.Spoke', size, loc=(gx, cz, bz))
+        assign(spoke, m['white'])
+        parts.append(spoke)
+    for k, (bx, bzz, ang) in enumerate(((0.20, 0.30, 24), (0.26, 0.14, -30), (0.20, -0.02, 24))):
+        seg = box(f'Chalk.Bolt{k}', (0.12, 0.03, 0.28), loc=(gx + bx, cz + 0.02, bz + bzz), rot=(0, ang, 0))
+        assign(seg, m['red'])
+        parts.append(seg)
+
+    # ---- the lesson: a restraint chair FACING the board (-Y), backrest to the doors ----
+    cx, cy = 0.0, -0.15
+    pad = box('Pad', (0.86, 0.8, 0.1), loc=(cx, cy, zs + 0.05))
+    bevel(pad, 0.02, 2)
+    assign(pad, m['concrete'])
+    scorch = box('Pad.Scorch', (0.7, 0.66, 0.014), loc=(cx, cy, zs + 0.106))
+    assign(scorch, m['char'])
+    parts += [pad, scorch]
+
+    pad_top = zs + 0.1                      # 0.72
+    seat_z = pad_top + 0.345                # 1.065, slab centre
+    seat_top = seat_z + 0.055               # 1.12
+    for lx in (-0.28, 0.28):                # legs run pad top -> seat underside, no gap
+        for ly in (-0.2, 0.2):
+            leg = box('Chair.Leg', (0.08, 0.08, 0.3), loc=(cx + lx, cy + ly, pad_top + 0.15))
+            assign(leg, m['plank2'])
+            parts.append(leg)
+    seat = box('Chair.Seat', (0.72, 0.54, 0.11), loc=(cx, cy, seat_z))
+    bevel(seat, 0.02, 2)
+    assign(seat, m['plank'])
+    back = box('Chair.Back', (0.54, 0.11, 0.78), loc=(cx, cy + 0.325, seat_top + 0.385))
+    bevel(back, 0.02, 2)
+    assign(back, m['plank'])
+    parts += [seat, back]
+    back_rear = cy + 0.325 + 0.055          # 0.23, the face the doors see
+    # Arms sit OUTBOARD of the backrest (0.31 vs 0.27), so the cuffs on them are still in the
+    # silhouette once the chair is turned to face the board and the backrest is what the player sees.
+    for s_ in (-1, 1):
+        arm = box('Chair.Arm', (0.1, 0.54, 0.16), loc=(cx + s_ * 0.31, cy, seat_top + 0.08))
+        bevel(arm, 0.02, 2)
+        assign(arm, m['plank'])
+        cuff = box('Chair.Cuff', (0.14, 0.14, 0.21), loc=(cx + s_ * 0.31, cy - 0.16, seat_top + 0.08))
+        assign(cuff, m['dark'])
+        parts += [arm, cuff]
+    # The chest strap wraps the backrest instead of crossing its front face only, so it reads from
+    # behind too; the buckle rides on the rear, which is the face the doors look at.
+    chest = box('Chair.Chest', (0.58, 0.22, 0.13), loc=(cx, cy + 0.325, seat_top + 0.34))
+    assign(chest, m['dark'])
+    buckle = box('Chair.Buckle', (0.16, 0.09, 0.17), loc=(cx, back_rear + 0.05, seat_top + 0.34))
+    assign(buckle, m['chrome'])
+    parts += [chest, buckle]
+    # The learner plate rides on the BACK of the backrest, which is the face the player sees.
+    # yaw=180: text() lays its strokes along +X, and a viewer facing a +Y surface sees +X on their
+    # left, so a +Y sign without the half turn comes out mirrored (the cell numbers do the same).
+    plate = box('Plate', (0.26, 0.03, 0.26), loc=(cx, back_rear + 0.015, seat_top + 0.62))
     assign(plate, m['white'])
     parts.append(plate)
-    parts += text('Plate.L', 'L', (bx + 0.02, by + bd / 2 + 0.065, 0.08 + 0.42), 0.28, m['red'], weight=0.3)
-    # Front gate line: plank rail with the two doors set in it.
-    yf = sz / 2 - 0.12
-    rail = box('Rail', (sx - 0.1, 0.06, 0.07), loc=(0, yf, 0.55))
-    assign(rail, m['plank'])
-    rail2 = box('Rail.Low', (sx - 0.1, 0.06, 0.07), loc=(0, yf, 0.28))
-    assign(rail2, m['plank'])
-    parts += [rail, rail2]
-    for px in (-sx / 2 + 0.08, 0, sx / 2 - 0.08):
-        post = box('Rail.Post', (0.08, 0.08, 0.72), loc=(px, yf, 0.08 + 0.36))
-        assign(post, m['plank2'])
-        parts.append(post)
+    parts += text('Plate.L', 'L', (cx, back_rear + 0.032, seat_top + 0.62), 0.18, m['red'],
+                  yaw=180, weight=0.3)
+
+    # The wheel is in the pupil's hands, not bolted to the floor where it read as a dropped tyre.
+    # Offset to +X so its rim clears the backrest that now stands between it and the player.
+    wx = cx + 0.2
+    stem = cylinder('Wheel.Post', 0.05, 0.34, loc=(wx, cy - 0.3, seat_top + 0.17), segments=10)
+    assign(stem, m['steel'])
+    rim = torus('Wheel.Rim', 0.22, 0.045, loc=(wx, cy - 0.34, seat_top + 0.34), rot=(70, 0, 0),
+                major_segments=18, minor_segments=8)
+    assign(rim, m['steel'])
+    spoke = box('Wheel.Spoke', (0.4, 0.06, 0.05), loc=(wx, cy - 0.34, seat_top + 0.34), rot=(70, 0, 0))
+    assign(spoke, m['steel'])
+    hub = sphere('Wheel.Hub', 0.07, loc=(wx, cy - 0.34, seat_top + 0.34), segments=10, rings=6)
+    assign(hub, m['red'])
+    parts += [stem, rim, spoke, hub]
+
+    # Electrode cap: a bar off the backrest top carrying the dome out over where a head would be.
+    back_top = seat_top + 0.77                                  # 1.89
+    bar = box('Cap.Bar', (0.07, 0.32, 0.07), loc=(cx, cy + 0.19, back_top + 0.03))
+    assign(bar, m['steel'])
+    dome = sphere('Cap.Dome', 0.19, loc=(cx, cy + 0.08, back_top + 0.07), scale=(1, 1, 0.62),
+                  segments=14, rings=7)
+    assign(dome, m['steel'])
+    spark = sphere('Cap.Spark', 0.07, loc=(cx, cy + 0.08, back_top + 0.23), segments=10, rings=5)
+    assign(spark, m['spark'])
+    parts += [bar, dome, spark]
+
+    # Car battery on the stage, wired to the cap along a run that clears the backrest and the board.
+    # A single straight cap-to-floor cable drew a long black diagonal across the chalkboard, so the
+    # run goes sideways over the headrest first, then straight down outboard of the chair.
+    bpx, bpy = 0.62, 0.16
+    batt = box('Battery', (0.32, 0.26, 0.26), loc=(bpx, bpy, zs + 0.13))
+    bevel(batt, 0.02, 2)
+    assign(batt, m['dark'])
+    parts.append(batt)
+    for s_ in (-1, 1):
+        term = cylinder('Battery.Term', 0.045, 0.09, loc=(bpx + s_ * 0.1, bpy, zs + 0.3), segments=8)
+        assign(term, m['chrome'])
+        parts.append(term)
+    elbow = (0.56, 0.1, back_top + 0.02)
+    parts += cable('Cable.Top', (cx, cy + 0.08, back_top + 0.07), elbow, segs=2)
+    parts += cable('Cable.Drop', elbow, (bpx - 0.1, bpy, zs + 0.34), segs=4)
+
+    # Interrogation lamp, craning in over the headrest from the side the chalk device is not on.
+    lpx, lpy = 0.8, -0.55
+    atop = 2.44
+    pole = cylinder('Lamp.Pole', 0.05, atop - zs, loc=(lpx, lpy, (zs + atop) / 2), segments=8)
+    assign(pole, m['steel'])
+    shx, shy = cx, cy - 0.13
+    arm = cylinder('Lamp.Arm', 0.036, math.hypot(shx - lpx, shy - lpy), axis='X', segments=8,
+                   loc=((lpx + shx) / 2, (lpy + shy) / 2, atop),
+                   rot=(0, 0, math.degrees(math.atan2(shy - lpy, shx - lpx))))
+    assign(arm, m['steel'])
+    shade = cylinder('Lamp.Shade', 0.22, 0.24, loc=(shx, shy, atop - 0.14), segments=14, radius2=0.06)
+    bevel(shade, 0.02, 2)
+    assign(shade, m['rust'])                # rust, not steel: two grey domes side by side read as one
+    bulb = sphere('Lamp.Bulb', 0.08, loc=(shx, shy, atop - 0.3), segments=10, rings=6)
+    assign(bulb, m['glow'])
+    parts += [pole, arm, shade, bulb]
+
+    # One pupil bench, on the stage behind the chair and square to the board, so whoever sits on it
+    # faces the lesson. Its top clears the door leaves at the pitch the camera looks down from.
+    by = 0.48
+    bench = box('Bench.Top', (1.5, 0.26, 0.09), loc=(0, by, zs + 0.34))
+    bevel(bench, 0.02, 2)
+    assign(bench, m['plank'])
+    parts.append(bench)
+    for s_ in (-1, 1):
+        leg = box('Bench.Leg', (0.09, 0.22, 0.3), loc=(s_ * 0.6, by, zs + 0.15))
+        assign(leg, m['plank2'])
+        parts.append(leg)
+
     parts += swing_door('Entry', ex, yf, 0.08, m, m['entry'], swing=0, hinge=-1)
     parts += swing_door('Exit', xx, yf, 0.08, m, m['exit'], swing=35, hinge=1)
-    # The wreck: nose toward the front-right, one wheel gone, up on bricks, radiator steaming.
-    cyaw = -32
-    car = (0.42, -0.05, 0.08)
-    parts += wreck_car('Wreck', car, m, yaw=cyaw, missing=(-1, 1), hood=0.0)
-    parts += smoke_puffs('Steam', _yawed(car, cyaw, (0.62, 0.1, 0.5)), m, count=3, r0=0.06)
-    lp = box('Wreck.LPlate', (0.04, 0.16, 0.16), loc=_yawed(car, cyaw, (-0.77, 0.12, 0.34)), rot=(0, 0, cyaw))
-    assign(lp, m['white'])
-    parts.append(lp)
-    parts += text('Wreck.L', 'L', _yawed(car, cyaw, (-0.8, 0.12, 0.34)), 0.11, m['red'], yaw=cyaw + 90, weight=0.3)
-    # Skid marks swerving in behind it, from the gate to the crash.
-    for i, (back, side, extra) in enumerate(((-0.95, 0.3, 0), (-0.95, -0.3, 0), (-1.35, 0.5, -30), (-1.35, -0.05, -30))):
-        sk = box(f'Skid{i}', (0.45, 0.07, 0.012), loc=_yawed(car, cyaw, (back, side, 0.006)), rot=(0, 0, cyaw + extra))
-        assign(sk, m['plank2'])
-        parts.append(sk)
-    # Knocked-over cones and one still standing.
-    parts += cone_down('Cone1', (-0.75, 0.25, 0.08), m, yaw=150)
-    parts += cone_down('Cone2', (-0.35, 0.5, 0.08), m, yaw=40)
-    parts += B.cone_prop('Cone3', (sx / 2 + 0.35, sz / 2 - 0.2, 0), m)
-    parts += tyre_stack('Tyres', (sx / 2 + 0.3, -sz / 2 + 0.35, 0), m, count=3, lean=4)
-    parts += tyre('Tyre.Loose', (-sx / 2 - 0.25, -0.3, 0.1), m, r=0.24, rot=(0, 0, 0))
-    # Wobbly striped barrier, one leg shorter than the other.
-    bxx, byy = -sx / 2 - 0.3, sz / 2 - 0.55
-    parts += striped_bar('Barrier', 1.1, (bxx, byy, 0.68), m, rot=(0, -9, 100))
-    for i, (yy, hh) in enumerate(((byy + 0.5, 0.75), (byy - 0.5, 0.58))):
-        for dx in (-0.08, 0.08):
-            leg = cylinder(f'Barrier.Leg{i}', 0.035, hh, loc=(bxx + dx, yy, 0.08 + hh / 2), segments=8,
-                           rot=(0, 10 if dx > 0 else -10, 0))
-            assign(leg, m['steel'])
-            parts.append(leg)
-    pivot('Body', (0, 0, 0), parts)
 
+    # Two cones, all that is left of the driving course, on the lot beside the stage where the door
+    # frames do not stand in front of them.
+    parts += cone_down('Cone1', (-0.95, 0.34, z0), m, yaw=200)
+    parts += B.cone_prop('Cone2', (0.95, 0.28, z0), m)
+    pivot('Body', (0, 0, 0), parts)
 
 def build_blasting_academy(sx, sz, ex, xx, m):
     """Boom Shack: a plank shack, back roof panel blown up on its hinge, scorched window, dynamite bench, KA-BOOM board."""

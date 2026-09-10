@@ -14,7 +14,7 @@ const EMISSIVE_COLOR  = new THREE.Color(0x1166cc); // deeper blue glow
 const OPACITY_MIN     = 0.20;            // dimmest pulse value
 const OPACITY_MAX     = 0.60;            // brightest pulse value
 const PULSE_SPEED     = 2.2;             // radians / second
-const GHOST_SIZE      = 0.9;             // box half-extent in metres
+export const GHOST_SIZE = 0.9;           // box half-extent in metres
 
 // Claimed ghosts (an employee has claimed the action and is en route/working
 // it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
@@ -188,6 +188,16 @@ export class GhostMesh {
   /** Number of ghost meshes currently rendered. */
   get count(): number {
     return this.meshes.size;
+  }
+
+  /**
+   * THREE.Object3D anchor for the ghost mesh with pending-action id `id`, or
+   * null when none exists (site not yet synced this frame, or gone). Lets
+   * other renderer modules parent world-space UI to a construction site
+   * without duplicating GhostMesh's own footprint-centering math (#1012).
+   */
+  getGroup(id: number): THREE.Object3D | null {
+    return this.meshes.get(id) ?? null;
   }
 
   dispose(): void {

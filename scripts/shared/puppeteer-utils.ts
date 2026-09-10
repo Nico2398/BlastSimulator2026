@@ -123,7 +123,7 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
 }
 
 /**
- * Wipe localStorage/IndexedDB/cache for the dev server's origin on `page`.
+ * Wipe the dev server origin's stored game state on `page`.
  *
  * Call it before navigating, so the app boots against clean storage rather
  * than reading a previous scenario's leftovers.
@@ -141,6 +141,17 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
  * (16.7s to 71.3s on shard 1) and pushed unrelated scenarios past their step
  * timeouts. Clearing the origin keeps the shared context's warm renderer.
  *
+ * Only the two storages the game actually persists into are cleared, and
+ * deliberately not `'all'`. `'all'` also drops the shader and HTTP caches,
+ * which are not scenario state at all — they are what makes the *second* and
+ * later scenarios in a shard cheap. Clearing them made every scenario
+ * recompile shaders and refetch modules, and on a 2-core CI runner that was
+ * enough to leave `sandbox-mode`'s blast report still unsized when its
+ * `report-close` click landed ("element has zero size (0x0)", CI runs
+ * `34510471725` and `34513294556`, both green again once narrowed).
+ * `IndexedDBPersistence` holds the saved games and `TutorialOverlay` holds
+ * `bs_tutorial_done`; nothing else in `src/` writes browser storage.
+ *
  * @param page - Page to clear storage on, before its first navigation.
  * @param port - Dev server port, which with localhost forms the origin.
  */
@@ -149,7 +160,7 @@ export async function resetOriginStorage(page: Page, port: number): Promise<void
   try {
     await cdp.send('Storage.clearDataForOrigin', {
       origin: `http://localhost:${port}`,
-      storageTypes: 'all',
+      storageTypes: 'indexeddb,local_storage',
     });
   } finally {
     await cdp.detach();

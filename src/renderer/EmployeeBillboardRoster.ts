@@ -16,7 +16,10 @@ import { computeEmployeeActivity, type EmployeeActivity } from '../core/entities
 
 /**
  * Map<employee id, item> plus the remove/sweep/clear lifecycle both
- * TaskProgressBar and EmployeePictograms need around it. Generic over the
+ * TaskProgressBar and EmployeePictograms need around it. TaskProgressBar also
+ * reuses it for its site-anchored construction bars (#1012), whose keys are
+ * `PendingAction` ids rather than employee ids — same lifecycle, other id
+ * space. Generic over the
  * per-item type `T`; `objectOf` tells the roster which Object3D to detach
  * from its parent on removal, since each caller's item shape differs (a Bar
  * wraps a `group`, a Pictogram wraps a `mesh`).

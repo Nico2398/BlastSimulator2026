@@ -497,4 +497,42 @@ describe('GhostMesh', () => {
       gm.dispose();
     });
   });
+
+  // ── #1012: getGroup(id) — lets other renderer modules (TaskProgressBar)
+  // anchor world-space UI to a construction site's own ghost transform.
+
+  describe('getGroup(id) (#1012)', () => {
+    it('returns the live THREE.Object3D for an active ghost id', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+
+      const group = gm.getGroup(1);
+
+      expect(group).not.toBeNull();
+      expect(group).toBe(scene.children[0]);
+      gm.dispose();
+    });
+
+    it('returns null for an id with no ghost', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+
+      expect(gm.getGroup(999)).toBeNull();
+      gm.dispose();
+    });
+
+    it('returns null once the ghost is removed from a later sync()', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+      expect(gm.getGroup(1)).not.toBeNull();
+
+      gm.sync([]);
+
+      expect(gm.getGroup(1)).toBeNull();
+      gm.dispose();
+    });
+  });
 });

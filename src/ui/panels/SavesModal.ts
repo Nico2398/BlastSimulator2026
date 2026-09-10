@@ -240,6 +240,7 @@ export class SavesModal {
       await this.backend.save(slotId, t('saveload.slot_name', { n: slotNum }), data, summary, state.campaign.activeLevelId);
       this.setStatus(t('saveload.saved'));
       await this.refreshSlotList();
+      this.hide();
     } catch (e) {
       this.setStatus(t('saveload.error', { msg: String(e) }));
     }

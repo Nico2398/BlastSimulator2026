@@ -11,7 +11,8 @@ import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
-import { computeRampSegmentCarveTarget, carveRampSegmentSlice, type RampSegmentDef } from '../mining/Ramp.js';
+import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
+import type { BlastRegion } from '../mining/BlastExecution.js';
 import { NavGrid } from '../nav/NavGrid.js';
 
 /**
@@ -25,11 +26,16 @@ import { NavGrid } from '../nav/NavGrid.js';
  * free of a `core/nav` import (core/nav already depends on core/mining, so
  * the reverse edge would cycle — see Ramp.ts's `computeColumnSurfaceY`
  * comment), while `core/engine` already sits above both.
+ *
+ * Typed to `BlastRegion` (minX/maxX/minZ/maxZ only) rather than
+ * `RampSegmentDef['region']` (#1009) — the only shape `NavGrid.patchNavGrid`
+ * actually reads, and the narrower type a level-ground region (no Y bounds)
+ * also satisfies without fabricating minY/maxY it doesn't have.
  */
 export function patchNavGridForRegion(
   state: GameState,
   grid: VoxelGrid,
-  region: RampSegmentDef['region'],
+  region: BlastRegion | null,
 ): void {
   if (region && state.navGrid) {
     NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);

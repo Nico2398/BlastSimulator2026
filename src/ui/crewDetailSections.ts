@@ -42,6 +42,7 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
   drill_hole: 'ui.crew.action_drill_hole',
   charge_hole: 'ui.crew.action_charge_hole',
   dig_ramp_segment: 'ui.crew.action_dig_ramp_segment',
+  level_ground: 'ui.crew.action_level_ground',
   set_sequence: 'ui.crew.action_set_sequence',
   place_building: 'ui.crew.action_place_building',
   demolish_building: 'ui.crew.action_demolish_building',

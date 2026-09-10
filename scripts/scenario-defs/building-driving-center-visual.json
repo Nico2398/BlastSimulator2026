@@ -1,0 +1,154 @@
+{
+  "name": "building-driving-center-visual",
+  "description": "Frames a built tier-1 driving centre (Learner's Lot) at the camera distance the game actually plays at, so the model can be inspected: the chalkboard, the restraint chair under its lamp and the pupil bench have to read as a classroom rather than as a junk lot (#1011). Yaw 180 looks at the door row (+Y), which is the only side the classroom is open from \u2014 the back wall carries the chalkboard, so any yaw near 0 photographs the outside of that wall. Distance 7 is what the building fills the frame at without leaving normal play framing.",
+  "shots": [
+    {
+      "name": "classroom",
+      "yaw": 180,
+      "pitch": 32,
+      "target": [
+        20,
+        5
+      ],
+      "distance": 7
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:150000",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:150000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Hired before the build order: ordering a building only queues the work, so someone has to be on the roster to walk over and put it up.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "build driving_center at:20,5",
+      "description": "Placed at 20,5. Two other tiles were tried first and both failed for reasons only a screenshot or CI could show: 5,5 \u2014 the row the other building-visual files use \u2014 sits on the face of a dune under seed 42, and the ridge in front of it hides everything below the door lintels from any camera the shot can reach; 25,15 placed fine on every local run but CI refused it with 'Uneven surface', so the voxel column heights there differ between the two environments. 20,5 is where building-training-visual already puts a tier-1 geology_lab, which has the same 2x2 footprint and passes CI, and it frames flat.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Lets the queued site be walked to and built out, so the shot above frames a finished building rather than its scaffold. The toolbar's Build tab is clicked first to toggle the build panel shut, so the shot frames the building rather than a third of a screen of menu.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "focusTile",
+          "x": 20,
+          "z": 5,
+          "distance": 7
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    }
+  ]
+}

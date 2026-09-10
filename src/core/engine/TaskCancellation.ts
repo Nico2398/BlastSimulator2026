@@ -432,6 +432,10 @@ function actionOrderCost(action: PendingAction): number {
   // FULL construction cost was charged at order time (buildOrder.ts) and is
   // refunded in full on cancellation (#556), unlike a ramp's per-segment cost.
   if (action.type === 'place_building') return (action.payload['cost'] as number) ?? 0;
+  // A level-ground order is one atomic unit, not segmented — the FULL cost
+  // was charged at order time (level.ts) and is refunded in full on
+  // cancellation (#1009, mirrors place_building above).
+  if (action.type === 'level_ground') return (action.payload['orderCost'] as number) ?? 0;
   if (action.type !== 'survey') return 0;
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;

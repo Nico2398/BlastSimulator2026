@@ -111,7 +111,7 @@ export class BuildMenu extends PanelBase {
 
     this.bodyEl.append(
       this.catalogEl,
-      this.makeRampSection(),
+      this.makeTerrainSection(),
       this.sectionLabel('ui.build.placed_buildings'),
       this.placedEl,
       this.statusEl,
@@ -224,23 +224,64 @@ export class BuildMenu extends PanelBase {
     return wrap;
   }
 
-  // ── Ramp (carved terrain, not a building) ─────────────────────────────────
+  // ── Terrain tools (carved terrain, not a building) ─────────────────────────
 
   /**
-   * Ramps are carved into the voxel grid rather than placed as a building, so
-   * they need their own control: drag the run from the upper bench to the lower.
+   * Ramp and level-ground orders both carve the voxel grid rather than place
+   * a building, so they share one "Terrain" section with one header — two
+   * `sectionLabel('ui.build.ramp_section')` calls back to back rendered the
+   * heading twice (#1009 review finding 3).
    */
-  private makeRampSection(): HTMLElement {
+  private makeTerrainSection(): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
 
-    const btn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
-    btn.style.cssText = 'width:100%';
-    this.locale.bindText(btn, 'ui.build.ramp');
-    btn.addEventListener('click', () => this.armRampTool());
+    const rampBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
+    rampBtn.style.cssText = 'width:100%';
+    this.locale.bindText(rampBtn, 'ui.build.ramp');
+    rampBtn.addEventListener('click', () => this.armRampTool());
 
-    wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
+    const levelGroundBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-level-ground-btn' });
+    levelGroundBtn.style.cssText = 'width:100%';
+    this.locale.bindText(levelGroundBtn, 'ui.build.level_ground');
+    levelGroundBtn.addEventListener('click', () => this.armLevelGroundTool());
+
+    wrap.append(this.sectionLabel('ui.build.ramp_section'), rampBtn, levelGroundBtn);
     return wrap;
+  }
+
+  /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
+  private armLevelGroundTool(): void {
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+    if (controller.isArmed) { controller.cancel(); return; }
+
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      overlay.update(sel ? { shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
+      const area = sel ? (sel.x2 - sel.x1 + 1) * (sel.z2 - sel.z1 + 1) : 0;
+      strip.show({
+        icon: 'grid',
+        title: t('ui.build.level_ground'),
+        subtitle: '',
+        fields: [],
+        result: sel ? `${area}` : '—',
+        confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
+        instruction: t('ui.build.level_ground_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      const cmd = this.gameConsole?.(`level_ground minX:${sel.x1} maxX:${sel.x2} minZ:${sel.z1} maxZ:${sel.z2}`);
+      this.setStatus(cmd?.success ? t('ui.build.level_ground_ordered') : (cmd?.output ?? ''));
+      overlay.flashConfirm();
+    });
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape: 'rect' });
+    refresh();
   }
 
   /** Ramps are a line drag (start → end), not a rectangle — the corridor width comes from the vehicle profile, not the drag. */
