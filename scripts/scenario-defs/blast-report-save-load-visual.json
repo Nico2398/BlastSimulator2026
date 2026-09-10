@@ -198,7 +198,7 @@
     },
     {
       "command": "state",
-      "description": "Save to real UI slot_1 via the Saves modal (SavesModal.ts) -- a separate, IndexedDB-backed path from the console save/load commands' in-memory slots. Command field stays inert; this step's real effect only exists through the clicks.",
+      "description": "Save to real UI slot_1 via the Saves modal (SavesModal.ts) -- a separate, IndexedDB-backed path from the console save/load commands' in-memory slots. Command field stays inert; this step's real effect only exists through the clicks. SavesModal.ts's saveToSlot() closes the modal itself once the save completes (matching loadFromSlot()'s own hide() call) -- no explicit close click needed; the wait below just bounds the async IndexedDB save + slot-list refresh that precedes that hide(). clickSelector alone (no separate waitForSelector) is deliberate -- interaction-executor.ts's own clickSelector already polls for the control with richer covered/absent diagnostics than Puppeteer's bare waitForSelector, which a prior version of this step duplicated and which then hung the full 10s budget instead of clickSelector's own retry loop finding the row.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -215,10 +215,6 @@
         {
           "type": "wait",
           "durationMs": 300
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-saves-modal > div > div:first-child button"
         }
       ],
       "role": "player",

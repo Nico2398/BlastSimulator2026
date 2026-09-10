@@ -14,6 +14,7 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../../core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../../core/mining/Ramp.js';
+import { carveLevelCells } from '../../core/mining/LevelGround.js';
 import { patchNavGridForRegion } from '../../core/engine/TaskProgress.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../../core/entities/Building.js';
@@ -80,6 +81,22 @@ export function resolveTaskCompletion(
           if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
         }
       }
+    }
+
+    // A completed 'level_ground' task lands here — the ordered rectangle is
+    // carved into the grid only once a qualified digger has actually
+    // finished the work, not the instant it was ordered (#1009, mirrors the
+    // 'dig_ramp_segment' branch above). Unlike a ramp, a level-ground order
+    // is one atomic PendingAction, so there's no per-segment tracker to mark
+    // done — carving and the nav patch are the entire completion side effect.
+    if (progress.actionType === 'level_ground' && progress.actionPayload && ctx.grid) {
+      const cells = progress.actionPayload['cells'] as { x: number; y: number; z: number }[];
+      const region = progress.actionPayload['region'] as { minX: number; maxX: number; minZ: number; maxZ: number } | null;
+      const carveResult = carveLevelCells(ctx.grid, cells, emitter);
+      if (carveResult.voxelsCleared > 0) {
+        patchNavGridForRegion(state, ctx.grid, region);
+      }
+      lines.push(`[tick ${state.tickCount}] Ground levelling complete: ${carveResult.voxelsCleared} voxels cleared.`);
     }
 
     // Any completed non-rest action — skill-required (survey, etc.) or

@@ -79,7 +79,10 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
   }
 
-  if (action.type === 'dig_ramp_segment') {
+  if (action.type === 'dig_ramp_segment' || action.type === 'level_ground') {
+    // Both action types carve a voxel `cells` list into the grid at the same
+    // rate — one shared duration formula (computeRampSegmentDurationTicks),
+    // caller-neutral despite its ramp-flavoured name (#1009 review finding 1).
     const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
     const voxelCount = grid !== undefined
       ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
