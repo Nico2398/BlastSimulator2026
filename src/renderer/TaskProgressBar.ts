@@ -7,8 +7,10 @@
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
+import type { PendingAction } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
+import { GHOST_SIZE } from './GhostMesh.js';
 
 // ---------- Config ----------
 
@@ -19,6 +21,8 @@ const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.
 const BAR_HEIGHT = 0.08;
 /** Height above the anchor's local origin — clears the worker model's hard hat (ridge top ~1.33). */
 const BAR_Y_OFFSET = 1.55;
+/** Height above a construction site's ghost-mesh anchor — clears the ghost volume so the bar isn't occluded by it (#1012). */
+const SITE_BAR_Y_OFFSET = GHOST_SIZE / 2 + 0.5;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
 
 interface Bar {
@@ -35,6 +39,8 @@ export class TaskProgressBar {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.Camera;
   private readonly bars = new Map<number, Bar>();
+  /** Bars anchored to a construction site (`place_building` PendingAction id) rather than a worker (#1012). */
+  private readonly siteBars = new Map<number, Bar>();
 
   // ---------- Shared resources (built once per instance, reused across every bar) ----------
   private readonly trackGeometry: THREE.PlaneGeometry;
@@ -68,19 +74,24 @@ export class TaskProgressBar {
 
   /** Number of progress bars currently rendered. */
   get count(): number {
-    return this.bars.size;
+    return this.bars.size + this.siteBars.size;
   }
 
   /**
-   * Sync progress-bar meshes against the current employee/vehicle roster.
-   * Adds bars for newly-working employees and removes bars for employees no
-   * longer working. `getAnchor` resolves an employee id to the CharacterMesh
-   * Group to billboard above.
+   * Sync progress-bar meshes against the current employee/vehicle roster and
+   * the pending-action pool. Adds/removes worker-anchored bars for
+   * newly-working/no-longer-working employees via `getWorkerAnchor`, and
+   * site-anchored bars for in-progress `place_building` actions via
+   * `getSiteAnchor` (#1012) — the latter survive the claiming worker walking
+   * away or being reassigned, since they key off the action rather than the
+   * employee.
    */
   sync(
     employees: readonly Employee[],
     vehicles: readonly Vehicle[],
-    getAnchor: (id: number) => THREE.Group | null,
+    pendingActions: readonly PendingAction[],
+    getWorkerAnchor: (id: number) => THREE.Group | null,
+    getSiteAnchor: (actionId: number) => THREE.Object3D | null,
   ): void {
     const liveIds = new Set<number>();
 
@@ -88,8 +99,10 @@ export class TaskProgressBar {
       liveIds.add(employee.id);
 
       const activity = computeEmployeeActivity(employee, vehicles);
-      const anchor = getAnchor(employee.id);
-      const fraction = activity.kind === 'working' ? taskProgressFraction(activity) : null;
+      const anchor = getWorkerAnchor(employee.id);
+      const fraction = activity.kind === 'working' && activity.actionType !== 'place_building'
+        ? taskProgressFraction(activity)
+        : null;
 
       if (fraction === null || anchor === null) {
         this.removeBar(employee.id);
@@ -99,7 +112,7 @@ export class TaskProgressBar {
       let bar = this.bars.get(employee.id);
       if (!bar) {
         // First appearance — snap immediately, no easing-in from zero.
-        bar = this.createBar();
+        bar = this.createBar(BAR_Y_OFFSET);
         bar.tween = createFillTween(fraction);
         bar.easedFraction = fraction;
         bar.targetFraction = fraction;
@@ -124,6 +137,11 @@ export class TaskProgressBar {
     for (const id of Array.from(this.bars.keys())) {
       if (!liveIds.has(id)) this.removeBar(id);
     }
+
+    // TODO: site-anchored bars — implementer fills this in (#1012)
+    void pendingActions;
+    void getSiteAnchor;
+    void SITE_BAR_Y_OFFSET;
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
@@ -140,6 +158,9 @@ export class TaskProgressBar {
     for (const id of Array.from(this.bars.keys())) {
       this.removeBar(id);
     }
+    for (const id of Array.from(this.siteBars.keys())) {
+      this.removeSiteBar(id);
+    }
   }
 
   dispose(): void {
@@ -152,9 +173,9 @@ export class TaskProgressBar {
 
   // ---------- Helpers ----------
 
-  private createBar(): Bar {
+  private createBar(yOffset: number): Bar {
     const group = new THREE.Group();
-    group.position.set(0, BAR_Y_OFFSET, 0);
+    group.position.set(0, yOffset, 0);
     // Parented into the scene root on creation; sync() immediately reparents
     // it under the resolved anchor group (THREE.Object3D.add() detaches from
     // whatever parent it already has), so this is only ever a transient home.
@@ -176,5 +197,13 @@ export class TaskProgressBar {
     if (!bar) return;
     bar.group.removeFromParent();
     this.bars.delete(id);
+  }
+
+  /** Remove the site-anchored bar for pending-action id `id`, if any (#1012). Mirrors removeBar(). */
+  private removeSiteBar(id: number): void {
+    const bar = this.siteBars.get(id);
+    if (!bar) return;
+    bar.group.removeFromParent();
+    this.siteBars.delete(id);
   }
 }
