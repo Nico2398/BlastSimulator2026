@@ -59,6 +59,10 @@ const {
   };
   const fakeBrowser = {
     newPage: vi.fn(async () => fakePage),
+    createBrowserContext: vi.fn(async () => ({
+      newPage: vi.fn(async () => fakePage),
+      close: vi.fn(async () => {}),
+    })),
     close: vi.fn(async () => {}),
   };
   return {
