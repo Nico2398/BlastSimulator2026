@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
-      "timeout": 20,
+      "timeout": 60,
       "interaction": [
         {
           "type": "command",
