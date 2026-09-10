@@ -21,6 +21,8 @@ import {
   initBrowser,
   executeInteractionActions,
   suspendDrawing,
+  resetOriginStorage,
+  CANVAS_READY_TIMEOUT_MS,
   DEFAULT_STEP_TIMEOUT,
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
@@ -35,7 +37,8 @@ export async function runBatchInteraction(
   console.log('\nLaunching shared browser...');
 
   const { browser, page: _sharedPage } = await initBrowser({ port });
-  // Note: We create a new page per scenario for isolation
+  // Note: We create a new page per scenario for isolation. A new tab is not
+  // storage isolation on its own — see resetOriginStorage, called below.
 
   const results: ScenarioResult[] = [];
   const startTime = Date.now();
@@ -53,6 +56,12 @@ export async function runBatchInteraction(
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
+        // Before the goto, so the game boots against clean storage instead of
+        // reading a save an earlier scenario in this shard left behind — a
+        // fresh tab shares the origin's localStorage/IndexedDB with every
+        // other tab in this browser (#1030).
+        await resetOriginStorage(page, port);
+
         // Navigate to the game (happens once per scenario fresh tab). See
         // puppeteer-utils.ts's initBrowser() for why this isn't
         // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
@@ -66,11 +75,10 @@ export async function runBatchInteraction(
         // tutorial stalled. Every other interaction harness (initBrowser,
         // scenario-test) already navigates with it; this batch runner did not.
         await page.goto(`http://localhost:${port}/?scenarioMode=1`, { waitUntil: 'domcontentloaded' });
-        // 30s, not 10s: a fresh tab boots the renderer with no GPU, and the
-        // first scenario of a batch pays that cold start on top. At 10s this
-        // flaked as "Waiting for selector `#game-canvas, canvas` failed",
-        // which reads like a broken page rather than a slow one.
-        await page.waitForSelector('#game-canvas, canvas', { timeout: 30000 });
+        // A fresh tab boots the renderer with no GPU, and the first scenario
+        // of a batch pays that cold start on top. Same budget as
+        // initBrowser()'s own canvas wait, from the one constant (#1021).
+        await page.waitForSelector('#game-canvas, canvas', { timeout: CANVAS_READY_TIMEOUT_MS });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
         // Batch mode passes enableScreenshots=false, so nothing here reads
