@@ -24,6 +24,8 @@ const BAR_Y_OFFSET = 1.55;
 /** Height above a construction site's ghost-mesh anchor — clears the ghost volume so the bar isn't occluded by it (#1012). */
 const SITE_BAR_Y_OFFSET = GHOST_SIZE / 2 + 0.5;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
+/** Drawn after (near-)everything else, paired with depthTest:false on the bar materials, so a bar is never occluded by the ghost volume or building geometry it's anchored to/near (#1012). */
+const BAR_RENDER_ORDER = 999;
 
 interface Bar {
   group: THREE.Group;
@@ -63,12 +65,14 @@ export class TaskProgressBar {
       transparent: true,
       opacity: 0.85,
       depthWrite: false,
+      depthTest: false,
     });
     this.fillMaterial = new THREE.MeshBasicMaterial({
       color: FILL_COLOR,
       transparent: true,
       opacity: 0.95,
       depthWrite: false,
+      depthTest: false,
     });
   }
 
@@ -138,15 +142,72 @@ export class TaskProgressBar {
       if (!liveIds.has(id)) this.removeBar(id);
     }
 
-    // TODO: site-anchored bars — implementer fills this in (#1012)
-    void pendingActions;
-    void getSiteAnchor;
-    void SITE_BAR_Y_OFFSET;
+    // Site-anchored bars for in-progress `place_building` actions (#1012) —
+    // keyed by the action's own id rather than the claiming employee's, so
+    // the bar survives the worker walking away or being reassigned.
+    const liveSiteIds = new Set<number>();
+    for (const action of pendingActions) {
+      if (action.type !== 'place_building') continue;
+      liveSiteIds.add(action.id);
+
+      const anchor = getSiteAnchor(action.id);
+      if (anchor === null) {
+        // Site not synced yet this frame, or gone.
+        this.removeSiteBar(action.id);
+        continue;
+      }
+
+      const holder = action.holderId !== null
+        ? employees.find(e => e.id === action.holderId) ?? null
+        : null;
+      const activity = holder ? computeEmployeeActivity(holder, vehicles) : null;
+      const fraction = activity && activity.kind === 'working' && activity.actionType === 'place_building'
+        ? taskProgressFraction(activity)
+        : null;
+
+      const existing = this.siteBars.get(action.id);
+      if (fraction === null) {
+        if (existing) {
+          // Freeze in place — no holder/progress this frame, but the bar
+          // already exists (worker walked away or was reassigned mid-build).
+          // Keep it anchored and visible; don't touch its fraction.
+          if (existing.group.parent !== anchor) anchor.add(existing.group);
+        }
+        continue;
+      }
+
+      let bar = existing;
+      if (!bar) {
+        bar = this.createBar(SITE_BAR_Y_OFFSET);
+        bar.tween = createFillTween(fraction);
+        bar.easedFraction = fraction;
+        bar.targetFraction = fraction;
+        bar.fillMesh.scale.x = fraction;
+        this.siteBars.set(action.id, bar);
+      } else {
+        bar.targetFraction = fraction;
+        bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, fraction, 0);
+        bar.fillMesh.scale.x = bar.easedFraction;
+      }
+      if (bar.group.parent !== anchor) {
+        anchor.add(bar.group);
+      }
+    }
+
+    // Sweep any site bar whose action is no longer an active place_building action.
+    for (const id of Array.from(this.siteBars.keys())) {
+      if (!liveSiteIds.has(id)) this.removeSiteBar(id);
+    }
   }
 
   /** Animate/refresh fill levels and billboard orientation. Call every frame with elapsed seconds. */
   update(dt: number): void {
     for (const bar of this.bars.values()) {
+      bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
+      bar.fillMesh.scale.x = bar.easedFraction;
+      bar.group.quaternion.copy(this.camera.quaternion);
+    }
+    for (const bar of this.siteBars.values()) {
       bar.easedFraction = stepFillTween(bar.tween, bar.easedFraction, bar.targetFraction, dt);
       bar.fillMesh.scale.x = bar.easedFraction;
       bar.group.quaternion.copy(this.camera.quaternion);
@@ -182,11 +243,13 @@ export class TaskProgressBar {
     this.scene.add(group);
 
     const trackMesh = new THREE.Mesh(this.trackGeometry, this.trackMaterial);
+    trackMesh.renderOrder = BAR_RENDER_ORDER;
     group.add(trackMesh);
 
     const fillMesh = new THREE.Mesh(this.fillGeometry, this.fillMaterial);
     fillMesh.position.set(-BAR_WIDTH / 2, 0, FILL_Z_OFFSET);
     fillMesh.scale.x = 0;
+    fillMesh.renderOrder = BAR_RENDER_ORDER;
     group.add(fillMesh);
 
     return { group, fillMesh, tween: createFillTween(0), easedFraction: 0, targetFraction: 0 };
