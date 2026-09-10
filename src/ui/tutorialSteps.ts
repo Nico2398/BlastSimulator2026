@@ -113,7 +113,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     'tutorial.step_livingquarters.title',
     'tutorial.step_livingquarters',
     (s) => countBuildingsOfType(s, 'living_quarters'),
-    ['build living_quarters at:12,15'],
+    ['build living_quarters at:29,12'],
     TOOLBAR_TARGET.build,
     // #556: ordering a building is queued work now — a site goes up over
     // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without

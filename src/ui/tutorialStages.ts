@@ -192,7 +192,52 @@ const REGION = {
   // argument above to hold, confirmed directly: the box-cut ramp and the
   // full charge/blast sequence both complete against this coordinate with
   // no employee or vehicle ever left permanently stranded.
-  livingQuarters: { x1: 12, z1: 15, x2: 12, z2: 15, exact: true },
+  //
+  // #1008-followup (CI, PR #1023): (12,15) still deadlocked box-cut in a real
+  // interaction-mode run (tutorial-steps-visual/tutorial-interactive stuck on
+  // "box-cut" for 125+ ticks, `isWorkInProgress()` genuinely false the whole
+  // time -- a stall, not merely slow). Command mode passed (89 ticks to fully
+  // dig the ramp) because it never exercises the browser's real per-tick
+  // fatigue/interrupt scheduling the way a live run does -- the two modes can
+  // diverge on exactly this class of timing-sensitive deadlock. Root cause:
+  // (12,15)'s footprint (x:12-14/z:15-17) is only 2-4 tiles (Chebyshev) from
+  // both the vehicle spawn point (16,16 -- VehicleCommand's baseX/baseZ =
+  // sizeX/2) and the box-cut corridor itself (x:16, z:19-31), well inside the
+  // radius the (18,18)/(19,22) attempts above already proved can strand a
+  // fatigue-interrupted employee's `clampToGrid`-floored fallback position
+  // inside a building footprint. Moved to (6,16), 10 tiles clear of all three
+  // hazards -- but a second real interaction-mode run (this PR, direct trace
+  // via a headless replay of tutorial-steps-visual's own steps 0-20 driving
+  // `state full`'s navGrid.cellTypeCounts.ramp counter tick by tick) showed a
+  // DIFFERENT deadlock at (6,16): zero carving progress across 5000 ticks of
+  // direct observation, not a stranding at all. The qualified excavator
+  // reaches box-cut already mid-fatigue (~60/100 from the setup steps above),
+  // the vehicle-gated dig_ramp_segment task interrupts them for a forced rest
+  // mid-dig, and the round trip out to (6,16) and back (~21 tiles each way at
+  // this coordinate's distance from the dig site near the drill grid,
+  // ~22-30,20-28) is long enough that fatigue crosses back over the rest
+  // threshold before the walk home even finishes, let alone before a single
+  // segment carves -- a genuine net-negative cycle, confirmed by the ramp
+  // cell count never moving, not merely a slow one. Maximizing clearance from
+  // the stranding hazards (as (6,16) does) works against this: it maximizes
+  // the round trip too. Re-picked via a terrain-flatness scan of the tutorial
+  // grid's NE quadrant (seed 42) for a site that clears every hazard radius
+  // this file's history has actually reproduced a deadlock at (vehicle spawn
+  // 16,16, the box-cut corridor x:16/z:19-31, and the drill grid rect
+  // 22-30,20-28) by >=5 tiles Chebyshev -- comfortably past the 2-4 tile
+  // radius those hazards are proven to strand at -- while sitting as close to
+  // the dig site as that constraint allows, instead of as far as possible:
+  // (29,12) (footprint x:29-31/z:12-14) clears the vehicle spawn and corridor
+  // by 13 tiles and the drill grid by 6, and is 12 tiles (Chebyshev) from the
+  // dig site itself versus (6,16)'s 21 -- roughly half the round trip. Also
+  // clear of the file's own #957 bootstrap drill_plan grid (x:24-28/z:2-11 --
+  // this footprint's z:12-14 sits entirely below it) and nowhere near the
+  // warehouse (6,9)/driving center (6,7) cluster in the opposite corner.
+  // Confirmed directly with a real browser: both tutorial-interactive and
+  // tutorial-steps-visual dig the box-cut ramp to completion (the excavator
+  // completes a rest cycle at the new, shorter distance and returns before
+  // fatigue threatens the dig again) instead of stalling.
+  livingQuarters: { x1: 29, z1: 12, x2: 29, z2: 12, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */

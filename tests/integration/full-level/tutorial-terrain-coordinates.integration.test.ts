@@ -48,7 +48,15 @@ interface PinnedRegion {
 const PINNED_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
   warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 9 },
   drivingCenter: { type: 'driving_center', tier: 1, x: 6, z: 7 },
-  livingQuarters: { type: 'living_quarters', tier: 1, x: 12, z: 15 },
+  // #1008-followup (PR #1023): moved from (12,15) to (6,16) — flat (this
+  // test's own Test 2 proves that), then to (29,12) — also flat — after a
+  // second real interaction-mode CI run showed (6,16) deadlocks box-cut too,
+  // just a different way (a fatigue/rest round-trip livelock, not a
+  // stranding). Flatness alone was never sufficient; see tutorialStages.ts's
+  // own REGION comment for the full trace and the new coordinate's
+  // clearance margin against every hazard this file's history has actually
+  // reproduced a deadlock at.
+  livingQuarters: { type: 'living_quarters', tier: 1, x: 29, z: 12 },
 };
 
 /**
@@ -233,7 +241,7 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
       [10, 10, 'survey target'],
       [6, 9, 'warehouse footprint origin'],
       [6, 7, 'driving center footprint origin'],
-      [12, 15, 'living quarters footprint origin'],
+      [29, 12, 'living quarters footprint origin'],
       [10, 16, 'ramp origin'],
     ];
 
