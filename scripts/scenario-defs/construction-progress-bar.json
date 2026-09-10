@@ -1,0 +1,105 @@
+{
+  "name": "construction-progress-bar",
+  "description": "#1012: a construction site's progress bar must stay anchored to the site (the ghost mesh), not float above whichever worker is currently building it. Places a tier-1 living_quarters via real click-driven interaction (role: player, same known-flat (2,6) tile building-placement-visual.json already places living_quarters on), then drives a handful of ticks so a staffed roster member has walked over and started work -- landing mid-in_progress, ghost still present, no building yet -- and captures a screenshot at that checkpoint for the later visual-tester phase to judge the bar's anchor against. Does not assert anything about the bar itself: TaskProgressBar/GhostMesh are renderer-only (no __gameState field exposes bar position), so this file only proves the state a screenshot needs (an in-progress site with a claimed ghost) is reachable by real clicks -- the bar's actual on-screen anchor is a visual-channel judgement, not a scenario `expect`.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:2,6 tier:1",
+      "description": "Real click path: open the build panel, buy living_quarters, pick the known-flat (2,6) tile (building-placement-visual.json already places living_quarters there post-#1008's flatness check), confirm. Ordering only queues a construction site (blue ghost, #556) -- no building exists yet.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 6
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
+        "equals": {
+          "buildingCount": 0,
+          "orderedBuildingCount": 1
+        },
+        "note": "Ordered, not placed: a construction site is queued, no building exists yet."
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "Mid-construction checkpoint: a staffed roster member has had time to walk to (2,6) and start work, but the tier-1 base duration is nowhere near spent -- the site is genuinely mid-in_progress, not finished. This is the capture point the visual-tester phase judges the site-anchored bar against (#1012): the bar should sit on the ghost at (2,6), not float above wherever the builder happens to be standing.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        },
+        "note": "Still under construction 10 ticks in -- proves this is a genuine mid-build snapshot."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the site to completion so a later run of this file can be extended to check the bar disappears once the building lands.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    }
+  ]
+}
