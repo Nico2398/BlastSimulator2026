@@ -35,7 +35,13 @@ export async function runBatchInteraction(
   console.log('\nLaunching shared browser...');
 
   const { browser, page: _sharedPage } = await initBrowser({ port });
-  // Note: We create a new page per scenario for isolation
+  // Note: We create a fresh incognito-style BrowserContext per scenario, not
+  // just a new page/tab. A new page in the shared default context still
+  // shares localStorage/IndexedDB with every other page at the same origin
+  // — SavesModal's IndexedDB state was leaking from one scenario file into
+  // the next scenario file in the same shard (#1030's shard-10 collision
+  // between blast-report-save-load-visual and save-load-visual).
+  // browser.createBrowserContext() gives genuinely isolated storage.
 
   const results: ScenarioResult[] = [];
   const startTime = Date.now();
@@ -50,7 +56,8 @@ export async function runBatchInteraction(
         const def = loadScenarioDef(name!, SCENARIO_DIR);
 
         const steps: ScenarioStepDef[] = def.steps;
-        const page = await browser.newPage();
+        const context = await browser.createBrowserContext();
+        const page = await context.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
         // Navigate to the game (happens once per scenario fresh tab). See
@@ -162,7 +169,7 @@ export async function runBatchInteraction(
           writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(report, null, 2));
         }
 
-        await page.close();
+        await context.close();
         results.push({
           name: name!,
           totalSteps: steps.length,
