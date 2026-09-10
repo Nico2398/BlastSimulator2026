@@ -12,8 +12,8 @@ import type { Page } from 'puppeteer';
 import { CANVAS_READY_TIMEOUT_MS, resetOriginStorage } from '../../../../scripts/shared/puppeteer-utils.js';
 
 /** Minimal CDP-capable page double: records what was sent and whether it detached. */
-function fakePage(sendImpl?: () => Promise<void>) {
-  const send = vi.fn(sendImpl ?? (async () => {}));
+function fakePage(sendImpl?: (method: string, params: { storageTypes: string }) => Promise<void>) {
+  const send = vi.fn(sendImpl ?? (async (_method: string, _params: { storageTypes: string }) => {}));
   const detach = vi.fn(async () => {});
   const createCDPSession = vi.fn(async () => ({ send, detach }));
   return { page: { createCDPSession } as unknown as Page, send, detach, createCDPSession };
@@ -28,15 +28,27 @@ describe('CANVAS_READY_TIMEOUT_MS', () => {
 });
 
 describe('resetOriginStorage', () => {
-  it('clears every storage type for the dev server origin', async () => {
+  it('clears the two storages the game persists into, for the dev server origin', async () => {
     const { page, send } = fakePage();
 
     await resetOriginStorage(page, 5173);
 
     expect(send).toHaveBeenCalledWith('Storage.clearDataForOrigin', {
       origin: 'http://localhost:5173',
-      storageTypes: 'all',
+      storageTypes: 'indexeddb,local_storage',
     });
+  });
+
+  it('leaves the shader and HTTP caches alone — they are shard-warmup, not scenario state', async () => {
+    // 'all' drops those too, which made every scenario pay a cold recompile
+    // and left sandbox-mode's blast report unsized under CI contention.
+    const { page, send } = fakePage();
+
+    await resetOriginStorage(page, 5173);
+
+    const payload = send.mock.calls[0]![1];
+    expect(payload.storageTypes).not.toBe('all');
+    expect(payload.storageTypes).not.toMatch(/shader_cache|cache_storage/);
   });
 
   it('targets the port it was given, not a hardcoded one', async () => {
