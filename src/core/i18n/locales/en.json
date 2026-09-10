@@ -3337,6 +3337,7 @@
   "mining.level_ground.invalid_area": "Invalid area: minX/maxX/minZ/maxZ must be finite whole numbers describing a non-empty rectangle.",
   "mining.level_ground.too_large": "Area too large: {area} voxels exceeds the {limit} voxel limit per order.",
   "mining.level_ground.refused_building_overlap": "Refused: a building occupies part of that area.",
+  "mining.level_ground.already_flat": "Ground already flat here — nothing to level.",
   "mining.weather.set_usage": "Usage: weather set <state>. Valid: {valid}",
   "mining.survey.usage": "Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Unknown method \"{method}\". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",

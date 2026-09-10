@@ -96,7 +96,7 @@ export function levelGroundCommand(
   const cells = computeLevelCells(ctx.grid!, rect, targetY);
 
   if (cells.length === 0) {
-    return { success: true, output: 'Ground already flat here — nothing to level.' };
+    return { success: true, output: t('mining.level_ground.already_flat') };
   }
 
   const region = computeLevelRegion(cells);

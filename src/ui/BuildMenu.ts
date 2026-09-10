@@ -111,8 +111,7 @@ export class BuildMenu extends PanelBase {
 
     this.bodyEl.append(
       this.catalogEl,
-      this.makeRampSection(),
-      this.makeLevelGroundSection(),
+      this.makeTerrainSection(),
       this.sectionLabel('ui.build.placed_buildings'),
       this.placedEl,
       this.statusEl,
@@ -225,38 +224,29 @@ export class BuildMenu extends PanelBase {
     return wrap;
   }
 
-  // ── Ramp (carved terrain, not a building) ─────────────────────────────────
+  // ── Terrain tools (carved terrain, not a building) ─────────────────────────
 
   /**
-   * Ramps are carved into the voxel grid rather than placed as a building, so
-   * they need their own control: drag the run from the upper bench to the lower.
+   * Ramp and level-ground orders both carve the voxel grid rather than place
+   * a building, so they share one "Terrain" section with one header — two
+   * `sectionLabel('ui.build.ramp_section')` calls back to back rendered the
+   * heading twice (#1009 review finding 3).
    */
-  private makeRampSection(): HTMLElement {
+  private makeTerrainSection(): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
 
-    const btn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
-    btn.style.cssText = 'width:100%';
-    this.locale.bindText(btn, 'ui.build.ramp');
-    btn.addEventListener('click', () => this.armRampTool());
+    const rampBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
+    rampBtn.style.cssText = 'width:100%';
+    this.locale.bindText(rampBtn, 'ui.build.ramp');
+    rampBtn.addEventListener('click', () => this.armRampTool());
 
-    wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
-    return wrap;
-  }
+    const levelGroundBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-level-ground-btn' });
+    levelGroundBtn.style.cssText = 'width:100%';
+    this.locale.bindText(levelGroundBtn, 'ui.build.level_ground');
+    levelGroundBtn.addEventListener('click', () => this.armLevelGroundTool());
 
-  // ── Level ground (carved terrain, not a building) ──────────────────────────
-
-  /** Mirrors {@link makeRampSection}'s shape for a rectangular level-ground order. */
-  private makeLevelGroundSection(): HTMLElement {
-    const wrap = el('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
-
-    const btn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-level-ground-btn' });
-    btn.style.cssText = 'width:100%';
-    this.locale.bindText(btn, 'ui.build.level_ground');
-    btn.addEventListener('click', () => this.armLevelGroundTool());
-
-    wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
+    wrap.append(this.sectionLabel('ui.build.ramp_section'), rampBtn, levelGroundBtn);
     return wrap;
   }
 

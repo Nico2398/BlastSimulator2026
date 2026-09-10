@@ -313,9 +313,12 @@ type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
  * and already has a precomputed `region`) and {@link carveRampSegmentSlice}
  * (which clears a sub-range and derives `region` from the cells it actually
  * cleared) — the only two carve loops in this file, and the only thing they
- * duplicated (#946 review finding 1).
+ * duplicated (#946 review finding 1). Exported so LevelGround.ts's
+ * `carveLevelCells` — the same density-check-then-clear loop for a level-
+ * ground order's cell list — reuses it instead of a third copy (#1009 review
+ * finding 2).
  */
-function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: number }): boolean {
+export function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: number }): boolean {
   if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
     grid.clearVoxel(cell.x, cell.y, cell.z);
     return true;
@@ -395,11 +398,15 @@ export function carveRampSegmentSlice(
 }
 
 /**
- * Work-duration ticks for a `rock_digger` of `tier` to excavate `voxelCount`
- * voxels of a ramp segment. Scales inversely with the tier's workRate
- * multiplier (VEHICLE_TIER_MULTIPLIERS) against the tier-1 baseline rate
- * (RAMP_DIG_VOXELS_PER_TICK_TIER1), always at least 1 tick — a zero-voxel
- * segment (row already flat) still takes a tick to "dig".
+ * Work-duration ticks for a `rock_digger` of `tier` to carve `voxelCount`
+ * voxels — a ramp segment's or a level-ground order's, both the same
+ * "clear this many solid cells" shape, so the two `dig_ramp_segment`/
+ * `level_ground` PendingAction types share this one formula rather than each
+ * defining an identical copy (#1009 review finding 1; ActionSelection.ts's
+ * `computeActionWorkTicks` calls this for both). Scales inversely with the
+ * tier's workRate multiplier (VEHICLE_TIER_MULTIPLIERS) against the tier-1
+ * baseline rate (RAMP_DIG_VOXELS_PER_TICK_TIER1), always at least 1 tick — a
+ * zero-voxel segment (row already flat) still takes a tick to "dig".
  *
  * `proficiencyLevel`/`needMultiplier`/`lqMultiplier` feed the same
  * `computeTaskDuration` formula every other skill-gated task duration uses

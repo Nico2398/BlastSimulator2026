@@ -6,13 +6,9 @@
 
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import type { VehicleTier } from '../entities/Vehicle.js';
-import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { carveCellIfSolid, computeRampSegmentDurationTicks } from './Ramp.js';
 import { formatMoney } from '../economy/formatMoney.js';
-import {
-  MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL,
-  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS,
-} from '../config/balance.js';
+import { MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL } from '../config/balance.js';
 
 // ── Types ──
 
@@ -157,8 +153,7 @@ export function carveLevelCells(
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
   for (const cell of cells) {
-    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
-      grid.clearVoxel(cell.x, cell.y, cell.z);
+    if (carveCellIfSolid(grid, cell)) {
       voxelsCleared++;
       minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
       minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
@@ -175,18 +170,8 @@ export function carveLevelCells(
 
 /**
  * Work-duration ticks for a `rock_digger` of `tier` to level `voxelCount`
- * voxels — mirrors `computeRampSegmentDurationTicks` (Ramp.ts) exactly,
- * sharing the same tier-1 baseline rate (RAMP_DIG_VOXELS_PER_TICK_TIER1)
- * rather than introducing a new one.
+ * voxels — same "carve N solid cells" formula a ramp segment uses, re-
+ * exported under this name rather than reimplemented (#1009 review finding
+ * 1). See `computeRampSegmentDurationTicks` (Ramp.ts) for the formula itself.
  */
-export function computeLevelGroundDurationTicks(
-  voxelCount: number,
-  tier: VehicleTier,
-  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
-  needMultiplier: number = 1,
-  lqMultiplier: number = 1,
-): number {
-  const tierWorkRateMultiplier = VEHICLE_TIER_MULTIPLIERS[tier].workRate;
-  const baseTicks = voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier);
-  return computeTaskDuration(baseTicks, proficiencyLevel, needMultiplier, lqMultiplier, 1);
-}
+export const computeLevelGroundDurationTicks = computeRampSegmentDurationTicks;
