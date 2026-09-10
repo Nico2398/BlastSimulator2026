@@ -112,7 +112,6 @@
     "src/core/entities/Employee.ts:planTraining",
     "src/core/entities/Employee.ts:schoolFor",
     "src/core/entities/Employee.ts:trainableSkills",
-    "src/core/entities/EmployeeActivity.ts:EmployeeActivityKind",
     "src/core/entities/EmployeeXpRules.ts:XpAward",
     "src/core/entities/Vehicle.ts:VehicleDef",
     "src/core/entities/VehicleStatus.ts:VehicleStatusKind",

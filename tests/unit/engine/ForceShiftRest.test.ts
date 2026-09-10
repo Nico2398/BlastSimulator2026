@@ -23,6 +23,7 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
 import { isMidLoadedHaul } from '../../../src/core/economy/FragmentTaskLifecycle.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
+import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -90,6 +91,28 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
 
     expect(employee.destinationX).not.toBe(employee.x);
     expect(employee.destinationZ).not.toBe(employee.z);
+  });
+
+  // #1013: computeEmployeeActivity must report actionType: 'rest' the
+  // instant finishForceRest starts the walk — the same pictogram-
+  // distinguishability bug NeedRestoration.test.ts's own #1013 tests pin for
+  // the other rest-dispatch call sites. finishForceRest sets destinationX/Z
+  // directly without touching pendingActionType today, so this reads null
+  // instead of 'rest' until beginRestWalk is wired in.
+  it('#1013: reports actionType "rest" via computeEmployeeActivity while walking to the living_quarters', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 200;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    state.buildings.unlockedTiers.living_quarters = 3;
+    placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 2);
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    expect(activity.kind).toBe('walking');
+    expect(activity.actionType).toBe('rest');
   });
 
   it('rests in place when no living_quarters exists at all', () => {
@@ -375,6 +398,25 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     expect(employee.destinationX).not.toBe(employee.x);
     expect(employee.destinationZ).not.toBe(employee.z);
+  });
+
+  // #1013: mirrors the legacy forceShiftRestIfNeeded test above — the
+  // policy-aware variant shares finishForceRest's tail, so it needs the same
+  // beginRestWalk wiring for its own walk to report actionType: 'rest'.
+  it('#1013: reports actionType "rest" via computeEmployeeActivity while walking to the living_quarters', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 401;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 1);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    expect(activity.kind).toBe('walking');
+    expect(activity.actionType).toBe('rest');
   });
 
   it('rests in place with no living_quarters at all, at the un-multiplied NEED_REST_DURATIONS.fatigue', () => {

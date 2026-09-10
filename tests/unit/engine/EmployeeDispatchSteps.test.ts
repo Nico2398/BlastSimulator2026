@@ -24,6 +24,7 @@ import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH, NEED_REST_DURATIONS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 
 const SEED = 42;
 
@@ -944,6 +945,28 @@ describe('promoteActionToActive', () => {
     expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
     expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.pendingTaskDuration).toBeNull();
+  });
+
+  // #1013: mirrors NeedRestoration.test.ts's and ForceShiftRest.test.ts's own
+  // #1013 tests for the other rest-dispatch call sites — this is the first
+  // point an idle employee actually starts walking to rest (this promotion's
+  // own doc comment above), so computeEmployeeActivity must report
+  // actionType: 'rest' here too, not just once pendingRestDuration/
+  // pendingRestNeedKey are seeded a few lines later in this same call.
+  it('#1013: reports actionType "rest" via computeEmployeeActivity while walking to the rest destination', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const action = makeAction({
+      id: 6, type: 'rest', targetX: 8, targetZ: 9, payload: { needKey: 'fatigue' },
+    });
+
+    promoteActionToActive(state, employee, action);
+
+    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    expect(activity.kind).toBe('walking');
+    expect(activity.actionType).toBe('rest');
   });
 
   it('is a no-op on pendingRestDuration/pendingRestNeedKey for a rest action with an unresolvable needKey', () => {
