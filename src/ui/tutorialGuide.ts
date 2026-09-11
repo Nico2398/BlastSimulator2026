@@ -90,7 +90,7 @@ export function resolveStageIndex(stages: TutorialStage[]): number {
 }
 
 /** What the card should show about a stage whose order was issued but not yet resolved. */
-interface StageWaitStatus {
+export interface StageWaitStatus {
   /** True once some stage's `spentWhen` has fired and its work is still outstanding. */
   waiting: boolean;
   /** The waiting stage's own `waitingKey`, or null when `waiting` is false. */

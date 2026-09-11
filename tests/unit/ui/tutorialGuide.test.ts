@@ -1070,8 +1070,9 @@ describe('decideClock', () => {
   // hasOutstandingWork/isWorkInProgress/workSignature only ever looked at
   // employees and state.pendingActions, so a tutorial step waiting on a haul
   // held the clock the instant an employee boarded, mid-delivery — the real
-  // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (unexported,
-  // exercised only through decideClock here) is the fix.
+  // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (exported and
+  // reused by isHaulDispatched in tutorialStepHelpers.ts, exercised here
+  // through decideClock) is the fix.
   describe('vehicle-gated hauling/breaking work (#552)', () => {
     it('keeps running past budget while a vehicle has a live haulingPhase, even though every employee is fully idle', () => {
       const s = state();
