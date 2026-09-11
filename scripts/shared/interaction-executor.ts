@@ -124,7 +124,11 @@ async function inspectSelector(page: Page, selector: string): Promise<Unclickabl
  * cycle chasing a re-render race that was really three scenario files clicking
  * into a Fleet panel nothing had opened.
  */
-function describeUnclickable(r: UnclickableReport, neverAppeared = false): string {
+function describeUnclickable(
+  r: UnclickableReport,
+  neverAppeared = false,
+  zeroSizeContext?: ZeroSizeDiagnosisContext,
+): string {
   const context = [
     r.matchCount !== undefined && r.matchCount > 1
       ? `selector is ambiguous (${r.matchCount} matches, first one used)`
@@ -132,11 +136,24 @@ function describeUnclickable(r: UnclickableReport, neverAppeared = false): strin
     r.tutorial !== undefined ? `tutorial on ${r.tutorial}` : '',
   ].filter(s => s !== '');
   const suffix = context.length > 0 ? ` [${context.join('; ')}]` : '';
-  return `${describeReason(r, neverAppeared)}${suffix}`;
+  return `${describeReason(r, neverAppeared, zeroSizeContext)}${suffix}`;
 }
 
-/** The primary reason, before context is appended. */
-function describeReason(r: UnclickableReport, neverAppeared = false): string {
+/**
+ * The primary reason, before context is appended.
+ *
+ * `zeroSizeContext` is present only from `clickSelector`'s own poll-timeout
+ * path (not the separate post-click-attempt catch, which only fires once the
+ * poll already reported the element usable) — it names how long the element
+ * sat attached-but-unlaid-out, including any zero-size grace extension
+ * (#1032), instead of the bare "zero size (0x0)" that gives no sense of
+ * whether this was a genuine layout failure or a slow render caught mid-poll.
+ */
+function describeReason(
+  r: UnclickableReport,
+  neverAppeared = false,
+  zeroSizeContext?: ZeroSizeDiagnosisContext,
+): string {
   if (!r.found) {
     return neverAppeared
       ? 'element never appeared in the DOM — nothing renders it (a panel no step opened, or a row that does not exist)'
@@ -150,7 +167,16 @@ function describeReason(r: UnclickableReport, neverAppeared = false): string {
   if (r.display === 'none' || r.visibility === 'hidden') {
     return `element is not visible (display: ${r.display}, visibility: ${r.visibility})`;
   }
-  if (r.width === 0 || r.height === 0) return `element has zero size (${r.width}x${r.height})`;
+  if (r.width === 0 || r.height === 0) {
+    if (zeroSizeContext !== undefined) {
+      return 'element is attached to the DOM and otherwise unblocked, but never gained a layout box '
+        + `(stayed ${r.width}x${r.height}) after waiting ${zeroSizeContext.waitedMs}ms`
+        + (zeroSizeContext.graceGranted
+          ? ` (including a ${CLICK_SELECTOR_ZERO_SIZE_GRACE_MS}ms zero-size grace extension)`
+          : '');
+    }
+    return `element has zero size (${r.width}x${r.height})`;
+  }
   if (r.covering !== undefined) return `element is covered by ${r.covering}`;
   return 'element is present and looks clickable — the browser still refused it';
 }
@@ -491,8 +517,14 @@ export async function executeActionOnPage(
       // immediately (#699). Bounded to exactly one retry so a selector
       // genuinely covered by something else (a tutorial rail, a real layout
       // bug) still fails loudly with today's exact error.
-      let deadline = Date.now() + timeoutMs;
+      const pollStartedAt = Date.now();
+      let deadline = pollStartedAt + timeoutMs;
       let retriedCoveredOnce = false;
+      // Independent of retriedCoveredOnce — a control can be covered, retried
+      // once, then later read zero-size before the (possibly already
+      // extended) deadline, and still earn its own single grace on top
+      // (#1032).
+      let zeroSizeGraceGranted = false;
       // 'absent' every single poll means the control was never rendered at
       // all, which `inspectSelector` alone cannot tell apart from one that
       // was swapped out mid-click — see `describeUnclickable`.
@@ -520,8 +552,22 @@ export async function executeActionOnPage(
               continue;
             }
           }
+          // A control that is attached and otherwise unblocked but still
+          // reads zero-size at the deadline may just be waiting on a heavy
+          // render/animation to release layout on a slow CI runner (#1032) —
+          // grant it one extension before treating this as a genuine
+          // never-lays-out failure. Bounded to once per call, same shape as
+          // the covered-retry above.
+          if (!zeroSizeGraceGranted && reason === 'zero-size') {
+            zeroSizeGraceGranted = true;
+            deadline += CLICK_SELECTOR_ZERO_SIZE_GRACE_MS;
+            continue;
+          }
+          const zeroSizeContext: ZeroSizeDiagnosisContext | undefined = reason === 'zero-size'
+            ? { waitedMs: Date.now() - pollStartedAt, graceGranted: zeroSizeGraceGranted }
+            : undefined;
           throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector), !everPresent)}`,
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector), !everPresent, zeroSizeContext)}`,
           );
         }
         await new Promise((r) => setTimeout(r, 150));
