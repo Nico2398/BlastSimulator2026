@@ -52,7 +52,7 @@ const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
  * Context passed into the zero-size diagnosis message. Present only when the
  * poll timed out on the zero-size reason specifically.
  */
-export interface ZeroSizeDiagnosisContext {
+interface ZeroSizeDiagnosisContext {
   waitedMs: number;
   graceGranted: boolean;
 }
