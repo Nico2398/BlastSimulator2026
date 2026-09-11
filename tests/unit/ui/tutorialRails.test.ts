@@ -8,7 +8,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
-import { SPEED_BUTTON_GROUP } from '../../../src/ui/tutorialStepHelpers.js';
+import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
@@ -100,22 +100,20 @@ describe('TutorialRails', () => {
   });
 
   it('omits the counter for a single-stage step', () => {
-    // #923: 'time-speed' no longer exists — 'speed-up-for-dig' is the
-    // single-stage step exercising the same shape now (one stage, targeting
-    // a speed button nested inside the .bs-speed-btn group container).
-    const bar = document.createElement('div');
-    bar.id = 'bs-hud-top';
-    const group = document.createElement('div');
-    group.className = 'bs-speed-btn';
+    // #1015: 'speed-up-for-dig' is gone — 'toggle-survey-overlay' has no
+    // entry of its own in TUTORIAL_STAGES, so stagesFor falls back to a
+    // single stage built from the step's own highlightTarget, exercising the
+    // same one-stage shape.
+    const panel = document.createElement('div');
+    panel.id = 'bs-survey-panel';
     const btn = document.createElement('button');
-    btn.dataset['speed'] = '8';
-    group.appendChild(btn);
-    bar.appendChild(group);
-    document.body.appendChild(bar);
+    btn.dataset['role'] = 'overlay-toggle';
+    panel.appendChild(btn);
+    document.body.appendChild(panel);
     withBox(btn);
 
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'speed-up-for-dig' }, state());
+    rails.beginStep({ id: 'toggle-survey-overlay', highlightTarget: SURVEY_OVERLAY_TOGGLE_TARGET }, state());
     expect(rails.refresh().hint).not.toContain('/');
   });
 
@@ -287,12 +285,11 @@ describe('TutorialRails', () => {
   });
 });
 
-// #923: once the speed-lesson pair completes, the speed controls are left
-// permanently player-controlled for the rest of the tutorial — a step
-// declares that via RailsStep.permanentlyUnlocks, and TutorialRails is
-// responsible for accumulating it across beginStep calls and applying it on
-// every refresh(), regardless of the active stage's own target.
-describe('permanentlyUnlocks (#923)', () => {
+// #1015: the speed bar is unconditionally player-controlled from the
+// tutorial's very first step onward — no step declares it any more.
+// TutorialRails bakes SPEED_BUTTON_GROUP into BASE_PERMANENTLY_ALLOWED and
+// passes it to every applyRails() call regardless of the active stage.
+describe('the speed bar is always allowed, from the first step onward (#1015)', () => {
   /** All four HUD speed buttons, nested inside the .bs-speed-btn group container. */
   function speedButtons(): HTMLButtonElement[] {
     const bar = document.createElement('div');
@@ -311,23 +308,14 @@ describe('permanentlyUnlocks (#923)', () => {
     return buttons;
   }
 
-  it('marks all four speed buttons allowed once a step with permanentlyUnlocks begins, regardless of the active stage\'s own target', () => {
+  it('marks all four speed buttons allowed immediately after the very first beginStep() call, with no special per-step field', () => {
     const buttons = speedButtons();
+    // SPEED_BUTTON_GROUP is the exact selector tutorialRails.ts bakes into
+    // BASE_PERMANENTLY_ALLOWED — assert it actually resolves these buttons,
+    // not a coincidentally-matching fixture.
+    expect(Array.from(document.querySelectorAll(SPEED_BUTTON_GROUP))).toEqual(buttons);
     // Active stage target is the Crew toolbar button — nothing to do with
-    // the speed buttons — proving the unlock is independent of the stage.
-    toolbarCrew();
-
-    const rails = new TutorialRails();
-    rails.beginStep({ id: 'hire-surveyor', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
-    rails.refresh();
-
-    for (const btn of buttons) {
-      expect(btn.classList.contains(ALLOWED_CLASS), `data-speed="${btn.dataset['speed']}" should be allowed`).toBe(true);
-    }
-  });
-
-  it('does not unlock the speed buttons for a step that carries no permanentlyUnlocks', () => {
-    const buttons = speedButtons();
+    // the speed buttons — proving the allowance is independent of the stage.
     toolbarCrew();
 
     const rails = new TutorialRails();
@@ -335,15 +323,15 @@ describe('permanentlyUnlocks (#923)', () => {
     rails.refresh();
 
     for (const btn of buttons) {
-      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(false);
+      expect(btn.classList.contains(ALLOWED_CLASS), `data-speed="${btn.dataset['speed']}" should be allowed`).toBe(true);
     }
   });
 
-  it('the unlock persists across subsequent beginStep calls for later steps, even when those steps carry no permanentlyUnlocks of their own', () => {
+  it('the allowance persists across subsequent beginStep() calls to unrelated steps', () => {
     const buttons = speedButtons();
 
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'speed-up-for-dig', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
+    rails.beginStep({ id: 'hire-surveyor' }, state());
     rails.refresh();
 
     rails.beginStep({ id: 'drill-plan' }, state());
@@ -354,11 +342,11 @@ describe('permanentlyUnlocks (#923)', () => {
     }
   });
 
-  it('clear() resets the permanent unlock — a fresh tutorial run does not start pre-unlocked', () => {
+  it('survives clear() followed by a fresh beginStep()', () => {
     const buttons = speedButtons();
 
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'speed-up-for-dig', permanentlyUnlocks: [SPEED_BUTTON_GROUP] }, state());
+    rails.beginStep({ id: 'hire-surveyor' }, state());
     rails.refresh();
     rails.clear();
 
@@ -366,7 +354,37 @@ describe('permanentlyUnlocks (#923)', () => {
     rails.refresh();
 
     for (const btn of buttons) {
-      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(false);
+      expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+    }
+  });
+
+  it('a non-speed control is still gated normally by the active stage — the one-live-control rule is unchanged', () => {
+    speedButtons();
+    const open = toolbarCrew();
+    const stray = withBox(document.createElement('button'));
+    document.body.appendChild(stray);
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    // Stage 0 targets the toolbar opener — a control that belongs to no
+    // stage at all (and is not the speed bar) stays gated, exactly as before
+    // #1015.
+    expect(open.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(stray.classList.contains(ALLOWED_CLASS)).toBe(false);
+  });
+
+  it('a speed button never gets HIGHLIGHT_CLASS applied — it is allowed but never the thing being pointed at', () => {
+    const buttons = speedButtons();
+    toolbarCrew();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    for (const btn of buttons) {
+      expect(btn.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     }
   });
 });

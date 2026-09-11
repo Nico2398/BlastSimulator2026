@@ -567,17 +567,20 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     20: 'tick 25',
     21: 'vehicle buy rock_digger',
     22: 'build_ramp start:16,19 end:16,31 depth:8',
-    // #923 inserts three new steps here (time speed:8, wait_until
+    // #923 had inserted three new steps here (time speed:8, wait_until
     // orderedRampSegmentCount, time speed:1 — indices 23-25, each already
-    // declaring its own timeout >= 90) between box-cut and drill_plan,
-    // shifting every index below down further (net +2 from the #921
-    // numbering: -1 for the removed 'time speed 2' step, +3 for these three).
+    // declaring its own timeout >= 90) between box-cut and drill_plan. #1015
+    // removes all three again — the speed bar is unconditionally
+    // player-controlled from the tutorial's first step onward, so box-cut
+    // advances straight to drill-plan — shifting every index below back up
+    // by 3 from the #923 numbering (net -1 from the #921 numbering: just the
+    // removed 'time speed 2' step from the earlier #923 shift).
     // #949 retunes the tutorial's own scripted plan (spacing:3/depth:6/(20,20)
     // -> spacing:4/depth:8/(22,20); amount:5/stemming:2 -> amount:4/stemming:2.5)
     // so the shot rates good-or-better instead of catastrophic.
-    26: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
-    36: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    40: 'sequence auto delay_step:25',
+    23: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
+    33: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
+    37: 'sequence auto delay_step:25',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

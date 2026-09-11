@@ -12,6 +12,10 @@
 // new named keys (tutorial.step_speedupdig/tutorial.step_speednormalafterdig, plus
 // their own .title and stage keys), the same box-cut-style naming already
 // used for tutorial.step_boxcut below.
+// #1015: those two keys (and their .title/stage keys) are removed again — the
+// speed-up-for-dig/speed-normal-after-dig steps are gone, since the speed bar
+// is unconditionally player-controlled from the tutorial's first step onward
+// and needs no dedicated lesson.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
@@ -39,10 +43,6 @@ function generateAllTutorialKeys(): string[] {
     keys.push(`tutorial.step${i}.title`);
   }
   keys.push('tutorial.step_boxcut', 'tutorial.step_boxcut.title', 'tutorial.stage.boxcut_area');
-  keys.push(
-    'tutorial.step_speedupdig', 'tutorial.step_speedupdig.title', 'tutorial.stage.speed_up_dig',
-    'tutorial.step_speednormalafterdig', 'tutorial.step_speednormalafterdig.title', 'tutorial.stage.speed_normal_after_dig',
-  );
   keys.push(
     'tutorial.done',
     'tutorial.complete_title',
@@ -120,27 +120,5 @@ describe('tutorial keys — en and fr translations differ', () => {
     expect(en, 'tutorial.complete_text must resolve in en').not.toBe('tutorial.complete_text');
     expect(fr, 'tutorial.complete_text must resolve in fr').not.toBe('tutorial.complete_text');
     expect(en, 'en and fr translations for tutorial.complete_text must differ').not.toBe(fr);
-  });
-
-  // #923: tutorial.step1.title no longer exists — replaced by the
-  // speed-up-for-dig/speed-normal-after-dig pair's own title keys.
-  it('tutorial.step_speedupdig.title is translated differently in en vs fr', () => {
-    setLocale('en');
-    const en = t('tutorial.step_speedupdig.title');
-    setLocale('fr');
-    const fr = t('tutorial.step_speedupdig.title');
-    expect(en, 'tutorial.step_speedupdig.title must resolve in en').not.toBe('tutorial.step_speedupdig.title');
-    expect(fr, 'tutorial.step_speedupdig.title must resolve in fr').not.toBe('tutorial.step_speedupdig.title');
-    expect(en, 'en and fr translations for tutorial.step_speedupdig.title must differ').not.toBe(fr);
-  });
-
-  it('tutorial.step_speednormalafterdig.title is translated differently in en vs fr', () => {
-    setLocale('en');
-    const en = t('tutorial.step_speednormalafterdig.title');
-    setLocale('fr');
-    const fr = t('tutorial.step_speednormalafterdig.title');
-    expect(en, 'tutorial.step_speednormalafterdig.title must resolve in en').not.toBe('tutorial.step_speednormalafterdig.title');
-    expect(fr, 'tutorial.step_speednormalafterdig.title must resolve in fr').not.toBe('tutorial.step_speednormalafterdig.title');
-    expect(en, 'en and fr translations for tutorial.step_speednormalafterdig.title must differ').not.toBe(fr);
   });
 });
