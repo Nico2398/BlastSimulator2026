@@ -21,20 +21,20 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:700000",
+      "command": "campaign start level:tutorial_pit cash:420176",
       "timeout": 90,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:700000"
+          "command": "campaign start level:tutorial_pit cash:420176"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 700000
+          "cash": 420176
         },
-        "note": "#959: bumped $420,176 -> $700,000, matching tutorial-interactive.json's own override. This file was already running the tutorial into BANKRUPTCY before #959 -- CI's own interaction-mode run of the pre-bump file reaches the haul-debris beat at $-36,970 -- and nothing caught it, because the tutorial rail had no way to notice: 'victory' completed on `state.levelEnded` alone and every earlier card simply waited forever on a condition a seized mine can never satisfy. #959's defeat short-circuit (TutorialOverlay.ts) makes it visible: the run now jumps to the closing card reading 'The Bank Foreclosed', which is the correct behaviour and a failing scenario. The bump covers the deficit the run already had (~$37,000), the ~200 further ticks the new sell-ore beat spends waiting for a dirtite ore_sale offer (~$60,000 at this file's own ~$300/tick drain), and margin. #553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 9-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure. #554-followup (issue #586 CI): bumped once more to $224,000 -- switching the charge-drain wait from chunked tick-N rounds to a single giant tick 225 (see that step's own note, fixing a real interaction-mode deadlock) burns marginally different real fuel/payroll than the chunked version did over the identical 225-tick span, and the freight_warehouse purchase further down came up ~$2,534 short at the old figure. #555 (this merge): bumped again to $300,176 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered, applied on top of the #554-followup $224,000 baseline; re-verify against an actual run. #556: bumped again, 300176 -> 420176. Every building in this file is queued construction now — the living quarters, the driving centre and the freight warehouse each take real crew time — and the run is ~500 ticks longer end to end as a result. At the old figure the balance went bankrupt while the warehouse was going up, ending the level before the haul and delivery steps this file exists to drive."
+        "note": "#959: bumped $420,176 -> $700,000, matching tutorial-interactive.json's own override. #923 had needed that headroom for the speed-up-for-dig/speed-normal-after-dig pair's own extra real-tick drain; #1015 removes those two steps entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward -- so this reverts to the file's own pre-#923 figure, $420,176. This file was already running the tutorial into BANKRUPTCY before #959 -- CI's own interaction-mode run of the pre-bump file reaches the haul-debris beat at $-36,970 -- and nothing caught it, because the tutorial rail had no way to notice: 'victory' completed on `state.levelEnded` alone and every earlier card simply waited forever on a condition a seized mine can never satisfy. #959's defeat short-circuit (TutorialOverlay.ts) makes it visible: the run now jumps to the closing card reading 'The Bank Foreclosed', which is the correct behaviour and a failing scenario. #553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 9-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure. #554-followup (issue #586 CI): bumped once more to $224,000 -- switching the charge-drain wait from chunked tick-N rounds to a single giant tick 225 (see that step's own note, fixing a real interaction-mode deadlock) burns marginally different real fuel/payroll than the chunked version did over the identical 225-tick span, and the freight_warehouse purchase further down came up ~$2,534 short at the old figure. #555 (this merge): bumped again to $300,176 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered, applied on top of the #554-followup $224,000 baseline; re-verify against an actual run. #556: bumped again, 300176 -> 420176. Every building in this file is queued construction now — the living quarters, the driving centre and the freight warehouse each take real crew time — and the run is ~500 ticks longer end to end as a result. At the old figure the balance went bankrupt while the warehouse was going up, ending the level before the haul and delivery steps this file exists to drive."
       }
     },
     {
@@ -597,90 +597,17 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "speed-up-for-dig"
-        }
-      ],
-      "role": "player",
-      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923: box-cut's own isComplete fires on the FIRST ramp segment landing, not the whole 12m corridor -- the card advances to 'speed-up-for-dig' next, while the rest of the dig is still genuinely in flight.",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "tutorialStep": "speed-up-for-dig",
-        "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
-      }
-    },
-    {
-      "command": "time speed:8",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "speed-normal-after-dig"
-        }
-      ],
-      "role": "player",
-      "description": "speed-up-for-dig complete (#923): real click on the ×8 speed button while the box-cut ramp is still genuinely mid-dig -- the wait step above only drove the clock to the FIRST segment landing, so most of the 12m corridor is still queued work here. Teaches the fast-forward lesson exactly where it pays off: the longest wait the tutorial has asked for yet.",
-      "expect": {
-        "equals": {
-          "timeScale": 8
-        },
-        "tutorialStep": "speed-normal-after-dig"
-      }
-    },
-    {
-      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedRampSegmentCount",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 180000
-        }
-      ],
-      "role": "setup",
-      "description": "#923: drains the rest of the box-cut ramp at ×8 -- the tutorial card stays on 'speed-normal-after-dig' throughout (its own isComplete needs the ramp fully dug AND the speed back at ×1, neither of which is true until the next step).",
-      "expect": {
-        "equals": {
-          "orderedRampSegmentCount": 0
-        },
-        "tutorialStep": "speed-normal-after-dig"
-      }
-    },
-    {
-      "command": "time speed:1",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
           "stepId": "drill-plan"
         }
       ],
       "role": "player",
-      "description": "speed-normal-after-dig complete (#923): real click on the ×1 speed button now that the box-cut dig has genuinely finished (orderedRampSegmentCount reached 0 in the wait step above) -- the card advances to 'drill-plan'. Every speed button stays clickable from here on, but no later step in this file completes on, or requires, a specific timeScale.",
+      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward -- so box-cut now advances straight to 'drill-plan', same as before #923.",
       "expect": {
-        "equals": {
-          "timeScale": 1
-        },
-        "tutorialStep": "drill-plan"
+        "decreased": [
+          "cash"
+        ],
+        "tutorialStep": "drill-plan",
+        "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
       }
     },
     {

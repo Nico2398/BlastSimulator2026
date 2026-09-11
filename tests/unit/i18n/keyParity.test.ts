@@ -314,8 +314,13 @@ describe('en.json / fr.json — key-set parity', () => {
     // for the tutorial waiting-state card — tutorial.waiting_chip,
     // tutorial.waiting_tooltip, and tutorial.waiting.{building,drilling,
     // charging,surveying,excavating,hauling,delivering} — both locales.
+    // Baseline is now 3488 (down from 3494): #1015's skeleton phase removes
+    // the 6 keys the speed-up-for-dig/speed-normal-after-dig steps used —
+    // tutorial.step_speedupdig(.title), tutorial.step_speednormalafterdig(.title),
+    // tutorial.stage.speed_up_dig, tutorial.stage.speed_normal_after_dig —
+    // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3494);
+    expect(Object.keys(en).length).toBe(3488);
   });
 });
 

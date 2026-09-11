@@ -124,32 +124,21 @@ describe('tutorial stage table', () => {
     }
   });
 
-  it('the speed-up-for-dig stage points at a speed the game is not already running at (#923)', () => {
-    // `button[data-speed]` matched 1×, the speed the game starts on — pressing
-    // exactly what was highlighted changed nothing and the step never completed.
-    const target = TUTORIAL_STAGES['speed-up-for-dig']![0]!.target;
-    expect(target, 'speed-up-for-dig highlights whichever speed button comes first').toMatch(/data-speed="\d+"/);
-    const speed = Number(/data-speed="(\d+)"/.exec(target)![1]);
-    expect(speed, `speed-up-for-dig points at ${speed}×`).toBeGreaterThan(1);
-  });
-
-  // ── #923: speed-control lesson relocated into the box-cut ramp-dig wait ──
-  describe('speed-control stage targets (#923)', () => {
-    it('speed-up-for-dig targets the ×8 speed button', () => {
-      const target = TUTORIAL_STAGES['speed-up-for-dig']![0]!.target;
-      expect(target).toBe('#bs-hud-top .bs-speed-btn button[data-speed="8"]');
-    });
-
-    it('speed-normal-after-dig targets the ×1 speed button', () => {
-      const target = TUTORIAL_STAGES['speed-normal-after-dig']![0]!.target;
-      expect(target).toBe('#bs-hud-top .bs-speed-btn button[data-speed="1"]');
-    });
-
+  // ── #1015: no step teaches the speed bar any more — it is unconditionally
+  // player-controlled from the tutorial's first step onward (BASE_PERMANENTLY_ALLOWED,
+  // tutorialRails.ts), so neither 'speed-up-for-dig' nor 'speed-normal-after-dig'
+  // has a TUTORIAL_STAGES entry (or exists as a step at all) any more.
+  describe('speed-control stages are gone (#1015)', () => {
     it('no "time-speed" entry exists in TUTORIAL_STAGES any more', () => {
       expect(TUTORIAL_STAGES['time-speed']).toBeUndefined();
     });
 
-    it('tick-advance no longer targets a single specific data-speed button — it targets the group container', () => {
+    it('no "speed-up-for-dig" or "speed-normal-after-dig" entry exists in TUTORIAL_STAGES', () => {
+      expect(TUTORIAL_STAGES['speed-up-for-dig']).toBeUndefined();
+      expect(TUTORIAL_STAGES['speed-normal-after-dig']).toBeUndefined();
+    });
+
+    it('tick-advance targets the speed-button group container, not a single specific data-speed button', () => {
       const target = TUTORIAL_STAGES['tick-advance']![0]!.target;
       expect(target).not.toMatch(/data-speed="\d+"/);
       expect(target).toBe('#bs-hud-top .bs-speed-btn');

@@ -16,19 +16,19 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:700000",
+      "command": "campaign start level:tutorial_pit cash:400000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered. #557: bumped again to $340,000 -- evacuateZone (Evacuation.ts) now genuinely routes the crew out to a reachable safe cell and back, instead of the previous no-op teleport, so the drill/charge/blast sequence spends real additional ticks (and payroll) on the walk; by build-storage this file's own `build freight_warehouse at:6,6` step was landing $9,182 short of the $15,000 cost (direct-traced, command mode) at the old $320,000 headroom. #923: bumped again to $700,000 -- the speed-up-for-dig/speed-normal-after-dig pair waits for the box-cut ramp's remaining 11 segments to finish digging (previously left running in the background, concurrent with drilling; now genuinely serialized in front of it, since speed-normal-after-dig's own isComplete needs the ramp gone from state.plannedRamps), adding ~560 real ticks of payroll/fuel/maintenance drain before drilling ever starts. Direct-traced (command mode) at the prior $340,000 headroom: `vehicle buy debris_hauler` failed outright (insufficient funds, $12,025 on hand against $25,000), cascading into a failed warehouse purchase and an empty haul with nothing to deliver. $700,000 clears the whole run end-to-end with ~$286,000 to spare.",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered. #557: bumped again to $340,000 -- evacuateZone (Evacuation.ts) now genuinely routes the crew out to a reachable safe cell and back, instead of the previous no-op teleport, so the drill/charge/blast sequence spends real additional ticks (and payroll) on the walk; by build-storage this file's own `build freight_warehouse at:6,6` step was landing $9,182 short of the $15,000 cost (direct-traced, command mode) at the old $320,000 headroom. #923 had bumped this again to $700,000 for the speed-up-for-dig/speed-normal-after-dig pair, which serialized ~560 extra real ticks of payroll/fuel/maintenance drain in front of drilling. #1015 reverted to $340,000 when those two steps were removed entirely -- but the file's other tick retargets since #923 (the tick-30->40 and tick-44->22 accept/haul retimings a few steps below, needed because removing the speed steps also moves every later tick landing earlier) shift *when* the tick-200 pretick step (before the ore_sale contract) lands relative to the rubble_disposal payout, and $340,000 no longer clears it: direct-traced (command mode) the balance goes as low as -$6,550.33 at tick 687, mid-way through that tick-200 step, before the dirtite ore_sale delivery two steps later brings it back to $14,002 -- a strictly linear payroll/fuel/maintenance drain over that whole 200-tick span (traced in 20-tick increments), not a spike. Interaction mode's own trajectory diverges further from command mode here than most of this file's earlier steps (role:'player' polling ticks accumulate) -- direct-traced (interaction mode, real browser, this fix) at a first attempted $360,000 bump the same tick-200 step still went to -$12,967.11 at tick 786, roughly double command mode's own deficit, and a clickSelector on the Operations toolbar button two steps later intermittently failed with 'element is covered by div' while cash was still negative (not reproduced on every run at that figure, consistent with a transient overlay tied to genuinely negative cash rather than a deterministic layout bug -- no code under src/renderer or src/ui was touched by this diff, and the interaction script driving that click is byte-identical to main's). #1015 follow-up: bumped to $400,000 -- clears the deeper interaction-mode trough (direct-traced at this figure: lowest observed cash is positive throughout, see the step's own note further down) with real margin either side, and removes whatever cash-negative-triggered overlay was intermittently covering the toolbar, rather than chasing the overlay itself.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:700000"
+          "command": "campaign start level:tutorial_pit cash:400000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 700000
+          "cash": 400000
         }
       }
     },
@@ -537,7 +537,7 @@
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923: box-cut's own isComplete fires the instant the FIRST ramp segment lands (navGrid ramp-cell count ticks up), well before the whole 12m corridor is carved -- the card advances to 'speed-up-for-dig' next, not straight to 'drill-plan', so the speed-control lesson lands while the rest of the dig is still genuinely in flight.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923.",
       "role": "player",
       "interaction": [
         {
@@ -573,89 +573,13 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "speed-up-for-dig",
-          "timeout": 30000
-        }
-      ],
-      "expect": {
-        "tutorialStep": "speed-up-for-dig",
-        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into (mirrors tutorial.json's box-cut beat). The ramp is a 12m/8-deep corridor -- one segment landing is nowhere near the whole job, so orderedRampSegmentCount is still well above 0 here (proven by the wait step below, which drains the rest of it)."
-      }
-    },
-    {
-      "command": "time speed:8",
-      "timeout": 30,
-      "description": "speed-up-for-dig complete (#923): real click on the ×8 speed button while the ramp is still genuinely mid-dig -- box-cut's own completion above fires on the FIRST segment landing, so most of the 12m corridor is still queued work at this point. Teaches the fast-forward lesson exactly where it pays off: the longest wait the tutorial has asked for yet.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "speed-normal-after-dig"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "speed-normal-after-dig",
-        "equals": {
-          "timeScale": 8
-        },
-        "note": "Clicked while orderedRampSegmentCount is still above 0 (box-cut only waited for the first of many segments) -- the lesson is taught mid-dig, not before the dig starts and not after it finishes."
-      }
-    },
-    {
-      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
-      "timeout": 320,
-      "description": "#923: drains the rest of the box-cut ramp at ×8 -- the tutorial card stays on 'speed-normal-after-dig' the whole time (its own isComplete needs the ramp fully dug AND the speed back at ×1, neither of which is true yet). max_ticks 800 (up from an initial 400): a lone driving.excavator-licensed employee digging all 12 segments of this 12m/8-deep corridor solo, with rest breaks under the continuous policy applied earlier, direct-traced (command mode) landing at tick 658 -- 400 stalled 3 segments short; 800 keeps a real margin over the observed landing rather than a bare tie.",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedRampSegmentCount",
-          "equals": 0,
-          "maxTicks": 800,
-          "timeoutMs": 320000
-        }
-      ],
-      "expect": {
-        "tutorialStep": "speed-normal-after-dig",
-        "equals": {
-          "orderedRampSegmentCount": 0
-        },
-        "note": "Ramp fully carved but still at ×8 -- speed-normal-after-dig must not complete on the ramp finishing alone."
-      }
-    },
-    {
-      "command": "time speed:1",
-      "timeout": 30,
-      "description": "speed-normal-after-dig complete (#923): real click on the ×1 speed button after the box-cut dig has genuinely finished (orderedRampSegmentCount reached 0 in the wait step above) -- the card advances to 'drill-plan'. From here on every speed button stays clickable but no later step ever completes on, or requires, a specific timeScale.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
           "stepId": "drill-plan",
           "timeout": 30000
         }
       ],
       "expect": {
         "tutorialStep": "drill-plan",
-        "equals": {
-          "timeScale": 1
-        }
+        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into (mirrors tutorial.json's box-cut beat)."
       }
     },
     {
@@ -1066,13 +990,13 @@
       }
     },
     {
-      "command": "tick 30",
-      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window. REPLACED for #556: an absolute tickCount target cannot hold here — command mode and interaction mode enter this step hundreds of ticks apart (interaction mode runs polling ticks command mode never does), and `equals` only matches going forward, so any single number is either already behind one mode or out of reach of the other. What the step actually needs is in the note above: a rubble_disposal offer is continuously present through this range, not confined to one narrow window, so a short relative block that turns the pool once (REFRESH_INTERVAL 20 ticks, Contract.ts) buys it in either mode.",
+      "command": "tick 40",
+      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window. REPLACED for #556: an absolute tickCount target cannot hold here — command mode and interaction mode enter this step hundreds of ticks apart (interaction mode runs polling ticks command mode never does), and `equals` only matches going forward, so any single number is either already behind one mode or out of reach of the other. What the step actually needs is in the note above: a rubble_disposal offer is continuously present through this range, not confined to one narrow window, so a short relative block that turns the pool once (REFRESH_INTERVAL 20 ticks, Contract.ts) buys it in either mode. #1015: 30 -> 40 -- removing the two speed-control steps (and their ~658-tick box-cut-drain wait) upstream shifts every later tick landing earlier by a similar amount, changing which rubble_disposal pool instance the later contract-accept step lands on; direct-traced (command mode) against the retimed run, `tick 30` here now lands contract-accept on an instance whose deadline the haul can't beat regardless of how the delivery-side wait is tuned (deadlineTicks 31, hauler load lands 37 ticks after accept). `tick 40` lands on a different instance (deadlineTicks 58, hauler loaded 9 ticks after accept) with real margin either side -- see the haul-debris step's own #1015 note below for the matching delivery-side retune.",
       "timeout": 90,
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 40"
         }
       ],
       "role": "setup",
@@ -1232,9 +1156,9 @@
       }
     },
     {
-      "command": "tick 44",
+      "command": "tick 22",
       "timeout": 90,
-      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin). #959: the card this step waits for is 'sell-ore', renamed from 'contract-deliver' — the tutorial's own missing beat is now selling the blasted ore for money, not just delivering whatever contract happened to be accepted.",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin). #959: the card this step waits for is 'sell-ore', renamed from 'contract-deliver' — the tutorial's own missing beat is now selling the blasted ore for money, not just delivering whatever contract happened to be accepted. #1015 follow-up: 44 -> 22 -- removing the two speed-control steps upstream (and the earlier #816-retarget pretick's own 30 -> 40 bump, see that step's own #1015 note) moves this step's own entry tick and lands contract-accept on a materially different rubble_disposal pool instance: deadlineTicks 31 (not #974's 46), acceptedAtTick 465, hauler's storedMassKg landing 9 ticks later at tick 474 (direct-traced, command mode, this retune). `tick 44` alone (landing tick 509) is 13 ticks past the instance's own deadlineAbs of 496 -- the delivery step right after finds the contract already expired. `tick 22` (landing tick 487) keeps 9 ticks of margin past the hauler's own load-in and 9 ticks of margin before the deadline, the same two-sided-margin philosophy #928/#974 used against their own instances.",
       "role": "player",
       "interaction": [
         {

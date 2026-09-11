@@ -238,7 +238,6 @@
     "src/ui/tutorialRails.ts:RailsView",
     "src/ui/tutorialStateProbe.ts:TutorialStateSnapshot",
     "src/ui/tutorialStepHelpers.ts:HireStepSnapshot",
-    "src/ui/tutorialStepHelpers.ts:SURVEY_OVERLAY_TOGGLE_TARGET",
     "src/ui/tutorialStepHelpers.ts:countVehiclesWithDriver",
     "src/ui/tutorialStepHelpers.ts:getBuildings",
     "src/ui/tutorialStepHelpers.ts:getVehicles",

@@ -11,7 +11,7 @@
 // it makes the next stage reachable at once. Closing the panel falls back.
 
 import {
-  TOOLBAR_TARGET, SPEED_UP_TO_MAX_BUTTON, SPEED_BACK_TO_NORMAL_BUTTON,
+  TOOLBAR_TARGET,
   hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
@@ -502,17 +502,6 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       spentWhen: (state) => state.plannedRamps.length > 0,
       waitingKey: 'tutorial.waiting.excavating',
     }),
-  ],
-
-  // #923: taught inside the box-cut wait — ×8 while the ramp-dig is still in
-  // progress, ×1 once it's done. One stage each: a single button press, no
-  // panel to open first.
-  'speed-up-for-dig': [
-    { target: SPEED_UP_TO_MAX_BUTTON, hintKey: 'tutorial.stage.speed_up_dig' },
-  ],
-
-  'speed-normal-after-dig': [
-    { target: SPEED_BACK_TO_NORMAL_BUTTON, hintKey: 'tutorial.stage.speed_normal_after_dig' },
   ],
 
   'set-policy': [

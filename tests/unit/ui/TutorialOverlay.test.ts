@@ -181,13 +181,17 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 33" at step 0 and has progress bar fill', () => {
+    it('shows step counter "1 / 32" at step 0 and has progress bar fill', () => {
       // 33, not 24: #553 inserts build-driving-center/train-driller/
       // buy-drill-rig-assign right after hire-driller, #555 inserts
       // train-digger/buy-rock-digger-assign right after that trio, #681
       // inserts build-living-quarters/set-early-policy right after
       // hire-driller too, #557 inserts evacuate-zone right before blast, and
       // #905 inserts toggle-survey-overlay right after survey.
+      // #923 had added speed-up-for-dig/speed-normal-after-dig (net +1, 33 ->
+      // 34); #1015 removes both again — the speed bar is unconditionally
+      // player-controlled from the tutorial's first step onward, so no step
+      // teaches it any more (net -2, 34 -> 32).
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -195,8 +199,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      // #923 removes 'time-speed' and adds speed-up-for-dig/speed-normal-after-dig -- net +1 (33 -> 34).
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*34/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*32/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -460,13 +463,15 @@ describe('TutorialOverlay (12.4)', () => {
     });
 
     it('highlightTarget with undefined selector does not throw', () => {
-      // congratulations (last step, index 30 after #553's tutorial fix added
-      // three drill-rig-licensing steps, #555 added two more
-      // rock-digger-licensing steps, and #681 added
-      // build-living-quarters/set-early-policy) has no highlightTarget
+      // congratulations (last step) has no highlightTarget. #1015 drops the
+      // array from 34 to 32 entries (speed-up-for-dig/speed-normal-after-dig
+      // removed), so the last index is 31 — computed here rather than
+      // hand-counted again next time a step is inserted or removed.
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      tut.stepIndex = 30;
+      const congratsIdx = TUTORIAL_STEPS.findIndex((s) => s.id === 'congratulations');
+      expect(congratsIdx).toBe(TUTORIAL_STEPS.length - 1);
+      tut.stepIndex = congratsIdx;
       expect(() => tut.render()).not.toThrow();
     });
 
@@ -512,17 +517,19 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 19/20 after #553's tutorial fix added three drill-rig-licensing
-      // steps, #555 added two more rock-digger-licensing steps, #681 added
+      // (index 17/18 in the current 32-length array: #553's tutorial fix
+      // added three drill-rig-licensing steps, #555 added two more
+      // rock-digger-licensing steps, #681 added
       // build-living-quarters/set-early-policy earlier in the sequence, #557
       // inserted evacuate-zone right before blast, #905 inserted
-      // toggle-survey-overlay right after survey, and #923 removes 'time-speed'
-      // and adds speed-up-for-dig/speed-normal-after-dig inside the box-cut
-      // wait (net +1, shifting this pair up one more from 18/19 to 19/20).
-      tut.stepIndex = 19;
+      // toggle-survey-overlay right after survey, #923 had inserted
+      // speed-up-for-dig/speed-normal-after-dig inside the box-cut wait, and
+      // #1015 removed that pair again — the speed bar needs no step of its
+      // own any more).
+      tut.stepIndex = 17;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(20);
+      expect(tut.stepIndex).toBe(18);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -535,7 +542,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createGame() defaults events.pendingEvent to null
-      tut.stepIndex = 19;
+      tut.stepIndex = 17;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -548,9 +555,12 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       // Do NOT call setGameConsole — gameConsole stays null
 
-      tut.stepIndex = 15;
+      // Index 13 is 'charge' in the current 32-length array (#1015 removed
+      // speed-up-for-dig/speed-normal-after-dig, shifting everything from
+      // drill-plan onward down by 2).
+      tut.stepIndex = 13;
       expect(() => tut.advanceToNextStep()).not.toThrow();
-      expect(tut.stepIndex).toBe(16);
+      expect(tut.stepIndex).toBe(14);
     });
   });
 
@@ -580,15 +590,11 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 33 after
-      // #553's tutorial fix added three drill-rig-licensing steps, #555
-      // added two more rock-digger-licensing steps, #681 added
-      // build-living-quarters/set-early-policy, #557 inserted evacuate-zone
-      // right before blast, #905 inserted toggle-survey-overlay right
-      // after survey, and #923 removes 'time-speed' and adds
-      // speed-up-for-dig/speed-normal-after-dig inside the box-cut wait
-      // (net +1, shifting this index up one more from 32 to 33)) and render
-      tut.stepIndex = 33;
+      // Directly set to congratulations step (last step). Was index 33 in
+      // the 34-length array #923 produced; #1015 removes
+      // speed-up-for-dig/speed-normal-after-dig, dropping the array to 32
+      // entries and the last index to 31.
+      tut.stepIndex = 31;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
