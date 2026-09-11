@@ -259,8 +259,8 @@
     },
     {
       "command": "state",
-      "timeout": 30,
-      "description": "#1014: once the living-quarters order lands, the buy button's own click is spent -- the tutorial card must stop re-instructing a control the player has already used and show the waiting state instead: the stage line swaps to the construction-underway sentence, the WAITING chip becomes visible, and the rails release the buy button's highlight while it stays genuinely clickable (still bs-tutorial-allowed, not abandoned). Observes only -- the building has not landed yet at this point (orderedBuildingCount still holds the pending order); the wait_until step right below still owns driving buildingCount to completion.",
+      "timeout": 60,
+      "description": "#1014: once the living-quarters order lands, the buy button's own click is spent -- the tutorial card must stop re-instructing a control the player has already used and show the waiting state instead: the stage line swaps to the construction-underway sentence, the WAITING chip becomes visible, and the rails release the buy button's highlight while it stays genuinely clickable (still bs-tutorial-allowed, not abandoned). Observes only -- the building has not landed yet at this point (orderedBuildingCount still holds the pending order); the wait_until step right below still owns driving buildingCount to completion. Issue #1014: this step's own timeout (60s) wraps its whole chained interaction array (3x waits at 15000ms each, worst case 45s) -- raised past that worst case rather than split, matching level2-playthrough-win.json step-96/98.",
       "role": "observe",
       "interaction": [
         {

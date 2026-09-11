@@ -276,9 +276,9 @@
     },
     {
       "command": "state",
-      "timeout": 30,
+      "timeout": 60,
       "role": "observe",
-      "description": "#1014: once the living-quarters order lands, the card must show the waiting state -- the stage line swaps to the construction-underway sentence, the WAITING chip becomes visible, and the buy button's highlight is released while it stays clickable (still bs-tutorial-allowed). Screenshot captures the waiting card for the visual channel. Observes only -- the wait_until step right below still owns driving buildingCount to completion.",
+      "description": "#1014: once the living-quarters order lands, the card must show the waiting state -- the stage line swaps to the construction-underway sentence, the WAITING chip becomes visible, and the buy button's highlight is released while it stays clickable (still bs-tutorial-allowed). Screenshot captures the waiting card for the visual channel. Observes only -- the wait_until step right below still owns driving buildingCount to completion. Issue #1014: this step's own timeout (60s) wraps its whole chained interaction array (3x waitForSelector/waitForProperty at 15000ms each, worst case 45s, plus the screenshot) -- the step-level timeout does not budget each action individually (same shape as level2-playthrough-win.json step-96/98), so it is raised well past the 45s worst case rather than split.",
       "interaction": [
         {
           "type": "waitForProperty",
