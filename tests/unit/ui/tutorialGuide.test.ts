@@ -523,6 +523,7 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
       },
     ];
     s.logistics.storedMassKg = 250;
+    s.collectedOre = { dirtite: 250 };
     expect(resolveWaitStatus(TUTORIAL_STAGES['sell-ore']!, s).waiting).toBe(false);
   });
 
