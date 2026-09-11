@@ -826,7 +826,7 @@ describe('clickSelector — zero-size grace extension (issue #1032)', () => {
     let i = 0;
     return vi.fn(async (fn: unknown) => {
       if (String(fn).includes('__probeSelector')) {
-        const step = script[Math.min(i, script.length - 1)];
+        const step = script[Math.min(i, script.length - 1)]!; // index is always clamped within bounds by Math.min
         i += 1;
         return step();
       }
