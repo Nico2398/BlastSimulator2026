@@ -27,12 +27,35 @@ const PICKER_TIMEOUT_MS = 5000;
  */
 export const CLOCK_HELD_FAIL_AFTER_POLLS = 2;
 
+/** How long `clickSelector` polls its target before giving up, absent an
+ * explicit `action.timeout`. */
+export const CLICK_SELECTOR_DEFAULT_TIMEOUT_MS = 5000;
+
+/**
+ * Extra grace granted once, only when a clickSelector target is polling as
+ * probe reason 'zero-size' at the moment CLICK_SELECTOR_DEFAULT_TIMEOUT_MS
+ * expires — i.e. attached and otherwise unblocked, but not yet laid out.
+ * Covers a heavy renderer/animation holding layout past the default budget
+ * on a slow CI runner. Any other blocked reason still fails at the
+ * unchanged default budget.
+ */
+export const CLICK_SELECTOR_ZERO_SIZE_GRACE_MS = 10000;
+
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
   left: 'left',
   right: 'right',
   middle: 'middle',
 };
+
+/**
+ * Context passed into the zero-size diagnosis message. Present only when the
+ * poll timed out on the zero-size reason specifically.
+ */
+export interface ZeroSizeDiagnosisContext {
+  waitedMs: number;
+  graceGranted: boolean;
+}
 
 /** Why a selector that exists in the DOM still refused a click. */
 interface UnclickableReport {
@@ -449,7 +472,7 @@ export async function executeActionOnPage(
     }
     case 'clickSelector': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      const timeoutMs = action.timeout ?? 5000;
+      const timeoutMs = action.timeout ?? CLICK_SELECTOR_DEFAULT_TIMEOUT_MS;
       // Wait until the page's own probe calls the control usable — an absent
       // selector reports 'absent' (uiActionProbe.ts) rather than null, so this
       // loop alone covers "never appears" the same deadline as "appears but
