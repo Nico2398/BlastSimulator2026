@@ -11,19 +11,20 @@ import {
   applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
+import { SPEED_BUTTON_GROUP } from './tutorialStepHelpers.js';
+
+/**
+ * Selectors permanently allowed from the tutorial's very first step onward,
+ * independent of any step's own declarations — the speed bar is the
+ * player's from the moment the tutorial starts (#1015).
+ */
+const BASE_PERMANENTLY_ALLOWED: readonly string[] = [SPEED_BUTTON_GROUP];
 
 export interface RailsStep {
   id: string;
   highlightTarget?: string;
   tickBudget?: number;
   waitsOnWork?: boolean;
-  /**
-   * Selectors this step leaves permanently clickable from here on, even once
-   * the rail has moved past it — e.g. the speed controls, left fully
-   * player-controlled for the rest of the tutorial after the speed-lesson
-   * pair (#923).
-   */
-  permanentlyUnlocks?: string[];
 }
 
 /** What the card should show about the current stage and the clock. */
@@ -51,12 +52,6 @@ export class TutorialRails {
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
   private lastProgressTrainingActive = false;
-  /**
-   * Selectors accumulated from every step's `permanentlyUnlocks` seen so far
-   * this tutorial run (#923). Never cleared by `beginStep`'s per-step reset —
-   * once a step unlocks a control, it stays unlocked for the rest of the run.
-   */
-  private permanentlyAllowed = new Set<string>();
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
@@ -68,9 +63,6 @@ export class TutorialRails {
     this.lastProgressSignature = null;
     this.lastProgressTick = this.stepStartTick;
     this.lastProgressTrainingActive = false;
-    for (const selector of step.permanentlyUnlocks ?? []) {
-      this.permanentlyAllowed.add(selector);
-    }
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
@@ -95,7 +87,7 @@ export class TutorialRails {
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
     const waitStatus = resolveWaitStatus(this.stages, state);
-    applyRails(stage, document, Array.from(this.permanentlyAllowed), waitStatus.waiting);
+    applyRails(stage, document, BASE_PERMANENTLY_ALLOWED, waitStatus.waiting);
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
@@ -183,6 +175,5 @@ export class TutorialRails {
     this.stages = [];
     this.stageIndex = 0;
     this.held = false;
-    this.permanentlyAllowed = new Set();
   }
 }

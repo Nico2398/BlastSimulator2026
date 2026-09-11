@@ -179,10 +179,10 @@ function isStageTargetInsideModal(
 export function applyRails(
   stage: TutorialStage | undefined,
   root: ParentNode = document,
-  // Selectors a past step (#923's speed buttons, once its lesson pair is
-  // done) left permanently clickable — stay live across every later stage,
-  // stage present or not.
-  extraAllowed: string[] = [],
+  // Selectors permanently allowed regardless of the active stage — e.g. the
+  // speed bar, unconditionally player-controlled from the tutorial's first
+  // step (#1015, `BASE_PERMANENTLY_ALLOWED` in tutorialRails.ts).
+  extraAllowed: readonly string[] = [],
   // True once some stage's `spentWhen` has fired (see `resolveWaitStatus`) —
   // the DOM-side half of the waiting state: the issued order's control stays
   // allowed (so a player free-clicking around the panel doesn't get blocked
