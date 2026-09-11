@@ -267,7 +267,7 @@
           "type": "waitForProperty",
           "selector": ".bs-tutorial-box .bs-tutorial-stage",
           "property": "textContent",
-          "expectedValue": "Construction is underway.",
+          "expectedValue": "Order placed — waiting for the crew to finish building it.",
           "timeoutMs": 15000
         },
         {
