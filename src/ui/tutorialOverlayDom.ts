@@ -3,8 +3,29 @@
 // keep each file under the 300-line limit; holds no behaviour of its own.
 
 import { el } from './dom.js';
-import { iconEl } from './icons.js';
+import { iconEl, IconName } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
+
+/**
+ * Build a title-row status chip: a hidden `span.bs-tutorial-chip <modifier>`
+ * carrying a tooltip, an optional leading icon, and a text child bound to a
+ * translation key. Shared shape behind `pausedEl`/`waitingChipEl` (#1014).
+ */
+function buildTutorialChip(
+  locale: LocaleTextRegistry,
+  className: string,
+  tooltipKey: string,
+  textKey: string,
+  icon?: IconName,
+): { chip: HTMLElement; textEl: HTMLElement } {
+  const chip = el('span', { className, attrs: { style: 'display:none' } });
+  locale.bindTitle(chip, tooltipKey);
+  if (icon) chip.appendChild(iconEl(icon, 8));
+  const textEl = el('span', {});
+  locale.bindText(textEl, textKey);
+  chip.appendChild(textEl);
+  return { chip, textEl };
+}
 
 /** Every element TutorialOverlay needs a handle on after construction. */
 export interface TutorialCardElements {
@@ -89,28 +110,17 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   // rather than broken. Sits inline with the title as a small pill chip; the
   // longer explanation moves to a native tooltip so the compact chip doesn't
   // have to carry a full sentence.
-  const pausedEl = el('span', {
-    className: 'bs-tutorial-paused',
-    attrs: { style: 'display:none' },
-  });
-  locale.bindTitle(pausedEl, 'tutorial.clock_held');
-  pausedEl.appendChild(iconEl('pause', 8));
-  const pausedChipEl = el('span', {});
-  locale.bindText(pausedChipEl, 'tutorial.clock_held_chip');
-  pausedEl.appendChild(pausedChipEl);
+  const { chip: pausedEl, textEl: pausedChipEl } = buildTutorialChip(
+    locale, 'bs-tutorial-chip bs-tutorial-paused', 'tutorial.clock_held', 'tutorial.clock_held_chip', 'pause',
+  );
 
   // "Order issued, simulation working on it" chip — sibling of `pausedEl`,
   // hidden until a stage's `spentWhen` fires (#1014). Left permanently
   // hidden in the skeleton phase; the implementation phase wires its display
   // and text to `resolveWaitStatus`'s result.
-  const waitingChipEl = el('span', {
-    className: 'bs-tutorial-waiting',
-    attrs: { style: 'display:none' },
-  });
-  locale.bindTitle(waitingChipEl, 'tutorial.waiting_tooltip');
-  const waitingChipTextEl = el('span', {});
-  locale.bindText(waitingChipTextEl, 'tutorial.waiting_chip');
-  waitingChipEl.appendChild(waitingChipTextEl);
+  const { chip: waitingChipEl } = buildTutorialChip(
+    locale, 'bs-tutorial-chip bs-tutorial-waiting', 'tutorial.waiting_tooltip', 'tutorial.waiting_chip',
+  );
 
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
