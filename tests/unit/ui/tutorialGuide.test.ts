@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   isReachable,
   resolveStageIndex,
+  resolveWaitStatus,
   allowedSelectors,
   applyRails,
   clearRails,
@@ -18,9 +19,10 @@ import {
   WORK_GRACE_TICKS,
   MODAL_DISMISS_SELECTOR,
 } from '../../../src/ui/tutorialGuide.js';
-import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
-import type { ClockProgress } from '../../../src/ui/tutorialGuide.js';
+import type { ClockProgress, StageWaitStatus } from '../../../src/ui/tutorialGuide.js';
+import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
@@ -315,6 +317,283 @@ describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
   }
 });
 
+// #1014: resolveWaitStatus is the sibling check to resolveStageIndex — it
+// scans EVERY stage in a step's list for a fired `spentWhen`, independent of
+// which stage resolveStageIndex itself resolved to (a stage whose control
+// stays reachable after being clicked never disappears, so `doneTarget`
+// alone can't tell "the player just used this" from "nothing happened yet").
+describe('resolveWaitStatus', () => {
+  const spentStage: TutorialStage = {
+    target: '#confirm',
+    hintKey: 'k',
+    spentWhen: (s) => (s as unknown as { spent: boolean }).spent === true,
+    waitingKey: 'tutorial.waiting.building',
+  };
+  const plainStage: TutorialStage = { target: '#open', hintKey: 'k' };
+
+  it('reports not waiting when state is null', () => {
+    expect(resolveWaitStatus([spentStage], null)).toEqual({ waiting: false, waitingKey: null });
+  });
+
+  it('reports not waiting when no stage\'s spentWhen fires', () => {
+    const state = { spent: false } as unknown as GameState;
+    expect(resolveWaitStatus([plainStage, spentStage], state)).toEqual({ waiting: false, waitingKey: null });
+  });
+
+  it('reports waiting with the firing stage\'s own waitingKey once spentWhen fires', () => {
+    const state = { spent: true } as unknown as GameState;
+    const result: StageWaitStatus = resolveWaitStatus([plainStage, spentStage], state);
+    expect(result).toEqual({ waiting: true, waitingKey: 'tutorial.waiting.building' });
+  });
+
+  it('scans every stage in the list, not just the one resolveStageIndex would resolve to', () => {
+    // '#open' is reachable (resolveStageIndex lands on the first stage), but
+    // the LATER stage's own spentWhen is what fires — the two checks run
+    // independently of each other.
+    button('open');
+    const state = { spent: true } as unknown as GameState;
+    expect(resolveStageIndex([plainStage, spentStage])).toBe(0);
+    expect(resolveWaitStatus([plainStage, spentStage], state))
+      .toEqual({ waiting: true, waitingKey: 'tutorial.waiting.building' });
+  });
+
+  it('ignores a stage with no spentWhen entirely', () => {
+    const noSpent: TutorialStage = { target: '#a', hintKey: 'k' };
+    expect(resolveWaitStatus([noSpent], {} as GameState)).toEqual({ waiting: false, waitingKey: null });
+  });
+
+  it('returns not waiting for an empty stage list', () => {
+    expect(resolveWaitStatus([], {} as GameState)).toEqual({ waiting: false, waitingKey: null });
+  });
+});
+
+/** A minimally-shaped PendingAction — only the fields hasPendingActionOfType/decideClock read. */
+function pendingAction(type: string): GameState['pendingActions'][number] {
+  return {
+    id: 1, type, requiredSkill: null, requiredVehicleRole: null,
+    targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+    status: 'queued', holderId: null,
+  } as unknown as GameState['pendingActions'][number];
+}
+
+describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
+  function baseState(): GameState {
+    return createGame({ seed: 42, mineType: 'desert' });
+  }
+
+  it('survey: waits once a survey action is pending, clears once it is gone', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['survey']!, s).waiting).toBe(false);
+
+    s.pendingActions = [pendingAction('survey')];
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['survey']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.surveying');
+
+    s.pendingActions = [];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['survey']!, s).waiting).toBe(false);
+  });
+
+  it('drill-plan: waits once holes are ordered but not yet drilled, clears once none are outstanding', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['drill-plan']!, s).waiting).toBe(false);
+
+    s.plannedDrillHoles = [{} as never];
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['drill-plan']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.drilling');
+
+    s.plannedDrillHoles = [];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['drill-plan']!, s).waiting).toBe(false);
+  });
+
+  it('charge: waits once charges are ordered but not yet loaded, clears once none are outstanding', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['charge']!, s).waiting).toBe(false);
+
+    s.plannedChargesByHole = { '1': {} as never };
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['charge']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.charging');
+
+    s.plannedChargesByHole = {};
+    expect(resolveWaitStatus(TUTORIAL_STAGES['charge']!, s).waiting).toBe(false);
+  });
+
+  it('box-cut: waits while the ramp order is still being dug, clears once none is outstanding', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['box-cut']!, s).waiting).toBe(false);
+
+    s.plannedRamps = [{} as never];
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['box-cut']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.excavating');
+
+    s.plannedRamps = [];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['box-cut']!, s).waiting).toBe(false);
+  });
+
+  it('haul-debris: waits once a hauler is genuinely dispatched (pending action), clears once it lands', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(false);
+
+    s.pendingActions = [pendingAction('haul_debris')];
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.hauling');
+
+    s.pendingActions = [];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(false);
+  });
+
+  it('haul-debris: also waits on a pending fragment_debris action', () => {
+    const s = baseState();
+    s.pendingActions = [pendingAction('fragment_debris')];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
+  });
+
+  it('haul-debris: also waits while a vehicle has a live haulingPhase, with no pending action at all', () => {
+    const s = baseState();
+    s.vehicles.vehicles = [{ id: 1, haulingPhase: 'to_fragment', breakPhase: null } as never];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
+
+    s.vehicles.vehicles = [{ id: 1, haulingPhase: null, breakPhase: null } as never];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(false);
+  });
+
+  it('haul-debris: also waits while a vehicle has a live breakPhase', () => {
+    const s = baseState();
+    s.vehicles.vehicles = [{ id: 1, haulingPhase: null, breakPhase: 'to_boulder' } as never];
+    expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
+  });
+
+  for (const [stepId, buildingType] of [
+    ['build-living-quarters', 'living_quarters'],
+    ['build-driving-center', 'driving_center'],
+    ['build-storage', 'freight_warehouse'],
+  ] as const) {
+    it(`${stepId}: waits once ${buildingType} is ordered but not yet built, clears once it lands`, () => {
+      const s = baseState();
+      expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, s).waiting).toBe(false);
+
+      s.plannedBuildings = [
+        { id: 1, buildingId: 1, type: buildingType, tier: 1, x: 0, z: 0, actionId: 1, cost: 100 } as never,
+      ];
+      const waiting = resolveWaitStatus(TUTORIAL_STAGES[stepId]!, s);
+      expect(waiting.waiting).toBe(true);
+      expect(waiting.waitingKey).toBe('tutorial.waiting.building');
+
+      s.plannedBuildings = [];
+      expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, s).waiting).toBe(false);
+    });
+
+    it(`${stepId}: does not wait on an unrelated planned building of a different type`, () => {
+      const s = baseState();
+      s.plannedBuildings = [
+        { id: 1, buildingId: 1, type: 'research_center', tier: 1, x: 0, z: 0, actionId: 1, cost: 100 } as never,
+      ];
+      expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, s).waiting).toBe(false);
+    });
+  }
+
+  it('sell-ore: waits once an active ore_sale contract remains AND storage is empty', () => {
+    const s = baseState();
+    expect(resolveWaitStatus(TUTORIAL_STAGES['sell-ore']!, s).waiting).toBe(false);
+
+    s.contracts.active = [
+      {
+        id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
+        deliveredKg: 0, pricePerKg: 3, deadlineTicks: 100, acceptedAtTick: 0,
+        penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+      },
+    ];
+    s.logistics.storedMassKg = 0;
+    const waiting = resolveWaitStatus(TUTORIAL_STAGES['sell-ore']!, s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.waitingKey).toBe('tutorial.waiting.delivering');
+  });
+
+  it('sell-ore: does NOT wait while stock is still on hand — Deliver is genuinely the next action', () => {
+    const s = baseState();
+    s.contracts.active = [
+      {
+        id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
+        deliveredKg: 0, pricePerKg: 3, deadlineTicks: 100, acceptedAtTick: 0,
+        penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+      },
+    ];
+    s.logistics.storedMassKg = 250;
+    s.collectedOre = { dirtite: 250 };
+    expect(resolveWaitStatus(TUTORIAL_STAGES['sell-ore']!, s).waiting).toBe(false);
+  });
+
+  it('sell-ore: does not wait once the contract is completed, even with empty storage', () => {
+    const s = baseState();
+    s.contracts.active = [
+      {
+        id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
+        deliveredKg: 100, pricePerKg: 3, deadlineTicks: 100, acceptedAtTick: 0,
+        penaltyAmount: 0, earlyBonus: 0, completed: true, expired: false,
+      },
+    ];
+    s.logistics.storedMassKg = 0;
+    expect(resolveWaitStatus(TUTORIAL_STAGES['sell-ore']!, s).waiting).toBe(false);
+  });
+});
+
+describe('resolveWaitStatus — steps that must never enter waiting (#1014)', () => {
+  /** Every "spent" domain lit up at once — none of these steps may react to any of it. */
+  function maximallySpentState(): GameState {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.pendingActions = [pendingAction('survey'), pendingAction('haul_debris'), pendingAction('fragment_debris')];
+    s.plannedDrillHoles = [{} as never];
+    s.plannedChargesByHole = { '1': {} as never };
+    s.plannedRamps = [{} as never];
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, actionId: 1, cost: 100 } as never,
+      { id: 2, buildingId: 2, type: 'driving_center', tier: 1, x: 0, z: 0, actionId: 2, cost: 100 } as never,
+      { id: 3, buildingId: 3, type: 'freight_warehouse', tier: 1, x: 0, z: 0, actionId: 3, cost: 100 } as never,
+    ];
+    s.vehicles.vehicles = [{ id: 1, haulingPhase: 'to_fragment', breakPhase: 'to_boulder' } as never];
+    s.contracts.active = [
+      {
+        id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
+        deliveredKg: 0, pricePerKg: 3, deadlineTicks: 100, acceptedAtTick: 0,
+        penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+      },
+    ];
+    s.logistics.storedMassKg = 0;
+    return s;
+  }
+
+  it.each(['sequence', 'evacuate-zone', 'tick-advance'])(
+    '%s never reports waiting, no matter how "spent" every domain looks',
+    (stepId) => {
+      expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, maximallySpentState()))
+        .toEqual({ waiting: false, waitingKey: null });
+    },
+  );
+
+  it.each(['train-driller', 'train-digger'])(
+    '%s never reports waiting either — already solved by doneTarget, not spentWhen',
+    (stepId) => {
+      expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, maximallySpentState()))
+        .toEqual({ waiting: false, waitingKey: null });
+    },
+  );
+
+  it('victory (no keyed TUTORIAL_STAGES entry — falls back to a generic single stage) never reports waiting', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'victory')!;
+    const stages = stagesFor('victory', step.highlightTarget);
+    expect(resolveWaitStatus(stages, maximallySpentState())).toEqual({ waiting: false, waitingKey: null });
+  });
+
+  it('a genuinely one-click step (contract-accept) never reports waiting either', () => {
+    expect(resolveWaitStatus(TUTORIAL_STAGES['contract-accept']!, maximallySpentState()))
+      .toEqual({ waiting: false, waitingKey: null });
+  });
+});
+
 describe('allowedSelectors', () => {
   it('is just the target when a stage has no helpers', () => {
     expect(allowedSelectors({ target: '#a', hintKey: 'k' })).toEqual(['#a']);
@@ -481,6 +760,53 @@ describe('applyRails', () => {
       expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
       expect(select.classList.contains(ALLOWED_CLASS)).toBe(true);
       expect(input.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
+  });
+
+  // #1014: the 4th `spent` param releases the highlight from a stage whose
+  // own order has already been issued, while keeping the control itself and
+  // its helpers clickable — the rails must not look like they abandoned the
+  // player mid-step, only stop pointing at a control there is nothing left
+  // to click.
+  describe('spent releases the highlight but keeps the control clickable (#1014)', () => {
+    it('does not highlight the target when spent is true', () => {
+      button('a');
+      applyRails({ target: '#a', hintKey: 'k' }, document, [], true);
+      expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    });
+
+    it('still marks the target ALLOWED (clickable) when spent is true', () => {
+      button('a');
+      applyRails({ target: '#a', hintKey: 'k' }, document, [], true);
+      expect(document.querySelector('#a')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
+
+    it('still allows helper (also) selectors when spent is true', () => {
+      button('deliver');
+      button('amount');
+      applyRails({ target: '#deliver', hintKey: 'k', also: ['#amount'] }, document, [], true);
+      expect(document.querySelector('#amount')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
+
+    it('still allows extraAllowed selectors when spent is true', () => {
+      button('perma');
+      applyRails({ target: '#nonexistent', hintKey: 'k' }, document, ['#perma'], true);
+      expect(document.querySelector('#perma')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
+
+    it('defaults to spent=false — highlight is applied exactly as before this issue', () => {
+      button('a');
+      applyRails({ target: '#a', hintKey: 'k' });
+      expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+    });
+
+    it('spent has no permanent effect — a later spent=false call restores the highlight', () => {
+      button('a');
+      applyRails({ target: '#a', hintKey: 'k' }, document, [], true);
+      expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+
+      applyRails({ target: '#a', hintKey: 'k' }, document, [], false);
+      expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
     });
   });
 });
@@ -744,8 +1070,9 @@ describe('decideClock', () => {
   // hasOutstandingWork/isWorkInProgress/workSignature only ever looked at
   // employees and state.pendingActions, so a tutorial step waiting on a haul
   // held the clock the instant an employee boarded, mid-delivery — the real
-  // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (unexported,
-  // exercised only through decideClock here) is the fix.
+  // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (exported and
+  // reused by isHaulDispatched in tutorialStepHelpers.ts, exercised here
+  // through decideClock) is the fix.
   describe('vehicle-gated hauling/breaking work (#552)', () => {
     it('keeps running past budget while a vehicle has a live haulingPhase, even though every employee is fully idle', () => {
       const s = state();

@@ -518,17 +518,36 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
 .bs-tutorial-stage {
   font: 600 11px/1.4 var(--bsx-font-ui);
 }
-/* CLOCK HELD chip, inline with the title. */
-.bs-tutorial-paused {
+/* Shared pill-chip shape for the title-row status chips (CLOCK HELD, IN
+   PROGRESS). Modifiers below carry only the color that distinguishes them. */
+.bs-tutorial-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255,176,46,.16);
-  color: var(--bsx-amber);
   font: 700 10px/1.4 var(--bsx-font-ui);
   letter-spacing: .04em;
+}
+/* CLOCK HELD chip, inline with the title. */
+.bs-tutorial-paused {
+  background: rgba(255,176,46,.16);
+  color: var(--bsx-amber);
+}
+/* IN PROGRESS chip (#1014) — an issued order's work is now the simulation's,
+   sibling of .bs-tutorial-paused. Blue (--bsx-info), not amber: the two chips
+   can show at once (an order can be spent while the clock is still held on a
+   later stage), and a shared color would read as one state. */
+.bs-tutorial-waiting {
+  background: rgba(85,168,255,.16);
+  color: var(--bsx-info);
+}
+.bs-tutorial-stage-line {
+  color: var(--bsx-amber);
+}
+/* Stage line while its issued order is spent and waiting on the simulation (#1014). */
+.bs-tutorial-stage-line--waiting {
+  color: var(--bsx-info-text);
 }
 
 /* ─── Reduced motion (P10): pip pulse → static ───

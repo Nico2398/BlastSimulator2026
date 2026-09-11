@@ -8,7 +8,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import { stagesFor, type TutorialStage } from './tutorialStages.js';
 import {
-  applyRails, clearRails, resolveStageIndex, decideClock, DEFAULT_TICK_BUDGET,
+  applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 
@@ -35,6 +35,10 @@ export interface RailsView {
   stageIndex: number;
   stageTotal: number;
   stageTarget: string | null;
+  /** True while an issued order's stage is waiting on the simulation to resolve it. */
+  waiting: boolean;
+  /** Localised waiting line, or '' when `waiting` is false. */
+  waitingHint: string;
 }
 
 export class TutorialRails {
@@ -80,15 +84,18 @@ export class TutorialRails {
    * Runs on every pass rather than only when the stage changes: panels are
    * rebuilt as the player interacts, and a rebuilt control has lost its marks.
    */
-  refresh(): RailsView {
+  refresh(state: GameState | null = null): RailsView {
     if (this.stages.length === 0) {
       clearRails();
-      return { hint: '', clockHeld: this.held, stageIndex: 0, stageTotal: 0, stageTarget: null };
+      return {
+        hint: '', clockHeld: this.held, stageIndex: 0, stageTotal: 0, stageTarget: null, waiting: false, waitingHint: '',
+      };
     }
 
     this.stageIndex = resolveStageIndex(this.stages);
     const stage = this.stages[this.stageIndex];
-    applyRails(stage, document, Array.from(this.permanentlyAllowed));
+    const waitStatus = resolveWaitStatus(this.stages, state);
+    applyRails(stage, document, Array.from(this.permanentlyAllowed), waitStatus.waiting);
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
@@ -99,6 +106,8 @@ export class TutorialRails {
       stageIndex: this.stageIndex,
       stageTotal: this.stages.length,
       stageTarget: stage?.target ?? null,
+      waiting: waitStatus.waiting,
+      waitingHint: waitStatus.waitingKey ? t(waitStatus.waitingKey) : '',
     };
   }
 

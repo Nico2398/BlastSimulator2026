@@ -12,9 +12,11 @@
 
 import {
   TOOLBAR_TARGET, SPEED_UP_TO_MAX_BUTTON, SPEED_BACK_TO_NORMAL_BUTTON,
+  hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
+import type { GameState } from '../core/state/GameState.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -41,6 +43,18 @@ export interface TutorialStage {
    * replaced by a status view once its own action starts (#903).
    */
   doneTarget?: string;
+  /**
+   * True once this stage's own action has been issued and the simulation now
+   * owns the result — the sibling of `doneTarget` for a control that stays
+   * reachable after being clicked (a buy/confirm/run button) instead of
+   * disappearing. Checked independently of which stage `resolveStageIndex`
+   * resolved to (see `resolveWaitStatus`, tutorialGuide.ts) so a control that
+   * becomes unreachable for an unrelated reason (e.g. insufficient cash for a
+   * second order) doesn't mask the wait.
+   */
+  spentWhen?: (state: GameState) => boolean;
+  /** i18n key for the waiting line shown once `spentWhen` fires. Required whenever `spentWhen` is set. */
+  waitingKey?: string;
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the
@@ -67,11 +81,29 @@ const PICKER_CONFIRM = '#bs-tile-select-confirm';
  * never actually retune spacing/depth off the tool's own defaults. Only the
  * drill picker passes any (survey/build/box-cut pickers have nothing to
  * tune, so they keep the empty default).
+ *
+ * `confirmSpent` (#1014): every picker-backed step's Confirm click issues an
+ * order the simulation then owns (a survey, a building, a drill grid, a ramp)
+ * — and Confirm stays reachable afterward, since nothing here disarms the
+ * tool once used. Six call sites need the same "mark the Confirm stage spent
+ * once the order lands" shape, so it lives here once rather than in each of
+ * them.
  */
-function pickerStages(pickHintKey: string, region: TileRegion, extraAlso: string[] = []): TutorialStage[] {
+function pickerStages(
+  pickHintKey: string,
+  region: TileRegion,
+  extraAlso: string[] = [],
+  confirmSpent?: { spentWhen: (state: GameState) => boolean; waitingKey: string },
+): TutorialStage[] {
   return [
     { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: extraAlso },
-    { target: PICKER_CONFIRM, hintKey: 'tutorial.stage.picker_confirm', also: [PICKER_CANVAS, ...extraAlso], region },
+    {
+      target: PICKER_CONFIRM,
+      hintKey: 'tutorial.stage.picker_confirm',
+      also: [PICKER_CANVAS, ...extraAlso],
+      region,
+      ...(confirmSpent ? { spentWhen: confirmSpent.spentWhen, waitingKey: confirmSpent.waitingKey } : {}),
+    },
   ];
 }
 
@@ -262,7 +294,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
     { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run' },
-    ...pickerStages('tutorial.stage.survey_target', REGION.survey),
+    ...pickerStages('tutorial.stage.survey_target', REGION.survey, [], {
+      spentWhen: (state) => hasPendingActionOfType(state, 'survey'),
+      waitingKey: 'tutorial.waiting.surveying',
+    }),
   ],
 
   'hire-driller': hireStages('driller', 'tutorial.stage.hire_driller'),
@@ -273,7 +308,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="living_quarters"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_living_quarters',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.livingQuarters),
+    ...pickerStages('tutorial.stage.build_site', REGION.livingQuarters, [], {
+      spentWhen: (state) => hasPlannedBuildingOfType(state, 'living_quarters'),
+      waitingKey: 'tutorial.waiting.building',
+    }),
   ],
 
   'set-early-policy': [
@@ -313,7 +351,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="driving_center"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_driving_center',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter),
+    ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter, [], {
+      spentWhen: (state) => hasPlannedBuildingOfType(state, 'driving_center'),
+      waitingKey: 'tutorial.waiting.building',
+    }),
   ],
 
   // train-driller/buy-drill-rig-assign/train-digger/buy-rock-digger-assign:
@@ -323,7 +364,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },
-    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, GRID_DEPTH_STEPPER]),
+    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, GRID_DEPTH_STEPPER], {
+      spentWhen: (state) => state.plannedDrillHoles.length > 0,
+      waitingKey: 'tutorial.waiting.drilling',
+    }),
   ],
 
   // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
@@ -341,6 +385,8 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
         '#bs-blast-panel [data-field="amount"] .bsx-stepper-btn',
         '#bs-blast-panel [data-field="stemming"] .bsx-stepper-btn',
       ],
+      spentWhen: (state) => Object.keys(state.plannedChargesByHole).length > 0,
+      waitingKey: 'tutorial.waiting.charging',
     },
   ],
 
@@ -412,7 +458,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="freight_warehouse"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_warehouse',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.warehouse),
+    ...pickerStages('tutorial.stage.build_site', REGION.warehouse, [], {
+      spentWhen: (state) => hasPlannedBuildingOfType(state, 'freight_warehouse'),
+      waitingKey: 'tutorial.waiting.building',
+    }),
   ],
 
   // No button to press — hauling self-dispatches (#552). One stage, so the
@@ -420,7 +469,12 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   // player to open it and watch the fleet work rather than pointing at a
   // control that no longer exists.
   'haul-debris': [
-    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.vehicle_watch' },
+    {
+      target: TOOLBAR_TARGET.vehicles,
+      hintKey: 'tutorial.stage.vehicle_watch',
+      spentWhen: isHaulDispatched,
+      waitingKey: 'tutorial.waiting.hauling',
+    },
   ],
 
   // A single merged stage, not separate accept/deliver stages (#959): the
@@ -436,13 +490,18 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-contract-panel .bs-contract-accept',
       hintKey: 'tutorial.stage.sell_ore',
       also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
+      spentWhen: isSellOreWaiting,
+      waitingKey: 'tutorial.waiting.delivering',
     },
   ],
 
   'box-cut': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
     { target: '#bs-build-panel .bs-build-ramp-btn', hintKey: 'tutorial.stage.ramp_tool' },
-    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut),
+    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut, [], {
+      spentWhen: (state) => state.plannedRamps.length > 0,
+      waitingKey: 'tutorial.waiting.excavating',
+    }),
   ],
 
   // #923: taught inside the box-cut wait — ×8 while the ramp-dig is still in

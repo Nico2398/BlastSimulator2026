@@ -1,12 +1,13 @@
 // BlastSimulator2026 — Tutorial step helper functions
 // Extracted from tutorialSteps.ts to keep each file under 300 lines.
 
-import type { GameState } from '../core/state/GameState.js';
+import type { ActionType, GameState } from '../core/state/GameState.js';
 import type { NavCell } from '../core/nav/NavGrid.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { computeDangerZone, isZoneClear } from '../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../core/config/balance.js';
+import { hasOutstandingVehicleWork } from './tutorialGuide.js';
 
 /**
  * Selectors for the toolbar buttons that open each panel. The panels themselves
@@ -231,6 +232,50 @@ export function getBuildings(state: GameState): { type: string }[] {
 /** Count buildings of a given type. */
 export function countBuildingsOfType(state: GameState, buildingType: string): number {
   return getBuildings(state).filter(b => b.type === buildingType).length;
+}
+
+/** Whether a pending action of the given type is currently queued or in flight. */
+export function hasPendingActionOfType(state: GameState, type: ActionType): boolean {
+  return (state.pendingActions ?? []).some((a) => a.type === type);
+}
+
+/**
+ * Whether a building of the given type is planned/under construction (not yet
+ * complete) — reads `state.plannedBuildings`, the order-then-work queue a
+ * `place_building` order lands in until the crew finishes it (#556) and
+ * splices out of on completion (`tickTaskCompletion.ts`).
+ */
+export function hasPlannedBuildingOfType(state: GameState, buildingType: string): boolean {
+  return (state.plannedBuildings ?? []).some((b) => b.type === buildingType);
+}
+
+/**
+ * True once a debris hauler has been genuinely dispatched (#552, #1014): a
+ * `haul_debris`/`fragment_debris` order queued, or a vehicle already mid-haul
+ * or mid-break. Reuses `hasOutstandingVehicleWork` (tutorialGuide.ts) — the
+ * same per-vehicle signature `decideClock`'s grace window relies on — rather
+ * than re-deriving what "genuinely hauling" means a second time.
+ */
+export function isHaulDispatched(state: GameState): boolean {
+  if (hasPendingActionOfType(state, 'haul_debris')) return true;
+  if (hasPendingActionOfType(state, 'fragment_debris')) return true;
+  return (state.vehicles?.vehicles ?? []).some(hasOutstandingVehicleWork);
+}
+
+/**
+ * True once every active, incomplete ore-sale contract has nothing left in
+ * storage to deliver against it — the 'sell-ore' step's `spentWhen` (#1014).
+ * A player who still has stock on hand keeps seeing the normal "click
+ * Deliver" instruction: that click is still genuinely the right next action,
+ * so this stays false while any active ore_sale contract's own material still
+ * has stock in `collectedOre`.
+ */
+export function isSellOreWaiting(state: GameState): boolean {
+  const activeOreSales = (state.contracts?.active ?? []).filter(
+    (c) => c.type === 'ore_sale' && !c.completed,
+  );
+  if (activeOreSales.length === 0) return false;
+  return activeOreSales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
 }
 
 /** Count vehicles with a driver assigned. */

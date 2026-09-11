@@ -389,6 +389,72 @@ describe('event-fire-resolve stage targets exactly the highlighted choice (#951)
   });
 });
 
+describe('spentWhen / waitingKey wiring (#1014)', () => {
+  // Every step named in the approved plan gets exactly one stage whose
+  // `spentWhen` fires once its own order is genuinely in the simulation's
+  // hands, paired with the matching waitingKey.
+  const WAITS_ON_WORK_WITH_SPENT_WHEN: Record<string, string> = {
+    survey: 'tutorial.waiting.surveying',
+    'drill-plan': 'tutorial.waiting.drilling',
+    charge: 'tutorial.waiting.charging',
+    'box-cut': 'tutorial.waiting.excavating',
+    'haul-debris': 'tutorial.waiting.hauling',
+    'build-living-quarters': 'tutorial.waiting.building',
+    'build-driving-center': 'tutorial.waiting.building',
+    'build-storage': 'tutorial.waiting.building',
+    'sell-ore': 'tutorial.waiting.delivering',
+  };
+
+  for (const [stepId, waitingKey] of Object.entries(WAITS_ON_WORK_WITH_SPENT_WHEN)) {
+    it(`${stepId} carries exactly one stage with a spentWhen wired to ${waitingKey}`, () => {
+      const stages = TUTORIAL_STAGES[stepId]!;
+      expect(stages, `no TUTORIAL_STAGES entry for "${stepId}"`).toBeDefined();
+      const spentStages = stages.filter(s => typeof s.spentWhen === 'function');
+      expect(spentStages.length, `${stepId} should carry exactly one spentWhen stage`).toBe(1);
+      expect(spentStages[0]!.waitingKey).toBe(waitingKey);
+      expect(messages[waitingKey], `missing en key ${waitingKey}`).toBeTruthy();
+      expect(messagesFr[waitingKey], `missing fr key ${waitingKey}`).toBeTruthy();
+    });
+  }
+
+  it.each(['sequence', 'evacuate-zone', 'tick-advance', 'train-driller', 'train-digger'])(
+    '%s carries no spentWhen on any of its stages',
+    (stepId) => {
+      const stages = TUTORIAL_STAGES[stepId]!;
+      for (const stage of stages) {
+        expect(stage.spentWhen, `${stepId} stage targeting ${stage.target} should not carry spentWhen`)
+          .toBeUndefined();
+      }
+    },
+  );
+
+  it('every stage that carries spentWhen also carries a waitingKey (required pairing)', () => {
+    for (const [stepId, stages] of Object.entries(TUTORIAL_STAGES)) {
+      for (const stage of stages) {
+        if (stage.spentWhen) {
+          expect(stage.waitingKey, `${stepId} stage targeting ${stage.target} has spentWhen but no waitingKey`)
+            .toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it('no step outside the named list above carries a spentWhen stage', () => {
+    // Guards against `spentWhen` creeping onto a step the plan never asked
+    // for (hire-*, blast, contract-accept, set-policy, event-fire-resolve,
+    // vehicle-buy-assign, etc.) — those steps are genuinely one-shot clicks
+    // and must keep re-highlighting nothing once used, not silently gain a
+    // waiting state nobody asked for.
+    for (const [stepId, stages] of Object.entries(TUTORIAL_STAGES)) {
+      if (stepId in WAITS_ON_WORK_WITH_SPENT_WHEN) continue;
+      for (const stage of stages) {
+        expect(stage.spentWhen, `${stepId} stage targeting ${stage.target} unexpectedly carries spentWhen`)
+          .toBeUndefined();
+      }
+    }
+  });
+});
+
 describe('stagesFor', () => {
   it('falls back to the step highlight target when no stages are keyed', () => {
     const stages = stagesFor('not-a-step', '#bs-toolbar [data-panel="blast"]');

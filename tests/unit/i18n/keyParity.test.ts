@@ -310,8 +310,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3485 (up from 3484): #1009's review-fix pass adds 1 key,
     // mining.level_ground.already_flat, for the already-flat order-completion
     // message, both locales.
+    // Baseline is now 3494 (up from 3485): #1014's skeleton phase adds 9 keys
+    // for the tutorial waiting-state card — tutorial.waiting_chip,
+    // tutorial.waiting_tooltip, and tutorial.waiting.{building,drilling,
+    // charging,surveying,excavating,hauling,delivering} — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3485);
+    expect(Object.keys(en).length).toBe(3494);
   });
 });
 
