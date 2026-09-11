@@ -12,10 +12,11 @@
 // `logic` channel (tests/unit/, no browser) while still exercising the real
 // control flow in interaction-executor.ts and scenario-interaction-runner.ts.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Page } from 'puppeteer';
 import {
   executeActionOnPage, resolveEventIfPendingOnPage, CLOCK_HELD_FAIL_AFTER_POLLS,
+  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, CLICK_SELECTOR_ZERO_SIZE_GRACE_MS,
 } from '../../scripts/shared/interaction-executor.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
@@ -771,5 +772,235 @@ describe('clickSelector retries once via resolveEventIfPendingOnPage when covere
 
     await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
     expect(page.click).toHaveBeenCalledWith(targetSelector, { button: 'left' });
+  });
+});
+
+// Issue #1032 — CI has flaked on `sandbox-mode.json` because a modal opened
+// while a heavy render/animation plays can still be zero-size at the
+// CLICK_SELECTOR_DEFAULT_TIMEOUT_MS mark on a slow/CPU-starved runner, yet
+// become usable moments later. clickSelector must grant one extra
+// CLICK_SELECTOR_ZERO_SIZE_GRACE_MS window instead of throwing immediately,
+// but only when the most recently polled reason is exactly 'zero-size', and
+// only once. Every other blocked reason (and a second zero-size timeout)
+// must still fail exactly as before.
+//
+// Date.now() is stubbed so these tests don't pay CLICK_SELECTOR_ZERO_SIZE_
+// GRACE_MS (10s) of real wall-clock time — the poll loop's own 150ms
+// real-time sleep between iterations still runs for real, but only a
+// handful of iterations are ever needed since the mocked clock, not the
+// sleep, is what the loop's deadline math reads.
+describe('clickSelector — zero-size grace extension (issue #1032)', () => {
+  const selector = '#bs-blast-report-modal .bs-blast-report-close';
+
+  /** A well-formed inspectSelector() report for a control that is attached,
+   * unblocked, but has never laid out. */
+  function zeroSizeReport() {
+    return {
+      found: true,
+      pointerEvents: 'auto',
+      display: 'block',
+      visibility: 'visible',
+      disabled: false,
+      width: 0,
+      height: 0,
+      matchCount: 1,
+    };
+  }
+
+  /**
+   * Builds a `page.evaluate` mock that dispatches on the *callback source*
+   * rather than call order: the probe callback (clickSelector's own poll)
+   * references `__probeSelector`, inspectSelector's does not. Called-order
+   * dispatch (a plain `mockResolvedValueOnce` chain) breaks here because
+   * today's (pre-#1032) code and the grace-extended code-to-be reach
+   * `inspectSelector` after a *different* number of probe polls — the same
+   * scripted sequence has to serve both without assuming which one is
+   * running. Each entry in `script` answers one probe poll in order; the
+   * last entry repeats for any extra poll beyond the scripted ones. Every
+   * non-probe call (i.e. inspectSelector, on the throw path) gets a
+   * well-formed zero-size report instead of risking mock-exhaustion
+   * `undefined` and an incidental `TypeError` unrelated to the behaviour
+   * under test.
+   */
+  function makeProbeEvaluate(script: Array<() => string | null>) {
+    let i = 0;
+    return vi.fn(async (fn: unknown) => {
+      if (String(fn).includes('__probeSelector')) {
+        const step = script[Math.min(i, script.length - 1)];
+        i += 1;
+        return step();
+      }
+      return zeroSizeReport();
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('extends the deadline once instead of throwing when zero-size persists past the default timeout, and clicks through once the control lays out inside the grace window', async () => {
+    let simulatedNow = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => simulatedNow);
+
+    const evaluate = makeProbeEvaluate([
+      // 1st poll: comfortably inside the default budget, still zero-size.
+      () => { simulatedNow = 100; return 'zero-size'; },
+      // 2nd poll: strictly past CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, and the
+      // modal is *still* zero-size — this is the moment grace, not a
+      // throw, must be granted.
+      () => { simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + 100; return 'zero-size'; },
+      // 3rd poll: well inside the extended (grace) deadline, and the
+      // modal has finally laid out — the click must proceed.
+      () => { simulatedNow += 100; return null; },
+    ]);
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast_report close',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(page.click).toHaveBeenCalledWith(selector, { button: 'left' });
+  });
+
+  it('grants the zero-size grace exactly once — still zero-size at the extended deadline throws with a loud, specific diagnosis', async () => {
+    let simulatedNow = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => simulatedNow);
+
+    const evaluate = makeProbeEvaluate([
+      // 1st poll: already past the default timeout — grace must be
+      // granted.
+      () => { simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + 100; return 'zero-size'; },
+      // 2nd poll: comfortably past the *extended* (grace) deadline too,
+      // and still zero-size — a second grace must never be granted, so
+      // this must throw.
+      () => {
+        simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + CLICK_SELECTOR_ZERO_SIZE_GRACE_MS + 1000;
+        return 'zero-size';
+      },
+    ]);
+    const page = fakePage({ evaluate });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast_report close',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    let caught: unknown;
+    try {
+      await executeActionOnPage(page, action, step);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message).toContain(selector);
+    // Substantive content rather than an exact string (brittle against the
+    // implementer's exact wording): communicates the control was attached
+    // and unblocked but never gained a layout box, distinguishing this from
+    // the plain "element has zero size (0x0)" every other reason keeps.
+    expect(message).toMatch(/layout|dimensions|laid out|never (gained|got)/i);
+    // ...and communicates timing (how long it waited in total), not just
+    // the bare fact of a timeout.
+    expect(message).toMatch(/wait(ed)?|timeout|\d+\s*ms/i);
+  });
+
+  it('never grants grace for a non-zero-size blocked reason (e.g. disabled) — throws at the unchanged default timeout with the unchanged message', async () => {
+    // No Date.now stub here: action.timeout:-1 (same degenerate value the
+    // #929 "never appeared" tests above use) forces the very first poll's
+    // deadline check to already be in the past, so exactly one probe + one
+    // inspectSelector call happen regardless of wall-clock timing.
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce('disabled')
+      .mockResolvedValueOnce({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: true,
+        width: 80,
+        height: 24,
+        matchCount: 1,
+      });
+    const click = vi.fn();
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector, timeout: -1 };
+    const step: ScenarioStepDef = {
+      command: 'blast_report close',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow('element is disabled');
+    expect(click).not.toHaveBeenCalled();
+    // Exactly one probe + one inspectSelector call: no extra poll iteration
+    // was spent trying (and failing) to grant a grace this reason never
+    // qualifies for.
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it('edge case: grants the zero-size grace even when action.timeout is already expired at the very first poll (timeout:-1)', async () => {
+    let simulatedNow = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => simulatedNow);
+
+    const evaluate = makeProbeEvaluate([
+      // 1st poll: the deadline (Date.now() + (-1)) is already in the past
+      // the instant it's computed, so this single reading is what an
+      // unmodified poll loop treats as "timed out" — and it reads
+      // zero-size.
+      () => { simulatedNow = 1; return 'zero-size'; },
+      // 2nd poll: usable moments later, comfortably inside the grace
+      // window (CLICK_SELECTOR_ZERO_SIZE_GRACE_MS is 10s; this is 1ms
+      // later).
+      () => { simulatedNow = 2; return null; },
+    ]);
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+    const action = { type: 'clickSelector' as const, selector, timeout: -1 };
+    const step: ScenarioStepDef = {
+      command: 'blast_report close',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(page.click).toHaveBeenCalledWith(selector, { button: 'left' });
+  });
+
+  // Edge case per the plan: a control that goes 'covered' first (triggering
+  // the existing #699 one-time covered-retry via resolveEventIfPendingOnPage)
+  // and *then* transitions to 'zero-size' before the extended covered
+  // deadline, confirming the two one-time grace mechanisms are independent.
+  // Not written here: the #699 retry path is itself driven by a second,
+  // real async subsystem (resolveEventIfPendingOnPage's own page.evaluate
+  // calls, interleaved with the zero-size poll's), and scripting a
+  // deterministic sequence across both against an interaction-executor.ts
+  // that does not yet implement the zero-size half would mean guessing the
+  // implementer's call ordering rather than pinning observable behaviour —
+  // exactly the brittleness the plan warns against. Once the implementation
+  // exists, this interaction is worth covering for real.
+
+  it('regression: no wasted poll iteration when the control is usable well before the default timeout (the common case)', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(null); // usable on the very first probe
+    const click = vi.fn().mockResolvedValue(undefined);
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast_report close',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledWith(selector, { button: 'left' });
   });
 });
