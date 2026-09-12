@@ -5,6 +5,8 @@ import type { VehicleState } from './Vehicle.js';
 import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
+import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
+import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -71,7 +73,14 @@ export function clearZone(
   vehicles: VehicleState,
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
+  canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
 ): EvacuationResult {
+  // TODO: implement boarding a driverless vehicle via findBestEvacuationDriver
+  // instead of always stranding it — placeholder references keep this stub
+  // compiling until then.
+  void canEmployeeReachVehicle;
+  void findBestEvacuationDriver;
+
   const result: EvacuationResult = {
     orderedVehicleIds: [],
     orderedEmployeeIds: [],

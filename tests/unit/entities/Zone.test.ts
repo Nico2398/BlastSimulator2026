@@ -55,7 +55,7 @@ describe('Zone clearing and evacuation', () => {
     const beforeEmployeeX = employee.x;
     const beforeEmployeeZ = employee.z;
 
-    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+    const result = clearZone(zone, vehicles, employees, findSafeDestination, () => true);
 
     // Not teleported: current position is unchanged by this same call.
     expect(vehicle.x).toBe(beforeVehicleX);
@@ -82,7 +82,7 @@ describe('Zone clearing and evacuation', () => {
     const rng = new Random(2);
     const { employee } = hireEmployee(employees, 'driller', rng, 5, 5);
 
-    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+    const result = clearZone(zone, vehicles, employees, findSafeDestination, () => true);
 
     expect(result.orderedEmployeeIds).not.toContain(employee.id);
     expect(employee.destinationX).toBeNull();
@@ -95,7 +95,7 @@ describe('Zone clearing and evacuation', () => {
     hireEmployee(employees, 'driller', rng, 20, 20);
 
     expect(isZoneClear(zone, vehicles, employees)).toBe(false);
-    clearZone(zone, vehicles, employees, findSafeDestination);
+    clearZone(zone, vehicles, employees, findSafeDestination, () => true);
     // A destination was set, but the entity's actual position has not moved.
     expect(isZoneClear(zone, vehicles, employees)).toBe(false);
   });
@@ -106,7 +106,7 @@ describe('Zone clearing and evacuation', () => {
     const rng = new Random(4);
     const { employee } = hireEmployee(employees, 'driller', rng, 20, 20);
 
-    clearZone(zone, vehicles, employees, findSafeDestination);
+    clearZone(zone, vehicles, employees, findSafeDestination, () => true);
     expect(isZoneClear(zone, vehicles, employees)).toBe(false);
 
     // Simulate movement resolving the walk: position catches up to destination.
@@ -123,7 +123,7 @@ describe('Zone clearing and evacuation', () => {
     const beforeX = employee.x;
     const beforeZ = employee.z;
 
-    const result = clearZone(zone, vehicles, employees, noSafeDestination);
+    const result = clearZone(zone, vehicles, employees, noSafeDestination, () => true);
 
     expect(employee.x).toBe(beforeX);
     expect(employee.z).toBe(beforeZ);
@@ -139,7 +139,7 @@ describe('Zone clearing and evacuation', () => {
     const beforeX = vehicle.x;
     const beforeZ = vehicle.z;
 
-    const result = clearZone(zone, vehicles, employees, noSafeDestination);
+    const result = clearZone(zone, vehicles, employees, noSafeDestination, () => true);
 
     expect(vehicle.x).toBe(beforeX);
     expect(vehicle.z).toBe(beforeZ);
@@ -161,7 +161,7 @@ describe('Zone clearing and evacuation', () => {
     // safe — the driverless check must short-circuit before the destination
     // lookup ever runs, not merely happen to agree with a "no destination"
     // outcome.
-    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+    const result = clearZone(zone, vehicles, employees, findSafeDestination, () => true);
 
     expect(result.strandedVehicleIds).toContain(vehicle.id);
     expect(result.orderedVehicleIds).not.toContain(vehicle.id);
@@ -179,7 +179,7 @@ describe('Zone clearing and evacuation', () => {
     const { vehicle: driverless } = purchaseVehicle(vehicles, 'rock_digger', 20, 20);
     driverless.driverId = null;
 
-    const result = clearZone(zone, vehicles, employees, findSafeDestination);
+    const result = clearZone(zone, vehicles, employees, findSafeDestination, () => true);
 
     expect(result.orderedVehicleIds).toContain(driven.id);
     expect(result.orderedVehicleIds).not.toContain(driverless.id);
@@ -197,7 +197,7 @@ describe('Zone clearing and evacuation', () => {
     const rng = new Random(6);
     hireEmployee(employees, 'driller', rng, 20, 20);
 
-    clearZone(zone, vehicles, employees, noSafeDestination);
+    clearZone(zone, vehicles, employees, noSafeDestination, () => true);
     expect(isZoneClear(zone, vehicles, employees)).toBe(false);
   });
 
@@ -221,7 +221,7 @@ describe('Zone clearing and evacuation', () => {
     const rng = new Random(9);
     const { employee } = hireEmployee(employees, 'driller', rng, 15, 15);
 
-    clearZone(zone, vehicles, employees, findSafeDestination);
+    clearZone(zone, vehicles, employees, findSafeDestination, () => true);
     // Resolve the walk before the blast fires — this is what the tutorial's
     // evacuate-zone step and blastCommand's refusal are meant to enforce.
     employee.x = employee.destinationX!;

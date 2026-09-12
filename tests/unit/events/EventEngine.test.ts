@@ -51,6 +51,7 @@ function makeWaitingVehicle(
     breakFragmentId: null,
     breakPhase: null,
     reservedForActionId: null,
+    pendingEvacuationDestination: null,
   };
 }
 

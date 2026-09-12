@@ -12,6 +12,7 @@ import { isInZone, isZoneClearOfEmployees, isZoneStillBlastThreatened } from '..
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { completePendingAction } from './TaskLifecycleCore.js';
 import type { Employee } from '../entities/Employee.js';
+import type { VehicleState } from '../entities/Vehicle.js';
 
 /**
  * PendingAction.payload key evacuateZone stamps on any action it interrupts
@@ -205,6 +206,28 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
  * durationTicks preservation) all exist for the ONE action `emp` was actively
  * walking/working, which this never was.
  */
+/**
+ * True when `employee` is currently driving a vehicle clear of an evacuating
+ * zone (boarded a driverless vehicle rather than evacuating on foot, #1042)
+ * rather than walking their own route.
+ */
+export function isMidEvacuationDrive(vehicles: VehicleState, employee: Employee): boolean {
+  void vehicles; void employee;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
+ * Releases the driver of any vehicle that has arrived at its
+ * pendingEvacuationDestination — the employee dismounts and evacuates the
+ * rest of the way on foot, mirroring an ordinary on-foot evacuee (#1042).
+ */
+export function releaseArrivedEvacuationDrivers(state: GameState): void {
+  void state;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, zone: ZoneBounds): void {
   if (emp.taskQueue.length === 0) return;
 

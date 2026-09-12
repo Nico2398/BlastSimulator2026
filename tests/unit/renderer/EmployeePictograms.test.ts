@@ -349,6 +349,7 @@ describe('EmployeePictograms', () => {
       waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
       haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
       breakFragmentId: null, breakPhase: null, reservedForActionId: null,
+      pendingEvacuationDestination: null,
     };
 
     pictograms.sync([emp], [vehicle], id => (id === 1 ? anchor : null));

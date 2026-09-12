@@ -20,7 +20,9 @@ import {
 // organization detail, not a change to who imports what. See
 // EvacuationHold.ts for EVACUATION_HOLD_KEY's own doc comment and both
 // functions'.
-export { EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds } from './EvacuationHold.js';
+export {
+  EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds, isMidEvacuationDrive,
+} from './EvacuationHold.js';
 
 /**
  * True when `employee` is currently walking a route the claim system knows
@@ -240,5 +242,8 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state.vehicles,
     state.employees,
     (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),
+    // TODO: replace with a real reachability check once findBestEvacuationDriver
+    // is implemented (#1042) — placeholder keeps this branch typechecking.
+    () => true,
   );
 }

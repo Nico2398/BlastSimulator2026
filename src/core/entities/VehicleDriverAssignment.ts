@@ -4,7 +4,7 @@
 // assignment checks, and the excavator loading-rate helper, verbatim from
 // Vehicle.ts.
 
-import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
+import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
 import { getVehicleDef } from './Vehicle.js';
 
@@ -84,4 +84,26 @@ export function assignDriver(
 export function getExcavatorLoadingRate(vehicle: Vehicle): number {
   if (vehicle.type !== 'rock_digger') return 0;
   return getVehicleDef('rock_digger').capacity;
+}
+
+// ── Evacuation driver assignment (#1042) ──
+
+/** Whether `employee` can reach `vehicle` in time to board and drive it clear. */
+export type EvacuationDriverReachabilityCheck = (employee: Employee, vehicle: Vehicle) => boolean;
+
+/**
+ * Picks the best qualified candidate among `candidateEmployeeIds` to board
+ * `vehicle` and drive it clear of an evacuating zone, or null when none
+ * qualifies or can reach it.
+ */
+export function findBestEvacuationDriver(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  candidateEmployeeIds: readonly number[],
+  canReach: EvacuationDriverReachabilityCheck,
+): Employee | null {
+  void vehicle; void vehicleState; void employeeState; void candidateEmployeeIds; void canReach;
+  // TODO: implement
+  throw new Error('not implemented');
 }
