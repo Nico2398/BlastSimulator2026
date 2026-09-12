@@ -97,6 +97,35 @@ export interface GroundTintPatch {
 /** Metres above the sampled surface a ground tint patch is drawn, to avoid z-fighting with the terrain mesh. */
 export const GROUND_TINT_Y_EPSILON = 0.03;
 
+/** World-unit half-step used to central-difference the height sampler when estimating local slope. */
+const SLOPE_SAMPLE_STEP = 0.1;
+
+/** Cap on how much local slope may inflate the flat-ground epsilon, so a near-vertical face doesn't push the tint arbitrarily far off the surface. */
+export const GROUND_TINT_MAX_SLOPE_FACTOR = 10;
+
+/**
+ * How much a flat-ground epsilon must be inflated to keep clearing the
+ * terrain mesh at (x, z), given the local slope of `sampler`. 1 on flat
+ * ground, growing with the steepness of the surface, capped at
+ * `GROUND_TINT_MAX_SLOPE_FACTOR`.
+ */
+function slopeOffsetFactor(_sampler: SurfaceHeightSampler, _x: number, _z: number): number {
+  // TODO: implement — central-difference `_sampler` around (_x, _z) using SLOPE_SAMPLE_STEP.
+  void SLOPE_SAMPLE_STEP;
+  return 1;
+}
+
+/**
+ * `epsilon`, scaled by the local slope of `sampler` at (x, z) — the
+ * ground-tint vertical offset that stays clear of the terrain mesh on steep,
+ * blast-carved slopes instead of the fixed-epsilon offset that used to
+ * z-fight there.
+ */
+export function slopeScaledEpsilon(sampler: SurfaceHeightSampler, x: number, z: number, epsilon: number): number {
+  // TODO: implement real slope-based scaling; wired to the stub factor for now.
+  return epsilon * slopeOffsetFactor(sampler, x, z);
+}
+
 /**
  * Shared ground-tint renderer: draws colour patches that conform to the
  * sloped marching-cubes surface instead of floating as flat axis-aligned
