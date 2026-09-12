@@ -7,6 +7,7 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../src/console/commands/events.js';
+import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import {
@@ -1060,5 +1061,63 @@ describe('construction levels the ground under the footprint (#1008)', () => {
     expect(upgrade.success, upgrade.output).toBe(true);
 
     expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1039 — a continuous-mode site policy with an aggressive fatigue threshold
+// must not fragment a single place_building order into a chain of
+// interrupt-walk-reclaim-restart cycles. Before ForceShiftRest.ts's
+// isMidConstructionWork guard exists (currently a stub returning false, so
+// this test is expected to stay red until the implementer fills it in), a
+// proactive shift-cycle rest yanks the assigned employee off the site the
+// instant fatigue crosses the policy's threshold, even mid-execution — and
+// since the crossing recurs every few ticks under a policy this aggressive,
+// the construction is directly observed here (empirically, via `npm run
+// console`) to never complete within 100 ticks at all on the buggy code,
+// instead of landing in ~20 (BUILDING_CONSTRUCTION_BASE_DURATION_TICKS=15
+// plus a short walk).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('a place_building order survives an aggressive continuous-mode site policy (#1039)', () => {
+  it('completes driving_center within a bounded tick count with at most one interruption of its in_progress work', () => {
+    const ctx = makeStaffedCtx();
+
+    const policyResult = setPolicyCommand(ctx, [], { mode: 'continuous', fatigue: '90' });
+    expect(policyResult.success, JSON.stringify(policyResult)).toBe(true);
+
+    const orderResult = buildCommand(ctx, ['driving_center'], { at: '6,7' });
+    expect(orderResult.success, JSON.stringify(orderResult)).toBe(true);
+    const actionId = ctx.state!.plannedBuildings[0]!.actionId;
+
+    const MAX_TICKS = 100;
+    let reachedInProgress = false;
+    let transitionsAwayFromInProgress = 0;
+    let prevStatus: string | null = null;
+    let completed = false;
+
+    for (let i = 0; i < MAX_TICKS; i++) {
+      const action = ctx.state!.pendingActions.find(a => a.id === actionId);
+      if (!action) {
+        // Removed from pendingActions entirely: the order has landed.
+        completed = true;
+        break;
+      }
+      if (action.status === 'in_progress') reachedInProgress = true;
+      if (prevStatus === 'in_progress' && action.status !== 'in_progress') {
+        transitionsAwayFromInProgress++;
+      }
+      prevStatus = action.status;
+      tickCommand(ctx, ['1'], {});
+    }
+    // One more check after the final tick, in case completion landed on it.
+    if (!completed && ctx.state!.pendingActions.find(a => a.id === actionId) === undefined) {
+      completed = true;
+    }
+
+    expect(reachedInProgress, 'construction never reached in_progress work at all').toBe(true);
+    expect(transitionsAwayFromInProgress).toBeLessThanOrEqual(1);
+    expect(completed, `driving_center did not complete within ${MAX_TICKS} ticks`).toBe(true);
+    const built = ctx.state!.buildings.buildings.find(b => b.type === 'driving_center');
+    expect(built).toBeDefined();
   });
 });
