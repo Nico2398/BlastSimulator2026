@@ -239,6 +239,71 @@ describe('GroundTintLayer — patch-set semantics', () => {
   });
 });
 
+/**
+ * Asserts every triangle in `position`'s first `triangleCount` triangles has
+ * a geometric normal (edge1 × edge2, CCW) pointing upward (+Y) — i.e. the
+ * triangle winds front-face-up.
+ */
+function expectUpwardNormals(position: THREE.BufferAttribute, triangleCount: number): void {
+  for (let t = 0; t < triangleCount; t++) {
+    const v0 = new THREE.Vector3().fromBufferAttribute(position, t * 3);
+    const v1 = new THREE.Vector3().fromBufferAttribute(position, t * 3 + 1);
+    const v2 = new THREE.Vector3().fromBufferAttribute(position, t * 3 + 2);
+    const edge1 = v1.clone().sub(v0);
+    const edge2 = v2.clone().sub(v0);
+    const normal = edge1.cross(edge2);
+    expect(normal.y, `triangle ${t} geometric normal should point upward (+Y)`).toBeGreaterThan(0);
+  }
+}
+
+describe('GroundTintLayer — front-face culling and winding (#1043)', () => {
+  // GroundTintLayer previously used `THREE.DoubleSide`, which hid the fact
+  // that emitCell/emitDisc wind their triangles with a downward (-Y) normal.
+  // Fixing the material to FrontSide alone would make the overlay invisible
+  // from above; the winding must flip too. These three tests pin both halves
+  // of the fix independently.
+
+  it('material.side is FrontSide, not DoubleSide, so the overlay culls from below the terrain', () => {
+    const layer = new GroundTintLayer(scene, () => 0);
+    layer.replace([cellPatch('a', 0, 0)]);
+
+    const mesh = allMeshes()[0];
+    expect(mesh, 'replace() with a patch should produce a mesh').toBeDefined();
+    const material = mesh!.material as THREE.MeshBasicMaterial;
+    expect(material.side).toBe(THREE.FrontSide);
+  });
+
+  it('emitCell winds both triangles of a cell patch with an upward (+Y) geometric normal', () => {
+    const sampler: SurfaceHeightSampler = () => 5;
+    const layer = new GroundTintLayer(scene, sampler);
+    layer.replace([cellPatch('a', 10, 10)]);
+
+    const mesh = allMeshes()[0]!;
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(pos.count, 'one cell patch is 2 triangles of 3 vertices each').toBe(6);
+
+    expectUpwardNormals(pos, pos.count / 3);
+  });
+
+  it('emitDisc winds every fan triangle of a disc patch with an upward (+Y) geometric normal', () => {
+    const sampler: SurfaceHeightSampler = () => 5;
+    const layer = new GroundTintLayer(scene, sampler);
+    const segments = 8;
+    layer.replace([{
+      id: 'disc',
+      shape: { kind: 'disc', cx: 10, cz: 10, radius: 5, segments },
+      color: 0xffffff,
+      opacity: 1,
+    }]);
+
+    const mesh = allMeshes()[0]!;
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(pos.count, 'a disc patch is `segments` fan triangles of 3 vertices each').toBe(segments * 3);
+
+    expectUpwardNormals(pos, segments);
+  });
+});
+
 describe('buildConformingRing', () => {
   it('vertices are not all at one constant Y when the sampler varies by position (mirrors the radius-ring bug)', () => {
     const sampler: SurfaceHeightSampler = (x, _z) => x;
