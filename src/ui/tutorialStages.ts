@@ -134,7 +134,7 @@ const GRID_DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-steppe
  * history on this block for the stranding-class postmortems (#1008,
  * #1008-followup) this rule superseded.
  */
-const REGION = {
+export const REGION = {
   // One tile, because a survey is a point pick. Sits inside the old 18→28
   // suggestion area, so nothing downstream of the survey moves.
   survey: { x1: 23, z1: 23, x2: 23, z2: 23, exact: true },

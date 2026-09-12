@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:29,12",
+      "command": "build living_quarters at:29,11",
       "timeout": 90,
       "interaction": [
         {
@@ -256,7 +256,7 @@
         {
           "type": "pickTile",
           "x": 29,
-          "z": 12
+          "z": 11
         },
         {
           "type": "screenshot"
@@ -267,7 +267,7 @@
         }
       ],
       "role": "player",
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023, CI): (12,15), while flat, deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31). A first fix attempt moved it to (6,16) (10 tiles clear of those hazards), which traded that deadlock for a different one: a fatigue/rest round-trip livelock -- the walk out to (6,16) and back is long enough that the excavator's fatigue crosses back over the rest threshold before a single box-cut ramp segment carves (confirmed live: `state full`'s navGrid.cellTypeCounts.ramp count never moved across 5000 ticks of direct observation). (29,12) clears the vehicle spawn, the box-cut corridor, and the drill grid by >=5 tiles each while sitting only 12 tiles (Chebyshev) from the dig site, roughly half (6,16)'s round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023, CI): (12,15), while flat, deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31). A first fix attempt moved it to (6,16) (10 tiles clear of those hazards), which traded that deadlock for a different one: a fatigue/rest round-trip livelock -- the walk out to (6,16) and back is long enough that the excavator's fatigue crosses back over the rest threshold before a single box-cut ramp segment carves (confirmed live: `state full`'s navGrid.cellTypeCounts.ramp count never moved across 5000 ticks of direct observation). (29,12) cleared the vehicle spawn, the box-cut corridor, and the drill grid by >=5 tiles each while sitting only 12 tiles (Chebyshev) from the dig site, roughly half (6,16)'s round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem.",
       "expect": {
         "increased": [
           "orderedBuildingCount"
@@ -315,7 +315,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,12) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,11) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
       "expect": {
         "equals": {
           "buildingCount": 1
@@ -358,7 +358,7 @@
       }
     },
     {
-      "command": "build driving_center at:6,7",
+      "command": "build driving_center at:29,14",
       "timeout": 90,
       "interaction": [
         {
@@ -375,8 +375,8 @@
         },
         {
           "type": "pickTile",
-          "x": 6,
-          "z": 7
+          "x": 29,
+          "z": 14
         },
         {
           "type": "screenshot"
@@ -1342,7 +1342,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:6,9",
+      "command": "build freight_warehouse at:25,12",
       "timeout": 90,
       "interaction": [
         {
@@ -1363,8 +1363,8 @@
         },
         {
           "type": "pickTile",
-          "x": 6,
-          "z": 9
+          "x": 25,
+          "z": 12
         },
         {
           "type": "screenshot"
@@ -1375,7 +1375,7 @@
         }
       ],
       "role": "player",
-      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,9) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground). #1040: moved again to (25,12), alongside living_quarters (29,11) and driving_center (29,14), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts). The tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (25,12) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
@@ -1396,10 +1396,13 @@
           "equals": 0,
           "maxTicks": 300,
           "timeoutMs": 90000
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, and an idle employee whose own taskQueue holds one permanently-unreachable entry now falls through to the open pool instead of freezing forever). #689-followup: buildingCount was 3 once this landed -- the #681 mitigation earlier in this file (build-living-quarters/set-early-policy steps) also builds a driving_center (step 15, `build driving_center at:10,8`) so the driller can train and crew a drill_rig; that building was never demolished pre-#557, so by this point (living_quarters + driving_center + this freight_warehouse) 3 buildings genuinely stood, not 2. #557: buildingCount was 2, not 3 -- Damage.ts's processProjections attenuates debris out to the full 15m BLAST_DANGER_MARGIN_M (was an exact 2m HIT_RADIUS only, the audited gap #557 closed), and the OLD 3x3 grid at (20,20)/5kg/2m destroyed the living_quarters at (18,14) -- 6.3m from the nearest hole, well outside the old exact-hit radius but squarely inside the wider one (direct-traced: two hits, 3412 J then a lethal 4380 J, against 120 HP). At that point retuning was attempted and rejected: stemming was already at 2m against the 6m-deep pattern's own 1.8m (holeDepth*0.3) effectiveness cap, so raising it further did nothing (BlastCalc.ts), and the integer-only amount stepper's one available downward step (5kg->4kg) survived the building but downgraded the rating to BAD -- losing the CATASTROPHIC blast that beat existed to demonstrate. #949 changes the premise: the tutorial's own scripted blast is no longer supposed to be catastrophic at all -- a tutorial exists to teach a competent shot, not a disaster -- so the whole pattern retunes together (3x3/spacing:4/depth:8 at (22,20), amount:4kg, stemming effectively 2.4-2.5m, see the drill-plan/charge steps above), verified live for tutorialSteps.ts's own version of this exact plan to rate PERFECT with zero casualties or destroyed buildings. buildingCount is 3 again here, not 2: the living_quarters at (18,14) -- 6.3m from grid center as before, but now well clear of the new grid's own footprint (x:22-30, z:20-28 vs the old 20-26/20-26) as well as blast-energetic enough to survive regardless -- is no longer destroyed. driving_center and the freight_warehouse this step itself just finished both continue to survive as before. buildingCount:3 here is the target outcome verified for tutorialSteps.ts's own plan against the real engine, and this file's own identical geometry (3x3/spacing:4/depth:8 at (22,20)) was independently confirmed via command-mode (`run-all-scenarios.ts`) and interaction-mode (Puppeteer, screenshots) runs, both passing.",
+      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction, the last of the tutorial's three enforced pins (living_quarters, driving_center, freight_warehouse -- #1040's compact cluster). Screenshot captures the finished layout for visual inspection of the pins' mutual proximity. (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, and an idle employee whose own taskQueue holds one permanently-unreachable entry now falls through to the open pool instead of freezing forever). #689-followup: buildingCount was 3 once this landed -- the #681 mitigation earlier in this file (build-living-quarters/set-early-policy steps) also builds a driving_center (step 15, `build driving_center at:10,8`) so the driller can train and crew a drill_rig; that building was never demolished pre-#557, so by this point (living_quarters + driving_center + this freight_warehouse) 3 buildings genuinely stood, not 2. #557: buildingCount was 2, not 3 -- Damage.ts's processProjections attenuates debris out to the full 15m BLAST_DANGER_MARGIN_M (was an exact 2m HIT_RADIUS only, the audited gap #557 closed), and the OLD 3x3 grid at (20,20)/5kg/2m destroyed the living_quarters at (18,14) -- 6.3m from the nearest hole, well outside the old exact-hit radius but squarely inside the wider one (direct-traced: two hits, 3412 J then a lethal 4380 J, against 120 HP). At that point retuning was attempted and rejected: stemming was already at 2m against the 6m-deep pattern's own 1.8m (holeDepth*0.3) effectiveness cap, so raising it further did nothing (BlastCalc.ts), and the integer-only amount stepper's one available downward step (5kg->4kg) survived the building but downgraded the rating to BAD -- losing the CATASTROPHIC blast that beat existed to demonstrate. #949 changes the premise: the tutorial's own scripted blast is no longer supposed to be catastrophic at all -- a tutorial exists to teach a competent shot, not a disaster -- so the whole pattern retunes together (3x3/spacing:4/depth:8 at (22,20), amount:4kg, stemming effectively 2.4-2.5m, see the drill-plan/charge steps above), verified live for tutorialSteps.ts's own version of this exact plan to rate PERFECT with zero casualties or destroyed buildings. buildingCount is 3 again here, not 2: the living_quarters at (18,14) -- 6.3m from grid center as before, but now well clear of the new grid's own footprint (x:22-30, z:20-28 vs the old 20-26/20-26) as well as blast-energetic enough to survive regardless -- is no longer destroyed. driving_center and the freight_warehouse this step itself just finished both continue to survive as before. buildingCount:3 here is the target outcome verified for tutorialSteps.ts's own plan against the real engine, and this file's own identical geometry (3x3/spacing:4/depth:8 at (22,20)) was independently confirmed via command-mode (`run-all-scenarios.ts`) and interaction-mode (Puppeteer, screenshots) runs, both passing.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 0,
@@ -1409,13 +1412,26 @@
       }
     },
     {
-      "command": "contract accept type:rubble_disposal",
-      "timeout": 90,
+      "command": "tick 60",
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"contracts\"]"
         },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
+          "timeout": 30000
+        }
+      ],
+      "role": "player",
+      "description": "#1040: the three tutorial building pins moved into a compact cluster (living_quarters/driving_center/freight_warehouse now within TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES of each other) -- the shorter travel/construction time this buys lands build-storage's own completion tick earlier than before (tick 397, direct-traced command mode against this file's own exact command sequence through the step above), before any rubble_disposal offer exists in the contract pool yet. Direct-traced: no such offer exists at tick 437; the type first appears at the very next 20-tick refresh (tick 440, CONTRACT_REFRESH_INTERVAL, Contract.ts) and stays continuously present for hundreds of ticks after. Genuine beat, not a bare pad, matching tutorial-interactive.json's own equivalent fix: the tutorial's own 'contract-accept' stage is already active once build-storage completes, so a player opens the Contracts panel here and watches for the rubble_disposal offer to actually appear before clicking Accept in the step below -- `waitForSelector` on the offer's own accept button is the real, condition-based version of this wait; `tick 60` is the command-mode fallback (fixed padding, since command mode has no live UI to poll) -- this file's own command sequence up to this point diverges tick-for-tick from tutorial-interactive.json's, which is why the two files needed different pad sizes to land inside the same class of window. Moving the toolbar-open click here (rather than duplicating it on the accept step below, which would toggle an already-open panel closed) keeps every clickSelector meaningful to what a player would actually do."
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "timeout": 90,
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
@@ -1426,7 +1442,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids. Card sequence follows tutorialSteps.ts’s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract’s deadline no longer starts while a construction site is still going up.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids. Card sequence follows tutorialSteps.ts’s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract’s deadline no longer starts while a construction site is still going up. #1040: the toolbar-open click moved to the padding step above (the panel is already open by the time this step runs, so its own former toolbar click would have toggled it closed instead).",
       "expect": {
         "equals": {
           "activeContractCount": 1
