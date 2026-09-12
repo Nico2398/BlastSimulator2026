@@ -103,7 +103,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     'tutorial.step_livingquarters.title',
     'tutorial.step_livingquarters',
     (s) => countBuildingsOfType(s, 'living_quarters'),
-    ['build living_quarters at:29,12'],
+    ['build living_quarters at:29,11'],
     TOOLBAR_TARGET.build,
     // #556: ordering a building is queued work now — a site goes up over
     // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without
@@ -158,7 +158,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     'tutorial.step_drivingcenter.title',
     'tutorial.step_drivingcenter',
     (s) => countBuildingsOfType(s, 'driving_center'),
-    ['build driving_center at:6,7'],
+    ['build driving_center at:29,14'],
     TOOLBAR_TARGET.build,
     // #556: ordering a building is queued work now — a site goes up over
     // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without
@@ -424,7 +424,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // the step as already resolved and stalls waiting on a count that hasn't
   // changed yet -- same gap 'drill-plan'/'charge'/'sequence' document above.
   // tickBudget 60 comfortably clears the build plus walk time.
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:6,9'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:25,12'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
 
   // ── contract-accept ──
   // Moved below build-storage (#556). A contract's deadline starts running the

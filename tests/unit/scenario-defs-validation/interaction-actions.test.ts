@@ -552,14 +552,14 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     7: 'state',
     8: 'employee hire role:driller',
     9: 'employee assign_skill 2 skill:blasting level:3',
-    10: 'build living_quarters at:29,12',
+    10: 'build living_quarters at:29,11',
     // #1014 inserts one new observe-only step here (index 11, "state" —
     // asserts the tutorial card's waiting state once the order above lands,
     // already declaring its own timeout >= 90 is not required since it has
     // no heavy render of its own; excluded from this map on purpose) between
     // the living_quarters order and its wait_until, shifting every index
     // below down by 1 from the #923 numbering.
-    14: 'build driving_center at:6,7',
+    14: 'build driving_center at:29,14',
     16: 'employee train 2 skill:driving.drill_rig',
     17: 'tick 25',
     18: 'vehicle buy drill_rig',

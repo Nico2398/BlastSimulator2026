@@ -509,6 +509,28 @@ export const BLAST_DANGER_MARGIN_M = 15;
  */
 export const EVACUATION_CLEARANCE_M = 5;
 
+/**
+ * Tiles a tutorial building's footprint must clear from `tutorialHazards()`
+ * (drill/boxcut/vehicle-spawn points) for its fixed-map REGION pin to be
+ * legal. Distinct from `BLAST_DANGER_MARGIN_M`: that one gates in-blast
+ * evacuation/damage geometry during a live blast; this one gates whether a
+ * tutorial building's hardcoded pin is placed too close to a hazard at all.
+ */
+export const TUTORIAL_SITE_HAZARD_CLEARANCE_TILES = 5;
+
+/**
+ * Maximum Chebyshev span (tiles) allowed between the three tutorial building
+ * pins (warehouse, driving_center, living_quarters), so the cluster reads as
+ * one walkable site instead of scattering the player across the map.
+ */
+export const TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES = 6;
+
+/**
+ * Maximum tiles from the tutorial building cluster to the dig/drill area,
+ * keeping the round trip an employee walks between site and workface short.
+ */
+export const TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES = 10;
+
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 
 /** Decay rate for surface proximity effect based on distance to air voxel. */
