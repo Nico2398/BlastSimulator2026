@@ -14,7 +14,7 @@ import {
   claimActionsTargetedAtEmployee, fillIdleEmployeeFromQueueOrPool, reserveOnePoolActionAhead,
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
-import { clearResolvedEvacuationHolds, isMidEvacuationWalk, isMidEvacuationDrive } from './Evacuation.js';
+import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -114,15 +114,11 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // the employee was already standing — NeedTaskInsertion.ts) straight to
     // active, overwriting the evacuation destination with the employee's OWN
     // current position — inside the danger zone they were just ordered out
-    // of — before they ever take a step. See isMidEvacuationWalk's own doc
-    // comment (Evacuation.ts) for the shared reasoning across all four call
-    // sites (#557).
-    if (isMidEvacuationWalk(employee)) continue;
-    // Mid-evacuation-drive (isMidEvacuationDrive, #1042) — boarded a
-    // driverless vehicle and driving it clear rather than walking. Same
-    // reasoning as the walk guard above: dispatch must not reassign this
-    // employee while the vehicle drive is in flight.
-    if (isMidEvacuationDrive(state.vehicles, employee)) continue;
+    // of — before they ever take a step, whether on foot or driving a
+    // vehicle clear (isMidEvacuation, #1042). See isMidEvacuationWalk's own
+    // doc comment (Evacuation.ts) for the shared reasoning across all four
+    // call sites (#557).
+    if (isMidEvacuation(state, employee)) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);

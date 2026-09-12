@@ -122,7 +122,8 @@ export function clearZone(
         e.alive
         && isInZone(e.x, e.z, zone)
         && !boardingEmployeeIds.has(e.id)
-        && !inZoneDriverIds.has(e.id),
+        && !inZoneDriverIds.has(e.id)
+        && e.pendingDriverVehicleId === null,
       )
       .map(e => e.id);
 

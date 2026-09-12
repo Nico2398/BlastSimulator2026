@@ -15,7 +15,7 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
-import { isMidEvacuationWalk, isMidEvacuationDrive } from './Evacuation.js';
+import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
@@ -261,15 +261,13 @@ export function forceShiftRestIfNeededByPolicy(
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;
-  // Mid-evacuation-walk (isMidEvacuationWalk — see its own doc comment,
-  // Evacuation.ts, #557): without this, the #707 "genuinely idle" branch
-  // below would read them as free to reassign and overwrite the evacuation
-  // destination with a walk back toward a living_quarters, possibly right
-  // back inside the danger zone they were just ordered out of.
-  if (isMidEvacuationWalk(emp)) return;
-  // Mid-evacuation-drive (isMidEvacuationDrive, #1042) — same reasoning as
-  // the walk guard just above.
-  if (isMidEvacuationDrive(state.vehicles, emp)) return;
+  // Mid-evacuation, on foot or driving a vehicle clear (isMidEvacuation —
+  // see isMidEvacuationWalk's own doc comment, Evacuation.ts, #557, #1042):
+  // without this, the #707 "genuinely idle" branch below would read them as
+  // free to reassign and overwrite the evacuation destination with a walk
+  // back toward a living_quarters, possibly right back inside the danger
+  // zone they were just ordered out of.
+  if (isMidEvacuation(state, emp)) return;
 
   const snapshot = {
     id: emp.id, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked,

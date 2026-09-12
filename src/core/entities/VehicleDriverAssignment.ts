@@ -7,6 +7,7 @@
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
 import { getVehicleDef } from './Vehicle.js';
+import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 
 // ── Licence mapping ──
 
@@ -112,11 +113,22 @@ export function findBestEvacuationDriver(
     return a - b;
   });
 
+  // Cheap, exact qualification filter (licence, availability) applied to the
+  // whole ranked pool before any real pathfinding — mirrors
+  // selectBestActionForEmployee's own pre-filter (ActionSelection.ts). Only
+  // the nearest EVACUATION_DRIVER_MAX_PATH_ATTEMPTS qualified candidates then
+  // get a real `findPath`-backed `canReach` call, capping per-vehicle
+  // evacuation dispatch cost regardless of how many employees are in the
+  // zone (#1042 review).
+  const qualified: Employee[] = [];
   for (const candidateId of ranked) {
     const check = canAssignDriver(vehicleState, employeeState, vehicle.id, candidateId);
-    if (!check.success) continue;
-    if (!canReach(check.employee, vehicle)) continue;
-    return check.employee;
+    if (check.success) qualified.push(check.employee);
+  }
+
+  for (let i = 0; i < qualified.length && i < EVACUATION_DRIVER_MAX_PATH_ATTEMPTS; i++) {
+    const candidate = qualified[i]!;
+    if (canReach(candidate, vehicle)) return candidate;
   }
 
   return null;

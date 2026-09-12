@@ -257,7 +257,15 @@ function migrateV14ToV15(obj: Record<string, unknown>): Record<string, unknown> 
  */
 function migrateV16ToV17(obj: Record<string, unknown>): Record<string, unknown> {
   ensureFieldsOnEach(obj, 'vehicles', [
-    { key: 'pendingEvacuationDestination', predicate: v => v !== undefined, defaultValue: null },
+    {
+      key: 'pendingEvacuationDestination',
+      predicate: v =>
+        v !== null &&
+        typeof v === 'object' &&
+        typeof (v as { x?: unknown }).x === 'number' &&
+        typeof (v as { z?: unknown }).z === 'number',
+      defaultValue: null,
+    },
   ]);
   return obj;
 }

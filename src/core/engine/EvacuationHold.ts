@@ -207,6 +207,30 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
  * durationTicks preservation) all exist for the ONE action `emp` was actively
  * walking/working, which this never was.
  */
+export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, zone: ZoneBounds): void {
+  if (emp.taskQueue.length === 0) return;
+
+  const kept: number[] = [];
+  for (const actionId of emp.taskQueue) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    // Gone already (completed/removed through some other path this same
+    // tick) or targets somewhere outside the zone — nothing to release,
+    // stays queued for this employee to resume once idle, same as today.
+    if (action === undefined) continue;
+    if (!isInZone(action.targetX, action.targetZ, zone)) {
+      kept.push(actionId);
+      continue;
+    }
+
+    if (action.type === 'rest') {
+      completePendingAction(state, actionId);
+    } else {
+      releaseActionToOpenPool(state, action);
+    }
+  }
+  emp.taskQueue = kept;
+}
+
 /**
  * True when `employee` is currently driving a vehicle clear of an evacuating
  * zone (boarded a driverless vehicle rather than evacuating on foot, #1042)
@@ -248,28 +272,4 @@ export function releaseArrivedEvacuationDrivers(state: GameState): void {
     unassignDriver(state.vehicles, vehicle.id);
     vehicle.pendingEvacuationDestination = null;
   }
-}
-
-export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, zone: ZoneBounds): void {
-  if (emp.taskQueue.length === 0) return;
-
-  const kept: number[] = [];
-  for (const actionId of emp.taskQueue) {
-    const action = state.pendingActions.find(a => a.id === actionId);
-    // Gone already (completed/removed through some other path this same
-    // tick) or targets somewhere outside the zone — nothing to release,
-    // stays queued for this employee to resume once idle, same as today.
-    if (action === undefined) continue;
-    if (!isInZone(action.targetX, action.targetZ, zone)) {
-      kept.push(actionId);
-      continue;
-    }
-
-    if (action.type === 'rest') {
-      completePendingAction(state, actionId);
-    } else {
-      releaseActionToOpenPool(state, action);
-    }
-  }
-  emp.taskQueue = kept;
 }
