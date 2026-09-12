@@ -11,7 +11,12 @@ import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type Sur
 /** Opacity multiplier for stale (expired) survey points. */
 const STALE_OPACITY = 0.6;
 
-/** Z-fighting offset above terrain surface — this overlay's GroundTintLayer epsilon. */
+/**
+ * Z-fighting offset above terrain surface — this overlay's GroundTintLayer
+ * epsilon. A flat-ground baseline only: GroundTintLayer scales it up by the
+ * local terrain slope (`slopeScaledEpsilon`) so steep, blast-carved faces
+ * still clear the terrain mesh.
+ */
 const OVERLAY_Y_OFFSET = 0.05;
 
 // ---------- Types ----------
