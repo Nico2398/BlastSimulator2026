@@ -1233,6 +1233,51 @@
       }
     },
     {
+      "command": "tick 160",
+      "timeout": 90,
+      "description": "#1040: the three tutorial building pins moved into a compact cluster -- the shorter hauler round-trip this buys means the SAME muck pile the step above's own 200-tick pad used to spend the full 280 real ticks (491 -> 771) hauling now empties by tick 691 (direct-traced interaction mode, this fix), well before offer #40 (dirtite) ever rotated in under the old timing. By 691 the pool only carries absurdium/rustite/craktonite/blingite ore_sale offers, none of them dirtite. Reached for a straight bump of the step above's own `tick 200` first (tried `tick 350`/`tick 400` directly) and traced it live: it lands at the exact same tick as `tick 200` always did, no further -- once the hauler's own muck pile is empty, TutorialRails' clock-hold (`decideClock`, tutorialGuide.ts: `DEFAULT_TICK_BUDGET`/`WORK_GRACE_TICKS`) pauses the sim once this step's own budget is spent and nothing is genuinely in flight, by design (\"a step that asks the player to pick an offer must not let the list churn while they read it\") -- so a single larger tick request spends its extra ticks the instant the hold engages and gets no further, same as the step above already does on its own. What actually moves the clock again, direct-traced live: this file's own recurring employee_shift_change rest tasks (see the tick command's own console spam) each open a fresh burst of outstanding work that lifts the hold for a few ticks before it re-engages -- so genuine further progress needs the wait split into separate `tick 20` round trips rather than one bulk request the hold cuts short mid-call; each entry below is its own action so interaction mode gets a real round trip to the browser between them, which is what lets the hold's own live re-check see the fresh work and lift again. Direct-traced (interaction mode, this fix), the 8 `tick 20` entries below land 691 -> 692 (+1, hold already engaged) -> 712 -> 732 -> 752 -> 772 -> 792 -> 812 -> 832, where a dirtite ore_sale offer (id #47, 420kg, deadline 46 ticks) is confirmed on the board -- not present at 812, present at 832. Landed at the earliest confirmed-safe tick rather than a wider pad: cash crosses below BANKRUPTCY_THRESHOLD ($5,000, balance.ts) around tick 817 on this trajectory (the same linear payroll/fuel/maintenance drain the step above's own cash-sizing note already describes), and BANKRUPTCY_GRACE_TICKS is 100 -- landing at 832 (cash -$718.76, direct-traced) keeps the two steps below's own accept+deliver well inside that grace window instead of drifting deeper negative on a wider margin that buys nothing further (dirtite's own presence was already confirmed exactly at 832, not merely nearby).",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        },
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
       "command": "contract accept type:ore_sale material:dirtite",
       "timeout": 120,
       "description": "#959, the issue's own missing half, first beat: Accept clicked on a dirtite ore_sale offer -- an offer for rock this pit's own two blasts actually produced, unlike the sparkium/gloomium offers earlier rounds of this file chased and could never fill (#653). Scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` like every other contract click in this file (#513/#581/#554) so it can never silently accept a different contract than the command names, with a `waitForSelector` ahead of the click so the pool's own refresh cycle has a chance to surface the card rather than the click assuming it is there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 44` in command mode), so the same 200-tick wait above lands command mode on a different offer pool, where the console refuses this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all.",
