@@ -198,6 +198,11 @@ export class GroundTintLayer {
     this.geometry.setDrawRange(0, positions.length / 3);
   }
 
+  /**
+   * Winding invariant (#1043): vertex order in both triangles must produce a
+   * geometric normal pointing +Y (up), so the layer's `FrontSide` material
+   * is visible from above and culled from below the terrain.
+   */
   private emitCell(
     shape: { x: number; z: number }, color: THREE.Color, opacity: number,
     positions: number[], colors: number[],
@@ -211,6 +216,11 @@ export class GroundTintLayer {
     this.pushTri(verts[0]!, verts[2]!, verts[3]!, color, opacity, positions, colors);
   }
 
+  /**
+   * Winding invariant (#1043): rim vertex order in the fan triangle must
+   * produce a geometric normal pointing +Y (up), matching `emitCell`, so the
+   * layer's `FrontSide` material is visible from above and culled from below.
+   */
   private emitDisc(
     shape: { cx: number; cz: number; radius: number; segments?: number }, color: THREE.Color, opacity: number,
     positions: number[], colors: number[],
