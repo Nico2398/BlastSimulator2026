@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
-import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { createTween, stepTween, stepTweenWithHeight, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { workerModelId } from './models/ModelIds.js';
@@ -103,7 +103,6 @@ export class CharacterMesh {
    *   under its feet every frame instead of the last synced cell (#1038).
    */
   update(employees: Employee[], dt: number, heightAt?: (x: number, z: number) => number): void {
-    void heightAt; // TODO(#1038): implement — sample at the eased (x, z), not the tween target
     this.time += dt;
 
     for (const emp of employees) {
@@ -115,10 +114,22 @@ export class CharacterMesh {
       // Ease toward work position (duration-aware tween, #520)
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = stepTween(entry.tween, fromX, fromZ, emp.x, emp.z, dt);
-      entry.group.position.x = eased.x;
-      entry.group.position.z = eased.z;
-      this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
+      let easedX: number, easedZ: number;
+      if (heightAt) {
+        const eased = stepTweenWithHeight(entry.tween, fromX, fromZ, emp.x, emp.z, dt, heightAt);
+        entry.group.position.x = eased.x;
+        entry.group.position.y = eased.y;
+        entry.group.position.z = eased.z;
+        easedX = eased.x;
+        easedZ = eased.z;
+      } else {
+        const eased = stepTween(entry.tween, fromX, fromZ, emp.x, emp.z, dt);
+        entry.group.position.x = eased.x;
+        entry.group.position.z = eased.z;
+        easedX = eased.x;
+        easedZ = eased.z;
+      }
+      this.animateGait(entry, easedX - fromX, easedZ - fromZ, dt);
 
       // Body colour for injury state
       const roleColor = ROLE_COLORS[emp.role];

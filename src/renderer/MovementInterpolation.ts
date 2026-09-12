@@ -97,7 +97,6 @@ export function stepTweenWithHeight(
   dt: number,
   heightAt: (x: number, z: number) => number,
 ): { x: number; y: number; z: number } {
-  void tween; void renderX; void renderZ; void targetX; void targetZ; void dt; void heightAt;
-  // TODO: implement
-  throw new Error('not implemented');
+  const eased = stepTween(tween, renderX, renderZ, targetX, targetZ, dt);
+  return { x: eased.x, y: heightAt(eased.x, eased.z), z: eased.z };
 }

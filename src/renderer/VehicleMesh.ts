@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
-import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { createTween, stepTween, stepTweenWithHeight, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
@@ -85,7 +85,6 @@ export class VehicleMesh {
    *   under its wheels every frame instead of the last synced cell (#1038).
    */
   update(vehicles: Vehicle[], dt: number, heightAt?: (x: number, z: number) => number): void {
-    void heightAt; // TODO(#1038): implement — sample at the eased (x, z), not the tween target
     for (const v of vehicles) {
       const entry = this.vehicles.get(v.id);
       if (!entry) continue;
@@ -95,10 +94,22 @@ export class VehicleMesh {
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = stepTween(entry.tween, fromX, fromZ, targetX, targetZ, dt);
-      entry.group.position.x = eased.x;
-      entry.group.position.z = eased.z;
-      this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt);
+      let easedX: number, easedZ: number;
+      if (heightAt) {
+        const eased = stepTweenWithHeight(entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
+        entry.group.position.x = eased.x;
+        entry.group.position.y = eased.y;
+        entry.group.position.z = eased.z;
+        easedX = eased.x;
+        easedZ = eased.z;
+      } else {
+        const eased = stepTween(entry.tween, fromX, fromZ, targetX, targetZ, dt);
+        entry.group.position.x = eased.x;
+        entry.group.position.z = eased.z;
+        easedX = eased.x;
+        easedZ = eased.z;
+      }
+      this.animateMotion(entry, easedX - fromX, easedZ - fromZ, dt);
       applyStateIndicator(entry.group, v.state);
     }
   }
