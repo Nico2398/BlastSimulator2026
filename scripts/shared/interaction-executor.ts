@@ -41,6 +41,21 @@ export const CLICK_SELECTOR_DEFAULT_TIMEOUT_MS = 5000;
  */
 export const CLICK_SELECTOR_ZERO_SIZE_GRACE_MS = 10000;
 
+/**
+ * Attempts `clickSelector` makes at the real `page.click()` call before
+ * giving up, when each failed attempt reads back zero-size (attached,
+ * unblocked, but no layout box). Distinct from the poll loop's own
+ * `CLICK_SELECTOR_ZERO_SIZE_GRACE_MS`: that grace covers the wait *before*
+ * this click; this retries the click itself, because a control the probe
+ * just called usable can still read zero-size to Puppeteer's own click() a
+ * beat later on a heavily loaded CI runner — the gap between the last poll
+ * and the real click is exactly what the poll-side grace does not reach
+ * (`sandbox-mode`'s report-close, CI run 34690787172, PR #1053 CI-fix).
+ * Every other failure reason (vanished, disabled, covered, ...) still fails
+ * on the very first attempt — only a zero-size readback retries.
+ */
+export const CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES = 3;
+
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
   left: 'left',
@@ -572,18 +587,28 @@ export async function executeActionOnPage(
         }
         await new Promise((r) => setTimeout(r, 150));
       }
-      try {
-        await page.click(action.selector, { button: btn });
-      } catch (err) {
-        // Puppeteer's own message ("Node is either not clickable or not an
-        // Element") names nothing, so a failure reports only that *something*
-        // on the page could not be clicked. Name the selector and say why it
-        // was refused — inert almost always means a `pointer-events: none`
-        // rail, which is a real player-facing block, not a test flake.
-        throw new Error(
-          `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
-          { cause: err },
-        );
+      for (let clickAttempt = 1; ; clickAttempt++) {
+        try {
+          await page.click(action.selector, { button: btn });
+          break;
+        } catch (err) {
+          // Puppeteer's own message ("Node is either not clickable or not an
+          // Element") names nothing, so a failure reports only that
+          // *something* on the page could not be clicked. Name the selector
+          // and say why it was refused — inert almost always means a
+          // `pointer-events: none` rail, which is a real player-facing block,
+          // not a test flake.
+          const inspected = await inspectSelector(page, action.selector);
+          const staleZeroSize = inspected.found === true && inspected.width === 0 && inspected.height === 0;
+          if (staleZeroSize && clickAttempt < CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES) {
+            await new Promise((r) => setTimeout(r, 150));
+            continue;
+          }
+          throw new Error(
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(inspected)}`,
+            { cause: err },
+          );
+        }
       }
       break;
     }
