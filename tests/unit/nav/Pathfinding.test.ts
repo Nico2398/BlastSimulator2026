@@ -1000,14 +1000,31 @@ describe('isImpassable — isAgentCell exemption (#954)', () => {
     expect(isImpassable(cell, false, false)).toBe(false);
   });
 
-  it('still blocks a genuinely blocked (building) cell for isAgentCell true — only occupancy flags are exempted, not solidity', () => {
+  it('does NOT block a genuinely blocked (building) cell for isAgentCell true (#1025 — corrected contract: the agent\'s own current cell is never impassable to itself, not even blocked/void)', () => {
+    // #1025: a fatigue-frozen employee gets clampToGrid'd onto a discrete
+    // cell; if a building's footprint later occupies that exact cell, the
+    // OLD contract here (isAgentCell true still blocks 'blocked') made every
+    // subsequent findPath call from that position fail permanently, since the
+    // agent's own current cell read impassable to itself. isAgentCell must
+    // bypass type solidity entirely, exactly like it already bypasses
+    // occupancy flags above.
     const cell = makeCell('blocked');
-    expect(isImpassable(cell, true, true)).toBe(true);
+    expect(isImpassable(cell, true, true)).toBe(false);
   });
 
-  it('still blocks a void cell for isAgentCell true', () => {
+  it('does NOT block a void cell for isAgentCell true (#1025 — same corrected contract)', () => {
     const cell = makeCell('void');
-    expect(isImpassable(cell, true, true)).toBe(true);
+    expect(isImpassable(cell, true, true)).toBe(false);
+  });
+
+  it('unchanged: still blocks a blocked cell when isAgentCell is false (not the agent\'s own cell)', () => {
+    const cell = makeCell('blocked');
+    expect(isImpassable(cell, true, false)).toBe(true);
+  });
+
+  it('unchanged: still blocks a void cell when isAgentCell is omitted (defaults to not-the-agent\'s-own-cell)', () => {
+    const cell = makeCell('void');
+    expect(isImpassable(cell, true)).toBe(true);
   });
 });
 

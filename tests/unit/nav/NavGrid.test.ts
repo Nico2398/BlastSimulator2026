@@ -1347,7 +1347,17 @@ describe('NavGrid.computeReachableSet', () => {
     expect(reachable.has(3, 3)).toBe(true);
   });
 
-  it('returns an empty set when the anchor itself sits on a non-traversable cell', () => {
+  it('always includes the anchor itself, even when it sits on a non-traversable cell (#1025 — corrected contract)', () => {
+    // #1025: a fatigue-frozen employee gets clampToGrid'd onto a discrete
+    // cell; if a building footprint later occupies that exact cell, the OLD
+    // contract here (anchor on a non-traversable cell -> empty set) meant the
+    // employee's own current position could never be proven reachable from
+    // itself, which fed straight into the same permanent-deadlock bug
+    // isImpassable's isAgentCell exemption fixes on the Pathfinding side. The
+    // anchor cell is always a member of its own reachable set when in-bounds,
+    // and every OTHER cell in the grid still passes ordinary traversability
+    // checks unchanged — this fixture is fully open elsewhere, so the whole
+    // 5x5 grid comes back.
     const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
       Array.from({ length: 5 }, (): NavCellType => 'walkable'));
     rows[2]![2] = 'void';
@@ -1355,7 +1365,34 @@ describe('NavGrid.computeReachableSet', () => {
 
     const reachable = NavGrid.computeReachableSet(nav, 2, 2);
 
-    expect(reachable.size).toBe(0);
+    expect(reachable.size).toBe(25);
+    expect(reachable.has(2, 2)).toBe(true);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        expect(reachable.has(x, z)).toBe(true);
+      }
+    }
+  });
+
+  it('a fully-enclosed anchor (every neighbour non-traversable) returns exactly {anchor}, size 1 — not empty (#1025)', () => {
+    // Anchor at (2,2) walled on all 8 neighbouring cells with 'blocked' —
+    // mirrors a building footprint that has occupied every cell immediately
+    // around a fatigue-frozen employee's own discrete cell. No traversable
+    // neighbour exists to flood into, so the set must contain the anchor and
+    // nothing else — never empty, since the anchor itself is always a member
+    // (distinct from the void-ring pocket fixture above: here the anchor's
+    // own neighbours, not a ring one cell further out, are the wall).
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    for (const [x, z] of [[1, 1], [2, 1], [3, 1], [1, 2], [3, 2], [1, 3], [2, 3], [3, 3]] as const) {
+      rows[z]![x] = 'blocked';
+    }
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 2, 2);
+
+    expect(reachable.size).toBe(1);
+    expect(reachable.has(2, 2)).toBe(true);
   });
 
   it('agrees with findNearestReachableCell on a shared pocket fixture (regression guard)', () => {
