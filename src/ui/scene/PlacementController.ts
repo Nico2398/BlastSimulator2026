@@ -230,15 +230,30 @@ export class PlacementController {
 
   /**
    * Set the selection directly and enter 'selected', bypassing real pointer
-   * events. For the command-mode scenario harness only (window.__placement)
-   * — a `role: 'player'` step's `interaction` array is what carries the
+   * events only for deriving screen pixels from a 3D world tile. For the
+   * command-mode scenario harness only (window.__placement) — a
+   * `role: 'player'` step's `interaction` array is what carries the
    * click-only requirement, and command mode has no such step, so this
    * shortcut is exact rather than fragile where re-deriving screen pixels
-   * for a 3D world tile on every call would be. Works for point mode too
-   * (pass the same tile twice). No-op while idle/confirmed, same as a real drag.
+   * on every call would be. It still runs the same claimCheck/footprintCheck/
+   * region-liveness validation onMouseDown runs, against the anchor tile
+   * (x1, z1) only — a harness-driven pick is refused exactly as a
+   * pointer-driven pick would be. Works for point mode too (pass the same
+   * tile twice). No-op while idle/confirmed, same as a real drag.
    */
   paintRect(x1: number, z1: number, x2: number, z2: number): void {
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
+    const { regionLive, claimRefusalReason, footprintCheckFailed } = this.evaluateTileChecks({ x: x1, z: z1 });
+    if (!regionLive || claimRefusalReason !== null) {
+      this.claimRefusalReason = claimRefusalReason;
+      this.blockedTile = { x: x1, z: z1 };
+      this.footprintCheckFailed = footprintCheckFailed;
+      this.notify();
+      return;
+    }
+    this.claimRefusalReason = null;
+    this.blockedTile = null;
+    this.footprintCheckFailed = footprintCheckFailed;
     this.anchor = { x: x1, z: z1 };
     this.current = { x: x2, z: z2 };
     this.phase = 'selected';
@@ -267,6 +282,27 @@ export class PlacementController {
     return regionContains(live, tile.x, tile.z);
   }
 
+  /**
+   * Region-liveness, claim-refusal and footprint-check outcome for a single
+   * tile, shared by onMouseMove/onMouseDown/paintRect so the three tile-check
+   * consumers stay identical. footprintCheckFailed is only meaningful (and
+   * only ever true) when regionLive holds and the claim check passed.
+   */
+  private evaluateTileChecks(tile: { x: number; z: number } | null): {
+    regionLive: boolean;
+    claimRefusalReason: ClaimRefusalReason | null;
+    footprintCheckFailed: boolean;
+  } {
+    const regionLive = tile !== null && this.isLive(tile);
+    const claimRefusalReason = tile !== null && regionLive
+      ? (this.claimCheck?.(tile.x, tile.z) ?? null)
+      : null;
+    const footprintCheckFailed = tile !== null && regionLive && claimRefusalReason === null && this.footprintCheck !== null
+      ? !this.footprintCheck(tile.x, tile.z)
+      : false;
+    return { regionLive, claimRefusalReason, footprintCheckFailed };
+  }
+
   private onMouseMove(e: MouseEvent): void {
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
     const tile = this.tileUnderCursor(e);
@@ -277,13 +313,9 @@ export class PlacementController {
     }
 
     this.hoverTile = tile;
-    const regionLive = tile !== null && this.isLive(tile);
-    this.claimRefusalReason = tile !== null && regionLive
-      ? (this.claimCheck?.(tile.x, tile.z) ?? null)
-      : null;
-    this.footprintCheckFailed = tile !== null && regionLive && this.claimRefusalReason === null && this.footprintCheck !== null
-      ? !this.footprintCheck(tile.x, tile.z)
-      : false;
+    const { regionLive, claimRefusalReason, footprintCheckFailed } = this.evaluateTileChecks(tile);
+    this.claimRefusalReason = claimRefusalReason;
+    this.footprintCheckFailed = footprintCheckFailed;
     const live = regionLive && this.claimRefusalReason === null;
     // Out-of-bounds (region OR claim refusal) reads as refused rather than as
     // nothing at all: the overlay paints this tile red and the strip says why.
@@ -297,11 +329,8 @@ export class PlacementController {
     if (e.button !== 0) return;
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
     const tile = this.tileUnderCursor(e);
-    const regionLive = tile !== null && this.isLive(tile);
-    const claimReason = tile !== null && regionLive ? (this.claimCheck?.(tile.x, tile.z) ?? null) : null;
-    this.footprintCheckFailed = tile !== null && regionLive && claimReason === null && this.footprintCheck !== null
-      ? !this.footprintCheck(tile.x, tile.z)
-      : false;
+    const { regionLive, claimRefusalReason: claimReason, footprintCheckFailed } = this.evaluateTileChecks(tile);
+    this.footprintCheckFailed = footprintCheckFailed;
     if (!tile || !regionLive || claimReason !== null) {
       // Anchor outside the pinned region, or refused a site claim: no
       // rectangle starts, but the refusal is shown. Returning in silence here
