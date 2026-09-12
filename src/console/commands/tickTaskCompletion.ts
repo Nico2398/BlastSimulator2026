@@ -14,7 +14,7 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../../core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../../core/mining/Ramp.js';
-import { carveLevelCells } from '../../core/mining/LevelGround.js';
+import { carveLevelCells, levelGroundRect } from '../../core/mining/LevelGround.js';
 import { patchNavGridForRegion } from '../../core/engine/TaskProgress.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../../core/entities/Building.js';
@@ -216,6 +216,24 @@ export function resolveTaskCompletion(
           if (ctx.grid) {
             const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
             footprintRegion = makeFootprintRegion(order.x, order.z, sizeX, sizeZ);
+            // Construction ends by cutting the ground under the footprint down
+            // to its lowest column (#1008 refinement). Placement tolerates a
+            // one-level slope (BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD) so siting
+            // a building is not a tile-by-tile hunt for perfectly level
+            // ground; this is the other half of that bargain — the finished
+            // building stands on flat ground regardless, rather than on the
+            // step it was allowed to straddle. Runs AFTER placeBuilding's own
+            // levelness re-check above, never before: carving first would make
+            // that check trivially pass and silently swallow a site a blast
+            // wrecked mid-construction, which is exactly what it exists to
+            // catch. A footprint already level carves nothing.
+            const levelled = levelGroundRect(ctx.grid, footprintRegion, emitter);
+            if (levelled.voxelsCleared > 0) {
+              lines.push(`[tick ${state.tickCount}] Footprint levelled for ${order.type} T${order.tier}: ${levelled.voxelsCleared} voxels cleared.`);
+            }
+            // Patched after the carve, so the NavGrid cells around the site
+            // carry their new surface heights (isStepClimbable reads them) and
+            // not the pre-construction ones.
             patchBuildingNavGrid(state, ctx.grid, footprintRegion);
           }
           // The employee who just finished the work is standing on the

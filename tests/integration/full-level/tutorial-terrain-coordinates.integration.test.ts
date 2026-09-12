@@ -12,7 +12,8 @@ import { surveyCommand } from '../../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import { buildRampCommand } from '../../../src/console/commands/mining.js';
 import {
-  isFootprintFlat,
+  footprintHeightSpread,
+  isFootprintBuildable,
   getSurfaceY,
   BUILDING_DEFS,
   type BuildingType,
@@ -22,7 +23,7 @@ import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
-import { HIRING_COSTS } from '../../../src/core/config/balance.js';
+import { HIRING_COSTS, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../../src/core/config/balance.js';
 
 const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
 
@@ -128,6 +129,9 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
   });
 
   // ── Test 2: pinned regions are flat for their own building's footprint (#1008) ──
+  // Dead flat, not merely within the placement tolerance: the tutorial teaches
+  // the habit, so its guided sites should be the unambiguous case rather than
+  // ones that lean on the one-level allowance.
 
   describe.each([
     ['warehouse', PINNED_REGIONS.warehouse],
@@ -138,7 +142,8 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
       const def = BUILDING_DEFS[region.type][region.tier];
       const heightAt = (cx: number, cz: number): number => getSurfaceY(ctx.grid!, cx, cz);
 
-      expect(isFootprintFlat(def.footprint, region.x, region.z, heightAt)).toBe(true);
+      expect(footprintHeightSpread(def.footprint, region.x, region.z, heightAt)).toBe(0);
+      expect(isFootprintBuildable(def.footprint, region.x, region.z, heightAt)).toBe(true);
     });
   });
 
@@ -225,11 +230,16 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     ['drivingCenter', OLD_REGIONS.drivingCenter],
     ['livingQuarters', OLD_REGIONS.livingQuarters],
   ] as const)('old %s region (regression)', (_name, region) => {
-    it(`is NOT flat for a ${region.type} T${region.tier} footprint at (${region.x},${region.z})`, () => {
+    it(`is NOT buildable for a ${region.type} T${region.tier} footprint at (${region.x},${region.z})`, () => {
       const def = BUILDING_DEFS[region.type][region.tier];
       const heightAt = (cx: number, cz: number): number => getSurfaceY(ctx.grid!, cx, cz);
 
-      expect(isFootprintFlat(def.footprint, region.x, region.z, heightAt)).toBe(false);
+      // Refused outright, not just non-flat: each old site spans two or three
+      // voxel levels, well past the one-level placement tolerance — so moving
+      // the regions was not made redundant by adding that tolerance.
+      expect(footprintHeightSpread(def.footprint, region.x, region.z, heightAt))
+        .toBeGreaterThan(BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD);
+      expect(isFootprintBuildable(def.footprint, region.x, region.z, heightAt)).toBe(false);
     });
   });
 

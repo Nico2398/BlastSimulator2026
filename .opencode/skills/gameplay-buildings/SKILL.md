@@ -84,7 +84,12 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 ## Placement Rules
 
 1. **Fixed footprint:** cell pattern per type+tier (2×2, 3×1, L-shape…); higher tiers = larger footprint
-2. **Flat surface required:** all cells in footprint must be at same surface height
+2. **Level enough, then levelled:** the footprint's surface heights may spread at most
+   `BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD` voxel levels (`isFootprintBuildable`, `Building.ts`) — a slight
+   slope is a legal site, a steeper one is refused with `'Uneven surface'`. Whatever step the placement
+   tolerated is then cut away: finishing construction (and an upgrade or a relocation, which land a
+   footprint on unlevelled ground too) levels the footprint down to its lowest column
+   (`levelGroundRect`, `LevelGround.ts`), so a standing building always sits on flat ground
 3. **Protected voxels:** voxels beneath building cannot be drilled or blasted (blocked with error)
 4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly
 5. **No overlap:** buildings cannot overlap each other

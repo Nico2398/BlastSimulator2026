@@ -8,6 +8,7 @@ import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
+import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../config/balance.js';
 
 // ── Building types ──
 
@@ -120,25 +121,47 @@ export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
 }
 
 /**
- * Whether every cell of a footprint placed at (x, z) sits at the same terrain
- * height, per `heightAt` — the flatness rule the real placement path
- * (`checkFootprintPlacement`) is missing (#1008).
+ * Difference between the highest and lowest terrain height under a footprint
+ * placed at (x, z), per `heightAt` — 0 on perfectly level ground. An empty
+ * footprint covers no ground and spreads 0.
+ *
+ * The one measure of ground unevenness the placement rule is built on
+ * (`isFootprintBuildable` below): callers that want "is this dead flat" ask
+ * for a spread of 0 rather than carrying a second predicate of their own,
+ * which is the split #1008 removed.
  */
-export function isFootprintFlat(
+export function footprintHeightSpread(
   footprint: ReadonlyArray<readonly [number, number]>,
   x: number, z: number,
   heightAt: (cx: number, cz: number) => number,
-): boolean {
-  let referenceHeight: number | undefined;
+): number {
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
   for (const [dx, dz] of footprint) {
     const h = heightAt(x + dx, z + dz);
-    if (referenceHeight === undefined) {
-      referenceHeight = h;
-    } else if (h !== referenceHeight) {
-      return false;
-    }
+    if (h < minHeight) minHeight = h;
+    if (h > maxHeight) maxHeight = h;
   }
-  return true;
+  return maxHeight === -Infinity ? 0 : maxHeight - minHeight;
+}
+
+/**
+ * Whether the ground under a footprint placed at (x, z) is level enough to
+ * build on — its height spread is within `maxSpread` voxel levels (#1008,
+ * tolerance added as its refinement).
+ *
+ * Not "is it flat": a footprint straddling a single voxel step is buildable,
+ * and construction ends by cutting that step away (`levelGroundRect`,
+ * LevelGround.ts) so the finished building still stands on flat ground. See
+ * BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD for why the tolerance is one level.
+ */
+export function isFootprintBuildable(
+  footprint: ReadonlyArray<readonly [number, number]>,
+  x: number, z: number,
+  heightAt: (cx: number, cz: number) => number,
+  maxSpread: number = BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
+): boolean {
+  return footprintHeightSpread(footprint, x, z, heightAt) <= maxSpread;
 }
 
 // ── Building instance ──
@@ -430,8 +453,10 @@ export interface FootprintOccupant {
  * order-then-build path.
  *
  * When `voxelGrid` is supplied, and only after bounds/occupancy pass, the
- * footprint's ground must also be flat (#1008) — omitting `voxelGrid` skips
- * that check entirely, for call sites with no grid to check against.
+ * footprint's ground must also be level enough to build on (#1008 —
+ * `isFootprintBuildable`, which tolerates a one-level step) — omitting
+ * `voxelGrid` skips that check entirely, for call sites with no grid to check
+ * against.
  */
 export function checkFootprintPlacement(
   occupants: ReadonlyArray<FootprintOccupant>,
@@ -462,8 +487,8 @@ export function checkFootprintPlacement(
   }
 
   if (voxelGrid !== undefined) {
-    const flat = isFootprintFlat(def.footprint, x, z, (cx, cz) => getSurfaceY(voxelGrid, cx, cz));
-    if (!flat) {
+    const buildable = isFootprintBuildable(def.footprint, x, z, (cx, cz) => getSurfaceY(voxelGrid, cx, cz));
+    if (!buildable) {
       return { valid: false, error: 'Uneven surface' };
     }
   }

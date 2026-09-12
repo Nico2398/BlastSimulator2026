@@ -3308,7 +3308,7 @@
   "shell.placement.outside_region": "Hors de la zone indiquée — cliquez à l’intérieur du contour bleu.",
   "shell.placement.pick_first": "Cliquez d’abord sur la zone indiquée dans la scène.",
   "shell.placement.refused_protected_ground": "Terrain protégé — un village, une rivière ou un site remarquable s’y trouve.",
-  "shell.placement.refused_uneven_ground": "Terrain irrégulier — chaque case couverte par le bâtiment doit être à la même hauteur.",
+  "shell.placement.refused_uneven_ground": "Pente trop forte \u2014 le terrain couvert par le b\u00e2timent ne peut varier que de {max} niveau(x) au maximum.",
   "shell.placement.refused_expansion_disabled": "Hors du site, et ce site ne peut pas être agrandi.",
   "shell.placement.refused_too_far": "Trop loin du site pour être réclamé en une seule action.",
   "console.no_game_loaded": "Aucune partie chargée. Utilisez new_game d'abord.",

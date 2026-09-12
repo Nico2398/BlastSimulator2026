@@ -1,6 +1,6 @@
 {
   "name": "nav-path-following-visual",
-  "description": "Tests path following with building obstacles; stuck-state coverage disabled pending #1022 — see TODO comments below",
+  "description": "Tests path following and stuck state with building obstacles",
   "steps": [
     {
       "command": "new_game seed:42 cash:80000",
@@ -101,9 +101,8 @@
       "role": "observe"
     },
     {
-      "command": "build management_office at:2,0",
-      "description": "First wall segment: seals the east side of the (0,0) corner (x:2-3, z:0-1). #556: confirming a placement only queues a construction site now — one of the two idle drillers hired above walks over and builds each wall segment for real; a waitUntil step below drives all three to completion before employee #1 is dispatched toward the now-sealed corner. TODO(#1022): #1008's flatness rule refuses this placement on seed 42's terrain (the (0,0) corner is not flat, and no other map corner is both flat and on the driller spawn's benchLevel) — disabled via commandOutcome:refused until the trap is redesigned.",
-      "commandOutcome": "refused",
+      "command": "build management_office at:0,6",
+      "description": "Walls the pocket off from the north: a 2x2 management_office covering (0,6)-(1,7), which blocks both cells directly north of the pocket. Its footprint is dead flat at surface height 37 on seed 42's terrain, as are the other two below -- the whole x:0-2, z:8-11 shelf is one level, so this trap needs no help from the placement tolerance (#1008). #556: confirming a placement only queues a construction site; one of the three idle drillers walks over and builds each wall for real, and the waitUntil step below drives all three to completion before anyone is dispatched into the pocket.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -119,8 +118,8 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
-          "z": 0
+          "x": 0,
+          "z": 6
         },
         {
           "type": "screenshot"
@@ -132,16 +131,17 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "orderedBuildingCount": 0
-        },
-        "note": "TODO(#1022): rejected: Uneven surface — the (0,0) corner's (2,0) footprint is not flat under #1008's placement rule"
+          "orderedBuildingCount": 1
+        }
       }
     },
     {
-      "command": "build management_office at:0,2",
-      "description": "Second wall segment: seals the south side of the (0,0) corner (x:0-1, z:2-3). TODO(#1022): refused for the same reason as the first wall segment — see its description.",
-      "commandOutcome": "refused",
+      "command": "build management_office at:0,10",
+      "description": "Walls the pocket off from the south: covers (0,10)-(1,11), blocking both cells directly south of the pocket.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -154,7 +154,7 @@
         {
           "type": "pickTile",
           "x": 0,
-          "z": 2
+          "z": 10
         },
         {
           "type": "screenshot"
@@ -166,16 +166,17 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "orderedBuildingCount": 0
-        },
-        "note": "TODO(#1022): rejected: Uneven surface"
+          "orderedBuildingCount": 2
+        }
       }
     },
     {
-      "command": "build management_office at:2,2",
-      "description": "Third wall segment: fills the diagonal corner gap (x:2-3, z:2-3) so no 8-directional diagonal move can slip past the wall. TODO(#1022): refused for the same reason as the first wall segment — see its description.",
-      "commandOutcome": "refused",
+      "command": "build management_office at:1,8",
+      "description": "Closes the pocket's only remaining side: covers (1,8)-(2,9), blocking the two cells east of it. With the west side sealed by the x=0 world edge, the pocket (0,8)-(0,9) is now enclosed on all 8 directions -- Pathfinding.ts admits a diagonal step with no corner rule, so every diagonal out of the pocket ((1,7) and (1,10)) has to be blocked too, which the north and south walls already cover.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -187,8 +188,8 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
-          "z": 2
+          "x": 1,
+          "z": 8
         },
         {
           "type": "screenshot"
@@ -200,21 +201,24 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "orderedBuildingCount": 0
+          "orderedBuildingCount": 3
         },
-        "note": "TODO(#1022): rejected: Uneven surface"
+        "note": "Confirming placement only queues a construction site (#556) -- the next step waits for all three walls to actually land before the pocket is genuinely sealed."
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:0 max_ticks:300",
-      "description": "TODO(#1022): all three wall-segment builds above are refused under #1008's flatness rule, so buildingCount never leaves 0 — this step now only confirms that degraded state rather than driving real construction to completion.",
+      "command": "wait_until field:buildingCount equals:3 max_ticks:300",
+      "description": "Drive all three wall sites to completion (#556) -- the idle drillers do the walking and building.",
       "timeout": 95,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 0,
+          "equals": 3,
           "maxTicks": 300,
           "timeoutMs": 90000
         }
@@ -222,18 +226,18 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 0,
+          "buildingCount": 3,
           "orderedBuildingCount": 0
         }
       }
     },
     {
-      "command": "employee dispatch 1 x:20 z:20",
-      "description": "TODO(#1022): historically dispatched only once the corner was fully sealed by three real walls (#556) — see the (now-disabled) build steps above for why no wall ever forms today, so this dispatch just resolves normally instead of getting stuck. Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
+      "command": "employee dispatch 1 x:0 z:8",
+      "description": "Dispatches employee #1 INTO the sealed pocket, at (0,8). Every route into it fails -- the pocket is enclosed by the three walls above plus the x=0 world edge -- so after STUCK_THRESHOLD consecutive pathfinding failures employee #1 flips to the stuck state. #1022 inverted the trap this file used to run: it used to seal the (0,0) map corner around the driller who had just finished building the last wall and dispatch them OUT, which made the whole assertion hinge on that builder still standing inside the pocket when it closed -- and #1008's placement rule then refused all three corner footprints outright, since that corner sits on a hillside (spread 2 across (2,0)-(3,1)) and no map corner is both flat and on the drillers' own bench level. Walling off a pocket and pathing into it from outside proves the same enclosure through the same A* search, with nothing riding on where a builder happens to be standing. Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:20 z:20"
+          "command": "employee dispatch 1 x:0 z:8"
         }
       ],
       "expect": {
@@ -245,7 +249,7 @@
     },
     {
       "command": "tick 5",
-      "description": "TODO(#1022): the wall was never built (all three placements refused under #1008's flatness rule), so (0,0) is never enclosed and employee #1's dispatch above resolves normally instead of getting stuck.",
+      "description": "Every route into the pocket fails since (0,8)-(0,9) is fully enclosed -- after STUCK_THRESHOLD consecutive failures employee #1 flips to the stuck state.",
       "interaction": [
         {
           "type": "command",
@@ -254,13 +258,12 @@
       ],
       "role": "setup",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "stuckEmployeeCount": 0
-        },
-        "note": "TODO(#1022): was 1, with cash decreasing (building upkeep), while the (now-disabled) trap stood; see issue for the redesign that restores it. No buildings exist now, so upkeep no longer drains cash over these 5 ticks."
+          "stuckEmployeeCount": 1
+        }
       }
     },
     {
@@ -285,12 +288,12 @@
       "role": "observe"
     },
     {
-      "command": "employee dispatch 1 x:20 z:20",
-      "description": "TODO(#1022): re-dispatched to the same target as before (#556) — historically unreachable while the trap wall stood; now a normal, resolvable dispatch since #1008's flatness rule keeps that wall from ever being built.",
+      "command": "employee dispatch 1 x:0 z:8",
+      "description": "Re-dispatched to the same sealed pocket as before (#556) -- still unreachable, so employee #1 stays stuck.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:20 z:20"
+          "command": "employee dispatch 1 x:0 z:8"
         }
       ],
       "role": "bootstrap",
@@ -314,9 +317,9 @@
           "cash"
         ],
         "equals": {
-          "stuckEmployeeCount": 0
+          "stuckEmployeeCount": 1
         },
-        "note": "TODO(#1022): was 1 (Shortened 10 -> 5 ticks, #556) while the trap stood; the wall never gets built now that #1008's flatness rule refuses it, so there is nothing to be stuck behind."
+        "note": "Shortened 10 -> 5 ticks (#556): the crew now spends ~65 ticks building the three offices before this block, so Walt enters it with fatigue already at ~35 and collapses 13 ticks in — and a collapsed employee is not a stuck one. Ten more ticks would have measured the collapse rather than the walled-off route this file is about; five keeps the whole block inside the window where the route itself is what is failing."
       }
     },
     {
@@ -332,61 +335,74 @@
     },
     {
       "command": "build destroy 1",
-      "description": "TODO(#1022): building #1 was never placed — all three wall builds above are refused under #1008's flatness rule — so there is no row/button in the DOM for a click to target; this demolition is refused too (\"Building #1 not found.\").",
-      "commandOutcome": "refused",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 1"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "buildingCount": 0
-        },
-        "note": "TODO(#1022): rejected: Building #1 not found."
+          "buildingCount": 2
+        }
       }
     },
     {
       "command": "build destroy 2",
-      "description": "TODO(#1022): same reason as `build destroy 1` above.",
-      "commandOutcome": "refused",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 2"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "buildingCount": 0
-        },
-        "note": "TODO(#1022): rejected: Building #2 not found."
+          "buildingCount": 1
+        }
       }
     },
     {
       "command": "build destroy 3",
-      "description": "TODO(#1022): same reason as `build destroy 1` above — nothing was ever built, so there is no corner to reopen and no stuck agent to free.",
-      "commandOutcome": "refused",
+      "description": "Demolish all three walls -- the previously stuck agent should be able to reach (0,8) once the pocket is open again.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 3"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 0
-        },
-        "note": "TODO(#1022): rejected: Building #3 not found."
+        }
       }
     },
     {
       "command": "tick 15",
-      "description": "Advance ticks after demolition. TODO(#1022): no agent was ever stuck — the three `build destroy` calls above are themselves refused (\"Building #N not found\"), since nothing was ever built.",
+      "description": "Advance ticks after demolition — the stuck agent should resume moving toward its destination.",
       "interaction": [
         {
           "type": "command",
