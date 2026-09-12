@@ -603,6 +603,55 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(held.status).toBe('in_progress');
   });
 
+  // NEW (#1049): widens PROTECTED_MID_EXECUTION_ACTION_TYPES to also cover
+  // charge_hole — same fragmentation bug class as #1039's place_building
+  // case (timer-driven via taskTicksRemaining, no vehicle gate). Modeled
+  // directly on the #1039 place_building test above. Currently red: the
+  // skeleton's PROTECTED_MID_EXECUTION_ACTION_TYPES only contains
+  // 'place_building', so this guard does not yet fire for charge_hole.
+  it('#1049: no-op when mid-execution of a charge_hole action (taskTicksRemaining set), even with fatigue very low', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1106, 'charge_hole');
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1106);
+    const held = state.pendingActions.find(a => a.id === 1106)!;
+    expect(held.status).toBe('in_progress');
+  });
+
+  // NEW (#1049): widens PROTECTED_MID_EXECUTION_ACTION_TYPES to also cover
+  // survey — same fragmentation bug class as #1039's place_building case.
+  // Modeled directly on the #1039 place_building test above. Currently red:
+  // the skeleton's PROTECTED_MID_EXECUTION_ACTION_TYPES only contains
+  // 'place_building', so this guard does not yet fire for survey.
+  it('#1049: no-op when mid-execution of a survey action (taskTicksRemaining set), even with fatigue very low', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1107, 'survey');
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1107);
+    const held = state.pendingActions.find(a => a.id === 1107)!;
+    expect(held.status).toBe('in_progress');
+  });
+
   // #1039: general_work is unaffected by the new place_building guard — see
   // the pre-existing #945 follow-up test above, which already pins this.
 

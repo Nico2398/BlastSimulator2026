@@ -681,6 +681,87 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction).toBeDefined();
   });
 
+  // ── NEW (#1049) ─────────────────────────────────────────────────────────────
+  // ForceShiftRest.ts's PROTECTED_MID_EXECUTION_ACTION_TYPES widens to also
+  // cover charge_hole and survey (same fragmentation bug class as #1039's
+  // place_building). tickCollapse remains a genuinely different code path (a
+  // real collapse, not a proactive nudge) and is deliberately left unguarded
+  // — mirrors the #1039 test above, specifically for a charge_hole action, to
+  // pin that this widened guard does not accidentally leak protection into
+  // the collapse path too.
+  it('#1049: interrupts an employee mid-execution of a charge_hole action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold (5)
+
+    const chargeAction: PendingAction = {
+      id: 1049, type: 'charge_hole', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 6, targetZ: 7, targetY: 0, payload: { holeId: 1 },
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+    };
+    state.pendingActions.push(chargeAction);
+    employee.activeActionId = chargeAction.id;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of the charging
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    // The charge_hole claim is released back to the pool, not orphaned —
+    // collapse interrupts unconditionally, regardless of action type.
+    const released = state.pendingActions.find(a => a.id === 1049)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    expect(employee.activeActionId).not.toBe(1049);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
+  // Same shape as above, for survey (#1049).
+  it('#1049: interrupts an employee mid-execution of a survey action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold (5)
+
+    const surveyAction: PendingAction = {
+      id: 1050, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 6, targetZ: 7, targetY: 0, payload: { method: 'core_sample' },
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+    };
+    state.pendingActions.push(surveyAction);
+    employee.activeActionId = surveyAction.id;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of the survey
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    // The survey claim is released back to the pool, not orphaned — collapse
+    // interrupts unconditionally, regardless of action type.
+    const released = state.pendingActions.find(a => a.id === 1050)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    expect(employee.activeActionId).not.toBe(1050);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
   // #1013: unlike tickNeedRestoration's proactive routing (mirrored test
   // above), checkCollapse sets employee.collapsing = true for the whole walk
   // AND rest — computeEmployeeActivity checks that flag first (it takes
