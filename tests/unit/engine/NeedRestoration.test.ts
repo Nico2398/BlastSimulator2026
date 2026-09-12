@@ -636,16 +636,22 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction).toBeDefined();
   });
 
-  // ── NEW (#1039) ─────────────────────────────────────────────────────────────
-  // ForceShiftRest.ts's forceShiftRestIfNeededByPolicy gains a place_building-
-  // scoped guard (isMidConstructionWork) so a proactive shift-cycle/fatigue-
-  // threshold rest no longer fragments a single construction into many
-  // interrupted, restarted attempts. tickCollapse is a genuinely different
-  // code path (a real collapse, not a proactive nudge) and is deliberately
-  // left unguarded — mirrors the #945 test above (a non-construction claimed
-  // task), specifically for a place_building action, to pin that this
-  // fix does not accidentally leak protection into the collapse path too.
-  it('#1039: interrupts an employee mid-execution of a place_building action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
+  // ── NEW (#1039, widened by #1049) ───────────────────────────────────────────
+  // ForceShiftRest.ts's forceShiftRestIfNeededByPolicy gains a
+  // PROTECTED_MID_EXECUTION_ACTION_TYPES guard (isMidConstructionWork) —
+  // place_building, charge_hole and survey — so a proactive shift-cycle/
+  // fatigue-threshold rest no longer fragments a single one of these tasks
+  // into many interrupted, restarted attempts. tickCollapse is a genuinely
+  // different code path (a real collapse, not a proactive nudge) and is
+  // deliberately left unguarded — mirrors the #945 test above (a
+  // non-construction claimed task), for each protected action type in turn,
+  // to pin that this guard does not accidentally leak protection into the
+  // collapse path too.
+  it.each<[PendingAction['type'], number, PendingAction['payload']]>([
+    ['place_building', 1039, { buildingType: 'driving_center' }],
+    ['charge_hole', 1049, { holeId: 1 }],
+    ['survey', 1050, { method: 'core_sample' }],
+  ])('#1039/#1049: interrupts an employee mid-execution of a %s action when fatigue collapses — tickCollapse is deliberately unguarded', (actionType, id, payload) => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -654,107 +660,26 @@ describe('tickCollapse (7.6)', () => {
     employee.z = 0;
     employee.fatigue = 3; // below the collapse threshold (5)
 
-    const constructionAction: PendingAction = {
-      id: 1039, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
-      targetX: 6, targetZ: 7, targetY: 0, payload: { buildingType: 'driving_center' },
+    const action: PendingAction = {
+      id, type: actionType, requiredSkill: null, requiredVehicleRole: null,
+      targetX: 6, targetZ: 7, targetY: 0, payload,
       targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
     };
-    state.pendingActions.push(constructionAction);
-    employee.activeActionId = constructionAction.id;
-    employee.taskTicksRemaining = 4; // arrived, mid-execution of the construction
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of the task
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
     const result = tickCollapse(state);
 
     expect(result.collapsed).toEqual([employee.id]);
-    // The construction claim is released back to the pool, not orphaned —
-    // collapse interrupts unconditionally, regardless of action type.
-    const released = state.pendingActions.find(a => a.id === 1039)!;
-    expect(released.status).toBe('queued');
-    expect(released.holderId).toBeNull();
-    expect(employee.activeActionId).not.toBe(1039);
-
-    const restAction = state.pendingActions.find(
-      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
-    );
-    expect(restAction).toBeDefined();
-  });
-
-  // ── NEW (#1049) ─────────────────────────────────────────────────────────────
-  // ForceShiftRest.ts's PROTECTED_MID_EXECUTION_ACTION_TYPES widens to also
-  // cover charge_hole and survey (same fragmentation bug class as #1039's
-  // place_building). tickCollapse remains a genuinely different code path (a
-  // real collapse, not a proactive nudge) and is deliberately left unguarded
-  // — mirrors the #1039 test above, specifically for a charge_hole action, to
-  // pin that this widened guard does not accidentally leak protection into
-  // the collapse path too.
-  it('#1049: interrupts an employee mid-execution of a charge_hole action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.x = 0;
-    employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold (5)
-
-    const chargeAction: PendingAction = {
-      id: 1049, type: 'charge_hole', requiredSkill: null, requiredVehicleRole: null,
-      targetX: 6, targetZ: 7, targetY: 0, payload: { holeId: 1 },
-      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
-    };
-    state.pendingActions.push(chargeAction);
-    employee.activeActionId = chargeAction.id;
-    employee.taskTicksRemaining = 4; // arrived, mid-execution of the charging
-
-    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
-
-    const result = tickCollapse(state);
-
-    expect(result.collapsed).toEqual([employee.id]);
-    // The charge_hole claim is released back to the pool, not orphaned —
-    // collapse interrupts unconditionally, regardless of action type.
-    const released = state.pendingActions.find(a => a.id === 1049)!;
-    expect(released.status).toBe('queued');
-    expect(released.holderId).toBeNull();
-    expect(employee.activeActionId).not.toBe(1049);
-
-    const restAction = state.pendingActions.find(
-      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
-    );
-    expect(restAction).toBeDefined();
-  });
-
-  // Same shape as above, for survey (#1049).
-  it('#1049: interrupts an employee mid-execution of a survey action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.x = 0;
-    employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold (5)
-
-    const surveyAction: PendingAction = {
-      id: 1050, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
-      targetX: 6, targetZ: 7, targetY: 0, payload: { method: 'core_sample' },
-      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
-    };
-    state.pendingActions.push(surveyAction);
-    employee.activeActionId = surveyAction.id;
-    employee.taskTicksRemaining = 4; // arrived, mid-execution of the survey
-
-    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
-
-    const result = tickCollapse(state);
-
-    expect(result.collapsed).toEqual([employee.id]);
-    // The survey claim is released back to the pool, not orphaned — collapse
+    // The claim is released back to the pool, not orphaned — collapse
     // interrupts unconditionally, regardless of action type.
-    const released = state.pendingActions.find(a => a.id === 1050)!;
+    const released = state.pendingActions.find(a => a.id === id)!;
     expect(released.status).toBe('queued');
     expect(released.holderId).toBeNull();
-    expect(employee.activeActionId).not.toBe(1050);
+    expect(employee.activeActionId).not.toBe(id);
 
     const restAction = state.pendingActions.find(
       (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
