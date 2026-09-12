@@ -245,6 +245,28 @@ export interface ContractSelector {
 }
 
 /**
+ * True when `available` holds an `ore_sale` offer asking for no more of its
+ * ore than `collectedOre` already carries — an offer that can be accepted
+ * and filled in full, which is what completes a sale. A part delivery
+ * completes nothing, so "some of that ore is in storage" is not the
+ * question.
+ *
+ * Both halves of the answer move on their own: `generateContracts` re-rolls
+ * which ore is asked for and how much every `REFRESH_INTERVAL` ticks, while
+ * the haulers change what is in storage. That is why this is a condition to
+ * wait on (the state dumps expose it as `fillableOreSaleOffered`) rather
+ * than a tick count to guess at.
+ */
+export function hasFillableOreSaleOffer(
+  available: readonly Contract[],
+  collectedOre: Readonly<Record<string, number>>,
+): boolean {
+  return available.some(
+    c => c.type === 'ore_sale' && (collectedOre[c.materialId] ?? 0) >= c.quantityKg,
+  );
+}
+
+/**
  * Find a contract in `pool` by `selector.id` if given, else by the first
  * entry matching `selector.type`/`selector.materialId` (either or both).
  * Null when no selector field is set (nothing to search for) or nothing in

@@ -7,7 +7,19 @@ import {
   deliverMaterials,
   checkDeadlines,
   findContract,
+  hasFillableOreSaleOffer,
 } from '../../../src/core/economy/Contract.js';
+import type { Contract } from '../../../src/core/economy/Contract.js';
+
+/** A minimal offered contract — only the fields hasFillableOreSaleOffer reads carry meaning. */
+function offer(overrides: Partial<Contract>): Contract {
+  return {
+    id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
+    deliveredKg: 0, pricePerKg: 3, deadlineTicks: 50, acceptedAtTick: 0,
+    penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+    ...overrides,
+  };
+}
 
 describe('Contract system', () => {
   it('generated contracts have valid fields within expected ranges', () => {
@@ -262,6 +274,37 @@ describe('Contract system', () => {
 
       expect(byId).toBe(target);
       expect(bySelector).toBe(target);
+    });
+  });
+
+  describe('hasFillableOreSaleOffer', () => {
+    it('is true when storage covers an offered ore_sale in full', () => {
+      expect(hasFillableOreSaleOffer([offer({ quantityKg: 100 })], { dirtite: 100 })).toBe(true);
+    });
+
+    it('is false one kilogram short — a part delivery completes no contract', () => {
+      expect(hasFillableOreSaleOffer([offer({ quantityKg: 100 })], { dirtite: 99 })).toBe(false);
+    });
+
+    it('is false for an ore the site holds none of', () => {
+      expect(hasFillableOreSaleOffer([offer({ materialId: 'gloomium' })], { dirtite: 5000 })).toBe(false);
+    });
+
+    it('ignores offers that are not ore_sale, however well covered', () => {
+      const rubble = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 1 });
+      expect(hasFillableOreSaleOffer([rubble], { '': 5000 })).toBe(false);
+    });
+
+    it('is false on an empty pool', () => {
+      expect(hasFillableOreSaleOffer([], { dirtite: 5000 })).toBe(false);
+    });
+
+    it('is true when any one of several offers is fillable', () => {
+      const pool = [
+        offer({ id: 1, materialId: 'gloomium', quantityKg: 500 }),
+        offer({ id: 2, materialId: 'dirtite', quantityKg: 50 }),
+      ];
+      expect(hasFillableOreSaleOffer(pool, { dirtite: 60 })).toBe(true);
     });
   });
 });

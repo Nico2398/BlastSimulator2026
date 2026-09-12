@@ -7,6 +7,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { MiningContext } from '../../src/console-api.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
+import type { Contract } from '../../src/core/economy/Contract.js';
+
+/** A minimal offered ore_sale contract — only the fields fillableOreSaleOffered reads carry meaning. */
+function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
+  return {
+    id: 1, type: 'ore_sale', materialId, description: `Deliver ${materialId} ore`,
+    quantityKg, deliveredKg: 0, pricePerKg: 3, deadlineTicks: 50, acceptedAtTick: 0,
+    penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+  };
+}
 
 /**
  * Field set window.__gameState() emits, restricted to the state-derived
@@ -83,7 +93,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'researchQueueLength', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount', 'activeContractCount', 'deathCount',
+  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg', 'collectedOreTotal', 'dangerZoneClear',
@@ -304,6 +314,49 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.activeContractCount).toBe(1);
+    });
+
+    // fillableOreSaleOffered (#1048 CI fix): the field a scenario waits on
+    // instead of padding a fixed number of ticks and hoping the random offer
+    // pool happens to hold something it can sell. "Fillable" is deliberately
+    // the whole quantity, not a single kilogram of the ore: only a COMPLETED
+    // ore_sale advances the tutorial's own 'sell-ore' card, and a part
+    // delivery completes nothing.
+    it('reports fillableOreSaleOffered false when the offered ore is not in storage at all', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+      s.collectedOre = {};
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableOreSaleOffered).toBe(false);
+    });
+
+    it('reports fillableOreSaleOffered false when storage holds some of the ore but less than the offer asks', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+      s.collectedOre = { dirtite: 99.9 };
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableOreSaleOffered).toBe(false);
+    });
+
+    it('reports fillableOreSaleOffered true once storage covers the offer in full', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+      s.collectedOre = { dirtite: 100 };
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableOreSaleOffered).toBe(true);
+    });
+
+    it('ignores a fillable offer that is not an ore_sale, and a fillable ore the pool is not asking for', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      const rubble = { ...makeOreSaleOffer('', 10), type: 'rubble_disposal' as const };
+      s.contracts.available = [rubble, makeOreSaleOffer('gloomium', 100)];
+      s.collectedOre = { dirtite: 5000 };
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableOreSaleOffered).toBe(false);
     });
 
     it('reports zero deathCount for a fresh game with no employees', () => {

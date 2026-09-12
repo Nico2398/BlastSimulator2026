@@ -20,14 +20,31 @@
     },
     {
       "command": "set_policy mode:continuous fatigue:90",
-      "description": "Continuous mode with a high fatigue rest threshold (90, well above the default 60) makes the proactive shift-cycle rest fire every few ticks for a working employee — the aggressive policy setting that reliably reproduces #1039's fragmentation on the buggy code (empirically traced: the driving_center order never lands within 100 ticks under this policy before the fix).",
+      "description": "Continuous mode with a high fatigue rest threshold (90, well above the default 60) makes the proactive shift-cycle rest fire every few ticks for a working employee — the aggressive policy setting that reliably reproduces #1039's fragmentation on the buggy code (empirically traced: the driving_center order never lands within 100 ticks under this policy before the fix). Set through the Operations panel's own controls, the way every other set_policy step in this suite does: the shift button first (it is what marks the card dirty, so the threshold field is no longer overwritten by the next state sync), then the fatigue field, then Apply.",
       "interaction": [
         {
-          "type": "command",
-          "command": "set_policy mode:continuous fatigue:90"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-policy-fatigue",
+          "value": "90"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
         }
       ],
-      "role": "setup"
+      "role": "player"
     },
     {
       "command": "build driving_center at:6,7",

@@ -1486,26 +1486,32 @@
       }
     },
     {
-      "command": "tick 80",
-      "timeout": 120,
-      "description": "#959: the hauler keeps bringing blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so the dirtite ore_sale offer the next step accepts has to be waited for. `role: setup` with a plain `tick` rather than a `waitUntil`: what is being waited on -- an ore_sale offer for a material this pit's own blast actually produced, with enough hauled in to fill it -- is not a single state-dump field `waitUntil`'s strict `field`/`equals` match can name, and interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`), so nothing advances the clock unless a step asks. #1008-followup (PR #1023): 200 -> 80 -- the living_quarters relocation (tutorialStages.ts's own REGION.livingQuarters comment) shifts every tick this file spends from box-cut onward, so the fixed 200-tick pad this step used to land on now overshoots: direct-traced (a headless replay of this file's own steps 0-59, ticking `contract list` every 20 ticks and reading its raw output), a `Deliver dirtite ore` ore_sale offer is already in the pool at tick 0 of this step's own pad and stays through +100 ticks (gone by +120, the pool's own rotation evicting it), while storedMassKg clears the 500kg step 62 delivers by +60. 80 sits inside both windows with margin on either side.",
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:400",
+      "timeout": 180,
+      "description": "#959: the hauler keeps bringing blasted rock into the freight_warehouse and the contract board rotates its offer pool every CONTRACT_REFRESH_INTERVAL (20) ticks, so the ore_sale offer the next step accepts has to be waited for. Interaction mode runs with `autoTickEnabled = false` (`?scenarioMode=1`) and the tutorial's own clock-hold pauses the world once a step outruns its tick budget, so the pool only rotates while a `setup` step is asking it to -- a `waitForSelector` on the next step's own card waits on a frozen board and can only ever time out. This step is what ticks. It waits on the real condition rather than a fixed pad: `fillableOreSaleOffered` (console-api.ts) is true once the pool holds an ore_sale asking for no more of its ore than the site already has, which is exactly what the next two steps need -- an offer that can be accepted and filled in full, since only a COMPLETED ore_sale advances the tutorial's 'sell-ore' card. This replaces the `tick 80` pad that stood here (200 before PR #1023 retuned it): both halves of what the pad was aiming at are random -- which ore the pool asks for, how much of it, against how much the haulers have brought in -- so any change upstream of it re-rolls the pool and the pad lands on a board with nothing fillable on it. #1048 was that change: it landed on main with every other channel green and turned CI's interaction shard red on the very next push.",
       "role": "setup",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 80"
+          "type": "waitUntil",
+          "field": "fillableOreSaleOffered",
+          "equals": true,
+          "maxTicks": 400,
+          "timeoutMs": 120000
         }
       ],
       "expect": {
+        "equals": {
+          "fillableOreSaleOffered": true
+        },
         "increased": [
           "tickCount"
         ]
       }
     },
     {
-      "command": "contract accept type:ore_sale material:dirtite",
+      "command": "contract accept type:ore_sale",
       "timeout": 120,
-      "description": "#959, the tutorial's missing half, first beat: Accept clicked on a dirtite ore_sale offer -- rock this pit's own blast actually produced. Scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]` like every other contract click in this file, with a `waitForSelector` ahead of the click so the pool's refresh cycle can surface the card. `commandOutcome: 'either'` is command-mode only: this file's own tick trajectory diverges between the two modes well upstream (the haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 46` in command mode), so the same wait lands command mode on a different offer pool, where the console refuses the accept outright.",
+      "description": "#959, the tutorial's missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blast produced and its own haulers carried in. Scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to a named material: which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins the step to a pool composition that any upstream re-timing re-rolls -- how this step went red on main after #1048. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. `commandOutcome: 'either'` is command-mode only: this file's own tick trajectory diverges between the two modes well upstream (the haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 46` in command mode), so the same wait lands command mode on a different offer pool, where the console can refuse the accept outright.",
       "role": "player",
       "commandOutcome": "either",
       "interaction": [
@@ -1515,7 +1521,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
         },
         {
@@ -1523,7 +1529,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "expect": {
@@ -1532,9 +1538,9 @@
       }
     },
     {
-      "command": "contract deliver type:ore_sale material:dirtite amount:500",
+      "command": "contract deliver type:ore_sale amount:500",
       "timeout": 120,
-      "description": "#959, the tutorial's missing half, second beat: Deliver clicked on the accepted dirtite contract, and the tutorial turns blasted ore into money for the first time. Nothing is typed into the amount field -- ContractsPanel pre-fills it with `min(remaining, stored)`, so a plain click delivers exactly what storage can cover. Asserted on 'set-policy' rather than 'sell-ore''s immediate successor: 'finances' and 'needs' after it are auto-advance cards, so whichever is showing when this step's goal is evaluated would be a race; 'set-policy' waits for a click and stays put once reached.",
+      "description": "#959, the tutorial's missing half, second beat: Deliver clicked on the ore_sale contract the step above accepted -- the only active one -- and the tutorial turns blasted ore into money for the first time. Nothing is typed into the amount field -- ContractsPanel pre-fills it with `min(remaining, stored)`, so a plain click delivers exactly what storage can cover, which the preceding wait has already made enough to fill the offer outright. Asserted on 'set-policy' rather than 'sell-ore''s immediate successor: 'finances' and 'needs' after it are auto-advance cards, so whichever is showing when this step's goal is evaluated would be a race; 'set-policy' waits for a click and stays put once reached.",
       "role": "player",
       "commandOutcome": "either",
       "interaction": [
@@ -1544,7 +1550,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
           "timeout": 30000
         },
         {
@@ -1552,7 +1558,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         },
         {
           "type": "waitForTutorialStep",
