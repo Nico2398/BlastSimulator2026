@@ -15,7 +15,7 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
-import { isMidEvacuationWalk } from './Evacuation.js';
+import { isMidEvacuationWalk, isMidEvacuationDrive } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
@@ -267,6 +267,9 @@ export function forceShiftRestIfNeededByPolicy(
   // destination with a walk back toward a living_quarters, possibly right
   // back inside the danger zone they were just ordered out of.
   if (isMidEvacuationWalk(emp)) return;
+  // Mid-evacuation-drive (isMidEvacuationDrive, #1042) — same reasoning as
+  // the walk guard just above.
+  if (isMidEvacuationDrive(state.vehicles, emp)) return;
 
   const snapshot = {
     id: emp.id, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked,

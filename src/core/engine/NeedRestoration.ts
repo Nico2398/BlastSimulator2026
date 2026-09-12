@@ -16,7 +16,7 @@ import { interruptActiveAction, completePendingAction } from './TaskDispatch.js'
 import {
   createRestPendingAction, findNearestBuildingOfType, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk,
 } from './RestActionHelpers.js';
-import { isMidEvacuationWalk } from './Evacuation.js';
+import { isMidEvacuationWalk, isMidEvacuationDrive } from './Evacuation.js';
 import {
   NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
@@ -48,6 +48,10 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // comment (Evacuation.ts) for the shared reasoning across all four call
     // sites (#557).
     if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuationWalk(emp)) continue;
+    // Mid-evacuation-drive (isMidEvacuationDrive, #1042) — boarded a
+    // driverless vehicle and driving it clear; same reasoning as the walk
+    // guard above.
+    if (isMidEvacuationDrive(state.vehicles, emp)) continue;
     const needsRest = emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
@@ -112,6 +116,9 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // collapsed mid-walk and orbited back to their pre-evacuation
     // living_quarters forever.
     if (isMidEvacuationWalk(emp)) continue;
+    // Mid-evacuation-drive (isMidEvacuationDrive, #1042) — same reasoning as
+    // the walk guard just above.
+    if (isMidEvacuationDrive(state.vehicles, emp)) continue;
 
     // checkCollapse nulls activeActionId itself on collapse, so the previous
     // active action (if any) must be captured before calling it — otherwise

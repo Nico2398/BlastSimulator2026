@@ -9,6 +9,7 @@ import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import type { Employee } from '../entities/Employee.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries,
@@ -242,8 +243,24 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state.vehicles,
     state.employees,
     (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),
-    // TODO: replace with a real reachability check once findBestEvacuationDriver
-    // is implemented (#1042) — placeholder keeps this branch typechecking.
-    () => true,
+    (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
   );
+}
+
+/**
+ * Whether `employee` can path to `vehicle`'s position to board it, per the
+ * live NavGrid — mirrors findSafeEvacuationCell's own findPath call
+ * (avoidVehicles: false — walking up to/onto a vehicle's own cell to board
+ * it is exactly the case that setting exists to allow).
+ */
+function canEmployeeReachVehicleForEvacuation(state: GameState, employee: Employee, vehicle: Vehicle): boolean {
+  if (!state.navGrid) return false;
+
+  const path = findPath(state.navGrid, {
+    agentId: employee.id,
+    fromX: employee.x, fromZ: employee.z,
+    toX: vehicle.x, toZ: vehicle.z,
+    avoidVehicles: false,
+  });
+  return path.found;
 }

@@ -13,6 +13,7 @@ import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { completePendingAction } from './TaskLifecycleCore.js';
 import type { Employee } from '../entities/Employee.js';
 import type { VehicleState } from '../entities/Vehicle.js';
+import { unassignDriver } from '../entities/Vehicle.js';
 
 /**
  * PendingAction.payload key evacuateZone stamps on any action it interrupts
@@ -210,11 +211,23 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
  * True when `employee` is currently driving a vehicle clear of an evacuating
  * zone (boarded a driverless vehicle rather than evacuating on foot, #1042)
  * rather than walking their own route.
+ *
+ * Keyed on `vehicle.pendingEvacuationDestination !== null` — the marker
+ * clearZone stages on exactly (and only) a vehicle being driven clear of an
+ * evacuation, cleared the moment it arrives (releaseArrivedEvacuationDrivers
+ * below) — rather than on `employee.activeActionId === null` combined with
+ * `driverId === employee.id` alone. That pair is NOT unique to an evacuation
+ * drive: a driver boarded directly (the console `vehicle driver` command,
+ * `assignDriver`) or one left mounted between two vehicle-gated tasks by
+ * vehicle-continuity (VehicleContinuity.ts's own dismount-then-reassign
+ * ordering can still leave a one-tick gap) both carry activeActionId===null
+ * while genuinely idle-but-boarded, not evacuating — treating that as an
+ * evacuation drive permanently soft-locks them out of tickEmployees, the
+ * exact regression collapse-vehicle-recovery.integration.test.ts caught
+ * (driverId assigned manually before any action ever claims the employee).
  */
 export function isMidEvacuationDrive(vehicles: VehicleState, employee: Employee): boolean {
-  void vehicles; void employee;
-  // TODO: implement
-  throw new Error('not implemented');
+  return vehicles.vehicles.some(v => v.driverId === employee.id && v.pendingEvacuationDestination !== null);
 }
 
 /**
@@ -223,9 +236,18 @@ export function isMidEvacuationDrive(vehicles: VehicleState, employee: Employee)
  * rest of the way on foot, mirroring an ordinary on-foot evacuee (#1042).
  */
 export function releaseArrivedEvacuationDrivers(state: GameState): void {
-  void state;
-  // TODO: implement
-  throw new Error('not implemented');
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.pendingEvacuationDestination === null) continue;
+    if (vehicle.driverId === null) continue;
+    // Now doing real work (a vehicle-gated action claimed the vehicle after
+    // boarding) — must not be dismounted mid-task.
+    if (vehicle.reservedForActionId !== null) continue;
+
+    if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
+
+    unassignDriver(state.vehicles, vehicle.id);
+    vehicle.pendingEvacuationDestination = null;
+  }
 }
 
 export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, zone: ZoneBounds): void {

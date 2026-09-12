@@ -85,7 +85,10 @@ import type { RampDef } from '../mining/Ramp.js';
 // gauge (#928). See SaveLoad.ts's migrateV14ToV15.
 // v15 -> v16: ActionType gained 'level_ground' (#1009 — order-then-work
 // ground levelling, mirrors #555's 'dig_ramp_segment').
-export const SAVE_VERSION = 16;
+// v16 -> v17: Vehicle gained `pendingEvacuationDestination: { x: number; z:
+// number } | null` (#1042 — a driverless vehicle can now be boarded and
+// driven clear of an evacuating zone). See SaveLoad.ts's migrateV16ToV17.
+export const SAVE_VERSION = 17;
 
 export interface GameConfig {
   seed: number;

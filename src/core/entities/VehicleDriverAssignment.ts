@@ -103,7 +103,27 @@ export function findBestEvacuationDriver(
   candidateEmployeeIds: readonly number[],
   canReach: EvacuationDriverReachabilityCheck,
 ): Employee | null {
-  void vehicle; void vehicleState; void employeeState; void candidateEmployeeIds; void canReach;
-  // TODO: implement
-  throw new Error('not implemented');
+  const ranked = [...candidateEmployeeIds].sort((a, b) => {
+    const empA = employeeState.employees.find(e => e.id === a);
+    const empB = employeeState.employees.find(e => e.id === b);
+    const distA = empA ? distanceSq(empA, vehicle) : Infinity;
+    const distB = empB ? distanceSq(empB, vehicle) : Infinity;
+    if (distA !== distB) return distA - distB;
+    return a - b;
+  });
+
+  for (const candidateId of ranked) {
+    const check = canAssignDriver(vehicleState, employeeState, vehicle.id, candidateId);
+    if (!check.success) continue;
+    if (!canReach(check.employee, vehicle)) continue;
+    return check.employee;
+  }
+
+  return null;
+}
+
+function distanceSq(employee: Employee, vehicle: Vehicle): number {
+  const dx = employee.x - vehicle.x;
+  const dz = employee.z - vehicle.z;
+  return dx * dx + dz * dz;
 }
