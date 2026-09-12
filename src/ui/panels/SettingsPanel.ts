@@ -11,7 +11,7 @@
 // default so the pre-game path (where update() never fires) shows nothing
 // it can't act on.
 
-import { PanelBase } from './PanelBase.js';
+import { PanelBase, PANEL_CLOSE_ATTR } from './PanelBase.js';
 import { t, getLocale, setLocale } from '../../core/i18n/I18n.js';
 import { el, button, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -90,6 +90,9 @@ export class SettingsPanel extends PanelBase {
         + 'border:1px solid var(--bsx-hairline);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer',
     } });
     closeBtn.appendChild(iconEl('x', 12));
+    // Navigation, not a game-state action — tutorial rails allow it
+    // unconditionally regardless of the active stage (#1041).
+    closeBtn.setAttribute(PANEL_CLOSE_ATTR, '');
     closeBtn.addEventListener('click', () => this.onCloseCb?.());
     header.append(iconChip, titleEl, closeBtn);
 

@@ -11,14 +11,21 @@ import {
   applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
-import { SPEED_BUTTON_GROUP } from './tutorialStepHelpers.js';
+import { SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR } from './tutorialStepHelpers.js';
+import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
 
 /**
  * Selectors permanently allowed from the tutorial's very first step onward,
- * independent of any step's own declarations — the speed bar is the
- * player's from the moment the tutorial starts (#1015).
+ * independent of any step's own declarations:
+ * - the speed bar is the player's from the moment the tutorial starts (#1015).
+ * - opening, closing, or switching between panels is navigation, never a
+ *   game-state action, so it is always allowed too (#1041) — gating stays on
+ *   the controls *inside* a panel (the active stage's own target/also set),
+ *   not on getting to that panel in the first place.
  */
-const BASE_PERMANENTLY_ALLOWED: readonly string[] = [SPEED_BUTTON_GROUP];
+const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
+  SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
+];
 
 export interface RailsStep {
   id: string;

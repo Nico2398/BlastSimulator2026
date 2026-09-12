@@ -7,6 +7,7 @@
 // src/ui/. Panels compose these instead of hand-rolling inline styles.
 
 import { iconEl, type IconName } from './icons.js';
+import { PANEL_CLOSE_ATTR } from './panels/PanelBase.js';
 
 export interface ElOptions {
   className?: string | string[];
@@ -294,6 +295,9 @@ export function panelHeader(opts: PanelHeaderOptions): PanelHeaderParts {
   }
 
   const closeBtn = panelHeaderButton('x', opts.onClose);
+  // Navigation (closing the panel), not a game-state action — tutorial rails
+  // allow it unconditionally regardless of the active stage (#1041).
+  closeBtn.setAttribute(PANEL_CLOSE_ATTR, '');
   const trailing = [...(opts.extras ?? []), closeBtn];
   // The first trailing control carries the margin that pushes the whole
   // group to the right — the ones after it sit against their neighbour.
