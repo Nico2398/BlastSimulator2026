@@ -127,6 +127,10 @@ export class TopBar {
     // ── Balance ── click opens the Finances panel (P5).
     this.balanceWrap = document.createElement('button');
     this.balanceWrap.dataset['action'] = 'open-finances';
+    // Structurally identical to a toolbar panel-open button (ToolRail.ts) so
+    // tutorial rails allow it unconditionally as navigation, not a
+    // per-panel-named exception (#1041).
+    this.balanceWrap.dataset['panel'] = 'finances';
     this.balanceWrap.style.cssText = 'display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0 16px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
     this.balanceWrap.addEventListener('click', () => this.onNavigate?.('finances'));
     this.balanceWrap.addEventListener('mouseenter', () => { this.balanceWrap.style.background = 'rgba(255,255,255,.05)'; });

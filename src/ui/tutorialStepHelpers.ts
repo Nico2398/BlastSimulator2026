@@ -28,6 +28,11 @@ export const TOOLBAR_TARGET = {
 /** Selector the rails allow unconditionally from the tutorial's very first step (#1015). */
 export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]';
 
+/** Every control that opens a panel — toolbar buttons and the TopBar balance
+ *  display alike, generic over `data-panel`'s value so a new panel needs no
+ *  new rails entry (#1041). */
+export const PANEL_OPEN_SELECTOR = '[data-panel]';
+
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the
  * target role at capture time. Completion requires an employee with that

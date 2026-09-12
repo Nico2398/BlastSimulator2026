@@ -16,6 +16,7 @@ import { t, setLocale, getLocale } from '../../../../src/core/i18n/I18n.js';
 import type { AudioManager, AudioCategory } from '../../../../src/audio/AudioManager.js';
 import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 import type { SaveBackend, SaveMeta } from '../../../../src/core/state/SaveBackend.js';
+import { PANEL_CLOSE_ATTR, PANEL_CLOSE_SELECTOR } from '../../../../src/ui/panels/PanelBase.js';
 
 /** Finds a button anywhere under `root` whose text matches `label` exactly. */
 function findButtonByText(root: ParentNode, label: string): HTMLButtonElement {
@@ -159,6 +160,19 @@ describe('SettingsPanel', () => {
     panel.setCloseHandler(() => { closed = true; });
     (container.querySelector('#bs-settings-panel button') as HTMLButtonElement).click();
     expect(closed).toBe(true);
+    panel.dispose();
+  });
+
+  // #1041: SettingsPanel hand-builds its own header (not through
+  // dom.ts's panelHeader()), so its close button needs PANEL_CLOSE_ATTR
+  // stamped separately — the tutorial rails match PANEL_CLOSE_SELECTOR
+  // ([data-panel-close]) generically and have no per-panel knowledge of
+  // Settings' own hand-rolled header.
+  it('the close button carries the data-panel-close attribute (#1041)', () => {
+    const { container, panel } = mount();
+    const closeBtn = container.querySelector('#bs-settings-panel button') as HTMLButtonElement;
+    expect(closeBtn.hasAttribute(PANEL_CLOSE_ATTR)).toBe(true);
+    expect(closeBtn.matches(PANEL_CLOSE_SELECTOR)).toBe(true);
     panel.dispose();
   });
 

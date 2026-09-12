@@ -16,7 +16,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Page } from 'puppeteer';
 import {
   executeActionOnPage, resolveEventIfPendingOnPage, CLOCK_HELD_FAIL_AFTER_POLLS,
-  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, CLICK_SELECTOR_ZERO_SIZE_GRACE_MS,
+  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES,
 } from '../../scripts/shared/interaction-executor.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
@@ -1002,5 +1002,110 @@ describe('clickSelector — zero-size grace extension (issue #1032)', () => {
     await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
     expect(evaluate).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledWith(selector, { button: 'left' });
+  });
+});
+
+// Issue #1053 CI-fix (CI run 34690787172) — sandbox-mode.json's report-close
+// click failed as bare "element has zero size (0x0)", not the #1032 grace's
+// "...after waiting Xms" phrasing. That message shape only comes from the
+// post-probe page.click() catch, not the poll loop's own deadline branch:
+// the probe had already called the control usable (broke out of the poll),
+// and the real click() failed a beat later on a heavily loaded runner — a
+// narrower gap than #1032's grace (which only extends the wait *before* the
+// click) reaches. CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES closes it by
+// retrying the click itself, bounded, and only for a zero-size readback.
+describe('clickSelector — retries a stale zero-size click failure (issue #1053 CI-fix)', () => {
+  const selector = '[data-action="report-close"]';
+
+  it('retries the click once a stale zero-size readback resolves, without re-polling the probe', async () => {
+    const evaluate = vi.fn()
+      // __probeSelector: usable, so the loop proceeds straight to the click.
+      .mockResolvedValueOnce(null)
+      // inspectSelector after the first page.click() rejects: still attached
+      // and unblocked, but no layout box yet.
+      .mockResolvedValueOnce({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: false,
+        width: 0,
+        height: 0,
+        matchCount: 1,
+      });
+    const click = vi.fn()
+      .mockRejectedValueOnce(new Error('Node is either not clickable or not an Element'))
+      .mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'blast complete',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(click).toHaveBeenCalledTimes(2);
+    // No extra probe poll — the retry re-attempts the click directly, it
+    // does not re-run the usable-wait loop.
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES attempts still reading zero-size, throwing the bare zero-size message (not the #1032 grace phrasing)', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(null) // probe: usable
+      .mockResolvedValue({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: false,
+        width: 0,
+        height: 0,
+        matchCount: 1,
+      });
+    const click = vi.fn().mockRejectedValue(new Error('Node is either not clickable or not an Element'));
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'blast complete',
+      role: 'player',
+      interaction: [action],
+    };
+
+    let caught: unknown;
+    try {
+      await executeActionOnPage(page, action, step);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message).toContain(selector);
+    expect(message).toContain('element has zero size (0x0)');
+    expect(click).toHaveBeenCalledTimes(CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES);
+  });
+
+  it('never retries a click failure for a reason other than zero-size (e.g. vanished) — fails on the very first attempt', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(null) // probe: usable, so the click is attempted
+      .mockResolvedValueOnce({ found: false }); // gone by the time it lands
+    const click = vi.fn().mockRejectedValue(new Error('Node is either not clickable or not an Element'));
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'blast complete',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      'element vanished from the DOM between the wait and the click',
+    );
+    expect(click).toHaveBeenCalledTimes(1);
   });
 });

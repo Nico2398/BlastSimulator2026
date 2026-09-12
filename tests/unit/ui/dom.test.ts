@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { scrollBoundedSection } from '../../../src/ui/dom.js';
+import { scrollBoundedSection, panelHeader } from '../../../src/ui/dom.js';
 import type { ScrollBoundedSectionOptions } from '../../../src/ui/dom.js';
+import { PANEL_CLOSE_ATTR, PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 
 function child(text: string): HTMLElement {
   const div = document.createElement('div');
@@ -65,5 +66,30 @@ describe('scrollBoundedSection', () => {
     const kept = child('kept');
     const wrapper = scrollBoundedSection([null, kept, undefined], 200);
     expect(Array.from(wrapper.children)).toEqual([kept]);
+  });
+});
+
+// #1041: every panel built through panelHeader() (Build, Blast, Contracts,
+// Crew, Finances, Fleet, Operations, Shady, Survey) gets a close control the
+// tutorial rails can allow unconditionally, without a per-panel selector —
+// PANEL_CLOSE_SELECTOR ([data-panel-close]) is what the rails match against.
+describe('panelHeader — close control carries PANEL_CLOSE_ATTR (#1041)', () => {
+  it('stamps the close button with the data-panel-close attribute', () => {
+    const { closeBtn } = panelHeader({ icon: 'x', accent: 'amber' });
+    expect(closeBtn.hasAttribute(PANEL_CLOSE_ATTR)).toBe(true);
+  });
+
+  it('the close button matches PANEL_CLOSE_SELECTOR once mounted in the DOM', () => {
+    const { header, closeBtn } = panelHeader({ icon: 'x', accent: 'amber' });
+    document.body.appendChild(header);
+    expect(document.querySelector(PANEL_CLOSE_SELECTOR)).toBe(closeBtn);
+    header.remove();
+  });
+
+  it('still fires the onClose callback — stamping the attribute does not disturb the click handler', () => {
+    let closed = false;
+    const { closeBtn } = panelHeader({ icon: 'x', accent: 'amber', onClose: () => { closed = true; } });
+    closeBtn.click();
+    expect(closed).toBe(true);
   });
 });

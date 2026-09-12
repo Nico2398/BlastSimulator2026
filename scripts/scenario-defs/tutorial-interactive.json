@@ -221,6 +221,44 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1041: tutorial rails allow navigating to ANY panel, not just the active stage's own target. The rail is still pointing at the Build toolbar button (stage 'build-living-quarters'), but the Fleet toolbar button is a [data-panel] control belonging to no stage at all -- before #1041 it was blocked exactly like a state-changing action, sealing the player behind whichever panel a stage happened to target. Opening it here must genuinely work, and must not move the tutorial off 'build-living-quarters' -- looking around is not progress.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-vehicle-panel",
+        "tutorialStep": "build-living-quarters",
+        "note": "PANEL_OPEN_SELECTOR ([data-panel], tutorialStepHelpers.ts) is baked into BASE_PERMANENTLY_ALLOWED (tutorialRails.ts) so every panel opener stays clickable regardless of the active stage."
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1041 (cont.): closes the Fleet panel just opened, via its own header close control -- also permanently allowed, independent of the active stage. Confirms the panel genuinely closes (not merely that the click didn't throw) and that the tutorial is still sitting on 'build-living-quarters', unmoved by the detour.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel",
+        "tutorialStep": "build-living-quarters",
+        "note": "PANEL_CLOSE_SELECTOR ([data-panel-close], PanelBase.ts) is the close-side half of the same permanent allowance -- stamped on panelHeader()'s close button so every panel built through it (Fleet included) can be dismissed without a per-panel rails entry."
+      }
+    },
+    {
       "command": "build living_quarters at:29,11",
       "timeout": 30,
       "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge/sequence stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem.",

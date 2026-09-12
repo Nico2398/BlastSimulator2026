@@ -284,6 +284,29 @@ describe('TopBar (redesign P1)', () => {
     topBar.dispose();
   });
 
+  // #1041: the tutorial rails allow every panel-opening control generically
+  // via [data-panel] (PANEL_OPEN_SELECTOR, tutorialStepHelpers.ts) — the same
+  // attribute ToolRail's toolbar buttons already carry. The balance display
+  // opens Finances exactly like a toolbar button opens its panel, so it needs
+  // the same marker to be included in that generic allowance.
+  it('the balance control carries data-panel="finances" alongside its existing data-action (#1041)', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    try {
+      const center = new NotificationCenter();
+      topBar.update(makeState(), undefined, undefined, center);
+      const balanceBtn = container.querySelector<HTMLButtonElement>('[data-action="open-finances"]');
+      expect(balanceBtn).not.toBeNull();
+      expect(balanceBtn?.dataset['panel']).toBe('finances');
+      // Existing data-action must survive — other code (scripts/ui-diagnostic.ts,
+      // the money-surfaces-visual scenario) still resolves this control by it.
+      expect(balanceBtn?.dataset['action']).toBe('open-finances');
+    } finally {
+      topBar.dispose();
+    }
+  });
+
   describe('balance formatting', () => {
     it('prints whole dollars with thousands separators', () => {
       expect(formatBalance(75000)).toBe('$75,000');
