@@ -132,12 +132,14 @@ export function forceShiftRestIfNeeded(
  * on-foot task type shown to fragment the same way. Vehicle-gated tasks
  * use isMidVehicleGatedWork instead (VehicleReservation.ts).
  *
- * Skeleton stage (#1049): still 'place_building' only — 'charge_hole' and
- * 'survey' land here once the implementer widens this set; the guard's
- * behavior is otherwise unchanged from isMidConstructionWork.
+ * 'place_building' (#1039), 'charge_hole' and 'survey' (#1049) — all three
+ * are requiredVehicleRole: null, timer-driven via taskTicksRemaining, with no
+ * vehicle gate.
  */
 const PROTECTED_MID_EXECUTION_ACTION_TYPES: ReadonlySet<ActionType> = new Set([
   'place_building',
+  'charge_hole',
+  'survey',
 ]);
 
 /**
