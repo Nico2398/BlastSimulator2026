@@ -6,6 +6,7 @@ import {
   createTween,
   computeInterpolatedPosition,
   stepTween,
+  stepTweenWithHeight,
   MOVE_TWEEN_DURATION_S,
   MOVE_TELEPORT_DISTANCE,
 } from '../../../src/renderer/MovementInterpolation.js';
@@ -194,6 +195,104 @@ describe('MovementInterpolation', () => {
       // zero-length step must read back the render position, not the target.
       expect(pos.x).toBe(0);
       expect(pos.z).toBe(0);
+    });
+  });
+
+  // #1038: an entity's rendered Y must follow the same eased (x, z) as its
+  // X/Z glide, not the target cell's height sampled once per sync. Without
+  // this, Y belongs to a different terrain column than X/Z for the whole
+  // glide across a slope, producing visible stepping/sinking/floating.
+  describe('stepTweenWithHeight', () => {
+    it('samples heightAt at the eased (x, z) it returns, never at the (unreached) target', () => {
+      const tween = createTween(0, 0);
+      const targetX = 10, targetZ = 0;
+      const dt = 0.05; // well under MOVE_TWEEN_DURATION_S — stays mid-glide
+      // Distinguishes any two different (x, z) pairs.
+      const heightAt = (x: number, z: number) => x * 10 + z;
+
+      const result = stepTweenWithHeight(tween, 0, 0, targetX, targetZ, dt, heightAt);
+
+      // Mid-glide: the eased x must differ from the target x, or this test
+      // cannot distinguish the two sampling strategies.
+      expect(result.x).toBeGreaterThan(0);
+      expect(result.x).toBeLessThan(targetX);
+
+      // Core regression check: y matches the height at the SAME eased (x, z)
+      // this call also returns...
+      expect(result.y).toBe(heightAt(result.x, result.z));
+      // ...and not the height at the target cell — a wrong implementation
+      // that samples heightAt(targetX, targetZ) instead fails this line.
+      expect(result.y).not.toBe(heightAt(targetX, targetZ));
+    });
+
+    it('mid-glide across two adjacent columns on a slope sits strictly between the two column heights', () => {
+      const tween = createTween(0, 0);
+      const SLOPE = 2.5;
+      const heightAt = (x: number, _z: number) => x * SLOPE;
+
+      const result = stepTweenWithHeight(tween, 0, 0, 1, 0, 0.05, heightAt);
+
+      expect(result.y).toBeGreaterThan(heightAt(0, 0));
+      expect(result.y).toBeLessThan(heightAt(1, 0));
+    });
+
+    it('sampling along a straight multi-cell path is monotonic on a constant slope, with no single-call snap bigger than that call\'s own movement', () => {
+      const tween = createTween(0, 0);
+      const SLOPE = 1.5;
+      const heightAt = (x: number, _z: number) => x * SLOPE;
+      const targetX = 20, targetZ = 0;
+      const dt = 0.05;
+      const steps = Math.ceil(MOVE_TWEEN_DURATION_S / dt) + 5;
+
+      let renderX = 0, renderZ = 0;
+      let prevY: number | null = null;
+      for (let i = 0; i < steps; i++) {
+        const beforeX = renderX, beforeZ = renderZ;
+        const result = stepTweenWithHeight(tween, renderX, renderZ, targetX, targetZ, dt, heightAt);
+
+        if (prevY !== null) {
+          // No reversal — the slope only rises as x increases.
+          expect(result.y).toBeGreaterThanOrEqual(prevY - 1e-9);
+          const moveDist = Math.hypot(result.x - beforeX, result.z - beforeZ);
+          // Δy this call cannot exceed this call's own (x, z) movement
+          // distance times the slope — i.e. no snap bigger than the glide
+          // that produced it.
+          expect(Math.abs(result.y - prevY)).toBeLessThanOrEqual(moveDist * SLOPE + 1e-9);
+        }
+
+        prevY = result.y;
+        renderX = result.x;
+        renderZ = result.z;
+      }
+    });
+
+    it('teleport: when stepTween snaps (distance >= MOVE_TELEPORT_DISTANCE), y equals heightAt(targetX, targetZ) in that same call, not an eased approach', () => {
+      const tween = createTween(0, 0);
+      const targetX = MOVE_TELEPORT_DISTANCE, targetZ = 0;
+      const heightAt = (x: number, z: number) => x * 3 + z * 7;
+
+      const result = stepTweenWithHeight(tween, 0, 0, targetX, targetZ, 0.05, heightAt);
+
+      expect(result.x).toBe(targetX);
+      expect(result.z).toBe(targetZ);
+      expect(result.y).toBe(heightAt(targetX, targetZ));
+    });
+
+    it('flat terrain (heightAt returns a constant): y stays exactly constant across the whole glide', () => {
+      const tween = createTween(0, 0);
+      const CONSTANT_Y = 42;
+      const heightAt = () => CONSTANT_Y;
+      const targetX = 10, targetZ = 10;
+      const dt = 0.05;
+      const steps = Math.ceil(MOVE_TWEEN_DURATION_S / dt) + 5;
+
+      let renderX = 0, renderZ = 0;
+      for (let i = 0; i < steps; i++) {
+        const result = stepTweenWithHeight(tween, renderX, renderZ, targetX, targetZ, dt, heightAt);
+        expect(result.y).toBe(CONSTANT_Y);
+        renderX = result.x;
+        renderZ = result.z;
+      }
     });
   });
 });

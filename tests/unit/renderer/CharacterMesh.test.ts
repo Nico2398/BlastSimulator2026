@@ -275,6 +275,70 @@ describe('CharacterMesh', () => {
     });
   });
 
+  // #1038: rendered Y must follow the same eased (x, z) as the X/Z glide,
+  // never the last-synced target cell — otherwise an entity's feet belong to
+  // a different terrain column than its body for the whole glide, and it
+  // visibly steps/sinks/floats when crossing a slope.
+  describe('heightAt — Y follows the eased render position on slopes (#1038)', () => {
+    it('update(employees, dt, heightAt) resamples y to heightAt at the eased render position, not a stale synced value', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = scene.children[0] as THREE.Group;
+
+      emp.x = 10;
+      emp.z = 0;
+      const heightAt = (x: number, _z: number) => x * 2;
+
+      cm.update([emp], 0.05, heightAt);
+
+      // Mid-glide: eased x must sit strictly between 0 and 10, or this test
+      // cannot distinguish "sampled at eased x" from "sampled at target x".
+      expect(group.position.x).toBeGreaterThan(0);
+      expect(group.position.x).toBeLessThan(10);
+      expect(group.position.y).toBe(heightAt(group.position.x, group.position.z));
+      cm.dispose();
+    });
+
+    it('resamples y from heightAt every call even for a stationary employee (post-blast terrain change under an idle entity)', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 5, z: 5 });
+      cm.addEmployee(emp, 0);
+      const group = scene.children[0] as THREE.Group;
+
+      // Converge the tween fully — a stationary employee, no target change.
+      for (let i = 0; i < 30; i++) cm.update([emp], 0.05);
+      expect(group.position.x).toBeCloseTo(5);
+      expect(group.position.z).toBeCloseTo(5);
+
+      // Terrain changed under the idle employee (e.g. a blast) between two
+      // calls — heightAt now returns a different value at the same (x, z).
+      let terrainY = 3;
+      const heightAt = () => terrainY;
+      cm.update([emp], 0.05, heightAt);
+      expect(group.position.y).toBe(3);
+
+      terrainY = 9;
+      cm.update([emp], 0.05, heightAt);
+      expect(group.position.y).toBe(9);
+      cm.dispose();
+    });
+
+    it('omitting heightAt leaves y untouched by update(), exactly as before (backward-compat regression guard)', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 5); // surfaceY = 5
+
+      cm.update([emp], 0.05); // no 3rd arg
+      const group = scene.children[0] as THREE.Group;
+      expect(group.position.y).toBe(5);
+      cm.dispose();
+    });
+  });
+
   describe('scene picking (P2)', () => {
     it('pickables() returns one tagged object per employee', () => {
       const scene = new THREE.Scene();

@@ -199,6 +199,73 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
   });
 });
 
+// #1038: rendered Y must follow the same eased (x, z) as the X/Z glide,
+// never the last-synced target cell — otherwise a vehicle's wheels belong to
+// a different terrain column than its body for the whole glide, and it
+// visibly steps/sinks/floats when crossing a slope. Mirrors the CharacterMesh
+// coverage — vehicles must behave the same as employees.
+describe('VehicleMesh — heightAt follows the eased render position on slopes (#1038)', () => {
+  it('update(vehicles, dt, heightAt) resamples y to heightAt at the eased render position, not a stale synced value', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
+    vm.addVehicle(v, 0);
+    const group = scene.children[0] as THREE.Group;
+
+    v.x = 10;
+    v.z = 0;
+    v.targetX = 10;
+    v.targetZ = 0;
+    const heightAt = (x: number, _z: number) => x * 2;
+
+    vm.update([v], 0.05, heightAt);
+
+    // Mid-glide: eased x must sit strictly between 0 and 10, or this test
+    // cannot distinguish "sampled at eased x" from "sampled at target x".
+    expect(group.position.x).toBeGreaterThan(0);
+    expect(group.position.x).toBeLessThan(10);
+    expect(group.position.y).toBe(heightAt(group.position.x, group.position.z));
+    vm.dispose();
+  });
+
+  it('resamples y from heightAt every call even for a stationary vehicle (post-blast terrain change under an idle entity)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 5, 5);
+    vm.addVehicle(v, 0);
+    const group = scene.children[0] as THREE.Group;
+
+    // Converge the tween fully — a stationary vehicle, no target change.
+    for (let i = 0; i < 30; i++) vm.update([v], 0.05);
+    expect(group.position.x).toBeCloseTo(5);
+    expect(group.position.z).toBeCloseTo(5);
+
+    // Terrain changed under the idle vehicle (e.g. a blast) between two
+    // calls — heightAt now returns a different value at the same (x, z).
+    let terrainY = 3;
+    const heightAt = () => terrainY;
+    vm.update([v], 0.05, heightAt);
+    expect(group.position.y).toBe(3);
+
+    terrainY = 9;
+    vm.update([v], 0.05, heightAt);
+    expect(group.position.y).toBe(9);
+    vm.dispose();
+  });
+
+  it('omitting heightAt leaves y untouched by update(), exactly as before (backward-compat regression guard)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
+    vm.addVehicle(v, 5); // surfaceY = 5
+
+    vm.update([v], 0.05); // no 3rd arg
+    const group = scene.children[0] as THREE.Group;
+    expect(group.position.y).toBe(5);
+    vm.dispose();
+  });
+});
+
 // ── Tiers: each tier is its own model asset, drawn at model scale ────────────
 // Role used throughout: debris_hauler. No runtime scaling or tinting shift
 // stands in for tier any more — the tier-1 junk heap and the tier-3 monster
