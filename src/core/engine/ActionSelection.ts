@@ -277,12 +277,15 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
 }
 
 /**
- * True when `action` is an on-foot (requiredVehicleRole === null) action
- * still sitting unpromoted in `employee.taskQueue`, `employee` cannot
- * currently reach it from their own position (resolveActionCost returns
- * null), and a different employee exists — alive, activeActionId === null,
- * restTicksRemaining === null, and holding requiredSkill if one is set — who
- * could attempt it instead.
+ * True when `action` is an on-foot (requiredVehicleRole === null) action,
+ * `employee` cannot currently reach it from their own position
+ * (resolveActionCost returns null), and a different employee exists — alive,
+ * activeActionId === null, restTicksRemaining === null, and holding
+ * requiredSkill if one is set — who could attempt it instead.
+ *
+ * Assumes/requires the caller only passes an on-foot action currently held
+ * by `employee` (e.g. sourced from `employee.taskQueue`); this function does
+ * not itself verify taskQueue membership.
  */
 export function canReleaseStrandedOnFootAction(
   state: GameState,

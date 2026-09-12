@@ -1123,6 +1123,12 @@ describe('canReleaseStrandedOnFootAction (#1025)', () => {
     makeEmployee(state, 0, 0); // otherwise a valid rescue candidate
     state.navGrid = null;
 
+    // resolveActionCost falls back to a non-null straight-line cost when
+    // navGrid is null, so `resolveActionCost(...) !== null` alone would
+    // already be true here — proving the dedicated
+    // `if (state.navGrid === null) return false` guard is what produces the
+    // `false` below, not a side effect of the reachability check.
+    expect(resolveActionCost(state, holder, action)).not.toBeNull();
     expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
   });
 });

@@ -511,8 +511,8 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const { avoidVehicles } = request;
 
   // 2. Start impassable check (must precede start==goal check). isAgentCell:
-  //    true — the agent is standing on this cell, so its own occupancy never
-  //    blocks it from pathing out.
+  //    true — the agent is standing on this cell, so neither its base cell
+  //    type/solidity nor its occupancy ever blocks it from pathing out.
   const startCell = grid.cellAt(sx, sz)!;
   if (isImpassable(startCell, avoidVehicles, true)) {
     return { found: false, waypoints: [], totalCost: 0 };
