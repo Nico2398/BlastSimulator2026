@@ -13,7 +13,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, findStarvedActionForEmployee, type SelectedAction,
+  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestWalk } from './RestActionHelpers.js';
@@ -141,6 +141,16 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // claim it the very next time they're offered the pool below.
       for (const candidate of candidates) {
         if (canReassignStrandedReservation(state, candidate)) {
+          employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
+          releaseActionToOpenPool(state, candidate);
+        } else if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
+          // #1025: an on-foot taskQueue candidate this employee can no longer
+          // reach (their own current cell got built over — clampToGrid froze
+          // them mid-fatigue onto the exact cell a building's footprint later
+          // occupies) with no other employee ever offered it, since it never
+          // sat in the open pool. Release it the same way the vehicle-gated
+          // branch above does, so a different, reachable employee can pick it
+          // up instead of it deadlocking here forever.
           employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
           releaseActionToOpenPool(state, candidate);
         }

@@ -4,6 +4,7 @@
 import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
+import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -43,12 +44,6 @@ export interface RampConnection {
   lowerX: number;
   lowerZ: number;
 }
-
-/** 8-directional neighbour offsets as [dx, dz] pairs. */
-const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
-  [0, -1], [0, 1], [-1, 0], [1, 0],   // cardinal
-  [-1, -1], [1, -1], [-1, 1], [1, 1], // diagonal
-];
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -148,19 +143,20 @@ class MinHeap<T extends { key: number }> {
 
 /**
  * Check whether a cell blocks traversal. `isAgentCell` is true when this is
- * the pathing agent's own current cell (#954): occupancy flags
- * (vehicleOccupied, fragmentOccupancy) never block an agent from pathing out
- * of the cell it is already standing on, but the cell's base solidity
- * ('blocked'/'void') still does — an agent's own cell can never itself be a
- * building or void.
+ * the pathing agent's own current cell: an agent's own cell is never
+ * impassable to itself, full stop (#1025) — neither the cell's base solidity
+ * ('blocked'/'void', e.g. a building footprint later placed on a fatigue-
+ * frozen agent's fractional-then-clamped position) nor its occupancy flags
+ * (vehicleOccupied, fragmentOccupancy) can strand an agent unable to path out
+ * of the cell it is already standing on.
  *
  * Exported (visibility only, no behaviour change) so
  * `tests/unit/nav/Pathfinding.test.ts` can exercise the isAgentCell
  * contract directly rather than only indirectly through findPath (#954).
  */
 export function isImpassable(cell: NavCell, avoidVehicles: boolean, isAgentCell: boolean = false): boolean {
-  if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (isAgentCell) return false;
+  if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
   return false;
 }
@@ -510,8 +506,8 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const { avoidVehicles } = request;
 
   // 2. Start impassable check (must precede start==goal check). isAgentCell:
-  //    true — the agent is standing on this cell, so its own occupancy never
-  //    blocks it from pathing out.
+  //    true — the agent is standing on this cell, so neither its base cell
+  //    type/solidity nor its occupancy ever blocks it from pathing out.
   const startCell = grid.cellAt(sx, sz)!;
   if (isImpassable(startCell, avoidVehicles, true)) {
     return { found: false, waypoints: [], totalCost: 0 };

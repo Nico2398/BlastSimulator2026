@@ -276,6 +276,35 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
   return { totalTicks: travelTicks + workTicks };
 }
 
+/**
+ * True when `action` is an on-foot (requiredVehicleRole === null) action,
+ * `employee` cannot currently reach it from their own position
+ * (resolveActionCost returns null), and a different employee exists — alive,
+ * activeActionId === null, restTicksRemaining === null, and holding
+ * requiredSkill if one is set — who could attempt it instead.
+ *
+ * Assumes/requires the caller only passes an on-foot action currently held
+ * by `employee` (e.g. sourced from `employee.taskQueue`); this function does
+ * not itself verify taskQueue membership.
+ */
+export function canReleaseStrandedOnFootAction(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+): boolean {
+  if (action.requiredVehicleRole !== null) return false;
+  if (state.navGrid === null) return false;
+  if (resolveActionCost(state, employee, action) !== null) return false;
+
+  return state.employees.employees.some(other =>
+    other.id !== employee.id &&
+    other.alive &&
+    other.activeActionId === null &&
+    other.restTicksRemaining === null &&
+    (action.requiredSkill === null || other.qualifications.some(q => q.category === action.requiredSkill)),
+  );
+}
+
 /** A candidate action chosen for an employee, with its resolved real cost. */
 export interface SelectedAction {
   action: PendingAction;

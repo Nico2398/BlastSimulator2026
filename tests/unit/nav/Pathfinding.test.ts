@@ -118,18 +118,23 @@ describe('findPath — obstacle avoidance', () => {
     }
   });
 
-  it('returns found: false when start cell is blocked', () => {
+  it('returns found: true when start cell is blocked but a path exists (agent\'s own cell is never impassable to itself)', () => {
+    // #1025 — the agent's own current cell is never impassable to itself,
+    // regardless of its type, so a 'blocked' start still paths to an open goal.
     const grid = makeFlatGrid(5, 5, 'walkable');
     setCell(grid, 0, 0, 'blocked');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: false });
-    expect(result.found).toBe(false);
+    expect(result.found).toBe(true);
+    expect(result.waypoints[0]).toEqual({ x: 0, z: 0 });
   });
 
-  it('returns found: false when start cell is void', () => {
+  it('returns found: true when start cell is void but a path exists (agent\'s own cell is never impassable to itself)', () => {
+    // #1025 — same corrected contract for 'void'.
     const grid = makeFlatGrid(5, 5, 'walkable');
     setCell(grid, 0, 0, 'void');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: false });
-    expect(result.found).toBe(false);
+    expect(result.found).toBe(true);
+    expect(result.waypoints[0]).toEqual({ x: 0, z: 0 });
   });
 
   it('returns found: false when goal cell is blocked', () => {
@@ -365,10 +370,12 @@ describe('findPath — edge cases', () => {
     expect(result.totalCost).toBe(0);
   });
 
-  it('returns found: false for a single cell (1×1) when it is blocked', () => {
+  it('returns found: true for a single cell (1×1) when it is blocked (start === goal, agent\'s own cell is never impassable to itself)', () => {
+    // #1025 — trivial start-equals-goal case: the sole cell is both the
+    // agent's start and goal, so its 'blocked' type never bars it.
     const grid = makeFlatGrid(1, 1, 'blocked');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 0, toZ: 0, avoidVehicles: false });
-    expect(result.found).toBe(false);
+    expect(result.found).toBe(true);
   });
 });
 
@@ -1000,14 +1007,31 @@ describe('isImpassable — isAgentCell exemption (#954)', () => {
     expect(isImpassable(cell, false, false)).toBe(false);
   });
 
-  it('still blocks a genuinely blocked (building) cell for isAgentCell true — only occupancy flags are exempted, not solidity', () => {
+  it('does NOT block a genuinely blocked (building) cell for isAgentCell true (#1025 — corrected contract: the agent\'s own current cell is never impassable to itself, not even blocked/void)', () => {
+    // #1025: a fatigue-frozen employee gets clampToGrid'd onto a discrete
+    // cell; if a building's footprint later occupies that exact cell, the
+    // OLD contract here (isAgentCell true still blocks 'blocked') made every
+    // subsequent findPath call from that position fail permanently, since the
+    // agent's own current cell read impassable to itself. isAgentCell must
+    // bypass type solidity entirely, exactly like it already bypasses
+    // occupancy flags above.
     const cell = makeCell('blocked');
-    expect(isImpassable(cell, true, true)).toBe(true);
+    expect(isImpassable(cell, true, true)).toBe(false);
   });
 
-  it('still blocks a void cell for isAgentCell true', () => {
+  it('does NOT block a void cell for isAgentCell true (#1025 — same corrected contract)', () => {
     const cell = makeCell('void');
-    expect(isImpassable(cell, true, true)).toBe(true);
+    expect(isImpassable(cell, true, true)).toBe(false);
+  });
+
+  it('unchanged: still blocks a blocked cell when isAgentCell is false (not the agent\'s own cell)', () => {
+    const cell = makeCell('blocked');
+    expect(isImpassable(cell, true, false)).toBe(true);
+  });
+
+  it('unchanged: still blocks a void cell when isAgentCell is omitted (defaults to not-the-agent\'s-own-cell)', () => {
+    const cell = makeCell('void');
+    expect(isImpassable(cell, true)).toBe(true);
   });
 });
 

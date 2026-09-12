@@ -20,6 +20,7 @@ import {
   selectBestActionForEmployee,
   computeActionWorkTicks,
   resolveRestNeedKey,
+  canReleaseStrandedOnFootAction,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -1007,5 +1008,127 @@ describe('resolveRestNeedKey (#549)', () => {
 
   it('returns null when payload carries no needKey at all (shift-cycle rest shape)', () => {
     expect(resolveRestNeedKey({ triggeredBy: 'shift_cycle' })).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// canReleaseStrandedOnFootAction (#1025)
+//
+// An employee fatigue-frozen at a fractional position gets clampToGrid'd onto
+// a discrete cell; if a building footprint later claims that exact cell, the
+// employee's own current cell reads 'blocked'/'void' to isImpassable and every
+// findPath call from it fails forever. When the stranded action sits only in
+// that employee's own taskQueue (never promoted to active), no other employee
+// can steal it either — a permanent deadlock. canReleaseStrandedOnFootAction
+// is the on-foot mirror of VehicleReservation.ts's
+// canReassignStrandedReservation: true only when the holder genuinely cannot
+// reach the action anymore AND a different alive/idle/qualified employee
+// exists to hand it to.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('canReleaseStrandedOnFootAction (#1025)', () => {
+  it('returns false for a vehicle-gated action (requiredVehicleRole !== null) — governed by canReassignStrandedReservation only', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    // Box the holder in on every neighbour so it would otherwise read
+    // unreachable, to isolate the requiredVehicleRole check from reachability.
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    // A different idle employee, so the "nothing to hand it to" branch can't
+    // be the reason this returns false.
+    makeEmployee(state, 0, 0);
+
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+  });
+
+  it('returns false when the holder can still reach the action (resolveActionCost resolves) — never released out from under a holder who can still do it', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    const action = makeAction({ id: 1, requiredVehicleRole: null, targetX: 6, targetZ: 6, holderId: holder.id, status: 'assigned' });
+    makeEmployee(state, 0, 0); // a qualified idle alternative exists, but must not matter here
+
+    expect(resolveActionCost(state, holder, action)).not.toBeNull();
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+  });
+
+  it('returns false when no other alive, idle, qualified employee exists to hand the action to', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, requiredVehicleRole: null, targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    // Solo roster — holder is the only employee at all.
+    expect(state.employees.employees).toHaveLength(1);
+
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+  });
+
+  it('returns true when the action is on-foot, unreachable by the holder, and another alive/idle/qualified employee exists (happy path — #1025 deadlock)', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, requiredVehicleRole: null, targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    const rescuer = makeEmployee(state, 0, 0);
+    expect(rescuer.activeActionId).toBeNull();
+    expect(rescuer.restTicksRemaining).toBeNull();
+
+    expect(resolveActionCost(state, holder, action)).toBeNull();
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(true);
+  });
+
+  it('returns true only when the alternative employee actually holds the required skill, false when the only other employee is unqualified', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    assignSkill(state.employees, holder.id, 'blasting', 3);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, requiredVehicleRole: null, requiredSkill: 'blasting', targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    const unqualified = makeEmployee(state, 0, 0);
+    unqualified.qualifications = [];
+
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+
+    assignSkill(state.employees, unqualified.id, 'blasting', 1);
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(true);
+  });
+
+  it('returns false when no other alive employee is idle (an otherwise-qualified candidate is mid-task)', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+    }
+    const action = makeAction({ id: 1, requiredVehicleRole: null, targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    const busy = makeEmployee(state, 0, 0);
+    busy.activeActionId = 999; // mid-task — not a rescue candidate
+
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+  });
+
+  it('returns false when state.navGrid is null — reachability can never be evaluated, so never a spurious release', () => {
+    const state = makeState(10, 10);
+    const holder = makeEmployee(state, 5, 5);
+    const action = makeAction({ id: 1, requiredVehicleRole: null, targetX: 8, targetZ: 8, holderId: holder.id, status: 'assigned' });
+    makeEmployee(state, 0, 0); // otherwise a valid rescue candidate
+    state.navGrid = null;
+
+    // resolveActionCost falls back to a non-null straight-line cost when
+    // navGrid is null, so `resolveActionCost(...) !== null` alone would
+    // already be true here — proving the dedicated
+    // `if (state.navGrid === null) return false` guard is what produces the
+    // `false` below, not a side effect of the reachability check.
+    expect(resolveActionCost(state, holder, action)).not.toBeNull();
+    expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
   });
 });
