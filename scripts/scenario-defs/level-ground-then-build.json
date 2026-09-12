@@ -36,7 +36,7 @@
     },
     {
       "command": "build management_office at:15,13",
-      "description": "Baseline: the rect spans two voxel levels (Y: 36,35 / 37,36), past the one-level tolerance BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD allows, so #1008's placement rule refuses the order outright — before any level_ground order exists to make this pass. Clicks through the real BuildMenu catalog + tile picker.",
+      "description": "Baseline: the rect spans two voxel levels (Y: 36,35 / 37,36), past the one-level tolerance BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD allows, so #1008's placement rule refuses the order outright — before any level_ground order exists to make this pass. Clicks through the real BuildMenu catalog + tile picker, then proves Confirm itself is unreachable on the uneven tile (#1045) rather than clicking it and asserting a refused command.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -57,19 +57,16 @@
         },
         {
           "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "commandOutcome": "refused",
       "expect": {
         "equals": {
           "orderedBuildingCount": 0
         },
-        "note": "Refused synchronously — no PlannedBuilding was queued for the uneven footprint."
+        "blocked": "#bs-tile-select-confirm",
+        "note": "issue #1045 — uneven footprint leaves Confirm disabled; no PlannedBuilding was queued for the uneven footprint."
       }
     },
     {
