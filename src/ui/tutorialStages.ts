@@ -184,7 +184,7 @@ export const REGION = {
 } as const satisfies Record<string, TileRegion>;
 
 /** A single-tile hazard the tutorial's fixed building pins must clear. */
-export interface TutorialHazard extends TileRegion {}
+export type TutorialHazard = TileRegion;
 
 /**
  * The tutorial's fleet spawn point, mirrored from how a real purchase derives
@@ -215,7 +215,19 @@ export function chebyshevRectDistance(a: TileRegion, b: TileRegion): number {
   return Math.max(dx, dz);
 }
 
-/** The tile rectangle a building of `type`/`tier` occupies when pinned at `region`'s origin corner. */
+/**
+ * The tile rectangle a building of `type`/`tier` occupies when pinned at `region`'s origin corner.
+ *
+ * The `origin + size - 1` arithmetic here matches `makeFootprintRegion`
+ * (`src/console/commands/buildingHelpers.ts`) and the inline sizing in
+ * `checkFootprintPlacement` (`src/core/entities/Building.ts`), just expressed
+ * in `TileRegion`'s `{x1,z1,x2,z2}` shape instead of `BlastRegion`'s
+ * `{minX,minZ,maxX,maxZ}`. Routing through `makeFootprintRegion` and
+ * translating its result would mean `src/ui/` importing a `src/console/`
+ * command helper — a layering cost bigger than the one line of arithmetic it
+ * would save. Left as its own copy; worth revisiting if a shared
+ * core-level "rect from origin + size" helper is ever introduced for other reasons.
+ */
 export function tutorialSiteFootprintRect(type: BuildingType, tier: BuildingTier, region: TileRegion): TileRegion {
   const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
   return { x1: region.x1, z1: region.z1, x2: region.x1 + sizeX - 1, z2: region.z1 + sizeZ - 1, exact: false };

@@ -83,10 +83,10 @@ describe('tutorial site layout rule (#1040)', () => {
       expect(chebyshevRectDistance(a, b)).toBe(chebyshevRectDistance(b, a));
     });
 
-    it('is 0 for two rectangles that only touch edges (no gap tile between them)', () => {
+    it('is 1 for two rectangles that are adjacent with no gap tile between them', () => {
       const a: TileRegion = { x1: 0, z1: 0, x2: 2, z2: 2 };
       const b: TileRegion = { x1: 3, z1: 0, x2: 5, z2: 2 };
-      // Adjacent, sharing an edge boundary — no tile of separation.
+      // Adjacent, sharing an edge boundary — closest corners are one tile apart.
       expect(chebyshevRectDistance(a, b)).toBe(1);
     });
   });
@@ -104,16 +104,31 @@ describe('tutorial site layout rule (#1040)', () => {
     });
 
     it('scales with tier when a building def changes footprint size by tier', () => {
+      // living_quarters footprint grows 3x3 -> 4x3 -> 5x4 across tiers
+      // (BuildingDefs.ts), so this actually exercises tier-scaling rather
+      // than just re-deriving one tier's own size.
       const region: TileRegion = { x1: 0, z1: 0, x2: 0, z2: 0, exact: true };
-      const rectT1 = tutorialSiteFootprintRect('living_quarters', 1, region);
       const { sizeX: t1X, sizeZ: t1Z } = getDefSize(getBuildingDef('living_quarters', 1));
+      const { sizeX: t2X, sizeZ: t2Z } = getDefSize(getBuildingDef('living_quarters', 2));
+      const { sizeX: t3X, sizeZ: t3Z } = getDefSize(getBuildingDef('living_quarters', 3));
+      expect(t2X).toBeGreaterThan(t1X);
+      expect(t3X).toBeGreaterThan(t2X);
+      expect(t3Z).toBeGreaterThan(t1Z);
+
+      const rectT1 = tutorialSiteFootprintRect('living_quarters', 1, region);
+      const rectT2 = tutorialSiteFootprintRect('living_quarters', 2, region);
+      const rectT3 = tutorialSiteFootprintRect('living_quarters', 3, region);
       expect(rectT1.x2 - rectT1.x1 + 1).toBe(t1X);
       expect(rectT1.z2 - rectT1.z1 + 1).toBe(t1Z);
+      expect(rectT2.x2 - rectT2.x1 + 1).toBe(t2X);
+      expect(rectT2.z2 - rectT2.z1 + 1).toBe(t2Z);
+      expect(rectT3.x2 - rectT3.x1 + 1).toBe(t3X);
+      expect(rectT3.z2 - rectT3.z1 + 1).toBe(t3Z);
     });
 
-    it('a single-cell footprint building produces a single-tile rect', () => {
-      // driving_center T1 — used here purely to exercise a second real
-      // building def rather than asserting a specific footprint size.
+    it('produces the correct rect for a second real building def, driving_center', () => {
+      // driving_center T1 is 2x2 (BuildingDefs.ts) — used here to exercise a
+      // second real building def, not to assert a single-cell footprint.
       const region: TileRegion = { x1: 7, z1: 7, x2: 7, z2: 7, exact: true };
       const { sizeX, sizeZ } = getDefSize(getBuildingDef('driving_center', 1));
       const rect = tutorialSiteFootprintRect('driving_center', 1, region);
