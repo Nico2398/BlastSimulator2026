@@ -222,6 +222,18 @@ export class UIManager {
     this.blastUI.setPlacementKit(kit);
     this.buildMenu.setPlacementKit(kit);
     this.surveyPanel.setPlacementKit(kit);
+    // Esc cascade (see KeyboardShortcuts.onEscape doc comment): an armed placement
+    // tool is "on top" and must consume Esc itself before handleEscape() falls
+    // through to closing the panel that armed it. PlacementController has its own
+    // `window` keydown listener that already cancels the tool on Esc and calls
+    // stopPropagation() — but that only stops bubbling to ancestors, not this
+    // class's own sibling `window` listener (KeyboardShortcuts), so without this
+    // layer handleEscape() always ran too and closed the whole panel underneath it.
+    this.registerEscLayer(() => {
+      if (!kit.controller.isArmed) return false;
+      kit.controller.cancel();
+      return true;
+    });
   }
 
   /** Passes the terrain-height sampler down to the Build panel, for the flatness refusal check (#1008). */

@@ -20,6 +20,8 @@ import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../src/ui/panels/BlastReportModal.js';
 import { setupEvents } from '../../../src/core/events/index.js';
+import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
+import type { PlacementController } from '../../../src/ui/scene/PlacementController.js';
 
 setupEvents();
 
@@ -751,5 +753,61 @@ describe('UIManager — blastActiveStep (#616 review round, item 7)', () => {
     chargeTab.click();
 
     expect(uiManager.blastActiveStep).toBe(2);
+  });
+});
+
+// ── setPlacementKit registers an Esc-cascade layer for the armed tool
+// (bug: Esc while a placement tool was armed both cancelled the tool via
+// PlacementController's own keydown listener AND fell through to
+// handleEscape()'s "close the whole panel" fallback, since nothing told
+// UIManager's escLayers about the armed tool — stopPropagation() on a
+// sibling `window` listener doesn't stop this class's own listener).
+
+function makePlacementKit(isArmed: boolean): { kit: PlacementKit; cancel: ReturnType<typeof vi.fn> } {
+  const cancel = vi.fn();
+  const controller = { isArmed, cancel } as unknown as PlacementController;
+  const kit = { controller, overlay: {}, strip: {} } as unknown as PlacementKit;
+  return { kit, cancel };
+}
+
+describe('UIManager — setPlacementKit Esc-cascade layer', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('handleEscape() cancels an armed placement tool instead of closing the active panel', () => {
+    uiManager = new UIManager(container);
+    const { kit, cancel } = makePlacementKit(true);
+    uiManager.setPlacementKit(kit);
+    uiManager.showPanel('build');
+
+    uiManager.handleEscape();
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.style.display).not.toBe('none');
+  });
+
+  it('handleEscape() falls through to closing the panel when no tool is armed', () => {
+    uiManager = new UIManager(container);
+    const { kit, cancel } = makePlacementKit(false);
+    uiManager.setPlacementKit(kit);
+    uiManager.showPanel('build');
+
+    uiManager.handleEscape();
+
+    expect(cancel).not.toHaveBeenCalled();
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.style.display).toBe('none');
   });
 });

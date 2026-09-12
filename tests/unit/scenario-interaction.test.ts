@@ -1108,4 +1108,70 @@ describe('clickSelector — retries a stale zero-size click failure (issue #1053
     );
     expect(click).toHaveBeenCalledTimes(1);
   });
+
+  // #1045 CI-fix (CI run 34720642781) — the same sandbox-mode report-close
+  // control failed a beat later than #1053's case: present, correctly sized,
+  // uncovered, everything a real player-facing block would show absent —
+  // and Puppeteer's click() still refused it. The retry above only covered
+  // a zero-size readback; this is the same race a beat further along
+  // whatever CSS transition the modal runs on open.
+  it('retries a click failure that reads back as fully clickable (present, sized, uncovered) — not just zero-size', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(null) // probe: usable, so the loop proceeds straight to the click
+      .mockResolvedValueOnce({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: false,
+        width: 84,
+        height: 32,
+        matchCount: 1,
+      });
+    const click = vi.fn()
+      .mockRejectedValueOnce(new Error('Node is either not clickable or not an Element'))
+      .mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'blast complete',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it('never retries a click failure the inspection reports as a real block (covered by another element) despite being found and sized', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(null) // probe: usable, so the click is attempted
+      .mockResolvedValueOnce({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: false,
+        width: 84,
+        height: 32,
+        matchCount: 1,
+        covering: 'div.bs-modal-backdrop',
+      });
+    const click = vi.fn().mockRejectedValue(new Error('Node is either not clickable or not an Element'));
+    const page = fakePage({ evaluate, click });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'blast complete',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      'element is covered by div.bs-modal-backdrop',
+    );
+    expect(click).toHaveBeenCalledTimes(1);
+  });
 });
