@@ -286,6 +286,12 @@ describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     vehicle.driverId = otherDriver.id; // claimed first
     vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    // otherDriver is already mid-drive toward the evacuation destination, not
+    // arrived — without this, releaseArrivedEvacuationDrivers reads the
+    // vehicle's default target (== its spawn position) as "already there" and
+    // dismounts otherDriver before this employee's boarding attempt ever runs.
+    vehicle.targetX = 40;
+    vehicle.targetZ = 40;
 
     employee.x = 5;
     employee.z = 5;

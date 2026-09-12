@@ -179,13 +179,17 @@ describe('discardStaleRestAction', () => {
 });
 
 describe('isMidEvacuationDrive (#1042)', () => {
-  it('true for an employee with no active action who is the driver of some vehicle', () => {
+  it('true for an employee with no active action who is driving a vehicle out as part of an evacuation', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.driverId = employee.id;
+    // The marker that actually distinguishes an evacuation drive from an
+    // ordinary one (driverId alone is not unique to evacuation — see
+    // isMidEvacuationDrive's own doc comment).
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
 
     expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(true);
   });
