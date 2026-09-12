@@ -9,7 +9,8 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { assignDriver } from '../entities/Vehicle.js';
+import { assignDriver, moveVehicle } from '../entities/Vehicle.js';
+import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
@@ -56,6 +57,13 @@ export interface ArrivalGateResult {
  * count (#924).
  */
 export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
+  // Dismount any evacuation driver whose vehicle has reached its
+  // pendingEvacuationDestination this tick (#1042) — before the employee/
+  // vehicle loops below, so a just-arrived driver is free to be picked up by
+  // ordinary dispatch/rest routing the same tick, exactly like an ordinary
+  // on-foot evacuee arriving at their own safe cell.
+  releaseArrivedEvacuationDrivers(state);
+
   const result: ArrivalGateResult = {
     restStarted: [],
     taskStarted: [],
@@ -301,6 +309,10 @@ function resolveBoarding(
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_taken' });
     releaseReservationIfVehicleGated(state, emp);
+    // A stale evacuation marker on this vehicle must not confuse whoever
+    // drives it next (#1042) — the driver who actually took it either isn't
+    // evacuating at all, or staged their own marker via clearZone already.
+    vehicle.pendingEvacuationDestination = null;
     return;
   }
 
@@ -310,6 +322,7 @@ function resolveBoarding(
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_moved' });
     releaseReservationIfVehicleGated(state, emp);
+    vehicle.pendingEvacuationDestination = null;
     return;
   }
 
@@ -363,6 +376,11 @@ function resolveBoarding(
 
       vehicle.task = 'moving';
       vehicle.waitingTicks = 0;
+    } else if (vehicle.pendingEvacuationDestination !== null) {
+      // Boarded to drive a vehicle clear of an evacuating zone (#1042) rather
+      // than for a vehicle-gated action — no reservation to hand off to, so
+      // start the drive here instead.
+      moveVehicle(state.vehicles, vehicle.id, vehicle.pendingEvacuationDestination.x, vehicle.pendingEvacuationDestination.z);
     }
   } else {
     result.boardingCancelled.push({ employeeId: emp.id, reason: boarded.error ?? 'unknown' });

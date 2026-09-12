@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createGame } from '../../../src/core/state/GameState.js';
+import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
 import { createBuildingState } from '../../../src/core/entities/Building.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
@@ -1120,5 +1120,70 @@ describe('FilePersistence', () => {
     await backend.save('slot1', 'Test', '{}', '', null);
     const loaded = await backend.load('slot1');
     expect(loaded!.meta.levelId).toBeNull();
+  });
+});
+
+// ── v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042) ─────
+// SAVE_VERSION bumped 16→17 when Vehicle gained a
+// `pendingEvacuationDestination: { x: number; z: number } | null` field — the
+// safe cell a qualified employee drives a boarded, evacuating vehicle toward.
+// A pre-v17 save has no such destination staged on any vehicle — it must
+// default to null, matching purchaseVehicle's own default.
+
+describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042)', () => {
+  it('SAVE_VERSION is 17', () => {
+    expect(SAVE_VERSION).toBe(17);
+  });
+
+  it('a v16 fixture with a vehicle missing pendingEvacuationDestination loads with pendingEvacuationDestination: null', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 16;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    expect(vehicleList).toHaveLength(1);
+    delete vehicleList[0]!['pendingEvacuationDestination'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.vehicles).toHaveLength(1);
+    expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
+  });
+
+  it('a pre-v17 save with pendingEvacuationDestination already set is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.pendingEvacuationDestination = { x: 12, z: 34 };
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 16;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restoredVehicle.pendingEvacuationDestination).toEqual({ x: 12, z: 34 });
+  });
+
+  it('a v16 fixture with a malformed pendingEvacuationDestination is reset to null rather than passed through', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 16;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    expect(vehicleList).toHaveLength(1);
+    // Wrong shape entirely — not the { x: number; z: number } | null the
+    // field actually is. Missing/wrong-typed z, hardened for by #1042.
+    vehicleList[0]!['pendingEvacuationDestination'] = { x: 'bad' };
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
   });
 });

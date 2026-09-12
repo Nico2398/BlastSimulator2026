@@ -247,6 +247,30 @@ function migrateV14ToV15(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v16 -> v17: Vehicle gained a `pendingEvacuationDestination: { x: number; z:
+ * number } | null` field (#1042 — a driverless vehicle can be boarded and
+ * driven clear of an evacuating zone instead of always being stranded). A
+ * pre-v17 save has no evacuation drive in flight — the field defaults to
+ * null for every vehicle, matching purchaseVehicle's own default. Mutates
+ * `obj` in place, matching every other migration block in `deserialize`
+ * below.
+ */
+function migrateV16ToV17(obj: Record<string, unknown>): Record<string, unknown> {
+  ensureFieldsOnEach(obj, 'vehicles', [
+    {
+      key: 'pendingEvacuationDestination',
+      predicate: v =>
+        v !== null &&
+        typeof v === 'object' &&
+        typeof (v as { x?: unknown }).x === 'number' &&
+        typeof (v as { z?: unknown }).z === 'number',
+      defaultValue: null,
+    },
+  ]);
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -441,6 +465,11 @@ export function deserialize(json: string): GameState {
   // v14 -> v15: Employee.hunger/breakNeed removed, fatigue-only (#928).
   if ((obj['version'] as number) < 15) {
     migrateV14ToV15(obj);
+  }
+
+  // v16 -> v17: Vehicle.pendingEvacuationDestination (#1042).
+  if ((obj['version'] as number) < 17) {
+    migrateV16ToV17(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

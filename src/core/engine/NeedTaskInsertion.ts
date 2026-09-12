@@ -13,7 +13,7 @@ import type { NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach } from './RestActionHelpers.js';
-import { isMidEvacuationWalk } from './Evacuation.js';
+import { isMidEvacuation } from './Evacuation.js';
 import { NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER } from '../config/balance.js';
 
 export interface NeedInsertionResult {
@@ -101,7 +101,7 @@ export function autoInsertNeedTasks(
     // position — queuing a rest action targeted right back there — then
     // reclaimed it the moment it reached its real safe cell, walking all the
     // way back into the still-armed blast footprint to rest.
-    if (isMidEvacuationWalk(emp)) continue;
+    if (isMidEvacuation(state, emp)) continue;
 
     // Skip employees already mid-rest — resting, or (#437) still walking to
     // rest with the timer not yet started. Their gauge is still below its

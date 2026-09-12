@@ -5,6 +5,8 @@ import type { VehicleState } from './Vehicle.js';
 import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
+import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
+import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -71,6 +73,7 @@ export function clearZone(
   vehicles: VehicleState,
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
+  canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
 ): EvacuationResult {
   const result: EvacuationResult = {
     orderedVehicleIds: [],
@@ -79,29 +82,73 @@ export function clearZone(
     strandedEmployeeIds: [],
   };
 
+  // Employees picked to board a vehicle this call — tracked so a later
+  // vehicle in the same zone doesn't also pick them, and so the foot-
+  // evacuation loop below skips them.
+  const boardingEmployeeIds = new Set<number>();
+
+  // Employees already driving some OTHER in-zone vehicle, computed once up
+  // front — neither the vehicle loop's candidate list nor the employee loop
+  // needs to rescan the vehicle list per employee to know this.
+  const inZoneDriverIds = new Set<number>();
+  for (const v of vehicles.vehicles) {
+    if (v.driverId !== null && isInZone(v.x, v.z, zone)) inZoneDriverIds.add(v.driverId);
+  }
+
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
-    // A driverless vehicle can never advance on tick (canTickVehicle,
-    // EntityMovementTick.ts, #947) — order it out anyway and it just sits
-    // there with task='moving' forever. Check driverId before even looking
-    // for a destination, so a valid safe cell existing makes no difference:
-    // report it stranded either way.
-    if (v.driverId === null) {
+
+    if (v.driverId !== null) {
+      const dest = findSafeDestination(v.x, v.z, zone);
+      if (dest) {
+        moveVehicle(vehicles, v.id, dest.x, dest.z);
+        result.orderedVehicleIds.push(v.id);
+      } else {
+        result.strandedVehicleIds.push(v.id);
+      }
+      continue;
+    }
+
+    // Driverless: find a safe destination first — a vehicle nobody can drive
+    // anywhere is stranded regardless of who might be free to board it.
+    const dest = findSafeDestination(v.x, v.z, zone);
+    if (!dest) {
       result.strandedVehicleIds.push(v.id);
       continue;
     }
-    const dest = findSafeDestination(v.x, v.z, zone);
-    if (dest) {
-      moveVehicle(vehicles, v.id, dest.x, dest.z);
-      result.orderedVehicleIds.push(v.id);
-    } else {
+
+    const candidateEmployeeIds = employees.employees
+      .filter(e =>
+        e.alive
+        && isInZone(e.x, e.z, zone)
+        && !boardingEmployeeIds.has(e.id)
+        && !inZoneDriverIds.has(e.id)
+        && e.pendingDriverVehicleId === null,
+      )
+      .map(e => e.id);
+
+    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
+    if (!driver) {
       result.strandedVehicleIds.push(v.id);
+      continue;
     }
+
+    driver.pendingDriverVehicleId = v.id;
+    driver.destinationX = v.x;
+    driver.destinationZ = v.z;
+    v.pendingEvacuationDestination = { x: dest.x, z: dest.z };
+    boardingEmployeeIds.add(driver.id);
+    result.orderedVehicleIds.push(v.id);
   }
 
   for (const emp of employees.employees) {
     if (!emp.alive) continue;
     if (!isInZone(emp.x, emp.z, zone)) continue;
+    if (boardingEmployeeIds.has(emp.id)) continue;
+    // Already driving an in-zone vehicle clear (driver-present branch above
+    // already staged its destination) — no foot destination needed too.
+    if (inZoneDriverIds.has(emp.id)) continue;
+
     const dest = findSafeDestination(emp.x, emp.z, zone);
     if (dest) {
       emp.destinationX = dest.x;

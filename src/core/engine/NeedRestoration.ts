@@ -16,7 +16,7 @@ import { interruptActiveAction, completePendingAction } from './TaskDispatch.js'
 import {
   createRestPendingAction, findNearestBuildingOfType, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk,
 } from './RestActionHelpers.js';
-import { isMidEvacuationWalk } from './Evacuation.js';
+import { isMidEvacuation } from './Evacuation.js';
 import {
   NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
@@ -40,14 +40,14 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
 
   for (const emp of state.employees.employees) {
     // Skips a busy employee (activeActionId !== null) same as always, plus —
-    // via isMidEvacuationWalk — one currently walking a safe-cell order
-    // outside the claim system entirely (evacuateZone). Without the latter,
-    // this routine would happily self-claim a fresh rest action over that
-    // walk, overwriting the evacuation destination with a walk back toward
-    // whatever building is nearest. See isMidEvacuationWalk's own doc
-    // comment (Evacuation.ts) for the shared reasoning across all four call
-    // sites (#557).
-    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuationWalk(emp)) continue;
+    // via isMidEvacuation — one currently mid-evacuation outside the claim
+    // system entirely, on foot or driving a vehicle clear (evacuateZone,
+    // #1042). Without the latter, this routine would happily self-claim a
+    // fresh rest action over that walk, overwriting the evacuation
+    // destination with a walk back toward whatever building is nearest. See
+    // isMidEvacuationWalk's own doc comment (Evacuation.ts) for the shared
+    // reasoning across all four call sites (#557).
+    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(state, emp)) continue;
     const needsRest = emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
@@ -100,8 +100,9 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured) continue;
     // Without this guard, an employee whose needs cross the collapse
-    // threshold while mid-evacuation (isMidEvacuationWalk — see its own doc
-    // comment, Evacuation.ts, #557) gets redirected here to the nearest
+    // threshold while mid-evacuation (isMidEvacuation, on foot or driving a
+    // vehicle clear — see isMidEvacuationWalk's own doc comment,
+    // Evacuation.ts, #557, #1042) gets redirected here to the nearest
     // suitable building — which, for an employee just evacuated FROM the
     // area around that same building, routes them right back inside the
     // danger zone they were ordered out of, and does so on every subsequent
@@ -111,7 +112,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // dangerZoneClear` never resolving because two evacuating employees
     // collapsed mid-walk and orbited back to their pre-evacuation
     // living_quarters forever.
-    if (isMidEvacuationWalk(emp)) continue;
+    if (isMidEvacuation(state, emp)) continue;
 
     // checkCollapse nulls activeActionId itself on collapse, so the previous
     // active action (if any) must be captured before calling it — otherwise

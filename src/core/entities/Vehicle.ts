@@ -163,6 +163,13 @@ export interface Vehicle {
    * is the walk-to-vehicle phase.
    */
   reservedForActionId: number | null;
+  /**
+   * Safe destination a qualified employee is driving this vehicle toward
+   * during an evacuation, or null when not mid-evacuation-drive. Set when a
+   * driverless vehicle is boarded and driven clear rather than left stranded
+   * (#1042); cleared once the vehicle arrives.
+   */
+  pendingEvacuationDestination: { x: number; z: number } | null;
 }
 
 // ── Fleet state ──
@@ -208,6 +215,7 @@ export function purchaseVehicle(
     breakFragmentId: null,
     breakPhase: null,
     reservedForActionId: null,
+    pendingEvacuationDestination: null,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

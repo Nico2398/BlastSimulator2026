@@ -9,9 +9,10 @@ import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import type { Employee } from '../entities/Employee.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import {
-  EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries,
+  EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
 } from './EvacuationHold.js';
 
 // Re-exported so EmployeeDispatch.ts/EmployeeDispatchSteps.ts keep importing
@@ -20,7 +21,9 @@ import {
 // organization detail, not a change to who imports what. See
 // EvacuationHold.ts for EVACUATION_HOLD_KEY's own doc comment and both
 // functions'.
-export { EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds } from './EvacuationHold.js';
+export {
+  EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds,
+} from './EvacuationHold.js';
 
 /**
  * True when `employee` is currently walking a route the claim system knows
@@ -59,6 +62,18 @@ export { EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHol
  */
 export function isMidEvacuationWalk(employee: Employee): boolean {
   return employee.activeActionId === null && employee.destinationX !== null;
+}
+
+/**
+ * True when `employee` is currently mid-evacuation by either route —
+ * walking (isMidEvacuationWalk) or driving a vehicle clear
+ * (isMidEvacuationDrive, #1042). Combines the two-check guard pair that
+ * EmployeeDispatch.ts, ForceShiftRest.ts, NeedRestoration.ts, and
+ * NeedTaskInsertion.ts each repeated at their own call sites into the one
+ * call those sites now make.
+ */
+export function isMidEvacuation(state: GameState, employee: Employee): boolean {
+  return isMidEvacuationWalk(employee) || isMidEvacuationDrive(state.vehicles, employee);
 }
 
 /**
@@ -240,5 +255,24 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state.vehicles,
     state.employees,
     (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),
+    (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
   );
+}
+
+/**
+ * Whether `employee` can path to `vehicle`'s position to board it, per the
+ * live NavGrid — mirrors findSafeEvacuationCell's own findPath call
+ * (avoidVehicles: false — walking up to/onto a vehicle's own cell to board
+ * it is exactly the case that setting exists to allow).
+ */
+function canEmployeeReachVehicleForEvacuation(state: GameState, employee: Employee, vehicle: Vehicle): boolean {
+  if (!state.navGrid) return false;
+
+  const path = findPath(state.navGrid, {
+    agentId: employee.id,
+    fromX: employee.x, fromZ: employee.z,
+    toX: vehicle.x, toZ: vehicle.z,
+    avoidVehicles: false,
+  });
+  return path.found;
 }

@@ -4,9 +4,10 @@
 // assignment checks, and the excavator loading-rate helper, verbatim from
 // Vehicle.ts.
 
-import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
+import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
 import { getVehicleDef } from './Vehicle.js';
+import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 
 // ── Licence mapping ──
 
@@ -84,4 +85,57 @@ export function assignDriver(
 export function getExcavatorLoadingRate(vehicle: Vehicle): number {
   if (vehicle.type !== 'rock_digger') return 0;
   return getVehicleDef('rock_digger').capacity;
+}
+
+// ── Evacuation driver assignment (#1042) ──
+
+/** Whether `employee` can reach `vehicle` in time to board and drive it clear. */
+export type EvacuationDriverReachabilityCheck = (employee: Employee, vehicle: Vehicle) => boolean;
+
+/**
+ * Picks the best qualified candidate among `candidateEmployeeIds` to board
+ * `vehicle` and drive it clear of an evacuating zone, or null when none
+ * qualifies or can reach it.
+ */
+export function findBestEvacuationDriver(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  candidateEmployeeIds: readonly number[],
+  canReach: EvacuationDriverReachabilityCheck,
+): Employee | null {
+  const ranked = [...candidateEmployeeIds].sort((a, b) => {
+    const empA = employeeState.employees.find(e => e.id === a);
+    const empB = employeeState.employees.find(e => e.id === b);
+    const distA = empA ? distanceSq(empA, vehicle) : Infinity;
+    const distB = empB ? distanceSq(empB, vehicle) : Infinity;
+    if (distA !== distB) return distA - distB;
+    return a - b;
+  });
+
+  // Cheap, exact qualification filter (licence, availability) applied to the
+  // whole ranked pool before any real pathfinding — mirrors
+  // selectBestActionForEmployee's own pre-filter (ActionSelection.ts). Only
+  // the nearest EVACUATION_DRIVER_MAX_PATH_ATTEMPTS qualified candidates then
+  // get a real `findPath`-backed `canReach` call, capping per-vehicle
+  // evacuation dispatch cost regardless of how many employees are in the
+  // zone (#1042 review).
+  const qualified: Employee[] = [];
+  for (const candidateId of ranked) {
+    const check = canAssignDriver(vehicleState, employeeState, vehicle.id, candidateId);
+    if (check.success) qualified.push(check.employee);
+  }
+
+  for (let i = 0; i < qualified.length && i < EVACUATION_DRIVER_MAX_PATH_ATTEMPTS; i++) {
+    const candidate = qualified[i]!;
+    if (canReach(candidate, vehicle)) return candidate;
+  }
+
+  return null;
+}
+
+function distanceSq(employee: Employee, vehicle: Vehicle): number {
+  const dx = employee.x - vehicle.x;
+  const dz = employee.z - vehicle.z;
+  return dx * dx + dz * dz;
 }

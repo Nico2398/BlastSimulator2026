@@ -13,6 +13,7 @@ import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
@@ -203,6 +204,32 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('rest');
+  });
+
+  // #1042: an employee mid-evacuation-drive (boarded a driverless vehicle and
+  // is driving it clear of a danger zone) has no activeActionId of their own
+  // — mirrors the isMidEvacuationWalk skip this file already relies on for a
+  // walking evacuee, but for one driving instead. Without the analogous
+  // isMidEvacuationDrive guard, this routine would self-claim a fresh rest
+  // action over the drive, overwriting nothing on the employee (they have no
+  // destinationX of their own while driving) but abandoning the vehicle
+  // mid-evacuation with no driver actively finishing the drive.
+  it('does NOT route an employee mid-evacuation-drive even when fatigue is below threshold (#1042)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    employee.fatigue = 10; // below the threshold of 25
+    employee.activeActionId = null;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.driverId = employee.id;
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = tickNeedRestoration(state);
+
+    expect(result.routed).toHaveLength(0);
+    expect(employee.activeActionId).toBeNull();
   });
 });
 
@@ -686,5 +713,25 @@ describe('tickCollapse (7.6)', () => {
     expect(employee.pendingActionType).toBe('rest');
     const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
     expect(activity.kind).toBe('collapsed');
+  });
+
+  // #1042 — mirrors tickNeedRestoration's own isMidEvacuationWalk-analogue
+  // guard above: an employee mid-evacuation-drive must not be
+  // collapse-interrupted out from under the vehicle they are still driving
+  // clear of the danger zone.
+  it('does NOT collapse an employee mid-evacuation-drive even below the collapse threshold (#1042)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    employee.fatigue = 3; // below NEED_COLLAPSE_THRESHOLDS.fatigue
+    employee.activeActionId = null;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.driverId = employee.id;
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+    expect(employee.collapsing).toBe(false);
   });
 });

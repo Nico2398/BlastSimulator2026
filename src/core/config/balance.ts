@@ -627,6 +627,18 @@ export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
 export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 
 /**
+ * Upper bound on how many ranked, qualified candidates
+ * `findBestEvacuationDriver` (VehicleDriverAssignment.ts) will spend a real
+ * `findPath`-backed `canReach` call resolving before giving up on finding a
+ * driver for a vehicle to evacuate. Same shape as
+ * `ACTION_SELECTION_MAX_PATH_ATTEMPTS` above — caps per-vehicle evacuation
+ * dispatch cost at a fixed number of pathfinds regardless of how many
+ * employees are in the zone — kept as its own constant since the two caps
+ * bound unrelated call sites and have no reason to move together.
+ */
+export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
+
+/**
  * Ranking-priority bonus (ticks) subtracted from a haul_debris/fragment_debris
  * candidate's estimated cost in `estimateActionCost` when its fragment
  * carries ore, so ore-bearing fragments get hauled before storage fills up
