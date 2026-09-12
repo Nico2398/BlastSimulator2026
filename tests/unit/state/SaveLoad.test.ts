@@ -1128,10 +1128,7 @@ describe('FilePersistence', () => {
 // `pendingEvacuationDestination: { x: number; z: number } | null` field — the
 // safe cell a qualified employee drives a boarded, evacuating vehicle toward.
 // A pre-v17 save has no such destination staged on any vehicle — it must
-// default to null, matching purchaseVehicle's own default. NOTE: this test is
-// expected to stay red until the implementer adds SAVE_VERSION = 17 and a
-// migrateV16ToV17 migration block — the skeleton/test-writer phases
-// deliberately do not touch either.
+// default to null, matching purchaseVehicle's own default.
 
 describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042)', () => {
   it('SAVE_VERSION is 17', () => {
