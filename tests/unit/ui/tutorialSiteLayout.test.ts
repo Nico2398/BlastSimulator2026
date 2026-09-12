@@ -147,10 +147,14 @@ describe('tutorial site layout rule (#1040)', () => {
 
     it('accepts a rect exactly at the clearance boundary', () => {
       const hazard = tutorialHazards()[0]!;
+      // Built on hazard's x1 side (west), away from the drill grid / box-cut
+      // corridor that sit east of it — going east lands exactly at clearance
+      // from `hazard` but inside clearance of those other fixed hazards,
+      // which isTutorialSiteHazardClear must also check.
       const boundaryRect: TileRegion = {
-        x1: hazard.x2 + TUTORIAL_SITE_HAZARD_CLEARANCE_TILES,
+        x1: hazard.x1 - TUTORIAL_SITE_HAZARD_CLEARANCE_TILES,
         z1: hazard.z1,
-        x2: hazard.x2 + TUTORIAL_SITE_HAZARD_CLEARANCE_TILES,
+        x2: hazard.x1 - TUTORIAL_SITE_HAZARD_CLEARANCE_TILES,
         z2: hazard.z1,
       };
       expect(chebyshevRectDistance(boundaryRect, hazard)).toBe(TUTORIAL_SITE_HAZARD_CLEARANCE_TILES);
