@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
-import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { workerModelId } from './models/ModelIds.js';
@@ -98,8 +98,11 @@ export class CharacterMesh {
    * Update all characters' positions and states.
    * @param employees - Current employee list from GameState
    * @param dt - Elapsed seconds since last call (for animation)
+   * @param heightAt - Optional terrain height sampler, called with the same
+   *   eased (x, z) the tween produces so a character's Y follows the slope
+   *   under its feet every frame instead of the last synced cell (#1038).
    */
-  update(employees: Employee[], dt: number): void {
+  update(employees: Employee[], dt: number, heightAt?: (x: number, z: number) => number): void {
     this.time += dt;
 
     for (const emp of employees) {
@@ -111,9 +114,7 @@ export class CharacterMesh {
       // Ease toward work position (duration-aware tween, #520)
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = stepTween(entry.tween, fromX, fromZ, emp.x, emp.z, dt);
-      entry.group.position.x = eased.x;
-      entry.group.position.z = eased.z;
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, emp.x, emp.z, dt, heightAt);
       this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
 
       // Body colour for injury state

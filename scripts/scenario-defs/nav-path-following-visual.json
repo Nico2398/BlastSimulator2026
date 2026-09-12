@@ -418,6 +418,155 @@
           "stuckEmployeeCount": 0
         }
       }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#1038: a fourth driller, dedicated to the slope-crossing beat below and kept out of the walled-pocket story above so its walk has nothing else contending for the path. New hires spawn near the map origin (see employees.ts's hire-spawn lookup), which sits right at the top of the natural downslope this beat walks across.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 4
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 4 x:10 z:0",
+      "description": "#1038 regression beat: dispatches driller #4 across seed 42's natural x:0..10, z:0 downslope (getSurfaceY probed column-by-column at game start: 37,36,35,34,33,33,32,32,32,31,30 -- a real, continuous ~7-unit drop over these 10 cells, no ramp construction needed) via the SelectionBar's own dispatch_here action -- same real click path as nav-ramp-routing-visual.json's vehicle move_here (clickEntity -> cameraFocus -> mousemove -> click), aimed at an employee instead of a vehicle. dispatch_here (src/main.ts) fires the exact `employee dispatch <id> x:<tileX> z:<tileZ>` command named above, read from the live cursor-terrain hit under the focused camera. The cameraFocus offset (+0.5 x, +1.5 z past the nominal target) reuses the offset nav-ramp-routing-visual.json measured live for this same default orbit/distance -- worth reconfirming in a real browser run if the hover lands on a different tile than (10,0).",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 4
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"dispatch_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 10.5,
+          "z": 1.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"dispatch_here\"]"
+        },
+        {
+          "type": "keypress",
+          "key": "Escape"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 1",
+      "description": "#1038: AGENT_WALK_SPEED is 2 cells/tick, so driller #4 covers roughly 2 of the 10 cells toward (10,0) per tick -- this and the four single-tick steps below each catch it at a different point on the slope for a human to inspect. Rendered Y must sit on the terrain directly under the eased render (x, z) every frame, never the last-synced target cell's height, or the model visibly steps/sinks/floats crossing this rise. No `decreased: cash` here (unlike the earlier multi-tick steps in this file) -- payroll only deducts on its own payday interval, not every single tick, so a lone `tick 1` can leave cash unchanged.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "tick 1",
+      "description": "#1038: final beat -- driller #4 should have arrived at or near (10,0), at the bottom of the slope.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "state full",
+      "description": "#1038: final position dump for driller #4, for manual cross-check against the terrain heights probed in the dispatch step's description.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

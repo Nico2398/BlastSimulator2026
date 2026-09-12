@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
-import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
+import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
@@ -80,8 +80,11 @@ export class VehicleMesh {
    * Update vehicle positions. Call every frame.
    * Eases toward the target position (duration-aware tween, #520) to give
    * smooth movement.
+   * @param heightAt - Optional terrain height sampler, called with the same
+   *   eased (x, z) the tween produces so a vehicle's Y follows the slope
+   *   under its wheels every frame instead of the last synced cell (#1038).
    */
-  update(vehicles: Vehicle[], dt: number): void {
+  update(vehicles: Vehicle[], dt: number, heightAt?: (x: number, z: number) => number): void {
     for (const v of vehicles) {
       const entry = this.vehicles.get(v.id);
       if (!entry) continue;
@@ -91,9 +94,7 @@ export class VehicleMesh {
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = stepTween(entry.tween, fromX, fromZ, targetX, targetZ, dt);
-      entry.group.position.x = eased.x;
-      entry.group.position.z = eased.z;
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
       this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt);
       applyStateIndicator(entry.group, v.state);
     }
