@@ -100,3 +100,32 @@ export function stepTweenWithHeight(
   const eased = stepTween(tween, renderX, renderZ, targetX, targetZ, dt);
   return { x: eased.x, y: heightAt(eased.x, eased.z), z: eased.z };
 }
+
+// Shared by CharacterMesh.update() and VehicleMesh.update() (#1038): steps
+// `tween` toward (targetX, targetZ) and writes the eased result straight
+// into `position` (a THREE.Vector3 or any {x,y,z} — mutated in place, same
+// as both call sites did inline before this was extracted). With `heightAt`
+// given, y follows the same eased (x, z) via stepTweenWithHeight(); without
+// it, y is left untouched, exactly as the two inlined branches did. Returns
+// the eased (x, z) so the caller can still derive a delta for its own
+// gait/motion animation.
+export function applyEasedPosition(
+  position: { x: number; y: number; z: number },
+  tween: MovementTween,
+  fromX: number, fromZ: number,
+  targetX: number, targetZ: number,
+  dt: number,
+  heightAt?: (x: number, z: number) => number,
+): { x: number; z: number } {
+  if (heightAt) {
+    const eased = stepTweenWithHeight(tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
+    position.x = eased.x;
+    position.y = eased.y;
+    position.z = eased.z;
+    return { x: eased.x, z: eased.z };
+  }
+  const eased = stepTween(tween, fromX, fromZ, targetX, targetZ, dt);
+  position.x = eased.x;
+  position.z = eased.z;
+  return { x: eased.x, z: eased.z };
+}

@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
-import { createTween, stepTween, stepTweenWithHeight, type MovementTween } from './MovementInterpolation.js';
+import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
@@ -94,22 +94,8 @@ export class VehicleMesh {
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      let easedX: number, easedZ: number;
-      if (heightAt) {
-        const eased = stepTweenWithHeight(entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
-        entry.group.position.x = eased.x;
-        entry.group.position.y = eased.y;
-        entry.group.position.z = eased.z;
-        easedX = eased.x;
-        easedZ = eased.z;
-      } else {
-        const eased = stepTween(entry.tween, fromX, fromZ, targetX, targetZ, dt);
-        entry.group.position.x = eased.x;
-        entry.group.position.z = eased.z;
-        easedX = eased.x;
-        easedZ = eased.z;
-      }
-      this.animateMotion(entry, easedX - fromX, easedZ - fromZ, dt);
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
+      this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt);
       applyStateIndicator(entry.group, v.state);
     }
   }
