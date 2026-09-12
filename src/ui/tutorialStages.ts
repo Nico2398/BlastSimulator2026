@@ -17,6 +17,7 @@ import {
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -116,29 +117,22 @@ const GRID_SPACING_STEPPER = '#bs-param-strip-bar [data-field="spacing"] .bsx-st
 const GRID_DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn';
 
 /**
- * Where each guided placement belongs, in tiles on the 32×32 tutorial map
- * (#458 T6.1/D13). Central enough to be obviously "the pit", wide enough not
- * to feel like threading a needle — and, critically, clear of the grid's
- * exact centre (16,16): vehicles always spawn there (VehicleCommand's
- * baseX/baseZ = sizeX/2), and a drill/blast footprint straddling that point
- * carves a lower "bench" right under the vehicle, on the far side of a level
- * change from wherever the driver starts. With no ramp built yet at that
- * point in the tutorial, NavGrid.findPath's multi-level routing can never
- * connect them — the driver walks partway, then sits stuck forever (found
- * via a full-suite regression this same resize introduced, traced to
- * findMultiLevelPath returning found:false with zero candidate ramps).
- * On the old 24×24 grid this region (8→18) missed the old centre (12,12) by
- * enough margin to never trip this; growing the grid without re-centring the
- * region is what closed that gap. Shifted well off-centre here instead of
- * re-deriving a new "just barely clears it" offset.
- */
-/**
- * Every guided placement is `exact`, so the step lands on the placement it is
- * teaching rather than on wherever the player's drag happened to finish (#489:
- * "the tutorial allow to create many different ramps... it should be told and
- * forced to place buildings or any element where expected"). Exact does not
- * mean fussy: the picker snaps any click inside the region's live margin onto
- * these corners, so the player aims at a drawn outline and cannot miss.
+ * Where each guided placement belongs, in tiles on the tutorial map (#458
+ * T6.1/D13). Every guided placement is `exact`, so the step lands on the
+ * placement it is teaching rather than on wherever the player's drag happened
+ * to finish (#489). The picker snaps any click inside the region's live
+ * margin onto these corners, so the player aims at a drawn outline and cannot
+ * miss.
+ *
+ * The three tutorial building pins (warehouse, drivingCenter, livingQuarters)
+ * are derived, not picked ad hoc: flat for the building's full footprint
+ * (`BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD`), clear of every tutorial hazard by
+ * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES` (`tutorialHazards`,
+ * `isTutorialSiteHazardClear`), mutually within
+ * `TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES` of each other, and within
+ * `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES` of the dig/drill area — see git
+ * history on this block for the stranding-class postmortems (#1008,
+ * #1008-followup) this rule superseded.
  */
 const REGION = {
   // One tile, because a survey is a point pick. Sits inside the old 18→28
@@ -166,111 +160,53 @@ const REGION = {
   // spans (22,20)-(30,28); the region widens to match with the same margin
   // convention as before.
   drill: { x1: 22, z1: 20, x2: 30, z2: 28, exact: true },
-  // One tile: the warehouse is placed by its origin corner, and the footprint
-  // ghost shows the rest. In the level's clear north-west quarter, but pulled
-  // off the map's own corner: at (4,4) the camera ray through that tile's
-  // pixel skims past the edge of the terrain mesh and hits nothing, so the
-  // click resolved to no tile at all. (6,9) picks cleanly at every framing
-  // distance and leaves room for the footprint to sit on the map — still the
-  // clear north-west quarter. #1008: moved off (6,6), which the real
-  // placement path (now flatness-checked, not just bounds/occupancy) rejects
-  // on tutorial_pit seed 42 — (6,9) is flat for the full 4×4 footprint there.
-  warehouse: { x1: 6, z1: 9, x2: 6, z2: 9, exact: true },
+  // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
+  // history on this file for the stranding-class postmortems (#1008,
+  // #1008-followup) this superseded.
+  warehouse: { x1: 25, z1: 12, x2: 25, z2: 12, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
   // toward and a void for the rock to fall into. One line, not a corridor of
   // candidate lines: the console hint names this exact ramp.
   boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
-  // One tile, same origin-corner placement as the warehouse above. Sits in
-  // the same clear north-west quarter as the warehouse but well clear of the
-  // box-cut/drill footprints further east and south (#553: drilling is now
-  // vehicle-gated — the driller needs somewhere to train for and park a
-  // drill_rig before drill-plan can ever land a hole). #1008: moved off
-  // (10,8), which the now-flatness-checked real placement path rejects on
-  // tutorial_pit seed 42 — (6,7) is flat for the full 2×2 footprint there.
-  // That puts it just north of the warehouse's own (6,9) site, the two
-  // sitting close together in the same corner rather than spread across it.
-  drivingCenter: { x1: 6, z1: 7, x2: 6, z2: 7, exact: true },
-  // One tile, same origin-corner convention. #689-followup: (13,4) sat far
-  // enough from the drill grid (20-26,20-26) that the crew's own commute
-  // there and back roughly broke even against the rest gained, leaving them
-  // to oscillate near collapse instead of recovering — the mitigation these
-  // steps exist to teach couldn't actually keep up. Moved to (18,14) (later
-  // #1008), north of the box-cut ramp (x=16, z19-31 — 3 tiles of x clearance,
-  // well clear on z) and the drill grid itself, cutting the round trip enough
-  // for a genuine net recovery instead of a near-wash. #1008: (18,14) is not
-  // flat for the full 3×3 footprint on tutorial_pit seed 42 under the
-  // now-flatness-checked real placement path, so this moved to (18,18),
-  // footprint x:18-20/z:18-20 — directly bordering the drill grid's own
-  // x1:22/z1:20 corner. That placement carried a latent deadlock (found
-  // post-merge, same issue): footprint cell (20,20) is exactly the grid cell
-  // a fatigue-interrupted employee near the drill grid can freeze at
-  // (`clampToGrid`, `src/core/nav/Pathfinding.ts`, floors a continuous
-  // position), and once a building occupies that cell `findPath` from the
-  // frozen position never resolves — a permanent stranding that deadlocks
-  // the charge step. A nearby flat spot bordering the drill grid isn't
-  // actually safe here: (19,22) (footprint x:19-21/z:22-24, 2 tiles clear of
-  // (20,20) itself) was tried and directly reproduced the same stranding
-  // class one cell over — a rock_digger driver dismounted mid box-cut-ramp
-  // dig at a frozen position flooring to (21,24), inside that footprint, and
-  // the ramp dig never completed. The drill/ramp work area throws off
-  // fatigue-interrupt freezes across a wider radius than just (20,20), so
-  // (12,15) — one of #1008's own 33 known-flat candidates, comfortably 6+
-  // tiles clear of (20,20) and of the whole drill-grid/box-cut-ramp working
-  // area rather than merely outside it — is the actual fix. It sits farther
-  // from the drill grid than (18,14)/(18,18) did, but still close enough
-  // (within 6 tiles of the original (18,14) pin) for the rest round-trip
-  // argument above to hold, confirmed directly: the box-cut ramp and the
-  // full charge/blast sequence both complete against this coordinate with
-  // no employee or vehicle ever left permanently stranded.
-  //
-  // #1008-followup (CI, PR #1023): (12,15) still deadlocked box-cut in a real
-  // interaction-mode run (tutorial-steps-visual/tutorial-interactive stuck on
-  // "box-cut" for 125+ ticks, `isWorkInProgress()` genuinely false the whole
-  // time -- a stall, not merely slow). Command mode passed (89 ticks to fully
-  // dig the ramp) because it never exercises the browser's real per-tick
-  // fatigue/interrupt scheduling the way a live run does -- the two modes can
-  // diverge on exactly this class of timing-sensitive deadlock. Root cause:
-  // (12,15)'s footprint (x:12-14/z:15-17) is only 2-4 tiles (Chebyshev) from
-  // both the vehicle spawn point (16,16 -- VehicleCommand's baseX/baseZ =
-  // sizeX/2) and the box-cut corridor itself (x:16, z:19-31), well inside the
-  // radius the (18,18)/(19,22) attempts above already proved can strand a
-  // fatigue-interrupted employee's `clampToGrid`-floored fallback position
-  // inside a building footprint. Moved to (6,16), 10 tiles clear of all three
-  // hazards -- but a second real interaction-mode run (this PR, direct trace
-  // via a headless replay of tutorial-steps-visual's own steps 0-20 driving
-  // `state full`'s navGrid.cellTypeCounts.ramp counter tick by tick) showed a
-  // DIFFERENT deadlock at (6,16): zero carving progress across 5000 ticks of
-  // direct observation, not a stranding at all. The qualified excavator
-  // reaches box-cut already mid-fatigue (~60/100 from the setup steps above),
-  // the vehicle-gated dig_ramp_segment task interrupts them for a forced rest
-  // mid-dig, and the round trip out to (6,16) and back (~21 tiles each way at
-  // this coordinate's distance from the dig site near the drill grid,
-  // ~22-30,20-28) is long enough that fatigue crosses back over the rest
-  // threshold before the walk home even finishes, let alone before a single
-  // segment carves -- a genuine net-negative cycle, confirmed by the ramp
-  // cell count never moving, not merely a slow one. Maximizing clearance from
-  // the stranding hazards (as (6,16) does) works against this: it maximizes
-  // the round trip too. Re-picked via a terrain-flatness scan of the tutorial
-  // grid's NE quadrant (seed 42) for a site that clears every hazard radius
-  // this file's history has actually reproduced a deadlock at (vehicle spawn
-  // 16,16, the box-cut corridor x:16/z:19-31, and the drill grid rect
-  // 22-30,20-28) by >=5 tiles Chebyshev -- comfortably past the 2-4 tile
-  // radius those hazards are proven to strand at -- while sitting as close to
-  // the dig site as that constraint allows, instead of as far as possible:
-  // (29,12) (footprint x:29-31/z:12-14) clears the vehicle spawn and corridor
-  // by 13 tiles and the drill grid by 6, and is 12 tiles (Chebyshev) from the
-  // dig site itself versus (6,16)'s 21 -- roughly half the round trip. Also
-  // clear of the file's own #957 bootstrap drill_plan grid (x:24-28/z:2-11 --
-  // this footprint's z:12-14 sits entirely below it) and nowhere near the
-  // warehouse (6,9)/driving center (6,7) cluster in the opposite corner.
-  // Confirmed directly with a real browser: both tutorial-interactive and
-  // tutorial-steps-visual dig the box-cut ramp to completion (the excavator
-  // completes a rest cycle at the new, shorter distance and returns before
-  // fatigue threatens the dig again) instead of stalling.
-  livingQuarters: { x1: 29, z1: 12, x2: 29, z2: 12, exact: true },
+  // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
+  // history on this file for the stranding-class postmortems (#1008,
+  // #1008-followup) this superseded.
+  drivingCenter: { x1: 29, z1: 14, x2: 29, z2: 14, exact: true },
+  // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
+  // history on this file for the stranding-class postmortems (#1008,
+  // #1008-followup) this superseded.
+  livingQuarters: { x1: 29, z1: 11, x2: 29, z2: 11, exact: true },
 } as const satisfies Record<string, TileRegion>;
+
+/** A single-tile hazard the tutorial's fixed building pins must clear. */
+export interface TutorialHazard extends TileRegion {}
+
+/**
+ * Every fixed hazard a tutorial building pin must clear by
+ * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`: the box-cut corridor, the drill
+ * grid, and the vehicle spawn point.
+ */
+export function tutorialHazards(): readonly TutorialHazard[] {
+  // TODO(impl): add vehicle spawn hazard point
+  return [REGION.boxcut, REGION.drill];
+}
+
+/** Chebyshev (chessboard) distance between the closest corners of two rects. */
+export function chebyshevRectDistance(_a: TileRegion, _b: TileRegion): number {
+  throw new Error('not implemented'); // TODO: implement
+}
+
+/** The tile rectangle a building of `type`/`tier` occupies when pinned at `region`'s origin corner. */
+export function tutorialSiteFootprintRect(_type: BuildingType, _tier: BuildingTier, _region: TileRegion): TileRegion {
+  throw new Error('not implemented'); // TODO: implement
+}
+
+/** Whether `rect` clears every `tutorialHazards()` entry by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. */
+export function isTutorialSiteHazardClear(_rect: TileRegion): boolean {
+  throw new Error('not implemented'); // TODO: implement
+}
 
 /** Open the Crew panel, then hire one role. */
 function hireStages(role: string, hintKey: string): TutorialStage[] {
