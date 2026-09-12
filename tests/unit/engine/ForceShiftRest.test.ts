@@ -24,7 +24,7 @@ import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../..
 import { isMidLoadedHaul } from '../../../src/core/economy/FragmentTaskLifecycle.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import type { PendingAction } from '../../../src/core/state/GameState.js';
+import type { ActionType, PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
@@ -33,10 +33,16 @@ import {
 
 const SEED = 42;
 
-/** Push a claimed, in-progress action `employee` is actively working. */
-function pushHeldAction(state: GameState, employeeId: number, id: number): PendingAction {
+/**
+ * Push a claimed, in-progress action `employee` is actively working.
+ * `type` defaults to 'general_work' (#1039: extended to accept any
+ * ActionType, e.g. 'place_building', so construction-interruption guard
+ * tests can reuse this same helper — backward compatible with every
+ * pre-existing 3-arg call site).
+ */
+function pushHeldAction(state: GameState, employeeId: number, id: number, type: ActionType = 'general_work'): PendingAction {
   const action: PendingAction = {
-    id, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+    id, type, requiredSkill: null, requiredVehicleRole: null,
     targetX: 5, targetZ: 5, targetY: 0, payload: { note: 'work' },
     targetEmployeeId: null, status: 'in_progress', holderId: employeeId,
   };
@@ -545,6 +551,67 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.activeActionId).not.toBe(1102);
+  });
+
+  // NEW (#1039): a place_building action mid-execution (taskTicksRemaining
+  // set, employee arrived at the site and actively constructing) must NOT be
+  // interrupted by a proactive shift-cycle/fatigue-threshold rest — unlike
+  // the general_work case above (#945 follow-up), which stays interruptible.
+  // Modeled directly on that test, inverted: isMidConstructionWork scopes
+  // this guard to construction specifically, mirroring isMidVehicleGatedWork's
+  // own scoping for vehicle-gated work. Currently red: isMidConstructionWork
+  // is a stub returning false, so this guard does not yet fire.
+  it('#1039: no-op when mid-execution of a place_building action (taskTicksRemaining set), even with fatigue very low', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1103, 'place_building');
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1103);
+    const held = state.pendingActions.find(a => a.id === 1103)!;
+    expect(held.status).toBe('in_progress');
+  });
+
+  // #1039: general_work is unaffected by the new place_building guard — see
+  // the pre-existing #945 follow-up test above, which already pins this.
+
+  // NEW (#1039): the new place_building guard is scoped to the executing
+  // phase only (taskTicksRemaining !== null) — mirrors isMidVehicleGatedWork's
+  // own drive-vs-execute distinction (see the mid-drive test above). A
+  // place_building action still mid-walk to the site (pendingTaskDuration set,
+  // taskTicksRemaining still null — not yet arrived) stays interruptible.
+  // Ordinarily an unfinished walk is already unconditionally protected by
+  // this function's own earlier `pendingTaskDuration !== null && !isMoveStuck`
+  // guard (line above shouldForceRest) regardless of action type, so
+  // `isMoveStuck: true` is set here to take that earlier, unrelated guard out
+  // of play — isolating what the new place_building guard alone decides once
+  // taskTicksRemaining is still null (not yet arrived): it must not block.
+  it('#1039: STILL interrupts a place_building action mid-walk (pendingTaskDuration set, taskTicksRemaining still null — not yet arrived)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1105, 'place_building');
+    prior.status = 'assigned';
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.pendingTaskDuration = 5;
+    employee.taskTicksRemaining = null;
+    employee.isMoveStuck = true;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1105);
   });
 });
 

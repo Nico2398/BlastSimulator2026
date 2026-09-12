@@ -609,6 +609,51 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction).toBeDefined();
   });
 
+  // ── NEW (#1039) ─────────────────────────────────────────────────────────────
+  // ForceShiftRest.ts's forceShiftRestIfNeededByPolicy gains a place_building-
+  // scoped guard (isMidConstructionWork) so a proactive shift-cycle/fatigue-
+  // threshold rest no longer fragments a single construction into many
+  // interrupted, restarted attempts. tickCollapse is a genuinely different
+  // code path (a real collapse, not a proactive nudge) and is deliberately
+  // left unguarded — mirrors the #945 test above (a non-construction claimed
+  // task), specifically for a place_building action, to pin that this
+  // fix does not accidentally leak protection into the collapse path too.
+  it('#1039: interrupts an employee mid-execution of a place_building action when fatigue collapses — tickCollapse is deliberately unguarded', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold (5)
+
+    const constructionAction: PendingAction = {
+      id: 1039, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 6, targetZ: 7, targetY: 0, payload: { buildingType: 'driving_center' },
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+    };
+    state.pendingActions.push(constructionAction);
+    employee.activeActionId = constructionAction.id;
+    employee.taskTicksRemaining = 4; // arrived, mid-execution of the construction
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    // The construction claim is released back to the pool, not orphaned —
+    // collapse interrupts unconditionally, regardless of action type.
+    const released = state.pendingActions.find(a => a.id === 1039)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    expect(employee.activeActionId).not.toBe(1039);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
   // #1013: unlike tickNeedRestoration's proactive routing (mirrored test
   // above), checkCollapse sets employee.collapsing = true for the whole walk
   // AND rest — computeEmployeeActivity checks that flag first (it takes

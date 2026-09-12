@@ -1,0 +1,86 @@
+{
+  "name": "building-construction-continuous-policy",
+  "description": "#1039: an aggressive continuous-mode site policy (fatigue rest threshold 90) must not fragment a single place_building order into a chain of interrupt-walk-reclaim-restart cycles. Before ForceShiftRest.ts's isMidConstructionWork guard exists, the assigned employee is yanked off the driving_center site the instant fatigue crosses the policy's threshold, even mid-execution, and the crossing recurs every few ticks under a policy this aggressive — the construction never lands within this scenario's tick budget on the buggy code, instead of landing in roughly 20-25 ticks (BUILDING_CONSTRUCTION_BASE_DURATION_TICKS=15 plus a short walk from the staffed roster's spawn point, directly traced via `npm run console` on the plain default policy).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:90",
+      "description": "Continuous mode with a high fatigue rest threshold (90, well above the default 60) makes the proactive shift-cycle rest fire every few ticks for a working employee — the aggressive policy setting that reliably reproduces #1039's fragmentation on the buggy code (empirically traced: the driving_center order never lands within 100 ticks under this policy before the fix).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:90"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "build driving_center at:6,7",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 6,
+          "z": 7
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:100",
+      "description": "100 ticks is roughly 4-5x the ~20-25 ticks a clean, uninterrupted build takes (traced via `npm run console` under the plain default policy) — generous margin for the fixed behavior, but far below the multi-hundred-tick (or never-completing) fragmented behavior the bug produces under this aggressive policy.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 100,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    }
+  ]
+}
