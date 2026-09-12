@@ -12,6 +12,12 @@
 // want the plain setter, and an inherited API that two subclasses have to
 // work around is worse than one line repeated.
 
+/** Stamped on a panel's own close control so the tutorial rails can allow every
+ *  panel's close button without a per-panel selector list (#1041) — navigating
+ *  the UI is not an action the rails need to gate. */
+export const PANEL_CLOSE_ATTR = 'data-panel-close';
+export const PANEL_CLOSE_SELECTOR = `[${PANEL_CLOSE_ATTR}]`;
+
 export abstract class PanelBase {
   /** The panel's root element — created by `panelRoot()`, hidden until `show()`. */
   protected readonly el: HTMLElement;
