@@ -196,9 +196,15 @@ const EMPTY_REACHABLE_SET: ReachableSet = { has: () => false, size: 0 };
  * (anchorX, anchorZ) — same adjacency Pathfinding.findPath and
  * findNearestReachableCell walk.
  *
- * Returns an empty set when the anchor cell itself is non-traversable
- * (no nudge to the nearest traversable cell, unlike findNearestReachableCell —
- * this is a raw reachability query from the exact anchor given).
+ * Returns an empty set only when the anchor is out of the grid's bounds
+ * entirely. An in-bounds anchor is always included in the returned set
+ * regardless of its own NavCell `type` (#1025) — mirrors `isImpassable`'s
+ * `isAgentCell` exemption (Pathfinding.ts): an agent's own current cell can
+ * never itself be impassable to it, even once a building footprint or a
+ * blast has since flipped that cell's type to 'blocked'/'void'. A fully
+ * enclosed anchor (no passable neighbour) returns a set of exactly
+ * `{anchor}` — every other cell reached by the flood fill still passes the
+ * ordinary per-neighbour traversability/occupancy checks unchanged.
  */
 export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
   return reachableSetFrom(navGrid, anchorX, anchorZ, false);
@@ -230,7 +236,7 @@ export function computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anch
 function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, climbAware: boolean): ReachableSet {
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
-  if (!isTraversableCell(navGrid, ax, az)) return EMPTY_REACHABLE_SET;
+  if (!navGrid.cellAt(ax, az)) return EMPTY_REACHABLE_SET;
 
   const { width, height, count } = floodFillReachable(navGrid, ax, az, climbAware);
   const { originX, originZ } = navGrid;
@@ -372,9 +378,15 @@ const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
 ];
 
 /**
- * 8-directional flood fill from (anchorX, anchorZ), assumed already
- * traversable. Shared by findNearestReachableCell and computeReachableSet so
- * both agree on every fixture. Result is only valid until the next call —
+ * 8-directional flood fill from (anchorX, anchorZ). The anchor itself is
+ * always added to the visited set regardless of its own traversability (#1025)
+ * — findNearestReachableCell's caller already nudged it onto a traversable
+ * cell first, but computeReachableSet/computeClimbReachableSet's anchor is the
+ * agent's live position exactly as-is, traversable or not. Only NEIGHBOURS
+ * discovered from the anchor outward are gated by isTraversableCell (and,
+ * when applicable, occupancy/climb) below. Shared by findNearestReachableCell
+ * and computeReachableSet so both agree on every fixture. Result is only
+ * valid until the next call —
  * callers must either consume it synchronously (findNearestReachableCell) or
  * copy what they need out of it (computeReachableSet).
  *

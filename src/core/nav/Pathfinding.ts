@@ -148,19 +148,20 @@ class MinHeap<T extends { key: number }> {
 
 /**
  * Check whether a cell blocks traversal. `isAgentCell` is true when this is
- * the pathing agent's own current cell (#954): occupancy flags
- * (vehicleOccupied, fragmentOccupancy) never block an agent from pathing out
- * of the cell it is already standing on, but the cell's base solidity
- * ('blocked'/'void') still does — an agent's own cell can never itself be a
- * building or void.
+ * the pathing agent's own current cell: an agent's own cell is never
+ * impassable to itself, full stop (#1025) — neither the cell's base solidity
+ * ('blocked'/'void', e.g. a building footprint later placed on a fatigue-
+ * frozen agent's fractional-then-clamped position) nor its occupancy flags
+ * (vehicleOccupied, fragmentOccupancy) can strand an agent unable to path out
+ * of the cell it is already standing on.
  *
  * Exported (visibility only, no behaviour change) so
  * `tests/unit/nav/Pathfinding.test.ts` can exercise the isAgentCell
  * contract directly rather than only indirectly through findPath (#954).
  */
 export function isImpassable(cell: NavCell, avoidVehicles: boolean, isAgentCell: boolean = false): boolean {
-  if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (isAgentCell) return false;
+  if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
   return false;
 }

@@ -285,12 +285,21 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
  * could attempt it instead.
  */
 export function canReleaseStrandedOnFootAction(
-  _state: GameState,
-  _employee: Employee,
-  _action: PendingAction,
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
 ): boolean {
-  // TODO: implement
-  throw new Error('Not implemented');
+  if (action.requiredVehicleRole !== null) return false;
+  if (state.navGrid === null) return false;
+  if (resolveActionCost(state, employee, action) !== null) return false;
+
+  return state.employees.employees.some(other =>
+    other.id !== employee.id &&
+    other.alive &&
+    other.activeActionId === null &&
+    other.restTicksRemaining === null &&
+    (action.requiredSkill === null || other.qualifications.some(q => q.category === action.requiredSkill)),
+  );
 }
 
 /** A candidate action chosen for an employee, with its resolved real cost. */
