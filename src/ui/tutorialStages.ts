@@ -18,6 +18,9 @@ import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { getLevel } from '../core/campaign/Level.js';
+import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -184,28 +187,43 @@ export const REGION = {
 export interface TutorialHazard extends TileRegion {}
 
 /**
+ * The tutorial's fleet spawn point, mirrored from how a real purchase derives
+ * its own spawn base (`src/console/commands/vehicle.ts`: `minX + sizeX / 2`,
+ * `minZ + sizeZ / 2`) — the tutorial level's world starts unexpanded, so
+ * `minX`/`minZ` are 0 and the grid dimensions come straight from its `LevelDef`.
+ */
+function tutorialVehicleSpawnPoint(): TutorialHazard {
+  const level = getLevel('tutorial_pit')!;
+  const x = Math.floor(level.gridX / 2);
+  const z = Math.floor(level.gridZ / 2);
+  return { x1: x, z1: z, x2: x, z2: z, exact: true };
+}
+
+/**
  * Every fixed hazard a tutorial building pin must clear by
  * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`: the box-cut corridor, the drill
  * grid, and the vehicle spawn point.
  */
 export function tutorialHazards(): readonly TutorialHazard[] {
-  // TODO(impl): add vehicle spawn hazard point
-  return [REGION.boxcut, REGION.drill];
+  return [tutorialVehicleSpawnPoint(), REGION.boxcut, REGION.drill];
 }
 
 /** Chebyshev (chessboard) distance between the closest corners of two rects. */
-export function chebyshevRectDistance(_a: TileRegion, _b: TileRegion): number {
-  throw new Error('not implemented'); // TODO: implement
+export function chebyshevRectDistance(a: TileRegion, b: TileRegion): number {
+  const dx = a.x1 > b.x2 ? a.x1 - b.x2 : (b.x1 > a.x2 ? b.x1 - a.x2 : 0);
+  const dz = a.z1 > b.z2 ? a.z1 - b.z2 : (b.z1 > a.z2 ? b.z1 - a.z2 : 0);
+  return Math.max(dx, dz);
 }
 
 /** The tile rectangle a building of `type`/`tier` occupies when pinned at `region`'s origin corner. */
-export function tutorialSiteFootprintRect(_type: BuildingType, _tier: BuildingTier, _region: TileRegion): TileRegion {
-  throw new Error('not implemented'); // TODO: implement
+export function tutorialSiteFootprintRect(type: BuildingType, tier: BuildingTier, region: TileRegion): TileRegion {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
+  return { x1: region.x1, z1: region.z1, x2: region.x1 + sizeX - 1, z2: region.z1 + sizeZ - 1, exact: false };
 }
 
 /** Whether `rect` clears every `tutorialHazards()` entry by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. */
-export function isTutorialSiteHazardClear(_rect: TileRegion): boolean {
-  throw new Error('not implemented'); // TODO: implement
+export function isTutorialSiteHazardClear(rect: TileRegion): boolean {
+  return tutorialHazards().every((h) => chebyshevRectDistance(rect, h) >= TUTORIAL_SITE_HAZARD_CLEARANCE_TILES);
 }
 
 /** Open the Crew panel, then hire one role. */
