@@ -11,6 +11,7 @@ import type { SelectionOverlay } from '../../renderer/SelectionOverlay.js';
 import type { ParamStrip } from './ParamStrip.js';
 import { t } from '../../core/i18n/I18n.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
+import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../core/config/balance.js';
 
 /** Site-claim refusal (#558) → the specific i18n key explaining it. `not_adjacent` shares `too_far`'s copy — bridging makes it effectively unreachable. */
 const CLAIM_REFUSAL_KEY: Record<ClaimRefusalReason, string> = {
@@ -38,7 +39,9 @@ export interface PlacementKit {
 export function placementRefusalReason(controller: PlacementController): string | undefined {
   if (controller.canConfirm) return undefined;
   if (controller.refusalReason) return t(CLAIM_REFUSAL_KEY[controller.refusalReason]);
-  if (controller.footprintInvalid) return t('shell.placement.refused_uneven_ground');
+  if (controller.footprintInvalid) {
+    return t('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
+  }
   if (controller.refusedTile) return t('shell.placement.outside_region');
   if (!controller.selection) return t('shell.placement.pick_first');
   return t('shell.placement.outside_region');

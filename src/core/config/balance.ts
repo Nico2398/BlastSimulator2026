@@ -756,6 +756,26 @@ export const BUILDING_CONSTRUCTION_BASE_DURATION_TICKS = 15;
 /** Per-tier multiplier applied to BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (#556 construction sites) — a bigger tier takes longer to build. */
 export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number> = { 1: 1, 2: 1.6, 3: 2.4 };
 
+/**
+ * Largest surface-height spread (in voxel levels, `getSurfaceY`) a building
+ * footprint may straddle and still be placeable (#1008 refinement).
+ *
+ * Zero — the rule as #1008 first shipped it — demanded a perfectly level
+ * footprint, which on the hand-sculpted relief these levels generate is rare
+ * enough to be tedious: seed 42's whole north-west quarter is a one-level-per-
+ * tile gradient, so a player hunting a legal 4x4 warehouse site scans dozens
+ * of tiles that differ by a single voxel. One level is the slight slope the
+ * crew is allowed to absorb: construction ends by cutting the footprint down
+ * to its lowest column (`levelGroundRect`, LevelGround.ts), so the building
+ * still stands on genuinely flat ground — the tolerance buys the player a
+ * forgiving placement, not a tilted building.
+ *
+ * Raising it past 1 is not free: the cut deepens with the spread, and on a
+ * small (2x2) footprint a 2-level step is a ~45 degrees slope, which reads as
+ * a building carved into a cliff rather than set on a gentle grade.
+ */
+export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',

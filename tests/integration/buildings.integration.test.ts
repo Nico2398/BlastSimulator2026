@@ -24,6 +24,7 @@ import {
   tickResearch,
   isTierUnlocked,
   getBuildingDef,
+  getSurfaceY,
   type BuildingType,
 } from '../../src/core/entities/Building.js';
 import { createLogisticsState, syncLogisticsCapacity, addBlastFragments } from '../../src/core/economy/Logistics.js';
@@ -34,6 +35,7 @@ import {
   BUILDING_CONSTRUCTION_BASE_DURATION_TICKS,
   BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
+  BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -877,20 +879,36 @@ function flattenFootprint(
   }
 }
 
-/** Same as flattenFootprint, but raises one footprint cell a layer higher than the rest — leaves the footprint uneven. */
+/**
+ * Same as flattenFootprint, but raises one footprint cell `stepLevels` layers
+ * above the rest — a footprint with a known height spread. One level is inside
+ * the placement tolerance (BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD); the default
+ * of one level past it is the genuinely refused case.
+ */
 function unevenFootprint(
   ctx: GameContext, type: BuildingType, tier: 1 | 2 | 3, x: number, z: number, baseHeight: number,
+  stepLevels: number = BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD + 1,
 ): void {
   flattenFootprint(ctx, type, tier, x, z, baseHeight);
   const def = getBuildingDef(type, tier);
   const [dx0, dz0] = def.footprint[0]!;
-  ctx.grid!.setVoxel(x + dx0, baseHeight, z + dz0, {
-    composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1,
-  });
+  for (let step = 0; step < stepLevels; step++) {
+    ctx.grid!.setVoxel(x + dx0, baseHeight + step, z + dz0, {
+      composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1,
+    });
+  }
 }
 
-describe('build command — terrain flatness gate (#1008)', () => {
-  it('refuses to order a building on uneven ground', () => {
+/** Every footprint cell's surface height, as the placement rule samples them. */
+function footprintHeights(
+  ctx: GameContext, type: BuildingType, tier: 1 | 2 | 3, x: number, z: number,
+): number[] {
+  const def = getBuildingDef(type, tier);
+  return def.footprint.map(([dx, dz]) => getSurfaceY(ctx.grid!, x + dx, z + dz));
+}
+
+describe('build command — terrain levelness gate (#1008)', () => {
+  it('refuses to order a building on ground steeper than the tolerance', () => {
     const ctx = makeCtx();
     unevenFootprint(ctx, 'management_office', 1, 20, 2, 5);
 
@@ -909,5 +927,138 @@ describe('build command — terrain flatness gate (#1008)', () => {
 
     expect(result.success).toBe(true);
     expect(ctx.state!.plannedBuildings.length).toBe(1);
+  });
+
+  it('orders a building successfully on a slope within the tolerance — siting is forgiving, not exact', () => {
+    const ctx = makeCtx();
+    unevenFootprint(ctx, 'management_office', 1, 20, 2, 5, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD);
+    // The footprint really is uneven, so this is the tolerance passing it, not flat ground.
+    expect(new Set(footprintHeights(ctx, 'management_office', 1, 20, 2)).size).toBeGreaterThan(1);
+
+    const result = buildCommand(ctx, ['management_office'], { at: '20,2' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedBuildings.length).toBe(1);
+  });
+});
+
+describe('construction levels the ground under the footprint (#1008)', () => {
+  it('a building ordered on a tolerated slope stands on flat ground once construction completes', () => {
+    const ctx = makeStaffedCtx();
+    unevenFootprint(ctx, 'management_office', 1, 20, 2, 5, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD);
+    const before = footprintHeights(ctx, 'management_office', 1, 20, 2);
+    const lowest = Math.min(...before);
+    expect(Math.max(...before)).toBe(lowest + BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD);
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    // Still sloped while it is only an order — levelling is construction work,
+    // not something the order does up front.
+    expect(footprintHeights(ctx, 'management_office', 1, 20, 2)).toEqual(before);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.buildings.buildings.length).toBe(1);
+    const after = footprintHeights(ctx, 'management_office', 1, 20, 2);
+    expect(new Set(after).size).toBe(1);
+    // Cut down to the lowest column, never filled up to the highest.
+    expect(after[0]).toBe(lowest);
+  });
+
+  it('leaves an already-flat footprint exactly as it was', () => {
+    const ctx = makeStaffedCtx();
+    flattenFootprint(ctx, 'management_office', 1, 20, 2, 5);
+    const before = footprintHeights(ctx, 'management_office', 1, 20, 2);
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.buildings.buildings.length).toBe(1);
+    expect(footprintHeights(ctx, 'management_office', 1, 20, 2)).toEqual(before);
+  });
+
+  it('a refused upgrade leaves the original building standing, unbilled', () => {
+    const ctx = makeStaffedCtx();
+    const bs = ctx.state!.buildings;
+    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
+    expect(queueResearchTask(bs, 'management_office', 2).success).toBe(true);
+    tickResearch(bs);
+
+    // T1's own 2x2 is flat; the row T2 grows onto steps up two levels, past the
+    // placement tolerance — so the upgrade is refused on levelness grounds.
+    flattenFootprint(ctx, 'management_office', 2, 20, 2, 5);
+    for (const [dx, dz] of getBuildingDef('management_office', 2).footprint.filter(([, z]) => z === 2)) {
+      for (let step = 0; step <= BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD; step++) {
+        ctx.grid!.setVoxel(20 + dx, 5 + step, 2 + dz, {
+          composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1,
+        });
+      }
+    }
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    const before = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
+    const cashBefore = ctx.state!.cash;
+
+    const upgrade = buildCommand(ctx, ['upgrade', String(before.id)], {});
+
+    expect(upgrade.success).toBe(false);
+    // The refusal must not have cost the player the building they already own.
+    const after = ctx.state!.buildings.buildings.find(b => b.id === before.id);
+    expect(after).toBeDefined();
+    expect(after!.tier).toBe(1);
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('a relocated building levels the ground it lands on', () => {
+    const ctx = makeStaffedCtx();
+    flattenFootprint(ctx, 'management_office', 1, 20, 2, 5);
+    // Destination: level enough to move onto, but a level short of flat.
+    unevenFootprint(ctx, 'management_office', 1, 10, 10, 5, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD);
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    const id = ctx.state!.buildings.buildings[0]!.id;
+    expect(new Set(footprintHeights(ctx, 'management_office', 1, 10, 10)).size).toBe(2);
+
+    const move = buildCommand(ctx, ['move', String(id)], { to: '10,10' });
+    expect(move.success, move.output).toBe(true);
+
+    expect(new Set(footprintHeights(ctx, 'management_office', 1, 10, 10)).size).toBe(1);
+  });
+
+  it('an upgrade levels the ground the larger tier newly covers', () => {
+    const ctx = makeStaffedCtx();
+    const bs = ctx.state!.buildings;
+    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
+    expect(queueResearchTask(bs, 'management_office', 2).success).toBe(true);
+    tickResearch(bs);
+    expect(isTierUnlocked(bs, 'management_office', 2)).toBe(true);
+
+    // management_office T1 covers 2x2, T2 2x3 — so T2 grows onto row z+2.
+    // Flatten everything T2 will cover, then step that extra row up one level:
+    // the T1 build sees dead-flat ground, and the upgrade sees a slope inside
+    // the tolerance that only its own larger footprint touches.
+    flattenFootprint(ctx, 'management_office', 2, 20, 2, 5);
+    const extraRow = getBuildingDef('management_office', 2).footprint
+      .filter(([, dz]) => dz === 2);
+    expect(extraRow.length).toBeGreaterThan(0);
+    for (const [dx, dz] of extraRow) {
+      ctx.grid!.setVoxel(20 + dx, 5, 2 + dz, {
+        composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1,
+      });
+    }
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    const id = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!.id;
+    // The T1 footprint came out flat; the ground the T2 footprint will cover
+    // has not been levelled by anything yet.
+    expect(new Set(footprintHeights(ctx, 'management_office', 1, 20, 2)).size).toBe(1);
+    expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(2);
+
+    const upgrade = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(upgrade.success, upgrade.output).toBe(true);
+
+    expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(1);
   });
 });

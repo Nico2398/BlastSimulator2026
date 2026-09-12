@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   computeLevelTargetY, computeLevelCells, computeLevelRegion,
-  validateLevelOrder, carveLevelCells, computeLevelGroundDurationTicks,
+  validateLevelOrder, carveLevelCells, levelGroundRect, computeLevelGroundDurationTicks,
   type LevelOrderDef,
 } from '../../../src/core/mining/LevelGround.js';
 import {
@@ -228,6 +228,62 @@ describe('carveLevelCells', () => {
     const result = carveLevelCells(grid, [], emitter);
     expect(result.voxelsCleared).toBe(0);
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe('levelGroundRect', () => {
+  it('cuts every column in the rect down to its lowest one, in a single call', () => {
+    // splitX=2: columns x=0,1 sit at 10, x>=2 at 13 — a three-level step.
+    const grid = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+
+    const result = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
+
+    expect(result.targetY).toBe(10);
+    // Two columns x 2 rows x 3 levels of excess (y = 11, 12, 13).
+    expect(result.voxelsCleared).toBe(12);
+    for (let z = 0; z <= 1; z++) {
+      for (let x = 0; x <= 3; x++) {
+        expect(grid.densityAt(x, 11, z)).toBe(0);
+        expect(grid.densityAt(x, 10, z)).toBeGreaterThan(0); // the target level itself stays
+      }
+    }
+    expect(result.region).toEqual({ minX: 2, maxX: 3, minZ: 0, maxZ: 1 });
+  });
+
+  it('leaves already-level ground untouched and reports nothing cleared', () => {
+    const grid = makeElevatedGrid(20, 30, 20, 15);
+
+    const result = levelGroundRect(grid, { minX: 4, maxX: 7, minZ: 4, maxZ: 7 });
+
+    expect(result.targetY).toBe(15);
+    expect(result.voxelsCleared).toBe(0);
+    expect(result.region).toBeNull();
+    expect(grid.densityAt(5, 15, 5)).toBeGreaterThan(0);
+  });
+
+  it('emits terrain:updated once when it carves, and not at all when it does not', () => {
+    const stepped = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    levelGroundRect(stepped, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 }, emitter);
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Second pass over the now-level rect: nothing left to carve, nothing emitted.
+    levelGroundRect(stepped, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 }, emitter);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('is idempotent — a second call on the same rect clears nothing more', () => {
+    const grid = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+
+    const first = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
+    const second = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
+
+    expect(first.voxelsCleared).toBeGreaterThan(0);
+    expect(second.voxelsCleared).toBe(0);
+    expect(second.targetY).toBe(first.targetY);
   });
 });
 

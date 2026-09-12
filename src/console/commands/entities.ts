@@ -13,8 +13,10 @@ import {
   getDemolishCost,
   getUpgradeCost,
   isPlacementBlockedByResearch,
+  checkFootprintPlacement,
   type BuildingType,
   type BuildingTier,
+  type FootprintOccupant,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -25,6 +27,7 @@ import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { makeFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
+import { levelGroundRect } from '../../core/mining/LevelGround.js';
 import { t } from '../../core/i18n/I18n.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
@@ -105,8 +108,30 @@ export function buildCommand(
         };
       }
       const { x, z, type: upgradeType } = toUpgrade;
-      destroyBuilding(state.buildings, id);
+
+      // Check the NEW tier's footprint before demolishing the old building,
+      // not after. placeBuilding below can refuse — the larger tier's
+      // footprint can run past the site bounds, overlap a neighbour, or (since
+      // #1008) cover ground too uneven to build on — and the demolition is not
+      // undone when it does, so validating second left the player with no
+      // building, no replacement and no refund. Occupants exclude this
+      // building itself, which is what the demolish-first order was standing
+      // in for; every other live building and every reserved construction site
+      // still counts.
       const upBounds = siteBounds(ctx);
+      const upgradeOccupants: FootprintOccupant[] = [
+        ...state.buildings.buildings.filter(b => b.id !== id).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+        ...state.plannedBuildings.map(pb => ({ type: pb.type, tier: pb.tier, x: pb.x, z: pb.z })),
+      ];
+      const upgradeCheck = checkFootprintPlacement(
+        upgradeOccupants, upgradeType, x, z, nextTier,
+        upBounds.width, upBounds.depth, upBounds.originX, upBounds.originZ, ctx.grid ?? undefined,
+      );
+      if (!upgradeCheck.valid) {
+        return { success: false, output: t('entities.build_upgrade_failed', { error: upgradeCheck.error! }) };
+      }
+
+      destroyBuilding(state.buildings, id);
       const upgradeResult = placeBuilding(
         state.buildings, upgradeType, x, z,
         upBounds.width, upBounds.depth, nextTier, upBounds.originX, upBounds.originZ,
@@ -122,6 +147,11 @@ export function buildCommand(
       if (ctx.grid) {
         const maxX = Math.max(getDefSize(oldDef).sizeX, getDefSize(newDef).sizeX);
         const maxZ = Math.max(getDefSize(oldDef).sizeZ, getDefSize(newDef).sizeZ);
+        // The upgraded tier's footprint is the one that has to stand level, and
+        // it can be bigger than the tier it replaces — so it reaches onto ground
+        // the original construction never levelled. Cut it flat here, the same
+        // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
+        levelGroundRect(ctx.grid, makeFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ), ctx.emitter);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
@@ -172,6 +202,11 @@ export function buildCommand(
       refreshLogisticsCapacity(state);
       // Patch NavGrid for old and new positions
       if (ctx.grid) {
+        // A relocated building lands on ground nothing has levelled yet, so its
+        // new footprint gets the same cut a finished build does (#1008
+        // refinement, tickTaskCompletion.ts). The vacated one is left as it is:
+        // levelling is not undone by moving away from it.
+        levelGroundRect(ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.emitter);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }

@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { isFootprintFlat } from '../../src/core/entities/Building.js';
-import { NAV_BENCH_HEIGHT, MAX_LEVEL_GROUND_AREA } from '../../src/core/config/balance.js';
+import { footprintHeightSpread } from '../../src/core/entities/Building.js';
+import { NAV_BENCH_HEIGHT, MAX_LEVEL_GROUND_AREA, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../src/core/config/balance.js';
 import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
@@ -40,10 +40,19 @@ function lowerColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, 
   for (let y = fromHeight; y > fromHeight - drop; y--) grid.clearVoxel(x, y, z);
 }
 
-/** A flat 2x2 rect at (15,15)-(16,16), except (15,15) is one voxel lower — uneven, matching management_office tier1's own 2x2 footprint. */
+/**
+ * A flat 2x2 rect at (15,15)-(16,16), except (15,15) sits one voxel past the
+ * placement tolerance below the rest — uneven enough to be refused, and
+ * matching management_office tier1's own 2x2 footprint.
+ *
+ * The drop is derived from BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD rather than
+ * hardcoded: #1008's refinement lets a footprint straddle a one-voxel step, so
+ * a fixed one-voxel drop (what this used to carve) is a legal placement and
+ * gives the levelling round trip below no baseline to prove anything against.
+ */
 function carveSlopedBuildingRect(grid: VoxelGrid): void {
   carveFlatRect(grid, 15, 16, 15, 16, BASE_HEIGHT);
-  lowerColumn(grid, 15, 15, BASE_HEIGHT, 1);
+  lowerColumn(grid, 15, 15, BASE_HEIGHT, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD + 1);
 }
 
 function makeStaffedRunner(cash?: number): RunnerWithContext {
@@ -69,7 +78,7 @@ function tickUntilGone(engine: RunnerWithContext, actionId: number, maxTicks = 5
 }
 
 describe('level_ground — console round trip (#1009)', () => {
-  it('1. baseline: place_building on a sloped rect is refused (#1008 flat-footprint rule is live)', () => {
+  it('1. baseline: place_building on a rect steeper than the tolerance is refused (#1008 placement rule is live)', () => {
     const engine = makeStaffedRunner();
     carveSlopedBuildingRect(engine.ctx.grid!);
 
@@ -268,11 +277,14 @@ describe('level_ground — console round trip (#1009)', () => {
       }
     }
 
-    // The whole rect reads as flat via #1008's own isFootprintFlat rule.
+    // The whole rect reads as dead flat via #1008's own spread measure — a
+    // levelled rect leaves nothing for the placement tolerance to absorb.
     const footprint: Array<readonly [number, number]> = [];
     for (let dz = 0; dz <= 1; dz++) for (let dx = 0; dx <= 3; dx++) footprint.push([dx, dz]);
-    const flat = isFootprintFlat(footprint, 25, 25, (cx, cz) => computeVoxelColumnSurfaceY(grid, cx, cz));
-    expect(flat).toBe(true);
+    const spread = footprintHeightSpread(
+      footprint, 25, 25, (cx: number, cz: number) => computeVoxelColumnSurfaceY(grid, cx, cz),
+    );
+    expect(spread).toBe(0);
   });
 
   it('11. refused before any game is started (requireGame guard)', () => {

@@ -1,8 +1,9 @@
 // BlastSimulator2026 — Ground levelling system (#1009)
-// Flattens a rectangular area to one target Y so it later passes the flat-
-// footprint building-placement rule (#1008). Mirrors the order-then-work
+// Flattens a rectangular area to one target Y so it later satisfies the
+// building-placement levelness rule (#1008). Mirrors the order-then-work
 // shape `dig_ramp_segment`/Ramp.ts established: validate at order time,
-// carve progressively as a `level_ground` PendingAction.
+// carve progressively as a `level_ground` PendingAction. `levelGroundRect`
+// below is the un-ordered, un-charged variant construction itself uses.
 
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -182,6 +183,31 @@ export function carveLevelCells(
   }
 
   return { voxelsCleared };
+}
+
+/**
+ * Level `rect` in one shot: compute its target Y, carve every solid voxel
+ * above it, and emit `terrain:updated` — the compute/carve dance
+ * `validateLevelOrder` + `carveLevelCells` split across order time and
+ * completion time, composed for a caller that does both at once.
+ *
+ * Used by the end of a building's construction (#1008 refinement): a
+ * footprint placed on a tolerated one-level slope is cut flat so the finished
+ * building stands on level ground. Unlike a player-ordered `level_ground`
+ * job this charges nothing and needs no digger — it is part of the
+ * construction the player already paid for. Already-level ground carves
+ * nothing and emits nothing.
+ */
+export function levelGroundRect(
+  grid: VoxelGrid,
+  rect: LevelOrderDef,
+  emitter?: EventEmitter,
+): { targetY: number; voxelsCleared: number; region: { minX: number; maxX: number; minZ: number; maxZ: number } | null } {
+  const targetY = computeLevelTargetY(grid, rect);
+  const cells = computeLevelCells(grid, rect, targetY);
+  const region = computeLevelRegion(cells);
+  const { voxelsCleared } = carveLevelCells(grid, cells, emitter);
+  return { targetY, voxelsCleared, region };
 }
 
 /**

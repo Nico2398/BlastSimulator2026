@@ -40,7 +40,7 @@ import {
   getMoveCost,
   isTierUnlocked,
   isResearchQueued,
-  isFootprintFlat,
+  isFootprintBuildable,
   type BuildingType,
   type BuildingTier,
   type Building,
@@ -352,7 +352,7 @@ export class BuildMenu extends PanelBase {
     controller.arm({ shape: 'point' });
     controller.setFootprintCheck(
       this.surfaceHeightSampler
-        ? (x, z) => isFootprintFlat(def.footprint, x, z, this.surfaceHeightSampler!)
+        ? (x, z) => isFootprintBuildable(def.footprint, x, z, this.surfaceHeightSampler!)
         : null,
     );
     refresh();
