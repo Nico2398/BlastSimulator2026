@@ -7,6 +7,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { hasFillableOreSaleOffer } from './core/economy/Contract.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
 export { createRunner };
@@ -69,6 +70,20 @@ export interface SerializableGameState {
   stuckEmployeeCount: number;
   /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
   activeContractCount: number;
+  /**
+   * True when at least one *offered* (not yet accepted) `ore_sale` contract
+   * asks for no more of its ore than the site already holds — an offer that
+   * can be accepted and filled in full right now, which is what completes a
+   * sale rather than part-delivering one. Both halves of it are random and
+   * moving: which ore the pool asks for and how much (Contract.ts's
+   * `generateContracts`, rotating every `REFRESH_INTERVAL` ticks and keeping
+   * only the most recent handful), against however much of that ore the
+   * haulers have brought in so far. So this is the condition a scenario
+   * waits on before clicking Accept, instead of a fixed tick count that only
+   * ever happened to land on a matching offer and is re-rolled by any change
+   * upstream of it.
+   */
+  fillableOreSaleOffered: boolean;
   /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
   deathCount: number;
   levelEnded: boolean;
@@ -147,6 +162,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
+    fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,

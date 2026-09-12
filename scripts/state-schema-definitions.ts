@@ -59,6 +59,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   minFatigue: { type: 'number', description: 'Lowest fatigue (0-100, 100=rested) across the roster — closest employee to collapse, 100 with none' },
   stuckEmployeeCount: { type: 'number', description: 'Employees currently in the isMoveStuck state — pathfinding failed STUCK_THRESHOLD consecutive times' },
   activeContractCount: { type: 'number', description: 'Contracts currently accepted and in progress (state.contracts.active)' },
+  fillableOreSaleOffered: { type: 'boolean', description: 'An offered ore_sale asks for no more of its ore than storage already holds — the condition to wait on before accepting, since the pool re-rolls which ore and how much every refresh' },
   deathCount: { type: 'number', description: 'Employees killed so far (state.damage.deathCount)' },
   levelEnded: { type: 'boolean' },
   levelEndReason: { type: 'string', optional: true, description: 'null while the level runs' },

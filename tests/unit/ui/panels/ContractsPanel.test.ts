@@ -121,6 +121,41 @@ describe('ContractsPanel', () => {
     expect(gameConsole).toHaveBeenCalledWith('contract accept id:7');
   });
 
+  // data-contract-fillable (#1048 CI fix): the DOM counterpart of
+  // console-api.ts's fillableOreSaleOffered, so a click can be scoped to an
+  // offer the site can complete instead of to a named ore the random offer
+  // pool may not be asking for on this run.
+  it('marks an offered card fillable only when storage covers its whole quantity', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100;
+    state.contracts.available.push(makeContract({ id: 7, materialId: 'dirtite', quantityKg: 100 }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="7"]')!
+      .getAttribute('data-contract-fillable')).toBe('true');
+
+    state.collectedOre['dirtite'] = 99;
+    state.contracts.available[0]!.quantityKg = 100;
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="7"]')!
+      .getAttribute('data-contract-fillable')).toBe('false');
+  });
+
+  it('marks a rubble offer fillable from raw stored mass, which carries no ore breakdown', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.logistics.storedMassKg = 500;
+    state.contracts.available.push(makeContract({ id: 8, type: 'rubble_disposal', materialId: '', quantityKg: 400 }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="8"]')!
+      .getAttribute('data-contract-fillable')).toBe('true');
+  });
+
   it('Negotiate and Decline dispatch their commands', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();

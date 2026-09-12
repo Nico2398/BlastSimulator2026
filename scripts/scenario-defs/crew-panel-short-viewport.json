@@ -66,7 +66,7 @@
         { "type": "screenshot" }
       ],
       "role": "player",
-      "expect": { "note": "The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+      "expect": { "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]", "note": "The Train button below the fold is reachable once the wheel gesture has scrolled to it — the step's own subject, and what step 5 then clicks. The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
     },
     {
       "command": "employee train 1 skill:driving.drill_rig",

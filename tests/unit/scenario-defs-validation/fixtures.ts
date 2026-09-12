@@ -1,3 +1,5 @@
+import { scenarioFiles, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+
 // Shared constant fixtures for the scenario-defs-*.test.ts split (issue #703).
 // Not a test file — no `describe`/`it`, so vitest's test-file glob never
 // collects it. Moved verbatim out of the original scenario-defs.test.ts.
@@ -167,11 +169,22 @@ export const UI_DRIVEN_SCENARIO_NAMES = [
   'building-tier-system-visual',
 ] as const;
 
-export const ALL_SCENARIO_NAMES = [
-  ...PLAYTHROUGH_SCENARIO_NAMES,
-  ...FEATURE_SCENARIO_NAMES,
-  ...VISUAL_SCENARIO_NAMES,
-] as const;
+/**
+ * Every scenario definition on disk, read from the directory rather than
+ * concatenated from the three category lists above — the same rule
+ * `tests/unit/lint/`'s scenario lints already follow through
+ * `scenarioFiles()`.
+ *
+ * A hand-maintained union silently skips any file nobody remembered to add
+ * to it: 28 of the 140 definitions had never been seen by a single check in
+ * this directory, and `building-construction-continuous-policy.json` was one
+ * of them — its `role: 'setup'` step running `set_policy` sailed past the
+ * `checkStepActionAllowed` lint below and only failed in CI's interaction
+ * shard, on `main`, after merge. The category lists stay hand-written
+ * because each one names a real category the checks below distinguish; the
+ * "all of them" list must not be one of those.
+ */
+export const ALL_SCENARIO_NAMES: readonly string[] = scenarioFiles(SCENARIO_DIR);
 
 export const KNOWN_COMMANDS = [
   'new_game', 'campaign', 'time', 'scores', 'finances',
@@ -181,7 +194,7 @@ export const KNOWN_COMMANDS = [
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'level_ground', 'set_policy', 'terrain_info', 'help',
-  'blast_plan', 'needs', 'save', 'load',
+  'blast_plan', 'needs', 'save', 'load', 'sandbox',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */
