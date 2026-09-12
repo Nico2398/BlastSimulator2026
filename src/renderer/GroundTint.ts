@@ -125,7 +125,7 @@ export class GroundTintLayer {
       vertexColors: true,
       transparent: true,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     if (opts?.renderOrder !== undefined) this.mesh.renderOrder = opts.renderOrder;
@@ -212,8 +212,8 @@ export class GroundTintLayer {
     const verts = corners.map(([cx, cz]): [number, number, number] => [cx, this.cornerY(cx, cz), cz]);
     // Fixed diagonal (corner 0 - corner 2) for every cell, so neighbouring
     // cells never disagree on which way a shared quad face bends.
-    this.pushTri(verts[0]!, verts[1]!, verts[2]!, color, opacity, positions, colors);
-    this.pushTri(verts[0]!, verts[2]!, verts[3]!, color, opacity, positions, colors);
+    this.pushTri(verts[0]!, verts[2]!, verts[1]!, color, opacity, positions, colors);
+    this.pushTri(verts[0]!, verts[3]!, verts[2]!, color, opacity, positions, colors);
   }
 
   /**
@@ -237,7 +237,7 @@ export class GroundTintLayer {
     }
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      this.pushTri(center, rim[i]!, rim[next]!, color, opacity, positions, colors);
+      this.pushTri(center, rim[next]!, rim[i]!, color, opacity, positions, colors);
     }
   }
 
