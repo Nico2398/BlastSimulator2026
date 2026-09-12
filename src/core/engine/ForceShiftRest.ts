@@ -131,7 +131,7 @@ export function forceShiftRestIfNeeded(
  * scoping: skip only the specific in-progress work that gets fragmented by
  * proactive shift-cycle rest, not every in-progress task.
  */
-export function isMidConstructionWork(state: GameState, employee: Employee): boolean {
+function isMidConstructionWork(state: GameState, employee: Employee): boolean {
   if (employee.activeActionId === null) return false;
   const action = state.pendingActions.find(a => a.id === employee.activeActionId);
   if (!action || action.type !== 'place_building') return false;
