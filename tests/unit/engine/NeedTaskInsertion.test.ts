@@ -11,6 +11,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -151,6 +152,32 @@ describe('autoInsertNeedTasks (7.7)', () => {
 
     expect(result.inserted).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // #1042: an employee mid-evacuation-drive (boarded a driverless vehicle,
+  // driving it clear of a danger zone) has no activeActionId of their own —
+  // mirrors the isMidEvacuationWalk skip this file already relies on for a
+  // walking evacuee (own doc comment above, #557), but for a drive instead.
+  // Unlike the other four call sites, this one doesn't self-claim on a miss —
+  // it just must not queue a fresh, unclaimed self-targeted rest action while
+  // the employee is still driving.
+  it('employee mid-evacuation-drive → skipped, no action inserted (#1042)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    employee.fatigue = 20;
+    employee.activeActionId = null;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.driverId = employee.id;
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
     expect(state.pendingActions).toHaveLength(0);
   });
 

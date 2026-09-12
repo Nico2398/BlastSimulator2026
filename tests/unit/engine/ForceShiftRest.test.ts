@@ -360,6 +360,29 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).toBeNull();
   });
 
+  // #1042: an employee mid-evacuation-drive (boarded a driverless vehicle,
+  // driving it clear) has activeActionId === null — mirrors the
+  // pendingDriverVehicleId guard just above, but for a drive rather than a
+  // walk-to-board.
+  it('no-op when the employee is mid-evacuation-drive (boarded a driverless vehicle, driving it clear) (#1042)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = null;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.driverId = employee.id;
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+  });
+
   it('no-op when shouldForceRest itself returns false', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

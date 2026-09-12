@@ -233,6 +233,32 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     expect((employee as any).activeActionId).toBeNull();
   });
 
+  // #1042: an employee mid-evacuation-drive (boarded a driverless vehicle,
+  // driving it clear of a danger zone) has activeActionId === null and would
+  // otherwise read as plainly idle to tickEmployees — mirrors the
+  // pendingDriverVehicleId/isMidEvacuationWalk skips already guarding this
+  // loop against claiming over a walk or a boarding-in-progress, but for a
+  // drive instead.
+  it('an employee mid-evacuation-drive does not claim a pending action (#1042)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    employee.activeActionId = null;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.driverId = employee.id;
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+
+    const action = makePendingAction({ id: 9, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions).toHaveLength(1);
+    expect(employee.activeActionId).toBeNull();
+  });
+
   it('multiple pending actions claimed by multiple idle employees', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

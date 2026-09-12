@@ -17,6 +17,10 @@ import {
   assignDriver,
   unassignDriver,
 } from '../../../src/core/entities/Vehicle.js';
+import {
+  findBestEvacuationDriver,
+  type EvacuationDriverReachabilityCheck,
+} from '../../../src/core/entities/VehicleDriverAssignment.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   createEmployeeState,
@@ -1591,5 +1595,93 @@ describe('computeScrapResidualValue', () => {
     const tier1 = computeScrapResidualValue('rock_fragmenter', 1, getVehicleDefByTier('rock_fragmenter', 1).maxHp);
     const tier3 = computeScrapResidualValue('rock_fragmenter', 3, getVehicleDefByTier('rock_fragmenter', 3).maxHp);
     expect(tier3).toBeGreaterThan(tier1);
+  });
+});
+
+// ── findBestEvacuationDriver (#1042) ────────────────────────────────────────
+
+const alwaysReach: EvacuationDriverReachabilityCheck = () => true;
+const neverReach: EvacuationDriverReachabilityCheck = () => false;
+
+function makeEvacuationFixture(seed: number) {
+  const vs = createVehicleState();
+  const es = createEmployeeState();
+  const { vehicle } = purchaseVehicle(vs, 'rock_digger', 20, 20); // requires driving.excavator
+  vehicle.driverId = null;
+  const rng = new Random(seed);
+  return { vs, es, vehicle, rng };
+}
+
+describe('findBestEvacuationDriver', () => {
+  it('picks the nearest qualified, reachable candidate among several', () => {
+    const { vs, es, vehicle, rng } = makeEvacuationFixture(100);
+    const { employee: far } = hireEmployee(es, 'driller', rng, 0, 0);
+    assignSkill(es, far.id, 'driving.excavator', 1);
+    const { employee: near } = hireEmployee(es, 'driller', rng, 21, 21);
+    assignSkill(es, near.id, 'driving.excavator', 1);
+    const { employee: mid } = hireEmployee(es, 'driller', rng, 10, 10);
+    assignSkill(es, mid.id, 'driving.excavator', 1);
+
+    const best = findBestEvacuationDriver(vehicle, vs, es, [far.id, near.id, mid.id], alwaysReach);
+
+    expect(best?.id).toBe(near.id);
+  });
+
+  it('excludes an unlicensed candidate, reusing the same licence check as canAssignDriver', () => {
+    const { vs, es, vehicle, rng } = makeEvacuationFixture(101);
+    // driller's starting qualification is 'blasting', not driving.excavator.
+    const { employee: unqualified } = hireEmployee(es, 'driller', rng, 20, 20);
+    const { employee: qualified } = hireEmployee(es, 'driller', rng, 25, 25);
+    assignSkill(es, qualified.id, 'driving.excavator', 1);
+
+    const best = findBestEvacuationDriver(vehicle, vs, es, [unqualified.id, qualified.id], alwaysReach);
+
+    expect(best?.id).toBe(qualified.id);
+  });
+
+  it('skips a candidate canReach rejects, falling through to the next-nearest', () => {
+    const { vs, es, vehicle, rng } = makeEvacuationFixture(102);
+    const { employee: nearButUnreachable } = hireEmployee(es, 'driller', rng, 21, 21);
+    assignSkill(es, nearButUnreachable.id, 'driving.excavator', 1);
+    const { employee: fartherButReachable } = hireEmployee(es, 'driller', rng, 10, 10);
+    assignSkill(es, fartherButReachable.id, 'driving.excavator', 1);
+
+    const canReach: EvacuationDriverReachabilityCheck = (employee) => employee.id !== nearButUnreachable.id;
+
+    const best = findBestEvacuationDriver(
+      vehicle, vs, es, [nearButUnreachable.id, fartherButReachable.id], canReach,
+    );
+
+    expect(best?.id).toBe(fartherButReachable.id);
+  });
+
+  it('returns null when the candidate list is empty (boundary)', () => {
+    const { vs, es, vehicle } = makeEvacuationFixture(103);
+
+    expect(findBestEvacuationDriver(vehicle, vs, es, [], alwaysReach)).toBeNull();
+  });
+
+  it('returns null when nobody in the candidate list qualifies or is reachable (rejection)', () => {
+    const { vs, es, vehicle, rng } = makeEvacuationFixture(104);
+    const { employee: unqualified } = hireEmployee(es, 'driller', rng, 20, 20);
+    const { employee: unreachable } = hireEmployee(es, 'driller', rng, 20, 20);
+    assignSkill(es, unreachable.id, 'driving.excavator', 1);
+
+    const best = findBestEvacuationDriver(vehicle, vs, es, [unqualified.id, unreachable.id], neverReach);
+
+    expect(best).toBeNull();
+  });
+
+  it('breaks a tie at equal distance by ascending employee id', () => {
+    const { vs, es, vehicle, rng } = makeEvacuationFixture(105);
+    const { employee: first } = hireEmployee(es, 'driller', rng, 15, 20); // distance 5 from (20,20)
+    assignSkill(es, first.id, 'driving.excavator', 1);
+    const { employee: second } = hireEmployee(es, 'driller', rng, 25, 20); // distance 5 too
+    assignSkill(es, second.id, 'driving.excavator', 1);
+
+    // second.id > first.id (hired after) — ascending-id tiebreak must pick first.
+    const best = findBestEvacuationDriver(vehicle, vs, es, [second.id, first.id], alwaysReach);
+
+    expect(best?.id).toBe(first.id);
   });
 });

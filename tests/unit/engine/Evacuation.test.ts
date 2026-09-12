@@ -10,7 +10,7 @@ import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../..
 import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
 import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
 import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EVACUATION_CLEARANCE_M } from '../../../src/core/config/balance.js';
@@ -208,6 +208,41 @@ describe('evacuateZone', () => {
 
     expect(result.strandedVehicleIds).toContain(vehicle.id);
     expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+  });
+});
+
+describe('evacuateZone — boards a driverless vehicle instead of stranding it outright (#1042)', () => {
+  it('boards a qualified, reachable in-zone employee onto a driverless vehicle before evacuation completes', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 15, 15);
+    vehicle.driverId = null;
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 16, 16);
+    assignSkill(state.employees, employee.id, 'driving.excavator', 1);
+
+    const result = evacuateZone(state, zone);
+
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.strandedEmployeeIds).not.toContain(employee.id);
+  });
+
+  it('strands a vehicle when no employee anywhere passes the real reachability check', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 15, 15);
+    vehicle.driverId = null;
+    // No employees hired at all — nobody anywhere the real reachability
+    // check could ever accept.
+
+    const result = evacuateZone(state, zone);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
   });
 });
 

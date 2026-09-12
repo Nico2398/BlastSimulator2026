@@ -255,6 +255,73 @@ describe('tickArrivalGate — vehicle boarding', () => {
   });
 });
 
+describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
+  it('starts driving toward pendingEvacuationDestination once boarding resolves, for a vehicle not reserved for any action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    expect(vehicle.reservedForActionId).toBeNull();
+
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = vehicle.id;
+
+    const result = tickArrivalGate(state);
+
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(result.driversBoarded).toEqual([employee.id]);
+    expect(vehicle.targetX).toBe(40);
+    expect(vehicle.targetZ).toBe(40);
+  });
+
+  it('clears pendingEvacuationDestination when a boarding attempt is cancelled with reason "vehicle_taken"', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { employee: otherDriver } = hireEmployee(state.employees, 'driver', new Random(SEED + 1));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.driverId = otherDriver.id; // claimed first
+    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = vehicle.id;
+
+    const result = tickArrivalGate(state);
+
+    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_taken' }]);
+    expect(vehicle.pendingEvacuationDestination).toBeNull();
+  });
+
+  it('clears pendingEvacuationDestination when a boarding attempt is cancelled with reason "vehicle_moved"', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    // Vehicle drove off before the employee finished walking to its old spot.
+    vehicle.x = 40;
+    vehicle.z = 40;
+    vehicle.pendingEvacuationDestination = { x: 60, z: 60 };
+
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = vehicle.id;
+
+    const result = tickArrivalGate(state);
+
+    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_moved' }]);
+    expect(vehicle.pendingEvacuationDestination).toBeNull();
+  });
+});
+
 describe('tickArrivalGate — dead employees are skipped entirely', () => {
   it('does nothing for a dead employee even with pending rest/task/boarding set', () => {
     const state = createGame({ seed: SEED });
