@@ -580,27 +580,8 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(held.status).toBe('in_progress');
   });
 
-  // NEW (#1039): same place_building type, but the general_work-equivalent
-  // control case — confirms the pre-existing #945-follow-up test above
-  // (general_work) is untouched by the new guard, and is a duplicate
-  // assertion of the file's own existing coverage rather than a new
-  // behavior; kept here for locality with the two new place_building cases.
-  it('#1039: still interrupts a general_work action mid-execution (control, unchanged by the new place_building guard)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const prior = pushHeldAction(state, employee.id, 1104, 'general_work');
-    employee.activeActionId = prior.id;
-    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
-    employee.fatigue = 1;
-    employee.taskTicksRemaining = 3;
-
-    forceShiftRestIfNeededByPolicy(state, employee, [], []);
-
-    expect(employee.pendingRestDuration).not.toBeNull();
-    expect(employee.activeActionId).not.toBe(1104);
-  });
+  // #1039: general_work is unaffected by the new place_building guard — see
+  // the pre-existing #945 follow-up test above, which already pins this.
 
   // NEW (#1039): the new place_building guard is scoped to the executing
   // phase only (taskTicksRemaining !== null) — mirrors isMidVehicleGatedWork's

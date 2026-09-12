@@ -37,6 +37,7 @@ import {
   BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
   BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
+  NEED_COLLAPSE_THRESHOLDS,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -1094,6 +1095,7 @@ describe('a place_building order survives an aggressive continuous-mode site pol
     let transitionsAwayFromInProgress = 0;
     let prevStatus: string | null = null;
     let completed = false;
+    let minObservedFatigue = Infinity;
 
     for (let i = 0; i < MAX_TICKS; i++) {
       const action = ctx.state!.pendingActions.find(a => a.id === actionId);
@@ -1107,6 +1109,13 @@ describe('a place_building order survives an aggressive continuous-mode site pol
         transitionsAwayFromInProgress++;
       }
       prevStatus = action.status;
+      // #1039 verification criterion: the employee actively building never
+      // collapses from fatigue during the build — sample whichever employee
+      // currently holds the action every tick.
+      if (action.holderId !== null) {
+        const holder = ctx.state!.employees.employees.find(e => e.id === action.holderId);
+        if (holder) minObservedFatigue = Math.min(minObservedFatigue, holder.fatigue);
+      }
       tickCommand(ctx, ['1'], {});
     }
     // One more check after the final tick, in case completion landed on it.
@@ -1117,6 +1126,7 @@ describe('a place_building order survives an aggressive continuous-mode site pol
     expect(reachedInProgress, 'construction never reached in_progress work at all').toBe(true);
     expect(transitionsAwayFromInProgress).toBeLessThanOrEqual(1);
     expect(completed, `driving_center did not complete within ${MAX_TICKS} ticks`).toBe(true);
+    expect(minObservedFatigue).toBeGreaterThan(NEED_COLLAPSE_THRESHOLDS.fatigue);
     const built = ctx.state!.buildings.buildings.find(b => b.type === 'driving_center');
     expect(built).toBeDefined();
   });
