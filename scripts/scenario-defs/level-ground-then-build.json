@@ -71,8 +71,12 @@
     },
     {
       "command": "level_ground minX:15 maxX:16 minZ:13 maxZ:14",
-      "description": "Order ground-levelling over the same uneven rect via the real BuildMenu control — armLevelGroundTool arms a rectangle drag exactly like armRampTool's line drag (makeTerrainSection, #1009).",
+      "description": "Order ground-levelling over the same uneven rect via the real BuildMenu control — armLevelGroundTool arms a rectangle drag exactly like armRampTool's line drag (makeTerrainSection, #1009). Escape first backs out of the management_office tool step 3 left armed-but-blocked (#1045): a refused pick leaves the placement controller's phase untouched, so armLevelGroundTool's own isArmed guard would otherwise just cancel that leftover tool instead of arming this one — exactly what a real player would do before switching tools.",
       "interaction": [
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel .bs-build-level-ground-btn"
