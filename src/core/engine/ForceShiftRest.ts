@@ -125,6 +125,18 @@ export function forceShiftRestIfNeeded(
 }
 
 /**
+ * True when `employee.activeActionId` names a PendingAction of type
+ * 'place_building' — a construction task in progress (#1039). Scoped guard
+ * for forceShiftRestIfNeededByPolicy, mirroring isMidVehicleGatedWork's own
+ * scoping: skip only the specific in-progress work that gets fragmented by
+ * proactive shift-cycle rest, not every in-progress task.
+ */
+export function isMidConstructionWork(_state: GameState, _employee: Employee): boolean {
+  // TODO: implement
+  return false;
+}
+
+/**
  * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
  * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
  * > 0) forces rest for real, using any living_quarters tier (tier 1
