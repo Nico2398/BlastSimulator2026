@@ -8,7 +8,8 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
-import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
+import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
+import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
@@ -386,6 +387,143 @@ describe('the speed bar is always allowed, from the first step onward (#1015)', 
     for (const btn of buttons) {
       expect(btn.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     }
+  });
+});
+
+// #1041: navigation (opening/closing any panel) is allowed unconditionally,
+// the same way the speed bar is (#1015) — the tutorial's `ALLOWED_CLASS`
+// allowlist used to cover only the active stage's own target/also/modal
+// controls, so moving to a panel the current stage doesn't target was blocked
+// exactly like a real game-state-changing action. `BASE_PERMANENTLY_ALLOWED`
+// (tutorialRails.ts) now also carries `PANEL_OPEN_SELECTOR` ([data-panel])
+// and `PANEL_CLOSE_SELECTOR` ([data-panel-close]) — generic over every
+// panel's own opener/closer, so no per-panel rails entry is ever needed.
+describe('every panel open/close control is always allowed, from the first step onward (#1041)', () => {
+  /** A toolbar opener for some OTHER panel than the one the active stage targets. */
+  function panelOpener(panelName: string): HTMLButtonElement {
+    const bar = document.getElementById('bs-toolbar') ?? (() => {
+      const b = document.createElement('div');
+      b.id = 'bs-toolbar';
+      document.body.appendChild(b);
+      return b;
+    })();
+    const btn = document.createElement('button');
+    btn.dataset['panel'] = panelName;
+    bar.appendChild(btn);
+    return withBox(btn) as HTMLButtonElement;
+  }
+
+  /** A panel's own header close control, matching PANEL_CLOSE_SELECTOR. */
+  function panelCloser(panelId: string): HTMLButtonElement {
+    const panel = document.createElement('div');
+    panel.id = panelId;
+    document.body.appendChild(panel);
+    const btn = document.createElement('button');
+    btn.setAttribute('data-panel-close', '');
+    panel.appendChild(btn);
+    return withBox(btn) as HTMLButtonElement;
+  }
+
+  /** A state-changing control that belongs to no stage at all — the negative case. */
+  function unrelatedHireButton(): HTMLButtonElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    const btn = document.createElement('button');
+    btn.dataset['role'] = 'driller';
+    panel.appendChild(btn);
+    document.body.appendChild(panel);
+    return withBox(btn) as HTMLButtonElement;
+  }
+
+  it('sanity: the fixtures actually match PANEL_OPEN_SELECTOR / PANEL_CLOSE_SELECTOR', () => {
+    const opener = panelOpener('vehicles');
+    const closer = panelCloser('bs-vehicle-panel');
+    expect(opener.matches(PANEL_OPEN_SELECTOR)).toBe(true);
+    expect(closer.matches(PANEL_CLOSE_SELECTOR)).toBe(true);
+  });
+
+  it('marks a panel opener for a DIFFERENT panel than the active stage\'s own target allowed', () => {
+    // Stage 0 of hire-surveyor targets the Crew ([data-panel="employees"])
+    // opener. Fleet's own opener belongs to no stage in this step at all.
+    toolbarCrew();
+    const fleetOpener = panelOpener('vehicles');
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    expect(fleetOpener.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('marks a panel\'s own close control allowed even though no stage targets it', () => {
+    toolbarCrew();
+    const closer = panelCloser('bs-vehicle-panel');
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    expect(closer.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('never highlights a panel opener/closer — only the active stage\'s own target gets HIGHLIGHT_CLASS', () => {
+    const open = toolbarCrew();
+    const fleetOpener = panelOpener('vehicles');
+    const closer = panelCloser('bs-vehicle-panel');
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    expect(fleetOpener.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    expect(closer.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    // Exactly one element on the whole page is highlighted, and it is the stage's own target.
+    const highlighted = Array.from(document.querySelectorAll(`.${HIGHLIGHT_CLASS}`));
+    expect(highlighted).toEqual([open]);
+  });
+
+  it('a state-changing control belonging to no stage at all still stays blocked — navigation allowance does not widen into action allowance', () => {
+    toolbarCrew();
+    panelOpener('vehicles');
+    const stray = unrelatedHireButton();
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    expect(stray.classList.contains(ALLOWED_CLASS)).toBe(false);
+  });
+
+  it('the allowance persists across subsequent beginStep() calls to unrelated steps', () => {
+    toolbarCrew();
+    const fleetOpener = panelOpener('vehicles');
+    const closer = panelCloser('bs-vehicle-panel');
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    rails.beginStep({ id: 'drill-plan' }, state());
+    rails.refresh();
+
+    expect(fleetOpener.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(closer.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('survives clear() followed by a fresh beginStep()', () => {
+    toolbarCrew();
+    const fleetOpener = panelOpener('vehicles');
+    const closer = panelCloser('bs-vehicle-panel');
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    rails.clear();
+
+    rails.beginStep({ id: 'drill-plan' }, state());
+    rails.refresh();
+
+    expect(fleetOpener.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(closer.classList.contains(ALLOWED_CLASS)).toBe(true);
   });
 });
 
