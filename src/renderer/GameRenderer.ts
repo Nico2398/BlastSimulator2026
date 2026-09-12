@@ -357,14 +357,14 @@ export class GameRenderer {
     }
 
     if (this.characters && this.lastState) {
-      this.characters.update(this.lastState.employees.employees, dt);
+      this.characters.update(this.lastState.employees.employees, dt, (x, z) => this.getTerrainSurfaceY(x, z));
     }
 
     this.taskProgress?.update(dt);
     this.pictograms?.update(dt);
 
     if (this.vehicles && this.lastState) {
-      this.vehicles.update(this.lastState.vehicles.vehicles, dt);
+      this.vehicles.update(this.lastState.vehicles.vehicles, dt, (x, z) => this.getTerrainSurfaceY(x, z));
     }
 
     if (this.ghosts) {

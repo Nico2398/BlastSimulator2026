@@ -80,8 +80,12 @@ export class VehicleMesh {
    * Update vehicle positions. Call every frame.
    * Eases toward the target position (duration-aware tween, #520) to give
    * smooth movement.
+   * @param heightAt - Optional terrain height sampler, called with the same
+   *   eased (x, z) the tween produces so a vehicle's Y follows the slope
+   *   under its wheels every frame instead of the last synced cell (#1038).
    */
-  update(vehicles: Vehicle[], dt: number): void {
+  update(vehicles: Vehicle[], dt: number, heightAt?: (x: number, z: number) => number): void {
+    void heightAt; // TODO(#1038): implement — sample at the eased (x, z), not the tween target
     for (const v of vehicles) {
       const entry = this.vehicles.get(v.id);
       if (!entry) continue;

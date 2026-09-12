@@ -98,8 +98,12 @@ export class CharacterMesh {
    * Update all characters' positions and states.
    * @param employees - Current employee list from GameState
    * @param dt - Elapsed seconds since last call (for animation)
+   * @param heightAt - Optional terrain height sampler, called with the same
+   *   eased (x, z) the tween produces so a character's Y follows the slope
+   *   under its feet every frame instead of the last synced cell (#1038).
    */
-  update(employees: Employee[], dt: number): void {
+  update(employees: Employee[], dt: number, heightAt?: (x: number, z: number) => number): void {
+    void heightAt; // TODO(#1038): implement — sample at the eased (x, z), not the tween target
     this.time += dt;
 
     for (const emp of employees) {

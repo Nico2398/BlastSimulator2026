@@ -83,3 +83,21 @@ export function stepTween(
     tween.elapsedS, MOVE_TWEEN_DURATION_S,
   );
 }
+
+// Composes stepTween() with a caller-supplied terrain height sampler so an
+// entity's rendered Y follows the same eased (x, z) as its X/Z glide (#1038),
+// instead of snapping to the target cell's height once per sync. `heightAt`
+// is sampled at the EASED (x, z) this call returns, never at (targetX,
+// targetZ) — that is the whole point of this function over calling
+// stepTween() and a height sampler separately.
+export function stepTweenWithHeight(
+  tween: MovementTween,
+  renderX: number, renderZ: number,
+  targetX: number, targetZ: number,
+  dt: number,
+  heightAt: (x: number, z: number) => number,
+): { x: number; y: number; z: number } {
+  void tween; void renderX; void renderZ; void targetX; void targetZ; void dt; void heightAt;
+  // TODO: implement
+  throw new Error('not implemented');
+}
