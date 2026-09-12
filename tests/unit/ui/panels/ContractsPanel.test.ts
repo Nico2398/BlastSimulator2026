@@ -203,6 +203,56 @@ describe('ContractsPanel', () => {
     expect(panel.root.querySelector('[data-contract-id="7"]')).not.toBeNull();
   });
 
+  // data-contract-stocked (#1048 follow-up): a selector naming one material is
+  // a bet on the offer pool's luck — which ore an offer asks for is a plain
+  // rng.pick(CONTRACT_ORES) unrelated to this pit's rock. This marks the
+  // property a scenario actually means by "an ore sale this pit can fill",
+  // under the same storedForContract rule the state dump's
+  // hasStockedOreSaleOffer waits on.
+  it('offered card is marked stocked when the site holds any of its material', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 625;
+    state.contracts.available.push(makeContract({ id: 7, materialId: 'dirtite' }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="7"]')?.getAttribute('data-contract-stocked')).toBe('true');
+  });
+
+  it('offered card is marked not stocked when the site holds none of its material', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 625;
+    state.contracts.available.push(makeContract({ id: 8, materialId: 'absurdium', description: 'Deliver absurdium ore' }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="8"]')?.getAttribute('data-contract-stocked')).toBe('false');
+  });
+
+  it('a rubble_disposal offer is marked stocked from raw stored mass, not a per-ore total', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.logistics.storedMassKg = 1021;
+    state.contracts.available.push(makeContract({ id: 9, type: 'rubble_disposal', materialId: '', description: 'Dispose of rubble' }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="9"]')?.getAttribute('data-contract-stocked')).toBe('true');
+  });
+
+  it('active card carries the same stocked marking as an offered one', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 625;
+    state.contracts.active.push(makeContract({ id: 10, materialId: 'dirtite' }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="10"]')?.getAttribute('data-contract-stocked')).toBe('true');
+  });
+
   it('active card carries data-contract-id matching its contract', () => {
     const { panel } = makePanel();
     const state = makeState();

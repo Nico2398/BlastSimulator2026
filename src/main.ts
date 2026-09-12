@@ -34,6 +34,7 @@ import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { hasStockedOffer } from './core/economy/Contract.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking } from './ui/scene/ScenePicking.js';
@@ -608,6 +609,15 @@ window.__gameState = () => {
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
+    // Site policy as the simulation actually holds it — mirrors
+    // serializeGameState's own fields (console-api.ts). An interaction-mode
+    // step that sets the policy by clicking the Operations panel has no other
+    // way to prove the Apply click landed: without these, a click that
+    // silently changed nothing leaves the scenario passing on the default
+    // policy, which is not the policy the scenario exists to exercise.
+    hasStockedOreSaleOffer: hasStockedOffer(s.contracts.available, 'ore_sale', s.collectedOre, s.logistics.storedMassKg),
+    sitePolicyShiftMode: s.sitePolicy.shiftMode,
+    sitePolicyFatigueThreshold: s.sitePolicy.fatigueRestThreshold,
     // Raw roster size, dead included — deliberate: `killEmployee` never
     // splices `employees` (only `fireEmployee` does), so this stays a
     // total-ever-hired count. `deathCount` tracks how many of them died; the

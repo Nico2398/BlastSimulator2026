@@ -26,6 +26,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { storedForContract } from '../../core/economy/Contract.js';
 import type { Contract, ContractType, NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -127,9 +128,9 @@ export class ContractsPanel extends PanelBase {
     this.bodyEl.replaceChildren(...sections);
   }
 
-  /** Kilograms of `materialId` available to deliver — collected ore by type, or raw stored mass for rubble ('' materialId). */
+  /** Kilograms of `materialId` available to deliver — `storedForContract` (Contract.ts), which the scenario state dump's `hasStockedOreSaleOffer` reads too. */
   private storedOf(materialId: string, state: GameState): number {
-    return materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0);
+    return storedForContract(materialId, state.collectedOre, state.logistics.storedMassKg);
   }
 
   private materialLabel(materialId: string): string {
@@ -251,6 +252,8 @@ export class ContractsPanel extends PanelBase {
     // See makeOfferedCard's own comment on data-contract-type/-material (#554).
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
+    // See makeOfferedCard's own comment on data-contract-stocked.
+    cardEl.dataset['contractStocked'] = stored > 0 ? 'true' : 'false';
     return cardEl;
   }
 
@@ -336,6 +339,19 @@ export class ContractsPanel extends PanelBase {
     // `material:` ContractSelector (#597) already does.
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
+    // Which material an offer asks for is a plain `rng.pick(CONTRACT_ORES)`
+    // (Contract.ts) — unrelated to what this pit's rock contains. So a
+    // selector naming one material is a bet on the pool's luck, and #959's
+    // own `[data-contract-material="dirtite"]` beat in
+    // tutorial-steps-visual.json lost it the moment an upstream change moved
+    // the tick this file reaches the contract board at (PR #1048): the pool
+    // held a rustite ore_sale and no dirtite one, and a 30s `waitForSelector`
+    // cannot outwait that — interaction mode runs with `autoTickEnabled =
+    // false`, so no ticks pass while it waits. This marks the property a
+    // scenario actually means by "an ore sale this pit can fill", under the
+    // same `storedForContract` rule the state dump's `hasStockedOreSaleOffer`
+    // waits on, so a click can follow that wait to a card that exists.
+    cardEl.dataset['contractStocked'] = stored > 0 ? 'true' : 'false';
     return cardEl;
   }
 

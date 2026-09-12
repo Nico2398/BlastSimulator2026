@@ -7,6 +7,8 @@ import {
   deliverMaterials,
   checkDeadlines,
   findContract,
+  storedForContract,
+  hasStockedOffer,
 } from '../../../src/core/economy/Contract.js';
 
 describe('Contract system', () => {
@@ -262,6 +264,57 @@ describe('Contract system', () => {
 
       expect(byId).toBe(target);
       expect(bySelector).toBe(target);
+    });
+  });
+  // `storedForContract`/`hasStockedOffer` (#1048 follow-up): which ore an offer
+  // asks for is a plain `rng.pick(CONTRACT_ORES)` in `generateOneContract`,
+  // owing nothing to what a given pit's rock contains — so "an offer this site
+  // can actually fill" is a property of the offer/storage pair. The Contracts
+  // panel's Deliver button, its `data-contract-stocked` attribute and the
+  // scenario state dump's `hasStockedOreSaleOffer` all read these, so a
+  // scenario that waits on the field and then clicks the marked card is
+  // waiting on the same rule the card was marked by.
+  describe('storedForContract', () => {
+    it('reads collected ore by material id', () => {
+      expect(storedForContract('dirtite', { dirtite: 625, rustite: 30 }, 1021)).toBe(625);
+    });
+
+    it("reads raw stored mass for rubble's empty material id", () => {
+      expect(storedForContract('', { dirtite: 625 }, 1021)).toBe(1021);
+    });
+
+    it('is 0 for a material the site holds none of', () => {
+      expect(storedForContract('absurdium', { dirtite: 625 }, 1021)).toBe(0);
+    });
+  });
+
+  describe('hasStockedOffer', () => {
+    const pool = [
+      { id: 1, type: 'ore_sale' as const, materialId: 'absurdium' } as never,
+      { id: 2, type: 'ore_sale' as const, materialId: 'dirtite' } as never,
+      { id: 3, type: 'supply' as const, materialId: 'gloomium' } as never,
+    ];
+
+    it('is true when an offer of that type asks for a material in storage', () => {
+      expect(hasStockedOffer(pool, 'ore_sale', { dirtite: 625 }, 0)).toBe(true);
+    });
+
+    it('is false when every offer of that type asks for a material the site lacks', () => {
+      expect(hasStockedOffer(pool, 'ore_sale', { rustite: 30 }, 0)).toBe(false);
+    });
+
+    it('does not count an offer of a different type, however well stocked', () => {
+      expect(hasStockedOffer(pool, 'ore_sale', { gloomium: 5000 }, 0)).toBe(false);
+    });
+
+    it('counts a rubble_disposal offer against raw stored mass', () => {
+      const rubble = [{ id: 4, type: 'rubble_disposal' as const, materialId: '' } as never];
+      expect(hasStockedOffer(rubble, 'rubble_disposal', {}, 1021)).toBe(true);
+      expect(hasStockedOffer(rubble, 'rubble_disposal', {}, 0)).toBe(false);
+    });
+
+    it('is false on an empty pool', () => {
+      expect(hasStockedOffer([], 'ore_sale', { dirtite: 625 }, 1021)).toBe(false);
     });
   });
 });

@@ -7,6 +7,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { hasStockedOffer } from './core/economy/Contract.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
 export { createRunner };
@@ -55,6 +56,12 @@ export interface SerializableGameState {
   pendingActionCount: number;
   buildingCount: number;
   vehicleCount: number;
+  /** At least one *offered* ore_sale contract asks for a material this site currently holds (`storedForContract`, Contract.ts) — the condition behind the Contracts panel's own `data-contract-stocked="true"`, so a scenario can tick until such an offer exists instead of padding a fixed `tick N` and hoping the pool's luck repeats. */
+  hasStockedOreSaleOffer: boolean;
+  /** Active shift mode (state.sitePolicy.shiftMode) — proves a policy a scenario set through the Operations panel actually reached the simulation, instead of an Apply click that looked fine and changed nothing. */
+  sitePolicyShiftMode: string;
+  /** Active fatigue rest threshold, 0-100 (state.sitePolicy.fatigueRestThreshold) — the other half of the same proof; a scenario that relies on an aggressive threshold to reproduce a bug is otherwise passing on the default one. */
+  sitePolicyFatigueThreshold: number;
   /** Raw roster size, dead included — deliberate: `killEmployee` never splices `employees` (only `fireEmployee` does), so this stays a total-ever-hired count. `deathCount` tracks how many of them died; the six fields below this one filter to the living roster instead. */
   employeeCount: number;
   /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
@@ -137,6 +144,9 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
+    hasStockedOreSaleOffer: hasStockedOffer(s.contracts.available, 'ore_sale', s.collectedOre, s.logistics.storedMassKg),
+    sitePolicyShiftMode: s.sitePolicy.shiftMode,
+    sitePolicyFatigueThreshold: s.sitePolicy.fatigueRestThreshold,
     employeeCount: s.employees.employees.length,
     qualificationCount: livingEmployees
       .reduce((n, e) => n + e.qualifications.length, 0),

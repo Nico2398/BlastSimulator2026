@@ -261,6 +261,37 @@ export function findContract(pool: readonly Contract[], selector: ContractSelect
   ) ?? null;
 }
 
+/**
+ * Kilograms of a contract's material the site can put against it right now —
+ * collected ore by type, or raw stored mass for rubble (`materialId: ''`).
+ *
+ * Which contracts a refresh offers is a plain `rng.pick(CONTRACT_ORES)`
+ * (`generateOneContract`), unrelated to what this pit's own rock actually
+ * contains, so "an offer this site can deliver against" is a property of the
+ * pair, not of the offer. Both the Contracts panel (whose Deliver button and
+ * `data-contract-stocked` attribute read it) and the scenario state dump's
+ * `hasStockedOreSaleOffer` answer that question through this one function, so
+ * a scenario waiting on the state field and then clicking the matching card
+ * cannot be waiting on a different rule than the one the card was marked by.
+ */
+export function storedForContract(
+  materialId: string,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): number {
+  return materialId === '' ? storedMassKg : (collectedOre[materialId] ?? 0);
+}
+
+/** Whether `pool` offers at least one contract of `type` whose material the site currently holds any of (`storedForContract`). */
+export function hasStockedOffer(
+  pool: readonly Contract[],
+  type: ContractType,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  return pool.some(c => c.type === type && storedForContract(c.materialId, collectedOre, storedMassKg) > 0);
+}
+
 /** Check and expire overdue contracts. Returns penalty amounts. */
 export function checkDeadlines(
   state: ContractState,

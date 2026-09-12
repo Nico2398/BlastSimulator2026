@@ -20,14 +20,37 @@
     },
     {
       "command": "set_policy mode:continuous fatigue:90",
-      "description": "Continuous mode with a high fatigue rest threshold (90, well above the default 60) makes the proactive shift-cycle rest fire every few ticks for a working employee — the aggressive policy setting that reliably reproduces #1039's fragmentation on the buggy code (empirically traced: the driving_center order never lands within 100 ticks under this policy before the fix).",
+      "description": "Continuous mode with a high fatigue rest threshold (90, well above the default 60) makes the proactive shift-cycle rest fire every few ticks for a working employee — the aggressive policy setting that reliably reproduces #1039's fragmentation on the buggy code (empirically traced: the driving_center order never lands within 100 ticks under this policy before the fix). Driven through the Operations panel's own policy card, the way a player sets it: `set_policy` changes game state and is not on the setup allowlist, so this is a `player` step. The Continuous button is clicked before the threshold is typed — the click sets the panel's `policyDirty` flag, without which the next state sync overwrites the typed value back to the live threshold.",
       "interaction": [
         {
-          "type": "command",
-          "command": "set_policy mode:continuous fatigue:90"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-policy-fatigue",
+          "value": "90"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sitePolicyShiftMode": "continuous",
+          "sitePolicyFatigueThreshold": 90
+        }
+      }
     },
     {
       "command": "build driving_center at:6,7",
