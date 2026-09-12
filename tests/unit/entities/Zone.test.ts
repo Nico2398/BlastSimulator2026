@@ -301,6 +301,47 @@ describe('Zone clearing and evacuation', () => {
     expect(result.strandedEmployeeIds).not.toContain(boarder.id);
   });
 
+  it('does not reassign an employee already mid-walk to board a DIFFERENT vehicle, even when otherwise the only qualified candidate (#1042)', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const { vehicle: otherVehicle } = purchaseVehicle(vehicles, 'debris_hauler', 40, 40); // outside this zone
+    const { vehicle: newVehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    newVehicle.driverId = null;
+    const rng = new Random(35);
+    const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+
+    // Already mid-walk, from an evacuation started before this one, to board
+    // a different vehicle — this must survive this clearZone call untouched.
+    employee.pendingDriverVehicleId = otherVehicle.id;
+    employee.destinationX = otherVehicle.x;
+    employee.destinationZ = otherVehicle.z;
+
+    // Finds a destination only for newVehicle's own position (so the
+    // driverless-vehicle branch reaches candidate search instead of
+    // stranding immediately for lack of anywhere to send it), and null for
+    // the employee's position (so the foot-evacuation loop below — which has
+    // no reason to know about a pending board elsewhere — reports the
+    // employee stranded rather than issuing a foot destination that would
+    // overwrite the busy employee's in-flight walk).
+    const findDestinationOnlyForVehicle: SafeDestinationFinder = (fromX, fromZ, z) =>
+      fromX === newVehicle.x && fromZ === newVehicle.z ? { x: z.x2 + 5, z: fromZ } : null;
+
+    const result = clearZone(zone, vehicles, employees, findDestinationOnlyForVehicle, () => true);
+
+    // Still pointed at the original vehicle — never overwritten by either
+    // the driver-candidate search or the foot-evacuation loop.
+    expect(employee.pendingDriverVehicleId).toBe(otherVehicle.id);
+    expect(employee.destinationX).toBe(otherVehicle.x);
+    expect(employee.destinationZ).toBe(otherVehicle.z);
+
+    // No other candidate exists (the only qualified employee is excluded by
+    // the pendingDriverVehicleId guard), so the new vehicle is stranded
+    // rather than silently reassigning the busy employee.
+    expect(result.strandedVehicleIds).toContain(newVehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(newVehicle.id);
+  });
+
   it('the zone is still reported occupied while a stranded entity remains inside it', () => {
     const vehicles = createVehicleState();
     const employees = createEmployeeState();

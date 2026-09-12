@@ -1167,4 +1167,23 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
     expect(restoredVehicle.pendingEvacuationDestination).toEqual({ x: 12, z: 34 });
   });
+
+  it('a v16 fixture with a malformed pendingEvacuationDestination is reset to null rather than passed through', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 16;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    expect(vehicleList).toHaveLength(1);
+    // Wrong shape entirely — not the { x: number; z: number } | null the
+    // field actually is. Missing/wrong-typed z, hardened for by #1042.
+    vehicleList[0]!['pendingEvacuationDestination'] = { x: 'bad' };
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
+  });
 });
