@@ -7,7 +7,7 @@
 // out of GameLoop.ts as part of #759's file-size split; re-exported there so
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import type { ActionType, GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -124,17 +124,36 @@ export function forceShiftRestIfNeeded(
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
 
-/**
- * True when `employee.activeActionId` names a PendingAction of type
- * 'place_building' — a construction task in progress (#1039). Scoped guard
- * for forceShiftRestIfNeededByPolicy, mirroring isMidVehicleGatedWork's own
- * scoping: skip only the specific in-progress work that gets fragmented by
- * proactive shift-cycle rest, not every in-progress task.
+/** Action types whose mid-execution phase is protected from proactive
+ * shift-cycle/fatigue-threshold rest (#1039, #1049) — each is timer-driven
+ * (taskTicksRemaining) with no vehicle gate, so interrupting mid-task
+ * fragments it into repeated walk-and-restart cycles under an aggressive
+ * continuous-mode policy. Extend this set, not a switch, for the next
+ * on-foot task type shown to fragment the same way. Vehicle-gated tasks
+ * use isMidVehicleGatedWork instead (VehicleReservation.ts).
+ *
+ * 'place_building' (#1039), 'charge_hole' and 'survey' (#1049) — all three
+ * are requiredVehicleRole: null, timer-driven via taskTicksRemaining, with no
+ * vehicle gate.
  */
-function isMidConstructionWork(state: GameState, employee: Employee): boolean {
+const PROTECTED_MID_EXECUTION_ACTION_TYPES: ReadonlySet<ActionType> = new Set([
+  'place_building',
+  'charge_hole',
+  'survey',
+]);
+
+/**
+ * True when `employee.activeActionId` names a PendingAction whose type is in
+ * PROTECTED_MID_EXECUTION_ACTION_TYPES — a task in progress (#1039, #1049).
+ * Scoped guard for forceShiftRestIfNeededByPolicy, mirroring
+ * isMidVehicleGatedWork's own scoping: skip only the specific in-progress
+ * work that gets fragmented by proactive shift-cycle rest, not every
+ * in-progress task.
+ */
+function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
   if (employee.activeActionId === null) return false;
   const action = state.pendingActions.find(a => a.id === employee.activeActionId);
-  return action !== undefined && action.type === 'place_building';
+  return action !== undefined && PROTECTED_MID_EXECUTION_ACTION_TYPES.has(action.type);
 }
 
 /**
@@ -151,10 +170,11 @@ function isMidConstructionWork(state: GameState, employee: Employee): boolean {
  * same-vehicle follow-up, rather than forcing a dismount-and-reboard
  * mid-task; deliberately does NOT also cover the mid-drive-to-target phase
  * or an on-foot task — see the guard's own inline comment for why), already
- * arrived and mid-execution of a place_building task (taskTicksRemaining
- * !== null && isMidConstructionWork — #1039, same scoping rationale as the
- * vehicle-gated guard: only the executing phase of construction specifically
- * is protected, not every in-progress task), or
+ * arrived and mid-execution of a task in PROTECTED_MID_EXECUTION_ACTION_TYPES
+ * (taskTicksRemaining !== null && isMidProtectedTaskWork — #1039, #1049,
+ * same scoping rationale as the vehicle-gated guard: only the executing
+ * phase of that catalog's task types is protected, not every in-progress
+ * task), or
  * mid-walk to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
  * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
@@ -230,21 +250,22 @@ export function forceShiftRestIfNeededByPolicy(
   // interruption as intended behavior for the legacy (non-policy)
   // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
   if (emp.taskTicksRemaining !== null && isMidVehicleGatedWork(state, emp)) return;
-  // Already arrived and mid-execution of a place_building task (#1039): an
-  // employee actively building (taskTicksRemaining !== null, not just
-  // claimed-but-still-walking) gets interrupted every time this policy's
-  // proactive threshold re-crosses, releasing the action back to the pool
-  // and forcing a fresh walk-and-restart each time instead of finishing the
-  // one work stint already in progress. Scoped to place_building specifically
-  // (isMidConstructionWork) and to the executing phase only, mirroring
+  // Already arrived and mid-execution of a task in
+  // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
+  // working one (taskTicksRemaining !== null, not just claimed-but-still-
+  // walking) gets interrupted every time this policy's proactive threshold
+  // re-crosses, releasing the action back to the pool and forcing a fresh
+  // walk-and-restart each time instead of finishing the one work stint
+  // already in progress. Scoped to that catalog specifically
+  // (isMidProtectedTaskWork) and to the executing phase only, mirroring
   // isMidVehicleGatedWork's own scoping above rather than a blanket
   // taskTicksRemaining !== null skip for any in-progress task — the legacy
   // path's own comment on that broader guard notes it previously regressed a
-  // long-run wellbeing test, so this stays narrow to the one task type
+  // long-run wellbeing test, so this stays narrow to the task types
   // actually shown to fragment mid-execution. tickCollapse's own unconditional
   // interruption (NeedRestoration.ts) is untouched: a genuine fatigue
-  // collapse must still interrupt construction.
-  if (emp.taskTicksRemaining !== null && isMidConstructionWork(state, emp)) return;
+  // collapse must still interrupt these tasks.
+  if (emp.taskTicksRemaining !== null && isMidProtectedTaskWork(state, emp)) return;
   // #974 follow-up: a debris_hauler already carrying cargo toward a depot
   // (haulingPhase === 'to_depot') never sets taskTicksRemaining — hauling is
   // phase-driven, not employee-timer-driven — so the guard just above can

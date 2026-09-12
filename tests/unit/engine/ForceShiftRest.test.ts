@@ -576,20 +576,25 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).not.toBe(1102);
   });
 
-  // NEW (#1039): a place_building action mid-execution (taskTicksRemaining
-  // set, employee arrived at the site and actively constructing) must NOT be
-  // interrupted by a proactive shift-cycle/fatigue-threshold rest — unlike
-  // the general_work case above (#945 follow-up), which stays interruptible.
-  // Modeled directly on that test, inverted: isMidConstructionWork scopes
-  // this guard to construction specifically, mirroring isMidVehicleGatedWork's
-  // own scoping for vehicle-gated work. Currently red: isMidConstructionWork
-  // is a stub returning false, so this guard does not yet fire.
-  it('#1039: no-op when mid-execution of a place_building action (taskTicksRemaining set), even with fatigue very low', () => {
+  // NEW (#1039, widened by #1049): an action mid-execution (taskTicksRemaining
+  // set, employee arrived and actively working) must NOT be interrupted by a
+  // proactive shift-cycle/fatigue-threshold rest — unlike the general_work
+  // case above (#945 follow-up), which stays interruptible.
+  // isMidConstructionWork/PROTECTED_MID_EXECUTION_ACTION_TYPES scopes this
+  // guard to place_building, charge_hole and survey specifically, mirroring
+  // isMidVehicleGatedWork's own scoping for vehicle-gated work — each shares
+  // the same fragmentation bug class (a single task fragmented into many
+  // interrupted, restarted attempts).
+  it.each<[ActionType, number]>([
+    ['place_building', 1103],
+    ['charge_hole', 1106],
+    ['survey', 1107],
+  ])('#1039/#1049: no-op when mid-execution of a %s action (taskTicksRemaining set), even with fatigue very low', (actionType, id) => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const prior = pushHeldAction(state, employee.id, 1103, 'place_building');
+    const prior = pushHeldAction(state, employee.id, id, actionType);
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
     employee.fatigue = 1;
@@ -598,8 +603,8 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
     expect(employee.pendingRestDuration).toBeNull();
-    expect(employee.activeActionId).toBe(1103);
-    const held = state.pendingActions.find(a => a.id === 1103)!;
+    expect(employee.activeActionId).toBe(id);
+    const held = state.pendingActions.find(a => a.id === id)!;
     expect(held.status).toBe('in_progress');
   });
 
