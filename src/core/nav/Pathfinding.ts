@@ -4,6 +4,7 @@
 import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
+import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -43,12 +44,6 @@ export interface RampConnection {
   lowerX: number;
   lowerZ: number;
 }
-
-/** 8-directional neighbour offsets as [dx, dz] pairs. */
-const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
-  [0, -1], [0, 1], [-1, 0], [1, 0],   // cardinal
-  [-1, -1], [1, -1], [-1, 1], [1, 1], // diagonal
-];
 
 // ---------------------------------------------------------------------------
 // Constants

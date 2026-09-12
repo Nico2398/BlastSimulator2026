@@ -9,6 +9,7 @@
 import type { NavGrid } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied } from './NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
+import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -371,11 +372,6 @@ function ensureReachabilityScratch(size: number): void {
   queueArr = new Int32Array(size);
   lastFillCount = 0; // fresh arrays are already all-zero; nothing to clear
 }
-
-const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
-  [0, -1], [0, 1], [-1, 0], [1, 0],   // cardinal
-  [-1, -1], [1, -1], [-1, 1], [1, 1], // diagonal
-];
 
 /**
  * 8-directional flood fill from (anchorX, anchorZ). The anchor itself is
