@@ -424,6 +424,10 @@
       "description": "#1038: a fourth driller, dedicated to the slope-crossing beat below and kept out of the walled-pocket story above so its walk has nothing else contending for the path. New hires spawn near the map origin (see employees.ts's hire-spawn lookup), which sits right at the top of the natural downslope this beat walks across.",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
