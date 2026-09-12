@@ -562,10 +562,10 @@
       "commandOutcome": "either",
       "expect": {
         "equals": {
-          "dangerZoneClear": false,
+          "dangerZoneClear": true,
           "levelEnded": false
         },
-        "note": "#947: dangerZoneClear reads false, not true -- the stranded driverless drill_rigs keep the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. levelEnded stays false here (#947-followup): the shrunk 60-tick pad (see the first tick step's own note) keeps wellBeing off the worker_revolt threshold this file's original 300-tick pad crashed into live. The blast step's own `deathCount: 0` proof downstream is what actually shows the drillers evacuated for real. #965: three drillers/rigs now, not two -- see the third hire's own note."
+        "note": "#1042: dangerZoneClear reads true here, not false -- the #947 stranded-driverless-drill_rig case (see the first tick step's own note) is exactly what #1042's evacuation driver-boarding now resolves: an idle employee boards each driverless rig and drives it clear instead of leaving it stranded, so the zone genuinely clears by this point rather than staying blocked forever. levelEnded stays false here (#947-followup): the shrunk 60-tick pad (see the first tick step's own note) keeps wellBeing off the worker_revolt threshold this file's original 300-tick pad crashed into live. The blast step's own `deathCount: 0` proof downstream is what actually shows the drillers evacuated for real. #965: three drillers/rigs now, not two -- see the third hire's own note."
       }
     },
     {
