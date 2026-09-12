@@ -386,7 +386,19 @@ export class PlacementController {
 
   private onKeyDown(e: KeyboardEvent): void {
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
-    if (e.key === 'Escape') { e.stopPropagation(); this.cancel(); }
+    if (e.key === 'Escape') {
+      // Consume the keydown entirely, not just its bubbling: KeyboardShortcuts
+      // registers its own `window` keydown listener for Escape (wired to
+      // UIManager.handleEscape, which falls through to closing the whole
+      // panel that armed this tool). stopPropagation() alone does not stop a
+      // sibling listener on the same target — only stopImmediatePropagation()
+      // does — so without it, cancelling the tool here still let Escape also
+      // close the panel underneath it (#1045 CI fix: the level-ground-then-
+      // build scenario's post-refusal Escape was doing exactly that).
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      this.cancel();
+    }
     else if (e.key === 'Enter' && this.phase === 'selected') this.confirm();
   }
 
