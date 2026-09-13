@@ -36,7 +36,12 @@ const MACHINERY = new Set([
   '.github/workflows/opencode-runner.yml',
 ]);
 
-/** Run conclusions that count as red. */
+/**
+ * Run conclusions that count as red. Kept in shape with the inline copies in
+ * `agentic-ci-failure.yml`'s `nudge` job and `agentic-watchdog.yml`'s re-raise
+ * step — unlike `MACHINERY`/`MARKER`, this set is not yet pinned equal to those
+ * copies by a test; a human or a later phase should add that assertion.
+ */
 const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
 
 /** A pipeline pull request's head branch, issue number in group 1. */
@@ -74,23 +79,33 @@ function pipelineIssueFor(pr) {
 }
 
 /**
- * Why redVerdict returned null, for reporting.
+ * The single gating computation `redVerdict` and `reasonForNoVerdict` both used
+ * to recompute independently — same four-line red-run predicate, run twice per
+ * `assessPipelinePr` call and free to drift apart. This is the one place it is
+ * decided; both public shapes are read off its result. Mirrors the
+ * `{assignable, reason}` house style of `assignability.cjs`.
  *
  * @param {{state: string, draft: boolean, head?: {ref?: string}}} pr
  * @param {Array<object>} runsOnHead
- * @returns {string}
+ * @returns {{ok: true, issueNumber: number, redRunId: number, reason: string}
+ *          |{ok: false, reason: string}}
  */
-function reasonForNoVerdict(pr, runsOnHead) {
-  if (pr.state !== 'open') return `PR is ${pr.state}, not open`;
-  if (pr.draft) return 'draft';
-  if (!PIPELINE_HEAD.test(pr.head?.ref || '')) return 'not a pipeline PR';
+function headVerdict(pr, runsOnHead) {
+  if (pr.state !== 'open') return { ok: false, reason: `PR is ${pr.state}, not open` };
+  if (pr.draft) return { ok: false, reason: 'draft' };
+  if (!PIPELINE_HEAD.test(pr.head?.ref || '')) return { ok: false, reason: 'not a pipeline PR' };
+
   const channels = latestPerWorkflow(runsOnHead);
-  if (channels.length === 0) return 'no runs yet on head';
+  if (channels.length === 0) return { ok: false, reason: 'no runs yet on head' };
+
   const redRuns = channels.filter(
     (run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion)
   );
-  if (redRuns.length === 0) return 'head is green';
-  return 'no verdict';
+  if (redRuns.length === 0) return { ok: false, reason: 'head is green' };
+
+  const redRunId = redRuns.map((run) => run.id).sort((a, b) => b - a)[0];
+  const issueNumber = pipelineIssueFor(pr);
+  return { ok: true, issueNumber, redRunId, reason: 'no verdict' };
 }
 
 /**
@@ -101,21 +116,8 @@ function reasonForNoVerdict(pr, runsOnHead) {
  * @returns {{issueNumber: number, redRunId: number}|null}
  */
 function redVerdict(pr, runsOnHead) {
-  if (pr.state !== 'open') return null;
-  if (pr.draft) return null;
-  if (!PIPELINE_HEAD.test(pr.head?.ref || '')) return null;
-
-  const channels = latestPerWorkflow(runsOnHead);
-  if (channels.length === 0) return null;
-
-  const redRuns = channels.filter(
-    (run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion)
-  );
-  if (redRuns.length === 0) return null;
-
-  const redRunId = redRuns.map((run) => run.id).sort((a, b) => b - a)[0];
-  const issueNumber = pipelineIssueFor(pr);
-  return { issueNumber, redRunId };
+  const verdict = headVerdict(pr, runsOnHead);
+  return verdict.ok ? { issueNumber: verdict.issueNumber, redRunId: verdict.redRunId } : null;
 }
 
 /**
@@ -143,9 +145,9 @@ function handbackVerdict(args) {
  */
 function assessPipelinePr(args) {
   const { pr, runsOnHead, comments, limit } = args;
-  const verdict = redVerdict(pr, runsOnHead);
-  if (!verdict) {
-    return { dispatch: false, issueNumber: null, reason: reasonForNoVerdict(pr, runsOnHead) };
+  const verdict = headVerdict(pr, runsOnHead);
+  if (!verdict.ok) {
+    return { dispatch: false, issueNumber: null, reason: verdict.reason };
   }
 
   const { issueNumber, redRunId } = verdict;

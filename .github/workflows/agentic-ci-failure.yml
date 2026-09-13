@@ -40,12 +40,23 @@ on:
         description: 'Pipeline PR number whose red CI should be handed back to the agent.'
         required: true
         type: string
+      force_retry:
+        description: >-
+          Repeat a nudge even if this exact CI run id was already commented
+          about. Set only by `agentic-watchdog.yml`'s hourly re-raise, whose
+          retry is for a handback no session ever picked up — never set this
+          from `scan-after-runner`'s automatic, potentially-concurrent scan,
+          which must not double-post. A human retrying by hand opts in the
+          same way.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   issues: write
   pull-requests: write
   contents: read
-  actions: write
+  actions: read
 
 jobs:
   nudge:
@@ -81,6 +92,7 @@ jobs:
           AGENTIC_AGENT: ${{ vars.AGENTIC_AGENT }}
           ATTEMPT_LIMIT: ${{ vars.AGENTIC_CI_FIX_ATTEMPT_LIMIT }}
           DISPATCH_PR: ${{ inputs.pr }}
+          FORCE_RETRY: ${{ inputs.force_retry }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -314,26 +326,34 @@ jobs:
             const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
             const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(`run:${ciRunId}`));
 
-            // The `workflow_run` path fires once per CI run. Firing twice for the
-            // same run id means the same event arrived twice — a redelivery, a
-            // re-request — and answering it twice would queue a second session.
-            if (askedAboutThisRun && !dispatchedLookup) {
+            // Firing twice for the same run id means the same event arrived
+            // twice — a redelivery, a re-request, or (now that
+            // `scan-after-runner` also dispatches this workflow, potentially
+            // from two overlapping scans) a second automatic decision reaching
+            // the same still-empty comment list before the first one's comment
+            // landed — and answering it twice would queue a second session.
+            // This holds regardless of how the job was invoked: a
+            // `workflow_dispatch` is no longer, on its own, evidence that a
+            // repeat is wanted. Only `force_retry` says that explicitly.
+            const forceRetry = dispatchedLookup && process.env.FORCE_RETRY === 'true';
+            if (askedAboutThisRun && !forceRetry) {
               core.info(`#${pr.number}: CI run ${ciRunId} was already handed back. Same event, not a new failure.`);
               return;
             }
 
-            // A dispatch deliberately bypasses that, and this is where the
-            // clock-free retry lives. `agentic-watchdog.yml` re-raises a red
-            // pipeline PR whenever it sweeps, so a handback whose session died
+            // `force_retry` is the clock-free retry `agentic-watchdog.yml`'s
+            // hourly sweep asks for explicitly: a handback whose session died
             // before pushing anything — the head never moves, so nothing about
-            // the failure changes — is asked again on the next sweep rather than
-            // skipped forever. It is not free: it counts against the limit below
-            // like any other attempt, so the retry is bounded and ends in a
-            // parked PR with its issue released, never in a silent stall.
+            // the failure changes — is asked again on the next sweep rather
+            // than skipped forever. It is not free: it counts against the
+            // limit below like any other attempt, so the retry is bounded and
+            // ends in a parked PR with its issue released, never in a silent
+            // stall. `scan-after-runner` never sets it, so its own dispatch can
+            // never repeat a nudge for a run id already commented about.
             if (askedAboutThisRun) {
               core.info(
                 `#${pr.number}: CI run ${ciRunId} was handed back before and the head is still ` +
-                `${pr.head.sha.slice(0, 7)} with no session running — that attempt produced nothing. Asking again.`
+                `${pr.head.sha.slice(0, 7)} with no session running — force_retry requested. Asking again.`
               );
             }
 
@@ -452,6 +472,27 @@ jobs:
       github.event_name == 'workflow_run' &&
       (github.event.workflow_run.name == 'Claude Pipeline' || github.event.workflow_run.name == 'OpenCode Pipeline')
     runs-on: ubuntu-latest
+    # Job-level permissions replace the workflow-level block for this job
+    # entirely rather than adding to it, so everything this job's steps call
+    # has to be listed here: checkout (contents), the PR/comment reads below
+    # (pull-requests, issues), and the one write this job needs that `nudge`
+    # never did — dispatching itself (actions). `nudge` stays on the
+    # workflow-level grant, which is `actions: read` only: it lists runs and
+    # jobs but never dispatches, so it never needed write.
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: write
+    # One scan across every open pipeline PR, not scoped per-PR like `nudge`'s
+    # group — two runner completions close together must not both read the
+    # same still-empty comment list and both decide `dispatch: true` before
+    # either dispatch lands. `cancel-in-progress: true` because a scan
+    # superseded by a newer one is redundant, not lost work: the newer scan
+    # re-reads the same PRs with fresher data.
+    concurrency:
+      group: agentic-ci-failure-scan-after-runner
+      cancel-in-progress: true
     steps:
       # Needed so the github-script step below can `require()` the shared
       # decision module — the first checkout in this workflow.
