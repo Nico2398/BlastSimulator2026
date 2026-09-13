@@ -10,7 +10,7 @@
 // panel polls GameState — no event-callback wiring needed.
 
 import type { IconName } from '../icons.js';
-import type { GameState } from '../../core/state/GameState.js';
+import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -62,7 +62,7 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders';
 
 export interface AlertPip {
   readonly kind: AlertKind;
@@ -79,6 +79,13 @@ export class NotificationCenter {
   private currentTick = 0;
   /** Contracts already warned about expiry, so the same contract doesn't re-toast every frame. */
   private readonly warnedContracts = new Set<number>();
+  /**
+   * PendingAction ids already warned about being blocked, keyed to the reason
+   * last warned (#1061). Not yet `private` — nothing reads it until update()
+   * wires it in (implementer's job); noUnusedLocals would fail the skeleton
+   * build on an unread private field. Narrow back to `private` once wired.
+   */
+  readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
 
   /** Push a notification: it appears as a toast now and stays in the log. */
   notify(input: NotifyInput): void {
@@ -167,4 +174,13 @@ export class NotificationCenter {
 
     return pips;
   }
+}
+
+/**
+ * Builds the notification body naming the blocked order and its missing
+ * requirement (#1061). Not yet wired into update() — implementer's job.
+ */
+export function buildBlockedOrderMessage(_action: PendingAction): string {
+  // TODO: implement
+  throw new Error('not implemented');
 }

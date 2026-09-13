@@ -57,7 +57,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // the filter check itself (#557 review).
   clearResolvedEvacuationHolds(state);
 
-  const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
+  const result: TickEmployeesResult = { claimed: [], unqualified: [], blocked: [], waiting: [] };
 
   // Base eligibility: alive, not injured, not in training.
   const eligible = state.employees.employees.filter(
