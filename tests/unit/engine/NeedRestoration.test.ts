@@ -130,6 +130,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
     state.pendingActions.push(workAction);
 
@@ -664,6 +665,7 @@ describe('tickCollapse (7.6)', () => {
       id, type: actionType, requiredSkill: null, requiredVehicleRole: null,
       targetX: 6, targetZ: 7, targetY: 0, payload,
       targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+      queuedAtTick: 0,
     };
     state.pendingActions.push(action);
     employee.activeActionId = action.id;

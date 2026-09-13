@@ -233,6 +233,7 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
       targetEmployeeId: null,
       status: 'assigned',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -1432,6 +1433,7 @@ describe('tickEmployeeMovement — sustained-stuck action abandonment (#938)', (
       targetEmployeeId: null,
       status: 'assigned',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }

@@ -26,6 +26,7 @@ function makeAction(overrides: Partial<PendingAction> & { id: number }): Pending
     targetEmployeeId: null,
     status: 'queued',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }

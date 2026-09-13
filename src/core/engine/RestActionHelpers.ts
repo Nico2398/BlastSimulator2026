@@ -43,6 +43,7 @@ export function createRestPendingAction(
     targetEmployeeId: overrides.targetEmployeeId,
     status: claimedByEmployeeId !== undefined ? 'assigned' : 'queued',
     holderId: claimedByEmployeeId ?? null,
+    queuedAtTick: state.tickCount,
   };
 }
 

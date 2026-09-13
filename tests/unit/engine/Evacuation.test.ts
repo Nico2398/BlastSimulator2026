@@ -287,6 +287,7 @@ describe('evacuateZone — stale rest targets and taskQueue entries (#557 follow
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: overrides.queuedAtTick ?? 0,
       ...overrides,
     };
   }

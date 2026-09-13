@@ -409,6 +409,7 @@ function makeVehicleGatedAction(overrides: Partial<PendingAction> & { id: number
     targetEmployeeId: null,
     status: 'assigned',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }

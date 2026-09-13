@@ -710,6 +710,7 @@ describe('cancelAction (#548)', () => {
       targetEmployeeId: empId,
       status: 'assigned',
       holderId: empId,
+      queuedAtTick: 0,
     };
     (state as any).pendingActions.push(restAction);
     emp.activeActionId = 5;
@@ -1259,6 +1260,7 @@ describe('interruptActiveAction (#549)', () => {
     const action: Omit<PendingAction, 'status' | 'holderId'> = {
       id: 39, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
       targetX: 8, targetZ: 8, targetY: 0, payload: {}, targetEmployeeId: null,
+      queuedAtTick: 0,
     };
     dispatchPendingAction(state, action, { skipQualificationCheck: true });
     simulateClaimWalking(state, 39, empId, {

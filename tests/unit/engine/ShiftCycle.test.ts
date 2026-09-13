@@ -446,6 +446,7 @@ describe('processShiftCycle (7.9)', () => {
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     };
     state.pendingActions.push(interrupted);
     employee.activeActionId = interrupted.id;
@@ -862,6 +863,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     };
     state.pendingActions.push(interrupted);
     employee.activeActionId = interrupted.id;

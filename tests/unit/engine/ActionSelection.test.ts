@@ -21,6 +21,7 @@ import {
   computeActionWorkTicks,
   resolveRestNeedKey,
   canReleaseStrandedOnFootAction,
+  findStarvedActionForEmployee,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -29,7 +30,7 @@ import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLiving
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
@@ -107,6 +108,7 @@ function makeAction(overrides: Partial<PendingAction> & { id: number }): Pending
     targetEmployeeId: null,
     status: 'queued',
     holderId: null,
+    queuedAtTick: overrides.queuedAtTick ?? 0,
     ...overrides,
   };
 }
@@ -744,6 +746,7 @@ function makeWorkAction(overrides: Partial<PendingAction>): PendingAction {
     targetEmployeeId: overrides.targetEmployeeId ?? null,
     status: overrides.status ?? 'queued',
     holderId: overrides.holderId ?? null,
+    queuedAtTick: overrides.queuedAtTick ?? 0,
   };
 }
 
@@ -1008,6 +1011,45 @@ describe('resolveRestNeedKey (#549)', () => {
 
   it('returns null when payload carries no needKey at all (shift-cycle rest shape)', () => {
     expect(resolveRestNeedKey({ triggeredBy: 'shift_cycle' })).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// findStarvedActionForEmployee (#1000, #1060)
+//
+// Finds a queued, unclaimed, on-foot (requiredVehicleRole === null) action
+// that has waited at least ACTION_STARVATION_TICK_THRESHOLD ticks since it
+// was queued (PendingAction.queuedAtTick), so it can win dispatch over
+// same-role vehicle continuity. #1060 makes queuedAtTick required and drops
+// the `?? state.tickCount` fallback that used to make an unstamped action's
+// age always read 0 (never starved) — these tests exercise the threshold
+// boundary directly against a real queuedAtTick value.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('findStarvedActionForEmployee (#1000, #1060)', () => {
+  it('reports a queued, unclaimed, on-foot action as starved once it has waited exactly ACTION_STARVATION_TICK_THRESHOLD ticks (happy path)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 3, targetZ: 0, queuedAtTick: 0 });
+    state.pendingActions.push(action);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD;
+
+    const result = findStarvedActionForEmployee(state, emp);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(action.id);
+  });
+
+  it('does not report the same action as starved one tick short of the threshold (boundary)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 3, targetZ: 0, queuedAtTick: 0 });
+    state.pendingActions.push(action);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD - 1;
+
+    const result = findStarvedActionForEmployee(state, emp);
+
+    expect(result).toBeNull();
   });
 });
 

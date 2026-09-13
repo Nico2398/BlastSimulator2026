@@ -1059,6 +1059,7 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
       targetEmployeeId: null,
       status: 'assigned',
       holderId: null,
+      queuedAtTick: overrides.queuedAtTick ?? 0,
       ...overrides,
     };
   }

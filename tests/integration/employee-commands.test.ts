@@ -540,6 +540,7 @@ describe('Console — employee cancel', () => {
       targetEmployeeId: empId,
       status: 'assigned',
       holderId: empId,
+      queuedAtTick: 0,
     });
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
     emp.activeActionId = restActionId;
