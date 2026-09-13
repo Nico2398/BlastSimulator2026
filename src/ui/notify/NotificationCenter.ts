@@ -165,8 +165,7 @@ export class NotificationCenter {
     }
     // Forget expiry warnings for contracts that are no longer active (completed, expired, or declined).
     if (this.warnedContracts.size > 0) {
-      const activeIds = new Set(state.contracts.active.map(c => c.id));
-      for (const id of this.warnedContracts) if (!activeIds.has(id)) this.warnedContracts.delete(id);
+      this.pruneStaleKeys(this.warnedContracts, new Set(state.contracts.active.map(c => c.id)));
     }
 
     // Blocked orders (#1061): EmployeeDispatch.ts's classification pass
@@ -189,8 +188,7 @@ export class NotificationCenter {
       });
     }
     if (this.warnedBlockedOrders.size > 0) {
-      const blockedIds = new Set(blockedActions.map(a => a.id));
-      for (const id of this.warnedBlockedOrders.keys()) if (!blockedIds.has(id)) this.warnedBlockedOrders.delete(id);
+      this.pruneStaleKeys(this.warnedBlockedOrders, new Set(blockedActions.map(a => a.id)));
     }
     if (blockedActions.length > 0) {
       pips.push({
@@ -203,6 +201,17 @@ export class NotificationCenter {
     }
 
     return pips;
+  }
+
+  /**
+   * Deletes keys from `map` that are no longer present in `currentIds` — the
+   * "forget stale warn-once state" half shared by the contract-expiry and
+   * blocked-orders guards above (#1061 review: identical prune shape).
+   */
+  private pruneStaleKeys(map: Map<number, BlockedOrderReason> | Set<number>, currentIds: Set<number>): void {
+    for (const key of map instanceof Map ? map.keys() : map) {
+      if (!currentIds.has(key)) map.delete(key);
+    }
   }
 }
 

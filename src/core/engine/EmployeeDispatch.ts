@@ -92,13 +92,17 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
+    // Shared shape between the vehicle-gated and plain branches below: an
+    // action with no requiredSkill just needs a warm body from `emps`;
+    // otherwise at least one of `emps` must hold the skill.
+    const holdsRequiredSkill = (emps: Employee[]): boolean => action.requiredSkill === null
+      ? emps.length > 0
+      : emps.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
     if (action.requiredVehicleRole !== null) {
       const role = action.requiredVehicleRole;
       const hasVehicle = state.vehicles.vehicles.some(v => v.type === role);
       const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
-      const hasQualifiedLicensed = action.requiredSkill === null
-        ? licensed.length > 0
-        : licensed.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+      const hasQualifiedLicensed = holdsRequiredSkill(licensed);
       action.blockedReason = !hasVehicle
         ? 'no_vehicle_in_fleet'
         : licensed.length === 0 ? 'no_licensed_driver'
@@ -106,9 +110,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
         : null;
       continue;
     }
-    const hasQualified = action.requiredSkill === null
-      ? eligible.length > 0
-      : eligible.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+    const hasQualified = holdsRequiredSkill(eligible);
     if (!hasQualified) {
       unqualifiedIds.add(action.id);
       result.unqualified.push(action.id);
