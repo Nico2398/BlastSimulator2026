@@ -58,7 +58,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // the filter check itself (#557 review).
   clearResolvedEvacuationHolds(state);
 
-  const result: TickEmployeesResult = { claimed: [], unqualified: [], blocked: [], waiting: [] };
+  const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
 
   // Base eligibility: alive, not injured, not in training.
   const eligible = state.employees.employees.filter(
@@ -83,20 +83,27 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // separate from the unqualifiedIds/result.unqualified heavy-modal channel
   // above: a vehicle-gated action is NEVER added to unqualifiedIds/
   // result.unqualified (see the doc comment above), but it still gets a
-  // blockedReason and a result.blocked entry when nobody can currently work
-  // it (no vehicle of that role in the fleet, or nobody licensed to drive
-  // one).
+  // blockedReason when nobody can currently work it (no vehicle of that role
+  // in the fleet, nobody licensed to drive one, or — matching the real claim
+  // requirement in findVehicleForClaim/claimOnePoolCandidate,
+  // EmployeeDispatchSteps.ts — nobody who is BOTH licensed for the role AND
+  // holds action.requiredSkill, e.g. drill_hole needs driving.drill_rig AND
+  // blasting on the same employee).
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
     if (action.requiredVehicleRole !== null) {
       const role = action.requiredVehicleRole;
       const hasVehicle = state.vehicles.vehicles.some(v => v.type === role);
-      const hasLicensedDriver = eligible.some(emp => isLicensedForRole(emp, role));
+      const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
+      const hasQualifiedLicensed = action.requiredSkill === null
+        ? licensed.length > 0
+        : licensed.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
       action.blockedReason = !hasVehicle
         ? 'no_vehicle_in_fleet'
-        : !hasLicensedDriver ? 'no_licensed_driver' : null;
-      if (action.blockedReason != null) result.blocked.push(action.id);
+        : licensed.length === 0 ? 'no_licensed_driver'
+        : !hasQualifiedLicensed ? 'no_qualified_employee'
+        : null;
       continue;
     }
     const hasQualified = action.requiredSkill === null
@@ -107,7 +114,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       result.unqualified.push(action.id);
     }
     action.blockedReason = hasQualified ? null : 'no_qualified_employee';
-    if (action.blockedReason != null) result.blocked.push(action.id);
   }
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);

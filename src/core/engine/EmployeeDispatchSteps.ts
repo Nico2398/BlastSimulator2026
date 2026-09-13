@@ -26,12 +26,6 @@ import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
   unqualified: number[]; // IDs of PendingActions no roster employee can ever do
-  /**
-   * IDs of PendingActions still `queued` after this tick whose `blockedReason` is
-   * non-null — a superset that includes every vehicle-gated id `unqualified`
-   * deliberately excludes (#1061).
-   */
-  blocked: number[];
   waiting: number[];     // IDs of PendingActions still queued after this tick (busy/unreachable/no budget left)
 }
 
