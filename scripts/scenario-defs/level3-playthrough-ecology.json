@@ -447,6 +447,7 @@
     },
     {
       "command": "tick 20",
+      "description": "#1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): holeCount 10 -> 9, orderedHoleCount 10 -> 11 at this checkpoint (and the next, following the same one-hole shift plus the drilling crew's own knock-on progress: holeCount 12 -> 13, orderedHoleCount 8 -> 7) -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break shift exactly when this file's own drillers are mid-hole versus mid-rest, delaying hole H5's own landing from this window into the next one (re-derived live: H5 lands at tick 71 into this window, one hole short of the old total; H10 lands early in the next window, one hole over the old total there). tickCount, deathCount, and employeeCount all reproduce unchanged.",
       "interaction": [
         {
           "type": "command",
@@ -457,8 +458,8 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "holeCount": 10,
-          "orderedHoleCount": 10,
+          "holeCount": 9,
+          "orderedHoleCount": 11,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -481,8 +482,8 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "holeCount": 10,
-          "orderedHoleCount": 10,
+          "holeCount": 9,
+          "orderedHoleCount": 11,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -506,8 +507,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
+          "holeCount": 13,
+          "orderedHoleCount": 7,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -530,8 +531,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
+          "holeCount": 13,
+          "orderedHoleCount": 7,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,

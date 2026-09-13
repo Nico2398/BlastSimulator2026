@@ -1,6 +1,6 @@
 {
   "name": "needs-collapse-visual",
-  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (≤5), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
+  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (≤0, NEED_HARD_THRESHOLDS.fatigue since #1062 moved it down from 5 — the gauge's own floor, not a tunable balance value), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch. #1062 also widened the final push's own tick budget (10 -> 30 ticks) at the last `tick` step below: draining the extra 5 units from the old floor to the new one pushed Stan's own collapse a little later (a real run without the extra budget stalls at fatigue 8.2, just short of 0, since the task he's mid-execution of only lasts long enough for the old floor) — re-derived live, not assumed.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -581,11 +581,11 @@
       }
     },
     {
-      "command": "tick 10",
+      "command": "tick 30",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
