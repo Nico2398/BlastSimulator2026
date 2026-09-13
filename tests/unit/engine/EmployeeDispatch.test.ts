@@ -29,6 +29,7 @@ import {
   BASE_TASK_DURATION_TICKS,
   MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
   ACTION_STARVATION_TICK_THRESHOLD,
+  NEED_HARD_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 
 /**
@@ -590,8 +591,8 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     employee.taskTicksRemaining = 5;
     employee.taskQueue = [queuedA.id, queuedB.id];
 
-    // Trigger collapse via fatigue below the collapse threshold.
-    employee.fatigue = 1;
+    // Trigger collapse via fatigue at the hard threshold.
+    employee.fatigue = NEED_HARD_THRESHOLDS.fatigue;
 
     tickCollapse(state);
 
