@@ -2623,7 +2623,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed.",
       "interaction": [
         {
           "type": "command",
@@ -2646,7 +2646,7 @@
     },
     {
       "command": "stats",
-      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there.",
       "interaction": [
         {
           "type": "command",
@@ -2669,7 +2669,7 @@
     },
     {
       "command": "campaign status",
-      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here.",
+      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above.",
       "interaction": [
         {
           "type": "command",
