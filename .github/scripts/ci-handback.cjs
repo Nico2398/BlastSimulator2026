@@ -52,8 +52,13 @@ const MARKER = '<!-- agentic-ci-failure -->';
  * @returns {Array<object>}
  */
 function latestPerWorkflow(runs) {
-  // TODO: implement
-  return [];
+  const latest = new Map();
+  for (const run of runs) {
+    if (MACHINERY.has(run.path)) continue;
+    const seen = latest.get(run.workflow_id);
+    if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
+  }
+  return [...latest.values()];
 }
 
 /**
@@ -64,8 +69,28 @@ function latestPerWorkflow(runs) {
  * @returns {number|null}
  */
 function pipelineIssueFor(pr) {
-  // TODO: implement
-  return null;
+  const match = PIPELINE_HEAD.exec(pr.head?.ref || '');
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Why redVerdict returned null, for reporting.
+ *
+ * @param {{state: string, draft: boolean, head?: {ref?: string}}} pr
+ * @param {Array<object>} runsOnHead
+ * @returns {string}
+ */
+function reasonForNoVerdict(pr, runsOnHead) {
+  if (pr.state !== 'open') return `PR is ${pr.state}, not open`;
+  if (pr.draft) return 'draft';
+  if (!PIPELINE_HEAD.test(pr.head?.ref || '')) return 'not a pipeline PR';
+  const channels = latestPerWorkflow(runsOnHead);
+  if (channels.length === 0) return 'no runs yet on head';
+  const redRuns = channels.filter(
+    (run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion)
+  );
+  if (redRuns.length === 0) return 'head is green';
+  return 'no verdict';
 }
 
 /**
@@ -76,8 +101,21 @@ function pipelineIssueFor(pr) {
  * @returns {{issueNumber: number, redRunId: number}|null}
  */
 function redVerdict(pr, runsOnHead) {
-  // TODO: implement
-  return null;
+  if (pr.state !== 'open') return null;
+  if (pr.draft) return null;
+  if (!PIPELINE_HEAD.test(pr.head?.ref || '')) return null;
+
+  const channels = latestPerWorkflow(runsOnHead);
+  if (channels.length === 0) return null;
+
+  const redRuns = channels.filter(
+    (run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion)
+  );
+  if (redRuns.length === 0) return null;
+
+  const redRunId = redRuns.map((run) => run.id).sort((a, b) => b - a)[0];
+  const issueNumber = pipelineIssueFor(pr);
+  return { issueNumber, redRunId };
 }
 
 /**
@@ -87,8 +125,14 @@ function redVerdict(pr, runsOnHead) {
  * @returns {'needs-handback'|'already-asked'|'at-limit'}
  */
 function handbackVerdict(args) {
-  // TODO: implement
-  throw new Error('not implemented');
+  const { comments, redRunId, limit } = args;
+  const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
+  if (nudges.length >= limit) return 'at-limit';
+
+  const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(`run:${redRunId}`));
+  if (askedAboutThisRun) return 'already-asked';
+
+  return 'needs-handback';
 }
 
 /**
@@ -98,8 +142,21 @@ function handbackVerdict(args) {
  * @returns {{dispatch: boolean, issueNumber: number|null, reason: string}}
  */
 function assessPipelinePr(args) {
-  // TODO: implement
-  return { dispatch: false, issueNumber: null, reason: 'not implemented' };
+  const { pr, runsOnHead, comments, limit } = args;
+  const verdict = redVerdict(pr, runsOnHead);
+  if (!verdict) {
+    return { dispatch: false, issueNumber: null, reason: reasonForNoVerdict(pr, runsOnHead) };
+  }
+
+  const { issueNumber, redRunId } = verdict;
+  const outcome = handbackVerdict({ comments, redRunId, limit });
+  if (outcome === 'at-limit') {
+    return { dispatch: false, issueNumber, reason: `at-limit: attempt limit (${limit}) already reached` };
+  }
+  if (outcome === 'already-asked') {
+    return { dispatch: false, issueNumber, reason: `already-asked about red run ${redRunId}` };
+  }
+  return { dispatch: true, issueNumber, reason: `needs-handback: run ${redRunId} is red` };
 }
 
 module.exports = {
