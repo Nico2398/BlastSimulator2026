@@ -937,7 +937,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
   // (nothing claimed yet, not mid-task) has nothing for interruptActiveAction
   // to release, but that is not a reason to skip them: they still have
   // the fatigue gauge draining, and skipping them here left them to the
-  // much lower reactive NEED_WARNING_THRESHOLDS (autoInsertNeedTasks) instead
+  // much lower reactive NEED_SOFT_THRESHOLDS (autoInsertNeedTasks) instead
   // of this policy's own configured (higher, proactive) thresholds — a long
   // enough idle stretch (waiting for work that doesn't exist yet, e.g. a
   // second qualified employee with nothing to do until a first one finishes

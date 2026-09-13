@@ -5,7 +5,7 @@
 import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
-import type { EmployeeRole, SkillCategory } from '../entities/Employee.js';
+import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -1117,24 +1117,15 @@ export const NEED_WELL_RESTED_THRESHOLD = 80;
 /** The well-rested morale bonus applied per tick when fatigue is above the threshold. */
 export const NEED_WELL_RESTED_BONUS = 1;
 
-/**
- * Warning thresholds that trigger proactive rest routing.
- * @deprecated Use {@link NEED_WARNING_THRESHOLDS} instead — this constant has identical values
- *             and is kept only for backward compatibility.
- */
-export const NEED_RESTORATION_THRESHOLDS = {
+/** Soft threshold per gauge: below this, proactive rest routing queues a rest action but does not yet force one. */
+export const NEED_SOFT_THRESHOLDS: Record<NeedKey, number> = {
   fatigue: 25,
-} as const;
+};
 
-/** Warning thresholds that trigger proactive need routing. */
-export const NEED_WARNING_THRESHOLDS = {
-  fatigue: 25,
-} as const;
-
-/** Collapse thresholds for the fatigue gauge. */
-export const NEED_COLLAPSE_THRESHOLDS = {
-  fatigue: 5,
-} as const;
+/** Hard threshold per gauge: at or below this, the employee collapses and rest is forced immediately — always 0, the gauge's own floor, never a tunable balance value. */
+export const NEED_HARD_THRESHOLDS: Record<NeedKey, number> = {
+  fatigue: 0,
+};
 
 /** Rest duration in ticks for the fatigue gauge when an employee collapses. */
 export const NEED_REST_DURATIONS = {

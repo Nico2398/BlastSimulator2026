@@ -1,6 +1,6 @@
 {
   "name": "collapse-recovery",
-  "description": "Chapter 7: Drive an employee's need gauges to genuine collapse purely through unrelieved neglect. #680's rest fix (resting drains at 0, not idle rate) closed the pathway this file used to rely on: a fully idle employee, even with zero reachable living_quarters anywhere on the map, is auto-routed by autoInsertNeedTasks into a self-targeted, zero-distance ground-rest the SAME tick their gauge first dips under its warning threshold, which now holds flat (0 drain) for the rest's whole duration and tops back up — direct probing (GameLoop.ts, tickNeedGauges/autoInsertNeedTasks) confirmed a purely-idle employee stabilizes in a permanent warning-threshold oscillation and cannot reach the collapse floor at any tick budget tested, with or without a living_quarters on the map. Genuine neglect that still bites (per #680's own acceptance framing, 'a site that genuinely neglects its crew still revolts — the mechanism keeps its teeth', its individual-collapse equivalent) instead requires the employee kept continuously BUSY with no living_quarters ever built: while activeActionId is set, autoInsertNeedTasks only queues a rest unclaimed (never self-claims a busy employee), so drain proceeds at the faster 'working' rate uninterrupted by any rest until tickCollapse's own unconditional threshold check fires — confirmed for real via a direct probe (`employee dispatch <id> x:<own x> z:<own z>` twice, matching the pattern #680's own needs.integration.test.ts CONTRAST acceptance case uses to prove the punishing mechanism survives the fix) and re-derived from that run below, not assumed from the file's old, now-false claim.",
+  "description": "Chapter 7: Drive an employee's need gauges to genuine collapse purely through unrelieved neglect. #680's rest fix (resting drains at 0, not idle rate) closed the pathway this file used to rely on: a fully idle employee, even with zero reachable living_quarters anywhere on the map, is auto-routed by autoInsertNeedTasks into a self-targeted, zero-distance ground-rest the SAME tick their gauge first dips under its warning threshold, which now holds flat (0 drain) for the rest's whole duration and tops back up — direct probing (GameLoop.ts, tickNeedGauges/autoInsertNeedTasks) confirmed a purely-idle employee stabilizes in a permanent warning-threshold oscillation and cannot reach the collapse floor at any tick budget tested, with or without a living_quarters on the map. Genuine neglect that still bites (per #680's own acceptance framing, 'a site that genuinely neglects its crew still revolts — the mechanism keeps its teeth', its individual-collapse equivalent) instead requires the employee kept continuously BUSY with no living_quarters ever built: while activeActionId is set, autoInsertNeedTasks only queues a rest unclaimed (never self-claims a busy employee), so drain proceeds at the faster 'working' rate uninterrupted by any rest until tickCollapse's own unconditional threshold check fires — confirmed for real via a direct probe (`employee dispatch <id> x:<own x> z:<own z>` twice, matching the pattern #680's own needs.integration.test.ts CONTRAST acceptance case uses to prove the punishing mechanism survives the fix) and re-derived from that run below, not assumed from the file's old, now-false claim. #1062 moved NEED_HARD_THRESHOLDS.fatigue from 5 to 0 and added rest-priority ordering (a queued rest always wins the claim race against any other targeted action for the same employee, EmployeeDispatchSteps.ts) plus #945's mid-execution defer (autoInsertNeedTasks never even queues a rest while the employee is still executing a claimed task). Together these make the file's OLD second-collapse technique (redispatch once per fixed tick batch) permanently unable to reproduce a second collapse: the instant any task completes with fatigue already under NEED_SOFT_THRESHOLDS.fatigue (25), a proactive rest is queued AND immediately promoted ahead of anything already staged in taskQueue, however many redispatches were queued in advance or however tightly they're issued — direct-probed exhaustively (every redispatch cadence from once-per-25-ticks down to once-per-tick, and pre-staging up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH redispatches at once) and confirmed genuine, intended #1062 behavior rather than a bug: the needs system now reliably protects an employee from being redirected back to work ahead of a rest it already queued for them. The only way left to force a genuine SECOND collapse is the inverse of that same protection: dispatch while fatigue is ALREADY below NEED_THRESHOLDS.fatigue.low (40, productivity.ts's duration formula) but still at/above the soft threshold (25) — computeTaskDuration's needMultiplier then stretches the single dispatched task's own fixed duration (ceil(BASE_TASK_DURATION_TICKS / 0.75) = 27 ticks) far enough past the ~2.4/tick working drain (working rate 2, ×1.20 low-morale multiplier post-first-collapse) to run fatigue through 0 while STILL mid-execution — #945's own guard then keeps a rest from ever being queued during that whole span, and tickCollapse's unconditional check (which runs before that same tick's task-completion pass) catches it before the task ever finishes naturally. Re-derived live: after the first collapse-rest caps fatigue at NEED_REST_NO_BUILDING_CAP (70), 60 further IDLE ticks (no redispatch) drain it via the idle rate down to ~42 — still safely above the soft threshold the whole time, so no rest is ever queued — then one redispatch there reliably collapses a second time at absolute tick 129 (cumulative tick ~129, well inside the 25-tick batch that follows).",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -162,26 +162,21 @@
       "role": "observe"
     },
     {
-      "command": "employee dispatch 1 x:82 z:34",
+      "command": "tick 60",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:82 z:34"
-        }
-      ],
-      "description": "The collapse-rest above completes on its own (NEED_REST_DURATIONS.fatigue × NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, no building involved) and frees the driller back to idle with nothing queued to claim — this redispatch, and the one after the next tick batch, put them straight back to genuinely neglected continuous work instead of leaving them to recover into the same permanent idle oscillation the file's own description found unbreakable.",
-      "role": "bootstrap"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 25"
+          "command": "tick 60"
         }
       ],
       "role": "setup",
-      "note": "cumulative tick 75 — recovers from the first collapse, back to genuinely neglected forced work; no assertion here, this batch's own job is only to set up the second collapse checked below"
+      "expect": {
+        "increased": ["minFatigue"],
+        "equals": {
+          "collapsedCount": 0
+        }
+      },
+      "note": "cumulative tick 110 — deliberately NOT redispatched this time (#1062 finding, see the file's own description): the collapse-rest above completes on its own and tops fatigue out at NEED_REST_NO_BUILDING_CAP (70), then 60 further idle ticks drain it via the idle rate down to ~42 — still safely above NEED_SOFT_THRESHOLDS.fatigue (25) the whole time, so no proactive rest is ever queued to race the next dispatch below. minFatigue increases net across this whole step (0 at the start, still mid-collapse-rest, to ~41.8 by the end) even though the back half of the step is pure idle drain — the rest's own recovery dominates. collapsedCount is a live snapshot of currently-collapsing employees, not a running total — by cumulative tick 110 the first collapse's rest has long since completed (~tick67), so it correctly reads 0 again here, not 1. Real run: fatigue 0 -> 70 (rest completes ~tick67) -> ~41.8 (idle drain to tick110)."
     },
     {
       "command": "employee dispatch 1 x:82 z:34",
@@ -191,7 +186,7 @@
           "command": "employee dispatch 1 x:82 z:34"
         }
       ],
-      "description": "See the dispatch two steps above — same handoff reasoning, second redispatch to keep the run genuinely neglectful through to the second collapse checkpoint below.",
+      "description": "Dispatched now, at fatigue ~42 — already below NEED_THRESHOLDS.fatigue.low (40), so computeTaskDuration's needMultiplier stretches this single task's own fixed duration (ceil(20 / 0.75) = 27 ticks) far enough past the ~2.4/tick working drain that fatigue runs through 0 while still mid-execution. #945's mid-execution guard keeps a rest from ever being queued during that span (unlike a task claimed at full fatigue, which completes normally before ever nearing the floor), so tickCollapse's own unconditional check is what interrupts it below, not a natural completion.",
       "role": "bootstrap"
     },
     {
@@ -205,10 +200,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "collapsedCount": 1
+          "collapsedCount": 1,
+          "wellBeing": 0
         },
-        "decreased": ["wellBeing"],
-        "note": "cumulative tick 100: neglect is not a one-off — sustained forced work with no rest destination collapses this employee again. Real run: fatigue back down near the collapse floor, restTicksRemaining active, matching a fresh collapse rather than the first one's tail"
+        "note": "cumulative tick 135: neglect is not a one-off — a single task dispatched into the low-fatigue productivity band runs long enough to collapse this employee again (real run: fires at absolute tick 129, well inside this batch). wellBeing is asserted flat at 0 rather than decreased — morale was already floored by the first collapse (NEED_MORALE_EFFECT_PENALTIES' repeated 'critical' penalty and clampScore's own 0 floor) and stays there; there is no further room for this second collapse to push it down."
       }
     },
     {

@@ -9,7 +9,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import {
   deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestWalk,
-  createRestPendingAction,
+  createRestPendingAction, isMidClaimedTaskExecution,
 } from '../../../src/core/engine/RestActionHelpers.js';
 import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
 
@@ -327,5 +327,39 @@ describe('beginRestWalk (#1013)', () => {
     expect(employee.destinationX).toBe(20);
     expect(employee.destinationZ).toBe(21);
     expect(employee.pendingActionType).toBe('rest');
+  });
+});
+
+// #1062: shared soft-threshold guard — true only once the employee has
+// physically arrived at, and is actively ticking down, an already-claimed
+// action; walking toward one (taskTicksRemaining still null) does not count.
+describe('isMidClaimedTaskExecution (#1062)', () => {
+  const SEED = 42;
+
+  it('is true when taskTicksRemaining is a non-null number (arrived, mid-execution)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.taskTicksRemaining = 4;
+
+    expect(isMidClaimedTaskExecution(employee)).toBe(true);
+  });
+
+  it('is false when taskTicksRemaining is null (not yet arrived, or nothing claimed)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.taskTicksRemaining = null;
+
+    expect(isMidClaimedTaskExecution(employee)).toBe(false);
+  });
+
+  it('boundary: is true even when taskTicksRemaining is 0 (last tick of execution, still a number)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.taskTicksRemaining = 0;
+
+    expect(isMidClaimedTaskExecution(employee)).toBe(true);
   });
 });

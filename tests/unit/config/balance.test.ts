@@ -13,9 +13,8 @@ import {
   BANKRUPTCY_THRESHOLD, SCORE_DECAY_RATE,
   PROFICIENCY_MULTIPLIERS,
   XP_THRESHOLDS,
-  NEED_WARNING_THRESHOLDS,
-  NEED_COLLAPSE_THRESHOLDS,
-  NEED_RESTORATION_THRESHOLDS,
+  NEED_SOFT_THRESHOLDS,
+  NEED_HARD_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -220,39 +219,49 @@ describe('Proficiency & XP balance (3.2)', () => {
 // ─── Task 7.2: Need warning & collapse thresholds ───────────────────────────
 
 describe('Need thresholds (7.2)', () => {
-  // ── NEED_WARNING_THRESHOLDS ──────────────────────────────────────────────
+  // ── NEED_SOFT_THRESHOLDS ──────────────────────────────────────────────
 
-  it('NEED_WARNING_THRESHOLDS is exported from balance.ts', () => {
-    expect(NEED_WARNING_THRESHOLDS).toBeDefined();
+  it('NEED_SOFT_THRESHOLDS is exported from balance.ts', () => {
+    expect(NEED_SOFT_THRESHOLDS).toBeDefined();
   });
 
-  it('NEED_WARNING_THRESHOLDS has exactly 1 key: fatigue (#928)', () => {
-    expect(Object.keys(NEED_WARNING_THRESHOLDS)).toEqual(['fatigue']);
+  it('NEED_SOFT_THRESHOLDS has exactly 1 key: fatigue (#928)', () => {
+    expect(Object.keys(NEED_SOFT_THRESHOLDS)).toEqual(['fatigue']);
   });
 
-  it('NEED_WARNING_THRESHOLDS.fatigue is 25 — triggers proactive routing when fatigue falls below 25', () => {
-    expect(NEED_WARNING_THRESHOLDS.fatigue).toBe(25);
+  it('NEED_SOFT_THRESHOLDS.fatigue is 25 — triggers proactive routing when fatigue falls below 25', () => {
+    expect(NEED_SOFT_THRESHOLDS.fatigue).toBe(25);
   });
 
-  it('NEED_WARNING_THRESHOLDS matches NEED_RESTORATION_THRESHOLDS (warning = restoration thresholds)', () => {
-    expect(NEED_WARNING_THRESHOLDS).toEqual(NEED_RESTORATION_THRESHOLDS);
+  // ── NEED_HARD_THRESHOLDS ────────────────────────────────────────────
+
+  it('NEED_HARD_THRESHOLDS is exported from balance.ts', () => {
+    expect(NEED_HARD_THRESHOLDS).toBeDefined();
   });
 
-  // ── NEED_COLLAPSE_THRESHOLDS ────────────────────────────────────────────
-
-  it('NEED_COLLAPSE_THRESHOLDS is exported from balance.ts', () => {
-    expect(NEED_COLLAPSE_THRESHOLDS).toBeDefined();
+  it('NEED_HARD_THRESHOLDS has exactly 1 key: fatigue (#928)', () => {
+    expect(Object.keys(NEED_HARD_THRESHOLDS)).toEqual(['fatigue']);
   });
 
-  it('NEED_COLLAPSE_THRESHOLDS has exactly 1 key: fatigue (#928)', () => {
-    expect(Object.keys(NEED_COLLAPSE_THRESHOLDS)).toEqual(['fatigue']);
+  it('NEED_HARD_THRESHOLDS.fatigue is 0 — the hard floor is the gauge\'s own zero (#1062)', () => {
+    expect(NEED_HARD_THRESHOLDS.fatigue).toBe(0);
   });
 
-  it('NEED_COLLAPSE_THRESHOLDS.fatigue is 5 — employee collapses when fatigue reaches 5', () => {
-    expect(NEED_COLLAPSE_THRESHOLDS.fatigue).toBe(5);
+  it('every value in NEED_HARD_THRESHOLDS is 0 — the hard threshold is always the gauge\'s own zero, for every NeedKey present now or added later (#1062)', () => {
+    for (const [key, value] of Object.entries(NEED_HARD_THRESHOLDS)) {
+      expect(value, `NEED_HARD_THRESHOLDS.${key} must be 0`).toBe(0);
+    }
   });
 
   it('collapse threshold is strictly lower than the warning threshold (employees get warned before they collapse)', () => {
-    expect(NEED_COLLAPSE_THRESHOLDS.fatigue).toBeLessThan(NEED_WARNING_THRESHOLDS.fatigue);
+    expect(NEED_HARD_THRESHOLDS.fatigue).toBeLessThan(NEED_SOFT_THRESHOLDS.fatigue);
+  });
+
+  it('collapse threshold is strictly lower than the warning threshold for every NeedKey (#1062 — generalizes the fatigue-only check above)', () => {
+    const soft: Record<string, number> = NEED_SOFT_THRESHOLDS;
+    const hard: Record<string, number> = NEED_HARD_THRESHOLDS;
+    for (const key of Object.keys(hard)) {
+      expect(hard[key], `NEED_HARD_THRESHOLDS.${key} must be below NEED_SOFT_THRESHOLDS.${key}`).toBeLessThan(soft[key]!);
+    }
   });
 });

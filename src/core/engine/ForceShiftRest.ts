@@ -12,7 +12,7 @@ import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
-import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk } from './RestActionHelpers.js';
+import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
@@ -84,7 +84,7 @@ export function forceShiftRestIfNeeded(
   // blanket guard on the *policy* path specifically regressed a long-run
   // wellbeing test (see that function's own comment on its narrower guard)
   // — this path was never shown to have the same problem.
-  if (emp.taskTicksRemaining !== null) return;
+  if (isMidClaimedTaskExecution(emp)) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
@@ -185,7 +185,7 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  * employee has nothing to interrupt and is handled by the other
  * need-restoration paths instead" — but those other paths
  * (autoInsertNeedTasks) fire at the much lower reactive
- * NEED_WARNING_THRESHOLDS.fatigue (25), not this policy's own configured (and
+ * NEED_SOFT_THRESHOLDS.fatigue (25), not this policy's own configured (and
  * player-chosen, typically higher) fatigueRestThreshold. An idle employee — one
  * with no active task to interrupt because none exists yet, not one who
  * chose to slack off — drained on the low reactive threshold instead of the
@@ -249,7 +249,7 @@ export function forceShiftRestIfNeededByPolicy(
   // #922's own VehicleReservation.test.ts already pins mid-drive
   // interruption as intended behavior for the legacy (non-policy)
   // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
-  if (emp.taskTicksRemaining !== null && isMidVehicleGatedWork(state, emp)) return;
+  if (isMidClaimedTaskExecution(emp) && isMidVehicleGatedWork(state, emp)) return;
   // Already arrived and mid-execution of a task in
   // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
   // working one (taskTicksRemaining !== null, not just claimed-but-still-
@@ -265,7 +265,7 @@ export function forceShiftRestIfNeededByPolicy(
   // actually shown to fragment mid-execution. tickCollapse's own unconditional
   // interruption (NeedRestoration.ts) is untouched: a genuine fatigue
   // collapse must still interrupt these tasks.
-  if (emp.taskTicksRemaining !== null && isMidProtectedTaskWork(state, emp)) return;
+  if (isMidClaimedTaskExecution(emp) && isMidProtectedTaskWork(state, emp)) return;
   // #974 follow-up: a debris_hauler already carrying cargo toward a depot
   // (haulingPhase === 'to_depot') never sets taskTicksRemaining — hauling is
   // phase-driven, not employee-timer-driven — so the guard just above can

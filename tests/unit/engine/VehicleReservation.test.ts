@@ -38,6 +38,7 @@ import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js'
 // stale position) is caught here too.
 import { cancelAction } from '../../../src/core/engine/TaskCancellation.js';
 import { forceShiftRestIfNeeded } from '../../../src/core/engine/ForceShiftRest.js';
+import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
 import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
 import { WORK_DURATION_TICKS } from '../../../src/core/config/balance.js';
 
@@ -355,6 +356,48 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     expect(vehicle.driverId).toBeNull();
     expect(employee.x).toBe(vehicleXAtRest);
     expect(employee.z).toBe(vehicleZAtRest);
+    expect(employee.x).not.toBe(0);
+  });
+
+  // #1062: tickCollapse (NeedRestoration.ts) is the real hard-threshold call
+  // chain — checkCollapse fires once fatigue reaches NEED_HARD_THRESHOLDS.fatigue
+  // (0) and tickCollapse releases the interrupted action through the same
+  // interruptActiveAction -> releaseActionToOpenPool -> releaseVehicleReservation
+  // chain the two tests above exercise for cancelAction/forceShiftRestIfNeeded.
+  it('tickCollapse (NeedRestoration.ts) snaps the driver to where the vehicle now sits, not the boarding cell, and clears driverId', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 30;
+    vehicle.targetZ = 0;
+
+    const action = makeVehicleGatedHeldAction(32, employee.id);
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    employee.x = 0;
+    employee.z = 0;
+
+    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    expect(vehicle.x).toBeGreaterThan(0);
+
+    const vehicleXAtCollapse = vehicle.x;
+    const vehicleZAtCollapse = vehicle.z;
+
+    employee.fatigue = 0; // NEED_HARD_THRESHOLDS.fatigue
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).not.toBe(action.id);
+    expect(employee.x).toBe(vehicleXAtCollapse);
+    expect(employee.z).toBe(vehicleZAtCollapse);
     expect(employee.x).not.toBe(0);
   });
 });

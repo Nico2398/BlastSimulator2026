@@ -4,7 +4,7 @@
 // to (rest routing, morale, collapse).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_COLLAPSE_THRESHOLDS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS } from '../config/balance.js';
 
 /** The single need gauge tracked on every Employee. */
 export type NeedKey = 'fatigue';
@@ -49,7 +49,11 @@ export function getNeedMultiplier(employee: Employee): number {
 export function needsMoraleEffect(employee: Employee): number {
   let delta = 0;
 
-  const gauges: NeedKey[] = ['fatigue'];
+  // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded
+  // ['fatigue'] list, matching checkCollapse below, so a second NeedKey added
+  // to the config map picks up its morale effect with no code change here
+  // (#1062 genericity).
+  const gauges = Object.keys(NEED_HARD_THRESHOLDS) as NeedKey[];
   for (const gauge of gauges) {
     const value = employee[gauge];
     if (value >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable) {
@@ -118,9 +122,12 @@ function getMoraleDrainMultiplier(morale: number): number {
 export function checkCollapse(employee: Employee): NeedKey | null {
   if (employee.collapsing) return null;
 
-  const gauges: NeedKey[] = ['fatigue'];
+  // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded
+  // ['fatigue'] list, so a second NeedKey added to the config map collapses
+  // correctly with no code change here (#1062 genericity).
+  const gauges = Object.keys(NEED_HARD_THRESHOLDS) as NeedKey[];
   for (const gauge of gauges) {
-    if (employee[gauge] <= NEED_COLLAPSE_THRESHOLDS[gauge]) {
+    if (employee[gauge] <= NEED_HARD_THRESHOLDS[gauge]) {
       employee.collapsing = true;
       employee.activeActionId = null;
       return gauge;
@@ -143,7 +150,11 @@ export function checkCollapse(employee: Employee): NeedKey | null {
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
   const multiplier = getMoraleDrainMultiplier(employee.morale);
 
-  const gauges: NeedKey[] = ['fatigue'];
+  // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded
+  // ['fatigue'] list, matching checkCollapse below, so a second NeedKey added
+  // to the config map drains correctly with no code change here (#1062
+  // genericity).
+  const gauges = Object.keys(NEED_HARD_THRESHOLDS) as NeedKey[];
   for (const gauge of gauges) {
     const baseRate = NEED_DRAIN_RATES[gauge][workState];
     const actualDrain = baseRate * multiplier;
