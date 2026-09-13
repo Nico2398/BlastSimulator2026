@@ -49,7 +49,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const { run, state } = setupDrivingDriller();
     const driver = state.employees.employees.find(e => e.id === 1)!;
 
-    driver.fatigue = 4; // below NEED_COLLAPSE_THRESHOLDS.fatigue (5) — collapses next tick
+    driver.fatigue = 4; // below NEED_HARD_THRESHOLDS.fatigue (5) — collapses next tick
 
     let collapsedAtLeastOnce = false;
     tickUntil(run, () => {

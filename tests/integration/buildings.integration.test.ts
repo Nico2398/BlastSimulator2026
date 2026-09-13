@@ -37,7 +37,7 @@ import {
   BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
   BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
-  NEED_COLLAPSE_THRESHOLDS,
+  NEED_HARD_THRESHOLDS,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -1126,7 +1126,7 @@ describe('a place_building order survives an aggressive continuous-mode site pol
     expect(reachedInProgress, 'construction never reached in_progress work at all').toBe(true);
     expect(transitionsAwayFromInProgress).toBeLessThanOrEqual(1);
     expect(completed, `driving_center did not complete within ${MAX_TICKS} ticks`).toBe(true);
-    expect(minObservedFatigue).toBeGreaterThan(NEED_COLLAPSE_THRESHOLDS.fatigue);
+    expect(minObservedFatigue).toBeGreaterThan(NEED_HARD_THRESHOLDS.fatigue);
     const built = ctx.state!.buildings.buildings.find(b => b.type === 'driving_center');
     expect(built).toBeDefined();
   });

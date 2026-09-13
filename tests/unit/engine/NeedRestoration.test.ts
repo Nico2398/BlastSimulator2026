@@ -32,7 +32,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     const rng   = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    // Fatigue 20 is below the NEED_RESTORATION_THRESHOLDS.fatigue = 25 threshold.
+    // Fatigue 20 is below the NEED_SOFT_THRESHOLDS.fatigue = 25 threshold.
     employee.fatigue = 20;
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
@@ -196,7 +196,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    employee.fatigue = 20; // below the NEED_WARNING_THRESHOLDS.fatigue = 25 threshold
+    employee.fatigue = 20; // below the NEED_SOFT_THRESHOLDS.fatigue = 25 threshold
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
@@ -606,7 +606,7 @@ describe('tickCollapse (7.6)', () => {
   // #945 adds a taskTicksRemaining !== null guard to forceShiftRestIfNeeded,
   // forceShiftRestIfNeededByPolicy, and autoInsertNeedTasks — but explicitly
   // does NOT touch tickCollapse/checkCollapse. This is the hard floor
-  // (NEED_COLLAPSE_THRESHOLDS.fatigue = 5) that keeps the fix from making a
+  // (NEED_HARD_THRESHOLDS.fatigue = 5) that keeps the fix from making a
   // worker immortal: a genuinely collapsing employee must still be
   // interrupted unconditionally, even mid-execution of a claimed, already-
   // arrived task (e.g. mid dig_ramp_segment) — not just mid-walk to one
@@ -731,7 +731,7 @@ describe('tickCollapse (7.6)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
-    employee.fatigue = 3; // below NEED_COLLAPSE_THRESHOLDS.fatigue
+    employee.fatigue = 3; // below NEED_HARD_THRESHOLDS.fatigue
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.driverId = employee.id;

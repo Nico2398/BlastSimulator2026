@@ -18,7 +18,7 @@ import {
 } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
 import {
-  NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
+  NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
 } from '../config/balance.js';
 
@@ -48,7 +48,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // isMidEvacuationWalk's own doc comment (Evacuation.ts) for the shared
     // reasoning across all four call sites (#557).
     if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(state, emp)) continue;
-    const needsRest = emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
+    const needsRest = emp.fatigue < NEED_SOFT_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
 
