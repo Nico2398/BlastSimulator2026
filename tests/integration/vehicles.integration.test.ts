@@ -671,8 +671,9 @@ describe('Vehicle fleet', () => {
       // Master-level 'blasting' (proficiency 5, ×0.40 duration multiplier) —
       // this test is about mount continuity across a claim, not about task
       // duration, so it keeps both dispatches' combined drive+work time well
-      // under the ~47-tick fatigue-collapse ceiling (NEED_DRAIN_RATES.fatigue.working
-      // × NEED_HARD_THRESHOLDS.fatigue, balance.ts). At Rookie level 1 the
+      // under the ~50-tick fatigue-collapse ceiling ((100 - NEED_HARD_THRESHOLDS.fatigue)
+      // / NEED_DRAIN_RATES.fatigue.working, balance.ts — threshold is 0, #1062).
+      // At Rookie level 1 the
       // two BASE_TASK_DURATION_TICKS=20 dispatches alone sum to ~48 ticks
       // before any drive time, so a needs-driven rest interruption — which
       // legitimately dismounts the driver (TaskDispatch.interruptActiveAction

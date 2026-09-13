@@ -155,8 +155,8 @@ describe('Employee needs', () => {
     emp.activeActionId = 42;
     emp.collapsing = false;
 
-    // Set fatigue at or below collapse threshold (fatigue ≤ 5)
-    emp.fatigue = 5;
+    // Set fatigue at or below collapse threshold (fatigue ≤ 0, NEED_HARD_THRESHOLDS.fatigue)
+    emp.fatigue = 0;
 
     const result = checkCollapse(emp);
 
@@ -195,7 +195,7 @@ describe('Employee needs', () => {
 
   it('checkCollapse returns null if already collapsing', () => {
     const emp = getEmployee(ctx, empId);
-    emp.fatigue = 3; // Below collapse threshold, would normally trigger collapse
+    emp.fatigue = 0; // At collapse threshold (NEED_HARD_THRESHOLDS.fatigue), would normally trigger collapse
     emp.collapsing = true;
 
     const result = checkCollapse(emp);

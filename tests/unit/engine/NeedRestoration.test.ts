@@ -243,7 +243,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -272,7 +272,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -300,7 +300,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -323,7 +323,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 7;
     employee.z = 13;
 
@@ -365,7 +365,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.collapsing = true;
-    employee.fatigue = 3;
+    employee.fatigue = 0;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -382,7 +382,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.alive = false;
-    employee.fatigue = 3;
+    employee.fatigue = 0;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -398,7 +398,7 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.injured = true;
-    employee.fatigue = 3;
+    employee.fatigue = 0;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -413,7 +413,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -428,7 +428,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;     // Below fatigue threshold (5)
+    employee.fatigue = 0;     // Below (== 0, the hard threshold — NEED_HARD_THRESHOLDS.fatigue)
     employee.x = 0;
     employee.z = 0;
 
@@ -456,7 +456,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -476,7 +476,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -513,12 +513,12 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee: emp1 } = hireEmployee(state.employees, 'driller', rng);
-    emp1.fatigue = 3;
+    emp1.fatigue = 0;
     emp1.x = 0;
     emp1.z = 0;
 
     const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng);
-    emp2.fatigue = 3;
+    emp2.fatigue = 0;
     emp2.x = 0;
     emp2.z = 0;
 
@@ -544,7 +544,7 @@ describe('tickCollapse (7.6)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.x = 0;
     employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold
+    employee.fatigue = 0; // at the collapse threshold (0)
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
 
@@ -583,7 +583,7 @@ describe('tickCollapse (7.6)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.x = 0;
     employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold (5)
+    employee.fatigue = 0; // at the collapse threshold (0)
     employee.activeActionId = 42; // claimed a job
     employee.pendingTaskDuration = 20; // walking to it, not yet arrived — 'traveling' state
 
@@ -606,7 +606,7 @@ describe('tickCollapse (7.6)', () => {
   // #945 adds a taskTicksRemaining !== null guard to forceShiftRestIfNeeded,
   // forceShiftRestIfNeededByPolicy, and autoInsertNeedTasks — but explicitly
   // does NOT touch tickCollapse/checkCollapse. This is the hard floor
-  // (NEED_HARD_THRESHOLDS.fatigue = 5) that keeps the fix from making a
+  // (NEED_HARD_THRESHOLDS.fatigue = 0, #1062) that keeps the fix from making a
   // worker immortal: a genuinely collapsing employee must still be
   // interrupted unconditionally, even mid-execution of a claimed, already-
   // arrived task (e.g. mid dig_ramp_segment) — not just mid-walk to one
@@ -618,7 +618,7 @@ describe('tickCollapse (7.6)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.x = 0;
     employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold (5)
+    employee.fatigue = 0; // at the collapse threshold (0)
     employee.activeActionId = 42; // claimed a job
     employee.taskTicksRemaining = 4; // arrived, mid-execution of it — not just walking
 
@@ -659,7 +659,7 @@ describe('tickCollapse (7.6)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.x = 0;
     employee.z = 0;
-    employee.fatigue = 3; // below the collapse threshold (5)
+    employee.fatigue = 0; // at the collapse threshold (0)
 
     const action: PendingAction = {
       id, type: actionType, requiredSkill: null, requiredVehicleRole: null,
@@ -708,7 +708,7 @@ describe('tickCollapse (7.6)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = 3;
+    employee.fatigue = 0;
     employee.x = 0;
     employee.z = 0;
 
@@ -731,7 +731,7 @@ describe('tickCollapse (7.6)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
-    employee.fatigue = 3; // below NEED_HARD_THRESHOLDS.fatigue
+    employee.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue (0)
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.driverId = employee.id;
@@ -741,5 +741,60 @@ describe('tickCollapse (7.6)', () => {
 
     expect(result.collapsed).toHaveLength(0);
     expect(employee.collapsing).toBe(false);
+  });
+
+  // ── NEW (#1062) ─────────────────────────────────────────────────────────────
+  // Hard threshold is always the gauge's own zero (NEED_HARD_THRESHOLDS.fatigue
+  // = 0): fatigue reaching exactly 0 the same tick interrupts whatever active
+  // action the employee holds, releases it back to the pool, and — for a
+  // vehicle-gated action the employee is boarded and mid-execution on — also
+  // releases the vehicle reservation and dismounts the driver, rather than
+  // leaving a vehicle idling with a driverId that no longer intends to work it.
+  it('#1062: fatigue reaching exactly 0 interrupts a boarded vehicle-gated action, releases it to the pool, and releases the vehicle reservation/driver', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.drill_rig', 1);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 0; // exactly NEED_HARD_THRESHOLDS.fatigue
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const gatedAction: PendingAction = {
+      id: 900, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+      targetX: 3, targetZ: 3, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+      queuedAtTick: 0,
+    };
+    state.pendingActions.push(gatedAction);
+    employee.activeActionId = gatedAction.id;
+    employee.taskTicksRemaining = 3; // boarded, mid-execution
+    vehicle.driverId = employee.id;
+    vehicle.reservedForActionId = gatedAction.id;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    expect(employee.collapsing).toBe(true);
+
+    // The active action is released back to the open pool, not orphaned.
+    const released = state.pendingActions.find(a => a.id === gatedAction.id)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    expect(employee.activeActionId).not.toBe(gatedAction.id);
+
+    // The vehicle reservation and its driver are released too.
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBeNull();
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.payload.collapsedNeed).toBe('fatigue');
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 });

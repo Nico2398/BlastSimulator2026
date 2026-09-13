@@ -161,6 +161,31 @@ describe('claimActionsTargetedAtEmployee', () => {
     expect(employee.activeActionId).toBeNull();
   });
 
+  // #1062: rest-priority ordering — a rest action queued alongside other work
+  // targeted at the same employee must always be the one claimed/promoted
+  // first this tick, regardless of id (the tie-break the sort otherwise
+  // falls back to for two same-kind actions).
+  it('#1062: a rest action with a HIGHER id than another targeted action is still the one promoted to active', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const work = makeAction({ id: 1, targetEmployeeId: employee.id, targetX: 1, targetZ: 1 });
+    const rest = makeAction({
+      id: 99, type: 'rest', targetEmployeeId: employee.id, targetX: 2, targetZ: 2, payload: { needKey: 'fatigue' },
+    });
+    state.pendingActions.push(work, rest); // insertion order deliberately id-ascending
+    const result = makeResult();
+
+    claimActionsTargetedAtEmployee(state, employee, result);
+
+    expect(employee.activeActionId).toBe(99); // the rest, despite the higher id
+    expect(employee.taskQueue).toContain(1);
+    expect(rest.status).toBe('assigned');
+    expect(work.status).toBe('assigned'); // both claimed — one active, one queued
+    expect(result.claimed).toEqual(expect.arrayContaining([1, 99]));
+  });
+
   it('excludes a non-claimable haul_debris action (fragment no longer resolvable)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
@@ -218,6 +243,60 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
     // The pool candidate is untouched — the queue entry wins, never both.
     expect(poolAction.status).toBe('queued');
     expect(poolAction.holderId).toBeNull();
+  });
+
+  // #1062: rest-priority ordering — a queued rest candidate is preferred over
+  // a cheaper/nearer non-rest candidate already sitting in the same
+  // employee's taskQueue, even though cost ranking alone would pick the
+  // cheaper one.
+  it('#1062: promotes a queued rest action over a cheaper/nearer non-rest action already in taskQueue', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const cheapWork = makeAction({
+      id: 1, targetX: 1, targetZ: 0, status: 'assigned', holderId: employee.id,
+    });
+    const farRest = makeAction({
+      id: 2, type: 'rest', targetX: 20, targetZ: 0, status: 'assigned', holderId: employee.id,
+      payload: { needKey: 'fatigue' },
+    });
+    state.pendingActions.push(cheapWork, farRest);
+    employee.taskQueue = [1, 2];
+    const result = makeResult();
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, result);
+
+    expect(employee.activeActionId).toBe(2); // the rest wins despite being farther/costlier
+    expect(employee.taskQueue).not.toContain(2);
+    expect(employee.taskQueue).toContain(1); // the cheaper candidate stays queued, untouched
+    expect(cheapWork.status).toBe('assigned');
+  });
+
+  it('#1062: falls back to the next candidate when the queued rest action is currently unreachable', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(30, 5);
+    blockColumn(grid, 3); // walls off x >= 3 from the employee's own column
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const unreachableRest = makeAction({
+      id: 1, type: 'rest', targetX: 10, targetZ: 0, status: 'assigned', holderId: employee.id,
+      payload: { needKey: 'fatigue' },
+    });
+    const reachableWork = makeAction({
+      id: 2, targetX: 1, targetZ: 0, status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(unreachableRest, reachableWork);
+    employee.taskQueue = [1, 2];
+    const result = makeResult();
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, result);
+
+    expect(employee.activeActionId).toBe(2); // falls back — the rest cannot be reached this tick
+    expect(employee.taskQueue).toContain(1); // retried, not dropped
+    expect(employee.taskQueue).not.toContain(2);
   });
 
   it('#1000 CI follow-up: a starved on-foot pool action beats a nearer, freshly queued one — cost ranking alone never rescues it', () => {

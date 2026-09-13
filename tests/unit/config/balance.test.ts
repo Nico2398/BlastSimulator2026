@@ -243,7 +243,25 @@ describe('Need thresholds (7.2)', () => {
     expect(Object.keys(NEED_HARD_THRESHOLDS)).toEqual(['fatigue']);
   });
 
+  it('NEED_HARD_THRESHOLDS.fatigue is 0 — the hard floor is the gauge\'s own zero (#1062)', () => {
+    expect(NEED_HARD_THRESHOLDS.fatigue).toBe(0);
+  });
+
+  it('every value in NEED_HARD_THRESHOLDS is 0 — the hard threshold is always the gauge\'s own zero, for every NeedKey present now or added later (#1062)', () => {
+    for (const [key, value] of Object.entries(NEED_HARD_THRESHOLDS)) {
+      expect(value, `NEED_HARD_THRESHOLDS.${key} must be 0`).toBe(0);
+    }
+  });
+
   it('collapse threshold is strictly lower than the warning threshold (employees get warned before they collapse)', () => {
     expect(NEED_HARD_THRESHOLDS.fatigue).toBeLessThan(NEED_SOFT_THRESHOLDS.fatigue);
+  });
+
+  it('collapse threshold is strictly lower than the warning threshold for every NeedKey (#1062 — generalizes the fatigue-only check above)', () => {
+    const soft: Record<string, number> = NEED_SOFT_THRESHOLDS;
+    const hard: Record<string, number> = NEED_HARD_THRESHOLDS;
+    for (const key of Object.keys(hard)) {
+      expect(hard[key], `NEED_HARD_THRESHOLDS.${key} must be below NEED_SOFT_THRESHOLDS.${key}`).toBeLessThan(soft[key]!);
+    }
   });
 });
