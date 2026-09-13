@@ -245,6 +245,14 @@ export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
  *  drillPlan.ts's console default and Drill.ts's UI default (#965). */
 export const DRILL_HOLE_DEFAULT_DIAMETER_M = 0.089;
 
+/** Hole spacing (m) the grid tool's placement strip opens at before the player
+ *  steps it (#1069) — the value a scenario's dragTiles rectangle is measured
+ *  against when its interaction array never clicks the spacing stepper. */
+export const DRILL_GRID_DEFAULT_SPACING_M = 3;
+/** Hole depth (m) the grid tool's placement strip opens at before the player
+ *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M. */
+export const DRILL_GRID_DEFAULT_DEPTH_M = 6;
+
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
 /** Reference charge amount (kg) that CHARGE_HOLE_BASE_DURATION_TICKS is calibrated against (#554). */
