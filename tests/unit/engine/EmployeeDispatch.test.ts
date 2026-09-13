@@ -914,12 +914,11 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // #1061 — blockedReason classification: a queued PendingAction that sits with
 // nobody able to perform it right now gets a light, non-blocking diagnosis
-// (BlockedOrderReason) recomputed every tick — surfaced via both the action's
-// own `blockedReason` field and TickEmployeesResult.blocked. Vehicle-gated
-// actions are deliberately never added to result.unqualified (see
-// EmployeeDispatch.ts's own comment on that pre-existing heavy channel) but
-// MUST appear in result.blocked/blockedReason once this lands. The order
-// itself is never cancelled — status stays 'queued' throughout.
+// (BlockedOrderReason) recomputed every tick — surfaced via the action's own
+// `blockedReason` field. Vehicle-gated actions are deliberately never added
+// to result.unqualified (see EmployeeDispatch.ts's own comment on that
+// pre-existing heavy channel) but MUST get a `blockedReason` once this lands.
+// The order itself is never cancelled — status stays 'queued' throughout.
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('tickEmployees — blockedReason classification (#1061)', () => {
@@ -953,7 +952,6 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     const result = tickEmployees(state);
 
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_vehicle_in_fleet');
-    expect(result.blocked).toContain(1);
     // Vehicle-gated actions never enter the heavy unqualified_task_error channel.
     expect(result.unqualified).not.toContain(1);
     // The order itself is never cancelled/refused — stays queued.
@@ -971,7 +969,6 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     const result = tickEmployees(state);
 
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_licensed_driver');
-    expect(result.blocked).toContain(1);
     expect(result.unqualified).not.toContain(1);
     expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
   });
@@ -986,7 +983,7 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     const action = makeLevelGroundAction({ id: 1 });
     state.pendingActions.push(action);
 
-    const result = tickEmployees(state);
+    tickEmployees(state);
 
     const stored = state.pendingActions.find(a => a.id === 1)!;
     // Optional field — null/undefined both mean "not blocked" (GameState.ts's
@@ -995,10 +992,9 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     // rather than pinning down which of the two falsy spellings is used.
     const reasons: unknown[] = ['no_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
     expect(reasons).not.toContain(stored.blockedReason);
-    expect(result.blocked).not.toContain(1);
   });
 
-  it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in BOTH result.unqualified and result.blocked', () => {
+  it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in result.unqualified', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     // Not 'driller': ROLE_STARTING_QUALIFICATION grants a fresh driller hire
@@ -1017,9 +1013,39 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     const result = tickEmployees(state);
 
     expect(result.unqualified).toContain(1);
-    expect(result.blocked).toContain(1);
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_qualified_employee');
     expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('flags no_qualified_employee on a vehicle-gated drill_hole order when the only licensed driver lacks the required skill, then clears once an employee holds BOTH', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    // 'surveyor' starts with 'geology' only (ROLE_STARTING_QUALIFICATION) — no
+    // 'blasting', so licensing them for drill_rig alone must not satisfy the
+    // conjunction the new gate requires.
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    const action: PendingAction = {
+      id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_qualified_employee');
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+
+    // Same employee now also holds the required skill — licensed AND qualified.
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    tickEmployees(state);
+
+    const reasons: unknown[] = ['no_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
+    expect(reasons).not.toContain(state.pendingActions.find(a => a.id === 1)!.blockedReason);
   });
 
   it('regression: result.unqualified still reports an action nobody on the roster is qualified for, unchanged by the new blocked channel (mirrors pre-#1061 coverage)', () => {
