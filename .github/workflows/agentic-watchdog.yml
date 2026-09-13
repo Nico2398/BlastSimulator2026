@@ -262,7 +262,12 @@ jobs:
                 owner, repo,
                 workflow_id: 'agentic-ci-failure.yml',
                 ref: context.payload.repository?.default_branch || 'main',
-                inputs: { pr: String(pr.number) }
+                // This sweep is exactly the case `force_retry` exists for: a
+                // handback that may already have been asked once but whose
+                // head never moved, so nothing about the failure changed.
+                // `agentic-ci-failure.yml`'s own idempotency gate honors this
+                // explicitly rather than inferring it from the dispatch alone.
+                inputs: { pr: String(pr.number), force_retry: 'true' }
               });
               raised += 1;
             }

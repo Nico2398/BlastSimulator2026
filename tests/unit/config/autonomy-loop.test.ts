@@ -1160,7 +1160,11 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   const triggers = failsafe.slice(failsafe.indexOf('\non:'), failsafe.indexOf('\npermissions:'));
 
   it('reacts to the same CI-completion event auto-merge reacts to', () => {
-    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI"\]/);
+    // Permissive of the comment lines above `workflows:` and of the widened
+    // array (`Claude Pipeline` / `OpenCode Pipeline` alongside `CI`, added by
+    // #1059's runner-completion fail-safe) — still fails if `CI` drops out of
+    // the array or `types: [completed]` changes.
+    expect(triggers).toMatch(/workflow_run:[\s\S]*?workflows:\s*\[[^\]]*"CI"[^\]]*\]/);
     expect(triggers).toMatch(/types:\s*\[completed\]/);
   });
 
@@ -1258,22 +1262,49 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   // Repeated question versus new one is decided on *event identity*, never on a
   // duration. A workflow run has an id and a redelivered webhook carries the same
   // one, so the `workflow_run` path answers each CI run exactly once.
+  // A `workflow_dispatch` alone used to be license to bypass the "already
+  // asked" check unconditionally — unsafe once `scan-after-runner` also
+  // dispatches automatically, potentially twice for the same still-empty
+  // comment list. That blanket bypass must be gone, replaced by a gate only an
+  // explicit `force_retry` can open.
   it('answers each CI run once, identified by its run id', () => {
     expect(failsafe).toContain("const MARKER = '<!-- agentic-ci-failure -->'");
     expect(failsafe).toContain('`run:${ciRunId}`');
-    expect(failsafe).toContain('if (askedAboutThisRun && !dispatchedLookup)');
-    expect(failsafe).toContain('run:${ciRunId}`');
+    expect(failsafe).not.toContain('if (askedAboutThisRun && !dispatchedLookup)');
+    expect(failsafe).toMatch(/if \(askedAboutThisRun && !forceRetry\)/);
+    expect(failsafe).toContain('process.env.FORCE_RETRY');
   });
 
   // The clock-free retry. A session that took the handback and died before
   // pushing leaves the head — and therefore the run id — unchanged, so a
-  // permanent per-run skip would strand the PR with attempts still unspent. A
-  // dispatch bypasses the dedup and counts against the limit, so the retry is
-  // bounded by the brake instead of by a guessed interval.
+  // permanent per-run skip would strand the PR with attempts still unspent.
+  // The legitimate repeat now happens only through the explicit `force_retry`
+  // input the watchdog's re-raise sets, never through the dispatch source
+  // alone — `scan-after-runner`'s own automatic dispatch never sets it.
   it('lets a re-raise ask again about a run whose session produced nothing', () => {
-    const retry = failsafe.slice(failsafe.indexOf('if (askedAboutThisRun && !dispatchedLookup)'));
-    expect(retry).toContain('that attempt produced nothing. Asking again.');
-    expect(retry).toContain('nudges.length >= limit');
+    expect(failsafe).toContain('force_retry:');
+    expect(failsafe).toContain('FORCE_RETRY: ${{ inputs.force_retry }}');
+    const forceRetryStart = failsafe.indexOf('const forceRetry =');
+    expect(forceRetryStart, 'const forceRetry = ... not found').toBeGreaterThan(-1);
+    const forceRetryGate = failsafe.slice(forceRetryStart);
+    expect(forceRetryGate).toContain("process.env.FORCE_RETRY === 'true'");
+    expect(forceRetryGate).toContain('force_retry requested. Asking again.');
+    expect(forceRetryGate).toContain('nudges.length >= limit');
+
+    const watchdog = workflow('agentic-watchdog.yml');
+    expect(watchdog).toContain("force_retry: 'true'");
+  });
+
+  // Structural proof of the actual idempotency fix: the override requires
+  // *both* a dispatch-lookup run (never the `workflow_run` path a genuine CI
+  // completion takes) and the explicit env flag — either alone is not enough,
+  // so `scan-after-runner`'s automatic dispatch (which never sets
+  // `force_retry`) can never bypass "already asked", only the watchdog's
+  // explicit re-raise can.
+  it('requires both a dispatch lookup and an explicit force_retry before re-asking', () => {
+    expect(failsafe).toContain(
+      "const forceRetry = dispatchedLookup && process.env.FORCE_RETRY === 'true';"
+    );
   });
 
   // A cooldown long enough for today's CI is a stall tomorrow, and one short
@@ -1538,13 +1569,16 @@ describe('an agent that never started is not an agent that produced nothing', ()
   });
 });
 
-// The one list that decides, in three places, whether a workflow run on a PR
+// The one list that decides, in four places, whether a workflow run on a PR
 // head is a channel or the merge machinery. `scripts/await-pr-ci.ts` decides
 // whether a run may end on it, the fail-safe whether to hand it back, the
-// watchdog whether to re-raise it — and a copy that drifts reintroduces #773
-// in whichever reader drifted. Inline in the two workflows because neither job
-// checks out the repository.
-describe('the machinery list is one list, in three copies', () => {
+// watchdog whether to re-raise it, and `ci-handback.cjs`'s pure decision core
+// (the event-driven path off `claude-runner.yml`/`opencode-runner.yml`
+// completion) whether to re-dispatch that nudge — and a copy that drifts
+// reintroduces #773 in whichever reader drifted. Inline in the two workflows
+// because neither job checks out the repository; `ci-handback.cjs` is `.cjs`
+// for the same reason the nudge job's own script is inline.
+describe('the machinery list is one list, in four copies', () => {
   const MACHINERY = [
     'agentic-auto-merge.yml',
     'agentic-ci-failure.yml',
@@ -1563,6 +1597,7 @@ describe('the machinery list is one list, in three copies', () => {
     ['scripts/lib/workflow-verdict.ts', 'const MACHINERY_WORKFLOWS'],
     ['.github/workflows/agentic-ci-failure.yml', 'const MACHINERY = new Set(['],
     ['.github/workflows/agentic-watchdog.yml', 'const MACHINERY = new Set(['],
+    ['.github/scripts/ci-handback.cjs', 'const MACHINERY = new Set(['],
   ])('%s lists the same set, and never the closing-keyword guard', (path, marker) => {
     const text = readFileSync(join(ROOT, path), 'utf8');
     const start = text.indexOf(marker);
@@ -1570,6 +1605,27 @@ describe('the machinery list is one list, in three copies', () => {
     const block = text.slice(start, text.indexOf(']', start));
     const listed = [...block.matchAll(/'(?:\.github\/workflows\/)?([\w.-]+\.yml)'/g)].map((m) => m[1]);
     expect(listed.sort()).toEqual([...MACHINERY].sort());
+  });
+});
+
+// Unlike MACHINERY/MARKER, RUN_FAILURES had no pinning test proving its three
+// copies — `agentic-ci-failure.yml`'s nudge job, `agentic-watchdog.yml`'s
+// re-raise step, and `ci-handback.cjs`'s exported constant — stay identical.
+describe('the run-failure conclusions are one list, in three copies', () => {
+  const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
+
+  it.each([
+    ['.github/workflows/agentic-ci-failure.yml'],
+    ['.github/workflows/agentic-watchdog.yml'],
+    ['.github/scripts/ci-handback.cjs'],
+  ])('%s lists the same run-failure conclusions', (path) => {
+    const text = readFileSync(join(ROOT, path), 'utf8');
+    const marker = 'const RUN_FAILURES = ';
+    const start = text.indexOf(marker);
+    expect(start, `${marker} not found in ${path}`).toBeGreaterThan(-1);
+    const block = text.slice(start, text.indexOf(']', start) + 1);
+    const listed = [...block.matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
+    expect(listed.sort()).toEqual([...RUN_FAILURES].sort());
   });
 });
 
@@ -1935,5 +1991,133 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
     const retry = runner.slice(runner.indexOf('- name: Retry the run when the first attempt'));
     expect(retry).toContain('there is no later turn');
     expect(retry).toContain('npm run long -- wait');
+  });
+});
+
+// The hourly `agentic-watchdog.yml` cron is the only thing that re-raises a
+// red CI once the live session that would have read `[await-ci]` itself has
+// exited — and GitHub delivers `schedule` unreliably, with gaps of 3-5 hours
+// observed. `agentic-ci-failure.yml` gets a second, event-driven wake-up here:
+// `claude-runner.yml`/`opencode-runner.yml` finishing is exactly the moment a
+// live session might have just ended, so a `workflow_run` completion on either
+// is the earliest honest signal that nobody is left to read the verdict.
+//
+// `.github/scripts/ci-handback.cjs` carries the pure decision this new job
+// calls into — `ci-handback.test.ts` covers that module directly. What is
+// pinned here is the wiring: the trigger is widened without touching what the
+// existing `nudge` job answers, and the new job fires on the opposite event.
+describe('the fail-safe also wakes on runner completion, not only CI', () => {
+  const failsafe = workflow('agentic-ci-failure.yml');
+  const triggers = failsafe.slice(failsafe.indexOf('\non:'), failsafe.indexOf('\npermissions:'));
+
+  const jobBlock = (source: string, name: string): string => {
+    const start = source.indexOf(`\n  ${name}:`);
+    if (start === -1) return '';
+    const rest = source.slice(start + 1);
+    const next = rest.slice(1).search(/\n {2}[A-Za-z0-9_-]+:\s*\n/);
+    return next === -1 ? rest : rest.slice(0, next + 1);
+  };
+
+  // `workflow_run`'s `workflows:` array matches on the *declared* `name:` of
+  // the upstream workflow, not its filename — the same fact
+  // `agentic-auto-merge.yml`'s ci.yml-name-drift test above pins for `CI`.
+  it('names the runner workflows exactly as they declare themselves', () => {
+    const claudeName = /^name:\s*(.+)$/m.exec(workflow('claude-runner.yml'))?.[1]?.trim();
+    const opencodeName = /^name:\s*(.+)$/m.exec(workflow('opencode-runner.yml'))?.[1]?.trim();
+    expect(claudeName, 'claude-runner.yml has no top-level name:').toBeTruthy();
+    expect(opencodeName, 'opencode-runner.yml has no top-level name:').toBeTruthy();
+    expect(triggers).toContain(`"${claudeName}"`);
+    expect(triggers).toContain(`"${opencodeName}"`);
+  });
+
+  it('widens the workflow_run trigger to include both runners alongside CI', () => {
+    expect(triggers).toMatch(/workflows:\s*\[[^\]]*"CI"[^\]]*\]/);
+    expect(triggers).toMatch(/workflows:\s*\[[^\]]*"Claude Pipeline"[^\]]*\]/);
+    expect(triggers).toMatch(/workflows:\s*\[[^\]]*"OpenCode Pipeline"[^\]]*\]/);
+  });
+
+  // The existing `nudge` job answers a CI-completion event; a runner
+  // completing must route to the new job instead, or the two would both react
+  // to the same wake-up and post two comments.
+  it("the nudge job's own if: does not also fire on a runner completion", () => {
+    const nudge = jobBlock(failsafe, 'nudge');
+    const rawIfBlock = /if:\s*>-\s*\n([\s\S]*?)\n\s*runs-on:/.exec(nudge)?.[1] ?? '';
+    expect(rawIfBlock, 'nudge job if: not found').not.toBe('');
+    // The trailing comment above `runs-on:` documents the exclusion by naming
+    // both pipelines, which would mask a regression that widened the
+    // *functional* condition itself while leaving that stale comment
+    // untouched. Strip comment lines before asserting on the actual if:.
+    const ifBlock = rawIfBlock
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('#'))
+      .join('\n');
+    expect(ifBlock).not.toMatch(/Claude Pipeline/);
+    expect(ifBlock).not.toMatch(/OpenCode Pipeline/);
+    expect(ifBlock).toContain("github.event.workflow_run.name == 'CI'");
+  });
+
+  // The new job's whole reason to exist: fire on either runner finishing,
+  // whatever it concluded — a successful run can still leave a red channel
+  // from an earlier push unanswered, and a failed one is exactly the crash
+  // this fail-safe exists for. Scoped to the job's own block, not the whole
+  // file — the `on:`/`workflow_run` trigger's explanatory comment also
+  // mentions both pipelines and would satisfy a looser match even if this
+  // job's own `if:` were wrong or the job were deleted.
+  it('carries a new job scoped to runner completion, any conclusion', () => {
+    const scanAfterRunner = jobBlock(failsafe, 'scan-after-runner');
+    expect(scanAfterRunner, 'scan-after-runner job not found').not.toBe('');
+    const ifBlock = /if:\s*>-\s*\n([\s\S]*?)\n\s*runs-on:/.exec(scanAfterRunner)?.[1] ?? '';
+    expect(ifBlock, 'scan-after-runner if: not found').not.toBe('');
+    expect(ifBlock).toMatch(/Claude Pipeline/);
+    expect(ifBlock).toMatch(/OpenCode Pipeline/);
+  });
+
+  // Unlike `nudge`, this job re-scans PRs and reads `ci-handback.cjs`, so it
+  // needs the workspace checked out — `nudge` deliberately does not.
+  it('checks out the repository and drives ci-handback.cjs', () => {
+    expect(failsafe).toContain('actions/checkout');
+    expect(failsafe).toContain('ci-handback.cjs');
+  });
+
+  // Two runners finishing within seconds of each other must not race into two
+  // comments on the same PR — the same class of collision `agentic-trigger.yml`
+  // and `auto-assign-next.yml` already serialise on `agentic-assignment`.
+  it('gives the nudge job a concurrency group keyed on PR/branch identity', () => {
+    const nudge = jobBlock(failsafe, 'nudge');
+    expect(nudge).toContain('concurrency:');
+    const concurrency = nudge.slice(nudge.indexOf('concurrency:'));
+    const group = /group:\s*(.+)/.exec(concurrency)?.[1] ?? '';
+    expect(group).toMatch(/head_branch|DISPATCH_PR|pr\.number|inputs\.pr/);
+  });
+
+  // Re-dispatching the nudge job from the new job needs the scope to fire a
+  // `workflow_dispatch` — `nudge`'s own `actions: read` cannot do that. The
+  // grant lives on `scan-after-runner`'s own job-level `permissions:`, which
+  // replaces the workflow-level block entirely for that job, rather than on
+  // the workflow-level block — widening that repo-wide would hand every job
+  // `actions: write`, including `nudge`, which never dispatches.
+  it('grants actions: write for the re-dispatch', () => {
+    const scanAfterRunner = jobBlock(failsafe, 'scan-after-runner');
+    expect(scanAfterRunner, 'scan-after-runner job not found').not.toBe('');
+    const jobPermissions = scanAfterRunner.slice(
+      scanAfterRunner.indexOf('permissions:'),
+      scanAfterRunner.indexOf('concurrency:')
+    );
+    expect(jobPermissions).toContain('actions: write');
+
+    // The top-level grant must stay narrow, or a future regression re-widens
+    // it repo-wide instead of scoping it to the one job that needs it.
+    const topLevelPermissions = failsafe.slice(failsafe.indexOf('\npermissions:'), failsafe.indexOf('\njobs:'));
+    expect(topLevelPermissions).toContain('actions: read');
+    expect(topLevelPermissions).not.toContain('actions: write');
+  });
+
+  // The two must never name the marker differently, or a comment either side
+  // writes would be invisible to the other's attempt count.
+  it('shares one MARKER literal with ci-handback.cjs', () => {
+    const handback = readFileSync(join(ROOT, '.github/scripts/ci-handback.cjs'), 'utf8');
+    const moduleMarker = /const MARKER = '([^']+)'/.exec(handback)?.[1];
+    expect(moduleMarker, 'MARKER not found in ci-handback.cjs').toBeTruthy();
+    expect(failsafe).toContain(`const MARKER = '${moduleMarker}'`);
   });
 });
