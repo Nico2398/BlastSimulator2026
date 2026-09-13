@@ -35,31 +35,40 @@
 // such label — so the failure first appeared on the merge commit, where no
 // PR-scoped workflow was watching. Unit tests run on every PR, so this check
 // fails where the mistake is made.
+//
+// #1072: spacing itself is now part of the comparison, not just hole
+// count/origin — a step can declare a `spacing:` its drag never sets, or
+// carry a stepper click the declared value does not account for, and the two
+// channels drill the same COUNT of holes at the same origin but at different
+// pitches. Catching that requires a whole-FILE stateful fold rather than a
+// per-step reset: `DrillStep` (src/ui/panels/blastSteps/Drill.ts) is the real
+// production UI class, constructed exactly once per session by `UIManager`'s
+// constructor. Its `gridSpacing` field persists across every grid-tool step
+// in a scenario file — it is never reset between steps, and a `new_game` /
+// `sandbox start` command mid-file does NOT recreate it. So `spacing`
+// (below) starts at DEFAULT_SPACING_M once per scenario FILE, and every
+// step's stepper clicks — whether or not that step itself drags — thread
+// into the running value the next dragging step reads. A per-step-reset
+// model produces false positives on any file where a later grid-tool step
+// inherits spacing set by an earlier one.
 
 import { describe, it, expect } from 'vitest';
 import type { ScenarioStepDef, InteractionStepAction } from '../../../scripts/shared/scenario-types.js';
 import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { DRILL_GRID_DEFAULT_SPACING_M } from '../../../src/core/config/balance.js';
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 
-/** Drill.ts's DEFAULT_SPACING_M / DEFAULT_DEPTH_M — the strip's start values. */
-const DEFAULT_SPACING_M = 3;
+/** Drill.ts's DEFAULT_SPACING_M — the strip's start value, once per session/file. */
+const DEFAULT_SPACING_M = DRILL_GRID_DEFAULT_SPACING_M;
 /** Drill.ts's own clamp on the spacing stepper. */
 const SPACING_RANGE = { min: 1, max: 20 };
 
 /**
- * The part of a grid plan both channels must agree on: how many holes, and
- * where the pattern starts.
- *
- * Deliberately not the pitch itself. Fourteen steps across the suite declare a
- * `spacing:` their drag never sets (the strip's steppers are simply not
- * clicked), so both channels drill the same COUNT of holes at the same origin
- * but at different pitches — a real divergence, but a pre-existing one whose
- * correction re-derives every downstream expectation in fourteen files, so it
- * is its own change and is filed separately. Add `spacing` here once those are
- * settled: `simulateGridDrag` already resolves it.
+ * The part of a grid plan both channels must agree on: how many holes, at
+ * what pitch, starting where.
  */
-interface PlanShape { rows: number; cols: number; startX: number; startZ: number }
+interface PlanShape { rows: number; cols: number; startX: number; startZ: number; spacing: number }
 
 /** Parse `drill_plan grid rows:2 cols:3 spacing:5 depth:8 start:14,14`. */
 function parseDeclaredGrid(command: string): PlanShape | null {
@@ -75,6 +84,7 @@ function parseDeclaredGrid(command: string): PlanShape | null {
   return {
     rows: num('rows', 1),
     cols: num('cols', 1),
+    spacing: num('spacing', DEFAULT_SPACING_M),
     startX: start === null ? 0 : Number(start[1]),
     startZ: start === null ? 0 : Number(start[2]),
   };
@@ -95,55 +105,80 @@ function spacingStepperDelta(action: InteractionStepAction): number {
   return which[1] === 'last' ? 1 : -1;
 }
 
-/** What `armGridTool`'s confirm handler would actually order for this step. */
-function simulateGridDrag(step: ScenarioStepDef): PlanShape | null {
+/** Whether a step's own interaction drags the grid tool at all (stateless sanity check). */
+function stepDragsGridTool(step: ScenarioStepDef): boolean {
   const actions = step.interaction;
-  if (actions === undefined) return null;
-  if (!actions.some(a => (a.type === 'clickSelector' || a.type === 'clickIfPresent') && /data-action="grid-tool"/.test(a.selector))) return null;
-  const drag = actions.find(a => a.type === 'dragTiles');
-  if (drag === undefined || drag.type !== 'dragTiles') return null;
-
-  let spacing = DEFAULT_SPACING_M;
-  for (const action of actions) {
-    spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, spacing + spacingStepperDelta(action)));
-  }
-
-  return {
-    cols: Math.max(1, Math.round((drag.x2 - drag.x1) / spacing) + 1),
-    rows: Math.max(1, Math.round((drag.z2 - drag.z1) / spacing) + 1),
-    startX: drag.x1,
-    startZ: drag.z1,
-  };
+  if (actions === undefined) return false;
+  if (!actions.some(a => (a.type === 'clickSelector' || a.type === 'clickIfPresent') && /data-action="grid-tool"/.test(a.selector))) return false;
+  return actions.some(a => a.type === 'dragTiles');
 }
 
-describe('repo-wide — a grid-tool drag orders the grid its step declares (issue #1069)', () => {
+/**
+ * Folds one scenario FILE's steps in declaration order, threading a single
+ * running `spacing` value the way the real, once-constructed `DrillStep`
+ * does — never reset between steps, even across `new_game`/`sandbox start`
+ * mid-file. For every step that drags the grid tool, records what
+ * `armGridTool`'s confirm handler would actually order using the spacing
+ * value as it stands *after* that step's own preceding stepper clicks (not a
+ * fresh per-step default).
+ */
+function simulateFileGridDrags(steps: readonly ScenarioStepDef[]): Map<number, PlanShape> {
+  const results = new Map<number, PlanShape>();
+  let spacing = DEFAULT_SPACING_M;
+
+  steps.forEach((step, stepIndex) => {
+    const actions = step.interaction;
+    if (actions === undefined) return;
+
+    let drag: { x1: number; z1: number; x2: number; z2: number } | null = null;
+    for (const action of actions) {
+      spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, spacing + spacingStepperDelta(action)));
+      if (action.type === 'dragTiles') drag = action;
+    }
+
+    if (!stepDragsGridTool(step) || drag === null) return;
+
+    results.set(stepIndex, {
+      cols: Math.max(1, Math.round((drag.x2 - drag.x1) / spacing) + 1),
+      rows: Math.max(1, Math.round((drag.z2 - drag.z1) / spacing) + 1),
+      startX: drag.x1,
+      startZ: drag.z1,
+      spacing,
+    });
+  });
+
+  return results;
+}
+
+describe('repo-wide — a grid-tool drag orders the grid its step declares (issue #1069, spacing #1072)', () => {
   it('sanity: the scenario directory is non-empty (guards against a silently broken glob)', () => {
     expect(ALL_SCENARIO_NAMES.length).toBeGreaterThan(0);
   });
 
   it('sanity: at least one step actually drags the grid tool, so this lint has something to check', () => {
     const dragging = ALL_SCENARIO_NAMES.flatMap(file =>
-      loadScenarioDef(file, SCENARIO_DIR).steps.filter(s => simulateGridDrag(s as ScenarioStepDef) !== null));
+      loadScenarioDef(file, SCENARIO_DIR).steps.filter(s => stepDragsGridTool(s as ScenarioStepDef)));
     expect(dragging.length).toBeGreaterThan(0);
   });
 
-  it('every grid-tool drag orders the same number of holes, at the same origin, as its own command declares', () => {
+  it('every grid-tool drag orders the same number of holes, at the same origin and spacing, as its own command declares', () => {
     const violations: string[] = [];
 
     for (const file of ALL_SCENARIO_NAMES) {
       const scenario = loadScenarioDef(file, SCENARIO_DIR);
-      scenario.steps.forEach((rawStep, stepIndex) => {
-        const step = rawStep as ScenarioStepDef;
-        const dragged = simulateGridDrag(step);
-        if (dragged === null) return;
+      const steps = scenario.steps as ScenarioStepDef[];
+      const dragged = simulateFileGridDrags(steps);
+
+      dragged.forEach((computed, stepIndex) => {
+        const step = steps[stepIndex]!;
         const declared = parseDeclaredGrid(step.command);
         if (declared === null) {
           violations.push(`  ${file}.json step[${stepIndex}]: drags the grid tool but its command is "${step.command}" — expected a "drill_plan grid …"`);
           return;
         }
-        const mismatches = (['rows', 'cols', 'startX', 'startZ'] as const)
-          .filter(key => declared[key] !== dragged[key])
-          .map(key => `${key} declared ${declared[key]} but the drag produces ${dragged[key]}`);
+        const mismatches = (['rows', 'cols', 'startX', 'startZ', 'spacing'] as const)
+          .filter(key => declared[key] !== computed[key])
+          .map(key => `${key} declared ${declared[key]} but the drag produces ${computed[key]}`);
         if (mismatches.length > 0) {
           violations.push(`  ${file}.json step[${stepIndex}] ("${step.command}"): ${mismatches.join('; ')}`);
         }
@@ -156,7 +191,9 @@ describe('repo-wide — a grid-tool drag orders the grid its step declares (issu
       + `would drill one grid and interaction mode another, from that step on. Fix by clicking the\n`
       + `strip's spacing/depth steppers ([data-field] .bsx-stepper-btn:last-child increments,\n`
       + `:first-child decrements) and sizing the rectangle so that\n`
-      + `cols = round((x2-x1)/spacing)+1 and rows = round((z2-z1)/spacing)+1:\n`
+      + `cols = round((x2-x1)/spacing)+1 and rows = round((z2-z1)/spacing)+1, remembering that\n`
+      + `spacing is a running total across the whole file (the real DrillStep is constructed once\n`
+      + `per session and never resets between steps):\n`
       + `${violations.join('\n')}\n`,
     ).toEqual([]);
   });
