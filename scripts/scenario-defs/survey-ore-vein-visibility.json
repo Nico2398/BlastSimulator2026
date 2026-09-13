@@ -637,8 +637,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15",
-      "description": "#553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles -- none drilled yet, so holeCount stays 0 right after confirm.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
+      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper clicks precede the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts) — the (15,15)-(19,19) rectangle (4x4) still computes 2x2 (round(4/3)+1=2). #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles -- none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",

@@ -20,7 +20,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 diameter:0.089 start:10,10",
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 diameter:0.089 start:10,10",
+      "description": "Corrected spacing from 1 to 3 to match the drag (#1072): no stepper clicks precede the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). This is a 1x1 grid (rows:1 cols:1), so spacing has zero effect on the computed hole position -- a single hole lands at the drag's own (10,10) origin regardless of spacing. Correcting a declared value with no behavioral effect.",
       "interaction": [
         {
           "type": "clickSelector",

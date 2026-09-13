@@ -347,8 +347,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
-      "description": "Four holes at minimal spacing/stemming (vs. the wider, well-stemmed grids used elsewhere) so their energy overlaps enough to actually throw fragments (isProjection) — a single lightly-charged hole clears rock cleanly with zero projections and never moves Ecology/Nuisance at all.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
+      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper clicks precede the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts) — the (20,20)-(24,24) rectangle (4x4) still computes 2x2 (round(4/3)+1=2). Four holes at minimal spacing/stemming (vs. the wider, well-stemmed grids used elsewhere) so their energy overlaps enough to actually throw fragments (isProjection) — a single lightly-charged hole clears rock cleanly with zero projections and never moves Ecology/Nuisance at all.",
       "interaction": [
         {
           "type": "clickSelector",
