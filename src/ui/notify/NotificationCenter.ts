@@ -12,6 +12,8 @@
 import type { IconName } from '../icons.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
+import { t } from '../../core/i18n/I18n.js';
+import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -79,13 +81,8 @@ export class NotificationCenter {
   private currentTick = 0;
   /** Contracts already warned about expiry, so the same contract doesn't re-toast every frame. */
   private readonly warnedContracts = new Set<number>();
-  /**
-   * PendingAction ids already warned about being blocked, keyed to the reason
-   * last warned (#1061). Not yet `private` — nothing reads it until update()
-   * wires it in (implementer's job); noUnusedLocals would fail the skeleton
-   * build on an unread private field. Narrow back to `private` once wired.
-   */
-  readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
+  /** PendingAction ids already warned about being blocked, keyed to the reason last warned (#1061), so a re-classification to a different reason re-toasts but the same one doesn't repeat every frame. */
+  private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
 
   /** Push a notification: it appears as a toast now and stays in the log. */
   notify(input: NotifyInput): void {
@@ -172,15 +169,56 @@ export class NotificationCenter {
       for (const id of this.warnedContracts) if (!activeIds.has(id)) this.warnedContracts.delete(id);
     }
 
+    // Blocked orders (#1061): EmployeeDispatch.ts's classification pass
+    // stamps action.blockedReason every tick — this just surfaces it. Mirrors
+    // the contract-expiry pattern just above: warn once per (action,
+    // reason) pair, re-toast only if the reason itself changes, and forget
+    // ids that are no longer blocked.
+    const blockedActions = state.pendingActions.filter(
+      a => a.status === 'queued' && a.blockedReason != null,
+    );
+    for (const action of blockedActions) {
+      const reason = action.blockedReason as BlockedOrderReason;
+      if (this.warnedBlockedOrders.get(action.id) === reason) continue;
+      this.warnedBlockedOrders.set(action.id, reason);
+      this.notify({
+        severity: 'warn',
+        icon: 'warn',
+        title: t('notification.title.order_blocked'),
+        body: buildBlockedOrderMessage(action),
+      });
+    }
+    if (this.warnedBlockedOrders.size > 0) {
+      const blockedIds = new Set(blockedActions.map(a => a.id));
+      for (const id of this.warnedBlockedOrders.keys()) if (!blockedIds.has(id)) this.warnedBlockedOrders.delete(id);
+    }
+    if (blockedActions.length > 0) {
+      pips.push({
+        kind: 'orders',
+        icon: 'warn',
+        label: t('notification.pip.blocked_orders_label', { count: blockedActions.length }),
+        tone: 'warn',
+        tip: t('notification.pip.blocked_orders_tip', { count: blockedActions.length }),
+      });
+    }
+
     return pips;
   }
 }
 
-/**
- * Builds the notification body naming the blocked order and its missing
- * requirement (#1061). Not yet wired into update() — implementer's job.
- */
-export function buildBlockedOrderMessage(_action: PendingAction): string {
-  // TODO: implement
-  throw new Error('not implemented');
+/** Builds the notification body naming the blocked order and its missing requirement (#1061). */
+function buildBlockedOrderMessage(action: PendingAction): string {
+  const order = t(ACTION_LABEL_KEY[action.type]);
+  switch (action.blockedReason) {
+    case 'no_vehicle_in_fleet':
+      return t('notification.order_blocked_no_vehicle', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'no_licensed_driver':
+      return t('notification.order_blocked_no_driver', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'no_qualified_employee':
+      return action.requiredSkill !== null
+        ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
+        : t('notification.order_blocked_no_staff', { order });
+    default:
+      return order;
+  }
 }

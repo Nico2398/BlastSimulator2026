@@ -15,6 +15,7 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
+import { isLicensedForRole } from './VehicleReservation.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -77,10 +78,27 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // ground — HaulDispatch.ts's own doc comment already promises these sit
   // queued silently until a hauler/driver exists; requiredSkill===null alone
   // doesn't deliver that promise when the roster is completely empty.
+  // Same pass also stamps action.blockedReason (#1061) — a live diagnostic
+  // NotificationCenter.ts surfaces as a non-blocking player warning, entirely
+  // separate from the unqualifiedIds/result.unqualified heavy-modal channel
+  // above: a vehicle-gated action is NEVER added to unqualifiedIds/
+  // result.unqualified (see the doc comment above), but it still gets a
+  // blockedReason and a result.blocked entry when nobody can currently work
+  // it (no vehicle of that role in the fleet, or nobody licensed to drive
+  // one).
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
-    if (action.requiredVehicleRole !== null) continue;
+    if (action.requiredVehicleRole !== null) {
+      const role = action.requiredVehicleRole;
+      const hasVehicle = state.vehicles.vehicles.some(v => v.type === role);
+      const hasLicensedDriver = eligible.some(emp => isLicensedForRole(emp, role));
+      action.blockedReason = !hasVehicle
+        ? 'no_vehicle_in_fleet'
+        : !hasLicensedDriver ? 'no_licensed_driver' : null;
+      if (action.blockedReason != null) result.blocked.push(action.id);
+      continue;
+    }
     const hasQualified = action.requiredSkill === null
       ? eligible.length > 0
       : eligible.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
@@ -88,6 +106,8 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       unqualifiedIds.add(action.id);
       result.unqualified.push(action.id);
     }
+    action.blockedReason = hasQualified ? null : 'no_qualified_employee';
+    if (action.blockedReason != null) result.blocked.push(action.id);
   }
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);
