@@ -34,7 +34,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:8 start:14,14",
-      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once.",
+      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once. #1069: the interaction half used to drag (14,14)-(29,24) without touching the strip's steppers, so it confirmed at the grid tool's own DEFAULT_SPACING_M of 3m (Drill.ts) — round((29-14)/3)+1 = 6 cols by round((24-14)/3)+1 = 4 rows, i.e. 24 holes, not the 6 this step's command declares (measured on main: 'orderedHoleCount should be 6 but is 24'). Two increment clicks on the spacing stepper (data-field=\"spacing\", 3->5) and two on the depth stepper (6->8, matching depth:8) now make both halves describe the same plan, and the drag rectangle shrinks to (14,14)-(24,19): at spacing 5 that is round((24-14)/5)+1 = 3 cols by round((19-14)/5)+1 = 2 rows. Same convention as blast-basic.json's own spacing-stepper click (#479 follow-up).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -49,11 +49,27 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 14,
           "z1": 14,
-          "x2": 29,
-          "z2": 24
+          "x2": 24,
+          "z2": 19
         },
         {
           "type": "clickSelector",

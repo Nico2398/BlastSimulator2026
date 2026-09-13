@@ -1302,7 +1302,7 @@
     },
     {
       "command": "blast",
-      "description": "#553 Finding (deaths): all 4 employees die -- the surveyor (still standing near (10,10), the core_sample site) and all 3 drillers (each physically standing at the last hole they drilled within the pattern when it detonates -- new under #553; pre-#553 nobody was ever at a pattern, since confirming a plan wrote the holes instantly). Verified via `employee list` post-blast: all four show DEAD.",
+      "description": "#553 Finding (deaths): all 4 employees die -- the surveyor (still standing near (10,10), the core_sample site) and all 3 drillers (each physically standing at the last hole they drilled within the pattern when it detonates -- new under #553; pre-#553 nobody was ever at a pattern, since confirming a plan wrote the holes instantly). Verified via `employee list` post-blast: all four show DEAD. #1069: the close step used to be `waitForSelector` + `clickSelector`, which went red on main after #1062 with `clickSelector \"[data-action=\\\"report-close\\\"]\" failed: element has zero size (0x0)` — measured in a real browser, the report modal's own node is already in the DOM while the collapse is still playing, so waiting on its mere existence returns a 0x0 element and the click lands on nothing. The report is present, not absent. Replaced with `awaitUsable`, which waits for the control to be genuinely clickable — the same pairing blast-execution-visual's own CATASTROPHIC-rating blast step already uses for this exact modal (that step even asserts `offsetHeight` is 0 first, to pin the zero-size window down).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1321,8 +1321,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 30000
         },
         {
           "type": "clickSelector",
