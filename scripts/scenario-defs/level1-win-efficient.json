@@ -1302,7 +1302,7 @@
     },
     {
       "command": "blast",
-      "description": "#553 Finding (deaths): all 4 employees die -- the surveyor (still standing near (10,10), the core_sample site) and all 3 drillers (each physically standing at the last hole they drilled within the pattern when it detonates -- new under #553; pre-#553 nobody was ever at a pattern, since confirming a plan wrote the holes instantly). Verified via `employee list` post-blast: all four show DEAD.",
+      "description": "#553 Finding (deaths): all 4 employees die -- the surveyor (still standing near (10,10), the core_sample site) and all 3 drillers (each physically standing at the last hole they drilled within the pattern when it detonates -- new under #553; pre-#553 nobody was ever at a pattern, since confirming a plan wrote the holes instantly). Verified via `employee list` post-blast: all four show DEAD. #1069 CI-fix (real interaction-mode finding -- main red since #1068 merged, CI: clickSelector \"[data-action=report-close]\" failed: element has zero size (0x0)): the wait ahead of this click was waitForSelector, which resolves on DOM PRESENCE alone. The blast report panel is in the DOM before the detonation playback has finished laying it out, so the very next clickSelector could land while the close button still measured 0x0. #1062 moving NEED_HARD_THRESHOLDS.fatigue 5 -> 0 shifts this file rest/collapse timing throughout the drilling phase (see the scores steps own #1062 notes for the same cascade in the score numbers), which is what moved this click inside that window rather than after it. Promoted to awaitUsable -- the same usability gate clickSelector itself clicks through, and the wait already used two steps above for the speed button and the Sequence tab -- so the wait now ends when the button is genuinely clickable instead of merely present. Condition-based, so it advances no ticks and changes nothing in command mode, whose own interaction array never runs it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1321,8 +1321,9 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 30000
         },
         {
           "type": "clickSelector",

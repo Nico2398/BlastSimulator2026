@@ -33,8 +33,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:8 start:14,14",
-      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once.",
+      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:8 diameter:0.089 start:14,14",
+      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once. #1069 CI-fix (real interaction-mode finding, `main` red since #1068 merged): the interaction half of this step described a completely different plan from its own `command` half, and only the interaction shards run it — the drag alone can never carry spacing/depth/diameter, those come from the grid tool's own strip (Drill.ts's DEFAULT_SPACING_M 3 / DEFAULT_DEPTH_M 6 / DRILL_HOLE_DEFAULT_DIAMETER_M 0.089) and the confirm handler computes cols = round((x2-x1)/spacing)+1, rows = round((z2-z1)/spacing)+1. The old (14,14)-(29,24) drag at the untouched 3m default therefore ordered round(15/3)+1 = 6 cols x round(10/3)+1 = 4 rows = 24 holes, not the declared 6 — CI: `orderedHoleCount should be 6 but is 24`. Corrected the way every other grid-tool step in this suite does it (blast-basic.json, blast-drill-plan-visual.json, blast-overcharge.json): two increment clicks on the spacing stepper (3 -> 5) and two on the depth stepper (6 -> 8) before dragging, plus a rectangle sized for the declared pattern — (14,14)-(24,19) computes round(10/5)+1 = 3 cols x round(5/5)+1 = 2 rows = the declared rows:2 cols:3, at the same start:14,14. `diameter:0.089` added to the declared command for the same reason blast-charge-loading-ui.json's own #947 note records: the strip has no diameter stepper, so the real drag always confirms at DRILL_HOLE_DEFAULT_DIAMETER_M, while the command's own omitted-diameter fallback is drillPlan.ts's 0.15 — that gap feeds computeDrillHoleDurationTicks a different per-hole drilling time per mode, which on a file whose whole point is a fatigue budget would make the two channels measure different runs.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -49,11 +49,27 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 14,
           "z1": 14,
-          "x2": 29,
-          "z2": 24
+          "x2": 24,
+          "z2": 19
         },
         {
           "type": "clickSelector",
