@@ -271,6 +271,30 @@ function migrateV16ToV17(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v17 -> v18: PendingAction.queuedAtTick became required (#1060 — the
+ * starvation check's `?? state.tickCount` fallback made an unstamped action
+ * measure its own age as always 0, so it could never starve). A pre-v18 save
+ * may have `pendingActions` entries with no `queuedAtTick`; backfilling to
+ * the save's own `tickCount` gives the entry age 0 at load time, which then
+ * grows normally as ticks advance from there — deliberately not "the current
+ * wall-clock tick" re-read later, it is the tick value frozen in that save
+ * file at the moment of backfill. Mutates `obj` in place, matching every
+ * other migration block in `deserialize` below.
+ */
+function migrateV17ToV18(obj: Record<string, unknown>): Record<string, unknown> {
+  const tickCount = typeof obj['tickCount'] === 'number' ? obj['tickCount'] : 0;
+  const pendingActions = obj['pendingActions'] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(pendingActions)) {
+    for (const action of pendingActions) {
+      if (typeof action['queuedAtTick'] !== 'number') {
+        action['queuedAtTick'] = tickCount;
+      }
+    }
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -470,6 +494,11 @@ export function deserialize(json: string): GameState {
   // v16 -> v17: Vehicle.pendingEvacuationDestination (#1042).
   if ((obj['version'] as number) < 17) {
     migrateV16ToV17(obj);
+  }
+
+  // v17 -> v18: PendingAction.queuedAtTick required, backfilled (#1060).
+  if ((obj['version'] as number) < 18) {
+    migrateV17ToV18(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

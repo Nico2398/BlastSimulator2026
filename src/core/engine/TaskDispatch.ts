@@ -36,7 +36,7 @@ export type DispatchRejectionReason = 'target-not-found' | 'target-unqualified' 
  */
 export function dispatchPendingAction(
   state: GameState,
-  action: Omit<PendingAction, 'status' | 'holderId'>,
+  action: Omit<PendingAction, 'status' | 'holderId' | 'queuedAtTick'>,
   options?: { skipQualificationCheck?: boolean },
 ): { success: boolean; error?: string; reason?: DispatchRejectionReason } {
   const targetId = action.targetEmployeeId;

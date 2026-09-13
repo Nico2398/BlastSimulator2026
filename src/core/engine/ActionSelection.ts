@@ -401,7 +401,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
     isQueuedActionAvailableToEmployee(employee, a) &&
     a.requiredVehicleRole === null &&
     !isEvacuationHoldActive(state, a) &&
-    state.tickCount - (a.queuedAtTick ?? state.tickCount) >= ACTION_STARVATION_TICK_THRESHOLD);
+    state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
 
   return selectBestActionForEmployee(state, employee, candidates);
 }

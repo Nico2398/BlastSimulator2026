@@ -88,7 +88,12 @@ import type { RampDef } from '../mining/Ramp.js';
 // v16 -> v17: Vehicle gained `pendingEvacuationDestination: { x: number; z:
 // number } | null` (#1042 — a driverless vehicle can now be boarded and
 // driven clear of an evacuating zone). See SaveLoad.ts's migrateV16ToV17.
-export const SAVE_VERSION = 17;
+// v17 -> v18: PendingAction.queuedAtTick became required (#1060). It was
+// optional, and the starvation check's `?? state.tickCount` fallback made an
+// unstamped action measure its own age as always 0, so it could never
+// starve. A migration backfills any pre-v18 `pendingActions` entry missing
+// the field to the save's own `tickCount`. See SaveLoad.ts's migrateV17ToV18.
+export const SAVE_VERSION = 18;
 
 export interface GameConfig {
   seed: number;
@@ -171,11 +176,11 @@ export interface PendingAction {
    * Tick this action was queued at — used by ActionSelection.ts's
    * `findStarvedActionForEmployee` to detect a queued, unclaimed,
    * `requiredVehicleRole === null` action that has waited at least
-   * `ACTION_STARVATION_TICK_THRESHOLD` ticks (#1000). Optional: absent on
-   * actions created before this field existed and on any action type this
-   * starvation check doesn't apply to.
+   * `ACTION_STARVATION_TICK_THRESHOLD` ticks (#1000). Stamped at every
+   * creation site; saves written before this field existed are backfilled on
+   * load by SaveLoad.ts's migrateV17ToV18 (#1060).
    */
-  queuedAtTick?: number;
+  queuedAtTick: number;
 }
 
 /**
