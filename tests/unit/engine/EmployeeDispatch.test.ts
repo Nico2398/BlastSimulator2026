@@ -1001,7 +1001,10 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
   it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in BOTH result.unqualified and result.blocked', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // Not 'driller': ROLE_STARTING_QUALIFICATION grants a fresh driller hire
+    // 'blasting' by default (Employee.ts), so that role would already be
+    // qualified for the action below. 'surveyor' starts with 'geology'.
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
     assignSkill(state.employees, employee.id, 'driving.truck', 1); // wrong skill for the action below
 
     const action: PendingAction = {

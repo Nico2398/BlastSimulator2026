@@ -204,7 +204,7 @@ describe('NotificationCenter (redesign P1)', () => {
 
       const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
       expect(entries).toHaveLength(1);
-      expect(entries[0]!.body).toContain('rock_digger');
+      expect(entries[0]!.body).toContain(t('vehicle_type.rock_digger'));
       expect(entries[0]!.body).toContain(t(ACTION_LABEL_KEY.level_ground));
     });
 
@@ -302,14 +302,14 @@ describe('NotificationCenter (redesign P1)', () => {
       const action = makeAction({ id: 1, blockedReason: 'no_vehicle_in_fleet' });
       const message = buildBlockedOrderMessage(action);
       expect(message).toContain(t(ACTION_LABEL_KEY.level_ground));
-      expect(message).toContain('rock_digger');
+      expect(message).toContain(t('vehicle_type.rock_digger'));
     });
 
     it('names the order type and the vehicle role for no_licensed_driver, with wording distinct from no_vehicle_in_fleet', () => {
       const action = makeAction({ id: 1, blockedReason: 'no_licensed_driver' });
       const message = buildBlockedOrderMessage(action);
       expect(message).toContain(t(ACTION_LABEL_KEY.level_ground));
-      expect(message).toContain('rock_digger');
+      expect(message).toContain(t('vehicle_type.rock_digger'));
 
       const otherMessage = buildBlockedOrderMessage(makeAction({ id: 1, blockedReason: 'no_vehicle_in_fleet' }));
       expect(message).not.toBe(otherMessage);
@@ -322,7 +322,7 @@ describe('NotificationCenter (redesign P1)', () => {
       });
       const message = buildBlockedOrderMessage(action);
       expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
-      expect(message).toContain('blasting');
+      expect(message).toContain(t('skill.blasting'));
     });
   });
 });
