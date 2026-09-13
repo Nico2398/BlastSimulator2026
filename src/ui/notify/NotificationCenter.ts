@@ -10,8 +10,10 @@
 // panel polls GameState — no event-callback wiring needed.
 
 import type { IconName } from '../icons.js';
-import type { GameState } from '../../core/state/GameState.js';
+import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
+import { t } from '../../core/i18n/I18n.js';
+import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -62,7 +64,7 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders';
 
 export interface AlertPip {
   readonly kind: AlertKind;
@@ -79,6 +81,8 @@ export class NotificationCenter {
   private currentTick = 0;
   /** Contracts already warned about expiry, so the same contract doesn't re-toast every frame. */
   private readonly warnedContracts = new Set<number>();
+  /** PendingAction ids already warned about being blocked, keyed to the reason last warned (#1061), so a re-classification to a different reason re-toasts but the same one doesn't repeat every frame. */
+  private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
 
   /** Push a notification: it appears as a toast now and stays in the log. */
   notify(input: NotifyInput): void {
@@ -161,10 +165,69 @@ export class NotificationCenter {
     }
     // Forget expiry warnings for contracts that are no longer active (completed, expired, or declined).
     if (this.warnedContracts.size > 0) {
-      const activeIds = new Set(state.contracts.active.map(c => c.id));
-      for (const id of this.warnedContracts) if (!activeIds.has(id)) this.warnedContracts.delete(id);
+      this.pruneStaleKeys(this.warnedContracts, new Set(state.contracts.active.map(c => c.id)));
+    }
+
+    // Blocked orders (#1061): EmployeeDispatch.ts's classification pass
+    // stamps action.blockedReason every tick — this just surfaces it. Mirrors
+    // the contract-expiry pattern just above: warn once per (action,
+    // reason) pair, re-toast only if the reason itself changes, and forget
+    // ids that are no longer blocked.
+    const blockedActions = state.pendingActions.filter(
+      a => a.status === 'queued' && a.blockedReason != null,
+    );
+    for (const action of blockedActions) {
+      const reason = action.blockedReason as BlockedOrderReason;
+      if (this.warnedBlockedOrders.get(action.id) === reason) continue;
+      this.warnedBlockedOrders.set(action.id, reason);
+      this.notify({
+        severity: 'warn',
+        icon: 'warn',
+        title: t('notification.title.order_blocked'),
+        body: buildBlockedOrderMessage(action),
+      });
+    }
+    if (this.warnedBlockedOrders.size > 0) {
+      this.pruneStaleKeys(this.warnedBlockedOrders, new Set(blockedActions.map(a => a.id)));
+    }
+    if (blockedActions.length > 0) {
+      pips.push({
+        kind: 'orders',
+        icon: 'warn',
+        label: t('notification.pip.blocked_orders_label', { count: blockedActions.length }),
+        tone: 'warn',
+        tip: t('notification.pip.blocked_orders_tip', { count: blockedActions.length }),
+      });
     }
 
     return pips;
+  }
+
+  /**
+   * Deletes keys from `map` that are no longer present in `currentIds` — the
+   * "forget stale warn-once state" half shared by the contract-expiry and
+   * blocked-orders guards above (#1061 review: identical prune shape).
+   */
+  private pruneStaleKeys(map: Map<number, BlockedOrderReason> | Set<number>, currentIds: Set<number>): void {
+    for (const key of map instanceof Map ? map.keys() : map) {
+      if (!currentIds.has(key)) map.delete(key);
+    }
+  }
+}
+
+/** Builds the notification body naming the blocked order and its missing requirement (#1061). */
+export function buildBlockedOrderMessage(action: PendingAction): string {
+  const order = t(ACTION_LABEL_KEY[action.type]);
+  switch (action.blockedReason) {
+    case 'no_vehicle_in_fleet':
+      return t('notification.order_blocked_no_vehicle', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'no_licensed_driver':
+      return t('notification.order_blocked_no_driver', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'no_qualified_employee':
+      return action.requiredSkill !== null
+        ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
+        : t('notification.order_blocked_no_staff', { order });
+    default:
+      return order;
   }
 }

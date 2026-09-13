@@ -319,8 +319,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.step_speedupdig(.title), tutorial.step_speednormalafterdig(.title),
     // tutorial.stage.speed_up_dig, tutorial.stage.speed_normal_after_dig —
     // both locales.
+    // Baseline is now 3495 (up from 3488): #1061 adds 7 keys for blocked-order
+    // notifications — notification.title.order_blocked,
+    // notification.order_blocked_no_employee, notification.order_blocked_no_staff,
+    // notification.order_blocked_no_vehicle, notification.order_blocked_no_driver,
+    // notification.pip.blocked_orders_label, notification.pip.blocked_orders_tip —
+    // both locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3488);
+    expect(Object.keys(en).length).toBe(3495);
   });
 });
 

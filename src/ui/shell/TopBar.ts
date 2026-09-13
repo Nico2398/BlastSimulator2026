@@ -48,6 +48,7 @@ const ALERT_ROUTE: Partial<Record<AlertPip['kind'], PanelName>> = {
   contract: 'contracts',
   crew: 'employees',
   fleet: 'vehicles',
+  orders: 'ops',
 };
 
 /**

@@ -15,6 +15,7 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
+import { isLicensedForRole } from './VehicleReservation.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -77,17 +78,44 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // ground — HaulDispatch.ts's own doc comment already promises these sit
   // queued silently until a hauler/driver exists; requiredSkill===null alone
   // doesn't deliver that promise when the roster is completely empty.
+  // Same pass also stamps action.blockedReason (#1061) — a live diagnostic
+  // NotificationCenter.ts surfaces as a non-blocking player warning, entirely
+  // separate from the unqualifiedIds/result.unqualified heavy-modal channel
+  // above: a vehicle-gated action is NEVER added to unqualifiedIds/
+  // result.unqualified (see the doc comment above), but it still gets a
+  // blockedReason when nobody can currently work it (no vehicle of that role
+  // in the fleet, nobody licensed to drive one, or — matching the real claim
+  // requirement in findVehicleForClaim/claimOnePoolCandidate,
+  // EmployeeDispatchSteps.ts — nobody who is BOTH licensed for the role AND
+  // holds action.requiredSkill, e.g. drill_hole needs driving.drill_rig AND
+  // blasting on the same employee).
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
-    if (action.requiredVehicleRole !== null) continue;
-    const hasQualified = action.requiredSkill === null
-      ? eligible.length > 0
-      : eligible.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+    // Shared shape between the vehicle-gated and plain branches below: an
+    // action with no requiredSkill just needs a warm body from `emps`;
+    // otherwise at least one of `emps` must hold the skill.
+    const holdsRequiredSkill = (emps: Employee[]): boolean => action.requiredSkill === null
+      ? emps.length > 0
+      : emps.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+    if (action.requiredVehicleRole !== null) {
+      const role = action.requiredVehicleRole;
+      const hasVehicle = state.vehicles.vehicles.some(v => v.type === role);
+      const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
+      const hasQualifiedLicensed = holdsRequiredSkill(licensed);
+      action.blockedReason = !hasVehicle
+        ? 'no_vehicle_in_fleet'
+        : licensed.length === 0 ? 'no_licensed_driver'
+        : !hasQualifiedLicensed ? 'no_qualified_employee'
+        : null;
+      continue;
+    }
+    const hasQualified = holdsRequiredSkill(eligible);
     if (!hasQualified) {
       unqualifiedIds.add(action.id);
       result.unqualified.push(action.id);
     }
+    action.blockedReason = hasQualified ? null : 'no_qualified_employee';
   }
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);

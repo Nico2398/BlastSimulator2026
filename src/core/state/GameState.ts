@@ -136,6 +136,12 @@ export type ActionType =
  */
 export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
 
+/**
+ * Why a PendingAction currently has nobody able to perform it — surfaced as a
+ * non-blocking player warning rather than cancelling the order (#1061).
+ */
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver';
+
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
   id: number;
@@ -181,6 +187,14 @@ export interface PendingAction {
    * load by SaveLoad.ts's migrateV17ToV18 (#1060).
    */
   queuedAtTick: number;
+  /**
+   * Live diagnostic recomputed every tick by EmployeeDispatch.ts's classification
+   * pass. `null`/`undefined` both mean "not currently blocked". Deliberately
+   * OPTIONAL — unlike queuedAtTick (#1060), nothing depends on distinguishing
+   * "never yet classified" from "classified as fine", so no SaveLoad.ts migration
+   * or SAVE_VERSION bump applies. Always read with `!= null` (loose), not `!==`.
+   */
+  blockedReason?: BlockedOrderReason | null;
 }
 
 /**
