@@ -417,7 +417,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#928: widened from tick 5 -- by this point in the file the legacy shift-cycle (hasBunkhouse: a tier-2+ living_quarters is already standing) is active, and #928's single-gauge fatigue model means less proactive need-interruption keeps an employee's ticksWorked accumulating uninterrupted, so one of the three employees is already mid forced-shift-rest (WORK_DURATION_TICKS=6) right as this step starts -- fatigue correctly holds flat while resting (NEED_DRAIN_RATES.fatigue.resting=0, unchanged, #680) rather than draining, so a 5-tick window can catch it between 'still resting' and 'just replenished above its own pre-rest value', making minFatigue non-monotonic for a few ticks. A wider window lets that employee's rest complete, replenish, and resume idle/traveling drain like the rest of the roster, so minFatigue nets downward again (sandbox-measured on seed 42: 86.5 -> 88.5 at +10 ticks (replenished) -> 83.5 at +20).",
+      "description": "#928: widened from tick 5 -- by this point in the file the legacy shift-cycle (hasBunkhouse: a tier-2+ living_quarters is already standing) is active, and #928's single-gauge fatigue model means less proactive need-interruption keeps an employee's ticksWorked accumulating uninterrupted, so one of the three employees is already mid forced-shift-rest (WORK_DURATION_TICKS=6) right as this step starts -- fatigue correctly holds flat while resting (NEED_DRAIN_RATES.fatigue.resting=0, unchanged, #680) rather than draining, so a 5-tick window can catch it between 'still resting' and 'just replenished above its own pre-rest value', making minFatigue non-monotonic for a few ticks. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0) changed which of these two competing employees this step's own tick budget catches mid-recovery: Walt genuinely collapses (fatigue reaches the new floor of 0, COLLAPSING) a little earlier in the file's own long unmanaged build-and-idle stretch than the old floor allowed, and his own collapse-rest is still completing (against a real living_quarters now, unlike collapse-recovery.json's no-building case) right as THIS step starts (minFatigue=0 going in) — its recovery, not Stan's own continued drain, dominates the step, so minFatigue nets UPWARD this time (0 -> 50.5, re-derived live) rather than the old downward net the comment above still describes for the shift-cycle-only case.",
       "interaction": [
         {
           "type": "command",
@@ -426,8 +426,8 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["minFatigue"],
-        "note": "fatigue accrues even while idle — minFatigue (100=rested) drops within this window with no work assigned, once any in-flight forced rest has completed and replenished"
+        "increased": ["minFatigue"],
+        "note": "minFatigue starts this step at 0 — Walt is mid-collapse-rest (real collapse, not just the legacy shift-cycle) — and his rest completing within this window dominates the net movement, so this step nets UPWARD (0 -> ~50.5) even though Stan, the other employee, is still draining downward (~60.5 -> ~50.5) the whole time"
       }
     },
     {

@@ -50,7 +50,9 @@ Fatigue above 80 (`NEED_WELL_RESTED_THRESHOLD`) → **"well-rested" bonus**: +1 
 
 ## Collapse
 
-When fatigue hits its collapse threshold (`NEED_COLLAPSE_THRESHOLDS.fatigue` = 5):
+Two threshold states exist per gauge: a **soft threshold** (`NEED_SOFT_THRESHOLDS`, see Proactive Need Queuing below) that never interrupts, and a **hard threshold** (`NEED_HARD_THRESHOLDS`) that interrupts immediately. The hard threshold is always exactly the gauge's own zero floor — not a separately tunable balance number — so a new `NeedKey` gets collapse behaviour for free at 0 without picking its own value.
+
+When fatigue hits its hard threshold (`NEED_HARD_THRESHOLDS.fatigue` = 0):
 
 1. Current task immediately interrupted — `interruptActiveAction` (`src/core/engine/TaskDispatch.ts`) returns it to the pool as `queued`, not discarded; work-in-progress ticks are preserved, not restarted. Reclaimed later via the normal cost-based dispatch (`gameplay-employee-skills`), by this employee or another qualified one.
 2. `rest` task self-claimed for the employee — targeting nearest available Living Quarters
@@ -88,13 +90,15 @@ A policy-forced rest (`forceShiftRestIfNeededByPolicy`, see Shift System below) 
 
 ## Proactive Need Queuing
 
-Auto-insert a rest task at the warning threshold — don't wait for collapse:
+Auto-insert a rest task at the soft threshold — don't wait for the hard threshold (Collapse, above):
 
-| Gauge | Warning Threshold | Auto-Insert Behaviour |
+| Gauge | Soft Threshold | Auto-Insert Behaviour |
 |-------|------------------|----------------------|
-| `fatigue` | 25 (`NEED_WARNING_THRESHOLDS.fatigue`) | Insert `rest(living_quarters)` after current task if not already queued |
+| `fatigue` | 25 (`NEED_SOFT_THRESHOLDS.fatigue`) | Insert `rest(living_quarters)` after current task if not already queued |
 
 Queue full → skip auto-insert + emit `need_warning` event for player.
+
+**Soft-threshold contract:** hitting it never interrupts — the employee finishes the action already in progress. The queued rest then wins priority over any other action once the employee next goes idle, or when actions are claimed in the same dispatch batch (`EmployeeDispatchSteps.ts`).
 
 ## Cost of Needs
 

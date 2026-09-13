@@ -49,7 +49,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const { run, state } = setupDrivingDriller();
     const driver = state.employees.employees.find(e => e.id === 1)!;
 
-    driver.fatigue = 4; // below NEED_COLLAPSE_THRESHOLDS.fatigue (5) — collapses next tick
+    driver.fatigue = 0; // NEED_HARD_THRESHOLDS.fatigue (0) — collapses next tick
 
     let collapsedAtLeastOnce = false;
     tickUntil(run, () => {
@@ -68,7 +68,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const interruptedActionId = driver.activeActionId;
 
     expect(run('build living_quarters at:11,14 tier:1')).toMatchObject({ success: true });
-    driver.fatigue = 4;
+    driver.fatigue = 0;
 
     tickUntil(run, () => driver.collapsing, 50);
     expect(driver.collapsing).toBe(true);
@@ -105,7 +105,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     const vehicle = state.vehicles.vehicles.find(v => v.id === 1)!;
 
     expect(run('build living_quarters at:11,14 tier:1')).toMatchObject({ success: true });
-    driver.fatigue = 4;
+    driver.fatigue = 0;
 
     tickUntil(run, () => driver.collapsing, 50);
     expect(driver.collapsing).toBe(true);

@@ -203,3 +203,14 @@ export function beginRestWalk(emp: Employee, x: number, z: number): void {
   emp.destinationZ = z;
   emp.pendingActionType = 'rest';
 }
+
+/**
+ * True when `employee` has physically arrived at, and is actively ticking
+ * down, an already-claimed action — the one stated soft-threshold contract
+ * every need-driven rest path honors: finish the action already in progress
+ * before taking a rest. Shared by NeedTaskInsertion.ts's proactive queuing
+ * and ForceShiftRest.ts's legacy/policy paths.
+ */
+export function isMidClaimedTaskExecution(employee: Employee): boolean {
+  return employee.taskTicksRemaining !== null;
+}

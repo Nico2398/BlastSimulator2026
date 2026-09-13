@@ -234,9 +234,9 @@
           "cash"
         ],
         "equals": {
-          "pendingActionCount": 2
+          "pendingActionCount": 1
         },
-        "note": "Recalibrated for #680 (tri-state 'working'/'idle'/'resting' need-drain classification): employee A's fatigue still crosses the collapse threshold at cumulative tick 49 (continuous work, no rest building) -- #549's interruptActiveAction still pauses the first dispatch (back to 'queued') and starts a genuine rest. The rest itself now drains actively-resting need gauges at 0 instead of the idle rate the whole time it's in progress, so it completes sooner -- by cumulative tick 65, well inside this checkpoint's 71-tick window -- instead of still being in progress at tick 71. By this checkpoint's own end the rest has already completed, the first dispatch has resumed (in_progress), and only it plus the still-reserved second dispatch (assigned) remain pending -- count is 2, not 3."
+        "note": "#1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0) shifted this checkpoint's own shape: employee A's fatigue no longer crosses the (lower, harder-to-reach) collapse floor before the first dispatch's own task naturally completes at cumulative tick 57 -- confirmed via a real run (no collapse event, no interruptActiveAction, no rest, through this whole checkpoint). Once it completes, employee A is claimed straight onto the second dispatch (targeted specifically at employee 1, per #547's own targeted-claim priority), leaving only that one PendingAction pending -- count is 1, not the pre-#1062 2 (which depended on employee A's first dispatch being interrupted mid-task by a collapse that, under the new floor, no longer happens this early). The collapse this file is named for still happens -- just later, at cumulative tick 72, during the second dispatch's own execution (see checkpoint 3's note below) -- rather than during the first."
       }
     },
     {

@@ -12,9 +12,9 @@ import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach } from './RestActionHelpers.js';
+import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
-import { NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER } from '../config/balance.js';
+import { NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER } from '../config/balance.js';
 
 export interface NeedInsertionResult {
   /** Employee/need pairs that had a rest PendingAction inserted. */
@@ -25,7 +25,7 @@ export interface NeedInsertionResult {
 
 /**
  * Proactively inserts rest PendingActions for employees whose need gauges
- * have fallen below their warning thresholds (NEED_WARNING_THRESHOLDS).
+ * have fallen below their warning thresholds (NEED_SOFT_THRESHOLDS).
  *
  * Unlike tickNeedRestoration() which handles only idle employees and
  * immediately assigns the action (sets activeActionId), this function handles
@@ -96,7 +96,7 @@ export function autoInsertNeedTasks(
     // ticks later, entirely outside evacuateZone's one-shot pass. Confirmed
     // live via scores-display-visual.json's own `wait_until
     // field:dangerZoneClear` never resolving: a driller's fatigue crossed
-    // NEED_WARNING_THRESHOLDS.fatigue on literally the first tick after
+    // NEED_SOFT_THRESHOLDS.fatigue on literally the first tick after
     // evacuation was ordered, while still standing at its pre-evacuation
     // position — queuing a rest action targeted right back there — then
     // reclaimed it the moment it reached its real safe cell, walking all the
@@ -127,15 +127,15 @@ export function autoInsertNeedTasks(
     // fire as aggressively as the policy path, and tickCollapse's hard floor
     // still backstops fatigue regardless of how long this guard defers a
     // queued rest.
-    if (emp.taskTicksRemaining !== null) continue;
+    if (isMidClaimedTaskExecution(emp)) continue;
 
-    // Determine which gauges are below warning thresholds
+    // Determine which gauges are below warning thresholds. Derived from
+    // NEED_SOFT_THRESHOLDS' own keys rather than a hardcoded ['fatigue']
+    // list, so a second NeedKey added to the config map is checked here with
+    // no code change (#1062 genericity).
     const triggeredGauges: NeedKey[] = [];
-    const gauges: Array<{ key: NeedKey; value: number }> = [
-      { key: 'fatigue', value: emp.fatigue },
-    ];
-    for (const { key, value } of gauges) {
-      if (value < NEED_WARNING_THRESHOLDS[key]) {
+    for (const key of Object.keys(NEED_SOFT_THRESHOLDS) as NeedKey[]) {
+      if (emp[key] < NEED_SOFT_THRESHOLDS[key]) {
         triggeredGauges.push(key);
       }
     }

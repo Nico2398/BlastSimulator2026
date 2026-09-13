@@ -14,11 +14,11 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 import { interruptActiveAction, completePendingAction } from './TaskDispatch.js';
 import {
-  createRestPendingAction, findNearestBuildingOfType, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk,
+  createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, beginRestWalk,
 } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
 import {
-  NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
+  NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
 } from '../config/balance.js';
 
@@ -48,14 +48,18 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // isMidEvacuationWalk's own doc comment (Evacuation.ts) for the shared
     // reasoning across all four call sites (#557).
     if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(state, emp)) continue;
-    const needsRest = emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
-    if (!needsRest) continue;
+    // First gauge (by NEED_SOFT_THRESHOLDS' own key order) below its warning
+    // threshold — derived from the config map's keys rather than a
+    // hardcoded 'fatigue' literal, so a second NeedKey is routed here with no
+    // code change (#1062 genericity).
+    const needKey = (Object.keys(NEED_SOFT_THRESHOLDS) as NeedKey[]).find(key => emp[key] < NEED_SOFT_THRESHOLDS[key]);
+    if (needKey === undefined) continue;
 
-    const needKey: NeedKey = 'fatigue';
     const restDuration = NEED_REST_DURATIONS[needKey];
 
-    const building = findNearestLivingQuarters(state, emp.x, emp.z);
+    const buildingType = NEED_REST_BUILDING_TYPES[needKey];
+    const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
     if (!building) {
       result.noBuilding.push(emp.id);
       continue;

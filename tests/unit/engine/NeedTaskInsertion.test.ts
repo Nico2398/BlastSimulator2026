@@ -18,7 +18,7 @@ import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   NEED_REST_DURATIONS,
-  NEED_WARNING_THRESHOLDS,
+  NEED_SOFT_THRESHOLDS,
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
 } from '../../../src/core/config/balance.js';
@@ -311,7 +311,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    employee.fatigue = NEED_WARNING_THRESHOLDS.fatigue; // exactly 25
+    employee.fatigue = NEED_SOFT_THRESHOLDS.fatigue; // exactly 25
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
 

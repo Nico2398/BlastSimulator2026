@@ -50,7 +50,14 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // zone is still occupied — see isEvacuationHoldActive's own doc
       // comment (Evacuation.ts).
       && !isEvacuationHoldActive(state, a))
-    .sort((a, b) => a.id - b.id);
+    .sort((a, b) => {
+      // Rest actions win ties over any other targeted action, so a rest
+      // queued alongside other work for this employee is always the first
+      // one claimed/promoted (#1062 rest-priority ordering).
+      const restRank = (x: PendingAction) => x.type === 'rest' ? 0 : 1;
+      const diff = restRank(a) - restRank(b);
+      return diff !== 0 ? diff : a.id - b.id;
+    });
 
   for (const action of targeted) {
     const depth = (employee.activeActionId !== null ? 1 : 0) + employee.taskQueue.length;
@@ -98,7 +105,13 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
     if (employee.taskQueue.length > 0) {
       const candidates = employee.taskQueue.map(id => state.pendingActions.find(a => a.id === id)!);
 
-      const selection = selectBestActionForEmployee(state, employee, candidates);
+      // Prefer a queued rest candidate when it's reachable this tick (#1062
+      // rest-priority ordering); fall back to ranking the full queue when it
+      // isn't, or when nothing in the queue is a rest action at all.
+      const restCandidate = candidates.find(a => a.type === 'rest');
+      const selection = restCandidate !== undefined
+        ? selectBestActionForEmployee(state, employee, [restCandidate]) ?? selectBestActionForEmployee(state, employee, candidates)
+        : selectBestActionForEmployee(state, employee, candidates);
       if (selection !== null) {
         promoteActionToActive(state, employee, selection.action);
         employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);

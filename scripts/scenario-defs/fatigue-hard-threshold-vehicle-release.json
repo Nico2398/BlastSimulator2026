@@ -1,0 +1,167 @@
+{
+  "name": "fatigue-hard-threshold-vehicle-release",
+  "description": "#1062: drives a single licensed driller through a drill_plan grid large enough that, working alone with no living_quarters anywhere on the map, their fatigue gauge is driven all the way from full down to the hard threshold (NEED_HARD_THRESHOLDS.fatigue = 0, balance.ts) while boarded on their reserved drill_rig. Proves the real tickCollapse call chain (NeedRestoration.ts) fires the instant fatigue reaches exactly 0 — not the pre-#1062 floor of 5 — interrupting the in-flight vehicle-gated drill_hole action, releasing the vehicle reservation, and taking a rest the same tick, then that the SAME driller reboards the SAME vehicle afterward and finishes every remaining hole. With only one driver in this roster holding driving.drill_rig and only one drill_rig vehicle purchased, `orderedHoleCount` eventually reaching 0 is only possible if the vehicle was genuinely released and reclaimed rather than left stranded with a driver who no longer intends to work it — the state-dump schema (console-api.ts's SerializableGameState) has no direct driverId field to assert against directly, so this is the closest machine-checked proxy; the `vehicle list` observe step at the end captures the raw driver-slot text (e.g. 'driver:1') as human-inspectable evidence alongside it.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "description": "STARTING_SITE_STAFFED_COMPOSITION (balance.ts, #551): grants a driller already holding driving.drill_rig at Rookie, plus a tier-1 drill_rig, for free — no hire/purchase/training steps needed. Deliberately no living_quarters is ever built in this file: the point is a genuine no-building hard-floor collapse, mirroring collapse-recovery.json's own real-neglect framing.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 5,
+          "vehicleCount": 4,
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "description": "role: bootstrap (issue #515) — post-#921 the Fleet panel's own Assign/Unassign controls were removed (vehicles claim automatically now), so pinning a specific vehicle/employee pairing has no UI equivalent left (see BOOTSTRAP_COMMAND_ALLOWLIST's own comment on this exact entry). Only one employee in this roster holds driving.drill_rig and only one drill_rig exists, so auto-claim would reach the same pairing on its own — this just makes it explicit and immediate rather than waiting on the first dispatched hole to reserve it.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:8 start:14,14",
+      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 14,
+          "z1": 14,
+          "x2": 29,
+          "z2": 24
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 6,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:collapsedCount equals:1 max_ticks:200",
+      "description": "Advances real ticks (drive + drill, both draining fatigue) until the driller's own gauge reaches NEED_HARD_THRESHOLDS.fatigue (0) and checkCollapse (EmployeeNeeds.ts) fires — the same tick tickCollapse (NeedRestoration.ts) interrupts whatever vehicle-gated drill_hole action is in flight, releases the drill_rig's reservation, and self-claims a rest. minFatigue reading exactly 0 in the SAME step that collapsedCount first reads 1 is the state-dump proxy for 'a rest is taken the same tick fatigue hits 0' — the gauge is clamped at 0 by tickNeedGauges and does not begin recovering until the rest itself completes several ticks later (checked in the next step), so it cannot yet read above 0 here.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "collapsedCount",
+          "equals": 1,
+          "maxTicks": 200,
+          "timeoutMs": 30000
+        }
+      ],
+      "timeout": 40,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 1,
+          "minFatigue": 0
+        },
+        "note": "orderedHoleCount is deliberately not asserted here as a fixed number: it depends on how many holes the driller reached before collapsing, which this step does not pin down (and does not need to) — only that collapse genuinely happened before the whole grid was drilled matters, checked below."
+      }
+    },
+    {
+      "command": "wait_until field:collapsedCount equals:0 max_ticks:400",
+      "description": "Drains the rest itself: with no living_quarters anywhere on the map, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER doubles NEED_REST_DURATIONS.fatigue (balance.ts) and the gauge caps at NEED_REST_NO_BUILDING_CAP rather than the full 100 — collapsing clears the instant that rest completes (completeRestForEmployee, RestActionHelpers.ts).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "collapsedCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 70,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "description": "Every remaining hole in the grid eventually lands, even though the same driller/drill_rig pair may collapse and recover more than once along the way (a large tick budget is given for exactly that reason). With only this one driving.drill_rig-qualified employee and this one drill_rig vehicle in the whole roster, reaching orderedHoleCount:0 is only possible if the vehicle reservation the collapse above interrupted was genuinely released back to the pool and successfully reclaimed by the same driller afterward, rather than left permanently locked to a driver who had stopped working it — the concrete, machine-checked stand-in for 'the vehicle is released (driverId cleared / reassignable)' this state-dump schema has no direct field to assert on its own.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 6
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "description": "Raw evidence: the driller's own fatigue/collapsing row at the end of the run.",
+      "role": "observe"
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "description": "Raw evidence: the drill_rig's own driver slot (e.g. 'driver:1') captured in this step's own state-dump JSON, for human inspection alongside the machine-checked orderedHoleCount:0 proof above.",
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

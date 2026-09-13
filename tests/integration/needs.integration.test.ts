@@ -21,9 +21,9 @@ import {
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import {
-  NEED_WARNING_THRESHOLDS,
+  NEED_SOFT_THRESHOLDS,
   NEED_REST_DURATIONS,
-  NEED_COLLAPSE_THRESHOLDS,
+  NEED_HARD_THRESHOLDS,
   AGENT_WALK_SPEED,
   NEED_DRAIN_RATES,
 } from '../../src/core/config/balance.js';
@@ -155,8 +155,8 @@ describe('Employee needs', () => {
     emp.activeActionId = 42;
     emp.collapsing = false;
 
-    // Set fatigue at or below collapse threshold (fatigue ≤ 5)
-    emp.fatigue = 5;
+    // Set fatigue at or below collapse threshold (fatigue ≤ 0, NEED_HARD_THRESHOLDS.fatigue)
+    emp.fatigue = 0;
 
     const result = checkCollapse(emp);
 
@@ -195,7 +195,7 @@ describe('Employee needs', () => {
 
   it('checkCollapse returns null if already collapsing', () => {
     const emp = getEmployee(ctx, empId);
-    emp.fatigue = 3; // Below collapse threshold, would normally trigger collapse
+    emp.fatigue = 0; // At collapse threshold (NEED_HARD_THRESHOLDS.fatigue), would normally trigger collapse
     emp.collapsing = true;
 
     const result = checkCollapse(emp);
@@ -448,7 +448,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.restTicksRemaining).toBeNull();
     expect(emp.restNeedKey).toBeNull();
     expect(emp.activeActionId).toBeNull();
-    expect(emp.fatigue).toBeGreaterThan(NEED_WARNING_THRESHOLDS.fatigue);
+    expect(emp.fatigue).toBeGreaterThan(NEED_SOFT_THRESHOLDS.fatigue);
     expect(state.pendingActions.filter(a => a.type === 'rest')).toHaveLength(0);
   });
 
@@ -491,7 +491,7 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     for (let i = 0; i < travelTicks + NEED_REST_DURATIONS.fatigue + 10; i++) tickCommand(ctx, ['1'], {});
 
     expect(emp.restTicksRemaining).toBeNull(); // completed and cleared
-    expect(emp.fatigue).toBeGreaterThan(NEED_WARNING_THRESHOLDS.fatigue);
+    expect(emp.fatigue).toBeGreaterThan(NEED_SOFT_THRESHOLDS.fatigue);
   });
 });
 
@@ -602,7 +602,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
     });
 
     expect(sawCollapse).toBe(true);
-    expect(minFatigue).toBeLessThanOrEqual(NEED_COLLAPSE_THRESHOLDS.fatigue);
+    expect(minFatigue).toBeLessThanOrEqual(NEED_HARD_THRESHOLDS.fatigue);
   });
 });
 

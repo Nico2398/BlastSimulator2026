@@ -46,6 +46,8 @@ import {
   BUILDING_REPLENISH_RATES,
   // ── 3.13: proficiency multipliers ──
   PROFICIENCY_MULTIPLIERS,
+  // ── 7.6: checkCollapse hard threshold ──
+  NEED_HARD_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
@@ -1277,11 +1279,11 @@ describe('Employee — computeTaskDuration (3.13)', () => {
 describe('Employee - checkCollapse (7.6)', () => {
 
   // -- Test 1 --------------------------------------------------------------
-  it('fatigue at threshold (<=5) triggers collapse returning "fatigue"', () => {
+  it('fatigue at hard threshold triggers collapse returning "fatigue"', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
-    employee.fatigue = 5;
+    employee.fatigue = NEED_HARD_THRESHOLDS.fatigue;
     employee.activeActionId = 42;
 
     const result = checkCollapse(employee);
@@ -1323,7 +1325,7 @@ describe('Employee - checkCollapse (7.6)', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.activeActionId = 42;
-    employee.fatigue = 3;
+    employee.fatigue = NEED_HARD_THRESHOLDS.fatigue;
 
     checkCollapse(employee);
 
@@ -1364,21 +1366,21 @@ describe('Employee - checkCollapse (7.6)', () => {
   });
 
   // -- Test 8 --------------------------------------------------------------
-  it('boundary: fatigue=6 -> no collapse, fatigue=5 -> collapse', () => {
+  it('boundary: fatigue=1 -> no collapse, fatigue=0 (hard threshold) -> collapse', () => {
     const state1 = createEmployeeState();
     const rng1 = new Random(1);
     const { employee: emp1 } = hireEmployee(state1, 'driller', rng1);
-    emp1.fatigue = 6;
+    emp1.fatigue = NEED_HARD_THRESHOLDS.fatigue + 1;
 
-    // fatigue=6 is above the collapse threshold (5) -> no collapse
+    // one tick above the hard threshold -> no collapse
     expect(checkCollapse(emp1)).toBeNull();
     expect(emp1.collapsing).toBe(false);
 
-    // fatigue=5 is at the collapse threshold (5) -> collapse
+    // at the hard threshold -> collapse
     const state2 = createEmployeeState();
     const rng2 = new Random(2);
     const { employee: emp2 } = hireEmployee(state2, 'driller', rng2);
-    emp2.fatigue = 5;
+    emp2.fatigue = NEED_HARD_THRESHOLDS.fatigue;
 
     const result = checkCollapse(emp2);
     expect(result).toBe('fatigue');

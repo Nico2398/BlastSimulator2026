@@ -21,16 +21,23 @@ import { isDestinationOccupied } from './EntityMovementTick.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 
+/** Every configured NeedKey — used to validate an untyped payload value against the catalog rather than a hardcoded literal (#1062 genericity). */
+const NEED_KEYS = Object.keys(NEED_REST_DURATIONS) as NeedKey[];
+
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
  * or null if the payload doesn't identify one — this is the case for the
  * Bunkhouse Tier 2+ shift-cycle rest created by forceShiftRestIfNeeded, which
  * processShiftCycle/completeRestTick already own end-to-end and never routes
  * through this cost-based selection path (it self-claims at creation).
+ *
+ * Validated against NEED_KEYS (derived from NEED_REST_DURATIONS' own keys)
+ * rather than a hardcoded 'fatigue' literal, so a second NeedKey added to the
+ * config maps is recognized here with no code change (#1062 genericity).
  */
 export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | null {
   const candidate = payload['needKey'];
-  return candidate === 'fatigue' ? candidate : null;
+  return typeof candidate === 'string' && (NEED_KEYS as string[]).includes(candidate) ? candidate as NeedKey : null;
 }
 
 /**
