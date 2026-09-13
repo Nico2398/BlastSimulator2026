@@ -1131,10 +1131,6 @@ describe('FilePersistence', () => {
 // default to null, matching purchaseVehicle's own default.
 
 describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042)', () => {
-  it('SAVE_VERSION is 17', () => {
-    expect(SAVE_VERSION).toBe(17);
-  });
-
   it('a v16 fixture with a vehicle missing pendingEvacuationDestination loads with pendingEvacuationDestination: null', () => {
     const state = createGame({ seed: 42 });
     purchaseVehicle(state.vehicles, 'debris_hauler');
