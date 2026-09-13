@@ -39,8 +39,8 @@ const MACHINERY = new Set([
 /**
  * Run conclusions that count as red. Kept in shape with the inline copies in
  * `agentic-ci-failure.yml`'s `nudge` job and `agentic-watchdog.yml`'s re-raise
- * step — unlike `MACHINERY`/`MARKER`, this set is not yet pinned equal to those
- * copies by a test; a human or a later phase should add that assertion.
+ * step; `autonomy-loop.test.ts`'s `'the run-failure conclusions are one list,
+ * in three copies'` test pins all three to the same set.
  */
 const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
 
