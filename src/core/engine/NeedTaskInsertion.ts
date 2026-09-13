@@ -129,13 +129,13 @@ export function autoInsertNeedTasks(
     // queued rest.
     if (isMidClaimedTaskExecution(emp)) continue;
 
-    // Determine which gauges are below warning thresholds
+    // Determine which gauges are below warning thresholds. Derived from
+    // NEED_SOFT_THRESHOLDS' own keys rather than a hardcoded ['fatigue']
+    // list, so a second NeedKey added to the config map is checked here with
+    // no code change (#1062 genericity).
     const triggeredGauges: NeedKey[] = [];
-    const gauges: Array<{ key: NeedKey; value: number }> = [
-      { key: 'fatigue', value: emp.fatigue },
-    ];
-    for (const { key, value } of gauges) {
-      if (value < NEED_SOFT_THRESHOLDS[key]) {
+    for (const key of Object.keys(NEED_SOFT_THRESHOLDS) as NeedKey[]) {
+      if (emp[key] < NEED_SOFT_THRESHOLDS[key]) {
         triggeredGauges.push(key);
       }
     }

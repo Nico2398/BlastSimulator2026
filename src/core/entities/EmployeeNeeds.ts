@@ -118,7 +118,10 @@ function getMoraleDrainMultiplier(morale: number): number {
 export function checkCollapse(employee: Employee): NeedKey | null {
   if (employee.collapsing) return null;
 
-  const gauges: NeedKey[] = ['fatigue'];
+  // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded
+  // ['fatigue'] list, so a second NeedKey added to the config map collapses
+  // correctly with no code change here (#1062 genericity).
+  const gauges = Object.keys(NEED_HARD_THRESHOLDS) as NeedKey[];
   for (const gauge of gauges) {
     if (employee[gauge] <= NEED_HARD_THRESHOLDS[gauge]) {
       employee.collapsing = true;
