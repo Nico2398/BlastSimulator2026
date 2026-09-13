@@ -15,6 +15,8 @@ import {
   XP_THRESHOLDS,
   NEED_SOFT_THRESHOLDS,
   NEED_HARD_THRESHOLDS,
+  DRILL_GRID_DEFAULT_SPACING_M,
+  DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../src/core/config/balance.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -263,5 +265,25 @@ describe('Need thresholds (7.2)', () => {
     for (const key of Object.keys(hard)) {
       expect(hard[key], `NEED_HARD_THRESHOLDS.${key} must be below NEED_SOFT_THRESHOLDS.${key}`).toBeLessThan(soft[key]!);
     }
+  });
+});
+
+// ─── Drill grid tool defaults (#1072) ───────────────────────────────────────
+
+describe('Drill grid tool defaults (#1072)', () => {
+  it('DRILL_GRID_DEFAULT_SPACING_M is exported from balance.ts', () => {
+    expect(DRILL_GRID_DEFAULT_SPACING_M).toBeDefined();
+  });
+
+  it('DRILL_GRID_DEFAULT_DEPTH_M is exported from balance.ts', () => {
+    expect(DRILL_GRID_DEFAULT_DEPTH_M).toBeDefined();
+  });
+
+  it('DRILL_GRID_DEFAULT_SPACING_M is 3 — the grid tool strip starts its spacing stepper at 3m', () => {
+    expect(DRILL_GRID_DEFAULT_SPACING_M).toBe(3);
+  });
+
+  it('DRILL_GRID_DEFAULT_DEPTH_M is 6 — the grid tool strip starts its depth stepper at 6m', () => {
+    expect(DRILL_GRID_DEFAULT_DEPTH_M).toBe(6);
   });
 });
