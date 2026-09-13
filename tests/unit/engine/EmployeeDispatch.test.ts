@@ -912,6 +912,134 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// #1061 — blockedReason classification: a queued PendingAction that sits with
+// nobody able to perform it right now gets a light, non-blocking diagnosis
+// (BlockedOrderReason) recomputed every tick — surfaced via both the action's
+// own `blockedReason` field and TickEmployeesResult.blocked. Vehicle-gated
+// actions are deliberately never added to result.unqualified (see
+// EmployeeDispatch.ts's own comment on that pre-existing heavy channel) but
+// MUST appear in result.blocked/blockedReason once this lands. The order
+// itself is never cancelled — status stays 'queued' throughout.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('tickEmployees — blockedReason classification (#1061)', () => {
+  const SEED = 42;
+
+  function makeLevelGroundAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'level_ground',
+      requiredSkill: 'driving.excavator',
+      requiredVehicleRole: 'rock_digger',
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: 0,
+      ...overrides,
+    };
+  }
+
+  it('flags no_vehicle_in_fleet on a level_ground order when a licensed employee exists but no rock_digger vehicle is owned anywhere', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.excavator', 1);
+    // No vehicle purchased at all — state.vehicles.vehicles stays empty.
+
+    const action = makeLevelGroundAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_vehicle_in_fleet');
+    expect(result.blocked).toContain(1);
+    // Vehicle-gated actions never enter the heavy unqualified_task_error channel.
+    expect(result.unqualified).not.toContain(1);
+    // The order itself is never cancelled/refused — stays queued.
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('flags no_licensed_driver on a level_ground order when a rock_digger vehicle exists but nobody on the roster is licensed to drive one', () => {
+    const state = createGame({ seed: SEED });
+    purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    // No employees hired at all — nobody could ever hold the licence.
+
+    const action = makeLevelGroundAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_licensed_driver');
+    expect(result.blocked).toContain(1);
+    expect(result.unqualified).not.toContain(1);
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('leaves blockedReason falsy on a level_ground order once a rock_digger vehicle and a licensed, eligible employee both exist', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.excavator', 1);
+    purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+
+    const action = makeLevelGroundAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    const stored = state.pendingActions.find(a => a.id === 1)!;
+    // Optional field — null/undefined both mean "not blocked" (GameState.ts's
+    // own doc comment on PendingAction.blockedReason: always read with `!=
+    // null`, never `!==`). Assert it is not one of the three reason strings
+    // rather than pinning down which of the two falsy spellings is used.
+    const reasons: unknown[] = ['no_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
+    expect(reasons).not.toContain(stored.blockedReason);
+    expect(result.blocked).not.toContain(1);
+  });
+
+  it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in BOTH result.unqualified and result.blocked', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1); // wrong skill for the action below
+
+    const action: PendingAction = {
+      id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(result.unqualified).toContain(1);
+    expect(result.blocked).toContain(1);
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_qualified_employee');
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('regression: result.unqualified still reports an action nobody on the roster is qualified for, unchanged by the new blocked channel (mirrors pre-#1061 coverage)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
+
+    const action: PendingAction = {
+      id: 3, type: 'drill_hole', requiredSkill: 'geology', requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(result.unqualified).toContain(3);
+    expect(state.pendingActions).toHaveLength(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // #1000 — a long-starved on-foot action (requiredVehicleRole: null) must win
 // dispatch over tryContinueVehicleGatedAction's same-role vehicle-continuity
 // fast path, so a deep same-role backlog (e.g. haul_debris) can never starve

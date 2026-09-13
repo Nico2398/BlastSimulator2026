@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
+import { NotificationCenter, buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -172,6 +175,154 @@ describe('NotificationCenter (redesign P1)', () => {
       state.tickCount = 2;
       const pips = center.update(state);
       expect(pips.some(p => p.kind === 'contract')).toBe(false);
+    });
+
+    // ── #1061: blocked-order warnings ─────────────────────────────────────
+
+    function makeBlockedLevelGroundAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+      return {
+        type: 'level_ground',
+        requiredSkill: 'driving.excavator',
+        requiredVehicleRole: 'rock_digger',
+        targetX: 0, targetZ: 0, targetY: 0,
+        payload: {},
+        targetEmployeeId: null,
+        status: 'queued',
+        holderId: null,
+        queuedAtTick: 0,
+        blockedReason: 'no_vehicle_in_fleet',
+        ...overrides,
+      };
+    }
+
+    it('notifies exactly once for a newly-blocked order, with a body naming the order type and the missing vehicle role', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(makeBlockedLevelGroundAction({ id: 1 }));
+
+      center.update(state);
+
+      const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.body).toContain('rock_digger');
+      expect(entries[0]!.body).toContain(t(ACTION_LABEL_KEY.level_ground));
+    });
+
+    it('does not re-notify on a second update() call for the same still-blocked action and reason (dedup holds)', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(makeBlockedLevelGroundAction({ id: 1 }));
+
+      center.update(state);
+      center.update(state);
+
+      const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+      expect(entries).toHaveLength(1);
+    });
+
+    it('re-notifies when the same action\'s blockedReason changes (vehicle bought, still no driver)', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      const action = makeBlockedLevelGroundAction({ id: 1 });
+      state.pendingActions.push(action);
+
+      center.update(state);
+      action.blockedReason = 'no_licensed_driver';
+      center.update(state);
+
+      const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+      expect(entries).toHaveLength(2);
+      expect(entries[0]!.body).toContain(t(ACTION_LABEL_KEY.level_ground)); // most recent, unshifted to front
+    });
+
+    it('stops notifying once blockedReason clears, and the orders alert pip disappears with it', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      const action = makeBlockedLevelGroundAction({ id: 1 });
+      state.pendingActions.push(action);
+
+      let pips = center.update(state);
+      expect(pips.some(p => p.kind === 'orders')).toBe(true);
+
+      action.blockedReason = null;
+      pips = center.update(state);
+
+      const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+      expect(entries).toHaveLength(1); // only the original notification, nothing new
+      expect(pips.some(p => p.kind === 'orders')).toBe(false);
+    });
+
+    it('re-notifies when a previously-blocked (then resolved) action becomes blocked again later', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      const action = makeBlockedLevelGroundAction({ id: 1 });
+      state.pendingActions.push(action);
+
+      center.update(state); // first block
+      action.blockedReason = null;
+      center.update(state); // resolved
+      action.blockedReason = 'no_vehicle_in_fleet'; // blocked again, same reason as before
+      center.update(state);
+
+      const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+      expect(entries).toHaveLength(2);
+    });
+
+    it('derives an orders pip whose count matches the number of currently-blocked queued actions', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(makeBlockedLevelGroundAction({ id: 1 }));
+      state.pendingActions.push(makeBlockedLevelGroundAction({ id: 2, blockedReason: 'no_licensed_driver' }));
+
+      const pips = center.update(state);
+
+      const ordersPip = pips.find(p => p.kind === 'orders');
+      expect(ordersPip).toBeDefined();
+      expect(ordersPip!.label).toContain('2');
+    });
+  });
+
+  describe('buildBlockedOrderMessage (#1061)', () => {
+    function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+      return {
+        type: 'level_ground',
+        requiredSkill: 'driving.excavator',
+        requiredVehicleRole: 'rock_digger',
+        targetX: 0, targetZ: 0, targetY: 0,
+        payload: {},
+        targetEmployeeId: null,
+        status: 'queued',
+        holderId: null,
+        queuedAtTick: 0,
+        ...overrides,
+      };
+    }
+
+    it('names the order type and the vehicle role for no_vehicle_in_fleet', () => {
+      const action = makeAction({ id: 1, blockedReason: 'no_vehicle_in_fleet' });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.level_ground));
+      expect(message).toContain('rock_digger');
+    });
+
+    it('names the order type and the vehicle role for no_licensed_driver, with wording distinct from no_vehicle_in_fleet', () => {
+      const action = makeAction({ id: 1, blockedReason: 'no_licensed_driver' });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.level_ground));
+      expect(message).toContain('rock_digger');
+
+      const otherMessage = buildBlockedOrderMessage(makeAction({ id: 1, blockedReason: 'no_vehicle_in_fleet' }));
+      expect(message).not.toBe(otherMessage);
+    });
+
+    it('names the order type and required skill for no_qualified_employee', () => {
+      const action = makeAction({
+        id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+        blockedReason: 'no_qualified_employee',
+      });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
+      expect(message).toContain('blasting');
     });
   });
 });
