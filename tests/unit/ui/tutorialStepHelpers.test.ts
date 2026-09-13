@@ -147,7 +147,7 @@ function stateWithPendingActions(actions: Partial<PendingAction>[]): GameState {
     pendingActions: actions.map((a, i) => ({
       id: i + 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
       ...a,
     })),
   } as unknown as GameState;

@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
+import { findStarvedActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -19,6 +20,7 @@ import {
   NEED_REST_DURATIONS,
   NEED_WARNING_THRESHOLDS,
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
+  ACTION_STARVATION_TICK_THRESHOLD,
 } from '../../../src/core/config/balance.js';
 
 describe('autoInsertNeedTasks (7.7)', () => {
@@ -203,7 +205,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: state.tickCount,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -350,7 +352,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: empB.id,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: state.tickCount,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -411,7 +413,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: state.tickCount,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -446,7 +448,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: state.tickCount,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -651,5 +653,47 @@ describe('autoInsertNeedTasks (7.7)', () => {
       (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
     );
     expect(restAction).toBeDefined();
+  });
+
+  // ── Test 24 (#1060) ─────────────────────────────────────────────────────────
+  // A rest action created by autoInsertNeedTasks and left queued/unclaimed
+  // must be stamped with the live tickCount at insertion (createRestPendingAction),
+  // and must become starvation-eligible (findStarvedActionForEmployee,
+  // ActionSelection.ts) once ACTION_STARVATION_TICK_THRESHOLD ticks have
+  // passed since then. Before #1060, PendingAction.queuedAtTick was optional
+  // and never actually stamped by createRestPendingAction, so
+  // findStarvedActionForEmployee's `?? state.tickCount` fallback always read
+  // the action's age as 0 — it could never starve, regardless of how long it
+  // sat queued. This must fail on that old behaviour and pass once the fix
+  // (required field, stamped at creation, fallback removed) lands.
+  it('#1060: a queued rest action from autoInsertNeedTasks is stamped with queuedAtTick and becomes starvation-eligible after ACTION_STARVATION_TICK_THRESHOLD ticks', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 20; // below the warning threshold
+    employee.activeActionId = null; // idle, qualified (rest requires no skill)
+    // No living_quarters placed — the rest action targets the employee's own
+    // position, keeping it trivially reachable without any navGrid setup.
+
+    const result = autoInsertNeedTasks(state);
+    expect(result.inserted).toHaveLength(1);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.queuedAtTick).toBe(state.tickCount);
+
+    // Not yet starved — freshly queued.
+    expect(findStarvedActionForEmployee(state, employee)).toBeNull();
+
+    state.tickCount += ACTION_STARVATION_TICK_THRESHOLD;
+
+    const starved = findStarvedActionForEmployee(state, employee);
+    expect(starved).not.toBeNull();
+    expect(starved!.action.id).toBe(restAction!.id);
   });
 });

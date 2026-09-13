@@ -188,7 +188,7 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
     state.pendingActions.push({
       id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
       targetX: 3, targetZ: 4, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -211,12 +211,12 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
       {
         id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
         targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-        status: 'queued', holderId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0,
       },
       {
         id: 2, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
         targetX: 1, targetZ: 1, targetY: 0, payload: {}, targetEmployeeId: null,
-        status: 'queued', holderId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0,
       },
     );
     const json = serialize(state);
@@ -261,7 +261,7 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
     state.pendingActions.push({
       id: 5, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
-      status: 'assigned', holderId: employee.id,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
     });
     employee.activeActionId = 5;
 
@@ -288,7 +288,7 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
     state.pendingActions.push({
       id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'in_progress', holderId: 3,
+      status: 'in_progress', holderId: 3, queuedAtTick: 0,
     });
     const json = serialize(state);
 
@@ -886,7 +886,7 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
       id: 100, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
       targetX: 5, targetZ: 5, targetY: 0,
       payload: { buildingOrderId: 1, cost: 15000, footprint: [[0, 0], [1, 0], [0, 1], [1, 1]], durationTicks: 40 },
-      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
     });
     state.nextPlannedBuildingId = 2;
 
@@ -978,7 +978,7 @@ describe('deserialize — v14→v15 migration for the single-gauge (fatigue) nee
       id: 1, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0,
       payload: { needKey: 'hunger', collapsedNeed: 'breakNeed' },
-      targetEmployeeId: null, status: 'assigned', holderId: employee.id,
+      targetEmployeeId: null, status: 'assigned', holderId: employee.id, queuedAtTick: 0,
     });
 
     const json = serialize(state);
@@ -1185,5 +1185,64 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
     const restored = deserialize(JSON.stringify(parsed));
 
     expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
+  });
+});
+
+// ── v17→v18 migration for PendingAction.queuedAtTick (#1060) ───────────────
+// SAVE_VERSION bumped 17→18 when PendingAction.queuedAtTick became required
+// (previously optional with a `?? state.tickCount` fallback in
+// ActionSelection.ts's findStarvedActionForEmployee, which made an unstamped
+// action's age always read 0 — it could never starve). A pre-v18 save's
+// pendingActions entries may be missing the field entirely; migration
+// backfills it from the save's own tickCount (age 0 at load time, growing
+// normally from there afterward), never from "now".
+
+describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
+  it('SAVE_VERSION is 18', () => {
+    expect(SAVE_VERSION).toBe(18);
+  });
+
+  it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
+    const state = createGame({ seed: 42 });
+    state.tickCount = 777;
+    state.pendingActions.push({
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 3, targetZ: 4, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 777,
+    });
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 17;
+    const pending = parsed['pendingActions'] as Array<Record<string, unknown>>;
+    expect(pending).toHaveLength(1);
+    delete pending[0]!['queuedAtTick'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.pendingActions).toHaveLength(1);
+    expect(typeof restored.pendingActions[0]!.queuedAtTick).toBe('number');
+    // Backfilled from the save's own frozen tickCount at serialization time,
+    // not "now" — and never past the restored tickCount.
+    expect(restored.pendingActions[0]!.queuedAtTick).toBe(777);
+    expect(restored.pendingActions[0]!.queuedAtTick).toBeLessThanOrEqual(restored.tickCount);
+  });
+
+  it('a pre-v18 save with queuedAtTick already set on every entry is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    state.tickCount = 500;
+    state.pendingActions.push({
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 123,
+    });
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 17;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.pendingActions[0]!.queuedAtTick).toBe(123);
   });
 });

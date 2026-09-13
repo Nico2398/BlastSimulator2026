@@ -56,6 +56,7 @@ function makeHaulAction(overrides: Partial<PendingAction> & { id: number; payloa
     targetEmployeeId: null,
     status: 'queued',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }
@@ -258,6 +259,7 @@ describe('isHaulOrFragmentActionClaimable — pass-through for other action type
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(isHaulOrFragmentActionClaimable(state, action)).toBe(true);
@@ -276,6 +278,7 @@ describe('isHaulOrFragmentActionClaimable — pass-through for other action type
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(isHaulOrFragmentActionClaimable(state, action)).toBe(true);
@@ -347,6 +350,7 @@ describe('isHaulOrFragmentActionClaimable — fragment_debris oversized gate', (
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -437,6 +441,7 @@ describe('haulActionCarriesOre', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(haulActionCarriesOre(state, action)).toBe(false);
@@ -457,6 +462,7 @@ describe('haulActionCarriesOre', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(haulActionCarriesOre(state, action)).toBe(false);
@@ -484,6 +490,7 @@ describe('haulActionCarriesOre', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(haulActionCarriesOre(state, action)).toBe(true);
@@ -502,6 +509,7 @@ describe('haulActionCarriesOre', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     expect(haulActionCarriesOre(state, action)).toBe(false);

@@ -45,6 +45,7 @@ function pushHeldAction(state: GameState, employeeId: number, id: number, type: 
     id, type, requiredSkill: null, requiredVehicleRole: null,
     targetX: 5, targetZ: 5, targetY: 0, payload: { note: 'work' },
     targetEmployeeId: null, status: 'in_progress', holderId: employeeId,
+    queuedAtTick: 0,
   };
   state.pendingActions.push(action);
   return action;

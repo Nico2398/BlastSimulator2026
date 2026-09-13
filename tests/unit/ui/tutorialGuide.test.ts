@@ -372,7 +372,7 @@ function pendingAction(type: string): GameState['pendingActions'][number] {
   return {
     id: 1, type, requiredSkill: null, requiredVehicleRole: null,
     targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-    status: 'queued', holderId: null,
+    status: 'queued', holderId: null, queuedAtTick: 0,
   } as unknown as GameState['pendingActions'][number];
 }
 
@@ -1037,7 +1037,7 @@ describe('decideClock', () => {
       s.pendingActions = [{
         id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
         targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-        status, holderId: status === 'queued' ? null : 7,
+        status, holderId: status === 'queued' ? null : 7, queuedAtTick: 0,
       } as unknown as GameState['pendingActions'][number]];
 
       const decision = decideClock(s, 0, DEFAULT_TICK_BUDGET, true);
@@ -1058,7 +1058,7 @@ describe('decideClock', () => {
     s.pendingActions = [{
       id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'assigned', holderId: 7,
+      status: 'assigned', holderId: 7, queuedAtTick: 0,
     } as unknown as GameState['pendingActions'][number]];
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
   });

@@ -96,6 +96,7 @@ function makeHaulAction(overrides: Partial<PendingAction> & { id: number; target
     targetEmployeeId: null,
     status: 'queued',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }

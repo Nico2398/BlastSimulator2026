@@ -9,6 +9,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import {
   deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestWalk,
+  createRestPendingAction,
 } from '../../../src/core/engine/RestActionHelpers.js';
 import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
 
@@ -55,6 +56,39 @@ describe('deductRestCost', () => {
     deductRestCost(state, 'fatigue');
 
     expect(state.finances.transactions.find(t => t.category === 'needs')).toBeUndefined();
+  });
+});
+
+// #1060: createRestPendingAction stamps queuedAtTick with the current
+// state.tickCount at creation time — read by ActionSelection.ts's
+// findStarvedActionForEmployee to measure how long a queued, unclaimed,
+// on-foot rest action has waited before it wins dispatch over vehicle
+// continuity (#1000). Must read live state.tickCount, not a hardcoded
+// constant, so a rest action created later in the game starves at the right
+// tick rather than always reading age 0.
+describe('createRestPendingAction', () => {
+  it('stamps queuedAtTick with state.tickCount at creation (happy path — tickCount 0)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    expect(state.tickCount).toBe(0);
+
+    const result = createRestPendingAction(state, {
+      targetX: 5, targetZ: 5, targetEmployeeId: null, payload: {},
+    });
+
+    expect(result.queuedAtTick).toBe(0);
+    expect(result.queuedAtTick).toBe(state.tickCount);
+  });
+
+  it('reads live state.tickCount rather than a hardcoded constant (boundary — non-zero tick)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.tickCount = 456;
+
+    const result = createRestPendingAction(state, {
+      targetX: 5, targetZ: 5, targetEmployeeId: null, payload: {},
+    });
+
+    expect(result.queuedAtTick).toBe(456);
+    expect(result.queuedAtTick).toBe(state.tickCount);
   });
 });
 

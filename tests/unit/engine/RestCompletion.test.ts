@@ -42,6 +42,7 @@ describe('tickGeneralRestCompletion', () => {
       targetEmployeeId: employee.id,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
@@ -162,6 +163,7 @@ describe('tickGeneralRestCompletion', () => {
       targetEmployeeId: employee.id,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     });
     state.ghostPreviews.push({ id: actionId, type: 'rest', targetX: 5, targetZ: 5, targetY: 0, claimed: true });
 

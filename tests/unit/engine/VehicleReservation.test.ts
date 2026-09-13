@@ -54,6 +54,7 @@ function makeAction(_state: GameState, overrides: Partial<PendingAction> & { id:
     targetEmployeeId: null,
     status: 'assigned',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }

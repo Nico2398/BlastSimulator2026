@@ -207,6 +207,7 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     });
   }
 

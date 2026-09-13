@@ -710,6 +710,7 @@ describe('cancelAction (#548)', () => {
       targetEmployeeId: empId,
       status: 'assigned',
       holderId: empId,
+      queuedAtTick: 0,
     };
     (state as any).pendingActions.push(restAction);
     emp.activeActionId = 5;

@@ -62,10 +62,10 @@ describe('OperationsPanel', () => {
     const { panel } = makePanel();
     const state = makeState();
     state.pendingActions = [
-      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
-      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
+      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0 },
+      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0 },
       // Already claimed by employee 7 (#547) — reserved/assigned work is not "unclaimed", so this one is excluded from the count below.
-      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7, status: 'assigned', holderId: 7 },
+      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7, status: 'assigned', holderId: 7, queuedAtTick: 0 },
     ];
     panel.update(state);
     const text = panel.root.textContent ?? '';
@@ -232,6 +232,7 @@ function makePendingActionFixture(overrides: Partial<PendingAction> = {}): Pendi
     targetEmployeeId: null,
     status: 'queued',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }
@@ -382,7 +383,7 @@ function pushPendingActions(state: GameState, count: number): void {
     state.pendingActions.push({
       id, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
       targetX: i, targetZ: i, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     state.ghostPreviews.push({ id, type: 'general_work', targetX: i, targetZ: i, targetY: 0, claimed: false });
   }

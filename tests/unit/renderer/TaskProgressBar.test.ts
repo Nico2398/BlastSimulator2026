@@ -72,6 +72,7 @@ function makePendingAction(overrides: Partial<PendingAction> = {}): PendingActio
     targetEmployeeId: null,
     status: 'in_progress',
     holderId: null,
+    queuedAtTick: 0,
     ...overrides,
   };
 }

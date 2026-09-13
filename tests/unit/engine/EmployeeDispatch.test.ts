@@ -67,6 +67,7 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -406,6 +407,7 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -675,6 +677,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
       payload: {},
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -750,6 +753,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
       payload: { needKey: 'fatigue', restDuration: 5 },
       targetEmployeeId: employee.id,
       status: 'queued', holderId: null,
+      queuedAtTick: 0,
     });
     tickEmployees(state);
     resolveArrival(state);
@@ -774,6 +778,7 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -889,6 +894,7 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
         targetEmployeeId: null,
         status: 'queued',
         holderId: null,
+        queuedAtTick: 0,
       });
     }
 
@@ -964,6 +970,7 @@ describe('completeVehicleGatedActionIfApplicable — starved on-foot action inte
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     };
     vehicle.reservedForActionId = completedAction.id;
     employee.activeActionId = completedAction.id;
@@ -978,6 +985,7 @@ describe('completeVehicleGatedActionIfApplicable — starved on-foot action inte
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
     };
 
     const starvedCandidate: PendingAction = {
@@ -1114,6 +1122,7 @@ describe('completeVehicleGatedActionIfApplicable — releases a taskQueue-held v
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: employee.id,
+      queuedAtTick: 0,
     };
     activeVehicle.reservedForActionId = completedAction.id;
     employee.activeActionId = completedAction.id;
@@ -1147,6 +1156,7 @@ describe('completeVehicleGatedActionIfApplicable — releases a taskQueue-held v
       targetEmployeeId: null,
       status: 'assigned',
       holderId: employee.id,
+      queuedAtTick: 0,
     };
     queuedVehicle.reservedForActionId = queuedFollowUp.id;
     employee.taskQueue = [queuedFollowUp.id];
@@ -1585,6 +1595,7 @@ describe('isRampSegmentClaimable (#555, relabelled for layer semantics — #925)
       targetEmployeeId: null,
       status: 'queued',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }

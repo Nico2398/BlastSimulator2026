@@ -611,7 +611,7 @@ describe('employees.ts — cancel a rest action (not cancellable)', () => {
     ctx.state!.pendingActions.push({
       id, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     return id;
   }
@@ -696,7 +696,7 @@ describe('employees.ts — cancel success message (with refund — cancel_refund
     ctx.state!.pendingActions.push({
       id, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: { cost }, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     return id;
   }

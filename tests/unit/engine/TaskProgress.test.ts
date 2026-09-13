@@ -42,7 +42,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     state.pendingActions.push({
       id: actionId, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employeeId,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     tickEmployees(state);
     resolveArrival(state);
@@ -120,7 +120,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     state.pendingActions.push({
       id: 2, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
       targetX: 1, targetZ: 1, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     const result = tickEmployees(state);
 
@@ -199,7 +199,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
     state.pendingActions.push({
       id: actionId, type, requiredSkill, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employeeId,
-      status: 'queued', holderId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
     });
     tickEmployees(state);
     resolveArrival(state);
@@ -399,7 +399,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
       id: actionId, type: 'dig_ramp_segment', requiredSkill: null, requiredVehicleRole: null,
       targetX: cells[0]?.x ?? 0, targetZ: cells[0]?.z ?? 0, targetY: cells[0]?.y ?? 0,
       payload: { rampId, segmentIndex: 0, cells, region, segmentCost: 0 },
-      targetEmployeeId: emp.id, status: 'assigned', holderId: emp.id,
+      targetEmployeeId: emp.id, status: 'assigned', holderId: emp.id, queuedAtTick: 0,
     });
 
     emp.activeActionId = actionId;
@@ -501,7 +501,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
     state.pendingActions.push({
       id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
-      status: 'assigned', holderId: employee.id,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
     });
     employee.activeActionId = 1;
     employee.taskTicksRemaining = 4;
@@ -532,7 +532,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
       id: 1, type: 'dig_ramp_segment', requiredSkill: null, requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0,
       payload: { rampId: 999, segmentIndex: 0, cells, region: null, segmentCost: 0 },
-      targetEmployeeId: employee.id, status: 'assigned', holderId: employee.id,
+      targetEmployeeId: employee.id, status: 'assigned', holderId: employee.id, queuedAtTick: 0,
     });
     employee.activeActionId = 1;
     employee.taskTicksRemaining = 4;

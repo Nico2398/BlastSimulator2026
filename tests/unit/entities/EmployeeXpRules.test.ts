@@ -82,6 +82,7 @@ describe('computeTaskXpAwards', () => {
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
@@ -230,6 +231,7 @@ describe('computeTaskXpAwards — driving licence XP for vehicle-gated actions (
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: null,
+      queuedAtTick: 0,
       ...overrides,
     };
   }
