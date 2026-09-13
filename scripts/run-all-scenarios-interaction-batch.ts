@@ -28,6 +28,7 @@ import {
 } from './shared/puppeteer-utils.js';
 import { describeStepFailure } from './scenario-interaction-runner.js';
 import { checkGoal, gameState } from './shared/interaction-driver.js';
+import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 import { buildScenarioLoadFailure, logBatchProgress } from './run-all-scenarios-result.js';
 
 export async function runBatchInteraction(
@@ -53,6 +54,10 @@ export async function runBatchInteraction(
         const def = loadScenarioDef(name!, SCENARIO_DIR);
 
         const steps: ScenarioStepDef[] = def.steps;
+        // Goals this scenario left to command mode, counted so the batch
+        // summary can say how much the browser channel did not re-assert
+        // rather than quietly checking less than the file declares.
+        let deferredGoals = 0;
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
@@ -125,10 +130,18 @@ export async function runBatchInteraction(
                 );
 
                 if (step.expect) {
-                  // interactionResult.gameState is this same moment's state —
-                  // nothing ran in between — so checkGoal reuses it instead of
-                  // re-fetching its own "after" snapshot.
-                  await checkGoal(page, step.expect, before, interactionResult.gameState ?? undefined);
+                  // Interaction mode proves reachability; the clock and the
+                  // chained balances that follow it are command mode's, which
+                  // asserts them unscoped on every pull request
+                  // (interaction-goal-scope.ts). interactionResult.gameState
+                  // is this same moment's state — nothing ran in between — so
+                  // checkGoal reuses it instead of re-fetching its own
+                  // "after" snapshot.
+                  const { scoped, deferred } = scopeGoalToInteraction(step.expect);
+                  deferredGoals += deferred.length;
+                  if (goalAssertsAnything(scoped)) {
+                    await checkGoal(page, scoped, before, interactionResult.gameState ?? undefined);
+                  }
                 }
 
                 // Save state JSON
@@ -175,6 +188,7 @@ export async function runBatchInteraction(
           name: name!,
           totalSteps: steps.length,
           failed,
+          deferredGoals,
           ...(failed ? { error: errorMsg } : {}),
         });
       } catch (err: unknown) {

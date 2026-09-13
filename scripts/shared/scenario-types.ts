@@ -259,12 +259,19 @@ export type ScenarioStepRole = 'player' | 'setup' | 'observe' | 'bootstrap' | 'g
  * so interaction mode reuses `checkGoal` from `interaction-driver.ts` directly
  * — one evaluator, not two that can drift apart.
  *
- * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
- * when the scenario runs in interaction mode; command mode has no DOM, so it
- * checks `equals`/`increased`/`decreased` only (`scenario-goal.ts`'s
- * `checkGoalAgainstState`). This is the same asymmetry the rest of the dual
- * -play mechanism already has — interaction mode is strictly the stronger
- * proof, command mode the faster one.
+ * The two modes prove different halves of this object, and neither is
+ * strictly the stronger:
+ *
+ * - `usable`/`blocked`/`tutorialStep` need a live page, so only interaction
+ *   mode checks them. They are the reachability claim itself.
+ * - `equals`/`increased`/`decreased`/`changedBy` are command mode's, checked
+ *   unscoped on every pull request (`scenario-goal.ts`'s
+ *   `checkGoalAgainstState`). Interaction mode re-checks them too, minus the
+ *   trajectory-coupled fields `interaction-goal-scope.ts` names: a step's
+ *   `interaction` array may spend ticks its `command` string has no
+ *   equivalent for, and once the two clocks diverge every field downstream of
+ *   an event draw follows. Asserting those in the browser tests which
+ *   trajectory the run took, not what the step did.
  */
 export interface ScenarioStepGoal {
   /** These numeric fields of the state dump must have grown since before this step's actions ran. */

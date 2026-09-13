@@ -76,6 +76,18 @@ async function main(): Promise<void> {
   console.log(`BATCH COMPLETE — ${totalTime}s`);
   console.log(`Total: ${results.length}, Passed: ${results.length - failures.length}, Failed: ${failures.length}`);
 
+  // Interaction mode narrows each step's `expect` to the half a browser can
+  // prove without re-running the clock (interaction-goal-scope.ts). Say how
+  // much, so "this channel checked less than the file declares" is on the
+  // record rather than inferred. Command mode asserts every one of them.
+  const deferredGoals = results.reduce((sum, r) => sum + (r.deferredGoals ?? 0), 0);
+  if (deferredGoals > 0) {
+    console.log(
+      `Trajectory-coupled goals left to command mode: ${deferredGoals} `
+      + `(the \`scenario\` channel asserts them unscoped — npm run scenarios)`,
+    );
+  }
+
   if (failures.length > 0) {
     console.log(`\nFailed scenarios:`);
     for (const f of failures) {
