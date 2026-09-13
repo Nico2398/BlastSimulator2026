@@ -13,6 +13,8 @@ import {
   buildConformingRing,
   GroundTintLayer,
   GROUND_TINT_Y_EPSILON,
+  GROUND_TINT_MAX_SLOPE_FACTOR,
+  slopeScaledEpsilon,
   type SurfaceHeightSampler,
   type GroundTintPatch,
 } from '../../../src/renderer/GroundTint.js';
@@ -326,6 +328,113 @@ describe('buildConformingRing', () => {
     for (let i = 0; i < pos.count; i++) {
       expect(pos.getY(i)).toBeGreaterThanOrEqual(5 - 0.001);
       expect(pos.getY(i)).toBeLessThanOrEqual(5 + GROUND_TINT_Y_EPSILON + 0.05);
+    }
+  });
+});
+
+// #1057 — a fixed Y epsilon is too small to clear the terrain mesh on steep,
+// blast-carved slopes (black seam lines / z-fighting). slopeScaledEpsilon
+// inflates the flat-ground epsilon by the local slope of the surface
+// sampler, capped at GROUND_TINT_MAX_SLOPE_FACTOR, and cornerY /
+// buildConformingRing must route their vertex Y through it instead of the
+// raw fixed epsilon.
+
+describe('slopeScaledEpsilon', () => {
+  it('flat sampler (zero gradient) returns exactly epsilon — factor of 1', () => {
+    const sampler: SurfaceHeightSampler = () => 12;
+    const epsilon = 0.05;
+    expect(slopeScaledEpsilon(sampler, 3, 4, epsilon)).toBeCloseTo(epsilon, 10);
+  });
+
+  it('known linear slope scales epsilon by exactly sqrt(1 + m^2)', () => {
+    // h(x,z) = m*x is exactly linear, so central-differencing the sampler
+    // recovers the analytic gradient with no finite-difference error.
+    const m = 2;
+    const sampler: SurfaceHeightSampler = (x, _z) => m * x;
+    const epsilon = 0.04;
+    const expected = epsilon * Math.sqrt(1 + m * m);
+    expect(slopeScaledEpsilon(sampler, 10, 10, epsilon)).toBeCloseTo(expected, 4);
+  });
+
+  it('caps slope-driven inflation at GROUND_TINT_MAX_SLOPE_FACTOR on a near-vertical face', () => {
+    const m = 100; // sqrt(1 + m*m) ~= 100.005, far past the cap of 10
+    const sampler: SurfaceHeightSampler = (x, _z) => m * x;
+    const epsilon = 0.03;
+    expect(slopeScaledEpsilon(sampler, 5, 5, epsilon)).toBeCloseTo(epsilon * GROUND_TINT_MAX_SLOPE_FACTOR, 6);
+  });
+});
+
+describe('GroundTintLayer — slope-scaled epsilon clearance (#1057)', () => {
+  /** Largest (vertex Y - sampled surface height) over every vertex currently in the scene. */
+  function maxClearance(sampler: SurfaceHeightSampler): number {
+    const mesh = allMeshes()[0]!;
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    let max = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const y = pos.getY(i);
+      max = Math.max(max, y - bilinearSurfaceHeight(sampler, x, z));
+    }
+    return max;
+  }
+
+  it('a steep-slope patch gets measurably more clearance above the surface than the flat epsilon alone', () => {
+    const m = 5; // steep, under the cap: sqrt(1 + 25) ~= 5.1
+    const sampler: SurfaceHeightSampler = (x, _z) => m * x;
+    const epsilon = 0.05;
+    const layer = new GroundTintLayer(scene, sampler, { epsilon });
+    layer.replace([cellPatch('steep', 10, 10)]);
+
+    expect(maxClearance(sampler), 'steep-slope clearance should be well above the flat epsilon').toBeGreaterThan(epsilon * 1.5);
+  });
+
+  it('flat-ground clearance is unchanged — stays exactly the configured epsilon (no regression)', () => {
+    const sampler: SurfaceHeightSampler = () => 8;
+    const epsilon = 0.05;
+    const layer = new GroundTintLayer(scene, sampler, { epsilon });
+    layer.replace([cellPatch('flat', 0, 0)]);
+
+    const ys = allPositionYs();
+    for (const y of ys) expect(y).toBeCloseTo(8 + epsilon, 5);
+  });
+
+  it('a gently sloped patch stays close to the flat epsilon — not a regression on the common case', () => {
+    const m = 0.2; // gentle: sqrt(1 + 0.04) ~= 1.02
+    const sampler: SurfaceHeightSampler = (x, _z) => m * x;
+    const epsilon = 0.05;
+    const layer = new GroundTintLayer(scene, sampler, { epsilon });
+    layer.replace([cellPatch('gentle', 10, 10)]);
+
+    const clearance = maxClearance(sampler);
+    expect(clearance).toBeGreaterThanOrEqual(epsilon);
+    expect(clearance).toBeLessThan(epsilon * 1.2);
+  });
+});
+
+describe('buildConformingRing — slope-scaled epsilon clearance (#1057)', () => {
+  it('a steep-slope ring gets measurably more clearance than the flat epsilon alone', () => {
+    const m = 5; // steep, under the cap: sqrt(1 + 25) ~= 5.1
+    const sampler: SurfaceHeightSampler = (x, _z) => m * x;
+    const ring = buildConformingRing(sampler, 10, 10, 5, 16, 0xffffff, 1);
+    const pos = ring.geometry.getAttribute('position') as THREE.BufferAttribute;
+
+    let maxClearance = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const y = pos.getY(i);
+      maxClearance = Math.max(maxClearance, y - bilinearSurfaceHeight(sampler, x, z));
+    }
+    expect(maxClearance, 'steep-slope ring clearance should be well above the flat epsilon').toBeGreaterThan(GROUND_TINT_Y_EPSILON * 1.5);
+  });
+
+  it('flat terrain ring clearance is unchanged — stays exactly GROUND_TINT_Y_EPSILON (no regression)', () => {
+    const sampler: SurfaceHeightSampler = () => 5;
+    const ring = buildConformingRing(sampler, 10, 10, 5, 16, 0xffffff, 1);
+    const pos = ring.geometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      expect(pos.getY(i)).toBeCloseTo(5 + GROUND_TINT_Y_EPSILON, 5);
     }
   });
 });
