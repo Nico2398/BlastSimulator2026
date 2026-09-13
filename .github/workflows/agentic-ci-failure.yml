@@ -59,6 +59,8 @@ jobs:
       vars.AGENTIC_CI_FIX_ENABLED != 'false' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.name == 'CI' && github.event.workflow_run.conclusion == 'failure'))
+    # Deliberately excludes `Claude Pipeline` / `OpenCode Pipeline` completing —
+    # those two route to `scan-after-runner` below instead, never here.
     runs-on: ubuntu-latest
     concurrency:
       group: agentic-ci-failure-${{ inputs.pr || github.event.workflow_run.head_branch }}

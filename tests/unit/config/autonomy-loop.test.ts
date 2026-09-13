@@ -1160,7 +1160,11 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   const triggers = failsafe.slice(failsafe.indexOf('\non:'), failsafe.indexOf('\npermissions:'));
 
   it('reacts to the same CI-completion event auto-merge reacts to', () => {
-    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI"\]/);
+    // Permissive of the comment lines above `workflows:` and of the widened
+    // array (`Claude Pipeline` / `OpenCode Pipeline` alongside `CI`, added by
+    // #1059's runner-completion fail-safe) — still fails if `CI` drops out of
+    // the array or `types: [completed]` changes.
+    expect(triggers).toMatch(/workflow_run:[\s\S]*?workflows:\s*\[[^\]]*"CI"[^\]]*\]/);
     expect(triggers).toMatch(/types:\s*\[completed\]/);
   });
 
