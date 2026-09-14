@@ -176,20 +176,30 @@ describe('run-all-scenarios-cli.ts', () => {
   describe('estimateScenarioCost', () => {
     const steps: ScenarioStepDef[] = [
       { command: 'new_game seed:42', role: 'setup', interaction: [{ type: 'command', command: 'new_game seed:42' }] },
-      { command: 'tick 10', role: 'setup', interaction: [{ type: 'command', command: 'tick 10' }, { type: 'wait', durationMs: 1 }] },
+      { command: 'tick 10', role: 'setup', interaction: [{ type: 'command', command: 'tick 10' }, { type: 'wait', durationMs: 2000 }] },
+      { command: 'wait_until field:holeCount equals:4 max_ticks:300', role: 'setup', interaction: [{ type: 'waitUntil', field: 'holeCount', equals: 4, maxTicks: 300, timeoutMs: 30000 }] },
+      { command: 'blast', role: 'player', interaction: [{ type: 'clickSelector', selector: '#fire' }, { type: 'clickSelector', selector: '[data-action="report-close"]' }] },
       { command: 'scores', role: 'observe' },
     ];
 
-    it('counts interaction actions in interaction mode', () => {
-      expect(estimateScenarioCost({ steps }, 'interaction')).toBe(3);
+    it('counts interaction actions, plus a blast step, a waitUntil and each second of a fixed wait, in interaction mode', () => {
+      // 6 actions, one blast step (+10), one waitUntil (+4), a 2 s wait (+6).
+      expect(estimateScenarioCost({ steps }, 'interaction')).toBe(6 + 10 + 4 + 6);
     });
 
     it('counts steps in command mode', () => {
-      expect(estimateScenarioCost({ steps }, 'command')).toBe(3);
+      expect(estimateScenarioCost({ steps }, 'command')).toBe(5);
     });
 
     it('is zero for a definition with no steps', () => {
       expect(estimateScenarioCost({ steps: [] }, 'interaction')).toBe(0);
+    });
+
+    it('does not mistake a command that merely starts with "blast" for a blast step', () => {
+      const plan: ScenarioStepDef[] = [
+        { command: 'blast_preview', role: 'observe', interaction: [{ type: 'command', command: 'blast_preview' }] },
+      ];
+      expect(estimateScenarioCost({ steps: plan }, 'interaction')).toBe(1);
     });
   });
 });
