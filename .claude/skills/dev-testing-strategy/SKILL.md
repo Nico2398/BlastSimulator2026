@@ -255,11 +255,11 @@ CI has 3 tiers of scenario testing:
 
 | Tier | What | When | Time |
 |------|------|------|------|
-| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
-| **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | ~12 min wall clock† |
-| **3 — Full** | Tiers 1 + 2 combined | Every push and pull request | ~15–19 min wall clock† |
+| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~2 min |
+| **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | a few minutes wall clock† |
+| **3 — Full** | Tiers 1 + 2, alongside every other job — nothing waits on the unit suite any more | Every push and pull request | the slowest job† |
 
-† No GPU means ~6 s/frame in software rasterisation (#475); the figures above are CI's 10-shard runs on 13–14 Sep 2026 and go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
+† No GPU means ~6 s/frame in software rasterisation (#475) — which is why a scenario page now boots with drawing suspended (`?scenarioMode=1`, main.ts) instead of paying ~10 s of never-seen frames per tab. Before that, CI's 10-shard runs on 13–14 Sep 2026 took ~12 min for the shards and 15–19 min end to end, half of it the unit suite the shards waited on. Shards are cost-balanced (`selectShard`, `scripts/run-all-scenarios-cli.ts`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
 **Every scenario job runs on every pull request.** The in-session `visual` channel covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 

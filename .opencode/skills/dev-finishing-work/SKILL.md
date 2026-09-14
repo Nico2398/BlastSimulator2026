@@ -39,7 +39,7 @@ Locally, run one named definition you are actively debugging. Never the whole in
 
 ## Every CI job runs on every pull request
 
-Nothing a session does decides which `ci.yml` jobs run. The interaction-mode shards (~12 minutes wall clock, `SCENARIO_INTERACTION_SHARDS`) are the merge path for every PR, deliberately: a red shard is found on the branch that caused it, by the session that can still fix it. Why: `agentic-pipeline-pr-management`. `scripts/lib/required-jobs.ts` is what refuses to read a run green when a required job somehow did not run.
+Nothing a session does decides which `ci.yml` jobs run. The interaction-mode shards (a few minutes wall clock, cost-balanced across `SCENARIO_INTERACTION_SHARDS` runners) are the merge path for every PR, deliberately: a red shard is found on the branch that caused it, by the session that can still fix it. Why: `agentic-pipeline-pr-management`. `scripts/lib/required-jobs.ts` is what refuses to read a run green when a required job somehow did not run.
 
 ## ▶ Reading the CI result
 

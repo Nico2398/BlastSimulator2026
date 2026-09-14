@@ -31,6 +31,14 @@ const PICKER_TIMEOUT_MS = 5000;
  */
 export const CLOCK_HELD_FAIL_AFTER_POLLS = 2;
 
+/**
+ * Ticks one `waitUntil` round trip may advance in the page before reporting
+ * back — see the action's own comment. Bounds how far a wait can overshoot a
+ * wall-clock `timeoutMs` that expired mid-batch, and how stale `onProgress`'s
+ * last line can be when it does.
+ */
+export const WAIT_UNTIL_TICK_BATCH = 100;
+
 /** How long `clickSelector` polls its target before giving up, absent an
  * explicit `action.timeout`. */
 export const CLICK_SELECTOR_DEFAULT_TIMEOUT_MS = 5000;
@@ -863,11 +871,14 @@ export async function executeActionOnPage(
       let ticksUsed = 0;
       for (;;) {
         let tickCountAfter: number | null = null;
+        let ticksThisRound = 1;
         if (onTrace) {
-          // Same call as the untraced branch below, plus reading back the
-          // resulting tick count in the same round trip — only paid when a
-          // caller actually asked to trace (issue #674's diagnostic tool).
-          // Mirrors the 'command' case's own onTrace branch above.
+          // Same sequence as the untraced branch below, one tick per round
+          // trip, plus reading back the resulting tick count — only paid when
+          // a caller actually asked to trace (issue #674's diagnostic tool),
+          // which compares the two modes tick by tick and so needs every
+          // tick reported on its own. Mirrors the 'command' case's own
+          // onTrace branch above.
           const stateResult = await page.evaluate((field: string) => {
             const run = (window as unknown as {
               __gameConsole?: (c: string) => { output?: unknown };
@@ -888,22 +899,40 @@ export async function executeActionOnPage(
           lastValue = stateResult.value;
           tickCountAfter = stateResult.tickCount;
         } else {
-          lastValue = await page.evaluate((field: string) => {
+          // The same tick / read / auto-resolve / compare sequence as the
+          // traced branch, run in the page for up to WAIT_UNTIL_TICK_BATCH
+          // ticks per round trip instead of one. A CDP round trip is ~25 ms
+          // and a wait runs for hundreds of ticks, so the round trips were
+          // the whole cost of the wait: 173 `waitUntil` actions across the
+          // suite, at 3–8 s each in CI. The in-page loop yields a macrotask
+          // between ticks so a rAF frame due in between still runs, as it
+          // did between two round trips; the bound is the remaining tick
+          // budget, so a batch never ticks past `maxTicks`.
+          const batch = await page.evaluate(async (field: string, equals: unknown, budget: number) => {
             const run = (window as unknown as {
               __gameConsole?: (c: string) => { output?: unknown };
             }).__gameConsole;
-            run?.('tick 1');
             const getState = (window as unknown as {
               __gameState?: () => Record<string, unknown> | null;
             }).__gameState;
-            const st = getState === undefined ? null : getState();
-            // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
-            // regex-matching `event status`'s text output.
-            if (st?.pendingEvent) run?.('event choose 0');
-            return st ? st[field] : undefined;
-          }, action.field);
+            let ticks = 0;
+            let value: unknown;
+            for (;;) {
+              run?.('tick 1');
+              const st = getState === undefined ? null : getState();
+              // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+              // regex-matching `event status`'s text output.
+              if (st?.pendingEvent) run?.('event choose 0');
+              value = st ? st[field] : undefined;
+              ticks++;
+              if (value === equals || ticks >= budget) return { value, ticks };
+              await new Promise((r) => setTimeout(r, 0));
+            }
+          }, action.field, action.equals, Math.min(WAIT_UNTIL_TICK_BATCH, Math.max(1, action.maxTicks - ticksUsed)));
+          lastValue = batch.value;
+          ticksThisRound = batch.ticks;
         }
-        ticksUsed++;
+        ticksUsed += ticksThisRound;
         // Diagnostic trace only (issue #674): each internal `tick 1` this
         // loop issues is itself a concrete command, the same one
         // command-mode's own `runWaitUntil` issues once per tick — this is

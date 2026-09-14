@@ -3,6 +3,8 @@
  * (`scripts/run-all-scenarios.ts`).
  */
 
+import type { ScenarioDef } from './shared/scenario-types.js';
+
 const DEV_SERVER_PORT = 5173;
 
 export interface ShardSpec {
@@ -58,13 +60,53 @@ export function parseArgs(): ParsedArgs {
 }
 
 /**
- * Split `names` into `total` shards by index modulo, not a contiguous slice —
- * scenario cost varies roughly 6x (13s to 80s+ in interaction mode), and the
- * alphabetical sort clusters same-prefix scenarios (the `level*-playthrough-*`
- * files) together, so a contiguous chunk would load some shards far more than
- * others. Round-robin spreads that variance evenly without needing per-scenario
- * cost data to balance against.
+ * Static cost proxy for one scenario, for `selectShard`'s balancing.
+ *
+ * Interaction mode: the number of interaction actions (clicks, waits,
+ * reads). Command mode: the number of steps. Neither needs measured
+ * durations that go stale as the suite changes; replayed over CI's own
+ * per-scenario interaction durations (10 shards, 13–14 Sep 2026), balancing
+ * on the action count landed within 1% of balancing on the measured
+ * durations themselves (correlation 0.84 between the two).
  */
-export function selectShard(names: string[], shard: ShardSpec): string[] {
-  return names.filter((_, i) => i % shard.total === shard.index - 1);
+export function estimateScenarioCost(def: Pick<ScenarioDef, 'steps'>, mode: string): number {
+  if (mode !== 'interaction') return def.steps.length;
+  let actions = 0;
+  for (const step of def.steps) actions += step.interaction?.length ?? 0;
+  return actions;
+}
+
+/**
+ * Split `names` into `total` shards by cost, longest first: names sorted by
+ * descending cost (ascending name on a tie) each go to the shard carrying
+ * the least cost so far (lowest index on a tie). Every shard job derives the
+ * same assignment from the same inputs, so the shards' union is exactly
+ * `names`, each once, and a name stays on its shard from run to run as long
+ * as the costs do. With no `costOf` every name costs 1, and the assignment
+ * is the index-modulo round-robin this replaced.
+ *
+ * Why cost-aware: scenario cost varies ~15x in interaction mode (12 s to
+ * 160 s per scenario in CI), so round-robin over the alphabetical list — which
+ * clusters the `level*-playthrough-*` files — left one shard at 512 s against
+ * another's 245 s in the same run. Balanced on `estimateScenarioCost`, the
+ * slowest shard of that run would have finished at 378 s against an ideal
+ * 368 s.
+ */
+export function selectShard(
+  names: string[],
+  shard: ShardSpec,
+  costOf: (name: string) => number = () => 1,
+): string[] {
+  const byCost = [...names].sort((a, b) => costOf(b) - costOf(a) || (a < b ? -1 : a > b ? 1 : 0));
+  const loads = new Array<number>(shard.total).fill(0);
+  const assigned = new Set<string>();
+  for (const name of byCost) {
+    let target = 0;
+    for (let i = 1; i < shard.total; i++) {
+      if (loads[i]! < loads[target]!) target = i;
+    }
+    loads[target] = loads[target]! + costOf(name);
+    if (target === shard.index - 1) assigned.add(name);
+  }
+  return names.filter(name => assigned.has(name));
 }

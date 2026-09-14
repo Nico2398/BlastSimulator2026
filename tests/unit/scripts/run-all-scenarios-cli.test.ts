@@ -15,7 +15,8 @@
 // DO NOT implement anything here — only add implementation to scripts/.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { parseArgs, parseShardArg, selectShard } from '../../../scripts/run-all-scenarios-cli.js';
+import { parseArgs, parseShardArg, selectShard, estimateScenarioCost } from '../../../scripts/run-all-scenarios-cli.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 
 const ORIGINAL_ARGV = process.argv;
 
@@ -142,6 +143,53 @@ describe('run-all-scenarios-cli.ts', () => {
 
     it('returns an empty array for an empty input list', () => {
       expect(selectShard([], { index: 1, total: 3 })).toEqual([]);
+    });
+
+    // Cost-balanced assignment: the costliest name goes first, each name to
+    // the least-loaded shard so far, so one 160 s scenario no longer shares a
+    // shard with the next-heaviest by alphabetical accident.
+    it('assigns by cost, longest first onto the least-loaded shard, and keeps input order within a shard', () => {
+      const cost: Record<string, number> = { a: 1, b: 10, c: 1, d: 1, e: 6, f: 1, g: 1 };
+      const costOf = (n: string) => cost[n]!;
+      const shard1 = selectShard(names, { index: 1, total: 2 }, costOf);
+      const shard2 = selectShard(names, { index: 2, total: 2 }, costOf);
+      // b (10) → shard 1; e (6) → shard 2; then a, c, d, f, g (1 each) fill
+      // shard 2 until it draws level, then alternate.
+      expect(shard1).toEqual(['b', 'g']);
+      expect(shard2).toEqual(['a', 'c', 'd', 'e', 'f']);
+    });
+
+    it('balances uneven costs within one item of the ideal, never losing or duplicating a name', () => {
+      const many = Array.from({ length: 141 }, (_, i) => `s${String(i).padStart(3, '0')}`);
+      const costOf = (n: string) => 1 + ((parseInt(n.slice(1), 10) * 7919) % 40);
+      const total = 10;
+      const shards = Array.from({ length: total }, (_, i) => selectShard(many, { index: i + 1, total }, costOf));
+      const loads = shards.map(s => s.reduce((sum, n) => sum + costOf(n), 0));
+      const all = shards.flat();
+      expect(new Set(all).size).toBe(many.length);
+      expect(all.length).toBe(many.length);
+      const ideal = many.reduce((sum, n) => sum + costOf(n), 0) / total;
+      expect(Math.max(...loads)).toBeLessThanOrEqual(ideal + 40);
+    });
+  });
+
+  describe('estimateScenarioCost', () => {
+    const steps: ScenarioStepDef[] = [
+      { command: 'new_game seed:42', role: 'setup', interaction: [{ type: 'command', command: 'new_game seed:42' }] },
+      { command: 'tick 10', role: 'setup', interaction: [{ type: 'command', command: 'tick 10' }, { type: 'wait', durationMs: 1 }] },
+      { command: 'scores', role: 'observe' },
+    ];
+
+    it('counts interaction actions in interaction mode', () => {
+      expect(estimateScenarioCost({ steps }, 'interaction')).toBe(3);
+    });
+
+    it('counts steps in command mode', () => {
+      expect(estimateScenarioCost({ steps }, 'command')).toBe(3);
+    });
+
+    it('is zero for a definition with no steps', () => {
+      expect(estimateScenarioCost({ steps: [] }, 'interaction')).toBe(0);
     });
   });
 });

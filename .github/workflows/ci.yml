@@ -19,6 +19,14 @@ concurrency:
 permissions:
   contents: read
 
+# Every job starts at t=0. The scenario and build jobs used to wait on the
+# unit-test job (`needs: [typecheck, test]`), which put the two longest
+# jobs of the run back to back: 4–8 minutes of vitest, then 4–9 minutes of
+# browser shards, for a 12–19 minute wall clock (runs 1950–1964, Sep 2026).
+# Nothing a shard does depends on the unit suite having passed, and the
+# runners are free on a public repository, so the gate bought nothing but
+# latency. A red typecheck now shows up alongside the shards instead of
+# before them, which is the trade.
 jobs:
   typecheck:
     name: TypeScript type check
@@ -61,9 +69,20 @@ jobs:
       - name: Check i18n parity (en.json / fr.json)
         run: npm run check:i18n
 
+  # The unit + integration suite, split across runners with vitest's own
+  # `--shard`: each runner takes every Nth test file, so the three together
+  # run exactly `npm run test` once. One runner took 4–8 minutes for the
+  # whole suite; the split brings the job to the length of its slowest
+  # shard. No browser is installed here: nothing under tests/unit or
+  # tests/integration launches one (tests/scenarios/, which does, is
+  # `npm run test:playthrough`, outside vitest.config.ts's include).
   test:
-    name: Unit & integration tests
+    name: Unit & integration tests (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -84,17 +103,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Puppeteer Chrome
-        run: npx puppeteer browsers install chrome
-
       - name: Run tests with verbose and JUnit reporters
-        run: npx vitest run --reporter=verbose --reporter=junit --outputFile=test-results/junit.xml
+        run: npx vitest run --shard=${{ matrix.shard }}/3 --reporter=verbose --reporter=junit --outputFile=test-results/junit-${{ matrix.shard }}.xml
 
       - name: Upload test results artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.shard }}
           path: test-results/
 
   qualimetry:
@@ -159,13 +175,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Puppeteer Chrome
-        run: npx puppeteer browsers install chrome
-
       # Enforces the per-file thresholds in vitest.config.ts, which nothing
       # ran until now — the `test` job runs the suite without --coverage.
       # vitest.coverage.config.ts holds the two directories this measurement
       # excludes and why; they still run, unexcluded, in that `test` job.
+      # Not sharded: the thresholds are per file over the whole suite's
+      # coverage, and this vitest (1.6) cannot merge partial coverage
+      # reports, so one runner has to see every test.
       - name: Run tests with coverage thresholds
         run: npm run test:coverage
 
@@ -175,9 +191,6 @@ jobs:
   build:
     name: Production build
     runs-on: ubuntu-latest
-    needs:
-      - typecheck
-      - test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -207,14 +220,12 @@ jobs:
           name: build-artifacts
           path: dist/
 
-  # Runs all scenarios in command mode (fast, no browser).
-  # Always runs on every push/PR/schedule/manual trigger.
+  # Runs all scenarios in command mode (fast, no browser). The runner is
+  # `tsx` over src/ directly, so no build precedes it — the bundle is the
+  # `build` job's to prove.
   scenario-command:
     name: "Scenarios (command mode)"
     runs-on: ubuntu-latest
-    needs:
-      - typecheck
-      - test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -234,9 +245,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Build project
-        run: npm run build
 
       - name: Run all scenarios (command mode — batch, no browser)
         run: |
@@ -287,12 +295,16 @@ jobs:
   # `scripts/lib/required-jobs.ts` and `agentic-auto-merge` still ask the
   # run's own jobs that these shards ran and passed, so a job that somehow
   # never runs is a red verdict, not a green one.
+  #
+  # Each shard derives its own scenario list from the definitions on disk
+  # (`selectShard`, scripts/run-all-scenarios-cli.ts): cost-balanced, so a
+  # 160 s scenario and the next-heaviest no longer land on one shard by
+  # alphabetical accident. The dev server serves src/ straight to the
+  # browser, so no build precedes it either.
   scenario-interaction:
     name: "Scenarios (interaction mode) — shard ${{ matrix.shard }}/${{ strategy.job-total }}"
     runs-on: ubuntu-latest
     needs:
-      - typecheck
-      - test
       - shard-config
     strategy:
       fail-fast: false
@@ -321,14 +333,22 @@ jobs:
       - name: Install Puppeteer Chrome
         run: npx puppeteer browsers install chrome
 
-      - name: Build project
-        run: npm run build
-
+      # Waits on the server answering, not on a fixed sleep: Vite is ready in
+      # well under a second here, and the old `sleep 5` was the same five
+      # seconds on every shard whether it needed them or not. Bounded, and
+      # fails by name when the server never comes up.
       - name: Start dev server
         run: |
           npx vite --port 5173 &
-          sleep 5
-          curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5173 > /dev/null; then
+              echo "Dev server ready after ${i} poll(s)."
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "Dev server failed to start within 30s"
+          exit 1
 
       - name: Run scenario shard ${{ matrix.shard }}/${{ strategy.job-total }} (interaction mode — batch, shared browser)
         run: |

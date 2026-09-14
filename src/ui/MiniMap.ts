@@ -20,6 +20,7 @@ import {
   drawNavGridOverlay,
   projectX,
   projectZ,
+  StaticLayerInputs,
   type MapProjection,
 } from './miniMapLayers.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -54,6 +55,15 @@ export class MiniMap {
   private _navGrid: NavGrid | null = null;
   /** Last projection used, so an out-of-band overlay draw lines up with the terrain already painted. */
   private projection: MapProjection = { originX: 0, originZ: 0, scaleX: 1, scaleZ: 1 };
+  /**
+   * Terrain shading + grid lines, painted once per change of what they draw
+   * and copied onto the map on every update — see StaticLayerInputs. Null
+   * where a 2D context cannot be had (jsdom), where update() paints them
+   * straight onto the map as it always did.
+   */
+  private readonly staticLayer: HTMLCanvasElement;
+  private readonly staticCtx: CanvasRenderingContext2D | null;
+  private readonly staticInputs = new StaticLayerInputs();
   private readonly locale = new LocaleTextRegistry();
   private onFocus?: (x: number, z: number) => void;
 
@@ -119,6 +129,10 @@ export class MiniMap {
     }
 
     this.ctx2d = this.canvas.getContext('2d')!;
+    this.staticLayer = document.createElement('canvas');
+    this.staticLayer.width = MAP_SIZE;
+    this.staticLayer.height = MAP_SIZE;
+    this.staticCtx = this.staticLayer.getContext('2d');
     this.el.append(header, this.canvas, legend);
     container.appendChild(this.el);
 
@@ -181,8 +195,17 @@ export class MiniMap {
     };
     this.projection = proj;
 
-    drawTerrain(ctx, state, proj);
-    drawGridLines(ctx, sizeX, sizeZ, proj);
+    if (this.staticCtx !== null) {
+      if (this.staticInputs.capture(state, proj)) {
+        this.staticCtx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
+        drawTerrain(this.staticCtx, state, proj);
+        drawGridLines(this.staticCtx, sizeX, sizeZ, proj);
+      }
+      ctx.drawImage(this.staticLayer, 0, 0);
+    } else {
+      drawTerrain(ctx, state, proj);
+      drawGridLines(ctx, sizeX, sizeZ, proj);
+    }
     drawSurveyedOre(ctx, state, proj);
 
     // Draw buildings

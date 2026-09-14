@@ -11,7 +11,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
 import { releaseVehicleOnCompletion } from './VehicleReservation.js';
-import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import {
   isRampSegmentClaimable, selectBestActionForEmployee, findStarvedActionForEmployee, isQueuedActionAvailableToEmployee,
 } from './ActionSelection.js';
@@ -62,6 +62,9 @@ export function tryContinueVehicleGatedAction(
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === completedAction.id);
   if (!vehicle || vehicle.driverId !== employee.id) return false;
 
+  // One id → fragment index for both candidate walks below — see
+  // createFragmentLookup's own doc comment (HaulDispatch.ts).
+  const fragmentOf = createFragmentLookup(state);
   const queuedFollowUps = employee.taskQueue
     .map(id => state.pendingActions.find(a => a.id === id))
     .filter((a): a is PendingAction =>
@@ -69,7 +72,7 @@ export function tryContinueVehicleGatedAction(
       // #552: re-checked here too — conditions (storage room, still
       // oversized) can drift between the original claim and this same-tick
       // continuity promotion.
-      && isHaulOrFragmentActionClaimable(state, a)
+      && isHaulOrFragmentActionClaimable(state, a, fragmentOf)
       // #555: same continuity gap for a ramp segment — a follow-up out of
       // order (predecessor not yet done) is skipped, not grabbed early.
       && isRampSegmentClaimable(state, a))
@@ -88,7 +91,7 @@ export function tryContinueVehicleGatedAction(
       isQueuedActionAvailableToEmployee(employee, a) &&
       a.requiredVehicleRole === role &&
       // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-      isHaulOrFragmentActionClaimable(state, a) &&
+      isHaulOrFragmentActionClaimable(state, a, fragmentOf) &&
       // #555: see queuedFollowUps' own comment on the same check, just above.
       isRampSegmentClaimable(state, a));
 

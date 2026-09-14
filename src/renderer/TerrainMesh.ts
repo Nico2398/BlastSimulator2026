@@ -312,7 +312,12 @@ export class TerrainMesh {
     let vertexCount = 0;
     for (const mesh of this.chunks.values()) {
       if (!mesh) continue;
-      mesh.geometry.computeBoundingBox();
+      // rebuildChunk() replaces a chunk's geometry whole, so a box computed
+      // once holds for that geometry's lifetime. computeBoundingBox()
+      // rescans every vertex on every call, and this runs inside every
+      // `__gameState` read a scenario harness makes — several per step, one
+      // per tick inside a wait — at ~8 ms a call on a 96×96 site.
+      if (mesh.geometry.boundingBox === null) mesh.geometry.computeBoundingBox();
       const bb = mesh.geometry.boundingBox;
       if (!bb) continue;
       box = box ? box.union(bb) : bb.clone();

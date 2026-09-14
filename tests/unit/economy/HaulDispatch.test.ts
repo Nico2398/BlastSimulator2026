@@ -18,7 +18,8 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre } from '../../../src/core/economy/HaulDispatch.js';
+import { syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
+import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 
 const SEED = 42;
 
@@ -531,5 +532,99 @@ describe('syncHaulDispatch — nextPendingActionId bookkeeping', () => {
 
     const ids = state.pendingActions.map(a => a.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+// ── createFragmentLookup — one index per dispatch pass ──────────────────────
+//
+// The claim-time gate used to resolve an action's fragment with a linear
+// `find` over logistics.fragments, once per pool action, per idle employee,
+// per tick — O(employees × actions × fragments) after a large blast
+// (level1-lose-ecology.json: 126 of 137 s in that one `find`). The lookup
+// replaces it with one lazily-built index per pass; these pin that it answers
+// exactly what `find` answered.
+
+describe('createFragmentLookup — one index per dispatch pass', () => {
+  it('resolves the very TrackedFragment object a linear find would return', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5), makeFragment(2, 6, 6), makeFragment(3, 7, 7)]);
+    const lookup = createFragmentLookup(state);
+
+    expect(lookup(2)).toBe(state.logistics.fragments.find(f => f.fragment.id === 2));
+    expect(lookup(3)).toBe(state.logistics.fragments[2]);
+  });
+
+  it('answers undefined for an id nothing tracks', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+
+    expect(createFragmentLookup(state)(99)).toBeUndefined();
+    expect(createFragmentLookup(state)(1)).toBeDefined();
+  });
+
+  it('keeps the first occurrence when two tracked fragments share an id, exactly like find', () => {
+    const state = createGame({ seed: SEED });
+    const first = makeFragment(7, 1, 1);
+    const second = makeFragment(7, 2, 2);
+    addBlastFragments(state.logistics, [first, second]);
+
+    expect(createFragmentLookup(state)(7)?.fragment).toBe(first);
+    expect(state.logistics.fragments.find(f => f.fragment.id === 7)?.fragment).toBe(first);
+  });
+
+  it('holds live objects: a fragment picked up after the index was built reads as in_transit', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+    const lookup = createFragmentLookup(state);
+    expect(lookup(1)?.state).toBe('on_ground');
+
+    expect(pickupFragment(state.logistics, 1, 'v1')).toBe(true);
+
+    expect(lookup(1)?.state).toBe('in_transit');
+  });
+
+  it('gives isHaulOrFragmentActionClaimable the same verdicts with the lookup as without it', () => {
+    const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 1000;
+    state.logistics.storedMassKg = 0;
+    addBlastFragments(state.logistics, [
+      makeFragment(1, 5, 5, 500),            // haulable, fits
+      makeFragment(2, 6, 6, 5000),           // heavier than the room left
+      makeOversizedFragment(3, 7, 7, 500),   // oversized: fits as haul_debris, and still breakable
+      makeFragment(4, 8, 8, 500),            // will be picked up below
+    ]);
+    pickupFragment(state.logistics, 4, 'v1');
+    const lookup = createFragmentLookup(state);
+
+    const actions: PendingAction[] = [
+      makeHaulAction({ id: 1, payload: { fragmentId: 1 } }),
+      makeHaulAction({ id: 2, payload: { fragmentId: 2 } }),
+      makeHaulAction({ id: 3, payload: { fragmentId: 3 } }),
+      makeHaulAction({ id: 4, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter', payload: { fragmentId: 3 } }),
+      makeHaulAction({ id: 5, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter', payload: { fragmentId: 1 } }),
+      makeHaulAction({ id: 6, payload: { fragmentId: 4 } }),
+      makeHaulAction({ id: 7, payload: { fragmentId: 42 } }),
+    ];
+
+    const verdicts = actions.map(a => isHaulOrFragmentActionClaimable(state, a, lookup));
+    expect(verdicts).toEqual(actions.map(a => isHaulOrFragmentActionClaimable(state, a)));
+    expect(verdicts).toEqual([true, false, true, true, false, false, false]);
+  });
+
+  it('gives haulActionCarriesOre the same verdicts with the lookup as without it', () => {
+    const state = createGame({ seed: SEED });
+    const ore = makeFragment(1, 5, 5);
+    ore.oreDensities = { gloomium: 0.1 };
+    addBlastFragments(state.logistics, [ore, makeFragment(2, 6, 6)]);
+    const lookup = createFragmentLookup(state);
+    const actions = [
+      makeHaulAction({ id: 1, payload: { fragmentId: 1 } }),
+      makeHaulAction({ id: 2, payload: { fragmentId: 2 } }),
+      makeHaulAction({ id: 3, payload: { fragmentId: 3 } }),
+    ];
+
+    expect(actions.map(a => haulActionCarriesOre(state, a, lookup)))
+      .toEqual(actions.map(a => haulActionCarriesOre(state, a)));
+    expect(actions.map(a => haulActionCarriesOre(state, a, lookup))).toEqual([true, false, false]);
   });
 });

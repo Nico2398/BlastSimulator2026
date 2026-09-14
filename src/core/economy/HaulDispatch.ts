@@ -73,17 +73,61 @@ export function syncHaulDispatch(state: GameState): void {
 }
 
 /**
+ * A fragment-by-id resolver scoped to one dispatch pass — see
+ * `createFragmentLookup`.
+ */
+export type FragmentLookup = (fragmentId: number) => TrackedFragment | undefined;
+
+/**
+ * Build a lazy id → TrackedFragment index over `state.logistics.fragments`
+ * for one dispatch pass.
+ *
+ * `logistics.fragments` is a plain array, so resolving an action's fragment
+ * is a linear `find`. The claim-time gate calls it once per pool action, for
+ * every idle employee, every tick — after a large blast that is
+ * O(employees × actions × fragments) per tick, with actions ≈ fragments in
+ * the thousands: `level1-lose-ecology.json` spent 126 of its 137 s in that
+ * one `find`. Every caller that walks the pool builds this once and hands
+ * it to the gate, so the pass is O(actions + fragments).
+ *
+ * The index is built on first use and is never kept past the pass that
+ * created it — nothing here can go stale, because nothing that adds or
+ * removes a fragment (`addBlastFragments`, `sellFragment`, a boulder split)
+ * runs inside a claim pass, and a fragment's own `state` transitions mutate
+ * the object the index holds. First occurrence wins, exactly like `find`.
+ */
+export function createFragmentLookup(state: GameState): FragmentLookup {
+  let byId: Map<number, TrackedFragment> | null = null;
+  return (fragmentId) => {
+    if (byId === null) {
+      byId = new Map();
+      for (const tracked of state.logistics.fragments) {
+        if (!byId.has(tracked.fragment.id)) byId.set(tracked.fragment.id, tracked);
+      }
+    }
+    return byId.get(fragmentId);
+  };
+}
+
+/**
  * Resolve the TrackedFragment a haul_debris/fragment_debris action's
  * payload.fragmentId refers to, or undefined when the payload carries no
  * numeric fragmentId or nothing in logistics.fragments matches it. Shared by
  * every consumer that needs to look up an action's fragment (claim-time
  * gating, ore-priority ranking) so the lookup lives in exactly one place.
+ * A caller walking many actions passes the pass's `FragmentLookup`; a
+ * one-off caller may omit it and pay the linear scan.
  */
-function resolveTrackedFragment(state: GameState, action: PendingAction): TrackedFragment | undefined {
+function resolveTrackedFragment(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): TrackedFragment | undefined {
   const fragmentId = action.payload['fragmentId'];
-  return typeof fragmentId === 'number'
-    ? state.logistics.fragments.find(f => f.fragment.id === fragmentId)
-    : undefined;
+  if (typeof fragmentId !== 'number') return undefined;
+  return lookup !== undefined
+    ? lookup(fragmentId)
+    : state.logistics.fragments.find(f => f.fragment.id === fragmentId);
 }
 
 /**
@@ -93,10 +137,14 @@ function resolveTrackedFragment(state: GameState, action: PendingAction): Tracke
  * fragment_debris: true iff the fragment is still on_ground and still
  * oversized.
  */
-export function isHaulOrFragmentActionClaimable(state: GameState, action: PendingAction): boolean {
+export function isHaulOrFragmentActionClaimable(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
   if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return true;
 
-  const tracked = resolveTrackedFragment(state, action);
+  const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return false;
 
   if (action.type === 'fragment_debris') {
@@ -117,10 +165,14 @@ export function isHaulOrFragmentActionClaimable(state: GameState, action: Pendin
  * fragment carries any ore (some oreDensities entry > 0). False for any
  * other action type or a fragment id that no longer resolves.
  */
-export function haulActionCarriesOre(state: GameState, action: PendingAction): boolean {
+export function haulActionCarriesOre(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
   if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return false;
 
-  const tracked = resolveTrackedFragment(state, action);
+  const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked) return false;
 
   return fragmentHasOre(tracked.fragment.oreDensities);
