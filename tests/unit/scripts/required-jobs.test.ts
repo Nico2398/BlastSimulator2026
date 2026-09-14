@@ -1,7 +1,7 @@
 // BlastSimulator2026 — required-job verification
 //
 // Extracted from `tests/unit/scripts/await-pr-ci.test.ts` (#785) alongside
-// `scripts/lib/required-jobs.ts` (then `label-gated-jobs`). #615's actual
+// `scripts/lib/required-jobs.ts`. #615's actual
 // failure mode: a workflow run's own `conclusion` is `success` the instant
 // every job in it either passed or was skipped, so a run-level verdict alone
 // cannot tell a genuinely green PR from one whose interaction shards silently

@@ -149,17 +149,14 @@ runs:
           };
 
           // A workflow run's own `conclusion` is `success` the moment every job
-          // in it either passed or was skipped -- and a job that never ran is
-          // indistinguishable from that at the run level. PR #615 merged
-          // exactly that way: the interaction shards, then gated behind the
-          // `full-ci` label, never ran, the CI run still concluded `success`,
-          // and nothing above ever asked the run's own jobs whether the one
-          // thing that mattered had actually happened. The label gate itself
-          // is gone -- `ci.yml` runs these jobs on every pull request -- and
-          // this stays as the independent line of defence: never trust a
-          // run-level `success` for a job the run owes without asking that
-          // run's own jobs. Kept identical to scripts/lib/required-jobs.ts's
-          // list; autonomy-loop.test.ts compares the two literals.
+          // in it either passed or was skipped -- a job that never ran is
+          // indistinguishable from that at the run level, which is how PR #615
+          // merged with its interaction shards never having run. `ci.yml` runs
+          // these jobs on every pull request; this is the independent line of
+          // defence: never trust a run-level `success` for a job the run owes
+          // without asking that run's own jobs. Kept identical to
+          // scripts/lib/required-jobs.ts's list; autonomy-loop.test.ts
+          // compares the two literals.
           const REQUIRED_JOBS = [
             { jobNamePrefix: 'Scenarios (interaction mode)' },
             { jobNamePrefix: 'Production build' },
@@ -212,7 +209,7 @@ runs:
           // state. `pipeline/feature-<N>` is the pipeline's own branch, so a
           // non-draft PR from one carrying no marker is a run that stopped
           // mid-sentence — #507 and #508 each said the marker "will follow once
-          // the full-ci jobs report", and nothing exists to bring it. This
+          // the CI jobs report", and nothing exists to bring it. This
           // action skips an unmarked PR, `auto-assign-next` chains from a merge
           // that never happens, and the watchdog skips any issue with a linked
           // PR, so issue #504 held `in-progress` for a day with every

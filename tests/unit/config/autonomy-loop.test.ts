@@ -741,7 +741,7 @@ describe('enabling auto-merge actually reaches GitHub', () => {
 // `main` requires no status check, so GitHub refuses native auto-merge outright
 // (`Pull request is in unstable status`) and the action always falls through to
 // merging the PR itself. That fallback read `unstable` as "wait", so it polled
-// for its whole 10-minute budget while the `full-ci` browser jobs still had 35
+// for its whole 10-minute budget while the browser shards still had 35
 // minutes to run, then declared the PR stuck. Nothing swept it again, because
 // no `pull_request` event fires when checks finish.
 describe('deciding whether to merge a PR auto-merge refused', () => {
@@ -1110,16 +1110,14 @@ describe('the sweep that runs when the checks come in', () => {
   });
 });
 
-// PR #615 merged with its interaction-mode job silently skipped: the job was
-// gated behind a `full-ci` label applied via a separate API call after
-// `pull_request: opened` had already fired, the `if:` guard was evaluated
-// against a PR that had no labels yet, the shards reported `skipped` rather
-// than `failure`, and the run still concluded `success`. The gate is gone
-// rather than patched: the interaction shards and the production build run
-// on every pull request, so there is no label to race and no `if:` to
-// evaluate early. This pins that no such guard comes back — the same
-// asymmetry ("runs on main, optional on PRs") is what made `main` the place
-// interaction regressions were discovered, ten times in sixty pushes.
+// PR #615 merged with its interaction-mode job silently skipped: an `if:` on
+// a pull-request label was evaluated at `opened`, before the label applied a
+// call later existed, the shards reported `skipped` rather than `failure`,
+// and the run still concluded `success`. The gate is gone rather than
+// patched: the interaction shards and the production build run on every
+// pull request, so there is no label to race and no `if:` to evaluate early.
+// This pins that no such guard comes back — a job optional on PRs and
+// unconditional on `main` makes `main` the place regressions are found.
 describe('ci.yml runs the interaction shards and the build on every pull request', () => {
   const ci = workflow('ci.yml');
 
@@ -1674,7 +1672,7 @@ describe('the watchdog re-raises a red CI it would otherwise skip', () => {
 // Rule 1 of `agentic-workflow-edition`, made executable. Every interval this
 // layer ever held was tuned to the CI of that week and broke when a shard count
 // moved: auto-merge's 10-minute settle poll called PR #499 stuck with 35 minutes
-// of `full-ci` left to run, and a 45-minute wait budget in `await-pr-ci` would
+// of browser shards left to run, and a 45-minute wait budget in `await-pr-ci` would
 // have reported "still running" as an outcome — #581's ending exactly.
 //
 // So a clock in this layer is allowlisted, one entry per file, with the reason it
@@ -1790,7 +1788,7 @@ describe('the READY TO MERGE marker', () => {
 
 // PRs #507 and #508 were opened non-draft, verified on every channel this
 // session could run, and left unmarked — each body promising `READY TO MERGE`
-// "once the full-ci jobs report". No step anywhere writes it later. Selection
+// "once the CI jobs report". No step anywhere writes it later. Selection
 // here needs the marker, `auto-assign-next` chains from a merge that never
 // happens, and the watchdog leaves alone any issue that has a linked PR, so
 // issue #504 held `in-progress` with every assignment behind it waiting on a

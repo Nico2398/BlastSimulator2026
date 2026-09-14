@@ -176,7 +176,6 @@ describe('reportFailure uses the injected job-fetch function', () => {
 // channel") live in tests/unit/scripts/workflow-verdict.test.ts alongside the
 // extracted scripts/lib/workflow-verdict.ts (#785).
 //
-// The label-gate tests ("asking a CI run's own jobs before trusting its
-// conclusion", "wantedGatedLabels") live in
-// tests/unit/scripts/required-jobs.test.ts alongside the extracted
-// scripts/lib/required-jobs.ts (#785, then `label-gated-jobs`).
+// The required-job tests ("asking a CI run's own jobs before trusting its
+// conclusion") live in tests/unit/scripts/required-jobs.test.ts alongside
+// the extracted scripts/lib/required-jobs.ts (#785).

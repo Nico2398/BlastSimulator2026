@@ -276,28 +276,17 @@ jobs:
           echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
 
   # Runs all scenarios in interaction mode (Puppeteer, slow) on every push
-  # and pull request, sharded. This job used to be opt-in on pull requests
-  # behind a `full-ci` label, with a documented exemption for "backend-only"
-  # diffs. Two things ended that:
-  #
-  #   - It was where `main` went red. `main` requires no status check and
-  #     `agentic-auto-merge` merges the moment a PR reads `clean`, so for
-  #     every unlabelled PR the push to `main` was the first time this job
-  #     ever ran on that code. Ten of the sixty pushes to `main` between
-  #     3 and 13 Sep 2026 were red; in every one the only red jobs were
-  #     these shards, and every other job on the same head was green.
-  #   - The exemption was wrong. PR #1068 changed one threshold in
-  #     `src/core/` and broke three interaction scenarios (PR #1070's
-  #     post-mortem: "nothing in src/core/ is at fault") — the browser path
-  #     depends on timing, and most core changes move timing.
-  #
-  # PR #615 is the other reason the gate is gone rather than merely on by
-  # default: a label applied after `opened` left the `if:` evaluated against
-  # no labels, the shards reported `skipped`, and the run still concluded
-  # `success`. No `if:` means no such gap. `scripts/lib/required-jobs.ts`
-  # and `agentic-auto-merge` still ask the run's own jobs that these shards
-  # ran and passed, so a job that somehow never runs is a red verdict, not a
-  # green one.
+  # and pull request, sharded — never behind a label, a path filter or an
+  # `if:`. A browser regression is only found where the browser runs, and
+  # `main` has no required check, so a job optional on pull requests first
+  # ran on a change at the merge commit: ten red `main` pushes in sixty
+  # (Sep 2026), every one only these shards. No diff is exempt — the browser
+  # path depends on timing, and a one-line `src/core/` threshold change
+  # broke three scenarios (#1068). An `if:` is also a race: evaluated at
+  # `opened`, before a label applied a call later exists (#615).
+  # `scripts/lib/required-jobs.ts` and `agentic-auto-merge` still ask the
+  # run's own jobs that these shards ran and passed, so a job that somehow
+  # never runs is a red verdict, not a green one.
   scenario-interaction:
     name: "Scenarios (interaction mode) — shard ${{ matrix.shard }}/${{ strategy.job-total }}"
     runs-on: ubuntu-latest

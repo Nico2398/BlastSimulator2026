@@ -32,7 +32,7 @@ A duration is a guess about a system that changes underneath it. Every interval 
 
 | What was timed | What it did instead of working |
 |----------------|-------------------------------|
-| `agentic-auto-merge`'s 10-minute settle poll | Reported PR #499 stuck while its `full-ci` jobs had 35 minutes left to run, and was never swept again |
+| `agentic-auto-merge`'s 10-minute settle poll | Reported PR #499 stuck while its browser shards had 35 minutes left to run, and was never swept again |
 | A 45-minute wait budget in `await-pr-ci` | Would report "still running" as an outcome — the exact ending that left PR #581's red CI unread |
 | A 60-minute per-commit cooldown in `agentic-ci-failure` | Long enough to stall once CI slows, short enough to double-ask when it speeds up |
 

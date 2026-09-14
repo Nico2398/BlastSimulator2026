@@ -1,8 +1,7 @@
 /**
  * BlastSimulator2026 — Required-job verification
  *
- * Extracted from scripts/await-pr-ci.ts (#785) as `label-gated-jobs`; the
- * label indirection went when the jobs stopped being optional.
+ * Extracted from scripts/await-pr-ci.ts (#785).
  *
  * @module required-jobs
  */
@@ -15,11 +14,9 @@ import type { WorkflowJob } from './phantom-cancelled-runs.js';
  * run reports `success` the moment every job in it either passed or was
  * skipped, and a job that never ran is indistinguishable from that at the
  * run level. PR #615 merged exactly that way, with its interaction shards
- * silently absent while the run read green. These two used to be gated
- * behind the `full-ci` / `build-check` labels, which is how #615's shards
- * came to be skipped in the first place; they now run on every pull
- * request unconditionally, and this check is what says so out loud when a
- * run somehow lacks them. Kept in step with the same-named list in
+ * silently absent while the run read green. Both run on every pull request
+ * unconditionally, and this check is what says so out loud when a run
+ * somehow lacks them. Kept in step with the same-named list in
  * `.github/actions/agentic-auto-merge/action.yml` — the two decide whether a
  * PR may end a run and whether it may merge, and must not disagree about it.
  */

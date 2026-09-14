@@ -37,9 +37,9 @@ Steps 5 and 6 are where a finished-looking change stops being finished. Everythi
 
 Locally, run one named definition you are actively debugging. Never the whole interaction-mode suite: without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475), and the browser harnesses wait a full frame per probe, so one player action costs tens of seconds and one scenario beat costs minutes. Level loading is cheap by comparison (a `new_game` is ~4 s, a campaign start ~16 s), and the simulation itself is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
 
-## No label decides what CI proves
+## Every CI job runs on every pull request
 
-Every job in `ci.yml` runs on every pull request. The interaction-mode shards and the production build used to be opt-in behind `full-ci` and `build-check`, with a rule that a "backend-only" diff never earned the shards; that is where `main` went red — ten of sixty pushes between 3 and 13 Sep 2026, every one of them only the shards, every one of them the first time those shards had run on that code — and PR #1068 proved the exemption wrong by changing one `src/core/` threshold and breaking three interaction scenarios. The shards cost ~12 minutes wall clock sharded (`SCENARIO_INTERACTION_SHARDS`), and that is now the merge path for every PR, deliberately: a red shard is found on the branch that caused it, by the session that can still fix it. `agentic-pipeline-pr-management` holds the reasoning; `scripts/lib/required-jobs.ts` is what refuses to read a run green when a required job somehow did not run.
+Nothing a session does decides which `ci.yml` jobs run. The interaction-mode shards (~12 minutes wall clock, `SCENARIO_INTERACTION_SHARDS`) are the merge path for every PR, deliberately: a red shard is found on the branch that caused it, by the session that can still fix it. Why: `agentic-pipeline-pr-management`. `scripts/lib/required-jobs.ts` is what refuses to read a run green when a required job somehow did not run.
 
 ## ▶ Reading the CI result
 

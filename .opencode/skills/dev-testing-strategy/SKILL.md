@@ -261,7 +261,7 @@ CI has 3 tiers of scenario testing:
 
 † No GPU means ~6 s/frame in software rasterisation (#475); the figures above are CI's 10-shard runs on 13–14 Sep 2026 and go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
-**No label convention.** The interaction-mode shards and the production build run on every pull request. They used to be opt-in behind `full-ci` / `build-check`, and `main` went red ten times in sixty pushes because an unlabelled PR's push to `main` was the first time the shards ever saw its code. The in-session `visual` channel still covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
+**Every scenario job runs on every pull request.** The in-session `visual` channel covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 
 ## Wait on Conditions, Never on a Fixed Delay
 

@@ -16,8 +16,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Page } from 'puppeteer';
 import {
   executeActionOnPage, resolveEventIfPendingOnPage, CLOCK_HELD_FAIL_AFTER_POLLS,
-  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES,
+  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS,
 } from '../../scripts/shared/interaction-executor.js';
+import {
+  CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES,
+} from '../../scripts/shared/click-retry.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 
