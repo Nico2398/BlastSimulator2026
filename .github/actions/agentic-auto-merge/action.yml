@@ -373,7 +373,7 @@ runs:
                 continue;
               }
 
-              // Every run reported, none failed, and every label-gated job
+              // Every run reported, none failed, and every required job
               // actually ran. Whether GitHub agrees the PR is mergeable is now
               // its call to make, not something to poll for: this request
               // either merges or names what stopped it.

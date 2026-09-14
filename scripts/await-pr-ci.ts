@@ -2,9 +2,9 @@
  * BlastSimulator2026 — Wait for a pull request's CI to report
  *
  * A pipeline run's last act is opening its PR, and the channels CI owns —
- * command-mode `scenario` on every push, the interaction-mode `visual` suite
- * behind `full-ci`, the production `build` behind `build-check` — report minutes
- * after the session that would have read them has exited. PR #581 is what that
+ * command-mode `scenario`, the interaction-mode `visual` shards and the
+ * production `build`, all on every pull request — report minutes after the
+ * session that would have read them has exited. PR #581 is what that
  * costs: green on every channel the session ran itself, marked `READY TO MERGE`,
  * and two interaction shards red in CI. `agentic-auto-merge.yml` skips a failed
  * CI run by design, so nothing merged it, nothing chained, and issue #552 held
@@ -39,8 +39,8 @@
  *   0  GREEN    every workflow run on the head reported success (or the PR merged),
  *               and the job(s) every pull request's CI run must contain
  *               gate actually ran and succeeded, not merely skipped without failing
- *   1  RED      at least one reported failure, or a full-ci/build-check PR whose
- *               gated job never ran despite the label (#615). The failing jobs are
+ *   1  RED      at least one reported failure, or a PR whose required jobs (the
+ *               interaction shards, the production build) never ran (#615). The failing jobs are
  *               printed with their log URLs, which is the input a fix needs
  *   2  TIMEOUT  only reachable with an explicit `--timeout-minutes`. Not a verdict
  *   3  GONE     the PR is closed unmerged, or no PR exists for that head

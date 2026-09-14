@@ -30,11 +30,12 @@
 // fatigue-hard-threshold-vehicle-release.json declaring
 // `rows:2 cols:3 spacing:5` beside a (14,14)-(29,24) drag that, at the
 // untouched 3m default, orders 6 x 4 = 24 holes instead of 6. Nothing caught
-// it: `ci.yml`'s `scenario-interaction` job runs on push to `main`, on
-// schedule/dispatch, or on a PR labelled `full-ci`, and that PR carried no
-// such label — so the failure first appeared on the merge commit, where no
-// PR-scoped workflow was watching. Unit tests run on every PR, so this check
-// fails where the mistake is made.
+// it: at the time, `ci.yml`'s `scenario-interaction` job ran on push to
+// `main`, on schedule/dispatch, or on a PR labelled `full-ci`, and that PR
+// carried no such label — so the failure first appeared on the merge commit,
+// where no PR-scoped workflow was watching. The shards now run on every pull
+// request; this check still fails earlier, in the `logic` channel, where the
+// mistake is made.
 //
 // #1072: spacing itself is now part of the comparison, not just hole
 // count/origin — a step can declare a `spacing:` its drag never sets, or

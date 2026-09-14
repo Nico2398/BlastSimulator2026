@@ -728,7 +728,7 @@ describe('resuming a paused run', () => {
       {
         number: 730,
         labels: ['ready', 'paused'],
-        pipelinePr: { number: 740, merged: false, labels: ['full-ci'] },
+        pipelinePr: { number: 740, merged: false, labels: ['enhancement'] },
       },
     ]);
     const { issue } = await select(api);
@@ -1041,7 +1041,7 @@ describe('the GitHub half', () => {
                         number: 570,
                         merged: true,
                         headRefName: 'pipeline/feature-547-8000',
-                        labels: { nodes: [{ name: 'full-ci' }] },
+                        labels: { nodes: [{ name: 'enhancement' }] },
                       },
                     ],
                   },
@@ -1066,7 +1066,7 @@ describe('the GitHub half', () => {
           {
             number: 570,
             merged: true,
-            labels: ['full-ci'],
+            labels: ['enhancement'],
             head: 'pipeline/feature-547-8000',
           },
         ],
