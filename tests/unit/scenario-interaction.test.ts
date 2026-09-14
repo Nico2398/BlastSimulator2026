@@ -1260,6 +1260,36 @@ describe('executeActionOnPage — setStepper (PR #1070 shard 1, #1072)', () => {
     expect(click).toHaveBeenCalledTimes(3);
   });
 
+  it('retries a click the panel re-rendered out from under it, like clickSelector does', async () => {
+    // PR #1080's first CI run: blast-visual-full's per-hole charge step died
+    // on Puppeteer's "Node is detached from document" — the Charge panel
+    // re-rendered its stepper between the usability probe and the click.
+    // setStepper drives its buttons through clickSelector's own path, whose
+    // retry treats a found/visible/uncovered node that still refused the
+    // click as transient, so one detached click costs a retry, not the step.
+    const state = { value: 5, clicks: 0, detachedOnce: false };
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return null;
+      if (src.includes('textContent')) return `${state.value} kg`;
+      if (src.includes('getBoundingClientRect')) {
+        // inspectSelector's report for the re-rendered node: attached, sized, clickable.
+        return { found: true, pointerEvents: 'auto', display: 'block', visibility: 'visible', disabled: false, width: 20, height: 20, matchCount: 1 };
+      }
+      return null;
+    });
+    const click = vi.fn(async (selector: string) => {
+      state.clicks += 1;
+      if (!state.detachedOnce) { state.detachedOnce = true; throw new Error('Node is detached from document'); }
+      state.value += selector.endsWith(':last-child') ? 1 : -1;
+    });
+    const page = fakePage({ evaluate, click });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 6 }, step);
+    expect(state.value).toBe(6);
+    // One refused click, one retry that landed.
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
   it('honours maxClicks as an outer bound and names what it still read', async () => {
     const { page } = fakeStepper({ start: 0, step: 1, unit: 'kg' });
     await expect(

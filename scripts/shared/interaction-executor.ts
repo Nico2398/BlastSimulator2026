@@ -541,6 +541,120 @@ export interface CommandTraceEntry {
   tickCountAfter: number | null;
 }
 
+/**
+ * The whole of `clickSelector`: poll the page's own usability probe until
+ * `selector` is clickable (with the covered-retry and the zero-size grace),
+ * then click, retrying a transient refusal. Extracted so `setStepper` drives
+ * its `+`/`-` buttons through exactly this path and not a weaker one — its
+ * first CI run died on `Node is detached from document`, Puppeteer's word
+ * for a control the Charge panel re-rendered between a single probe and a
+ * single click. The retry below already treats that shape (found, not
+ * inert, not disabled, visible, uncovered) as transient and clicks again.
+ */
+async function clickUsableSelector(
+  page: Page,
+  selector: string,
+  button: 'left' | 'right' | 'middle',
+  timeoutMs: number,
+): Promise<void> {
+  const btn = BUTTON_MAP[button] ?? 'left';
+  // Wait until the page's own probe calls the control usable — an absent
+  // selector reports 'absent' (uiActionProbe.ts) rather than null, so this
+  // loop alone covers "never appears" the same deadline as "appears but
+  // stays blocked"; a separate waitForSelector before it duplicated that
+  // wait and, when the selector genuinely never appeared, threw Puppeteer's
+  // own unnamed timeout instead of this loop's describeUnclickable
+  // diagnosis. panels pre-exist hidden, and the tutorial rails mark a
+  // control allowed only on the guide's next 250ms pass — a machine-speed
+  // click in that gap lands on `pointer-events: none` and falls through
+  // silently, because page.click does not throw for it (#481).
+  // A timer/event dialog can appear in the real-time gap between a
+  // preceding step and this one — if the deadline below is reached with
+  // the last probed reason 'covered' (something else is on top of the
+  // target, not "not found"/"disabled"/etc.), try resolving a pending
+  // event once and give the poll one extended chance rather than failing
+  // immediately (#699). Bounded to exactly one retry so a selector
+  // genuinely covered by something else (a tutorial rail, a real layout
+  // bug) still fails loudly with today's exact error.
+  const pollStartedAt = Date.now();
+  let deadline = pollStartedAt + timeoutMs;
+  let retriedCoveredOnce = false;
+  // Independent of retriedCoveredOnce — a control can be covered, retried
+  // once, then later read zero-size before the (possibly already
+  // extended) deadline, and still earn its own single grace on top
+  // (#1032).
+  let zeroSizeGraceGranted = false;
+  // 'absent' every single poll means the control was never rendered at
+  // all, which `inspectSelector` alone cannot tell apart from one that
+  // was swapped out mid-click — see `describeUnclickable`.
+  let everPresent = false;
+  for (;;) {
+    const reason = await page.evaluate((sel: string) => {
+      const probe = (window as unknown as {
+        __probeSelector?: (s: string) => string | null;
+      }).__probeSelector;
+      if (probe === undefined) return null;
+      // Scroll into view before probing, exactly as page.click will before
+      // clicking: a row below a panel's fold has its centre over the game
+      // canvas until scrolled, and probing that reads as covered-forever.
+      document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+      return probe(sel);
+    }, selector);
+    if (reason === null) break;
+    if (reason !== 'absent') everPresent = true;
+    if (Date.now() > deadline) {
+      if (!retriedCoveredOnce && reason === 'covered') {
+        retriedCoveredOnce = true;
+        const resolved = await resolveEventIfPendingOnPage(page, 8000);
+        if (resolved) {
+          deadline += 5000;
+          continue;
+        }
+      }
+      // A control that is attached and otherwise unblocked but still
+      // reads zero-size at the deadline may just be waiting on a heavy
+      // render/animation to release layout on a slow CI runner (#1032) —
+      // grant it one extension before treating this as a genuine
+      // never-lays-out failure. Bounded to once per call, same shape as
+      // the covered-retry above.
+      if (!zeroSizeGraceGranted && reason === 'zero-size') {
+        zeroSizeGraceGranted = true;
+        deadline += CLICK_SELECTOR_ZERO_SIZE_GRACE_MS;
+        continue;
+      }
+      const zeroSizeContext: ZeroSizeDiagnosisContext | undefined = reason === 'zero-size'
+        ? { waitedMs: Date.now() - pollStartedAt, graceGranted: zeroSizeGraceGranted }
+        : undefined;
+      throw new Error(
+        `clickSelector "${selector}" failed: ${describeUnclickable(await inspectSelector(page, selector), !everPresent, zeroSizeContext)}`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  for (let clickAttempt = 1; ; clickAttempt++) {
+    try {
+      await page.click(selector, { button: btn });
+      break;
+    } catch (err) {
+      // Puppeteer's own message ("Node is either not clickable or not an
+      // Element") names nothing, so a failure reports only that
+      // *something* on the page could not be clicked. Name the selector
+      // and say why it was refused — inert almost always means a
+      // `pointer-events: none` rail, which is a real player-facing block,
+      // not a test flake.
+      const inspected = await inspectSelector(page, selector);
+      if (isTransientClickFailure(inspected) && clickAttempt < CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES) {
+        await new Promise((r) => setTimeout(r, 150));
+        continue;
+      }
+      throw new Error(
+        `clickSelector "${selector}" failed: ${describeUnclickable(inspected)}`,
+        { cause: err },
+      );
+    }
+  }
+}
+
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
@@ -555,103 +669,9 @@ export async function executeActionOnPage(
       break;
     }
     case 'clickSelector': {
-      const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      const timeoutMs = action.timeout ?? CLICK_SELECTOR_DEFAULT_TIMEOUT_MS;
-      // Wait until the page's own probe calls the control usable — an absent
-      // selector reports 'absent' (uiActionProbe.ts) rather than null, so this
-      // loop alone covers "never appears" the same deadline as "appears but
-      // stays blocked"; a separate waitForSelector before it duplicated that
-      // wait and, when the selector genuinely never appeared, threw Puppeteer's
-      // own unnamed timeout instead of this loop's describeUnclickable
-      // diagnosis. panels pre-exist hidden, and the tutorial rails mark a
-      // control allowed only on the guide's next 250ms pass — a machine-speed
-      // click in that gap lands on `pointer-events: none` and falls through
-      // silently, because page.click does not throw for it (#481).
-      // A timer/event dialog can appear in the real-time gap between a
-      // preceding step and this one — if the deadline below is reached with
-      // the last probed reason 'covered' (something else is on top of the
-      // target, not "not found"/"disabled"/etc.), try resolving a pending
-      // event once and give the poll one extended chance rather than failing
-      // immediately (#699). Bounded to exactly one retry so a selector
-      // genuinely covered by something else (a tutorial rail, a real layout
-      // bug) still fails loudly with today's exact error.
-      const pollStartedAt = Date.now();
-      let deadline = pollStartedAt + timeoutMs;
-      let retriedCoveredOnce = false;
-      // Independent of retriedCoveredOnce — a control can be covered, retried
-      // once, then later read zero-size before the (possibly already
-      // extended) deadline, and still earn its own single grace on top
-      // (#1032).
-      let zeroSizeGraceGranted = false;
-      // 'absent' every single poll means the control was never rendered at
-      // all, which `inspectSelector` alone cannot tell apart from one that
-      // was swapped out mid-click — see `describeUnclickable`.
-      let everPresent = false;
-      for (;;) {
-        const reason = await page.evaluate((sel: string) => {
-          const probe = (window as unknown as {
-            __probeSelector?: (s: string) => string | null;
-          }).__probeSelector;
-          if (probe === undefined) return null;
-          // Scroll into view before probing, exactly as page.click will before
-          // clicking: a row below a panel's fold has its centre over the game
-          // canvas until scrolled, and probing that reads as covered-forever.
-          document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
-          return probe(sel);
-        }, action.selector);
-        if (reason === null) break;
-        if (reason !== 'absent') everPresent = true;
-        if (Date.now() > deadline) {
-          if (!retriedCoveredOnce && reason === 'covered') {
-            retriedCoveredOnce = true;
-            const resolved = await resolveEventIfPendingOnPage(page, 8000);
-            if (resolved) {
-              deadline += 5000;
-              continue;
-            }
-          }
-          // A control that is attached and otherwise unblocked but still
-          // reads zero-size at the deadline may just be waiting on a heavy
-          // render/animation to release layout on a slow CI runner (#1032) —
-          // grant it one extension before treating this as a genuine
-          // never-lays-out failure. Bounded to once per call, same shape as
-          // the covered-retry above.
-          if (!zeroSizeGraceGranted && reason === 'zero-size') {
-            zeroSizeGraceGranted = true;
-            deadline += CLICK_SELECTOR_ZERO_SIZE_GRACE_MS;
-            continue;
-          }
-          const zeroSizeContext: ZeroSizeDiagnosisContext | undefined = reason === 'zero-size'
-            ? { waitedMs: Date.now() - pollStartedAt, graceGranted: zeroSizeGraceGranted }
-            : undefined;
-          throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector), !everPresent, zeroSizeContext)}`,
-          );
-        }
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      for (let clickAttempt = 1; ; clickAttempt++) {
-        try {
-          await page.click(action.selector, { button: btn });
-          break;
-        } catch (err) {
-          // Puppeteer's own message ("Node is either not clickable or not an
-          // Element") names nothing, so a failure reports only that
-          // *something* on the page could not be clicked. Name the selector
-          // and say why it was refused — inert almost always means a
-          // `pointer-events: none` rail, which is a real player-facing block,
-          // not a test flake.
-          const inspected = await inspectSelector(page, action.selector);
-          if (isTransientClickFailure(inspected) && clickAttempt < CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES) {
-            await new Promise((r) => setTimeout(r, 150));
-            continue;
-          }
-          throw new Error(
-            `clickSelector "${action.selector}" failed: ${describeUnclickable(inspected)}`,
-            { cause: err },
-          );
-        }
-      }
+      await clickUsableSelector(
+        page, action.selector, action.button ?? 'left', action.timeout ?? CLICK_SELECTOR_DEFAULT_TIMEOUT_MS,
+      );
       break;
     }
     case 'setStepper': {
@@ -691,7 +711,7 @@ export async function executeActionOnPage(
           );
         }
         const direction = current < action.value ? 'last' : 'first';
-        await waitUsableAndClick(page, `${action.selector} .bsx-stepper-btn:${direction}-child`, timeoutMs);
+        await clickUsableSelector(page, `${action.selector} .bsx-stepper-btn:${direction}-child`, 'left', timeoutMs);
         const next = await readValue();
         if (Math.abs(next - current) <= SET_STEPPER_TOLERANCE) {
           throw new Error(
