@@ -282,7 +282,7 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
     await waitForUiUpdate(page);
     await new Promise((r) => setTimeout(r, 150));
   }
-  await page.click(selector);
+  await clickWithTransientRetry(page, selector, 'left');
 }
 
 /**
@@ -542,6 +542,51 @@ export interface CommandTraceEntry {
 }
 
 /**
+ * Click `selector`, retrying a refusal that looks like a race rather than a
+ * block: Puppeteer's own "Node is either not clickable or not an Element" a
+ * beat after the probe called it usable (#1045), and "Node is detached from
+ * document" when a panel rebuilt the control between the probe and the click
+ * — `ChargeHoleList` replaces every per-hole row on update, so a click on
+ * `[data-hole="H1"] [data-action="charge-hole"]` issued right after the
+ * amount changed lands on a node the next frame threw away (PR #1080, shard
+ * 5, twice). `inspectSelector` re-resolves the selector to the fresh node:
+ * found, visible, uncovered, so the refusal reads as transient and the retry
+ * clicks the replacement. Anything that fails one of those checks is a real
+ * block and is reported by name. Every click this executor makes goes
+ * through here (`clickSelector`, `setStepper`, `clickIfPresent`,
+ * `ensurePanel`/`ensureStep`/`resolveEventIfPending` via
+ * `waitUsableAndClick`); interaction-driver.ts's `set`/`clickLabel` still
+ * click bare, and no scenario uses them today.
+ */
+async function clickWithTransientRetry(
+  page: Page,
+  selector: string,
+  btn: 'left' | 'right' | 'middle',
+): Promise<void> {
+  for (let clickAttempt = 1; ; clickAttempt++) {
+    try {
+      await page.click(selector, { button: btn });
+      break;
+    } catch (err) {
+      // Puppeteer's own message ("Node is either not clickable or not an
+      // Element") names nothing, so a failure reports only that
+      // *something* on the page could not be clicked. Name the selector
+      // and say why it was refused — inert almost always means a
+      // `pointer-events: none` rail, which is a real player-facing block,
+      // not a test flake.
+      const inspected = await inspectSelector(page, selector);
+      if (isTransientClickFailure(inspected) && clickAttempt < CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES) {
+        await new Promise((r) => setTimeout(r, 150));
+        continue;
+      }
+      throw new Error(
+        `clickSelector "${selector}" failed: ${describeUnclickable(inspected)}`,
+        { cause: err },
+      );
+    }
+  }}
+
+/**
  * The whole of `clickSelector`: poll the page's own usability probe until
  * `selector` is clickable (with the covered-retry and the zero-size grace),
  * then click, retrying a transient refusal. Extracted so `setStepper` drives
@@ -631,28 +676,8 @@ async function clickUsableSelector(
     }
     await new Promise((r) => setTimeout(r, 150));
   }
-  for (let clickAttempt = 1; ; clickAttempt++) {
-    try {
-      await page.click(selector, { button: btn });
-      break;
-    } catch (err) {
-      // Puppeteer's own message ("Node is either not clickable or not an
-      // Element") names nothing, so a failure reports only that
-      // *something* on the page could not be clicked. Name the selector
-      // and say why it was refused — inert almost always means a
-      // `pointer-events: none` rail, which is a real player-facing block,
-      // not a test flake.
-      const inspected = await inspectSelector(page, selector);
-      if (isTransientClickFailure(inspected) && clickAttempt < CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES) {
-        await new Promise((r) => setTimeout(r, 150));
-        continue;
-      }
-      throw new Error(
-        `clickSelector "${selector}" failed: ${describeUnclickable(inspected)}`,
-        { cause: err },
-      );
-    }
-  }
+  await clickWithTransientRetry(page, selector, btn);
+
 }
 
 export async function executeActionOnPage(
@@ -827,7 +852,7 @@ export async function executeActionOnPage(
           return probe(sel) === null;
         }, action.selector);
         if (usable) {
-          await page.click(action.selector);
+          await clickWithTransientRetry(page, action.selector, 'left');
           break;
         }
         if (Date.now() >= deadline) break;

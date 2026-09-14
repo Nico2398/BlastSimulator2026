@@ -540,7 +540,7 @@ describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', (
 
     await executeActionOnPage(page, action, step);
 
-    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]');
+    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]', { button: 'left' });
   });
 
   it('rejects an unknown/non-toggle panel name without touching the page', async () => {
@@ -582,7 +582,7 @@ describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', ()
 
     await executeActionOnPage(page, action, step);
 
-    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]');
+    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]', { button: 'left' });
   });
 
   // Issue #652: ensureStep clicks the tab selector without ever checking
@@ -691,8 +691,8 @@ describe('resolveEventIfPendingOnPage (issue #699)', () => {
     const resolved = await resolveEventIfPendingOnPage(page, 8000);
 
     expect(resolved).toBe(true);
-    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice');
-    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss');
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice', { button: 'left' });
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss', { button: 'left' });
   });
 
   it('resolves via the console (not a dialog click) and returns true when the level has already ended', async () => {
@@ -1173,6 +1173,37 @@ describe('clickSelector — retries a stale zero-size click failure (issue #1053
       'element is covered by div.bs-modal-backdrop',
     );
     expect(click).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('executeActionOnPage — clickIfPresent retries a re-rendered control (PR #1080 shard 5)', () => {
+  it('clicks again when the first click lands on a node the panel just replaced', async () => {
+    // blast-visual-full's per-hole charge step: `[data-hole="H1"]
+    // [data-action="charge-hole"]` is rebuilt by ChargeHoleList on the
+    // update after the amount stepper moved, and the click issued right
+    // after that read Puppeteer's raw "Node is detached from document" —
+    // twice on CI. The refreshed selector resolves to the replacement row,
+    // which inspects as found/visible/uncovered, so the click is retried.
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return true;   // clickIfPresent's own usable probe
+      if (src.includes('getBoundingClientRect')) {
+        return { found: true, pointerEvents: 'auto', display: 'block', visibility: 'visible', disabled: false, width: 40, height: 18, matchCount: 1 };
+      }
+      return null;
+    });
+    let detachedOnce = false;
+    const click = vi.fn(async () => {
+      if (!detachedOnce) { detachedOnce = true; throw new Error('Node is detached from document'); }
+    });
+    const page = fakePage({ evaluate, click });
+    const step: ScenarioStepDef = {
+      command: 'charge hole:H1 explosive:boomite amount:8 stemming:3',
+      role: 'player',
+      interaction: [{ type: 'clickIfPresent', selector: '#bs-blast-panel [data-hole="H1"] [data-action="charge-hole"]' }],
+    };
+    await executeActionOnPage(page, step.interaction![0]!, step);
+    expect(click).toHaveBeenCalledTimes(2);
   });
 });
 
