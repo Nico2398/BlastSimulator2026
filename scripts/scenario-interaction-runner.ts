@@ -25,6 +25,7 @@ import {
   suspendDrawing,
 } from './shared/puppeteer-utils.js';
 import { checkGoal, gameState, InteractionFailure } from './shared/interaction-driver.js';
+import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -160,7 +161,21 @@ export async function runScenarioInteraction(
             // mutated it — instead of having checkGoal re-fetch its own
             // "after" snapshot.
             if (step.expect) {
-              await checkGoal(page, step.expect, before, interactionResult.gameState ?? undefined);
+              // Scoped first: interaction mode proves reachability, and
+              // leaves the clock and the chained balances that follow it to
+              // command mode, which asserts them unscoped
+              // (interaction-goal-scope.ts). Named on stdout rather than
+              // dropped silently — a channel that checks less than the file
+              // declares has to say so.
+              const { scoped, deferred } = scopeGoalToInteraction(step.expect);
+              for (const d of deferred) {
+                console.log(
+                  `  step ${i + 1}: expect.${d.goalType}.${d.field} left to command mode — ${d.reason}`,
+                );
+              }
+              if (goalAssertsAnything(scoped)) {
+                await checkGoal(page, scoped, before, interactionResult.gameState ?? undefined);
+              }
             }
 
             let screenshotPath = '';

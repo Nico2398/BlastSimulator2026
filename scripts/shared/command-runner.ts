@@ -98,6 +98,14 @@ export interface ScenarioResult {
   error?: string;
   reportPath?: string;
   driftRecords?: DriftRecord[];
+  /**
+   * Interaction mode only: how many of this scenario's `expect` goals were
+   * left to command mode as trajectory-coupled (`interaction-goal-scope.ts`).
+   * Reported in the batch summary so the browser channel says what it did not
+   * re-assert; command mode checks every one of them unscoped, so this is
+   * never a goal the suite stopped proving.
+   */
+  deferredGoals?: number;
 }
 
 /**

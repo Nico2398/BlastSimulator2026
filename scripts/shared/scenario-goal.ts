@@ -1,12 +1,16 @@
 /**
  * BlastSimulator2026 — Scenario goal checking (command mode)
  *
- * Command mode has a state dump but no DOM, so it can only prove the
- * `equals`/`increased`/`decreased`/`changedBy` half of a step's `expect` —
- * the same fields `interaction-driver.ts`'s `checkGoal` proves, minus
- * `usable`/`blocked`/`tutorialStep`, which need a live page and are checked
- * only in interaction mode (scenario-interaction-runner.ts calls `checkGoal`
- * directly there, rather than duplicating this logic).
+ * Command mode has a state dump but no DOM, so it proves the
+ * `equals`/`increased`/`decreased`/`changedBy` half of a step's `expect`, and
+ * proves it **unscoped** — this evaluator is the one place every goal a
+ * scenario declares is actually asserted, and it must stay that way.
+ * `usable`/`blocked`/`tutorialStep` need a live page and are checked only in
+ * interaction mode, which calls `interaction-driver.ts`'s `checkGoal`
+ * directly rather than duplicating this logic — through
+ * `interaction-goal-scope.ts`, which narrows what the browser re-asserts to
+ * what a browser can prove without re-running the clock. Narrowing there is
+ * safe only because nothing narrows here.
  *
  * @module shared/scenario-goal
  */
