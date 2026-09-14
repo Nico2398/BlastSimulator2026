@@ -22,8 +22,6 @@ function makeMockSceneManager() {
   const csm = { cascades: 3, maxFar: 1200, camera, getExtendedBreaks: () => {}, shaders: new Map() };
   const postPipeline = {
     aerial: { setHazeColor: () => {}, setHeightRef: () => {}, setGrade: () => {}, update: () => {} },
-    addOverlayObject: () => {},
-    removeOverlayObject: () => {},
   };
   return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: () => {} } as unknown };
 }

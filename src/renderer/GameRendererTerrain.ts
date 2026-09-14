@@ -20,6 +20,7 @@ import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
+import { markSceneOverlay, unmarkSceneOverlay } from './post/SceneOverlay.js';
 
 // Re-exported so GameRenderer.ts can pull the smoothed-surface sampler
 // through this module's existing terrain-helpers import, alongside
@@ -145,7 +146,7 @@ export function landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: 
  * the whole point of the change.
  */
 export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
-  if (deps.borderWall) deps.sm.postPipeline.removeOverlayObject(deps.borderWall.object3d);
+  if (deps.borderWall) unmarkSceneOverlay(deps.borderWall.object3d);
   deps.borderWall?.dispose();
   deps.borderWall = null;
 
@@ -168,7 +169,7 @@ export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
     minGroundY: bounds?.minY ?? groundY,
     maxGroundY: bounds?.maxY ?? groundY + 20,
   });
-  deps.sm.postPipeline.addOverlayObject(deps.borderWall.object3d);
+  markSceneOverlay(deps.borderWall.object3d);
 }
 
 /**

@@ -15,6 +15,7 @@ import { ensureLandscape, type LandscapeHandle } from '../console/commands/world
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
+import { unmarkSceneOverlay } from './post/SceneOverlay.js';
 import type { SceneManager } from './SceneManager.js';
 import { TerrainMesh } from './TerrainMesh.js';
 import { BuildingMesh } from './BuildingMesh.js';
@@ -358,7 +359,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.characters?.clearAll();
   deps.skybox?.dispose();
   deps.clouds?.dispose();
-  if (deps.borderWall) deps.sm.postPipeline.removeOverlayObject(deps.borderWall.object3d);
+  if (deps.borderWall) unmarkSceneOverlay(deps.borderWall.object3d);
   deps.borderWall?.dispose();
   disposeAmbientModules(deps);
   deps.fragments?.dispose();
