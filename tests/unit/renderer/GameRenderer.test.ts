@@ -43,8 +43,6 @@ function makeMockSceneManager() {
   };
   const postPipeline = {
     aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() },
-    addOverlayObject: vi.fn(),
-    removeOverlayObject: vi.fn(),
   };
   return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn() } as unknown };
 }
