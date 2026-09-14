@@ -16,10 +16,11 @@ import { ensureLandscape } from '../console/commands/world.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceHeight, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import type { SceneManager } from './SceneManager.js';
-import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
+import { densityGradientNormal, type TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
+import { markSceneOverlay, unmarkSceneOverlay } from './post/SceneOverlay.js';
 
 // Re-exported so GameRenderer.ts can pull the smoothed-surface sampler
 // through this module's existing terrain-helpers import, alongside
@@ -98,20 +99,31 @@ export function siteBoundsChanged(deps: TerrainDeps, grid: VoxelGrid | null): bo
  * than at a separately-sampled value that agrees only when nothing clamps.
  */
 export function playableCut(grid: VoxelGrid, edgeHeight?: (x: number, z: number) => number): PlayableCut {
+  // What the playable mesh draws at this column, by the same two rules it
+  // draws by: the live voxel surface where it owns the ground — before or
+  // after a blast, never the static WorldGen prediction — and the neighbouring
+  // ground, clamped into the grid's own vertical range, on the sealing halo
+  // ring it shares with the landscape (#907). NaN anywhere it draws nothing,
+  // which is the landscape's signal to use its own sampled height.
+  const boundaryHeightAt = (x: number, z: number): number => {
+    const live = computeVoxelColumnSurfaceHeight(grid, x, z);
+    if (!Number.isNaN(live)) return live;
+    if (!edgeHeight || !nodeTouchesMeshedCell(grid, x, z)) return NaN;
+    return haloSurfaceHeight(grid, edgeHeight(x, z));
+  };
+
   return {
     rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
     ownsColumn: (x, z) => grid.containsColumn(x, z),
-    // What the playable mesh draws at this column, by the same two rules it
-    // draws by: the live voxel surface where it owns the ground — before or
-    // after a blast, never the static WorldGen prediction — and the neighbouring
-    // ground, clamped into the grid's own vertical range, on the sealing halo
-    // ring it shares with the landscape (#907). NaN anywhere it draws nothing,
-    // which is the landscape's signal to use its own sampled height.
-    boundaryHeightAt: (x, z) => {
-      const live = computeVoxelColumnSurfaceHeight(grid, x, z);
-      if (!Number.isNaN(live)) return live;
-      if (!edgeHeight || !nodeTouchesMeshedCell(grid, x, z)) return NaN;
-      return haloSurfaceHeight(grid, edgeHeight(x, z));
+    boundaryHeightAt,
+    // And how it SHADES that column: the density gradient at the very vertex
+    // the height above places, so the node the two sheets share is lit once
+    // rather than estimated twice (#1077). Null where the playable mesh draws
+    // nothing, which is the landscape's signal to use its own slope.
+    boundaryNormalAt: (x, z) => {
+      const y = boundaryHeightAt(x, z);
+      if (Number.isNaN(y)) return null;
+      return densityGradientNormal(grid, edgeHeight ?? null, x, y, z);
     },
     // The very cells TerrainMesh marches, read from the one function that
     // decides its march bounds — not a second derivation of the same rule
@@ -145,7 +157,7 @@ export function landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: 
  * the whole point of the change.
  */
 export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
-  if (deps.borderWall) deps.sm.postPipeline.removeOverlayObject(deps.borderWall.object3d);
+  if (deps.borderWall) unmarkSceneOverlay(deps.borderWall.object3d);
   deps.borderWall?.dispose();
   deps.borderWall = null;
 
@@ -168,7 +180,7 @@ export function rebuildBorderWall(deps: TerrainDeps, ctx: MiningContext): void {
     minGroundY: bounds?.minY ?? groundY,
     maxGroundY: bounds?.maxY ?? groundY + 20,
   });
-  deps.sm.postPipeline.addOverlayObject(deps.borderWall.object3d);
+  markSceneOverlay(deps.borderWall.object3d);
 }
 
 /**

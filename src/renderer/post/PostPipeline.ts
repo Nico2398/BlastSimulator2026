@@ -13,6 +13,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { AerialPerspectivePass } from './AerialPerspectivePass.js';
+import { collectSceneOverlays } from './SceneOverlay.js';
 
 // Low strength, high threshold — bloom should catch only the brightest
 // highlights, not wash out the cartoon-flat terrain shading (#458 A20).
@@ -26,17 +27,20 @@ export class PostPipeline {
   readonly aerial: AerialPerspectivePass;
 
   /**
-   * Objects hidden while GTAO renders its depth/normal prepass.
+   * The scene every render pass draws — walked for objects marked with
+   * `markSceneOverlay` before the GTAO prepass, which then runs without them.
    *
    * That prepass draws the whole scene with an override material, so
    * depthWrite:false on a transparent overlay does not keep it out — it lands
    * in the depth buffer like solid geometry. Everything behind it is then
-   * treated as occluded and shaded black, and the aerial pass, which
-   * reconstructs world position from the same depth texture, hazes it as if
-   * the overlay were the surface. A see-through effect has no business in
-   * either, so overlays are simply not present while that pass runs.
+   * treated as occluded and shaded black, the overlay itself is shaded black
+   * when its geometry carries no `normal` attribute for the prepass to write,
+   * and the aerial pass, which reconstructs world position from the same
+   * depth texture, hazes it as if the overlay were the surface. A see-through
+   * effect has no business in either, so overlays are simply not present
+   * while that pass runs.
    */
-  private readonly overlayObjects: THREE.Object3D[] = [];
+  private readonly scene: THREE.Scene;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -45,18 +49,21 @@ export class PostPipeline {
     width: number,
     height: number,
   ) {
+    this.scene = scene;
     this.composer = new EffectComposer(renderer);
     this.composer.addPass(new RenderPass(scene, camera));
 
     this.gtao = new GTAOPass(scene, camera, width, height);
     const renderGtao = this.gtao.render.bind(this.gtao);
     this.gtao.render = ((...args: Parameters<GTAOPass['render']>) => {
-      const wasVisible = this.overlayObjects.map((o) => o.visible);
-      for (const o of this.overlayObjects) o.visible = false;
+      // Only visible overlays are collected, so restoring means `true` —
+      // nothing here can turn an already-hidden overlay back on.
+      const hidden = collectSceneOverlays(this.scene);
+      for (const o of hidden) o.visible = false;
       try {
         renderGtao(...args);
       } finally {
-        this.overlayObjects.forEach((o, i) => { o.visible = wasVisible[i]!; });
+        for (const o of hidden) o.visible = true;
       }
     }) as GTAOPass['render'];
     this.composer.addPass(this.gtao);
@@ -87,16 +94,6 @@ export class PostPipeline {
 
     const dpr = renderer.getPixelRatio();
     this.composer.addPass(new SMAAPass(width * dpr, height * dpr));
-  }
-
-  /** Keep `object` out of the GTAO depth/normal prepass — see `overlayObjects`. */
-  addOverlayObject(object: THREE.Object3D): void {
-    if (!this.overlayObjects.includes(object)) this.overlayObjects.push(object);
-  }
-
-  removeOverlayObject(object: THREE.Object3D): void {
-    const i = this.overlayObjects.indexOf(object);
-    if (i >= 0) this.overlayObjects.splice(i, 1);
   }
 
   /**

@@ -121,6 +121,14 @@ export interface PlayableCut {
    *  quad belongs to the next quad (#559 root cause 4, #907). Falls back to
    *  ownsColumn when absent. */
   meshClaimsColumn?(x: number, z: number): boolean;
+  /** The normal the playable mesh shades column (x, z) with, or null where it
+   *  draws nothing there. On the shared ring this is what makes the two sheets
+   *  LIGHT the node they share identically, the way `boundaryHeightAt` makes
+   *  them place it identically: each sheet derives normals its own way — a
+   *  density gradient here, a height-field slope there — and where those
+   *  disagree across the edge they share, the crease draws the site's whole
+   *  perimeter as a hairline rectangle (#1077). */
+  boundaryNormalAt?(x: number, z: number): readonly [number, number, number] | null;
 }
 
 /** The pre-expansion behaviour: the site is exactly its rect. */
@@ -237,6 +245,28 @@ const ALL_SIDES_COARSE: BoundaryQuadSides = {
 };
 
 /**
+ * The normal to shade a landscape node at (x, z) with: the playable mesh's own
+ * wherever that mesh draws the same node, and the height field's slope
+ * everywhere else.
+ *
+ * `heightAt` is the boundary-adjusted height source the caller already uses for
+ * positions, so the fallback slope is measured against the very ground the ring
+ * is placed on rather than a separately-sampled one.
+ */
+function shadingNormalAt(
+  x: number,
+  z: number,
+  playable: PlayableCut,
+  heightAt: (x: number, z: number) => number,
+): readonly [number, number, number] {
+  const shared = playable.boundaryNormalAt?.(x, z);
+  if (shared) return shared;
+  const dhdx = (heightAt(x + FINE_STEP, z) - heightAt(x - FINE_STEP, z)) / (2 * FINE_STEP);
+  const dhdz = (heightAt(x, z + FINE_STEP) - heightAt(x, z - FINE_STEP)) / (2 * FINE_STEP);
+  return heightFieldNormal(dhdx, dhdz);
+}
+
+/**
  * Emits the clipped/subdivided geometry for one boundary quad (a coarse-tile
  * quad classifyQuad marked 'boundary') into the given output arrays, sampled
  * at fine (FINE_STEP) resolution against the live claim edge so it meets the
@@ -350,9 +380,11 @@ export function buildBoundaryQuad(
       y = trueHeightAt(x, z);
     }
 
-    const dhdx = (trueHeightAt(x + FINE_STEP, z) - trueHeightAt(x - FINE_STEP, z)) / (2 * FINE_STEP);
-    const dhdz = (trueHeightAt(x, z + FINE_STEP) - trueHeightAt(x, z - FINE_STEP)) / (2 * FINE_STEP);
-    const normal = heightFieldNormal(dhdx, dhdz);
+    // A node the playable mesh also draws is a node on the ring the two sheets
+    // share, and it takes that mesh's own normal rather than a second estimate
+    // of the same slope (#1077). Every other node keeps the height field's,
+    // which is the only answer available out there.
+    const normal = shadingNormalAt(x, z, playable, trueHeightAt);
 
     const idx = positions.length / 3;
     positions.push(x, y, z);

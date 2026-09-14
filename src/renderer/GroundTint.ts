@@ -8,6 +8,7 @@
 // footprint, so painted colour follows the slope instead of floating above it.
 
 import * as THREE from 'three';
+import { markSceneOverlay } from './post/SceneOverlay.js';
 
 /** A callback answering the smoothed (marching-cubes) terrain surface height at a world (x, z) column. */
 export type SurfaceHeightSampler = (x: number, z: number) => number;
@@ -156,6 +157,10 @@ export class GroundTintLayer {
       side: THREE.FrontSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
+    // A tint is paint on the ground, never geometry: it must not reach the
+    // GTAO depth/normal prepass, which has no normals to read here and shades
+    // the whole patch black when it draws one anyway (#1043 follow-up).
+    markSceneOverlay(this.mesh);
     if (opts?.renderOrder !== undefined) this.mesh.renderOrder = opts.renderOrder;
     this.scene.add(this.mesh);
   }

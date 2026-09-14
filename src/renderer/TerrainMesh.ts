@@ -144,8 +144,16 @@ function densityAtSmooth(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: 
  *
  * An iso-surface's true normal is the negated gradient of the field it is an
  * iso-surface of, which owes nothing to how the triangles were cut.
+ *
+ * Exported because the landscape has to light the ring node it SHARES with this
+ * mesh exactly the way this mesh lights it. #907 made both sheets take that
+ * node's height from one authority; its normal was still derived twice, once
+ * from this gradient and once from the landscape's own height-field slope, and
+ * the two disagree by ~7 degrees on real ground. A normal that jumps across a
+ * shared edge is a lighting crease, and this edge runs the site's whole
+ * perimeter (#1077).
  */
-function densityGradientNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): [number, number, number] {
+export function densityGradientNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): [number, number, number] {
   const e = 0.85;
   const gx = densityAtSmooth(grid, sampler, x + e, y, z) - densityAtSmooth(grid, sampler, x - e, y, z);
   const gy = densityAtSmooth(grid, sampler, x, y + e, z) - densityAtSmooth(grid, sampler, x, y - e, z);

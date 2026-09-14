@@ -18,6 +18,7 @@ import {
   type SurfaceHeightSampler,
   type GroundTintPatch,
 } from '../../../src/renderer/GroundTint.js';
+import { isSceneOverlay } from '../../../src/renderer/post/SceneOverlay.js';
 
 let scene: THREE.Scene;
 
@@ -436,5 +437,21 @@ describe('buildConformingRing — slope-scaled epsilon clearance (#1057)', () =>
     for (let i = 0; i < pos.count; i++) {
       expect(pos.getY(i)).toBeCloseTo(5 + GROUND_TINT_Y_EPSILON, 5);
     }
+  });
+});
+
+describe('GroundTintLayer — kept out of the GTAO prepass', () => {
+  // A tint is paint on the ground, and its geometry carries no `normal`
+  // attribute for a depth/normal prepass to read. Drawn into that prepass it
+  // wrote a degenerate normal GTAO read as fully occluded, and every surveyed
+  // cell / pinned tutorial tile rendered as a solid black plate.
+
+  it('marks its mesh as a scene overlay so PostPipeline hides it for the prepass', () => {
+    const layer = new GroundTintLayer(scene, () => 0);
+    layer.replace([cellPatch('a', 0, 0)]);
+
+    const mesh = allMeshes()[0];
+    expect(mesh, 'replace() with a patch should produce a mesh').toBeDefined();
+    expect(isSceneOverlay(mesh!)).toBe(true);
   });
 });
