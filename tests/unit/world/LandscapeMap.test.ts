@@ -3,9 +3,9 @@ import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../
 import { buildStructureSet, type StructureSet } from '../../../src/core/world/Structures.js';
 import { buildLandscapeMap, sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
 import { getBiome, biomeIndexOf } from '../../../src/core/world/BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY, sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
+import { createWorldGenContext, sampleSurfaceVoxelY, sampleSurfaceHeightY, applyPitMask, sampleBaseHeight } from '../../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
-import { StrataSampler } from '../../../src/core/world/Strata.js';
+import { StrataSampler, buildStrataProfile } from '../../../src/core/world/Strata.js';
 import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 
 const EMPTY_STRUCTURES: StructureSet = { overlays: [], spatialIndex: new Map(), rivers: [], villages: [], trees: [], landmarks: [] };
@@ -51,6 +51,47 @@ describe('sampleLandscapeColumn', () => {
     const { worldGen, strata, structureSet, grid } = buildAll(config);
     const s = sampleLandscapeColumn(worldGen, config.climateBias, structureSet, strata, grid.palette, 0.7 * 1000, -0.6 * 1000);
     expect(s.biomeId).toBe(biomeIndexOf('desert_badlands'));
+  });
+});
+
+describe('buildLandscapeMap — a grid too short for the relief it stands in (#1077)', () => {
+  // The suite below deliberately gives itself a 200 m grid so nothing clamps.
+  // Every real level is the opposite case: alpine_granite's relief runs tens of
+  // metres through a 20 m grid, the tutorial's own north-east corner dips 1.2 m
+  // below its floor, and TerrainGen answers by clamping every column into
+  // [1, sizeY - 1]. The landscape used to be the one sheet that did not, so the
+  // site rendered a flat-topped rectangle wherever the world left the band —
+  // the square a player sees drawn on untouched ground.
+  const config: TerrainConfig = { sizeX: 40, sizeY: 20, sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
+  const { worldGen, biome } = buildTerrainContext(config);
+  const strata = new StrataSampler(config.seed, buildStrataProfile(biome.dominantRocks));
+  const palette = new CompositionPalette();
+  const landscapeHeightAt = (x: number, z: number): number =>
+    sampleLandscapeColumn(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, x, z).height;
+
+  /** The site's rectangle, its halo ring, and its corners. */
+  const boundaryColumns: Array<[number, number]> = [
+    [0, 20], [40, 20], [20, 0], [20, 40], [0, 0], [40, 40],
+    [-1, 20], [20, -1], [-1, -1], [41, 41], [10, 10], [30, 5],
+  ];
+
+  it('clamps somewhere, or it is testing nothing', () => {
+    const unclamped = boundaryColumns.some(([x, z]) => {
+      const free = applyPitMask(sampleBaseHeight(worldGen.fields, x, z, worldGen.shapingAt(x, z)), worldGen.centerHeight, worldGen.playableRect, x, z) + worldGen.groundOffset;
+      return free < 1 || free > config.sizeY - 1;
+    });
+    expect(unclamped).toBe(true);
+  });
+
+  it('puts the landscape on exactly the height the grid fills, boundary, halo ring and interior alike', () => {
+    for (const [x, z] of boundaryColumns) {
+      expect(landscapeHeightAt(x, z)).toBeCloseTo(sampleSurfaceHeightY(worldGen, x, z), 9);
+    }
+  });
+
+  it('hands the world back its own relief out in the open, where nothing else is drawing', () => {
+    const free = applyPitMask(sampleBaseHeight(worldGen.fields, 400, -300, worldGen.shapingAt(400, -300)), worldGen.centerHeight, worldGen.playableRect, 400, -300) + worldGen.groundOffset;
+    expect(landscapeHeightAt(400, -300)).toBeCloseTo(free, 9);
   });
 });
 

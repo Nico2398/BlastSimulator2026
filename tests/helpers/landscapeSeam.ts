@@ -5,9 +5,12 @@
 //   1. **Exactly one sheet owns every square metre.** No cell carries geometry
 //      from both (a doubled edge, z-fighting) and none carries geometry from
 //      neither (a slot you can see through).
-//   2. **Both sheets place every shared node at the same height.** A node the
-//      two meshes each emit a vertex at is a node on the ring they share, and a
-//      disagreement there is a step in the ground.
+//   2. **Both sheets place every shared node at the same height, and light it
+//      the same way.** A node the two meshes each emit a vertex at is a node on
+//      the ring they share: a height disagreement there is a step in the
+//      ground, and a normal disagreement is a lighting crease drawn along the
+//      site's whole perimeter — the rectangle a player sees on open ground
+//      (#1077).
 //
 // Neither is checkable from one mesh alone, which is exactly why four passes at
 // this seam (#458 → #491 → #559 → #560) each shipped green: no test anywhere
@@ -22,16 +25,26 @@ export interface SeamReport {
   /** Largest height disagreement at any shared node, metres. */
   worstDisagreement: number;
   worstAt: string;
+  /** Largest angle between the two sheets' normals at any shared node, degrees. */
+  worstNormalAngle: number;
+  worstNormalAt: string;
   /** Cells carrying geometry from both sheets, and from neither. */
   doubleCovered: string[];
   uncovered: string[];
 }
 
-/** Every lattice node an emitted triangle actually references, with its heights. */
-function indexedLatticeNodes(meshes: readonly THREE.Mesh[]): Map<string, number[]> {
-  const nodes = new Map<string, number[]>();
+/** One vertex a mesh placed at a lattice node: where it put it, and how it lights it. */
+interface NodeVertex {
+  y: number;
+  normal: THREE.Vector3;
+}
+
+/** Every lattice node an emitted triangle actually references, with its vertices. */
+function indexedLatticeNodes(meshes: readonly THREE.Mesh[]): Map<string, NodeVertex[]> {
+  const nodes = new Map<string, NodeVertex[]>();
   for (const mesh of meshes) {
     const pos = mesh.geometry.attributes['position'] as THREE.BufferAttribute;
+    const nor = mesh.geometry.attributes['normal'] as THREE.BufferAttribute | undefined;
     const index = mesh.geometry.getIndex();
     // LandscapeMesh pushes every coarse node of a tile up front and indexes
     // only the quads it keeps, so the buffer carries nodes inside the claim
@@ -44,7 +57,10 @@ function indexedLatticeNodes(meshes: readonly THREE.Mesh[]): Map<string, number[
       const x = pos.getX(i), z = pos.getZ(i);
       if (Math.abs(x - Math.round(x)) > 1e-4 || Math.abs(z - Math.round(z)) > 1e-4) continue;
       const key = `${Math.round(x)},${Math.round(z)}`;
-      nodes.set(key, [...(nodes.get(key) ?? []), pos.getY(i)]);
+      const normal = nor
+        ? new THREE.Vector3(nor.getX(i), nor.getY(i), nor.getZ(i))
+        : new THREE.Vector3(0, 1, 0);
+      nodes.set(key, [...(nodes.get(key) ?? []), { y: pos.getY(i), normal }]);
     }
   }
   return nodes;
@@ -77,6 +93,11 @@ function coveredCells(meshes: readonly THREE.Mesh[]): Set<string> {
   return cells;
 }
 
+/** Angle between two unit normals, in degrees. */
+function angleBetweenDegrees(a: THREE.Vector3, b: THREE.Vector3): number {
+  return THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)));
+}
+
 /**
  * Measure the join along the site's whole boundary.
  *
@@ -97,7 +118,9 @@ export function measureSeam(
   const landscapeCells = coveredCells(landscape);
 
   const report: SeamReport = {
-    sharedNodes: 0, worstDisagreement: 0, worstAt: '', doubleCovered: [], uncovered: [],
+    sharedNodes: 0, worstDisagreement: 0, worstAt: '',
+    worstNormalAngle: 0, worstNormalAt: '',
+    doubleCovered: [], uncovered: [],
   };
 
   for (let x = grid.minX - band; x < grid.maxX + band; x++) {
@@ -108,12 +131,27 @@ export function measureSeam(
       if (a && b) {
         report.sharedNodes++;
         // A cliff column carries several playable vertices; the ring node is
-        // the one the landscape also placed, so compare the nearest pair.
+        // the one the landscape also placed, so compare the nearest pair — and
+        // read that same pair's normals, since only the vertices the two
+        // sheets actually share light a shared edge.
         let nearest = Infinity;
-        for (const ya of a) for (const yb of b) nearest = Math.min(nearest, Math.abs(ya - yb));
+        let nearestPair: [NodeVertex, NodeVertex] | null = null;
+        for (const va of a) for (const vb of b) {
+          const gap = Math.abs(va.y - vb.y);
+          if (gap >= nearest) continue;
+          nearest = gap;
+          nearestPair = [va, vb];
+        }
         if (nearest > report.worstDisagreement) {
           report.worstDisagreement = nearest;
           report.worstAt = key;
+        }
+        if (nearestPair) {
+          const angle = angleBetweenDegrees(nearestPair[0].normal, nearestPair[1].normal);
+          if (angle > report.worstNormalAngle) {
+            report.worstNormalAngle = angle;
+            report.worstNormalAt = key;
+          }
         }
       }
 
