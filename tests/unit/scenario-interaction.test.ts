@@ -1175,3 +1175,116 @@ describe('clickSelector — retries a stale zero-size click failure (issue #1053
     expect(click).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('executeActionOnPage — setStepper (PR #1070 shard 1, #1072)', () => {
+  // A fake stepper: `evaluate` answers the usability probe with "usable" and
+  // the value read with the current display text; `click` moves the value
+  // by one step in the direction of the button clicked, clamped like the
+  // real controls are. Shape-based dispatch on the evaluated function's
+  // source rather than a once-sequence, because the loop's length is the
+  // thing under test.
+  function fakeStepper(opts: { start: number; step: number; unit: string; min?: number; max?: number; decimals?: number }) {
+    const state = { value: opts.start, clicks: 0 };
+    const render = () => `${opts.decimals === undefined ? state.value : state.value.toFixed(opts.decimals)} ${opts.unit}`;
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return null;
+      if (src.includes('textContent')) return render();
+      return null;
+    });
+    const click = vi.fn(async (selector: string) => {
+      state.clicks += 1;
+      const delta = selector.endsWith(':last-child') ? opts.step : -opts.step;
+      const next = +(state.value + delta).toFixed(6);
+      state.value = Math.max(opts.min ?? -Infinity, Math.min(opts.max ?? Infinity, next));
+    });
+    return { page: fakePage({ evaluate, click }), state, click };
+  }
+
+  const step: ScenarioStepDef = {
+    command: 'charge hole:* explosive:boomite amount:8 stemming:2',
+    role: 'player',
+    interaction: [{ type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }],
+  };
+
+  it('clicks + until the displayed value reads the target', async () => {
+    const { page, state, click } = fakeStepper({ start: 5, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }, step);
+    expect(state.value).toBe(8);
+    expect(click).toHaveBeenCalledTimes(3);
+    for (const [sel] of click.mock.calls) expect(sel).toBe('#bs-blast-panel [data-field="amount"] .bsx-stepper-btn:last-child');
+  });
+
+  it('clicks - when the target is below the current value', async () => {
+    const { page, state, click } = fakeStepper({ start: 5, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 2 }, step);
+    expect(state.value).toBe(2);
+    expect(click).toHaveBeenCalledTimes(3);
+    for (const [sel] of click.mock.calls) expect(sel).toBe('#bs-blast-panel [data-field="amount"] .bsx-stepper-btn:first-child');
+  });
+
+  it('does not click at all when the value already matches', async () => {
+    const { page, click } = fakeStepper({ start: 8, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }, step);
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('matches a toFixed(1) display against an integer target and survives float steps', async () => {
+    // Stemming steps by 0.2 and renders `2.0 m`: five clicks from 1.0 land
+    // on 2.0000000000000004 in plain arithmetic, which must read as done.
+    const { page, state, click } = fakeStepper({ start: 1, step: 0.2, unit: 'm', decimals: 1 });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="stemming"]', value: 2 }, step);
+    expect(state.value).toBeCloseTo(2, 6);
+    expect(click).toHaveBeenCalledTimes(5);
+  });
+
+  it('fails by name when the control clamps before the target, instead of spinning', async () => {
+    const { page, click } = fakeStepper({ start: 18, step: 1, unit: 'm', max: 20 });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-param-strip [data-field="spacing"]', value: 25 }, step),
+    ).rejects.toThrow(/\+ button no longer moves the value \(clamped at 20\), wanted 25/);
+    // 18→19, 19→20, then one click that changes nothing — and stops there.
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('names a target the stepper cannot land on instead of oscillating around it', async () => {
+    // tutorial-interactive.json's original shape: stemming declared 2.5 on a
+    // 0.2 m stepper that starts at 2.0. The old click-count form silently
+    // produced 2.4; this must fail by name on the first crossing, not spin
+    // 2.4 → 2.6 → 2.4 until maxClicks.
+    const { page, click } = fakeStepper({ start: 2, step: 0.2, unit: 'm', decimals: 1 });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="stemming"]', value: 2.5 }, step),
+    ).rejects.toThrow(/2\.5 is not a value this stepper can reach — one click moves it from 2\.4 to 2\.6/);
+    // 2.0 → 2.2 → 2.4 → 2.6 (crossed): three clicks, then stop.
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('honours maxClicks as an outer bound and names what it still read', async () => {
+    const { page } = fakeStepper({ start: 0, step: 1, unit: 'kg' });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 10, maxClicks: 3 }, step),
+    ).rejects.toThrow(/still reads 3 after 3 click\(s\), wanted 10/);
+  });
+
+  it('fails by name when the container has no stepper value to read', async () => {
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('textContent')) return null;
+      // inspectSelector's report for the diagnosis in the message.
+      return { found: false, pointerEvents: '', display: '', visibility: '', disabled: false, width: 0, height: 0, matchCount: 0 };
+    });
+    const page = fakePage({ evaluate });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-nowhere [data-field="amount"]', value: 3 }, step),
+    ).rejects.toThrow(/no \.bsx-stepper-value found/);
+  });
+
+  it('fails by name when the displayed value is not a number', async () => {
+    const evaluate = vi.fn(async (fn: unknown) => (String(fn).includes('textContent') ? '—' : null));
+    const page = fakePage({ evaluate });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 3 }, step),
+    ).rejects.toThrow(/stepper value "—" is not a number/);
+  });
+});

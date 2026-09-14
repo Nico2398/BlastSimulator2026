@@ -62,6 +62,24 @@ export const CLICK_SELECTOR_ZERO_SIZE_GRACE_MS = 10000;
  */
 export const CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES = 3;
 
+/**
+ * `setStepper`'s click budget when the action names none. The widest stepper
+ * the suite drives is `amount` across an explosive's whole charge range, and
+ * the largest count-encoded run the migration replaced was 20 clicks; 64
+ * leaves room for a range change without a step ever spinning on a control
+ * whose clamp has already stopped it (that case fails by name after one
+ * ineffective click, before this bound matters).
+ */
+const SET_STEPPER_DEFAULT_MAX_CLICKS = 64;
+
+/**
+ * Two displayed stepper values are "the same" within this. Stemming steps
+ * by 0.2 and is rendered with `toFixed(1)`, so a target of 2 against a
+ * display of `2.0 m` must match, and a float sum like 1.2000000000000002
+ * must not read as one step short.
+ */
+const SET_STEPPER_TOLERANCE = 1e-6;
+
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
   left: 'left',
@@ -633,6 +651,71 @@ export async function executeActionOnPage(
             { cause: err },
           );
         }
+      }
+      break;
+    }
+    case 'setStepper': {
+      // The count-encoded form this replaces — N clicks on `:last-child` —
+      // assumed the control's default and its persistence across steps; a
+      // change to either left the command right and the clicks wrong
+      // (PR #1070's first red shard, #1072). Reading the displayed value and
+      // clicking toward the target instead makes the JSON carry the figure,
+      // and `ScenarioStepperValueMatchesCommand.test.ts` pins that figure to
+      // the step's own command. Each click goes through the same usability
+      // gate `clickSelector` uses (a tutorial rail marks a control allowed
+      // only on the guide's next pass), and the loop is bounded twice: by
+      // `maxClicks`, and by a click that fails to move the value at all —
+      // the control's own clamp, reported by name rather than spun on.
+      const valueSelector = `${action.selector} .bsx-stepper-value`;
+      const timeoutMs = action.timeout ?? CLICK_SELECTOR_DEFAULT_TIMEOUT_MS;
+      const maxClicks = action.maxClicks ?? SET_STEPPER_DEFAULT_MAX_CLICKS;
+      const readValue = async (): Promise<number> => {
+        const text = await page.evaluate((sel: string) => {
+          const el = document.querySelector(sel);
+          return el === null ? null : (el.textContent ?? '');
+        }, valueSelector);
+        if (text === null) {
+          throw new Error(`setStepper "${action.selector}" failed: no .bsx-stepper-value found — ${describeUnclickable(await inspectSelector(page, action.selector))}`);
+        }
+        const parsed = Number.parseFloat(text);
+        if (!Number.isFinite(parsed)) {
+          throw new Error(`setStepper "${action.selector}" failed: stepper value "${text}" is not a number`);
+        }
+        return parsed;
+      };
+      let current = await readValue();
+      for (let clicks = 0; Math.abs(current - action.value) > SET_STEPPER_TOLERANCE; clicks++) {
+        if (clicks >= maxClicks) {
+          throw new Error(
+            `setStepper "${action.selector}" failed: still reads ${current} after ${maxClicks} click(s), wanted ${action.value}`,
+          );
+        }
+        const direction = current < action.value ? 'last' : 'first';
+        await waitUsableAndClick(page, `${action.selector} .bsx-stepper-btn:${direction}-child`, timeoutMs);
+        const next = await readValue();
+        if (Math.abs(next - current) <= SET_STEPPER_TOLERANCE) {
+          throw new Error(
+            `setStepper "${action.selector}" failed: the ${direction === 'last' ? '+' : '-'} button no longer moves the value `
+            + `(clamped at ${current}), wanted ${action.value}`,
+          );
+        }
+        // A target off the control's own lattice (a 2.5 m stemming on a
+        // 0.2 m stepper that starts at 2.0) would otherwise oscillate 2.4 →
+        // 2.6 → 2.4 until `maxClicks`. Crossing the target without landing
+        // on it is the whole diagnosis, so say it now: the scenario declares
+        // a value the control cannot reach, and the command must move to one
+        // it can (tutorial-interactive.json's 2.5 → 2.4 is the case).
+        const crossed = (current < action.value) !== (next < action.value)
+          && Math.abs(next - action.value) > SET_STEPPER_TOLERANCE;
+        if (crossed) {
+          const [lo, hi] = current < next ? [current, next] : [next, current];
+          throw new Error(
+            `setStepper "${action.selector}" failed: ${action.value} is not a value this stepper can reach — `
+            + `one click moves it from ${lo} to ${hi}. Declare a reachable value in the step's command.`,
+          );
+        }
+        onProgress?.(`setStepper ${action.selector}: ${current} → ${next} (target ${action.value})`);
+        current = next;
       }
       break;
     }

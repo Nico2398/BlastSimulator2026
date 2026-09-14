@@ -924,28 +924,27 @@ describe("reading #499's head the way the action now reads it", () => {
 
 // PR #615's actual failure mode: a workflow run's own `conclusion` is
 // `success` the instant every job in it either passed or was skipped, so
-// `checkState`/`mergeVerdict` alone cannot tell a genuinely green `full-ci`
-// PR from one whose interaction shards silently never ran. This is the
-// third, independent line of defence (alongside ci.yml's `labeled` trigger
-// type and open-pr setting the label at creation) — it asks the CI run's
-// own jobs directly.
+// `checkState`/`mergeVerdict` alone cannot tell a genuinely green PR from one
+// whose interaction shards silently never ran. The jobs are unconditional
+// now; this is the independent line of defence that asks the CI run's own
+// jobs directly, so a job that somehow never runs is a red verdict.
 describe("asking the CI run's own jobs before trusting its conclusion", () => {
   const source = readFileSync(
     join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
   );
-  const start = source.indexOf('const LABEL_GATED_JOBS');
+  const start = source.indexOf('const REQUIRED_JOBS');
   const end = source.indexOf('const method = ');
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
 
-  interface GatedJob { name: string; conclusion: string }
+  interface RunJob { name: string; conclusion: string }
 
-  const buildMissingGatedJobs = (jobsByRunId: Record<number, GatedJob[]>) =>
+  const buildMissingRequiredJobs = (jobsByRunId: Record<number, RunJob[]>) =>
     new Function(
       'github',
       'owner',
       'repo',
-      `${source.slice(start, end)} return missingGatedJobs;`
+      `${source.slice(start, end)} return missingRequiredJobs;`
     )(
       {
         paginate: async (_fn: unknown, { run_id }: { run_id: number }) => jobsByRunId[run_id] ?? [],
@@ -953,103 +952,87 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
       },
       'Nico2398',
       'BlastSimulator2026'
-    ) as (labels: { name: string }[], runs: unknown[]) => Promise<string[]>;
+    ) as (runs: unknown[]) => Promise<string[]>;
 
   const CI_RUN = { id: 555, path: '.github/workflows/ci.yml' };
-  const interactionJob = (n: number, conclusion: string): GatedJob => ({ name: `Scenarios (interaction mode) — shard ${n}/4`, conclusion });
-  const buildJob = (conclusion: string): GatedJob => ({ name: 'Production build', conclusion });
+  const INTERACTION = 'Scenarios (interaction mode)';
+  const BUILD = 'Production build';
+  const interactionJob = (n: number, conclusion: string): RunJob => ({ name: `${INTERACTION} — shard ${n}/4`, conclusion });
+  const buildJob = (conclusion: string): RunJob => ({ name: BUILD, conclusion });
+  const allGreen = [...[1, 2, 3, 4].map((n) => interactionJob(n, 'success')), buildJob('success')];
 
-  it('is a no-op when the PR carries no gated label', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({});
-    await expect(missingGatedJobs([], [CI_RUN])).resolves.toEqual([]);
+  it('clears once every interaction shard and the build report success', async () => {
+    const missingRequiredJobs = buildMissingRequiredJobs({ [CI_RUN.id]: allGreen });
+    await expect(missingRequiredJobs([CI_RUN])).resolves.toEqual([]);
   });
 
-  it('clears full-ci once every interaction shard reports success', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({
+  // The exact #615 shape: the run reports `success`, but the job never
+  // appears in its own job list at all.
+  it('flags the interaction job when it never ran', async () => {
+    const missingRequiredJobs = buildMissingRequiredJobs({ [CI_RUN.id]: [buildJob('success')] });
+    await expect(missingRequiredJobs([CI_RUN])).resolves.toEqual([INTERACTION]);
+  });
+
+  it('flags the interaction job when a shard is present but did not succeed', async () => {
+    const missingRequiredJobs = buildMissingRequiredJobs({
+      [CI_RUN.id]: [interactionJob(1, 'success'), interactionJob(2, 'failure'), buildJob('success')],
+    });
+    await expect(missingRequiredJobs([CI_RUN])).resolves.toEqual([INTERACTION]);
+  });
+
+  it('checks the build independently of the shards', async () => {
+    const missingRequiredJobs = buildMissingRequiredJobs({
       [CI_RUN.id]: [1, 2, 3, 4].map((n) => interactionJob(n, 'success')),
     });
-    await expect(
-      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
-    ).resolves.toEqual([]);
+    await expect(missingRequiredJobs([CI_RUN])).resolves.toEqual([BUILD]);
   });
 
-  // The exact #615 shape: the run reports `success`, but the label's job
-  // never appears in its own job list at all.
-  it('flags full-ci when the interaction job never ran', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({ [CI_RUN.id]: [] });
-    await expect(
-      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
-    ).resolves.toEqual(['full-ci']);
-  });
-
-  it('flags full-ci when a shard is present but did not succeed', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({
-      [CI_RUN.id]: [interactionJob(1, 'success'), interactionJob(2, 'failure')],
-    });
-    await expect(
-      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
-    ).resolves.toEqual(['full-ci']);
-  });
-
-  it('checks build-check against the Production build job independently of full-ci', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({ [CI_RUN.id]: [buildJob('success')] });
-    await expect(
-      missingGatedJobs([{ name: 'build-check' }], [CI_RUN])
-    ).resolves.toEqual([]);
-    const missingGatedJobs2 = buildMissingGatedJobs({ [CI_RUN.id]: [] });
-    await expect(
-      missingGatedJobs2([{ name: 'build-check' }], [CI_RUN])
-    ).resolves.toEqual(['build-check']);
+  it('fails closed when no ci.yml run exists on the head at all', async () => {
+    const missingRequiredJobs = buildMissingRequiredJobs({});
+    await expect(missingRequiredJobs([])).resolves.toEqual([INTERACTION, BUILD]);
   });
 
   it('looks up the CI run by path, not by display name', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({
-      [CI_RUN.id]: [1, 2].map((n) => interactionJob(n, 'success')),
-    });
+    const missingRequiredJobs = buildMissingRequiredJobs({ [CI_RUN.id]: allGreen });
     const renamedButSamePath = { id: CI_RUN.id, path: CI_RUN.path };
-    await expect(
-      missingGatedJobs([{ name: 'full-ci' }], [renamedButSamePath])
-    ).resolves.toEqual([]);
+    await expect(missingRequiredJobs([renamedButSamePath])).resolves.toEqual([]);
   });
 
   it('reads the newest CI run on the head when more than one is present', async () => {
-    const missingGatedJobs = buildMissingGatedJobs({
+    const missingRequiredJobs = buildMissingRequiredJobs({
       [CI_RUN.id]: [],
-      [CI_RUN.id + 1]: [1, 2].map((n) => interactionJob(n, 'success')),
+      [CI_RUN.id + 1]: allGreen,
     });
     await expect(
-      missingGatedJobs(
-        [{ name: 'full-ci' }],
-        [CI_RUN, { ...CI_RUN, id: CI_RUN.id + 1 }]
-      )
+      missingRequiredJobs([CI_RUN, { ...CI_RUN, id: CI_RUN.id + 1 }])
     ).resolves.toEqual([]);
   });
 });
 
-// The two LABEL_GATED_JOBS array literals -- one real TS
-// (scripts/lib/label-gated-jobs.ts, exported and unit-tested directly), one inline
+// The two REQUIRED_JOBS array literals -- one real TS
+// (scripts/lib/required-jobs.ts, exported and unit-tested directly), one inline
 // github-script JS (this same action.yml, extracted above for its own tests)
 // -- can drift with nothing in either test suite noticing, since each only
 // proves its own copy's behavior. That drift already produced a real
 // disagreement once (a PR review round found await-pr-ci.ts's no-ci.yml-run
-// case reading GREEN where this action's own equivalent reads every gated
-// label missing) before this test existed. Comparing the two literals
+// case reading GREEN where this action's own equivalent reads every required
+// job missing) before this test existed. Comparing the two literals
 // directly is what would have caught it before the behavior ever diverged.
-describe('LABEL_GATED_JOBS stays identical between scripts/lib/label-gated-jobs.ts and this action', () => {
+describe('REQUIRED_JOBS stays identical between scripts/lib/required-jobs.ts and this action', () => {
   it('the two array literals are the same value, not just similarly shaped', () => {
     const actionSource = readFileSync(
       join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
     );
-    const actionStart = actionSource.indexOf('const LABEL_GATED_JOBS');
+    const actionStart = actionSource.indexOf('const REQUIRED_JOBS');
     const actionEnd = actionSource.indexOf('];', actionStart) + 2;
-    const actionArray = new Function(`${actionSource.slice(actionStart, actionEnd)} return LABEL_GATED_JOBS;`)();
+    const actionArray = new Function(`${actionSource.slice(actionStart, actionEnd)} return REQUIRED_JOBS;`)();
 
-    const tsSource = readFileSync(join(ROOT, 'scripts/lib/label-gated-jobs.ts'), 'utf8');
-    const tsStart = tsSource.indexOf('const LABEL_GATED_JOBS');
+    const tsSource = readFileSync(join(ROOT, 'scripts/lib/required-jobs.ts'), 'utf8');
+    const tsStart = tsSource.indexOf('const REQUIRED_JOBS');
     const tsEnd = tsSource.indexOf('];', tsStart) + 2;
     // Strip the TS-only type annotation the YAML copy has no equivalent for.
-    const tsDecl = tsSource.slice(tsStart, tsEnd).replace(': { label: string; jobNamePrefix: string }[]', '');
-    const tsArray = new Function(`${tsDecl} return LABEL_GATED_JOBS;`)();
+    const tsDecl = tsSource.slice(tsStart, tsEnd).replace(': { jobNamePrefix: string }[]', '');
+    const tsArray = new Function(`${tsDecl} return REQUIRED_JOBS;`)();
 
     expect(actionArray).toEqual(tsArray);
   });
@@ -1127,26 +1110,34 @@ describe('the sweep that runs when the checks come in', () => {
   });
 });
 
-// PR #615 merged with its `full-ci` interaction-mode job silently skipped:
-// the label was applied via a separate API call after `pull_request: opened`
-// had already fired, and default `pull_request` types are
-// [opened, synchronize, reopened] -- not `labeled`. Both `shard-config` and
-// `scenario-interaction` evaluated their `if: contains(...'full-ci')` guard
-// against a PR that had no labels yet, reported `skipped` rather than
-// `failure`, and the run still concluded `success`. PR #616 only got its
-// shards from 30 unrelated follow-up pushes after the label landed --
-// `synchronize` was already in the list, `labeled` was not. Mirrors the same
-// fix already proven for `auto-assign-next.yml`'s READY TO MERGE marker
-// above. `labeled` fires the same on a draft PR and its check run attaches
-// to the head SHA, so no separate `ready_for_review` type is needed to cover
-// a label applied before a PR goes ready.
-describe('ci.yml re-evaluates full-ci/build-check when the label lands', () => {
-  it('includes labeled alongside the defaults', () => {
-    const ci = workflow('ci.yml');
-    const types = /pull_request:[\s\S]*?types:\s*\[([^\]]+)\]/.exec(ci)?.[1] ?? '';
-    for (const type of ['opened', 'synchronize', 'reopened', 'labeled']) {
-      expect(types, `ci.yml's pull_request trigger is missing \`${type}\``).toContain(type);
-    }
+// PR #615 merged with its interaction-mode job silently skipped: the job was
+// gated behind a `full-ci` label applied via a separate API call after
+// `pull_request: opened` had already fired, the `if:` guard was evaluated
+// against a PR that had no labels yet, the shards reported `skipped` rather
+// than `failure`, and the run still concluded `success`. The gate is gone
+// rather than patched: the interaction shards and the production build run
+// on every pull request, so there is no label to race and no `if:` to
+// evaluate early. This pins that no such guard comes back — the same
+// asymmetry ("runs on main, optional on PRs") is what made `main` the place
+// interaction regressions were discovered, ten times in sixty pushes.
+describe('ci.yml runs the interaction shards and the build on every pull request', () => {
+  const ci = workflow('ci.yml');
+
+  it('gates neither job behind a pull-request label', () => {
+    expect(ci).not.toContain("contains(github.event.pull_request.labels.*.name");
+    expect(ci).not.toContain("github.event_name != 'pull_request'");
+  });
+
+  it('needs no `labeled` trigger type, because nothing reads labels', () => {
+    const types = /pull_request:[\s\S]*?types:\s*\[([^\]]+)\]/.exec(ci)?.[1];
+    expect(types, 'ci.yml should rely on the default pull_request types').toBeUndefined();
+  });
+
+  it('still declares both jobs, so "not gated" cannot quietly mean "not there"', () => {
+    expect(ci).toMatch(/\n {2}scenario-interaction:\n/);
+    expect(ci).toMatch(/\n {2}build:\n/);
+    expect(ci).toContain('name: Production build');
+    expect(ci).toContain('name: "Scenarios (interaction mode)');
   });
 });
 

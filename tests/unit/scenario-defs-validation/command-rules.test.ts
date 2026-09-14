@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 import { getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
@@ -76,36 +78,40 @@ describe('"contract" commands use type:/material:, not a numeric id (issue #597)
 // 7c. No step's FUNCTIONAL fields — the ones that actually drive DOM
 // targeting or command dispatch (`command`, `interaction[].command`,
 // `interaction[].selector` on any action that carries one, and
-// `expect.blocked`/`expect.usable`) — contain a literal `data-contract-id="N"`
-// DOM selector (issue #654). The contract-offer pool rotates on
-// `CONTRACT_REFRESH_INTERVAL`, so an id baked straight into a guard selector
-// (e.g. `#bs-contract-panel [data-contract-id="26"] .bs-contract-deliver`)
-// pins to whatever the pool happened to resolve to at authoring time and
-// breaks the moment an upstream timing change shifts tick counts — the same
-// class of flake 7b already guards against for `contract` command strings,
-// widened here to catch the id showing up in any functional field of a step.
+// `expect.blocked`/`expect.usable`) — name an entity by an id the simulation
+// assigns at run time. Issue #654 closed this for `data-contract-id="N"`:
+// the contract-offer pool rotates on `CONTRACT_REFRESH_INTERVAL`, so an id
+// baked into a guard selector pins to whatever the pool resolved to at
+// authoring time. Widened here to every runtime-assigned id the DOM exposes
+// — `data-hole`, `data-vehicle-id`, `data-employee-id`, `data-building-id` —
+// because they share the failure shape even where the mechanism differs: a
+// hole, vehicle, employee or building number is assigned in creation order,
+// so one step inserted upstream (a hire, an extra drill) renumbers every
+// entity after it and every later selector silently targets a different
+// thing. The command/interaction disagreement that produces is the class
+// `.claude/rules/scenario-defs.md` names, arriving through an id instead of
+// a click count.
 //
-// Deliberately scoped to those fields, NOT the whole `JSON.stringify(step)`
+// Held against a baseline, not banned outright: 112 such selectors across 28
+// files predate this rule, and a migration of that size is its own change.
+// The baseline is a ratchet in both directions, the same shape as
+// `tests/unit/lint/dead-code-baseline.json` — a new baked id fails, and an
+// entry that has been migrated away and is no longer present fails too, so
+// the file can only ever shrink. `level1-win-efficient`'s #654-era named
+// exemption is folded into the baseline rather than kept as a special case.
+//
+// Deliberately scoped to functional fields, NOT the whole `JSON.stringify(step)`
 // (post-review fix, issue #654): a step's free-text `description` narrates
 // its own authoring history in prose and can legitimately quote an old,
-// already-fixed selector (e.g. "...previously scoped to
-// `[data-contract-id=\"19\"] .bs-contract-accept`...") without that prose
-// being a live violation. Scanning the whole step produced a false positive
-// on level3-playthrough-win.json step 79, whose live `command`/`selector`/
-// `expect` fields are already migrated to `type:`/`data-contract-type`
-// selectors — only its description mentions the old id it moved away from.
-//
-// level1-win-efficient.json is exempted by name: it has its own pre-existing
-// literal `data-contract-id="N"` selectors in real `selector`/`expect.blocked`
-// fields that predate #654 and need a separate migration. That migration is
-// out of scope for #654 — this is a deliberate, named skip, not a loophole.
+// already-fixed selector without that prose being a live violation.
 // ──────────────────────────────────────────────
-describe('No step contains a literal data-contract-id="N" DOM selector (issue #654)', () => {
-  // Matches the pattern in a step's raw field value (data-contract-id="26").
-  const LITERAL_CONTRACT_ID = /data-contract-id="\d+"/;
+describe('No step names an entity by a runtime-assigned id outside the baseline (issue #654, widened)', () => {
+  /** A literal `data-<attr>="<value>"` for an attribute the simulation numbers at run time. `*` is a wildcard, not an id. */
+  const LITERAL_RUNTIME_ID = /data-(?:contract-id|hole|vehicle-id|employee-id|building-id)="[^"*]+"/g;
 
-  // Deliberate, named exemption — see comment above. Not part of #654's scope.
-  const EXEMPT_SCENARIOS = new Set(['level1-win-efficient']);
+  const BASELINE_PATH = resolve(import.meta.dirname, 'baked-id-baseline.json');
+  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as { bakedRuntimeIds: string[] };
+  const known = new Set(baseline.bakedRuntimeIds);
 
   /** Every functional (DOM/command-dispatching) string field of a step, not free text like `description`. */
   const functionalStrings = (step: ScenarioStepDef): string[] => {
@@ -119,29 +125,48 @@ describe('No step contains a literal data-contract-id="N" DOM selector (issue #6
     return values;
   };
 
-  for (const name of ALL_SCENARIO_NAMES) {
-    if (EXEMPT_SCENARIOS.has(name)) {
-      it.skip(`${name} — exempted from data-contract-id lint (issue #654, separate follow-up)`, () => {});
-      continue;
-    }
-
-    it(`${name} — no step's functional fields contain a literal data-contract-id="N" selector`, () => {
+  /** `<scenario>:<stepIndex>:<literal>` for every baked id in the tree right now, de-duplicated per step. */
+  const currentEntries = (): Set<string> => {
+    const found = new Set<string>();
+    for (const name of ALL_SCENARIO_NAMES) {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      const offenders: string[] = [];
-
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i] as ScenarioStepDef;
-        for (const value of functionalStrings(step)) {
-          const match = LITERAL_CONTRACT_ID.exec(value);
-          if (match) {
-            offenders.push(`step[${i}]: ${match[0]}`);
+      scenario.steps.forEach((rawStep, i) => {
+        for (const value of functionalStrings(rawStep as ScenarioStepDef)) {
+          for (const match of value.matchAll(LITERAL_RUNTIME_ID)) {
+            found.add(`${name}:${i}:${match[0]}`);
           }
         }
-      }
+      });
+    }
+    return found;
+  };
 
-      expect(offenders).toEqual([]);
-    });
-  }
+  it('introduces no baked runtime id the baseline does not already carry', () => {
+    const fresh = [...currentEntries()].filter((e) => !known.has(e));
+    expect(
+      fresh,
+      `${fresh.length} new selector(s) name an entity by a runtime-assigned id. Select on shape `
+      + `instead — data-contract-type, a role, an ordinal — the way #654's contract fix did:\n`
+      + fresh.map((e) => `  ${e}`).join('\n'),
+    ).toEqual([]);
+  });
+
+  it('carries no baseline entry that has already been migrated away', () => {
+    const current = currentEntries();
+    const stale = baseline.bakedRuntimeIds.filter((e) => !current.has(e));
+    expect(
+      stale,
+      `${stale.length} baseline entr(ies) no longer present — delete these lines from `
+      + `tests/unit/scenario-defs-validation/baked-id-baseline.json:\n`
+      + stale.map((e) => `  ${e}`).join('\n'),
+    ).toEqual([]);
+  });
+
+  it('keeps the baseline shrinking, never growing', () => {
+    // Pins the count so a bulk re-generation cannot quietly absorb new
+    // offenders. Lower this number as entries are migrated; never raise it.
+    expect(baseline.bakedRuntimeIds.length).toBeLessThanOrEqual(112);
+  });
 });
 
 // ──────────────────────────────────────────────

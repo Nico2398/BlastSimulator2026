@@ -81,10 +81,12 @@ nature.
 
 **Coverage is measured through `vitest.coverage.config.ts`, not the plain config.** It excludes
 `tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
-budgets) and `tests/unit/lint/` (drives every scenario definition through the console — 2486s of a
-2880s coverage run, 86% of the wall clock, for rules about scenario JSON rather than `src/`
-coverage). Excluding those two took the measurement from 48 minutes to ~6 with the thresholds
-unchanged and still passing. Both directories still run, unexcluded, in `npm run test` — the `logic`
+budgets) and `tests/unit/lint/` (static rules about scenario JSON and repo hygiene, not `src/`
+behaviour — nothing there adds to the measurement). Excluding those two took the measurement from
+48 minutes to ~6 with the thresholds unchanged and still passing. The lint directory used to also
+replay every scenario through the console (`ScenarioCommandOutcomes`, ~240 s, half of `npm run
+test`); that replay was retired because `npm run scenarios` already fails an undeclared refusal
+through `checkCommandOutcome` in `runSteps`, on every pull request, with the same message. Both directories still run, unexcluded, in `npm run test` — the `logic`
 channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
 
 ### What the coverage gate actually holds
@@ -254,12 +256,12 @@ CI has 3 tiers of scenario testing:
 | Tier | What | When | Time |
 |------|------|------|------|
 | **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
-| **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | tens of minutes† |
-| **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | tens of minutes† |
+| **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | ~12 min wall clock† |
+| **3 — Full** | Tiers 1 + 2 combined | Every push and pull request | ~15–19 min wall clock† |
 
-† No GPU means ~6 s/frame in software rasterisation (#475) — a cached minute figure goes stale fast, so none is kept here. Current cost and the `full-ci` label rule: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
+† No GPU means ~6 s/frame in software rasterisation (#475); the figures above are CI's 10-shard runs on 13–14 Sep 2026 and go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
-**Label convention:** Add `full-ci` to a PR when an interaction-mode scenario drives the change, or when it touches machinery every scenario runs through. The `full-ci` label on an issue MUST transfer to the opened PR. Most PRs — docs, config, logic-only, and UI no definition reaches — skip both browser jobs safely; the `visual` channel covers those against the one scenario that exercises them. Rule and cost: `agentic-pipeline-pr-management`.
+**No label convention.** The interaction-mode shards and the production build run on every pull request. They used to be opt-in behind `full-ci` / `build-check`, and `main` went red ten times in sixty pushes because an unlabelled PR's push to `main` was the first time the shards ever saw its code. The in-session `visual` channel still covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 
 ## Wait on Conditions, Never on a Fixed Delay
 

@@ -103,6 +103,18 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(a.selector.length).toBeGreaterThan(0);
   }),
   defineActionCheck(
+    'setStepper',
+    'setStepper actions name a [data-field] container and a finite numeric value',
+    (a) => {
+      expect(typeof a.selector).toBe('string');
+      expect(a.selector, 'setStepper must target the stepper\'s [data-field="…"] container, not a button')
+        .toMatch(/\[data-field="[^"]+"\]$/);
+      expect(typeof a.value).toBe('number');
+      expect(Number.isFinite(a.value)).toBe(true);
+      if (a.maxClicks !== undefined) expect(a.maxClicks).toBeGreaterThan(0);
+    },
+  ),
+  defineActionCheck(
     'waitForProperty',
     'waitForProperty actions name a selector, a property, and a value to wait for',
     (a) => {
@@ -579,7 +591,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     // -> spacing:4/depth:8/(22,20); amount:5/stemming:2 -> amount:4/stemming:2.5)
     // so the shot rates good-or-better instead of catastrophic.
     23: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
-    33: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
+    33: 'charge hole:* explosive:boomite amount:4 stemming:2.4',
     37: 'sequence auto delay_step:25',
   };
 

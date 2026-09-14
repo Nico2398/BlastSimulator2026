@@ -338,7 +338,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
 
   // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
   // convention) alongside Charge All — without them the scripted plan's
-  // amount:4/stemming:2.5 was unreachable by a real click: the panel opens at
+  // amount:4/stemming:2.4 was unreachable by a real click: the panel opens at
   // its own 5kg/2.0m defaults and nothing on this stage let a player move off
   // them. Both stepper buttons (inc/dec) allowed, not just the direction the
   // scripted plan happens to need.

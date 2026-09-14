@@ -32,17 +32,14 @@ Steps 5 and 6 are where a finished-looking change stops being finished. Everythi
 |-----|-------|
 | `static`, `logic`, `scenario` (command mode) | Either. CI runs all three on every push and pull request. |
 | `screenshot`, one named scenario in interaction mode | Your session — this is the `visual` channel's working loop. |
-| `build` (production bundle) | CI job `Production build`, on PRs labelled `build-check`. |
-| All scenarios in interaction mode | CI job `Scenarios (interaction mode)`, on PRs labelled `full-ci`. |
+| `build` (production bundle) | CI job `Production build`, on every push and pull request. |
+| All scenarios in interaction mode | CI job `Scenarios (interaction mode)`, sharded, on every push and pull request. |
 
 Locally, run one named definition you are actively debugging. Never the whole interaction-mode suite: without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475), and the browser harnesses wait a full frame per probe, so one player action costs tens of seconds and one scenario beat costs minutes. Level loading is cheap by comparison (a `new_game` is ~4 s, a campaign start ~16 s), and the simulation itself is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
 
-## Labels decide what CI proves
+## No label decides what CI proves
 
-- **`full-ci`** — the interaction-mode job. Apply it when an interaction-mode scenario actually drives the change, or when the change touches machinery every scenario runs through. Not on every diff a player can see. It is real added time on the merge path: sharded, it lands around 12 minutes wall clock, and each shard's ~11-12 min is mostly harness batch time that scales down with shard count (`SCENARIO_INTERACTION_SHARDS`).
-- **`build-check`** — the production bundle. Apply it when the change touches build config (`vite.config.ts`, `tsconfig*.json`, `package.json` dependencies) or bundling and chunking itself. `static` already catches what would break the bundle far more often than a Vite-specific failure does.
-
-The two are independent: a pull request can drive the interaction-mode scenarios without proving the bundle, and the reverse. The label test and its cost live in `agentic-pipeline-pr-management`.
+Every job in `ci.yml` runs on every pull request. The interaction-mode shards and the production build used to be opt-in behind `full-ci` and `build-check`, with a rule that a "backend-only" diff never earned the shards; that is where `main` went red — ten of sixty pushes between 3 and 13 Sep 2026, every one of them only the shards, every one of them the first time those shards had run on that code — and PR #1068 proved the exemption wrong by changing one `src/core/` threshold and breaking three interaction scenarios. The shards cost ~12 minutes wall clock sharded (`SCENARIO_INTERACTION_SHARDS`), and that is now the merge path for every PR, deliberately: a red shard is found on the branch that caused it, by the session that can still fix it. `agentic-pipeline-pr-management` holds the reasoning; `scripts/lib/required-jobs.ts` is what refuses to read a run green when a required job somehow did not run.
 
 ## ▶ Reading the CI result
 

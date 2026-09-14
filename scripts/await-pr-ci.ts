@@ -37,7 +37,7 @@
  *
  * Exit codes — the whole point of the script, since the caller branches on them:
  *   0  GREEN    every workflow run on the head reported success (or the PR merged),
- *               and — for a `full-ci`/`build-check` PR — the job(s) those labels
+ *               and the job(s) every pull request's CI run must contain
  *               gate actually ran and succeeded, not merely skipped without failing
  *   1  RED      at least one reported failure, or a full-ci/build-check PR whose
  *               gated job never ran despite the label (#615). The failing jobs are
@@ -51,7 +51,7 @@
 
 import { dropPhantomCancelledRuns, type WorkflowRun, type WorkflowJob } from './lib/phantom-cancelled-runs.js';
 import { verdictOf, latestRunPerWorkflow, isMachineryWorkflow, RUN_FAILURES } from './lib/workflow-verdict.js';
-import { missingGatedJobs, wantedGatedLabels } from './lib/label-gated-jobs.js';
+import { missingRequiredJobs, allRequiredJobs } from './lib/required-jobs.js';
 import { resolvePr, runsOnHead, jobsForRun, type PullRequest } from './lib/github-ci-fetch.js';
 
 export type { WorkflowRun, WorkflowJob } from './lib/phantom-cancelled-runs.js';
@@ -184,32 +184,25 @@ async function main(): Promise<number> {
     }
     if (verdict === 'green') {
       const ciRun = latest.find((run) => run.path === '.github/workflows/ci.yml');
-      const labels = (pr.labels ?? []).map((l) => l.name);
-      // No gated label at all -- most PRs -- skips the jobs fetch entirely
-      // rather than paying a `gh api` round trip for a check that's a no-op.
-      // No `ci.yml` run on the head at all is not a pass on the labels it
-      // does gate -- fails closed, matching agentic-auto-merge's own
-      // `ciRuns.length === 0` branch (see wantedGatedLabels's doc comment).
-      const wanted = wantedGatedLabels(labels);
-      const missing = wanted.length === 0 ? []
-        : ciRun ? missingGatedJobs(labels, cachedJobsForRun(ciRun.id))
-        : wanted;
+      // No `ci.yml` run on the head at all is not a pass on the jobs it
+      // owes -- fails closed, matching agentic-auto-merge's own
+      // `ciRuns.length === 0` branch (see allRequiredJobs's doc comment).
+      const missing = ciRun ? missingRequiredJobs(cachedJobsForRun(ciRun.id)) : allRequiredJobs();
 
       if (missing.length > 0) {
         // Every workflow run on the head reported success -- but a run
         // reports `success` the moment every job in it either passed or was
-        // skipped, and a job a label gates can be skipped for the same
-        // reason it never ran at all: the label did not exist yet when its
-        // `if:` guard was evaluated. #615 merged on the run-level fact alone
-        // with its interaction shards silently absent; this is what reads
-        // that gap instead of reporting green on an absence of evidence.
+        // skipped, and a job that never ran is indistinguishable from that
+        // at the run level. #615 merged on the run-level fact alone with its
+        // interaction shards silently absent; this is what reads that gap
+        // instead of reporting green on an absence of evidence.
         console.log(
           `CI RED — pull request #${pr.number}: every workflow run reported success, `
-          + `but the job(s) gated behind ${missing.join(', ')} did not fully run`
+          + `but the required job(s) ${missing.join(', ')} did not fully run`
           + (ciRun ? '.' : ' (no ci.yml run found on this head at all).')
         );
         if (ciRun) console.log(`  ${ciRun.html_url}`);
-        console.log('Re-push (or re-run the CI workflow) so the label is evaluated against a live run.');
+        console.log('Re-push (or re-run the CI workflow) so every required job runs against a live run.');
         return 1;
       }
 

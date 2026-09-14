@@ -6,10 +6,11 @@
 //     inflates them, so these fail for a reason that has nothing to do with
 //     the code under test (a TerrainMesh rebuild budgeted at 2000ms measured
 //     2702ms under coverage).
-//   tests/unit/lint/       — drives all scenario definitions through the
-//     console to lint them. Under instrumentation that single directory took
-//     2486s of a 2880s run: 86% of the wall clock for rules that are about
-//     scenario JSON, not about src/ coverage.
+//   tests/unit/lint/       — static rules about scenario JSON and repo
+//     hygiene, not about src/ behaviour, so they add nothing to the
+//     measurement. (Until the replay lint was retired this directory also
+//     drove every scenario through the console — 2486s of a 2880s run under
+//     instrumentation; `npm run scenarios` owns that replay now.)
 //
 // Both still run, unexcluded, in the ordinary `npm run test` suite that CI's
 // test job and the `logic` channel use. This config only shapes the coverage

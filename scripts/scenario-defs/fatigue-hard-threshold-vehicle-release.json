@@ -49,20 +49,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 5
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
         },
         {
           "type": "dragTiles",

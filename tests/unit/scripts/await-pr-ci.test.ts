@@ -178,5 +178,5 @@ describe('reportFailure uses the injected job-fetch function', () => {
 //
 // The label-gate tests ("asking a CI run's own jobs before trusting its
 // conclusion", "wantedGatedLabels") live in
-// tests/unit/scripts/label-gated-jobs.test.ts alongside the extracted
-// scripts/lib/label-gated-jobs.ts (#785).
+// tests/unit/scripts/required-jobs.test.ts alongside the extracted
+// scripts/lib/required-jobs.ts (#785, then `label-gated-jobs`).
