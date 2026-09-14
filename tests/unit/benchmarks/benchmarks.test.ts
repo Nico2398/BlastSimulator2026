@@ -24,6 +24,12 @@ import type { HoleCharge } from '../../../src/core/mining/ChargePlan.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { Building } from '../../../src/core/entities/Building.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
+import { claimOnePoolCandidate } from '../../../src/core/engine/EmployeeDispatchSteps.js';
+import { selectBestActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -594,5 +600,63 @@ describe('Performance Benchmarks', () => {
       expect(result.success).toBe(true);
       expect(elapsed).toBeLessThan(2000);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dispatch over a post-blast debris field
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A site right after a large blast: one on-ground fragment per haul action,
+ * thousands of each. Big enough that a per-action linear scan over the
+ * fragments (the shape `createFragmentLookup`, HaulDispatch.ts, replaced) is
+ * seconds per pass, while the indexed pass is milliseconds — the budget below
+ * sits an order of magnitude from either side.
+ */
+function setupDebrisFieldState(fragmentCount: number): { state: GameState; employeeId: number } {
+  const state = createGame({ seed: 42 });
+  const fragments: FragmentData[] = [];
+  for (let i = 0; i < fragmentCount; i++) {
+    fragments.push({
+      id: i,
+      position: { x: 5 + (i % 50), y: 0, z: 5 + Math.floor(i / 50) },
+      volume: 0.3,
+      mass: 10,
+      rockId: 'cruite',
+      oreDensities: i % 7 === 0 ? { gloomium: 0.1 } : {},
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+      shapeSeed: i,
+    });
+  }
+  state.logistics.storageCapacityKg = fragmentCount * 100;
+  addBlastFragments(state.logistics, fragments);
+  syncHaulDispatch(state);
+  const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 0);
+  return { state, employeeId: employee.id };
+}
+
+describe('Dispatch over a post-blast debris field (6000 fragments, 6000 haul actions)', () => {
+  it('filters the pool and ranks every candidate for one employee in under 250ms', () => {
+    const { state, employeeId } = setupDebrisFieldState(6000);
+    const employee = state.employees.employees.find(e => e.id === employeeId)!;
+    expect(state.pendingActions.length).toBe(6000);
+
+    // Warmup: one pass of each, so the measured pass is not paying JIT.
+    claimOnePoolCandidate(state, employee);
+    selectBestActionForEmployee(state, employee, state.pendingActions);
+
+    const start = performance.now();
+    // The claim-time gate over the whole pool (what every idle employee pays
+    // every tick) …
+    claimOnePoolCandidate(state, employee);
+    // … and the cost ranking over every candidate, whose ore-priority bonus
+    // resolves each candidate's fragment inside the sort.
+    selectBestActionForEmployee(state, employee, state.pendingActions);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(250);
   });
 });
