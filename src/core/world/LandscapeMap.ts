@@ -8,7 +8,7 @@
 // test rather than by hoping two independent implementations stay in sync.
 
 import { selectBiomeWeights, dominantBiome, biomeShaping, biomeIndexOf } from './BiomeCatalog.js';
-import { sampleBaseHeight, applyPitMask, type WorldGenContext } from './WorldGen.js';
+import { sampleBaseHeight, applyPitMask, applyPlayableBand, type WorldGenContext } from './WorldGen.js';
 import { applyOverlays, type StructureSet } from './Structures.js';
 import type { StrataSampler } from './Strata.js';
 import type { CompositionPalette } from './VoxelGrid.js';
@@ -66,7 +66,12 @@ export function sampleLandscapeColumn(
   const raw = sampleBaseHeight(worldGen.fields, x, z, shapingInput);
   const masked = applyPitMask(raw, worldGen.centerHeight, worldGen.playableRect, x, z);
   const overlaid = applyOverlays(structureSet, x, z, masked);
-  const height = overlaid + worldGen.groundOffset;
+  // The band the playable grid can hold, applied to the world as well wherever
+  // the site draws — the landscape used to be the only sheet that ignored the
+  // clamp, which is what put a flat-topped rectangle on the ground (#1077).
+  const height = applyPlayableBand(
+    overlaid + worldGen.groundOffset, worldGen.sizeY, worldGen.playableRect, x, z,
+  );
 
   // Match the playable grid's own topmost SOLID voxel exactly: TerrainGen's
   // fill loop leaves y >= surfaceY as air, so the surface voxel sits at
