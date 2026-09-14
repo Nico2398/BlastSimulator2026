@@ -50,7 +50,7 @@ A run that defaulted an open requirement keeps `READY TO MERGE` and records the 
 
 A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. `agentic-auto-merge` reads it as `pending`, logs which runs it is waiting on, and stops — and the CI-completion sweep re-evaluates it when they report. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
 
-So a channel this session cannot run but CI does — interaction-mode `visual`/`scenario` — is **covered**, and the PR ships marked; when the change earns the `full-ci` label below, that job is what reports on it. Only a channel no mechanism will ever report on is a draft case.
+So a channel this session cannot run but CI does — interaction-mode `visual`/`scenario` — is **covered**, and the PR ships marked; the interaction shards run on every pull request and are what reports on it. Only a channel no mechanism will ever report on is a draft case.
 
 ### Marked is not finished — the run stays until CI reports
 
@@ -84,23 +84,19 @@ A run that stops on a dependency it filed leaves its finished work on a draft PR
 
 It follows that a paused PR **must not be closed or merged** by anything, and that a run resuming one **must not open a second PR against the same issue** — that recreates the deadlock the label exists to avoid. If the remaining work turns out unrelated to the branch, say so on the PR and continue on it anyway.
 
-Everything else about it is an ordinary PR: it gets the issue's `full-ci` label if the issue carried one, and it never carries `[skip ci]`.
+Everything else about it is an ordinary PR, and it never carries `[skip ci]`.
 
-## The `full-ci` label
+## Every CI job runs on every pull request
 
-`full-ci` starts the `Scenarios (interaction mode)` browser job — sharded via the repo variable `SCENARIO_INTERACTION_SHARDS` (a plain integer), defaulting to 4 shards as of #530 — a small `shard-config` job turns that integer into the `[1..N]` matrix array, since the workflow expression language has no range primitive to do it inline, each shard driving roughly 1/N of the scenarios; the terrain material still costs ~6.4 s/frame without a GPU (#475), so the job remains real added time to the merge path even sharded. #530 also cut the harness's own overhead by ~30% (measured 3367s -> ~2350s, single-threaded, in a sandbox) and, confirmed on #530's own PR checks, brings the sharded job to ~12 minutes wall clock at 4 shards — of each shard's ~11-12 min, ~30s is fixed per-job setup (checkout, install, Chrome, build, dev-server boot) that does not shrink with more shards, the rest is the harness's own batch time, which scales down roughly with shard count. Treat it as costly, not as free just because it is parallelised; apply it where there is evidence to buy:
+The `Scenarios (interaction mode)` browser job — sharded via the repo variable `SCENARIO_INTERACTION_SHARDS` (a plain integer; a small `shard-config` job turns it into the `[1..N]` matrix array, since the workflow expression language has no range primitive) — and the `Production build` job run on every push and every pull request. Nothing decides whether a change "earns" them.
 
-| Apply because | Test |
-|---------------|------|
-| The issue carried it | The label transfers from issue to PR — `agentic-issue-creation` |
-| An interaction-mode scenario drives the change | `scripts/scenario-defs/` holds the whole click-only, `role`-tagged suite (issue #515). Read the scenario: does one click its way through the control, panel or flow this diff changes? |
-| Every scenario runs through what changed | Shared rendering, input, camera, picking, or the scenario harness itself — machinery no single scenario names and all of them exercise |
+Both run unconditionally because a browser regression is only found where the browser runs, and `main` has no required check: a job optional on pull requests first ran on a change at the merge commit, which is where `main` went red (ten pushes in sixty, Sep 2026). No diff is exempt — the browser path depends on timing, and a one-line `src/core/` threshold change broke three interaction scenarios (#1068). Sharded, the job costs ~12 minutes wall clock; a red shard found on the branch is fixed by the session that caused it.
 
-Otherwise the label pays real added CI time to replay flows the diff never touched. A control added to an existing panel, a setup form's field list, copy, a renderer detail no scenario reaches — the `visual` channel already covers those, run in this session against the one named scenario that exercises them, and that is the stronger evidence because it looks at the thing that changed. A **backend-only** diff — confined to `src/core/`, `src/console/`, config or pure logic — never earns it at all: `static`, `logic` and command-mode `scenario` prove that code end to end, and no amount of browser replay says anything further about it.
+What stays true: without a GPU the terrain material costs ~6.4 s/frame (#475), so the suite is CI's and never a session's — the `visual` channel in a session runs the one named scenario that exercises the change, which is the working loop and the stronger evidence for that change. And a run-level `success` is still not proof the shards ran: `scripts/lib/required-jobs.ts` and `agentic-auto-merge` ask the run's own jobs, so a shard that somehow never ran (PR #615's shape) is a red verdict, not a green one.
 
-**When player-reachability is owed and no scenario drives the flow**, the label is not the answer — running scenarios that never reach the change reports nothing about it. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new `role: 'player'` step in `scripts/scenario-defs/` (and then the label, so CI runs it in interaction mode); a control on an existing panel is covered by the `visual` channel and needs neither.
+**When player-reachability is owed and no scenario drives the flow**, CI running every scenario reports nothing about it — the scenarios never reach the change. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new `role: 'player'` step in `scripts/scenario-defs/`, which CI then runs in interaction mode on every later pull request; a control on an existing panel is covered by the `visual` channel.
 
-Labelling is a claim about which machine runs a channel. It is never a reason to withhold the marker, and never a substitute for the visual channel.
+Which machine runs a channel is never a reason to withhold the marker, and never a substitute for the visual channel.
 
 ## Critical: NEVER use `[skip ci]` on PR branches
 

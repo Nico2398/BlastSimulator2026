@@ -36,16 +36,9 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 6
         },
         {
           "type": "dragTiles",
@@ -97,88 +90,14 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 6
         },
         {
           "type": "assert",
@@ -239,28 +158,14 @@
       "command": "charge hole:H2 explosive:boomite amount:5 stemming:5",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 5
         },
         {
           "type": "assert",
@@ -320,28 +225,14 @@
       "command": "charge hole:H3 explosive:boomite amount:4 stemming:4",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 4
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 4
         },
         {
           "type": "assert",
@@ -401,28 +292,14 @@
       "command": "charge hole:H4 explosive:boomite amount:3 stemming:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 3
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 3
         },
         {
           "type": "assert",

@@ -663,16 +663,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip-bar [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip-bar [data-field=\"spacing\"]",
+          "value": 4
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip-bar [data-field=\"depth\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip-bar [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip-bar [data-field=\"depth\"]",
+          "value": 8
         },
         {
           "type": "dragTiles",
@@ -729,22 +727,20 @@
       "commandOutcome": "either"
     },
     {
-      "command": "charge hole:* explosive:boomite amount:4 stemming:2.5",
+      "command": "charge hole:* explosive:boomite amount:4 stemming:2.4",
       "timeout": 30,
-      "description": "charge ordered: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed). #949: standardized on boomite (matching tutorial-playthrough.json/tutorial-steps-visual.json, and the panel's own DEFAULT_EXPLOSIVE, Charge.ts) -- the old pop_rock/3kg/2m command never actually matched what a real click produced anyway (Charge All always applies the panel's own boomite/5kg/2m defaults, a pre-existing command/click divergence this file carried before #949), so no explosive-selector click is needed. Amount/stemming steppers now clicked explicitly to reach the retuned amount:4/stemming: the amount stepper's step is 1kg (5->4, one decrement click) and the stemming stepper's step is 0.2m (2.0->2.2->2.4, two increment clicks) -- 2.4m is the closest reachable value to the declared stemming:2.5, and functionally equivalent to it: both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's depth:8), so the extra 0.1m the console command asks for does nothing more. The stepper click count/selectors were verified against a real interaction-mode run (Puppeteer, screenshots).",
+      "description": "charge ordered: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed). #949: standardized on boomite (matching tutorial-playthrough.json/tutorial-steps-visual.json, and the panel's own DEFAULT_EXPLOSIVE, Charge.ts) -- the old pop_rock/3kg/2m command never actually matched what a real click produced anyway (Charge All always applies the panel's own boomite/5kg/2m defaults, a pre-existing command/click divergence this file carried before #949), so no explosive-selector click is needed. Amount/stemming steppers now clicked explicitly to reach the retuned amount:4/stemming: the amount stepper's step is 1kg (5->4, one decrement click) and the stemming stepper's step is 0.2m (2.0->2.2->2.4, two increment clicks) -- 2.4m is the closest reachable value to the 2.5 this step first declared (the command now declares 2.4 too, so both channels run the same value -- setStepper refuses a target the control cannot reach), and functionally equivalent to it: both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's depth:8), so the extra 0.1m the console command asks for does nothing more. The stepper click count/selectors were verified against a real interaction-mode run (Puppeteer, screenshots).",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 4
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2.4
         },
         {
           "type": "clickSelector",

@@ -62,7 +62,7 @@ LOOP:
                         for, every definition under scripts/scenario-defs/ the diff
                         touches, and any the orchestrator adds because the change
                         reaches it. Never the whole suite — the full interaction-mode
-                        run is CI's, behind `full-ci`.
+                        run is CI's, on every pull request.
                         Must return VISUAL: PASS, VISUAL: FAIL, or VISUAL: BLOCKED.
                         If VISUAL: BLOCKED → halt pipeline immediately (escalate).
                         If no failures → exit loop (continue to step 9).

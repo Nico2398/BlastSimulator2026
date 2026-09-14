@@ -219,7 +219,7 @@ Where the triangles go:
 
 A model change is unverified until an image has been inspected, and **one inspection is not the loop** — **The visual loop** above is, and it reports the round it took. A green `ModelAssets` run proves the contract, not the picture.
 
-**A model change earns no `full-ci` label.** The interaction-mode suite replays click flows an asset diff never reaches, so it says nothing about the model while buying its flaky shards a place on the merge path. The capture you read is the stronger evidence, because it looks at the thing that changed. `agentic-issue-creation` rule 10 holds the boundary.
+**The interaction-mode suite says nothing about a model.** It runs on every pull request regardless, but it replays click flows an asset diff never reaches. The capture you read is the evidence that counts, because it looks at the thing that changed.
 
 ## Editing a `.blend` by hand
 

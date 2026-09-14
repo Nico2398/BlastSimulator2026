@@ -41,8 +41,9 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 2
         },
         {
           "type": "dragTiles",

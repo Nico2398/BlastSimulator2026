@@ -37,12 +37,9 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 5
         },
         {
           "type": "dragTiles",
@@ -91,16 +88,9 @@
       "description": "stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), so only amount needs adjusting: 3 decrement clicks on the amount stepper (data-field=\"amount\") reach boomite's minimum viable charge, 5->2kg, before Charge All (issue #479 follow-up, same class as Finding #4/the overcharge fix — verified against the real chargesByHole dump, not assumed).",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 2
         },
         {
           "type": "clickSelector",

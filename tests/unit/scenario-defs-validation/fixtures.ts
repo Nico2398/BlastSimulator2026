@@ -1,4 +1,4 @@
-import { scenarioFiles, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 
 // Shared constant fixtures for the scenario-defs-*.test.ts split (issue #703).
 // Not a test file — no `describe`/`it`, so vitest's test-file glob never
@@ -36,128 +36,36 @@ export const KNOWN_INTERACTION_ACTION_TYPES = [
   // condition-based alternative to padding with a flat `wait` for something
   // the browser settles asynchronously (PR #888). See InteractionStepAction.
   'waitForProperty',
+  // Drives a -/value/+ stepper to an explicit value instead of encoding it
+  // as a click count. See InteractionStepAction.
+  'setStepper',
 ] as const;
 
-export const PLAYTHROUGH_SCENARIO_NAMES = [
-  'tutorial-playthrough',
-  'level1-playthrough-win',
-  'level1-playthrough-revolt',
-  'level2-playthrough-win',
-  'level2-playthrough-bankruptcy',
-  'level3-playthrough-win',
-  'level3-playthrough-ecology',
-  'survey-then-blast-playthrough',
-] as const;
+/**
+ * Every definition whose name carries `-playthrough` — the long, campaign-
+ * shaped files `shape.test.ts` holds to a minimum step count and an
+ * inspection-command ending. Read from the directory, not hand-listed: a
+ * hand-maintained list silently skips any file nobody remembered to add
+ * (29 of 141 definitions were in no category list at all when this was
+ * derived), and a playthrough that dodges its own shape checks is exactly
+ * the file most likely to need them.
+ */
+export const PLAYTHROUGH_SCENARIO_NAMES: readonly string[] =
+  scenarioFiles(SCENARIO_DIR).filter((name) => name.includes('-playthrough'));
 
-export const FEATURE_SCENARIO_NAMES = [
-  'survey-then-blast',
-  'building-lifecycle',
-  'research-center-gate',
-  'skill-progression',
-  'multi-deck-blast',
-  'presplit-wall',
-  'needs-cycle',
-  'ramp-navigation',
-  'vibration-budget',
-  'vehicle-traffic',
-  'employee-training',
-  'blast-undercharge',
-  'blast-overcharge',
-  'collapse-recovery',
-  'contract-negotiation',
-  'weather-flood',
-  'blast-basic',
-  'blast-charge-loading-ui',
-  'blast-detonation-sequence-ui',
-  'blast-drill-plan-ui',
-  'blast-execution-effects',
-  'blast-preview-software-tiers',
-  'blast-report-metrics',
-  'blast-voxel-fragmentation',
-  'employee-skills-visual',
-  'level1-lose-arrest',
-  'level1-lose-bankruptcy',
-  'level1-lose-ecology',
-  'level1-lose-revolt',
-  'level1-win-conservative',
-  'level1-win-efficient',
-  'hauling-gate',
-  'economy-full-loop',
-  'maintenance-cost-drain',
-  'action-cancel',
-  'level-ground-then-build',
-] as const;
-
-export const VISUAL_SCENARIO_NAMES = [
-  'blast-drill-plan-visual',
-  'blast-charge-sequence-visual',
-  'blast-preview-tiers-visual',
-  'blast-execution-visual',
-  'blast-report-visual',
-  'blast-voxel-fragmentation-visual',
-  'blast-visual-full',
-  'employee-skill-progression-visual',
-  'needs-gauges-visual',
-  'needs-drain-visual',
-  'needs-morale-visual',
-  'needs-collapse-visual',
-  'needs-replenishment-visual',
-  'needs-proactive-queue-visual',
-  'needs-cost-visual',
-  'needs-shift-cycle-visual',
-  'nav-cell-types-visual',
-  'nav-move-costs-visual',
-  'nav-pathfinding-visual',
-  'nav-ramp-routing-visual',
-  'nav-dynamic-updates-visual',
-  'nav-path-following-visual',
-  'nav-minimap-integration-visual',
-  'core-loop-visual',
-  'economy-display-visual',
-  'contract-panel-visual',
-  'event-dialog-visual',
-  'scores-display-visual',
-  'time-management-visual',
-  'weather-display-visual',
-  'safety-projection-visual',
-  'save-load-visual',
-  'i18n-display-visual',
-  'employee-fatigue-pictograms',
-  'main-menu-visual',
-  'tutorial-steps-visual',
-  'building-menu-visual',
-  'building-placement-visual',
-  'building-tier-system-visual',
-  'building-training-visual',
-  'building-living-visual',
-  'building-warehouse-visual',
-  'building-research-visual',
-  'building-research-progression-visual',
-  'building-vehicle-depot-visual',
-  'building-ramp-visual',
-  'building-destruction-visual',
-  'vehicle-3d-rendering-visual',
-  'vehicle-driver-assignment-visual',
-  'vehicle-purchase-tier-ui-visual',
-  'vehicle-purchase-visual',
-  'vehicle-roles-panel-visual',
-  'vehicle-task-states-visual',
-  'vehicle-traffic-routing-visual',
-  'survey-confidence-display',
-  'survey-confidence-overlay',
-  'survey-execution',
-  'survey-method-selection',
-  'survey-ore-vein-visibility',
-  'survey-overlay-lifecycle',
-  'survey-post-blast-ore-report',
-  'survey-result-visualization',
-  'survey-seismic-side-effects',
-  'survey-stale-handling',
-  'tutorial-interactive',
-  'scene-picking-visual',
-  'landscape-continuity-visual',
-  'insufficient-funds-guards-visual',
-] as const;
+/**
+ * Every definition that declares a multi-angle `shots` array, whatever its
+ * name. The shots-shape check applies to the property, not to a naming
+ * convention: 20 files with a real `shots` array were unlisted under the old
+ * hand-written list and went unchecked, while four `-visual` files carry no
+ * `shots` at all (their per-step screenshots are the visual evidence) and
+ * must not be forced to.
+ */
+export const VISUAL_SCENARIO_NAMES: readonly string[] =
+  scenarioFiles(SCENARIO_DIR).filter((name) => {
+    const def = loadScenarioDef(name, SCENARIO_DIR) as { shots?: unknown };
+    return Array.isArray(def.shots) && def.shots.length > 0;
+  });
 
 /**
  * Scenarios that exercise the UI by clicking real controls rather than
@@ -171,7 +79,7 @@ export const UI_DRIVEN_SCENARIO_NAMES = [
 
 /**
  * Every scenario definition on disk, read from the directory rather than
- * concatenated from the three category lists above — the same rule
+ * concatenated from the category lists above — the same rule
  * `tests/unit/lint/`'s scenario lints already follow through
  * `scenarioFiles()`.
  *
@@ -180,9 +88,8 @@ export const UI_DRIVEN_SCENARIO_NAMES = [
  * this directory, and `building-construction-continuous-policy.json` was one
  * of them — its `role: 'setup'` step running `set_policy` sailed past the
  * `checkStepActionAllowed` lint below and only failed in CI's interaction
- * shard, on `main`, after merge. The category lists stay hand-written
- * because each one names a real category the checks below distinguish; the
- * "all of them" list must not be one of those.
+ * shard, on `main`, after merge. The category lists are derived from
+ * the same directory, each by the property its checks are about.
  */
 export const ALL_SCENARIO_NAMES: readonly string[] = scenarioFiles(SCENARIO_DIR);
 

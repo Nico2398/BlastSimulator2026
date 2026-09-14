@@ -10,6 +10,7 @@
 import type { Page } from 'puppeteer';
 import type { PlayerAction, InteractionGoal } from './interaction-types.js';
 import { awaitPlacementArmed, worldToScreenPoint } from './tile-picker.js';
+import { clickWithTransientRetry } from './click-retry.js';
 
 /** Mirror of src/ui/uiActionProbe.ts UiAction, kept structural to avoid a src import. */
 interface ProbedAction {
@@ -238,12 +239,25 @@ async function requireCanvasAt(page: Page, px: number, py: number, tile: string)
   );
 }
 
+/**
+ * Click a control the probe already called usable, retrying a refusal that
+ * reads as a re-render race, and report a real block as an
+ * InteractionFailure carrying the panel's own diagnosis.
+ */
+async function clickUsable(page: Page, selector: string, actionName: string): Promise<void> {
+  try {
+    await clickWithTransientRetry(page, selector, 'left', actionName);
+  } catch (err) {
+    throw new InteractionFailure((err as Error).message, describeAvailable(await probe(page)));
+  }
+}
+
 /** Run one player action, throwing InteractionFailure with a diagnosis on failure. */
 export async function runAction(page: Page, action: PlayerAction): Promise<void> {
   switch (action.do) {
     case 'click': {
       await requireUsable(page, action.selector, DEFAULT_TIMEOUT_MS);
-      await page.click(action.selector);
+      await clickUsable(page, action.selector, 'click');
       break;
     }
     case 'clickLabel': {
@@ -259,7 +273,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
           describeAvailable(actions),
         );
       }
-      await page.click(match.selector);
+      await clickUsable(page, match.selector, 'clickLabel');
       break;
     }
     case 'set': {

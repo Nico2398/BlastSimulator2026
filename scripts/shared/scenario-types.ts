@@ -98,6 +98,25 @@ export type InteractionStepAction =
   // copy that can drift from it.
   /** Set a form control's value the way typing or picking would. */
   | { type: 'set'; selector: string; value: string }
+  /**
+   * Drive a `-/value/+` stepper (dom.ts's `stepper`) to an exact value:
+   * `selector` names the `[data-field="…"]` container, `value` the figure
+   * its `.bsx-stepper-value` must read afterward. The executor reads the
+   * displayed value, clicks `+` or `-` through the same usability gate
+   * `clickSelector` uses, re-reads, and stops on a match — bounded by
+   * `maxClicks`, and failing by name if a click stops moving the value
+   * (the control's own clamp) before the target is reached.
+   *
+   * Replaces the count-encoded form — N `clickSelector`s on
+   * `.bsx-stepper-btn:last-child` — where N silently assumed the control's
+   * default. PR #1070's first red shard was a drag declared at `spacing:5`
+   * beside a strip still at its 3 m default; #1072 closed that for the grid
+   * tool's spacing with a lint that simulates the clicks, and this closes the
+   * class for every stepper by making the value explicit instead of derived.
+   * `tests/unit/lint/ScenarioStepperValueMatchesCommand.test.ts` pins that
+   * the value equals what the step's own command declares.
+   */
+  | { type: 'setStepper'; selector: string; value: number; maxClicks?: number; timeout?: number }
   /** Click the first usable control whose label matches (case-insensitive). */
   | { type: 'clickLabel'; label: string; region?: string }
   /** Wait for a selector to exist and be genuinely usable, not merely present. */
