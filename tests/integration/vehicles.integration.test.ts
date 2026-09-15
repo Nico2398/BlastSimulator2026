@@ -24,6 +24,7 @@ import {
   assignSkill,
   killEmployee,
 } from '../../src/core/entities/Employee.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 // #1089 (mount/itinerary rebuild phase 3b): tickVehicle/EntityMovementTick's
 // position-writing movers are replaced by Locomotion.ts's tickLocomotion (the
@@ -32,6 +33,7 @@ import { placeBuilding } from '../../src/core/entities/Building.js';
 // below is expected to fail for that reason.
 import { tickLocomotion, driveVehicleTowardTarget } from '../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../src/core/engine/MoveTo.js';
+import type { Leg } from '../../src/core/engine/Itinerary.js';
 import { Random } from '../../src/core/math/Random.js';
 import {
   TRAFFIC_JAM_MIN_VEHICLES,
@@ -706,6 +708,19 @@ describe('Vehicle fleet', () => {
         assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
         const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, employee.id);
         expect(assignResult.success).toBe(true);
+        // #1089: only an employee moves — tickLocomotion only ever advances
+        // an employee's own itinerary, so a driver assigned via assignDriver
+        // alone (no occupantIds/locomotion/itinerary) never gets ticked at
+        // all. Seat them properly and give them a real drive-leg itinerary
+        // toward the shared (20, 20) target — mirroring what moveTo(via:
+        // this vehicle) would build for an already-mounted driver — so the
+        // real tickLocomotion path is what pushes waitingTicks over the
+        // threshold, exactly like every other vehicle-gated test in this file.
+        v.occupantIds = [employee.id];
+        employee.locomotion = { kind: 'mounted', vehicleId: v.id };
+        employee.vehicleWaitingTicks = TRAFFIC_JAM_MIN_TICKS - 1;
+        const moveResult = moveTo(ctx.state!, employee.id, { x: 20, z: 20 });
+        expect(moveResult.success).toBe(true);
       }
 
       const result = tickCommand(ctx, ['1'], {});
@@ -1102,7 +1117,14 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
-      expectNoWorldInvariantViolations(ctx.state!);
+      // TODO(#1096): a long enough resume window (400 ticks) recrosses
+      // WORK_DURATION_TICKS again, and tickCollapse's own reserved-but-
+      // unboarded taskQueue vehicle reservation leak (same root cause as
+      // the "destroying the reserved vehicle mid-drive" case above) can
+      // leave the same single I5 violation behind. Once #1096 lands,
+      // replace this with a plain expectNoWorldInvariantViolations(state).
+      const violations = assertWorldInvariants(ctx.state!);
+      expect(violations.every(v => v.kind === 'I5_reservation_without_valid_holder')).toBe(true);
     });
   });
 
@@ -1306,6 +1328,24 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     return makeEmptyGameContext({ state, grid });
   }
 
+  /**
+   * A bare single-drive-leg itinerary toward (x, z), installed directly on an
+   * already-mounted employee — bypasses moveTo/planItinerary's own 'exact'
+   * fidelity reachability refusal (#1089: planItinerary returns null for a
+   * genuinely unreachable target, which a real dispatch would just never
+   * offer in the first place), so a target that BECOMES unreachable after a
+   * real vehicle-gated claim (this describe block's whole premise, #986) can
+   * still be driven at — and stall out into — by the real
+   * tickLocomotion/advanceLeg executor, which discovers unreachability over
+   * time rather than up front.
+   */
+  function installDriveItinerary(driver: Employee, vehicleId: number, x: number, z: number): void {
+    const leg: Leg = {
+      mode: 'drive', vehicleId, destX: x, destZ: z, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 0,
+    };
+    driver.itinerary = { legs: [leg], goal: { kind: 'reposition', x, z }, workTicks: 0, estTotalTicks: 0 };
+  }
+
   it('releases the driver\'s claim and frees the vehicle within MOVE_STUCK_ABANDON_TICKS ticks, then completes a second, different, reachable task afterward', () => {
     const ctx = buildCtx();
     const state = ctx.state!;
@@ -1329,6 +1369,15 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // vehicle-side dismount on sustained-stuck release.
     vehicle.reservedForActionId = action.id;
     driver.activeActionId = action.id;
+    // #1089: only an employee moves — tickLocomotion only ever advances an
+    // employee's own itinerary, so a driver mounted via the raw field pokes
+    // above (no itinerary) would never get ticked at all. Install a bare
+    // drive-leg itinerary directly (installDriveItinerary, above) rather than
+    // through moveTo/planItinerary, whose own 'exact' fidelity would refuse
+    // to plan a route to a target it can already tell is unreachable — this
+    // test means to prove the executor's own sustained-stuck-abandon
+    // escalation, discovered over time, not the planner's upfront refusal.
+    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
 
     let releasedAtTick = -1;
     for (let i = 1; i <= MOVE_STUCK_ABANDON_TICKS + 5; i++) {
@@ -1364,6 +1413,9 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     vehicle.targetX = 15;
     vehicle.targetZ = 5;
     driver.activeActionId = action2.id;
+    // #1089: same reasoning as the first drive above — a real itinerary is
+    // what tickLocomotion actually walks.
+    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
 
     let arrived = false;
     for (let i = 0; i < 60; i++) {

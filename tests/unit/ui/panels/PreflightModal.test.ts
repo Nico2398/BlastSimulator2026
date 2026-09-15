@@ -127,6 +127,7 @@ describe('PreflightModal', () => {
       pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
       pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
       taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
     });
 
     modal.update(state, 'sunny');

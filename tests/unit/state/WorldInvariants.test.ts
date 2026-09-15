@@ -200,54 +200,56 @@ describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)
   });
 });
 
-// ── I4: moving vehicle without driver ───────────────────────────────────────
+// ── I4: vehicle moved without occupant (#1089) ──────────────────────────────
+// Mount/itinerary phase 3b retargeted I4 from a driverId/state-based check
+// (moving/haulingPhase/breakPhase implying a driver) to a position-delta
+// check against vehiclePositionsAtTickStart — a vehicle only ever moves as a
+// side effect of its occupant's own locomotion now (WorldInvariants.ts's own
+// #1089 header comment).
 
-describe('assertWorldInvariants — I4_moving_vehicle_without_driver', () => {
-  it('no violation when a moving vehicle has a driver aboard', () => {
+describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', () => {
+  it('vacuously satisfied with no vehiclePositionsAtTickStart snapshot supplied', () => {
     const state = makeState();
-    const emp = addEmployee(state, { x: 0, z: 0 });
-    addVehicle(state, { state: 'moving', driverId: emp.id, x: 0, z: 0 });
+    addVehicle(state, { x: 10, z: 10, occupantIds: [] });
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('no violation for an idle, undriven vehicle', () => {
+  it('no violation when an unoccupied vehicle stayed exactly where it was at tick start', () => {
     const state = makeState();
-    addVehicle(state, { state: 'idle', driverId: null, haulingPhase: null, breakPhase: null });
+    const v = addVehicle(state, { x: 10, z: 10, occupantIds: [] });
+    const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    expect(assertWorldInvariants(state)).toEqual([]);
+    expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('violation when state is "moving" but driverId is null', () => {
+  it('no violation when an occupied vehicle moved this tick', () => {
     const state = makeState();
-    const v = addVehicle(state, { state: 'moving', driverId: null });
+    const emp = addEmployee(state, { x: 15, z: 15 });
+    const v = addVehicle(state, { x: 15, z: 15, occupantIds: [emp.id] });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I4_moving_vehicle_without_driver');
-    expect(violations[0]!.vehicleId).toBe(v.id);
+    expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('violation when haulingPhase is set but driverId is null', () => {
+  it('no violation for a vehicle with no baseline entry (created this tick)', () => {
     const state = makeState();
-    const v = addVehicle(state, { state: 'idle', haulingPhase: 'to_fragment', driverId: null });
+    addVehicle(state, { x: 15, z: 15, occupantIds: [] });
+    const snapshot = new Map<number, { x: number; z: number }>(); // no entry at all
 
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I4_moving_vehicle_without_driver');
-    expect(violations[0]!.vehicleId).toBe(v.id);
+    expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('violation when breakPhase is set but driverId is null', () => {
+  it('violation when an unoccupied vehicle\'s position differs from its tick-start snapshot', () => {
     const state = makeState();
-    const v = addVehicle(state, { state: 'idle', breakPhase: 'to_boulder', driverId: null });
+    const v = addVehicle(state, { x: 15, z: 15, occupantIds: [] });
+    const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    const violations = assertWorldInvariants(state);
+    const violations = assertWorldInvariants(state, snapshot);
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I4_moving_vehicle_without_driver');
+    expect(violations[0]!.kind).toBe('I4_vehicle_moved_without_occupant');
     expect(violations[0]!.vehicleId).toBe(v.id);
   });
 });
@@ -312,84 +314,96 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
   });
 });
 
-// ── I6: destination partially set ───────────────────────────────────────────
+// ── I6: empty itinerary (#1089) ──────────────────────────────────────────────
+// Mount/itinerary phase 3b retargeted I6 from a partially-set legacy
+// destinationX/Z check to "an itinerary must never sit empty instead of
+// being cleared to null" (WorldInvariants.ts's own #1089 header comment).
 
-describe('assertWorldInvariants — I6_destination_partially_set', () => {
-  it('no violation when both destinationX and destinationZ are null', () => {
+describe('assertWorldInvariants — I6_empty_itinerary (#1089)', () => {
+  it('no violation when itinerary is null', () => {
     const state = makeState();
-    addEmployee(state, { destinationX: null, destinationZ: null });
+    addEmployee(state, {});
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('no violation when both destinationX and destinationZ are set', () => {
+  it('no violation when the itinerary carries at least one leg', () => {
     const state = makeState();
-    addEmployee(state, { destinationX: 5, destinationZ: 5 });
+    const emp = addEmployee(state, {});
+    emp.itinerary = {
+      legs: [{ mode: 'foot', vehicleId: null, destX: 5, destZ: 5, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1 }],
+      goal: { kind: 'reposition', x: 5, z: 5 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    };
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('violation when destinationX is set but destinationZ is null', () => {
+  it('violation when the itinerary is non-null but its legs array is empty', () => {
     const state = makeState();
-    const emp = addEmployee(state, { destinationX: 5, destinationZ: null });
+    const emp = addEmployee(state, {});
+    emp.itinerary = { legs: [], goal: { kind: 'reposition', x: 5, z: 5 }, workTicks: 0, estTotalTicks: 0 };
 
     const violations = assertWorldInvariants(state);
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I6_destination_partially_set');
-    expect(violations[0]!.employeeId).toBe(emp.id);
-  });
-
-  it('violation when destinationZ is set but destinationX is null', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { destinationX: null, destinationZ: 5 });
-
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I6_destination_partially_set');
+    expect(violations[0]!.kind).toBe('I6_empty_itinerary');
     expect(violations[0]!.employeeId).toBe(emp.id);
   });
 });
 
-// ── I7: in-progress vehicle action driver mismatch ──────────────────────────
+// ── I7: drive leg without mount (#1089) ─────────────────────────────────────
+// Mount/itinerary phase 3b retargeted I7 from an in-progress-action/driverId
+// mismatch check to "a drive leg's employee must actually be mounted in that
+// leg's vehicle" (WorldInvariants.ts's own #1089 header comment).
 
-describe('assertWorldInvariants — I7_in_progress_vehicle_action_driver_mismatch', () => {
-  it('no violation when the reserved vehicle\'s driver matches the action\'s holder', () => {
+describe('assertWorldInvariants — I7_drive_leg_without_mount (#1089)', () => {
+  it('no violation when the current leg is a foot leg (drive-leg check does not apply)', () => {
     const state = makeState();
-    const emp = addEmployee(state, { x: 0, z: 0 });
-    const v = addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
-    const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', status: 'in_progress', holderId: emp.id });
-    v.reservedForActionId = action.id;
+    const emp = addEmployee(state, {});
+    emp.itinerary = {
+      legs: [{ mode: 'foot', vehicleId: null, destX: 5, destZ: 5, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1 }],
+      goal: { kind: 'reposition', x: 5, z: 5 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    };
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('no violation when no vehicle is reserved for the in-progress action at all (skipped, not violated)', () => {
+  it('no violation when the current leg is a drive leg and the employee is mounted in that exact vehicle', () => {
     const state = makeState();
+    const v = addVehicle(state, { x: 0, z: 0, occupantIds: [] });
     const emp = addEmployee(state, { x: 0, z: 0 });
-    addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', status: 'in_progress', holderId: emp.id });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = [emp.id];
+    emp.itinerary = {
+      legs: [{ mode: 'drive', vehicleId: v.id, destX: 5, destZ: 5, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1 }],
+      goal: { kind: 'reposition', x: 5, z: 5 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    };
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('violation when the reserved vehicle\'s driverId disagrees with the in-progress action\'s holderId', () => {
+  it('violation when the current leg is a drive leg but the employee is not mounted in that vehicle', () => {
     const state = makeState();
+    const v = addVehicle(state, { x: 0, z: 0, occupantIds: [] });
     const emp = addEmployee(state, { x: 0, z: 0 });
-    const otherEmp = addEmployee(state, { x: 1, z: 1 });
-    const v = addVehicle(state, { driverId: otherEmp.id, x: 1, z: 1 });
-    const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', status: 'in_progress', holderId: emp.id });
-    v.reservedForActionId = action.id;
-    // Keep this I5-valid (holder mid-walk to board its own reservation) so only
-    // I7's stricter "already driving" check fires — I5 doesn't distinguish
-    // in_progress from any other status and would otherwise double-count.
-    emp.pendingDriverVehicleId = v.id;
+    emp.itinerary = {
+      legs: [{ mode: 'drive', vehicleId: v.id, destX: 5, destZ: 5, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1 }],
+      goal: { kind: 'reposition', x: 5, z: 5 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    };
 
     const violations = assertWorldInvariants(state);
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I7_in_progress_vehicle_action_driver_mismatch');
-    expect(violations[0]!.actionId).toBe(action.id);
+    expect(violations[0]!.kind).toBe('I7_drive_leg_without_mount');
+    expect(violations[0]!.employeeId).toBe(emp.id);
     expect(violations[0]!.vehicleId).toBe(v.id);
   });
 });

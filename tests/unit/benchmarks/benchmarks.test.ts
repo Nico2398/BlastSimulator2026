@@ -181,6 +181,8 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
       pendingDriverVehicleId: null,
       taskQueue: [],
       locomotion: { kind: 'on_foot' },
+      itinerary: null,
+      vehicleWaitingTicks: 0,
     });
   }
 

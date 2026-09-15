@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
@@ -50,10 +50,26 @@ function makeIdleHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   const vehicle = makeIdleHauler(state, x, z);
   const rng = new Random(SEED);
-  const { employee } = hireEmployee(state.employees, 'driver', rng);
+  const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.truck', 1);
+  // #1089: driveVehicleTowardTarget (Locomotion.ts) reads the driver off
+  // vehicle.occupantIds[0], not the driverId mirror alone.
   vehicle.driverId = employee.id;
+  vehicle.occupantIds = [employee.id];
+  employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
+}
+
+/**
+ * Moves a driven vehicle AND its mounted driver together (I2) —
+ * driveVehicleTowardTarget (Locomotion.ts) reads arrival off the DRIVER's
+ * own position, not the vehicle's.
+ */
+function moveVehicleAndDriver(state: ReturnType<typeof createGame>, vehicle: Vehicle, x: number, z: number): void {
+  vehicle.x = x;
+  vehicle.z = z;
+  const driver = state.employees.employees.find(e => e.id === vehicle.occupantIds[0]);
+  if (driver) { driver.x = x; driver.z = z; }
 }
 
 function placeWarehouse(state: ReturnType<typeof createGame>, x: number, z: number) {
@@ -226,8 +242,7 @@ describe('tickHaulingProgress — travelling', () => {
 
     // Still en route: task is 'moving' and position has not reached the fragment.
     vehicle.task = 'moving';
-    vehicle.x = 1;
-    vehicle.z = 1;
+    moveVehicleAndDriver(state, vehicle, 1, 1);
 
     tickHaulingProgress(state, vehicle);
 
@@ -248,8 +263,7 @@ describe('tickHaulingProgress — arrival at fragment', () => {
 
     // Arrived: task idle, position matches the fragment.
     vehicle.task = 'idle';
-    vehicle.x = 5;
-    vehicle.z = 5;
+    moveVehicleAndDriver(state, vehicle, 5, 5);
 
     tickHaulingProgress(state, vehicle);
 
@@ -272,8 +286,7 @@ describe('tickHaulingProgress — arrival at depot', () => {
 
     // First leg: arrive at fragment, load it.
     vehicle.task = 'idle';
-    vehicle.x = 5;
-    vehicle.z = 5;
+    moveVehicleAndDriver(state, vehicle, 5, 5);
     tickHaulingProgress(state, vehicle);
     expect(state.logistics.fragments[0]!.state).toBe('in_transit');
 
@@ -281,8 +294,7 @@ describe('tickHaulingProgress — arrival at depot', () => {
 
     // Second leg: arrive at the depot.
     vehicle.task = 'idle';
-    vehicle.x = warehouse.x;
-    vehicle.z = warehouse.z;
+    moveVehicleAndDriver(state, vehicle, warehouse.x, warehouse.z);
     tickHaulingProgress(state, vehicle);
 
     expect(state.logistics.fragments[0]!.state).toBe('stored');
@@ -491,8 +503,7 @@ describe('tickHaulingProgress — NavGrid fragment-occupancy clearing (#954)', (
 
     // Arrived: task idle, position matches the fragment.
     vehicle.task = 'idle';
-    vehicle.x = 5;
-    vehicle.z = 5;
+    moveVehicleAndDriver(state, vehicle, 5, 5);
 
     tickHaulingProgress(state, vehicle);
 

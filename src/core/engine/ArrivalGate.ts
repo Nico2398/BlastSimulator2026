@@ -7,11 +7,14 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
+import { seedTaskTimerFields } from './ActionSelection.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -50,8 +53,12 @@ export interface ArrivalGateResult {
  * foot-only mover, itinerary nulled by the itinerary mover, on arrival
  * (#1089) — this module reuses those signals rather than tracking arrival a
  * second way.
+ *
+ * `grid`, when provided, is threaded through to a vehicle-gated action's own
+ * seedTaskTimerFields call below so a `dig_ramp_segment` action's duration
+ * can be computed off the live voxel count (#924).
  */
-export function tickArrivalGate(state: GameState, emitter?: EventEmitter): ArrivalGateResult {
+export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
   // Dismount any evacuation driver whose vehicle has reached its
   // pendingEvacuationDestination this tick (#1042) — before the employee/
   // vehicle loops below, so a just-arrived driver is free to be picked up by
@@ -106,6 +113,35 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       // handler blind to what it just did (see survey.integration.test.ts).
       result.taskStarted.push(emp.id);
       workStarted = true;
+    } else if (emp.taskTicksRemaining === null && emp.activeActionId !== null) {
+      // A vehicle-gated action's own work timer is never staged at claim
+      // time (VehicleReservation.promoteVehicleGatedAction's own doc
+      // comment, #1089) — compute and start it here instead, the instant
+      // the employee (and, by I2, their vehicle) actually reaches the
+      // target, mirroring the pre-itinerary vehicle-drive loop's identical
+      // deferral. haul_debris/fragment_debris are excluded — their own
+      // phase machinery (HaulingTask.ts/BoulderBreaking.ts) drives
+      // completion instead, so seeding a work timer for them here would
+      // race it. Also requires the employee to still be genuinely mounted
+      // in the vehicle reserved for this action — "arrived" (itinerary ===
+      // null) also covers a drive leg that just ABORTED (its vehicle
+      // destroyed/reassigned underneath it, Locomotion.advanceLeg), which
+      // leaves the employee back on_foot with the same activeActionId still
+      // set; that case must fall through to reconcileVehicleReservations's
+      // own interruption below instead of being mistaken for a real arrival.
+      const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+      if (action && action.requiredVehicleRole !== null
+        && action.type !== 'haul_debris' && action.type !== 'fragment_debris') {
+        const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+        if (vehicle && isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id) {
+          seedTaskTimerFields(state, emp, action, grid);
+          emp.taskTicksRemaining = emp.pendingTaskDuration!;
+          emp.activeTaskTotalTicks = emp.pendingTaskDuration!;
+          emp.pendingTaskDuration = null;
+          result.taskStarted.push(emp.id);
+          workStarted = true;
+        }
+      }
     }
 
     // The employee has physically reached the target and started working —

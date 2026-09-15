@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { processShiftCycle } from '../../../src/core/engine/ShiftCycle.js';
 import { tickGeneralRestCompletion } from '../../../src/core/engine/RestCompletion.js';
@@ -32,7 +32,7 @@ import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
  * common case below, both at (0,0)) to resolve that walk in one step.
  */
 function resolveArrival(state: GameState): void {
-  tickEmployeeMovement(state);
+  tickLocomotion(state);
   tickArrivalGate(state);
 }
 

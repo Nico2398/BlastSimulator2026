@@ -17,8 +17,8 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/balance.js';
@@ -176,6 +176,9 @@ describe('tickLocomotion', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    // A real board() call (unlike this file's other fixtures, which set
+    // occupantIds/locomotion directly) enforces the role's licence.
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     // 1 cell away — well within a single tick's AGENT_WALK_SPEED (2).
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 0);
 

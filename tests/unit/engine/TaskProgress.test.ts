@@ -7,7 +7,7 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
-import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
@@ -24,7 +24,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
  * common case below, both at (0,0)) to resolve that walk in one step.
  */
 function resolveArrival(state: GameState): void {
-  tickEmployeeMovement(state);
+  tickLocomotion(state);
   tickArrivalGate(state);
 }
 

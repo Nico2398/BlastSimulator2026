@@ -36,10 +36,11 @@ function addDrillRig(ctx: MiningContext): number {
  * Fields every Employee needs beyond the identity/role/qualification basics —
  * factored out so the three fixture builders below stay in sync with the
  * Employee interface (issue #437 added several "pending" and "destination"
- * fields; a fixture missing them isn't a type error in test files — tests
- * aren't typechecked — but tickCommand's movement/arrival-gate pipeline reads
- * them directly and crashes on `undefined` rather than failing a clean
- * assertion).
+ * fields). `tests/tsconfig.json` does typecheck this file, so a fixture
+ * missing one of these is a build-time error today — but tickCommand's
+ * movement/arrival-gate pipeline reads them directly at runtime too, and an
+ * `any`-cast fixture would crash on `undefined` rather than failing a clean
+ * assertion.
  */
 function employeeMovementDefaults(): Omit<
   Employee,
@@ -67,6 +68,8 @@ function employeeMovementDefaults(): Omit<
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
     taskQueue: [],
+    itinerary: null,
+    vehicleWaitingTicks: 0,
   };
 }
 

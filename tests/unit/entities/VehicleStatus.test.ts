@@ -5,7 +5,10 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { moveTo } from '../../../src/core/engine/MoveTo.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/balance.js';
 
@@ -90,13 +93,14 @@ describe('computeVehicleStatus', () => {
     state.navGrid = NavGrid.buildNavGrid(vg, [], []);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
-    // #947: canTickVehicle now requires a driver aboard to advance on tick at
-    // all -- a driverless vehicle never moves, everywhere in the game.
-    vehicle.driverId = 1;
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 4;
-    vehicle.targetZ = 1;
+    // #1089: only an employee moves — a real, licensed, boarded driver with a
+    // genuine drive-leg itinerary is what tickLocomotion actually walks
+    // (mirrors the old #947 driver-required-to-advance rule, driven through
+    // the new mover instead of a dangling fake employee id).
+    const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(1), 0, 1);
+    vehicle.occupantIds = [driver.id];
+    vehicle.driverId = driver.id;
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Stationary blocker sitting on the only possible route — never ticked.
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
@@ -104,8 +108,10 @@ describe('computeVehicleStatus', () => {
     blocker.state = 'idle';
 
     const emitter = new EventEmitter();
+    const moveResult = moveTo(state, driver.id, { x: 4, z: 1 });
+    expect(moveResult.success).toBe(true);
     for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
-      tickVehicle(state, vehicle, emitter);
+      tickLocomotion(state, emitter);
     }
 
     expect(vehicle.isMoveStuck).toBe(true); // sanity: the fixture actually escalated

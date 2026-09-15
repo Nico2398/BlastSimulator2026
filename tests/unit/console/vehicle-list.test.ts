@@ -6,7 +6,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
-import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
@@ -32,6 +32,8 @@ const EMPLOYEE_DEFAULTS = {
   pendingActionPayload: null,
   pendingDriverVehicleId: null,
   locomotion: { kind: 'on_foot' },
+  itinerary: null,
+  vehicleWaitingTicks: 0,
 } as const;
 
 /**
@@ -40,7 +42,7 @@ const EMPLOYEE_DEFAULTS = {
  * movement + arrival-gate tick resolves it (the employee is already there).
  */
 function resolveDriverBoarding(ctx: MiningContext): void {
-  tickEmployeeMovement(ctx.state!, ctx.emitter);
+  tickLocomotion(ctx.state!, ctx.emitter);
   tickArrivalGate(ctx.state!, ctx.emitter);
 }
 

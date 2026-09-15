@@ -7,7 +7,7 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
 
-export type MoveResult = { success: true } | { success: false; error: string };
+type MoveResult = { success: true } | { success: false; error: string };
 
 /** Walk to (x, z), optionally via a named vehicle (a hint, not a command). */
 export function moveTo(

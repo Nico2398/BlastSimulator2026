@@ -9,7 +9,7 @@ import { tickEmployees, employeeWorkState } from '../../../src/core/engine/Emplo
 import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
 import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
-import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { completePendingAction, dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
 import { tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../../src/core/engine/VehicleContinuity.js';
@@ -41,7 +41,7 @@ import {
  * common case below, both at (0,0)) to resolve that walk in one step.
  */
 function resolveArrival(state: GameState): void {
-  tickEmployeeMovement(state);
+  tickLocomotion(state);
   tickArrivalGate(state);
 }
 
@@ -420,7 +420,7 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
    */
   function runFullTick(state: GameState): void {
     tickEmployees(state);
-    tickEmployeeMovement(state);
+    tickLocomotion(state);
     tickArrivalGate(state);
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
@@ -552,7 +552,7 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     // Settle dispatch across several ticks without letting anything complete.
     for (let i = 0; i < 10; i++) {
       tickEmployees(state);
-      tickEmployeeMovement(state);
+      tickLocomotion(state);
       tickArrivalGate(state);
 
       const heldByEmployee = state.pendingActions.filter(
@@ -642,7 +642,7 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     // action sitting untouched right next to them.
     for (let i = 0; i < 5; i++) {
       tickEmployees(state);
-      tickEmployeeMovement(state);
+      tickLocomotion(state);
       tickArrivalGate(state);
       if (employee.activeActionId === openPoolCandidate.id) break;
     }
@@ -1400,7 +1400,7 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
    */
   function runFullTickAndLandDrilledHoles(state: GameState): string[] {
     tickEmployees(state);
-    tickEmployeeMovement(state);
+    tickLocomotion(state);
     tickArrivalGate(state);
 
     const landed: string[] = [];
@@ -1546,7 +1546,7 @@ describe('charge_hole actions — dispatch and landing (#554)', () => {
    */
   function runFullTickAndLandLoadedCharges(state: GameState): string[] {
     tickEmployees(state);
-    tickEmployeeMovement(state);
+    tickLocomotion(state);
     tickArrivalGate(state);
 
     const landed: string[] = [];
@@ -1705,7 +1705,7 @@ describe('dig_ramp_segment actions — vehicle-gated dispatch and driving.excava
     // timer is finally seeded.
     let seededAt = -1;
     for (let i = 0; i < 100 && employee.taskTicksRemaining === null; i++) {
-      tickEmployeeMovement(state);
+      tickLocomotion(state);
       tickArrivalGate(state);
       if (employee.taskTicksRemaining !== null) seededAt = i;
     }

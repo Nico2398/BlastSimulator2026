@@ -13,10 +13,11 @@ type MountResult = { success: true } | { success: false; error: string };
 
 /**
  * Whether two points are within one tile of each other (Chebyshev distance
- * <= 1) — the shared "close enough to board" test used both here and by
- * ArrivalGate's own boarding-arrival check.
+ * <= 1) — the "close enough to board" test `board` itself uses. Locomotion.ts's
+ * own adjacent-arrival leg check (#1089) computes the identical Chebyshev
+ * test inline rather than importing this, so it stays module-private.
  */
-export function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): boolean {
+function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): boolean {
   return Math.max(Math.abs(ax - bx), Math.abs(az - bz)) <= 1;
 }
 
@@ -51,6 +52,15 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   employee.x = vehicle.x;
   employee.z = vehicle.z;
   employee.locomotion = { kind: 'mounted', vehicleId };
+
+  // #1083's lifetime counter — every prior mover (requestBoardVehicle/
+  // ArrivalGate.resolveBoarding, pre-#1089) incremented it on a successful
+  // board; this is now the one place a board ever succeeds. Scoped to the
+  // seat that actually becomes the driver (occupantIds[0]) rather than every
+  // successful board, so a future multi-seat passenger doesn't inflate it.
+  if (vehicle.driverId === employeeId) {
+    state.vehicles.driverBoardingCount++;
+  }
 
   emitter?.emit('employee:mounted', { employeeId, vehicleId });
   emitter?.emit('vehicle:driver_boarded', { employeeId, vehicleId });

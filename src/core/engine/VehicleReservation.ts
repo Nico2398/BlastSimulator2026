@@ -13,15 +13,13 @@
 // caller instead of performing the interruption itself — see
 // reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
 // caller, which already imports both modules safely.
-// Two cycles exist through this module's own imports (#1089): MoveTo.ts ->
-// PlanItinerary.ts -> findFreeVehicleForRole (here), and ActionSelection.ts ->
-// findFreeVehicleForRole (here) while this module imports seedTaskTimerFields
-// from ActionSelection.ts. Both are safe for the same reason the
-// EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle that used to run
-// through here was safe: every import is a function declaration, called only
-// from inside other function bodies, never evaluated at module-load time —
-// ESM resolves the cycle fine as long as nothing at the top level reads a
-// not-yet-initialized binding.
+// A cycle exists through this module's own imports (#1089): MoveTo.ts ->
+// PlanItinerary.ts -> findFreeVehicleForRole (here). Safe for the same
+// reason the EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle that
+// used to run through here was safe: every import is a function
+// declaration, called only from inside other function bodies, never
+// evaluated at module-load time — ESM resolves the cycle fine as long as
+// nothing at the top level reads a not-yet-initialized binding.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -29,7 +27,6 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
-import { seedTaskTimerFields } from './ActionSelection.js';
 import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { alight } from './Mount.js';
 
@@ -210,13 +207,19 @@ export function findVehicleForClaim(
  * for this action at claim time. Called by EmployeeDispatchSteps.ts's
  * promoteActionToActive when action.requiredVehicleRole is set.
  *
- * Stages the work timer (seedTaskTimerFields) now, exactly like an on-foot
- * action's own claim (promoteActionToActive's non-vehicle branch) — safe
- * because ArrivalGate.tickArrivalGate's "arrived" check only promotes it once
- * the employee's itinerary clears, and an itinerary clears only at the real
- * target, not at the vehicle (#1089). haul_debris/fragment_debris are the one
- * exception: their own phase machinery (HaulingTask.ts/BoulderBreaking.ts)
- * drives completion instead, so staging a work timer for them would race it.
+ * Deliberately does NOT call seedTaskTimerFields here — that only happens
+ * once the EMPLOYEE (and, by I2, their vehicle) reaches action.targetX/
+ * targetZ, via ArrivalGate.tickArrivalGate's own vehicle-gated branch
+ * (#1089, mirrors the pre-itinerary vehicle-drive loop's identical
+ * deferral). Staying null during the whole walk/drive is also what keeps
+ * this action interruptible mid-drive by ForceShiftRest.ts's legacy path
+ * (its own `pendingTaskDuration !== null` guard, #922) and what keeps
+ * `dig_ramp_segment`'s own live-voxel-count duration formula reading the
+ * grid at actual arrival rather than at claim time, before an externally
+ * timed clearing has had a chance to land (#924). haul_debris/fragment_debris
+ * are driven end to end by their own phase machinery
+ * (HaulingTask.ts/BoulderBreaking.ts) regardless — they never seed a work
+ * timer through this path at all.
  */
 export function promoteVehicleGatedAction(state: GameState, employee: Employee, action: PendingAction): void {
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
@@ -228,10 +231,6 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
 
   const continuity = vehicle.driverId === employee.id;
   const isFragmentGated = action.type === 'haul_debris' || action.type === 'fragment_debris';
-
-  if (!isFragmentGated) {
-    seedTaskTimerFields(state, employee, action);
-  }
 
   // #1089: a fresh boarding and the continuity case (already driving this
   // vehicle) both collapse into one moveTo call — planItinerary drops the
@@ -303,11 +302,13 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  *
  * Shared by releaseVehicleReservation, whose `findAndAbortReservedVehicle`
  * already aborts as part of clearing the reservation (a second, idempotent
- * abort here is a harmless no-op in that case), and by
- * EntityMovementTick.ts's sustained-stuck release for a vehicle driven with
- * no PendingAction/reservation at all — that caller holds the vehicle
- * directly and has nothing to look up by actionId, so it calls this instead
- * of releaseVehicleReservation.
+ * abort here is a harmless no-op in that case), and by Locomotion.ts's own
+ * sustained-stuck release (advanceLeg's abandon branch) for a vehicle driven
+ * with no PendingAction at all (a manual `vehicle driver`/`vehicle haul`
+ * console command) — interruptActiveAction(..., actionId: null, ...) is a
+ * no-op in that case (nothing to release via an action), so that caller
+ * holds the vehicle directly and calls this instead of going through
+ * releaseVehicleReservation.
  */
 export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   abortVehicleGatedFragmentWork(state, vehicle);
@@ -411,6 +412,18 @@ export interface VehicleGoneInterruption {
 export function reconcileVehicleReservations(state: GameState): VehicleGoneInterruption[] {
   // (a) / (b): every still-reserved vehicle whose PendingAction vanished or
   // whose reserving employee died — release the reservation outright.
+  // (d, #928): the vehicle's own driver is alive and resolves fine, but has
+  // since moved on to something else entirely (activeActionId no longer
+  // names this reservation's own action) without going through the ordinary
+  // interruptActiveAction -> releaseVehicleReservation chain — e.g. a rest-
+  // completion handler that reassigns activeActionId directly rather than
+  // interrupting the stale vehicle-gated claim first (#928's own original
+  // repro: RestCompletion.ts/ShiftCycle.ts). #1089 deleted the dedicated
+  // per-tick vehicle-drive loop that used to carry this exact staleness
+  // check (ArrivalGate.ts's old holder.activeActionId !== action.id guard,
+  // right before promoting a just-arrived vehicle's work timer) — this is
+  // that same guard, restored here since nothing else sweeps every reserved,
+  // driven vehicle unconditionally each tick any more.
   for (const vehicle of state.vehicles.vehicles) {
     if (vehicle.reservedForActionId === null) continue;
     const actionId = vehicle.reservedForActionId;
@@ -421,7 +434,13 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       continue;
     }
 
-    if (!resolveReservationHolder(state, vehicle, action)) {
+    const holder = resolveReservationHolder(state, vehicle, action);
+    if (!holder) {
+      releaseVehicleReservation(state, actionId);
+      continue;
+    }
+
+    if (vehicle.driverId === holder.id && holder.activeActionId !== actionId) {
       releaseVehicleReservation(state, actionId);
     }
   }

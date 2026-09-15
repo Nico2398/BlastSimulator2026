@@ -32,6 +32,8 @@ function addEmployee(state: GameState, x: number, z: number): Employee {
     pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
     pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
     taskQueue: [], locomotion: { kind: 'on_foot' },
+    itinerary: null,
+    vehicleWaitingTicks: 0,
   };
   state.employees.employees.push(emp);
   return emp;

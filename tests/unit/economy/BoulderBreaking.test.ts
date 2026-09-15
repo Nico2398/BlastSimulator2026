@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
@@ -44,10 +44,26 @@ function makeIdleFragmenter(state: ReturnType<typeof createGame>, x = 0, z = 0) 
 function makeDrivenFragmenter(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   const vehicle = makeIdleFragmenter(state, x, z);
   const rng = new Random(SEED);
-  const { employee } = hireEmployee(state.employees, 'driver', rng);
+  const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.excavator', 1);
+  // #1089: driveVehicleTowardTarget (Locomotion.ts) reads the driver off
+  // vehicle.occupantIds[0], not the driverId mirror alone.
   vehicle.driverId = employee.id;
+  vehicle.occupantIds = [employee.id];
+  employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
+}
+
+/**
+ * Moves a driven vehicle AND its mounted driver together (I2) —
+ * driveVehicleTowardTarget (Locomotion.ts) reads arrival off the DRIVER's
+ * own position, not the vehicle's.
+ */
+function moveVehicleAndDriver(state: ReturnType<typeof createGame>, vehicle: Vehicle, x: number, z: number): void {
+  vehicle.x = x;
+  vehicle.z = z;
+  const driver = state.employees.employees.find(e => e.id === vehicle.occupantIds[0]);
+  if (driver) { driver.x = x; driver.z = z; }
 }
 
 // ── requestBreakBoulder — precondition failures ─────────────────────────────
@@ -172,8 +188,7 @@ describe('tickBreakProgress — arrival at the boulder', () => {
     requestBreakBoulder(state, vehicle.id, 1);
 
     // Arrived: vehicle position matches the break target.
-    vehicle.x = vehicle.targetX;
-    vehicle.z = vehicle.targetZ;
+    moveVehicleAndDriver(state, vehicle, vehicle.targetX, vehicle.targetZ);
 
     const brokenId = tickBreakProgress(state, vehicle);
 
@@ -226,8 +241,7 @@ describe('tickBreakProgress — NavGrid fragment-occupancy transfer (#954)', () 
     expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
 
     requestBreakBoulder(state, vehicle.id, 1);
-    vehicle.x = vehicle.targetX;
-    vehicle.z = vehicle.targetZ;
+    moveVehicleAndDriver(state, vehicle, vehicle.targetX, vehicle.targetZ);
 
     const brokenId = tickBreakProgress(state, vehicle);
 

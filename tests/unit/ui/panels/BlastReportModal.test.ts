@@ -24,6 +24,8 @@ function addEmployee(state: GameState, overrides: Partial<Employee> = {}): Emplo
     pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
     pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
     taskQueue: [], locomotion: { kind: 'on_foot' },
+    itinerary: null,
+    vehicleWaitingTicks: 0,
     ...overrides,
   };
   state.employees.employees.push(emp);

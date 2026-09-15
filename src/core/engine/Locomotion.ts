@@ -28,9 +28,10 @@ import { isDestinationOccupied, updateVehicleCellOccupancy, tickVehicleTaskState
 import { interruptActiveAction } from './TaskDispatch.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
+import { dismountVehicleDriver } from './VehicleReservation.js';
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
-export interface LocomotionResult {
+interface LocomotionResult {
   moved: number[];
   arrived: number[];
   stuck: number[];
@@ -294,8 +295,39 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     if (emp.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
       const actionId = emp.activeActionId;
       interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
+      // #986: interruptActiveAction(..., actionId: null, ...) is a no-op —
+      // nothing to release via an action — so a vehicle driven with no
+      // PendingAction at all (a manual `vehicle driver`/`vehicle haul`
+      // console command) would otherwise never dismount here and stay stuck
+      // forever. Mirrors the pre-itinerary tickVehicleOnNavGrid's own
+      // explicit, unconditional dismountVehicleDriver call on this same
+      // abandon path (EntityMovementTick.ts, deleted) — releaseVehicleReservation
+      // already calls this as part of releasing a real action, so this is a
+      // harmless no-op (past its own idempotent abort) in that case. Also
+      // clears the now-invalid drive leg immediately (I7: a drive leg's
+      // employee must be mounted in that leg's vehicle) — the ordinary
+      // aborted-leg self-heal (advanceLeg's own occupant-mismatch check,
+      // above) only runs on the NEXT tickLocomotion pass, one tick too late
+      // to cover this employee's own itinerary within the very call that
+      // just alighted them.
+      if (isDrive) {
+        dismountVehicleDriver(state, vehicle!, emitter);
+        clearItineraryOnFailure(emp);
+      }
       result.abandoned.push({ employeeId: emp.id, actionId });
       emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
+      // #986: the released vehicle's own stuck mirror must reset too — left
+      // set, a freshly idle vehicle re-accumulates from a stale
+      // moveConsecutiveFailures/isMoveStuck the instant its next driver's own
+      // drive leg starts touching these same fields, hitting this same
+      // abandon branch again almost immediately instead of getting the full
+      // MOVE_STUCK_ABANDON_TICKS a genuinely new drive is owed — mirrors the
+      // pre-itinerary tickVehicleOnNavGrid's own identical reset right after
+      // its abandon release (EntityMovementTick.ts, deleted).
+      if (isDrive) {
+        vehicle!.moveConsecutiveFailures = 0;
+        vehicle!.isMoveStuck = false;
+      }
     }
     return 'blocked';
   }
@@ -344,6 +376,16 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     vehicle.isMoveStuck = false;
     vehicle.waitingTicks = 0;
 
+    // The employee's own x/z must move too (I2) — a reroute that only wrote
+    // the vehicle's position left the employee frozen at the pre-reroute
+    // cell forever: findPathAvoidingOtherVehicles reads its FROM point off
+    // emp.x/z, so a stale employee position recomputed the identical
+    // "successful" reroute to the identical first waypoint every subsequent
+    // tick, never progressing (confirmed live: the tutorial's own box-cut
+    // ramp order stalled a rock_digger permanently behind an idle drill_rig
+    // this exact way).
+    emp.x = outcome.x;
+    emp.z = outcome.z;
     writeVehiclePosition(state, vehicle, outcome.x, outcome.z, leg);
     return 'moved';
   }
@@ -417,15 +459,28 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
 
 /** Applies `leg`'s arrival step. Returns false when the step fails (vehicle gone/taken) — the caller clears the itinerary and leaves the employee on foot where they stand. */
 function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: EventEmitter): boolean {
-  // A completed drive leg's vehicle takes on its role's arrival task as a
-  // display mirror (fuel/HUD upkeep), regardless of the leg's own arrival
-  // step — mirrors what the old vehicle-drive loop (ArrivalGate.ts) did on
-  // every generic vehicle-gated arrival.
+  // A completed drive leg's vehicle always snaps back to idle first — mirrors
+  // the pre-itinerary tickVehicleOnNavGrid's own unconditional arrival snap
+  // (EntityMovementTick.ts, deleted: "if (vehicle.x === vehicle.targetX && ...)
+  // setVehicleIdle(vehicle)"), which ran for every drive regardless of what
+  // it was for. Only THEN, when this drive was actually for a reserved
+  // vehicle-gated PendingAction (reservedForActionId set), does it take on
+  // its role's arrival task as a display mirror (fuel/HUD upkeep) instead —
+  // mirrors the old vehicle-drive loop's own identical override
+  // (ArrivalGate.ts, scoped to `vehicle.reservedForActionId !== null`, see
+  // that file's own #550 header). A plain reposition drive (moveTo(x,z) with
+  // no reservation — an evacuation-clear, or a manual `vehicle driver`/test
+  // drive) never had a task of its own to arrive INTO, and settles on idle.
   if (leg.mode === 'drive' && leg.vehicleId !== null) {
     const drivenVehicle = state.vehicles.vehicles.find(v => v.id === leg.vehicleId);
     if (drivenVehicle) {
-      drivenVehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[drivenVehicle.type];
-      tickVehicleTaskState(drivenVehicle);
+      drivenVehicle.task = 'idle';
+      drivenVehicle.state = 'idle';
+      drivenVehicle.waitingTicks = 0;
+      if (drivenVehicle.reservedForActionId !== null) {
+        drivenVehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[drivenVehicle.type];
+        tickVehicleTaskState(drivenVehicle);
+      }
     }
   }
 
@@ -439,7 +494,15 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
     const alreadyThere = isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id;
     if (!alreadyThere) {
       const boarded = board(state, vehicle.id, emp.id, emitter);
-      if (!boarded.success) return false;
+      if (!boarded.success) {
+        // #1042: a stale evacuation marker on this vehicle must not confuse
+        // whoever drives it next — the driver who actually took it either
+        // isn't evacuating at all, or staged their own marker via clearZone
+        // already. Mirrors the old ArrivalGate.resolveBoarding's identical
+        // cleanup on every cancelled-boarding path.
+        vehicle.pendingEvacuationDestination = null;
+        return false;
+      }
     }
 
     handlePostBoardIntent(state, emp, vehicle);

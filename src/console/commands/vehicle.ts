@@ -10,6 +10,7 @@ import {
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
+  canAssignDriver,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
@@ -193,9 +194,17 @@ export function vehicleCommand(
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: t('vehicle.not_found', { id: vehicleId }) };
       }
-      // Validates availability now, but the employee must physically walk to
-      // the vehicle before they actually become its driver — resolved by
-      // tickLocomotion's own board arrival step once they arrive (#1089).
+      // Validates licence/availability now — the same canAssignDriver check
+      // Mount.board re-runs at arrival time (#1089) — so a request that can
+      // never succeed (unlicensed employee, vehicle already has a driver) is
+      // rejected immediately rather than only once the employee has walked
+      // all the way there. The employee still must physically walk to the
+      // vehicle before they actually become its driver — resolved by
+      // tickLocomotion's own board arrival step once they arrive.
+      const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+      if (!eligible.success) {
+        return { success: false, output: eligible.error };
+      }
       const result = moveTo(state, employeeId, { vehicleId });
       if (!result.success) {
         return { success: false, output: result.error };
