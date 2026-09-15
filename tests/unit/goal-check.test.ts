@@ -143,6 +143,36 @@ describe('checkGoal — changedBy', () => {
   });
 });
 
+describe('checkGoal — atMost (issue #1083)', () => {
+  it('passes when the actual value is under the ceiling', async () => {
+    const page = fakePage({ gameState: { vehicleBoardingCount: 3 } });
+    await expect(
+      checkGoal(page, { atMost: { vehicleBoardingCount: 5 } }, {}),
+    ).resolves.toBeUndefined();
+  });
+
+  it('passes when the actual value equals the ceiling exactly (boundary, inclusive)', async () => {
+    const page = fakePage({ gameState: { vehicleBoardingCount: 5 } });
+    await expect(
+      checkGoal(page, { atMost: { vehicleBoardingCount: 5 } }, {}),
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws InteractionFailure naming the field, the ceiling, and the actual value when it exceeds the ceiling', async () => {
+    const page = fakePage({ gameState: { vehicleBoardingCount: 6 } });
+    let caught: unknown;
+    try {
+      await checkGoal(page, { atMost: { vehicleBoardingCount: 5 } }, {});
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(InteractionFailure);
+    expect((caught as Error).message).toContain('vehicleBoardingCount');
+    expect((caught as Error).message).toContain('5');
+    expect((caught as Error).message).toContain('6');
+  });
+});
+
 describe('checkGoal — tutorialStep', () => {
   it('passes when the tutorial card is on the expected step', async () => {
     const page = fakePage({

@@ -78,6 +78,15 @@ describe('scopeGoalToInteraction', () => {
     expect(scoped.decreased).toEqual(['cash']);
   });
 
+  it('never scopes out atMost — it is not in TRAJECTORY_COUPLED_GOAL_FIELDS, so it passes through unscoped (issue #1083)', () => {
+    const goal: ScenarioStepGoal = { atMost: { vehicleBoardingCount: 2 } };
+    const { scoped, deferred } = scopeGoalToInteraction(goal);
+    expect(deferred).toEqual([]);
+    expect(scoped.atMost).toEqual({ vehicleBoardingCount: 2 });
+    // Same object identity: nothing to scope means nothing to rebuild.
+    expect(scoped).toBe(goal);
+  });
+
   it('never scopes out a DOM or tutorial goal — those are the reachability claim', () => {
     const goal: ScenarioStepGoal = {
       equals: { tickCount: 40 },
@@ -146,6 +155,7 @@ describe('goalAssertsAnything', () => {
       { decreased: ['cash'] },
       { equals: { holeCount: 1 } },
       { changedBy: { cash: -1 } },
+      { atMost: { vehicleBoardingCount: 2 } },
       { usable: '#x' },
       { blocked: '#x' },
       { tutorialStep: 'a' },

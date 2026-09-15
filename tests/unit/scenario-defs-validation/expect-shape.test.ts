@@ -49,6 +49,14 @@ describe('Step expect field is shaped correctly when present', () => {
             expect(typeof amount, `step[${i}] expect.changedBy.${field} must be a number`).toBe('number');
           }
         }
+        if (e.atMost !== undefined) {
+          expect(typeof e.atMost, `step[${i}] expect.atMost must be an object`).toBe('object');
+          const entries = Object.entries(e.atMost);
+          expect(entries.length, `step[${i}] expect.atMost is empty`).toBeGreaterThan(0);
+          for (const [field, ceiling] of entries) {
+            expect(typeof ceiling, `step[${i}] expect.atMost.${field} must be a number`).toBe('number');
+          }
+        }
         for (const field of ['usable', 'blocked', 'tutorialStep'] as const) {
           if (e[field] === undefined) continue;
           expect(typeof e[field], `step[${i}] expect.${field} must be a string`).toBe('string');
@@ -71,11 +79,12 @@ describe('Step expect field is shaped correctly when present', () => {
           || (e.decreased?.length ?? 0) > 0
           || e.equals !== undefined
           || e.changedBy !== undefined
+          || e.atMost !== undefined
           || e.usable !== undefined
           || e.blocked !== undefined;
         expect(
           checkable,
-          `step[${i}] expect has no checkable field (equals/increased/decreased/changedBy/usable/blocked/tutorialStep) — a note alone proves nothing`,
+          `step[${i}] expect has no checkable field (equals/increased/decreased/changedBy/atMost/usable/blocked/tutorialStep) — a note alone proves nothing`,
         ).toBe(true);
       }
     });
@@ -123,5 +132,49 @@ describe('expect.changedBy shape (issue #596)', () => {
   it('an empty changedBy object fails the non-empty rule — it names no field, so it proves nothing', () => {
     const step: ScenarioStepDef = { command: 'state', expect: { changedBy: {} } };
     expect(Object.keys(step.expect!.changedBy!).length).toBe(0);
+  });
+});
+
+// ──────────────────────────────────────────────
+// 15c. expect.atMost shape, in isolation (issue #1083) — same treatment as
+// expect.changedBy above: object of field name -> numeric ceiling, non-empty,
+// every value numeric.
+// ──────────────────────────────────────────────
+describe('expect.atMost shape (issue #1083)', () => {
+  it('a well-formed atMost (object of field name -> numeric ceiling) satisfies the shape and checkable-field rules', () => {
+    const step: ScenarioStepDef = {
+      command: 'tick 1',
+      expect: { atMost: { vehicleBoardingCount: 2 } },
+    };
+    const e = step.expect!;
+    expect(typeof e.atMost).toBe('object');
+    const entries = Object.entries(e.atMost!);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, ceiling] of entries) {
+      expect(typeof ceiling).toBe('number');
+    }
+    const checkable = e.tutorialStep !== undefined
+      || (e.increased?.length ?? 0) > 0
+      || (e.decreased?.length ?? 0) > 0
+      || e.equals !== undefined
+      || e.changedBy !== undefined
+      || e.atMost !== undefined
+      || e.usable !== undefined
+      || e.blocked !== undefined;
+    expect(checkable).toBe(true);
+  });
+
+  it('an atMost entry with a non-numeric ceiling fails the shape rule', () => {
+    const step = {
+      command: 'tick 1',
+      expect: { atMost: { vehicleBoardingCount: '2' } },
+    } as unknown as ScenarioStepDef;
+    const ceiling = (step.expect!.atMost as unknown as Record<string, unknown>)['vehicleBoardingCount'];
+    expect(typeof ceiling).not.toBe('number');
+  });
+
+  it('an empty atMost object fails the non-empty rule — it names no field, so it proves nothing', () => {
+    const step: ScenarioStepDef = { command: 'tick 1', expect: { atMost: {} } };
+    expect(Object.keys(step.expect!.atMost!).length).toBe(0);
   });
 });

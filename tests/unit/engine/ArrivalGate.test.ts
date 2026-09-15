@@ -255,6 +255,49 @@ describe('tickArrivalGate — vehicle boarding', () => {
   });
 });
 
+describe('tickArrivalGate — driverBoardingCount (issue #1083)', () => {
+  it('increments state.vehicles.driverBoardingCount by exactly 1 on a successful boarding', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = vehicle.id;
+
+    expect(state.vehicles.driverBoardingCount).toBe(0);
+
+    tickArrivalGate(state);
+
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(state.vehicles.driverBoardingCount).toBe(1);
+  });
+
+  it('does not increment driverBoardingCount when a boarding attempt is cancelled (boardingCancelled branch)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const goneId = vehicle.id;
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== goneId);
+
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = goneId;
+
+    expect(state.vehicles.driverBoardingCount).toBe(0);
+
+    const result = tickArrivalGate(state);
+
+    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_gone' }]);
+    expect(state.vehicles.driverBoardingCount).toBe(0);
+  });
+});
+
 describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
   it('starts driving toward pendingEvacuationDestination once boarding resolves, for a vehicle not reserved for any action', () => {
     const state = createGame({ seed: SEED });

@@ -848,11 +848,24 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
 // the whole run) is robust to a different qualified driver picking up the
 // same vehicle after a legitimate handoff, whereas a fixed employee id is
 // not. Bounded by polling until no dig_ramp_segment PendingActions remain
-// (max 200 ticks) rather than a fixed tick count, per dev-testing-strategy's
-// wait-on-condition rule.
+// rather than a fixed tick count, per dev-testing-strategy's wait-on-condition
+// rule.
+//
+// issue #1083: the old repro (`campaign start level:tutorial_pit
+// staffed:true` + `build living_quarters at:12,15`) skips every hire/train/
+// licence step a real driller/digger needs to reach this point at all, and
+// (12,15) is a living_quarters placement tutorial-interactive.json's own
+// history found deadlocks this exact box-cut corridor — no player meets
+// these repro conditions. Replaced with the tutorial's own canonical setup
+// order (see the test body). MAX_TICKS/MAX_EXPECTED_BOARDINGS below are
+// PLACEHOLDER values (issue #1083) until the real measured boarding count is
+// known against the new setup.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 2 times for the whole order', () => {
-  const MAX_TICKS = 200;
+  // PLACEHOLDER (issue #1083): raised from 200 to 2000 so the tick-polling
+  // loop can run to real completion against the new tutorial-own setup
+  // rather than time out early and hide the true measurement.
+  const MAX_TICKS = 2000;
   // The initial boarding, plus at most one legitimate policy-forced handoff
   // (fixer follow-up) — NOT the 12 dismount/reboard cycles the pre-fix bug
   // produced, and not the 3 an earlier fixer round settled for. Three root
@@ -901,20 +914,54 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards at most 2 ti
   // handoff back to the SAME interrupted driver once their own forced rest
   // completes — never a different, farther-away one — for 2 boardings total,
   // confirmed directly against this exact scenario.
-  const MAX_EXPECTED_BOARDINGS = 2;
+  // PLACEHOLDER (issue #1083): intentionally too tight so the failure
+  // reports the real measured boarding count; @fixer/implementer tightens
+  // this to a real ceiling with margin once the counter is implemented.
+  const MAX_EXPECTED_BOARDINGS = 0;
 
   it('boards the rock_digger vehicle no more than 2 times while carving the whole box-cut ramp', () => {
     const engine = createGameEngine();
 
-    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
-    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    // Tutorial's own canonical hire/train/build/buy/build_ramp setup order
+    // (matches tutorial-interactive.json's steps, start through build_ramp)
+    // rather than `staffed:true` + `build living_quarters at:12,15` — no
+    // player ever reaches this repro that way: `staffed:true` skips every
+    // hire/train/licence step a real driller/digger needs, and (12,15) is a
+    // living_quarters placement tutorial-interactive.json's own history (see
+    // its build-living-quarters step comment) found deadlocks the box-cut
+    // corridor at this exact map/seed (issue #1083).
+    expect(runCommand(engine, 'campaign start level:tutorial_pit cash:400000').success).toBe(true);
+    expect(runCommand(engine, 'employee hire role:surveyor').success).toBe(true);
+    expect(runCommand(engine, 'employee assign_skill 1 skill:geology level:3').success).toBe(true);
+    expect(runCommand(engine, 'survey seismic x:23 z:23').success).toBe(true);
+    expect(runCommand(engine, 'employee hire role:driller').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:29,11').success).toBe(true);
+    // poll instead of a fixed pad
+    {
+      let t = 0;
+      while (t < 300 && engine.ctx.state!.buildings.buildings.length < 1) {
+        runCommand(engine, 'tick 1'); t++;
+      }
+    }
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build driving_center at:29,14').success).toBe(true);
+    {
+      let t = 0;
+      while (t < 300 && engine.ctx.state!.plannedBuildings.length > 0) {
+        runCommand(engine, 'tick 1'); t++;
+      }
+    }
+    expect(runCommand(engine, 'employee train 2 skill:driving.drill_rig').success).toBe(true);
+    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
+    expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
+    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    expect(runCommand(engine, 'vehicle buy rock_digger').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
 
     const state = engine.ctx.state!;
     const rockDigger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
-    if (!rockDigger) throw new Error('Setup: no rock_digger vehicle in the staffed starting fleet');
+    if (!rockDigger) throw new Error('Setup: no rock_digger vehicle purchased');
     const rockDiggerVehicleId = rockDigger.id;
 
     let boardingCount = 0;

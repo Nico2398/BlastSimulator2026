@@ -183,6 +183,37 @@ describe('checkGoalAgainstState — decreased', () => {
   });
 });
 
+describe('checkGoalAgainstState — atMost (issue #1083)', () => {
+  it('passes when the actual value is under the ceiling', () => {
+    const violation = checkGoalAgainstState(
+      { atMost: { vehicleBoardingCount: 5 } },
+      {},
+      { vehicleBoardingCount: 3 },
+    ).violation;
+    expect(violation).toBeNull();
+  });
+
+  it('passes when the actual value equals the ceiling exactly (boundary, inclusive)', () => {
+    const violation = checkGoalAgainstState(
+      { atMost: { vehicleBoardingCount: 5 } },
+      {},
+      { vehicleBoardingCount: 5 },
+    ).violation;
+    expect(violation).toBeNull();
+  });
+
+  it('fails naming the field, the ceiling, and the actual value when the actual value exceeds the ceiling', () => {
+    const violation = checkGoalAgainstState(
+      { atMost: { vehicleBoardingCount: 5 } },
+      {},
+      { vehicleBoardingCount: 6 },
+    ).violation;
+    expect(violation).toContain('vehicleBoardingCount');
+    expect(violation).toContain('5');
+    expect(violation).toContain('6');
+  });
+});
+
 describe('checkGoalAgainstState — combined and empty goals', () => {
   it('checks increased before equals, reporting the first violation found', () => {
     const violation = checkGoalAgainstState(
@@ -237,6 +268,17 @@ describe('checkGoalAgainstState — mismatches (drift report, issue #679)', () =
     );
     expect(result.mismatches).toEqual([
       { field: 'cash', goalType: 'changedBy', expected: -1000, actual: -500 },
+    ]);
+  });
+
+  it('records one GoalMismatch for a mismatched atMost goal, with the real post-state value as actual (issue #1083)', () => {
+    const result = checkGoalAgainstState(
+      { atMost: { vehicleBoardingCount: 5 } },
+      {},
+      { vehicleBoardingCount: 6 },
+    );
+    expect(result.mismatches).toEqual([
+      { field: 'vehicleBoardingCount', goalType: 'atMost', expected: 5, actual: 6 },
     ]);
   });
 

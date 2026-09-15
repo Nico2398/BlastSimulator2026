@@ -51,6 +51,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
   vehicleCount: { type: 'number' },
+  vehicleBoardingCount: { type: 'number', description: 'Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount, #1083)' },
   employeeCount: { type: 'number' },
   qualificationCount: { type: 'number', description: 'Qualifications held across the whole roster' },
   proficiencyTotal: { type: 'number', description: 'Sum of every held qualification\'s proficiency level' },
