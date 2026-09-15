@@ -3,9 +3,10 @@
 // Thin assertion wrapper around `assertWorldInvariants` so integration tests
 // can fail with a readable message instead of hand-inspecting a Violation[].
 
+import { expect } from 'vitest';
 import type { GameState } from '../../src/core/state/GameState.js';
+import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 export function expectNoWorldInvariantViolations(state: GameState): void {
-  // TODO: implement
-  throw new Error('not implemented');
+  expect(assertWorldInvariants(state)).toEqual([]);
 }

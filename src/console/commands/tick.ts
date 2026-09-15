@@ -40,6 +40,7 @@ import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveTaskCompletion } from './tickTaskCompletion.js';
 import { checkGameOverConditions } from './tickGameOver.js';
 import { buildEventContext, pushEventOptionLines } from './eventResolution.js';
+import { assertWorldInvariants } from '../../core/state/WorldInvariants.js';
 
 /** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
 function deductExpense(
@@ -268,6 +269,16 @@ export function tickCommand(
     // 9. Win/lose condition checks (level complete, bankruptcy, ecological
     // shutdown, arrest, worker revolt).
     checkGameOverConditions(state, emitter, lines);
+
+    // 9b. World invariant check (#1084) — dev/test builds only, warn-only.
+    // Reports internal-consistency violations (dangling driver refs,
+    // position mismatches, etc.) that should never occur if the
+    // mount/itinerary/task machinery upstream is correct; never throws.
+    if (!import.meta.env.PROD) {
+      for (const violation of assertWorldInvariants(state)) {
+        lines.push(`[tick ${state.tickCount}] WORLD INVARIANT VIOLATION: ${violation.kind} ${JSON.stringify(violation)}`);
+      }
+    }
 
     // 10. Pending event — auto-pause and report to player
     if (fired) {
