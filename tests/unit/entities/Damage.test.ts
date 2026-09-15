@@ -35,6 +35,7 @@ const EMPLOYEE_DEFAULTS = {
   pendingActionType: null,
   pendingActionPayload: null,
   pendingDriverVehicleId: null,
+  locomotion: { kind: 'on_foot' },
 } as const;
 
 function makeProjection(id: number, x: number, z: number, mass: number, velocity: number): FragmentData {

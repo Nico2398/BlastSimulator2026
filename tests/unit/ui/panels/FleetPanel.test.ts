@@ -17,6 +17,7 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
     haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
     breakFragmentId: null, breakPhase: null, reservedForActionId: null, pendingEvacuationDestination: null,
+    occupantIds: [],
     ...overrides,
   };
 }
@@ -35,6 +36,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingTaskDuration: null, pendingActionType: null,
     pendingActionPayload: null, pendingDriverVehicleId: null,
     taskQueue: [],
+    locomotion: { kind: 'on_foot' },
     ...overrides,
   };
 }

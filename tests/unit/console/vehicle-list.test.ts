@@ -31,6 +31,7 @@ const EMPLOYEE_DEFAULTS = {
   pendingActionType: null,
   pendingActionPayload: null,
   pendingDriverVehicleId: null,
+  locomotion: { kind: 'on_foot' },
 } as const;
 
 /**

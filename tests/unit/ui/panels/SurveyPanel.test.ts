@@ -21,6 +21,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingTaskDuration: null, pendingActionType: null,
     pendingActionPayload: null, pendingDriverVehicleId: null,
     taskQueue: [],
+    locomotion: { kind: 'on_foot' },
     ...overrides,
   };
 }

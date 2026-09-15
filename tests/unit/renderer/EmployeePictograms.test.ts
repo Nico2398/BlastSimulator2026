@@ -43,6 +43,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
     taskQueue: [],
+    locomotion: { kind: 'on_foot' },
     ...overrides,
   };
 }
@@ -350,6 +351,7 @@ describe('EmployeePictograms', () => {
       haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
       breakFragmentId: null, breakPhase: null, reservedForActionId: null,
       pendingEvacuationDestination: null,
+      occupantIds: [1],
     };
 
     pictograms.sync([emp], [vehicle], id => (id === 1 ? anchor : null));

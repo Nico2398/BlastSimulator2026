@@ -679,6 +679,7 @@ function makeVehicle(id: number): Vehicle {
     haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
     breakFragmentId: null, breakPhase: null, reservedForActionId: null,
     pendingEvacuationDestination: null,
+    occupantIds: [],
   };
 }
 
