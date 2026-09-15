@@ -52,6 +52,7 @@ function makeWaitingVehicle(
     breakPhase: null,
     reservedForActionId: null,
     pendingEvacuationDestination: null,
+    occupantIds: [],
   };
 }
 

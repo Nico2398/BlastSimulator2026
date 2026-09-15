@@ -1194,8 +1194,8 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 18', () => {
-    expect(SAVE_VERSION).toBe(18);
+  it('SAVE_VERSION is 19', () => {
+    expect(SAVE_VERSION).toBe(19);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1240,5 +1240,87 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
     const restored = deserialize(JSON.stringify(parsed));
 
     expect(restored.pendingActions[0]!.queuedAtTick).toBe(123);
+  });
+});
+
+// ── v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087) ─
+// Mount/itinerary phase 2 makes `occupantIds`/`locomotion` the source of
+// truth for who rides what — `driverId` stays a plain mirrored field (a real
+// accessor can't survive a JSON round-trip). A pre-v19 save predates both
+// fields entirely: its vehicles carry only `driverId`, and its employees
+// carry neither field at all. Migration must reconstruct `occupantIds` from
+// each vehicle's own `driverId`, and give the matching employee a `mounted`
+// locomotion while every other living employee gets `on_foot`.
+//
+// Red phase: SAVE_VERSION has not been bumped past 18 yet, and no v18->v19
+// migration block exists — every assertion below is expected to fail against
+// today's deserialize (undefined/absent fields), not a compile error.
+
+describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
+  it('SAVE_VERSION is 19', () => {
+    expect(SAVE_VERSION).toBe(19);
+  });
+
+  it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee: driver } = hireEmployee(state.employees, 'driver', rng, 5, 5);
+    const { employee: onFoot } = hireEmployee(state.employees, 'surveyor', new Random(43), 8, 8);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.driverId = driver.id;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 18;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    delete vehiclesList[0]!['occupantIds'];
+
+    const employeesContainer = parsed['employees'] as Record<string, unknown>;
+    const employeesList = employeesContainer['employees'] as Array<Record<string, unknown>>;
+    for (const emp of employeesList) {
+      delete emp['locomotion'];
+    }
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restoredVehicle.occupantIds).toEqual([driver.id]);
+
+    const restoredDriver = restored.employees.employees.find(e => e.id === driver.id)!;
+    expect(restoredDriver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+
+    const restoredOnFoot = restored.employees.employees.find(e => e.id === onFoot.id)!;
+    expect(restoredOnFoot.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('a pre-v19 vehicle with driverId null loads with an empty occupantIds and every employee on_foot', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'surveyor', new Random(42), 1, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.driverId = null;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 18;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    delete vehiclesList[0]!['occupantIds'];
+
+    const employeesContainer = parsed['employees'] as Record<string, unknown>;
+    const employeesList = employeesContainer['employees'] as Array<Record<string, unknown>>;
+    for (const emp of employeesList) {
+      delete emp['locomotion'];
+    }
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restoredVehicle.occupantIds).toEqual([]);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.locomotion).toEqual({ kind: 'on_foot' });
   });
 });

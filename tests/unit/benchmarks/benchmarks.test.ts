@@ -180,6 +180,7 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
       pendingActionPayload: null,
       pendingDriverVehicleId: null,
       taskQueue: [],
+      locomotion: { kind: 'on_foot' },
     });
   }
 

@@ -255,6 +255,8 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     const action = makeVehicleAction({ id: actionId, holderId: driver.id });
     state.pendingActions.push(action);
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = targetX;
@@ -410,6 +412,8 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
 
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 3;
@@ -787,13 +791,23 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     expect(blocker.z).toBe(1);
   });
 
-  // #947: a blocker with no driver aboard can never actually drive itself off
-  // the target cell even if moveVehicle relocates it — so the relocation
-  // branch must not attempt it at all, and must fall through to the same
-  // stuck escalation the reserved-blocker guard above proves, rather than
-  // silently leaving the mover permanently deadlocked against a blocker that
-  // "moved" on paper but never actually vacates the cell.
-  it('does not relocate a driverless idle unreserved blocker, and still escalates to stuck (#947 guard)', () => {
+  // #1087 follow-up: a blocker with no driver aboard has nobody to drive it
+  // off the target cell via the ordinary moving-task machinery, but it also
+  // has no task of its own in flight to interrupt — so it is relocated
+  // directly instead (relocateDriverlessVehicle, VehicleOccupancyReroute.ts),
+  // bypassing moveVehicle's 'moving'-task drive entirely rather than staging
+  // a drive canTickVehicle (#947) could never advance. Mount's
+  // Chebyshev-radius boarding (Mount.ts) reassigns a vehicle-gated action's
+  // vehicle far more often than the old exact-cell model did, so a released,
+  // driverless rig now orphans on a *different* action's own target cell
+  // often enough to permanently deadlock it (confirmed live:
+  // level1-lose-ecology.json's own holeCount stalled 48/49 forever, 8000+
+  // ticks with zero progress, behind exactly this shape of blocker) — this
+  // was the one occupancy-block shape the pre-#1087 guard deliberately left
+  // unhandled (see git history for this test's own prior "does not relocate"
+  // assertion), and it needed a real fix once Mount's boarding radius made
+  // it reachable in practice rather than only in theory.
+  it('relocates a driverless idle unreserved blocker parked on the target cell itself, and the vehicle then reaches its target (#1087 follow-up)', () => {
     const state = buildCorridorState();
     const rng = new Random(VEHICLE_TICK_SEED);
     const { employee: mainDriver } = hireEmployee(state.employees, 'driller', rng);
@@ -817,14 +831,25 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const stuckEvents: number[] = [];
     emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
 
-    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+    const MAX_TICKS = VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 20;
+    let ticks = 0;
+    while (!(vehicle.x === 2 && vehicle.z === 1 && (vehicle.task as VehicleTask) === 'idle') && ticks < MAX_TICKS) {
       tickVehicle(state, vehicle, emitter);
+      ticks++;
     }
 
-    expect(vehicle.isMoveStuck).toBe(true);
-    expect(stuckEvents).toEqual([vehicle.id]);
-    expect(blocker.x).toBe(2); // never relocated
-    expect(blocker.z).toBe(1);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(1);
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.isMoveStuck).toBe(false);
+    expect(stuckEvents).toEqual([]);
+
+    // The blocker was relocated off the target cell in one shot (no driver to
+    // stage a drive through) — the vehicle did not somehow reach the target
+    // while it was still occupied.
+    expect(blocker.x === 2 && blocker.z === 1).toBe(false);
+    expect(blocker.driverId).toBeNull();
+    expect(blocker.task).toBe('idle');
   });
 });
 

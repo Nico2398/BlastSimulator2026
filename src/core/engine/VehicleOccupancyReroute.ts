@@ -13,7 +13,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, type AdvanceAlongPathOutcome } from '../nav/AgentAdvance.js';
 import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../config/balance.js';
-import { markVehicleWaiting, setVehicleIdle, isCellOccupiedByOtherVehicle } from './EntityMovementTick.js';
+import { markVehicleWaiting, setVehicleIdle, isCellOccupiedByOtherVehicle, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 /**
  * Applies an advanceAlongPath outcome to a vehicle: position, moving state,
@@ -88,15 +88,28 @@ export function handleVehicleOccupancyBlock(
   // pending action needs). isLicensedForRole/findFreeVehicleForRole only gate
   // *claiming a vehicle-gated task* (drilling, digging, hauling) — driving
   // itself has never required the role licence, so any employee's vehicle
-  // can relocate one out of the way. But canTickVehicle (#947) now requires
-  // driverId !== null to advance on tick at all: relocating a driverless
-  // blocker would stage task='moving' on it and then never advance it,
-  // trading a visible deadlock for a silent, permanent one. Relocate an
-  // idle, unreserved blocker sitting on the target ONLY when it has a driver
-  // aboard — once it clears, this same reroute attempt succeeds on a later
-  // tick. A blocker that is reserved, mid-task, driverless, or has nowhere
-  // free to go will never clear on its own — fall through to the same stuck
-  // escalation as any other deadlock rather than wait on it forever.
+  // can relocate one out of the way. A driven idle blocker relocates by
+  // driving itself clear (moveVehicle, below) — canTickVehicle (#947)
+  // requires driverId !== null to advance a 'moving' task on tick, and a
+  // driven vehicle satisfies that. A driverless idle blocker has nobody to
+  // drive it, so it is relocated directly (#1087 follow-up): Mount's
+  // Chebyshev-radius boarding (board/alight, Mount.ts) reassigns a
+  // vehicle-gated action's vehicle far more often than the old exact-cell
+  // model did — a reclaiming employee's own nearest-vehicle pick
+  // (findFreeVehicleForRole) need not be the one already sitting at the
+  // target, so a released, driverless rig can now end up permanently
+  // abandoned on a *different*, still-incomplete action's own target cell,
+  // with no driver ever available to drive it off (confirmed live:
+  // level1-lose-ecology.json's own H44 stalled at holeCount 48/49 forever —
+  // 8000+ ticks with zero progress — behind exactly this kind of orphaned
+  // rig). Nothing needs to *drive* a driverless, unreserved, idle vehicle
+  // out of the way — it has no task of its own to interrupt — so it is
+  // simply repositioned to the nearest free cell outright, the same
+  // satirical "someone shoves the abandoned car aside" beat the driven case
+  // already plays out over several ticks of animated driving. A blocker
+  // that is reserved, mid-task, or has nowhere free to go will never clear
+  // on its own either way — fall through to the same stuck escalation as
+  // any other deadlock rather than wait on it forever.
   const blocker = state.vehicles.vehicles.find(
     v => v.id !== vehicle.id && v.x === vehicle.targetX && v.z === vehicle.targetZ,
   );
@@ -106,10 +119,14 @@ export function handleVehicleOccupancyBlock(
       // to clear rather than escalate mid-relocation.
       return;
     }
-    if (blocker.task === 'idle' && blocker.reservedForActionId === null && blocker.driverId !== null) {
+    if (blocker.task === 'idle' && blocker.reservedForActionId === null) {
       const freeCell = findNearestFreeCellForVehicle(state, blocker);
       if (freeCell) {
-        moveVehicle(state.vehicles, blocker.id, freeCell.x, freeCell.z);
+        if (blocker.driverId !== null) {
+          moveVehicle(state.vehicles, blocker.id, freeCell.x, freeCell.z);
+        } else {
+          relocateDriverlessVehicle(state, blocker, freeCell.x, freeCell.z);
+        }
         return;
       }
       // No free cell nearby either — nothing left to try, fall through.
@@ -123,6 +140,28 @@ export function handleVehicleOccupancyBlock(
   if (!wasStuckBeforeTick) {
     emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
   }
+}
+
+/**
+ * Direct repositioning for a driverless idle blocker (#1087 follow-up): no
+ * driver exists to stage a 'moving' task through the ordinary drive
+ * machinery (canTickVehicle would never advance it — #947), and none is
+ * needed — an unreserved, driverless vehicle has no task of its own in
+ * flight to interrupt, so it is simply placed on `x`/`z` outright. Reuses
+ * tickVehicle's own updateVehicleCellOccupancy (EntityMovementTick.ts) to
+ * keep NavCell.vehicleOccupied in sync, so foot/vehicle pathfinding
+ * immediately sees the old cell as free and the new one as occupied rather
+ * than waiting for the next tick's reconciliation.
+ */
+function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number): void {
+  const prevX = Math.floor(blocker.x);
+  const prevZ = Math.floor(blocker.z);
+  const wasStationary = blocker.state !== 'moving';
+
+  blocker.x = x;
+  blocker.z = z;
+
+  updateVehicleCellOccupancy(state, blocker, wasStationary, prevX, prevZ);
 }
 
 /**

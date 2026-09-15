@@ -1117,6 +1117,8 @@ describe('completeVehicleGatedActionIfApplicable — starved on-foot action inte
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const completedAction: PendingAction = {
       id: 1,

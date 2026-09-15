@@ -8,13 +8,16 @@
 
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { resolveReservationHolder } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
 
 export type ViolationKind =
-  | 'I1_dangling_driver_reference'
-  | 'I2_driver_position_mismatch'
+  | 'I1_occupant_locomotion_mismatch'
+  | 'I2_mounted_position_mismatch'
   | 'I3_employee_drives_two_vehicles'
+  | 'I3_seat_capacity_exceeded'
   | 'I4_moving_vehicle_without_driver'
   | 'I5_reservation_without_valid_holder'
   | 'I6_destination_partially_set'
@@ -35,38 +38,67 @@ function findLivingDriver(state: GameState, driverId: number): Employee | undefi
   return employee && employee.alive ? employee : undefined;
 }
 
-function checkI1DanglingDriverReference(state: GameState): Violation[] {
+/**
+ * I1: `Vehicle.occupantIds` and `Employee.locomotion` must agree in both
+ * directions — every occupant must be mounted on that exact vehicle, and
+ * every mounted employee must appear in their vehicle's `occupantIds`.
+ */
+function checkI1OccupantLocomotionMismatch(state: GameState): Violation[] {
   const violations: Violation[] = [];
+
   for (const v of state.vehicles.vehicles) {
-    if (v.driverId !== null && !findLivingDriver(state, v.driverId)) {
-      violations.push({ kind: 'I1_dangling_driver_reference', vehicleId: v.id, employeeId: v.driverId });
+    for (const employeeId of v.occupantIds) {
+      const e = findLivingDriver(state, employeeId);
+      if (!e || !isMounted(e.locomotion) || mountedVehicleId(e.locomotion) !== v.id) {
+        violations.push({ kind: 'I1_occupant_locomotion_mismatch', vehicleId: v.id, employeeId });
+      }
     }
   }
+
+  for (const e of state.employees.employees) {
+    if (!e.alive || !isMounted(e.locomotion)) continue;
+    const vehicleId = mountedVehicleId(e.locomotion)!;
+    const v = state.vehicles.vehicles.find(veh => veh.id === vehicleId);
+    if (!v || !v.occupantIds.includes(e.id)) {
+      violations.push({ kind: 'I1_occupant_locomotion_mismatch', vehicleId, employeeId: e.id });
+    }
+  }
+
   return violations;
 }
 
-function checkI2DriverPositionMismatch(state: GameState): Violation[] {
+/** I2: a mounted employee's position must equal their vehicle's position. */
+function checkI2MountedPositionMismatch(state: GameState): Violation[] {
   const violations: Violation[] = [];
-  for (const v of state.vehicles.vehicles) {
-    if (v.driverId === null) continue;
-    const e = findLivingDriver(state, v.driverId);
-    if (!e) continue;
+  for (const e of state.employees.employees) {
+    if (!e.alive || !isMounted(e.locomotion)) continue;
+    const vehicleId = mountedVehicleId(e.locomotion)!;
+    const v = state.vehicles.vehicles.find(veh => veh.id === vehicleId);
+    if (!v) continue; // already reported by I1
     if (e.x !== v.x || e.z !== v.z) {
-      violations.push({ kind: 'I2_driver_position_mismatch', vehicleId: v.id, employeeId: e.id });
+      violations.push({ kind: 'I2_mounted_position_mismatch', vehicleId: v.id, employeeId: e.id });
     }
   }
   return violations;
 }
 
-function checkI3EmployeeDrivesTwoVehicles(state: GameState): Violation[] {
+/**
+ * I3: a vehicle's `occupantIds` may not exceed `VEHICLE_SEAT_COUNT[type]`,
+ * and no employee id may appear in more than one vehicle's `occupantIds`.
+ */
+function checkI3OccupantCapacityViolation(state: GameState): Violation[] {
   const violations: Violation[] = [];
   const seen = new Set<number>();
   for (const v of state.vehicles.vehicles) {
-    if (v.driverId === null) continue;
-    if (seen.has(v.driverId)) {
-      violations.push({ kind: 'I3_employee_drives_two_vehicles', vehicleId: v.id, employeeId: v.driverId });
-    } else {
-      seen.add(v.driverId);
+    if (v.occupantIds.length > VEHICLE_SEAT_COUNT[v.type]) {
+      violations.push({ kind: 'I3_seat_capacity_exceeded', vehicleId: v.id });
+    }
+    for (const employeeId of v.occupantIds) {
+      if (seen.has(employeeId)) {
+        violations.push({ kind: 'I3_employee_drives_two_vehicles', vehicleId: v.id, employeeId });
+      } else {
+        seen.add(employeeId);
+      }
     }
   }
   return violations;
@@ -182,9 +214,9 @@ function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
 
 export function assertWorldInvariants(state: GameState): Violation[] {
   return [
-    ...checkI1DanglingDriverReference(state),
-    ...checkI2DriverPositionMismatch(state),
-    ...checkI3EmployeeDrivesTwoVehicles(state),
+    ...checkI1OccupantLocomotionMismatch(state),
+    ...checkI2MountedPositionMismatch(state),
+    ...checkI3OccupantCapacityViolation(state),
     ...checkI4MovingVehicleWithoutDriver(state),
     ...checkI5ReservationWithoutValidHolder(state),
     ...checkI6DestinationPartiallySet(state),

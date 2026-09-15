@@ -93,7 +93,12 @@ import type { RampDef } from '../mining/Ramp.js';
 // unstamped action measure its own age as always 0, so it could never
 // starve. A migration backfills any pre-v18 `pendingActions` entry missing
 // the field to the save's own `tickCount`. See SaveLoad.ts's migrateV17ToV18.
-export const SAVE_VERSION = 18;
+// v18 -> v19: Vehicle gained `occupantIds: number[]` and Employee gained
+// `locomotion: Locomotion` (#1087 — the mount/itinerary rebuild's employee
+// side). A pre-v19 save only has `driverId` — occupantIds defaults to
+// `[driverId]` (or `[]` when unset) and locomotion is derived from whichever
+// vehicle's driverId names the employee. See SaveLoad.ts's migrateV18ToV19.
+export const SAVE_VERSION = 19;
 
 export interface GameConfig {
   seed: number;

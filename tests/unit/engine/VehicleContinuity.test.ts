@@ -125,6 +125,8 @@ function makeFixture(kind: VehicleGatedActionKind) {
 
   const { vehicle } = purchaseVehicle(state.vehicles, kind.role, 0, 0);
   vehicle.driverId = employee.id;
+  vehicle.occupantIds = [employee.id];
+  employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
   const completedAction: PendingAction = {
     id: 1,

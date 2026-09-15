@@ -252,6 +252,8 @@ describe('releaseVehicleReservation', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.reservedForActionId = 5;
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'drilling';
     vehicle.state = 'working';
 
@@ -295,6 +297,8 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 30;
@@ -332,6 +336,8 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 30;
@@ -371,6 +377,8 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 30;
@@ -409,6 +417,8 @@ describe('releaseVehicleOnCompletion', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 7;
 
     releaseVehicleOnCompletion(state, employee, 7);
@@ -440,6 +450,8 @@ describe('reconcileVehicleReservations', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.reservedForActionId = 99;
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     // No PendingAction with id 99 exists — orphaned reservation.
 
     reconcileVehicleReservations(state);
@@ -458,6 +470,8 @@ describe('reconcileVehicleReservations', () => {
     employee.activeActionId = 10;
     vehicle.reservedForActionId = 10;
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     killEmployee(state.employees, employee.id);
     reconcileVehicleReservations(state);
@@ -732,6 +746,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     pickupFragment(state.logistics, 1, String(vehicle.id));
 
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 100;
     vehicle.haulingFragmentId = 1;
     vehicle.haulingPhase = 'to_depot';
@@ -770,6 +786,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     pickupFragment(state.logistics, 1, String(vehicle.id));
 
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 101;
     vehicle.haulingFragmentId = 1;
     vehicle.haulingPhase = 'to_depot';
@@ -791,6 +809,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     addBlastFragments(state.logistics, [makeCargoFragment(2, 5000)]);
 
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 102;
     vehicle.breakFragmentId = 2;
     vehicle.breakPhase = 'to_boulder';
@@ -813,6 +833,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 103;
     vehicle.task = 'drilling';
     vehicle.state = 'working';

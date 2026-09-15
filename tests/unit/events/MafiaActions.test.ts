@@ -20,6 +20,7 @@ const EMPLOYEE_DEFAULTS = {
   moveConsecutiveFailures: 0, isMoveStuck: false, pendingRestDuration: null,
   pendingRestNeedKey: null, pendingTaskDuration: null, pendingActionType: null,
   pendingActionPayload: null, pendingDriverVehicleId: null,
+  locomotion: { kind: 'on_foot' },
 } as const;
 
 function addTestEmployee(state: ReturnType<typeof createEmployeeState>, unionized = false): Employee {

@@ -639,6 +639,8 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.targetX = 20;
     vehicle.targetZ = 20;
 

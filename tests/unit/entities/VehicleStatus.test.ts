@@ -16,6 +16,7 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
     haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
     breakFragmentId: null, breakPhase: null, reservedForActionId: null, pendingEvacuationDestination: null,
+    occupantIds: [],
     ...overrides,
   };
 }

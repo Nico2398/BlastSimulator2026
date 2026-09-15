@@ -36,11 +36,13 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
-import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
+import { moveVehicle } from '../entities/Vehicle.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
 import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { alight } from './Mount.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -315,7 +317,7 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  * directly and has nothing to look up by actionId, so it calls this instead
  * of releaseVehicleReservation.
  */
-export function dismountVehicleDriver(state: GameState, vehicle: Vehicle): void {
+export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   abortVehicleGatedFragmentWork(state, vehicle);
   if (vehicle.driverId === null) return;
 
@@ -330,7 +332,7 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle): void 
   // distance-based decision that follows (nearest living_quarters, the walk
   // back to reboard) relies on being current.
   syncDriverPosition(state, vehicle);
-  unassignDriver(state.vehicles, vehicle.id);
+  alight(state, vehicle.id, emitter);
   setVehicleIdle(vehicle);
 }
 
@@ -340,11 +342,11 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle): void 
  * Used by cancellation, needs-interruption, and the death/destruction
  * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
  */
-export function releaseVehicleReservation(state: GameState, actionId: number): void {
+export function releaseVehicleReservation(state: GameState, actionId: number, emitter?: EventEmitter): void {
   const vehicle = findAndAbortReservedVehicle(state, actionId);
   if (!vehicle) return;
 
-  dismountVehicleDriver(state, vehicle);
+  dismountVehicleDriver(state, vehicle, emitter);
 }
 
 /**
