@@ -227,7 +227,7 @@ today. A migration issue updates its own row as it lands.
 
 | Phase | Delivers | Status |
 |-------|----------|--------|
-| 0a | Box-cut regression coverage under the tutorial's own conditions, interaction mode | planned |
+| 0a | Box-cut regression coverage under the tutorial's own conditions, interaction mode | landed |
 | 0b | `assertWorldInvariants`, warn-only, against today's fields | planned |
 | 1a | One vehicle-gated completion path | planned |
 | 1b | Tick pipeline core-owned; the second, test-only loop removed | planned |
@@ -238,6 +238,14 @@ today. A migration issue updates its own row as it lands.
 | 5 | Haul and break become leg effects | planned |
 | 6 | Dead vehicle fields stripped, tier-correct stat reads, `reposition` goal | planned |
 | 7 | Fast transport un-gated | planned |
+
+Phase 0a's own measured baseline (`tutorial-boxcut-full.json`, interaction mode and command mode
+both converge on the same figures): the box-cut finishes in 108 ticks (command mode) / 20 ticks for
+the final wait step (interaction mode, measured from the `build_ramp` order to full completion) —
+both bounded in the scenario's own `maxTicks: 130` ceiling — with the rock_digger boarded 3 times,
+bounded by `atMost: { vehicleBoardingCount: 4 }`. Both ceilings are measured-baseline caps later
+phases are expected to lower, not design targets. 3 boardings is far above the 2 boardings the
+mount/itinerary model targets; closing that gap is what phase 1a+ exists to do.
 
 Phase 2 keeps `driverId` as a read-only mirror of `occupantIds` so the readers that phases 3 to 5
 rewrite or delete are not migrated twice. Phase 6 removes the mirror and the readers left.
