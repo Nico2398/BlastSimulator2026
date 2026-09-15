@@ -526,6 +526,13 @@ export async function checkGoal(
     }
 
     if (goal.atMost) {
+      // Interaction mode has no drift-tolerant path — unlike command mode's
+      // --report-drift, which reports an exceeded atMost ceiling (like an
+      // equals/changedBy mismatch) as drift rather than a hard failure —
+      // every goal checked here throws directly on failure, atMost included,
+      // the same as equals/changedBy above. atMost's own tolerance for a
+      // lower (improved) actual is a command-mode reporting concern; the
+      // ceiling itself is still checked exactly here.
       for (const [field, ceiling] of Object.entries(goal.atMost)) {
         const actualRaw = state[field];
         const actual = typeof actualRaw === 'number' ? actualRaw : 0;
