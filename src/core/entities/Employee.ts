@@ -3,6 +3,7 @@
 
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
+import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 
@@ -178,6 +179,13 @@ export interface Employee {
    * at enqueue time. Empty when the employee has no queued follow-up work.
    */
   taskQueue: number[];
+  /**
+   * Whether the employee is on foot or mounted in a vehicle. Must agree with
+   * the mounted vehicle's `occupantIds` in both directions — see the
+   * `vehicles` rule's invariant list. Set/cleared only by `board`/`alight`
+   * (Mount.ts).
+   */
+  locomotion: Locomotion;
 }
 
 // ── Employee state ──
@@ -248,6 +256,7 @@ export function hireEmployee(
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
     taskQueue: [],
+    locomotion: { kind: 'on_foot' },
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would
@@ -405,6 +414,8 @@ export function assignSkill(
 
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
+export type { Locomotion } from './EmployeeLocomotion.js';
+export { isMounted, isOnFoot, mountedVehicleId } from './EmployeeLocomotion.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export type { EmployeeWorkState } from './EmployeeNeeds.js';
 export { tickNeedGauges, getNeedMultiplier, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';

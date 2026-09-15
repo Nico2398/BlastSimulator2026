@@ -170,6 +170,13 @@ export interface Vehicle {
    * (#1042); cleared once the vehicle arrives.
    */
   pendingEvacuationDestination: { x: number; z: number } | null;
+  /**
+   * IDs of employees currently mounted in this vehicle (driver included).
+   * Must agree with each occupant's `Locomotion` in both directions — see
+   * the `vehicles` rule's invariant list. Bounded by
+   * `VEHICLE_SEAT_COUNT[role]`.
+   */
+  occupantIds: number[];
 }
 
 // ── Fleet state ──
@@ -218,6 +225,7 @@ export function purchaseVehicle(
     breakPhase: null,
     reservedForActionId: null,
     pendingEvacuationDestination: null,
+    occupantIds: [],
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

@@ -827,6 +827,15 @@ export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   building_destroyer: 'clearing',
 };
 
+/** Seats per vehicle role — how many employees a vehicle of that role may carry at once. */
+export const VEHICLE_SEAT_COUNT: Record<VehicleRole, number> = {
+  drill_rig: 1,
+  debris_hauler: 1,
+  rock_digger: 1,
+  rock_fragmenter: 1,
+  building_destroyer: 1,
+};
+
 // ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
 
 export interface StartingSiteEmployeeSlot {
