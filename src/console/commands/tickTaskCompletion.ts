@@ -7,9 +7,8 @@ import type { Employee } from '../../core/entities/Employee.js';
 import type { TaskProgressResult } from '../../core/engine/GameLoop.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { Random } from '../../core/math/Random.js';
-import { tryContinueVehicleGatedAction } from '../../core/engine/GameLoop.js';
+import { completeVehicleGatedActionIfApplicable } from '../../core/engine/GameLoop.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
-import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { landDrilledHole } from '../../core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
@@ -105,20 +104,17 @@ export function resolveTaskCompletion(
     // removes the completing action's record and ghost, once the work has
     // actually finished, not at claim time (#547).
     if (progress.actionId !== undefined) {
-      // #550: look the action up before completePendingAction removes
-      // the record — nothing to look requiredVehicleRole up on
-      // afterward. For a vehicle-gated action, try the scoped same-tick
-      // continuity promotion first (tryContinueVehicleGatedAction) —
-      // reassigns the just-finished vehicle straight to a same-role
-      // follow-up already available to this employee, keeping them
-      // mounted. Only when no follow-up qualifies does the vehicle get
-      // unconditionally released/dismounted via releaseVehicleOnCompletion.
-      const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
-      if (completingAction && completingAction.requiredVehicleRole !== null) {
-        const continued = tryContinueVehicleGatedAction(state, emp, completingAction);
-        if (!continued) releaseVehicleOnCompletion(state, emp, progress.actionId);
+      // #1085: route through the same shared completion function the
+      // phase-driven (haul_debris/fragment_debris) path already used, so the
+      // starvation override, the vehicle-continuity promotion and the
+      // reservation release happen once, in one place, regardless of which
+      // kind of work just finished. Returns false for a non-vehicle-gated
+      // action (or an already-removed one) — completePendingAction below is
+      // the same fallback that already ran for those.
+      const handled = completeVehicleGatedActionIfApplicable(state, emp, progress.actionId);
+      if (!handled) {
+        completePendingAction(state, progress.actionId);
       }
-      completePendingAction(state, progress.actionId);
     }
 
     // A completed 'survey' task resolves here — after the surveyor has

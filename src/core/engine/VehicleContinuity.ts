@@ -137,9 +137,9 @@ export function tryContinueVehicleGatedAction(
  * tickTaskProgress's employee-timer completion path (its work is entirely
  * vehicle-position/phase-driven, not a counted-down employee task timer).
  */
-export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Employee, actionId: number): void {
+export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Employee, actionId: number): boolean {
   const action = state.pendingActions.find(a => a.id === actionId);
-  if (!action || action.requiredVehicleRole === null) return;
+  if (!action || action.requiredVehicleRole === null) return false;
 
   // #1000: a long-starved on-foot (requiredVehicleRole === null) action wins
   // over same-role vehicle continuity, so a deep haul/fragment backlog can
@@ -157,7 +157,7 @@ export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Em
       promoteActionToActive(state, emp, claimed);
     }
     completePendingAction(state, actionId);
-    return;
+    return true;
   }
 
   const continued = tryContinueVehicleGatedAction(state, emp, action);
@@ -171,4 +171,5 @@ export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Em
   }
 
   completePendingAction(state, actionId);
+  return true;
 }

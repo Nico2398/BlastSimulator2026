@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
-import { employeeCommand } from '../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
+import { buildRampCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
 import {
@@ -32,6 +33,7 @@ import {
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
   WORK_DURATION_TICKS,
   MOVE_STUCK_ABANDON_TICKS,
+  ACTION_STARVATION_TICK_THRESHOLD,
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { createGame } from '../../src/core/state/GameState.js';
@@ -1309,5 +1311,132 @@ describe('dig_ramp_segment work duration scales with live voxel count (#924)', (
     expect(actualRatio).toBeLessThan(expectedRatio + 0.15);
     expectNoWorldInvariantViolations(a.ctx.state!);
     expectNoWorldInvariantViolations(b.ctx.state!);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1085 — the #1000/#1002 starvation override must apply identically to a
+// TIMER-DRIVEN vehicle-gated completion (dig_ramp_segment, resolved in
+// src/console/commands/tickTaskCompletion.ts) as it already does to a
+// PHASE-DRIVEN one (haul_debris/fragment_debris, resolved through
+// completeVehicleGatedActionIfApplicable via ArrivalGate's completion pass
+// in tick.ts — see buildings.integration.test.ts's own #1000 describe block,
+// the haul_debris mirror of this exact scenario). Today
+// tickTaskCompletion.ts hand-rolls tryContinueVehicleGatedAction +
+// releaseVehicleOnCompletion for a timer-driven completion instead of
+// calling the shared completeVehicleGatedActionIfApplicable, so
+// findStarvedActionForEmployee never runs on that path — a deep
+// dig_ramp_segment chain can starve out an unclaimed place_building order
+// forever, the same bug #1000 fixed for haul_debris but left open here.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('dig_ramp_segment — starvation override on the timer-driven completion path (#1085)', () => {
+  function tickWithFatigueToppedUp(ctx: GameContext): void {
+    // Mirrors buildings.integration.test.ts's own #1000 helper: pins every
+    // employee's fatigue at full each tick so an unrelated forced-rest
+    // interruption can never hand the digger a spontaneous idle window of
+    // its own, which would let ordinary (non-continuity) idle dispatch pick
+    // up the place_building order for a reason that has nothing to do with
+    // this bug.
+    for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+    tickCommand(ctx, ['1'], {});
+  }
+
+  it('a starved place_building order wins dispatch over dig_ramp_segment vehicle continuity — same reservation/release shape the phase-driven (haul_debris) path already produces', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1_000_000 });
+
+    // Roster: exactly ONE rock_digger-licensed driver, and nobody else —
+    // reproduces the bug precisely: without the #1085 fix, this driver can
+    // never be spared for the place_building order once the ramp's segment
+    // chain exists, because tickTaskCompletion.ts's dig_ramp_segment
+    // completion branch never checks findStarvedActionForEmployee at all.
+    const hireResult = employeeCommand(ctx, ['hire'], { role: 'driver' });
+    expect(hireResult.success, JSON.stringify(hireResult)).toBe(true);
+    const digger = ctx.state!.employees.employees[ctx.state!.employees.employees.length - 1]!;
+    assignSkill(ctx.state!.employees, digger.id, 'driving.excavator', 1);
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'rock_digger'], {});
+    expect(buyResult.success, JSON.stringify(buyResult)).toBe(true);
+    const vehicle = ctx.state!.vehicles.vehicles[0]!;
+
+    // Same ramp footprint #924's own suite already proved out against this
+    // exact seed/size/origin (11 segments, several with well over 10 cells
+    // each) — plenty of segment-to-segment continuity hops for the ramp to
+    // still be mid-chain by the time the override should fire.
+    const rampResult = buildRampCommand(ctx, [], { origin: '16,19', direction: 'south', length: '8', depth: '8' });
+    expect(rampResult.success, JSON.stringify(rampResult)).toBe(true);
+    expect(ctx.state!.plannedRamps).toHaveLength(1);
+    const rampId = ctx.state!.plannedRamps[0]!.id;
+    expect(ctx.state!.plannedRamps[0]!.segments.length).toBeGreaterThan(2);
+
+    // Let the digger actually commit to the ramp chain first through
+    // ordinary idle dispatch — not the continuity fast path — mirroring
+    // #1000's own "let every driver commit to the backlog first" setup, so
+    // the place_building order below is queued only once vehicle continuity
+    // is the ONLY thing standing between the digger and it.
+    const isDigging = (): boolean => {
+      const action = digger.activeActionId !== null
+        ? ctx.state!.pendingActions.find(a => a.id === digger.activeActionId)
+        : undefined;
+      return action?.type === 'dig_ramp_segment';
+    };
+    for (let i = 0; i < 100 && !isDigging(); i++) tickWithFatigueToppedUp(ctx);
+    expect(isDigging(), JSON.stringify(digger)).toBe(true);
+
+    const buildingResult = buildCommand(ctx, ['freight_warehouse'], { at: '6,9' });
+    expect(buildingResult.success, JSON.stringify(buildingResult)).toBe(true);
+    const placeBuildingActionId = ctx.state!.pendingActions.find(a => a.type === 'place_building')!.id;
+
+    // Backdate the order's own queuedAtTick so it counts as already having
+    // waited ACTION_STARVATION_TICK_THRESHOLD ticks — only the *elapsed-tick
+    // delta* findStarvedActionForEmployee reads matters, not real wall-clock
+    // ticks spent waiting for it (same technique VehicleContinuity.test.ts's
+    // own #1085 fixture uses at the unit level). This keeps the ramp
+    // genuinely mid-chain, rather than gambling on whether hundreds of real
+    // ticks would let a single digger fully drain an 11-segment ramp before
+    // or after crossing the threshold.
+    const placeAction = ctx.state!.pendingActions.find(a => a.id === placeBuildingActionId)!;
+    placeAction.queuedAtTick = ctx.state!.tickCount - ACTION_STARVATION_TICK_THRESHOLD;
+
+    let assignedAtTick: number | null = null;
+    let rampStillOpenWhenAssigned = false;
+    const TICK_BUDGET = 500; // generous margin over a single ramp segment's own work duration
+
+    for (let i = 0; i < TICK_BUDGET; i++) {
+      tickWithFatigueToppedUp(ctx);
+      const action = ctx.state!.pendingActions.find(a => a.id === placeBuildingActionId);
+      if (action && action.status === 'assigned') {
+        assignedAtTick = ctx.state!.tickCount;
+        rampStillOpenWhenAssigned = ctx.state!.plannedRamps.some(r => r.id === rampId);
+        break;
+      }
+    }
+
+    // Regression assertion (fails today): once the threshold is crossed, the
+    // starved place_building order must be handed to the digger instead of
+    // the driver perpetually continuing to the next ramp segment via
+    // tryContinueVehicleGatedAction's own continuity fast path.
+    expect(
+      assignedAtTick,
+      'place_building order was never assigned — the starvation override never fired for the timer-driven (dig_ramp_segment) completion path',
+    ).not.toBeNull();
+    // Proves the override actually preempted an in-progress ramp — not that
+    // the ramp coincidentally finished first and the digger picked up the
+    // building afterward through ordinary idle dispatch.
+    expect(rampStillOpenWhenAssigned).toBe(true);
+    expect(ctx.state!.plannedRamps.some(r => r.id === rampId)).toBe(true); // ramp interrupted, not finished
+
+    const landedAction = ctx.state!.pendingActions.find(a => a.id === placeBuildingActionId)!;
+    expect(landedAction.status).toBe('assigned');
+    expect(landedAction.holderId).toBe(digger.id);
+    expect(digger.activeActionId).toBe(placeBuildingActionId);
+
+    // Same reservation/release shape the phase-driven (#1000/#1002) path
+    // already produces for the same starvation event: the vehicle is fully
+    // released, not left reserved-but-idle on the abandoned ramp segment.
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 });

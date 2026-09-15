@@ -229,7 +229,7 @@ today. A migration issue updates its own row as it lands.
 |-------|----------|--------|
 | 0a | Box-cut regression coverage under the tutorial's own conditions, interaction mode | landed |
 | 0b | `assertWorldInvariants`, warn-only, against today's fields | landed |
-| 1a | One vehicle-gated completion path | planned |
+| 1a | One vehicle-gated completion path | landed |
 | 1b | Tick pipeline core-owned; the second, test-only loop removed | planned |
 | 2 | `Locomotion` + `occupantIds` as the mount truth, `Mount` its only writer; renderer and 1-tile board/alight | planned |
 | 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | planned |
