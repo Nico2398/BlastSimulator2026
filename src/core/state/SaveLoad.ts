@@ -341,6 +341,12 @@ export function deserialize(json: string): GameState {
   ensureField(eventsRaw, 'actionCountSinceEvent', v => typeof v === 'number', 0);
   ensureField(eventsRaw, 'cooldownMinIntervalTicks', v => typeof v === 'number', null);
 
+  // #1083: VehicleState gained a `driverBoardingCount` lifetime counter. A
+  // pre-#1083 save has none recorded — default to 0, matching
+  // createVehicleState's own default.
+  const vehiclesRaw = obj['vehicles'] as Record<string, unknown> | undefined;
+  ensureField(vehiclesRaw, 'driverBoardingCount', v => typeof v === 'number', 0);
+
   // Ensure restNeedKey exists on employees saved before the field was added.
   // Absent means "not resting under the general rest path", which is what null
   // encodes — an employee frozen mid-rest in such a save is released by the

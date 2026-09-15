@@ -122,7 +122,17 @@ export function checkGoalAgainstState(
   }
 
   if (goal.atMost) {
-    // TODO: implement in green phase
+    for (const [field, ceiling] of Object.entries(goal.atMost)) {
+      const actualRaw = after?.[field];
+      const actual = typeof actualRaw === 'number' ? actualRaw : 0;
+      if (actual > ceiling) {
+        mismatches.push({ field, goalType: 'atMost', expected: ceiling, actual });
+        if (violation === null) {
+          violation = `${field} should be at most ${ceiling} but is ${actual}`;
+          violationIsDrift = true;
+        }
+      }
+    }
   }
 
   return {

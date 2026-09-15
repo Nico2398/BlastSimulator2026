@@ -526,7 +526,16 @@ export async function checkGoal(
     }
 
     if (goal.atMost) {
-      // TODO: implement in green phase
+      for (const [field, ceiling] of Object.entries(goal.atMost)) {
+        const actualRaw = state[field];
+        const actual = typeof actualRaw === 'number' ? actualRaw : 0;
+        if (actual > ceiling) {
+          throw new InteractionFailure(
+            `${field} should be at most ${ceiling} but is ${actual}`,
+            describeAvailable(await probe(page)),
+          );
+        }
+      }
     }
   }
 
