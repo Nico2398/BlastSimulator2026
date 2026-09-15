@@ -633,6 +633,7 @@ window.__gameState = () => {
     // Mirrors console-api.ts's own field so both modes read the same thing.
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     deathCount: s.damage.deathCount,
+    vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // Typed mirror of `ctx.state.events.pendingEvent !== null` (EventSystem.ts)

@@ -330,6 +330,7 @@ function resolveBoarding(
   emp.pendingDriverVehicleId = null;
   if (boarded.success) {
     result.driversBoarded.push(emp.id);
+    state.vehicles.driverBoardingCount++;
     emitter?.emit('vehicle:driver_boarded', { employeeId: emp.id, vehicleId: vehicle.id });
     // #550: a vehicle-gated action normally already staged targetX/targetZ
     // on this vehicle at claim time (GameLoop.promoteVehicleGatedAction) —

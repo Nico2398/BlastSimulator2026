@@ -465,7 +465,7 @@ export async function checkGoal(
   // state-reading goal kinds below — up to four separate evaluates for a
   // step whose expect combines increased/decreased/equals/changedBy, on every
   // step of every scenario, for state that cannot have changed between them.
-  if (goal.increased || goal.decreased || goal.equals || goal.changedBy) {
+  if (goal.increased || goal.decreased || goal.equals || goal.changedBy || goal.atMost) {
     const state = after ?? await gameState(page);
 
     if (goal.increased) {
@@ -519,6 +519,26 @@ export async function checkGoal(
         if (actualDelta !== expectedDelta) {
           throw new InteractionFailure(
             `${field} should have changed by ${expectedDelta} but changed by ${actualDelta} (${was} → ${now})`,
+            describeAvailable(await probe(page)),
+          );
+        }
+      }
+    }
+
+    if (goal.atMost) {
+      // Interaction mode has no drift-tolerant path — unlike command mode's
+      // --report-drift, which reports an exceeded atMost ceiling (like an
+      // equals/changedBy mismatch) as drift rather than a hard failure —
+      // every goal checked here throws directly on failure, atMost included,
+      // the same as equals/changedBy above. atMost's own tolerance for a
+      // lower (improved) actual is a command-mode reporting concern; the
+      // ceiling itself is still checked exactly here.
+      for (const [field, ceiling] of Object.entries(goal.atMost)) {
+        const actualRaw = state[field];
+        const actual = typeof actualRaw === 'number' ? actualRaw : 0;
+        if (actual > ceiling) {
+          throw new InteractionFailure(
+            `${field} should be at most ${ceiling} but is ${actual}`,
             describeAvailable(await probe(page)),
           );
         }

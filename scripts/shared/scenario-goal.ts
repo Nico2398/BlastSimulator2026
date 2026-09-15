@@ -2,8 +2,8 @@
  * BlastSimulator2026 — Scenario goal checking (command mode)
  *
  * Command mode has a state dump but no DOM, so it proves the
- * `equals`/`increased`/`decreased`/`changedBy` half of a step's `expect`, and
- * proves it **unscoped** — this evaluator is the one place every goal a
+ * `equals`/`increased`/`decreased`/`changedBy`/`atMost` half of a step's
+ * `expect`, and proves it **unscoped** — this evaluator is the one place every goal a
  * scenario declares is actually asserted, and it must stay that way.
  * `usable`/`blocked`/`tutorialStep` need a live page and are checked only in
  * interaction mode, which calls `interaction-driver.ts`'s `checkGoal`
@@ -18,13 +18,13 @@
 import type { ScenarioStepGoal } from './scenario-types.js';
 
 /**
- * A single `equals`/`changedBy` field mismatch — the drift-report unit
- * (issue #679). Never produced for `increased`/`decreased`, which stay
+ * A single `equals`/`changedBy`/`atMost` field mismatch — the drift-report
+ * unit (issue #679). Never produced for `increased`/`decreased`, which stay
  * directional-only and out of scope for drift reporting.
  */
 export interface GoalMismatch {
   field: string;
-  goalType: 'equals' | 'changedBy';
+  goalType: 'equals' | 'changedBy' | 'atMost';
   expected: unknown;
   /** For 'equals': the actual field value. For 'changedBy': the actual delta (after - before), not the absolute post-state value. */
   actual: unknown;
@@ -34,27 +34,27 @@ export interface GoalMismatch {
  * Result of checking one step's goal against its before/after state dumps.
  */
 export interface GoalCheckResult {
-  /** Same text/semantics as today's return value — first violation found, increased→decreased→equals→changedBy order. */
+  /** Same text/semantics as today's return value — first violation found, increased→decreased→equals→changedBy→atMost order. */
   violation: string | null;
-  /** Every equals/changedBy field that mismatched, exhaustively (not just the first). Never contains increased/decreased failures. */
+  /** Every equals/changedBy/atMost field that mismatched, exhaustively (not just the first). Never contains increased/decreased failures. */
   mismatches: GoalMismatch[];
   /** True only when violation is non-null and every contributing failure is in `mismatches` — i.e. no increased/decreased goal also failed. */
   isDriftOnly: boolean;
 }
 
 /**
- * Checks `goal.equals`/`goal.increased`/`goal.decreased`/`goal.changedBy`
- * against `before`/`after` state dumps. Returns a violation message naming
- * the field and the mismatch, or `null` when everything holds — identical
- * text/semantics to the pre-#679 version (first violation found, in
- * increased→decreased→equals→changedBy order).
+ * Checks `goal.equals`/`goal.increased`/`goal.decreased`/`goal.changedBy`/
+ * `goal.atMost` against `before`/`after` state dumps. Returns a violation
+ * message naming the field and the mismatch, or `null` when everything
+ * holds — identical text/semantics to the pre-#679 version (first violation
+ * found, in increased→decreased→equals→changedBy→atMost order).
  *
- * Additionally, for `equals`/`changedBy` goals, collects every mismatching
- * field (not just the first) into `.mismatches` — the drift-report unit
- * (issue #679). `increased`/`decreased` never contribute to `.mismatches`.
- * `usable`/`blocked`/`tutorialStep` are silently skipped — command mode has
- * no page to check them against, and that gap is filled by the same
- * scenario running in interaction mode.
+ * Additionally, for `equals`/`changedBy`/`atMost` goals, collects every
+ * mismatching field (not just the first) into `.mismatches` — the
+ * drift-report unit (issue #679). `increased`/`decreased` never contribute
+ * to `.mismatches`. `usable`/`blocked`/`tutorialStep` are silently skipped —
+ * command mode has no page to check them against, and that gap is filled by
+ * the same scenario running in interaction mode.
  */
 export function checkGoalAgainstState(
   goal: ScenarioStepGoal,
@@ -115,6 +115,25 @@ export function checkGoalAgainstState(
         mismatches.push({ field, goalType: 'changedBy', expected: expectedDelta, actual: actualDelta });
         if (violation === null) {
           violation = `${field} should have changed by ${expectedDelta} but changed by ${actualDelta} (${was} → ${now})`;
+          violationIsDrift = true;
+        }
+      }
+    }
+  }
+
+  if (goal.atMost) {
+    for (const [field, ceiling] of Object.entries(goal.atMost)) {
+      const actualRaw = after?.[field];
+      const actual = typeof actualRaw === 'number' ? actualRaw : 0;
+      if (actual > ceiling) {
+        mismatches.push({ field, goalType: 'atMost', expected: ceiling, actual });
+        if (violation === null) {
+          violation = `${field} should be at most ${ceiling} but is ${actual}`;
+          // atMost is reported as drift (not a hard failure under --report-drift)
+          // because a later run legitimately lowering the ceiling is exactly what
+          // this goal kind exists to allow — same tolerance equals/changedBy use
+          // for a different reason (rebasing), applied here for the opposite
+          // direction (improvement).
           violationIsDrift = true;
         }
       }

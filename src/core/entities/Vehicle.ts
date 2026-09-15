@@ -177,10 +177,12 @@ export interface Vehicle {
 export interface VehicleState {
   vehicles: Vehicle[];
   nextId: number;
+  /** Fleet-wide count of driver-boarding events. */
+  driverBoardingCount: number;
 }
 
 export function createVehicleState(): VehicleState {
-  return { vehicles: [], nextId: 1 };
+  return { vehicles: [], nextId: 1, driverBoardingCount: 0 };
 }
 
 // ── Operations ──

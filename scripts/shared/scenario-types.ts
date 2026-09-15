@@ -309,6 +309,12 @@ export interface ScenarioStepGoal {
    * a running total (flags, ids, terminal outcomes, counts that are set rather than accrued).
    */
   changedBy?: Record<string, number>;
+  /**
+   * Ceiling — actual value must be <= N. Unlike equals/changedBy this
+   * tolerates a lower actual, so later work that improves the measured
+   * number still passes.
+   */
+  atMost?: Record<string, number>;
   /** A control that must be usable after this step (interaction mode only). */
   usable?: string;
   /** A control that must NOT be reachable after this step (interaction mode only). For guard/rejection proofs. */

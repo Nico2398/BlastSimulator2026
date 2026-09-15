@@ -159,6 +159,7 @@ export function goalAssertsAnything(goal: ScenarioStepGoal): boolean {
     || goal.decreased !== undefined
     || goal.equals !== undefined
     || goal.changedBy !== undefined
+    || goal.atMost !== undefined
     || goal.usable !== undefined
     || goal.blocked !== undefined
     || goal.tutorialStep !== undefined;

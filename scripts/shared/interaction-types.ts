@@ -84,6 +84,11 @@ export interface InteractionGoal {
    * rationale — this is its field-for-field mirror.
    */
   changedBy?: Record<string, number>;
+  /**
+   * Ceiling — actual value must be <= N. See `ScenarioStepGoal.atMost`
+   * (scenario-types.ts) for the rationale — this is its field-for-field mirror.
+   */
+  atMost?: Record<string, number>;
   /** A control that must be usable by now. */
   usable?: string;
   /**
