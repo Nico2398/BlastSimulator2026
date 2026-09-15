@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleDefByTier, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
@@ -170,6 +171,29 @@ describe('planItinerary', () => {
       const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
       expect(itinerary).toBeNull();
     });
+
+    it('geometrically unreachable target: reposition goal boxed in by blocked cells on all 8 neighbours returns null (real findPath failure, not entity-resolution failure)', () => {
+      const state = makeState();
+      const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+
+      // Box (12,7) in completely — every 8-directional neighbour is blocked,
+      // so no A* path (nor the direct-line fast path) can ever step onto it,
+      // even though the cell itself stays walkable and the grid is otherwise open.
+      const targetX = 12;
+      const targetZ = 7;
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dz === 0) continue;
+          state.navGrid!.cells[targetZ + dz]![targetX + dx] = makeCell('blocked');
+        }
+      }
+      const walled = findPath(state.navGrid!, { agentId: employee.id, fromX: employee.x, fromZ: employee.z, toX: targetX, toZ: targetZ, avoidVehicles: false });
+      expect(walled.found).toBe(false);
+
+      const goal: Goal = { kind: 'reposition', x: targetX, z: targetZ };
+      const itinerary = planItinerary(state, employee, goal, 'exact');
+      expect(itinerary).toBeNull();
+    });
   });
 
   it('fidelity agreement: same leg structure for estimate vs exact, but estTicks differ where an obstacle forces a detour', () => {
@@ -255,6 +279,25 @@ describe('planItinerary', () => {
     expect(itinerary).toBeNull();
   });
 
+  it("'rest' goal resolving against a real, existing building: single foot leg to its x/z, zero work ticks (mirrors 'reposition', exercising resolveGoal's building lookup on the success path)", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+    const { success, building } = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+    expect(success).toBe(true);
+
+    const goal: Goal = { kind: 'rest', buildingId: building!.id };
+    const itinerary = planItinerary(state, employee, goal, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+    expect(itinerary!.legs[0]!.arrival).toBe('exact');
+    expect(itinerary!.legs[0]!.onArrive).toEqual({ kind: 'none' });
+    expect(itinerary!.legs[0]!.destX).toBe(building!.x);
+    expect(itinerary!.legs[0]!.destZ).toBe(building!.z);
+    expect(itinerary!.workTicks).toBe(0);
+  });
+
   it('employee not licensed for the required vehicle role returns null even though a free vehicle of that role exists (distinguishes "not licensed" from "no vehicle")', () => {
     const state = makeState();
     const rng = new Random(SEED);
@@ -266,6 +309,25 @@ describe('planItinerary', () => {
 
     const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
     expect(itinerary).toBeNull();
+  });
+
+  it("fidelity: 'exact' with state.navGrid still null falls back to the octile heuristic instead of throwing or returning null purely for lack of a NavGrid (mirrors resolveActionCost's own null-navGrid convention)", () => {
+    const state = createGame({ seed: SEED }); // no makeState() — navGrid left at its createGame default.
+    expect(state.navGrid).toBeNull();
+    const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
+    const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(2);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+    expect(itinerary!.legs[0]!.onArrive).toEqual({ kind: 'board', vehicleId: vehicle.id });
+    expect(itinerary!.legs[1]!.mode).toBe('drive');
+    expect(itinerary!.legs[1]!.destX).toBe(action.targetX);
+    expect(itinerary!.legs[1]!.destZ).toBe(action.targetZ);
   });
 
   it('is pure: state is unchanged after planning a vehicle-gated itinerary (no mutation, no reservation side effect)', () => {
