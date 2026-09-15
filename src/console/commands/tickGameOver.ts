@@ -1,54 +1,27 @@
 // BlastSimulator2026 — Game-over condition checks for the per-tick loop
-// Split from events.ts's tickCommand (#695).
+// Split from events.ts's tickCommand (#695). The checks themselves now live
+// in src/core/engine/GameOverConditions.ts's checkGameOverConditions
+// (#1086), called once per tick from the core-owned runTick — this file is a
+// pure formatter turning the GameOverReport it already produced into the
+// same console lines as before. It does not call checkGameOverConditions
+// itself: runTick already did, once, this tick — calling it again here
+// would double the bankruptcy/ecology/arrest/revolt streak bookkeeping a
+// second pass through the checks would trigger.
 
-import type { GameState } from '../../core/state/GameState.js';
-import { EventEmitter } from '../../core/state/EventEmitter.js';
-import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
-import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
-import { updateArrest } from '../../core/campaign/CriminalArrest.js';
-import { updateRevolt } from '../../core/campaign/WorkerRevolt.js';
-import { checkLevelComplete } from '../../core/campaign/LevelTransition.js';
-import { snapshotStats } from '../../core/campaign/SuccessTracker.js';
+import type { GameOverReport } from '../../core/engine/TickPipeline.js';
 
-export function checkGameOverConditions(
-  state: GameState,
-  emitter: EventEmitter,
-  lines: string[],
-): void {
-  // 9. Level stats snapshot + campaign profit check
-  snapshotStats(state.levelStats, state);
-  const levelResult = checkLevelComplete(state, state.campaign, emitter);
-  if (levelResult.triggered) {
-    state.levelEnded = true;
-    state.levelEndReason = 'completed';
-    lines.push(`[tick ${state.tickCount}] LEVEL COMPLETE! Profit target reached.`);
+export function formatGameOver(tickCount: number, report: GameOverReport, lines: string[]): void {
+  if (report.levelCompleted) {
+    lines.push(`[tick ${tickCount}] LEVEL COMPLETE! Profit target reached.`);
   }
 
-  // 9. Campaign game-over condition checks (emit events; UI subscribes).
-  // All 4 always run, unconditionally, to preserve their own streak/warning
-  // bookkeeping — only the first one to return true this tick sets
-  // levelEndReason, and only if 'completed' didn't already claim it above.
-  const bankrupted = updateBankruptcy(state, state.bankruptcy, emitter);
-  const ecoShutdown = updateEcology(state, state.ecological, emitter);
-  const arrested = updateArrest(state, state.arrest, emitter);
-  const revolted = updateRevolt(state, state.revolt, emitter);
-  if (!state.levelEnded) {
-    if (bankrupted) {
-      state.levelEnded = true;
-      state.levelEndReason = 'bankruptcy';
-      lines.push(`[tick ${state.tickCount}] BANKRUPTCY! The mine is seized.`);
-    } else if (ecoShutdown) {
-      state.levelEnded = true;
-      state.levelEndReason = 'ecological_shutdown';
-      lines.push(`[tick ${state.tickCount}] ECOLOGICAL SHUTDOWN! Regulators close the mine.`);
-    } else if (arrested) {
-      state.levelEnded = true;
-      state.levelEndReason = 'arrest';
-      lines.push(`[tick ${state.tickCount}] ARRESTED! Criminal charges end your run.`);
-    } else if (revolted) {
-      state.levelEnded = true;
-      state.levelEndReason = 'worker_revolt';
-      lines.push(`[tick ${state.tickCount}] WORKER REVOLT! Your workforce walks out for good.`);
-    }
+  if (report.levelEndReason === 'bankruptcy' && report.bankrupted) {
+    lines.push(`[tick ${tickCount}] BANKRUPTCY! The mine is seized.`);
+  } else if (report.levelEndReason === 'ecological_shutdown' && report.ecoShutdown) {
+    lines.push(`[tick ${tickCount}] ECOLOGICAL SHUTDOWN! Regulators close the mine.`);
+  } else if (report.levelEndReason === 'arrest' && report.arrested) {
+    lines.push(`[tick ${tickCount}] ARRESTED! Criminal charges end your run.`);
+  } else if (report.levelEndReason === 'worker_revolt' && report.revolted) {
+    lines.push(`[tick ${tickCount}] WORKER REVOLT! Your workforce walks out for good.`);
   }
 }

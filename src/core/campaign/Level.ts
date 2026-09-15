@@ -248,7 +248,8 @@ export function getAllLevels(): readonly LevelDef[] {
  * Core-owned relocation of console/commands/commandUtils.ts's
  * resolveContractPriceMultiplier (#1086 skeleton phase) — no logic yet.
  */
-export function resolveContractPriceMultiplier(_state: GameState): number {
-  // TODO: implement
-  throw new Error('not implemented');
+export function resolveContractPriceMultiplier(state: GameState): number {
+  const levelId = state.campaign.activeLevelId;
+  if (!levelId) return 1;
+  return getLevel(levelId)?.contractPriceMultiplier ?? 1;
 }

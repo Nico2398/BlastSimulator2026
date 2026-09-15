@@ -3,10 +3,6 @@
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
 import type { GameState } from '../state/GameState.js';
-import type { Random } from '../math/Random.js';
-import type { EventContext } from '../events/EventPool.js';
-import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
-import { detectTrafficJam } from '../events/EventEngine.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
 import {
@@ -68,7 +64,7 @@ export { completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
 
 // Task progress ticking and completion lives in TaskProgress.ts (#759's
 // file-size split) — re-exported here.
-export { tickTaskProgress, type TaskProgressLevelUp, type TaskProgressResult } from './TaskProgress.js';
+export { tickTaskProgress, type TaskProgressLevelUp } from './TaskProgress.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -77,76 +73,7 @@ export const BASE_TICK_MS = _BASE_TICK_MS;
 export const VALID_SPEEDS = _VALID_SPEEDS;
 export type SpeedMultiplier = (typeof VALID_SPEEDS)[number];
 
-// ── Tick result ──
-
-export interface TickResult {
-  /** Number of ticks actually processed. */
-  ticksProcessed: number;
-  /** Events fired during these ticks. */
-  firedEvents: FiredEvent[];
-  /** Whether auto-pause was triggered. */
-  autoPaused: boolean;
-  /** Reason for auto-pause if triggered. */
-  autoPauseReason: string | null;
-}
-
 // ── Core loop ──
-
-/**
- * Process a frame of game time. Called by the rendering loop or console.
- * At Nx speed, processes N ticks per call.
- * Auto-pauses on events requiring player decision.
- *
- * @param state - The game state (mutated in place)
- * @param buildContext - Function to build EventContext from current state
- * @param rng - Seeded random for determinism
- * @returns TickResult with what happened
- */
-export function processFrame(
-  state: GameState,
-  buildContext: (state: GameState) => EventContext,
-  rng: Random,
-): TickResult {
-  if (state.isPaused) {
-    return { ticksProcessed: 0, firedEvents: [], autoPaused: false, autoPauseReason: null };
-  }
-
-  const ticksToProcess = state.timeScale;
-  const firedEvents: FiredEvent[] = [];
-  let autoPaused = false;
-  let autoPauseReason: string | null = null;
-  let ticksProcessed = 0;
-
-  for (let i = 0; i < ticksToProcess; i++) {
-    state.tickCount++;
-    state.time += BASE_TICK_MS;
-    ticksProcessed++;
-
-    const ctx = buildContext(state);
-    const fired = tickEventSystem(state.events, ctx, rng);
-
-    if (fired) {
-      firedEvents.push(fired);
-      // Auto-pause: event requires player decision
-      state.isPaused = true;
-      autoPaused = true;
-      autoPauseReason = `Event requires decision: ${fired.eventId}`;
-      break; // Stop processing further ticks
-    }
-
-    // No event from timers — check for traffic jam condition
-    const jamEvent = detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
-    if (jamEvent) {
-      firedEvents.push(jamEvent);
-      state.isPaused = true;
-      autoPaused = true;
-      autoPauseReason = `Event requires decision: ${jamEvent.eventId}`;
-      break;
-    }
-  }
-
-  return { ticksProcessed, firedEvents, autoPaused, autoPauseReason };
-}
 
 /**
  * Set game speed. Validates the multiplier.
