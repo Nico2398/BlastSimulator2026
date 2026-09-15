@@ -24,7 +24,7 @@ import type { ScenarioStepGoal } from './scenario-types.js';
  */
 export interface GoalMismatch {
   field: string;
-  goalType: 'equals' | 'changedBy';
+  goalType: 'equals' | 'changedBy' | 'atMost';
   expected: unknown;
   /** For 'equals': the actual field value. For 'changedBy': the actual delta (after - before), not the absolute post-state value. */
   actual: unknown;
@@ -119,6 +119,10 @@ export function checkGoalAgainstState(
         }
       }
     }
+  }
+
+  if (goal.atMost) {
+    // TODO: implement in green phase
   }
 
   return {

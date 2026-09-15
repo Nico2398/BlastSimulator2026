@@ -86,6 +86,8 @@ export interface SerializableGameState {
   fillableOreSaleOffered: boolean;
   /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
   deathCount: number;
+  /** Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount). */
+  vehicleBoardingCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -164,6 +166,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     deathCount: s.damage.deathCount,
+    vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,

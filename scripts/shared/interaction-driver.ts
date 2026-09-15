@@ -465,7 +465,7 @@ export async function checkGoal(
   // state-reading goal kinds below — up to four separate evaluates for a
   // step whose expect combines increased/decreased/equals/changedBy, on every
   // step of every scenario, for state that cannot have changed between them.
-  if (goal.increased || goal.decreased || goal.equals || goal.changedBy) {
+  if (goal.increased || goal.decreased || goal.equals || goal.changedBy || goal.atMost) {
     const state = after ?? await gameState(page);
 
     if (goal.increased) {
@@ -523,6 +523,10 @@ export async function checkGoal(
           );
         }
       }
+    }
+
+    if (goal.atMost) {
+      // TODO: implement in green phase
     }
   }
 
