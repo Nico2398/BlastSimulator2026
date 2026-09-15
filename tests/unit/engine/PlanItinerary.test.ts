@@ -4,9 +4,8 @@
 // the scattered cost logic in ActionSelection.ts (resolveVehicleGatedWalkTarget,
 // computeActionWorkTicks) and VehicleReservation.ts (findFreeVehicleForRole)
 // with one ordered Itinerary both the action-cost estimator and the executor
-// consume. Red phase: the stub (src/core/engine/PlanItinerary.ts)
-// unconditionally returns null, so every test below expecting a non-null
-// Itinerary is expected to fail until @implementer lands the real logic.
+// consume. Nothing wires it in yet (phase 3a, see gameplay-vehicle-fleet) —
+// this suite exercises the planner in isolation.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';

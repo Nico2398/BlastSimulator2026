@@ -10,9 +10,9 @@
 // loop both call) drive the employee through the same journey, and compare
 // the ticks each one took.
 //
-// Red phase: PlanItinerary.ts's stub always returns null, so every case
-// below fails at the `expect(itinerary).not.toBeNull()` inside the harness,
-// not with an import or type error.
+// planItinerary is not wired into the tick pipeline yet (phase 3a) — this
+// suite plans an itinerary directly, then drives the real pipeline through
+// the same journey to prove the two numbers agree.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../src/core/state/GameState.js';
