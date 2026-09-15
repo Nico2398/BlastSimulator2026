@@ -365,6 +365,10 @@ describe('assertWorldInvariants — I7_in_progress_vehicle_action_driver_mismatc
     const v = addVehicle(state, { driverId: otherEmp.id, x: 1, z: 1 });
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', status: 'in_progress', holderId: emp.id });
     v.reservedForActionId = action.id;
+    // Keep this I5-valid (holder mid-walk to board its own reservation) so only
+    // I7's stricter "already driving" check fires — I5 doesn't distinguish
+    // in_progress from any other status and would otherwise double-count.
+    emp.pendingDriverVehicleId = v.id;
 
     const violations = assertWorldInvariants(state);
 
