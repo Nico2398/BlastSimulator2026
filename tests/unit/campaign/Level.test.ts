@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractPriceMultiplier } from '../../../src/core/campaign/Level.js';
+import { createGame } from '../../../src/core/state/GameState.js';
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -118,6 +119,26 @@ describe('Level definition system (7.1)', () => {
     for (const level of levels) {
       expect('revoltImmune' in level).toBe(false);
     }
+  });
+
+  describe('resolveContractPriceMultiplier (#1086)', () => {
+    it('returns 1 when no level is active', () => {
+      const state = createGame({ seed: 1 });
+      expect(state.campaign.activeLevelId).toBeNull();
+      expect(resolveContractPriceMultiplier(state)).toBe(1);
+    });
+
+    it("returns the active level's own contractPriceMultiplier when one is active", () => {
+      const state = createGame({ seed: 1 });
+      state.campaign.activeLevelId = 'dusty_hollow';
+      expect(resolveContractPriceMultiplier(state)).toBe(getLevel('dusty_hollow')!.contractPriceMultiplier);
+    });
+
+    it('falls back to 1 when the active id no longer resolves to a known level', () => {
+      const state = createGame({ seed: 1 });
+      state.campaign.activeLevelId = 'nonexistent_mine';
+      expect(resolveContractPriceMultiplier(state)).toBe(1);
+    });
   });
 
   it('tutorial_pit only has basic explosives', () => {

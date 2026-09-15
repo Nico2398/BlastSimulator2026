@@ -246,7 +246,8 @@ export function getAllLevels(): readonly LevelDef[] {
  * The active level's own `contractPriceMultiplier`, or 1 when no level is
  * active (sandbox/no-game state) or the active id no longer resolves.
  * Core-owned relocation of console/commands/commandUtils.ts's
- * resolveContractPriceMultiplier (#1086 skeleton phase) — no logic yet.
+ * resolveContractPriceMultiplier (#1086), so the core-owned tick pipeline
+ * can read it without reaching into src/console/.
  */
 export function resolveContractPriceMultiplier(state: GameState): number {
   const levelId = state.campaign.activeLevelId;

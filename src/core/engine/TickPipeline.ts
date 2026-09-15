@@ -272,9 +272,9 @@ export function runTick(
     tickVehicleTaskState(vehicle);
   }
 
-  // 8f-2. Traffic jam detection — mirrors GameLoop.processFrame's own
-  // post-vehicle-tick check (src/core/engine/GameLoop.ts), reachable here so
-  // console/scenario "tick" steps can fire TrafficJamEvent too (#411).
+  // 8f-2. Traffic jam detection — runs immediately after vehicle movement,
+  // once per tick, so console/scenario "tick" steps can fire TrafficJamEvent
+  // too (#411).
   fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
 
   // 8g. Employee movement — walk employees with a destination (set by
