@@ -23,7 +23,13 @@ export type ViolationKind =
   | 'I6_destination_partially_set'
   | 'I7_in_progress_vehicle_action_driver_mismatch'
   | 'I8_payload_not_in_transit'
-  | 'I9_executing_task_still_travelling';
+  | 'I9_executing_task_still_travelling'
+  // #1089 (mount/itinerary phase 3b) — checked against the new
+  // itinerary/tickLocomotion model once the implementer phase wires them up;
+  // the old I4/I6/I7 checks above stay in place until then.
+  | 'I4_vehicle_moved_without_occupant'
+  | 'I6_empty_itinerary'
+  | 'I7_drive_leg_without_mount';
 
 export interface Violation {
   kind: ViolationKind;
@@ -212,7 +218,14 @@ function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
   return violations;
 }
 
-export function assertWorldInvariants(state: GameState): Violation[] {
+export function assertWorldInvariants(
+  state: GameState,
+  // #1089: vehicle x/z captured before this tick's locomotion step, so a
+  // future I4 check can tell "moved" from "stationary" without re-deriving
+  // it from vehicle.state. Unused until the implementer phase wires the new
+  // itinerary-model checks in.
+  _vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
+): Violation[] {
   return [
     ...checkI1OccupantLocomotionMismatch(state),
     ...checkI2MountedPositionMismatch(state),

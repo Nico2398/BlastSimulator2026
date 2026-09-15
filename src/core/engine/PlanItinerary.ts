@@ -85,6 +85,11 @@ export function planItinerary(
   employee: Employee,
   goal: Goal,
   fidelity: PlanFidelity,
+  // #1089: a caller-supplied vehicle hint — moveTo's `via` — steering which
+  // vehicle a work/reposition goal is planned through. Not wired up yet: the
+  // planner still resolves its own vehicle via findFreeVehicleForRole/the
+  // action's own reservation, ignoring this hint until the implementer phase.
+  _opts?: { via?: number },
 ): Itinerary | null {
   const resolved = resolveGoal(state, employee, goal);
   if (resolved === null) return null;

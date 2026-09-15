@@ -5,6 +5,7 @@ import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
+import type { Itinerary } from '../engine/Itinerary.js';
 import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 
 // ── Roles ──
@@ -186,6 +187,21 @@ export interface Employee {
    * (Mount.ts).
    */
   locomotion: Locomotion;
+  /**
+   * The employee's current planned journey (produced by planItinerary,
+   * walked by tickLocomotion — #1089), or null when they have no itinerary
+   * in flight. Null for every employee still driven by the legacy
+   * destinationX/Z single foot leg until the implementer phase migrates
+   * each caller over.
+   */
+  itinerary: Itinerary | null;
+  /**
+   * Consecutive ticks a mounted-but-not-yet-departed employee has spent
+   * waiting on their vehicle (e.g. a seat reserved but the drive leg not yet
+   * startable) — #1089's mirror of moveConsecutiveFailures for the
+   * vehicle-wait case tickLocomotion will own.
+   */
+  vehicleWaitingTicks: number;
 }
 
 // ── Employee state ──
@@ -257,6 +273,8 @@ export function hireEmployee(
     pendingDriverVehicleId: null,
     taskQueue: [],
     locomotion: { kind: 'on_foot' },
+    itinerary: null,
+    vehicleWaitingTicks: 0,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would
