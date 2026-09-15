@@ -9,11 +9,11 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 
 export type PlanFidelity = 'estimate' | 'exact';
 
@@ -80,23 +80,72 @@ function estimateLegDistance(
   return path.found ? path.totalCost : null;
 }
 
+/**
+ * The foot-to-vehicle leg every fresh (not-yet-mounted) vehicle-gated
+ * itinerary starts with: walk to within one tile of `vehicle` and board it.
+ * Shared by planItinerary's own vehicle-gated branch below and MoveTo.ts's
+ * board-only itinerary (`moveTo(state, id, {vehicleId})`), which is exactly
+ * this one leg with nothing appended after it.
+ */
+export function buildBoardLeg(
+  state: GameState,
+  employee: Employee,
+  vehicle: Vehicle,
+  fidelity: PlanFidelity,
+): Leg | null {
+  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
+  if (footDist === null) return null;
+
+  return {
+    mode: 'foot',
+    vehicleId: vehicle.id,
+    destX: vehicle.x,
+    destZ: vehicle.z,
+    arrival: 'adjacent',
+    onArrive: { kind: 'board', vehicleId: vehicle.id },
+    estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
+  };
+}
+
+/**
+ * Whether `vehicle` has a free seat for `employee` — already aboard counts as
+ * free (continuity never needs a second seat). Shared with MoveTo.ts's
+ * board-only itinerary, which runs the identical availability check before
+ * committing to a route.
+ */
+export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
+  return vehicle.occupantIds.includes(employee.id) || vehicle.occupantIds.length < VEHICLE_SEAT_COUNT[vehicle.type];
+}
+
 export function planItinerary(
   state: GameState,
   employee: Employee,
   goal: Goal,
   fidelity: PlanFidelity,
-  // #1089: a caller-supplied vehicle hint — moveTo's `via` — steering which
-  // vehicle a work/reposition goal is planned through. Not wired up yet: the
-  // planner still resolves its own vehicle via findFreeVehicleForRole/the
-  // action's own reservation, ignoring this hint until the implementer phase.
-  _opts?: { via?: number },
+  // #1089: a caller-supplied vehicle hint — moveTo's `via` — names the exact
+  // vehicle to plan a reposition goal through, overriding the goal's own
+  // (null, for 'reposition') role-based selection below. Reused by a 'work'
+  // goal too (harmless: no caller passes both today), so the override lives
+  // in one place rather than being special-cased per goal kind.
+  opts?: { via?: number },
 ): Itinerary | null {
   const resolved = resolveGoal(state, employee, goal);
   if (resolved === null) return null;
 
   const role = resolved.requiredVehicleRole;
+  // A 'reposition' goal carries no role of its own — an employee already
+  // mounted planning one implicitly keeps driving the vehicle they're in
+  // (Zone.ts's already-driven-relocate case: `moveTo(state, v.driverId, {x,
+  // z})`, no explicit `via`) rather than stepping off it to walk, which
+  // would desync their position from the vehicle's (I2) without ever
+  // alighting. An explicit `via` always wins when both are present.
+  const via = opts?.via ?? (
+    goal.kind === 'reposition' && isMounted(employee.locomotion)
+      ? mountedVehicleId(employee.locomotion) ?? undefined
+      : undefined
+  );
 
-  if (role === null) {
+  if (role === null && via === undefined) {
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED) {
       /* reserved for gameplay-vehicle-fleet phase 7 (fast transport): compare
        * this foot leg's cost against boarding+driving and return whichever is
@@ -119,14 +168,21 @@ export function planItinerary(
     return { legs: [footLeg], goal, workTicks: 0, estTotalTicks: footLeg.estTicks };
   }
 
-  // Vehicle-gated: reuse the reservation already made for this action, if
-  // any, otherwise the cheapest free vehicle of the required role — same
-  // lookup resolveVehicleGatedWalkTarget (ActionSelection.ts) uses.
-  const reserved = resolved.actionId !== null
-    ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
-    : undefined;
-  const vehicle = reserved ?? findFreeVehicleForRole(state, role, employee);
-  if (!vehicle) return null;
+  // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent
+  // that, reuse the reservation already made for this action, if any,
+  // otherwise the cheapest free vehicle of the required role — same lookup
+  // resolveVehicleGatedWalkTarget (ActionSelection.ts) uses.
+  let vehicle: Vehicle | undefined;
+  if (via !== undefined) {
+    vehicle = state.vehicles.vehicles.find(v => v.id === via);
+    if (!vehicle || !hasFreeSeatFor(vehicle, employee)) return null;
+  } else {
+    const reserved = resolved.actionId !== null
+      ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
+      : undefined;
+    vehicle = reserved ?? findFreeVehicleForRole(state, role!, employee) ?? undefined;
+    if (!vehicle) return null;
+  }
 
   const alreadyMounted = isMounted(employee.locomotion) && mountedVehicleId(employee.locomotion) === vehicle.id;
 
@@ -135,18 +191,9 @@ export function planItinerary(
   let driveFromZ = employee.z;
 
   if (!alreadyMounted) {
-    const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
-    if (footDist === null) return null;
-
-    legs.push({
-      mode: 'foot',
-      vehicleId: vehicle.id,
-      destX: vehicle.x,
-      destZ: vehicle.z,
-      arrival: 'adjacent',
-      onArrive: { kind: 'board', vehicleId: vehicle.id },
-      estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
-    });
+    const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
+    if (boardLeg === null) return null;
+    legs.push(boardLeg);
 
     driveFromX = vehicle.x;
     driveFromZ = vehicle.z;

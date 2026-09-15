@@ -16,7 +16,7 @@ import {
 } from '../../core/entities/Vehicle.js';
 import { alight } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
+import { moveTo } from '../../core/engine/MoveTo.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
@@ -193,12 +193,12 @@ export function vehicleCommand(
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: t('vehicle.not_found', { id: vehicleId }) };
       }
-      // Validates licence/availability now, but the employee must physically
-      // walk to the vehicle before they actually become its driver — resolved
-      // by ArrivalGate.tickArrivalGate once they arrive (#437).
-      const result = requestBoardVehicle(state, vehicleId, employeeId);
+      // Validates availability now, but the employee must physically walk to
+      // the vehicle before they actually become its driver — resolved by
+      // tickLocomotion's own board arrival step once they arrive (#1089).
+      const result = moveTo(state, employeeId, { vehicleId });
       if (!result.success) {
-        return { success: false, output: result.error! };
+        return { success: false, output: result.error };
       }
       return { success: true, output: t('vehicle.driver_board_success', { employeeId, vehicleId }) };
     }

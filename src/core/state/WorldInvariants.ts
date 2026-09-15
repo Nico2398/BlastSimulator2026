@@ -18,15 +18,12 @@ export type ViolationKind =
   | 'I2_mounted_position_mismatch'
   | 'I3_employee_drives_two_vehicles'
   | 'I3_seat_capacity_exceeded'
-  | 'I4_moving_vehicle_without_driver'
   | 'I5_reservation_without_valid_holder'
-  | 'I6_destination_partially_set'
-  | 'I7_in_progress_vehicle_action_driver_mismatch'
   | 'I8_payload_not_in_transit'
   | 'I9_executing_task_still_travelling'
-  // #1089 (mount/itinerary phase 3b) — checked against the new
-  // itinerary/tickLocomotion model once the implementer phase wires them up;
-  // the old I4/I6/I7 checks above stay in place until then.
+  // #1089 (mount/itinerary phase 3b): the itinerary/tickLocomotion model's
+  // own I4/I6/I7 semantics, replacing the pre-itinerary checks of the same
+  // number.
   | 'I4_vehicle_moved_without_occupant'
   | 'I6_empty_itinerary'
   | 'I7_drive_leg_without_mount';
@@ -110,12 +107,28 @@ function checkI3OccupantCapacityViolation(state: GameState): Violation[] {
   return violations;
 }
 
-function checkI4MovingVehicleWithoutDriver(state: GameState): Violation[] {
+/**
+ * I4: a vehicle whose x/z changed this tick must have had an occupant — a
+ * vehicle only ever moves as a side effect of its occupant driver's own
+ * locomotion (#1089). `vehiclePositionsAtTickStart`, when supplied, is the
+ * snapshot TickPipeline.ts captures before locomotion runs this tick; when
+ * omitted (a caller with no such snapshot to hand, e.g. a unit test), this
+ * check is vacuously satisfied rather than requiring every caller to supply
+ * one.
+ */
+function checkI4VehicleMovedWithoutOccupant(
+  state: GameState,
+  vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
+): Violation[] {
+  if (!vehiclePositionsAtTickStart) return [];
+
   const violations: Violation[] = [];
   for (const v of state.vehicles.vehicles) {
-    const isMoving = v.state === 'moving' || v.haulingPhase !== null || v.breakPhase !== null;
-    if (isMoving && v.driverId === null) {
-      violations.push({ kind: 'I4_moving_vehicle_without_driver', vehicleId: v.id });
+    const before = vehiclePositionsAtTickStart.get(v.id);
+    if (!before) continue; // created this tick — no baseline to compare against
+    const moved = before.x !== v.x || before.z !== v.z;
+    if (moved && v.occupantIds.length === 0) {
+      violations.push({ kind: 'I4_vehicle_moved_without_occupant', vehicleId: v.id });
     }
   }
   return violations;
@@ -162,31 +175,28 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
   return violations;
 }
 
-function checkI6DestinationPartiallySet(state: GameState): Violation[] {
+/** I6: an itinerary must never sit empty instead of being cleared to null. */
+function checkI6EmptyItinerary(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const e of state.employees.employees) {
-    const xSet = e.destinationX !== null;
-    const zSet = e.destinationZ !== null;
-    if (xSet !== zSet) {
-      violations.push({ kind: 'I6_destination_partially_set', employeeId: e.id });
+    if (e.itinerary !== null && e.itinerary.legs.length === 0) {
+      violations.push({ kind: 'I6_empty_itinerary', employeeId: e.id });
     }
   }
   return violations;
 }
 
-function checkI7InProgressVehicleActionDriverMismatch(state: GameState): Violation[] {
+/** I7: a drive leg's employee must actually be mounted in that leg's vehicle. */
+function checkI7DriveLegWithoutMount(state: GameState): Violation[] {
   const violations: Violation[] = [];
-  for (const action of state.pendingActions) {
-    if (action.requiredVehicleRole === null || action.status !== 'in_progress' || action.holderId == null) continue;
-    const v = state.vehicles.vehicles.find(veh => veh.reservedForActionId === action.id);
-    if (!v) continue;
-    if (v.driverId !== action.holderId) {
-      violations.push({
-        kind: 'I7_in_progress_vehicle_action_driver_mismatch',
-        vehicleId: v.id,
-        actionId: action.id,
-        employeeId: action.holderId,
-      });
+  for (const e of state.employees.employees) {
+    if (!e.alive || e.itinerary === null || e.itinerary.legs.length === 0) continue;
+    const leg = e.itinerary.legs[0]!;
+    if (leg.mode !== 'drive') continue;
+    if (!isMounted(e.locomotion) || mountedVehicleId(e.locomotion) !== leg.vehicleId) {
+      const violation: Violation = { kind: 'I7_drive_leg_without_mount', employeeId: e.id };
+      if (leg.vehicleId !== null) violation.vehicleId = leg.vehicleId;
+      violations.push(violation);
     }
   }
   return violations;
@@ -220,20 +230,20 @@ function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
 
 export function assertWorldInvariants(
   state: GameState,
-  // #1089: vehicle x/z captured before this tick's locomotion step, so a
-  // future I4 check can tell "moved" from "stationary" without re-deriving
-  // it from vehicle.state. Unused until the implementer phase wires the new
-  // itinerary-model checks in.
-  _vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
+  // #1089: vehicle x/z captured before this tick's locomotion step, so I4
+  // can tell "moved" from "stationary" without re-deriving it from
+  // vehicle.state. TickPipeline.ts's own runTick captures and passes this;
+  // a caller with no snapshot to hand gets I4 vacuously satisfied.
+  vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
 ): Violation[] {
   return [
     ...checkI1OccupantLocomotionMismatch(state),
     ...checkI2MountedPositionMismatch(state),
     ...checkI3OccupantCapacityViolation(state),
-    ...checkI4MovingVehicleWithoutDriver(state),
+    ...checkI4VehicleMovedWithoutOccupant(state, vehiclePositionsAtTickStart),
     ...checkI5ReservationWithoutValidHolder(state),
-    ...checkI6DestinationPartiallySet(state),
-    ...checkI7InProgressVehicleActionDriverMismatch(state),
+    ...checkI6EmptyItinerary(state),
+    ...checkI7DriveLegWithoutMount(state),
     ...checkI8PayloadNotInTransit(state),
     ...checkI9ExecutingTaskStillTravelling(state),
   ];

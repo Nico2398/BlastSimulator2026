@@ -1,15 +1,10 @@
 // BlastSimulator2026 — Vehicle reservation for vehicle-gated actions (#550)
 // Owns the exclusive claim a PendingAction holds on a Vehicle: finding one to
-// claim, reserving it, promoting the claim to an active walk-to-vehicle
-// transition, and releasing it — whether that's on completion, cancellation,
+// claim, reserving it, promoting the claim to an active moveTo itinerary
+// (#1089), and releasing it — whether that's on completion, cancellation,
 // needs-interruption, or the vehicle being destroyed underneath it.
-// EmployeeDispatchSteps.ts's claim/promotion sites call into this module rather than
-// duplicating any of it. Core-pure: imports only from entities/, state/,
-// EntityMovementTick.js, and — for the haul_debris/fragment_debris
-// continuity case (#552) — economy/FragmentTaskLifecycle.js
-// (startVehicleGatedFragmentWork, shared with ArrivalGate.ts's
-// resolveBoarding), which does not import anything from engine/ that could
-// cycle back here.
+// EmployeeDispatchSteps.ts's claim/promotion sites call into this module
+// rather than duplicating any of it.
 // Deliberately does NOT import TaskDispatch.ts directly — TaskDispatch.ts's
 // own module re-exports from TaskCancellation.ts, which imports
 // releaseVehicleReservation from here, so calling into TaskDispatch.ts
@@ -18,29 +13,23 @@
 // caller instead of performing the interruption itself — see
 // reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
 // caller, which already imports both modules safely.
-// Two cycles exist through EntityMovementTick.js, which this module already
-// imports: an indirect one (EntityMovementTick.ts itself imports
-// interruptActiveAction from TaskDispatch.ts, #938, for its sustained-stuck
-// abandonment path, closing VehicleReservation -> EntityMovementTick ->
-// TaskDispatch -> TaskCancellation -> VehicleReservation), and — since
-// #986's dismountVehicleDriver extraction — a direct one (EntityMovementTick.ts
-// imports dismountVehicleDriver from here for its own sustained-stuck vehicle
-// release, closing VehicleReservation -> EntityMovementTick ->
-// VehicleReservation). Both are safe for the same reason the pre-existing
-// EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle is safe: every
-// import here is a function declaration, called only from inside other
-// function bodies, never evaluated at module-load time — ESM resolves the
-// cycle fine as long as nothing at the top level reads a not-yet-initialized
-// binding.
+// Two cycles exist through this module's own imports (#1089): MoveTo.ts ->
+// PlanItinerary.ts -> findFreeVehicleForRole (here), and ActionSelection.ts ->
+// findFreeVehicleForRole (here) while this module imports seedTaskTimerFields
+// from ActionSelection.ts. Both are safe for the same reason the
+// EntityMovementTick.ts <-> VehicleOccupancyReroute.ts cycle that used to run
+// through here was safe: every import is a function declaration, called only
+// from inside other function bodies, never evaluated at module-load time —
+// ESM resolves the cycle fine as long as nothing at the top level reads a
+// not-yet-initialized binding.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
-import { moveVehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
-import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
-import { setVehicleIdle, syncDriverPosition } from './EntityMovementTick.js';
+import { moveTo } from './MoveTo.js';
+import { seedTaskTimerFields } from './ActionSelection.js';
 import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { alight } from './Mount.js';
 
@@ -216,19 +205,18 @@ export function findVehicleForClaim(
 
 /**
  * Vehicle-gated claim transition (#550): instead of walking to the action's
- * own target, the employee walks to (or, already driving it — the
- * continuity tie-break in findFreeVehicleForRole above — skips straight
- * past) the vehicle reserved for this action at claim time. Called by
- * EmployeeDispatchSteps.ts's promoteActionToActive when action.requiredVehicleRole is set.
+ * own target, the employee walks to (or, already driving it — moveTo/
+ * planItinerary's own continuity — skips straight past) the vehicle reserved
+ * for this action at claim time. Called by EmployeeDispatchSteps.ts's
+ * promoteActionToActive when action.requiredVehicleRole is set.
  *
- * Deliberately does not call seedTaskTimerFields here — that only happens
- * once the VEHICLE (not the employee) reaches action.targetX/targetZ, via
- * the vehicle-drive loop ArrivalGate.tickArrivalGate adds. Boarding and
- * driving reuse existing machinery end to end: VehicleBoarding.requestBoardVehicle
- * for the walk-and-board (resolved by ArrivalGate.resolveBoarding), and
- * Vehicle.moveVehicle for setting the vehicle's own destination once someone
- * is already aboard — EntityMovementTick.tickVehicle is the only thing that
- * ever actually advances a vehicle's x/z (see ArrivalGate.ts's header).
+ * Stages the work timer (seedTaskTimerFields) now, exactly like an on-foot
+ * action's own claim (promoteActionToActive's non-vehicle branch) — safe
+ * because ArrivalGate.tickArrivalGate's "arrived" check only promotes it once
+ * the employee's itinerary clears, and an itinerary clears only at the real
+ * target, not at the vehicle (#1089). haul_debris/fragment_debris are the one
+ * exception: their own phase machinery (HaulingTask.ts/BoulderBreaking.ts)
+ * drives completion instead, so staging a work timer for them would race it.
  */
 export function promoteVehicleGatedAction(state: GameState, employee: Employee, action: PendingAction): void {
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
@@ -238,43 +226,47 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   // sweep interrupts the action back to the pool.
   if (!vehicle) return;
 
-  if (vehicle.driverId === employee.id) {
-    // #552: haul_debris/fragment_debris are driven end to end by their own
-    // request*/tick* phase machinery (HaulingTask.ts/BoulderBreaking.ts),
-    // not a single generic moveVehicle target — the continuity case (already
-    // driving this vehicle, no boarding needed) has to kick that request off
-    // itself, mirroring what ArrivalGate.resolveBoarding does for a fresh
-    // boarding (both call the same startVehicleGatedFragmentWork helper,
-    // FragmentTaskLifecycle.ts). Any failure here (fragment/depot vanished
-    // between claim and promotion — practically unreachable within one
-    // synchronous tick, but never crashes) just leaves the vehicle idle;
-    // reconcileVehicleReservations (ArrivalGate.ts) is the backstop that
-    // interrupts a claim nothing is actually working.
+  const continuity = vehicle.driverId === employee.id;
+  const isFragmentGated = action.type === 'haul_debris' || action.type === 'fragment_debris';
+
+  if (!isFragmentGated) {
+    seedTaskTimerFields(state, employee, action);
+  }
+
+  // #1089: a fresh boarding and the continuity case (already driving this
+  // vehicle) both collapse into one moveTo call — planItinerary drops the
+  // leading foot leg when the employee is already mounted in `vehicle`, so
+  // continuity needs no boarding walk either way.
+  const result = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+  if (!result.success) return;
+
+  // #552: haul_debris/fragment_debris are driven end to end by their own
+  // request*/tick* phase machinery (HaulingTask.ts/BoulderBreaking.ts), not
+  // the itinerary's own drive leg above. A fresh boarding's own arrival step
+  // (Locomotion.ts) starts that work the tick the employee actually boards;
+  // continuity never walks through a board arrival step at all (the driver
+  // is already seated this exact tick), so it has to be kicked off here
+  // instead — mirroring what the fresh-boarding arrival step does.
+  if (continuity && isFragmentGated) {
     const started = startVehicleGatedFragmentWork(state, vehicle, action);
-    if (started === false) {
+    if (started === true) {
+      // Phase machinery now owns driving this vehicle — the itinerary's own
+      // single drive leg (targeting the fragment's raw position, not the
+      // approach cell requestHaulFragment/requestBreakBoulder just staged)
+      // would otherwise fight it for the same vehicle's x/z next tick.
+      employee.itinerary = null;
+    } else if (started === false) {
       // Conditions changed between claim and promotion (fragment gone, no
       // active depot) — release the reservation so
       // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
       // and returns the action to the pool instead of leaving it claimed
-      // with nothing actually driving it. Keeps the driver seated (#552,
-      // see releaseVehicleReservationKeepDriver) — they are already
-      // aboard this exact vehicle via the continuity tie-break, so
-      // dismounting them here would only force a needless walk-back-and-
-      // reboard the moment a depot appears.
+      // with nothing actually working it. Keeps the driver seated (#552) —
+      // they are already aboard this exact vehicle via the continuity
+      // tie-break, so dismounting them here would only force a needless
+      // walk-back-and-reboard the moment a depot appears.
       releaseVehicleReservationKeepDriver(state, action.id);
     }
-    if (started !== null) return;
-    moveVehicle(state.vehicles, vehicle.id, action.targetX, action.targetZ);
-    return;
   }
-
-  // Stage the destination now (the same targetX/targetZ tickVehicle reads),
-  // but deliberately leave vehicle.task alone — starting it 'moving' before
-  // anyone is aboard would drive an unmanned vehicle. ArrivalGate.resolveBoarding
-  // flips it to 'moving' once the employee has actually boarded.
-  vehicle.targetX = action.targetX;
-  vehicle.targetZ = action.targetZ;
-  requestBoardVehicle(state, vehicle.id, employee.id);
 }
 
 /**
@@ -321,19 +313,15 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitte
   abortVehicleGatedFragmentWork(state, vehicle);
   if (vehicle.driverId === null) return;
 
-  // #593/#922: EntityMovementTick.tickVehicle already calls
-  // syncDriverPosition every tick, so the driver's x/z tracks the vehicle
-  // continuously throughout the drive — this call is a defensive,
-  // idempotent re-assertion at release time, not what establishes the
-  // invariant. It covers any release path that could otherwise run off the
-  // normal tick cycle: without it, a release landing between ticks would
-  // risk reading the employee's position as stale (frozen at the boarding
-  // point) instead of wherever the vehicle currently sits, which every
-  // distance-based decision that follows (nearest living_quarters, the walk
-  // back to reboard) relies on being current.
-  syncDriverPosition(state, vehicle);
+  // #1089: Locomotion.ts is now the only writer of a vehicle's x/z, and it
+  // writes the mounted employee's own x/z in the same step (I2) — the two
+  // can never drift apart mid-tick the way the pre-itinerary tickVehicle
+  // model's own separate syncDriverPosition call (dropped here) had to
+  // defend against.
   alight(state, vehicle.id, emitter);
-  setVehicleIdle(vehicle);
+  vehicle.task = 'idle';
+  vehicle.state = 'idle';
+  vehicle.waitingTicks = 0;
 }
 
 /**

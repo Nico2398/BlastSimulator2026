@@ -252,6 +252,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
 
   return clearZone(
     zone,
+    state,
     state.vehicles,
     state.employees,
     (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),

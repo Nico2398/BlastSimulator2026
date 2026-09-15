@@ -4,6 +4,8 @@
 // locomotion tick to walk.
 
 import type { GameState } from '../state/GameState.js';
+import type { Employee } from '../entities/Employee.js';
+import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
 
 export type MoveResult = { success: true } | { success: false; error: string };
 
@@ -21,11 +23,53 @@ export function moveTo(
   target: { vehicleId: number },
 ): MoveResult;
 export function moveTo(
-  _state: GameState,
-  _employeeId: number,
-  _target: { x: number; z: number } | { vehicleId: number },
-  _opts?: { via?: number },
+  state: GameState,
+  employeeId: number,
+  target: { x: number; z: number } | { vehicleId: number },
+  opts?: { via?: number },
 ): MoveResult {
-  // TODO: implement
-  throw new Error('not implemented');
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee) return { success: false, error: 'Employee not found' };
+
+  if ('vehicleId' in target) {
+    const vehicle = state.vehicles.vehicles.find(v => v.id === target.vehicleId);
+    if (!vehicle) return { success: false, error: 'Vehicle not found' };
+    if (!hasFreeSeatFor(vehicle, employee)) return { success: false, error: 'Vehicle unavailable' };
+
+    const leg = buildBoardLeg(state, employee, vehicle, 'exact');
+    if (leg === null) return { success: false, error: 'No route to vehicle' };
+
+    employee.itinerary = {
+      legs: [leg],
+      goal: { kind: 'reposition', x: vehicle.x, z: vehicle.z },
+      workTicks: 0,
+      estTotalTicks: leg.estTicks,
+    };
+    syncPendingDriverVehicleId(employee);
+    return { success: true };
+  }
+
+  const itinerary = planItinerary(state, employee, { kind: 'reposition', x: target.x, z: target.z }, 'exact', opts);
+  if (itinerary === null) return { success: false, error: 'No route available' };
+
+  employee.itinerary = itinerary;
+  syncPendingDriverVehicleId(employee);
+  return { success: true };
+}
+
+/**
+ * Keeps `employee.pendingDriverVehicleId` — the read-only mirror
+ * ForceShiftRest.ts/TaskCancellation.ts/tutorialGuide.ts/FleetPanel.ts read to
+ * mean "currently walking to board a vehicle" — in agreement with the
+ * itinerary's own current leg: set while that leg's arrival step is a board
+ * naming a vehicle, null otherwise (no itinerary, or a foot/drive leg that
+ * isn't a board). Called from every point this module and Locomotion.ts
+ * mutate `employee.itinerary`, so the mirror never drifts from what the
+ * employee is actually walking toward.
+ */
+export function syncPendingDriverVehicleId(employee: Employee): void {
+  const leg = employee.itinerary?.legs[0];
+  employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board'
+    ? leg.onArrive.vehicleId
+    : null;
 }

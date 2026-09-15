@@ -23,7 +23,7 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { tickVehicle } from '../engine/EntityMovementTick.js';
+import { driveVehicleTowardTarget } from '../engine/Locomotion.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { requestHaulFragment, abortHaulReturningCargo } from './HaulingTask.js';
 import { requestBreakBoulder, abortBreak } from './BoulderBreaking.js';
@@ -73,8 +73,7 @@ export function driveTowardFragment(state: GameState, vehicle: Vehicle, fragment
   vehicle.task = 'moving';
   vehicle.targetX = approach.x;
   vehicle.targetZ = approach.z;
-  tickVehicle(state, vehicle);
-  return vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ;
+  return driveVehicleTowardTarget(state, vehicle, approach.x, approach.z).arrived;
 }
 
 /**

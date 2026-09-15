@@ -35,9 +35,7 @@ import {
   tickEmployees,
   tickGeneralRestCompletion,
   tickTaskProgress,
-  tickVehicle,
-  tickVehicleTaskState,
-  tickEmployeeMovement,
+  tickLocomotion,
   tickArrivalGate,
   completeVehicleGatedActionIfApplicable,
   employeeWorkState,
@@ -257,39 +255,29 @@ export function runTick(
     taskCompletions.push({ employeeId: emp.id, report: completionReport });
   }
 
-  // 8f. Vehicle movement — advance every vehicle currently task='moving' one
-  // step toward its target (moveVehicle/vehicle-move-command only set the
-  // target; nothing advanced x/z toward it before this). Hauling vehicles
-  // are driven entirely by tickArrivalGate/tickHaulingProgress instead (8h)
-  // — ticking them here too would move them twice in the same tick (#437).
-  for (const vehicle of state.vehicles.vehicles) {
-    // Vehicle-gated actions (#550) are driven exclusively by
-    // ArrivalGate.tickArrivalGate's own vehicle-drive loop (8h below) —
-    // ticking them here too would move them twice in the same tick, same
-    // rationale as the haulingPhase skip.
-    if (vehicle.haulingPhase !== null || vehicle.reservedForActionId !== null) continue;
-    tickVehicle(state, vehicle, emitter);
-    tickVehicleTaskState(vehicle);
-  }
-
-  // 8f-2. Traffic jam detection — runs immediately after vehicle movement,
-  // once per tick, so console/scenario "tick" steps can fire TrafficJamEvent
-  // too (#411).
-  fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
-
-  // 8g. Employee movement — walk employees with a destination (set by
-  // tickEmployees/tickCollapse/tickNeedRestoration/forceShiftRestIfNeeded
-  // above) one tick's worth of movement along a NavGrid path.
-  const movementResult = tickEmployeeMovement(state, emitter);
+  // 8f. Locomotion (#1089) — the only mover: walks every alive employee's
+  // itinerary (or, absent one, their legacy destinationX/Z single foot leg)
+  // one tick's worth of movement, and writes a mounted employee's vehicle's
+  // x/z from theirs — the only place a vehicle's position ever changes.
+  // Snapshot every vehicle's position first, before this step (or anything
+  // else this tick) can move one, so assertWorldInvariants' I4 check below
+  // can tell "moved this tick" from "already here" without re-deriving it
+  // from vehicle.state.
+  const vehiclePositionsAtTickStart = new Map(state.vehicles.vehicles.map(v => [v.id, { x: v.x, z: v.z }]));
+  const movementResult = tickLocomotion(state, emitter);
   const stuckEmployees = movementResult.stuck;
   const abandonedActions = movementResult.abandoned;
 
-  // 8h. Arrival gate — must run after employee/vehicle movement above:
-  // promotes rest/task/vehicle-boarding intents queued this tick or a prior
-  // one into their active timers/effects once the entity has actually
-  // arrived, and drives hauling vehicles (move → load → move → unload) end
-  // to end (#437).
-  const arrivalResult = tickArrivalGate(state, emitter, grid ?? undefined);
+  // 8f-2. Traffic jam detection — runs immediately after locomotion, once
+  // per tick, so console/scenario "tick" steps can fire TrafficJamEvent too
+  // (#411).
+  fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
+
+  // 8h. Arrival gate — must run after locomotion above: promotes rest/task
+  // intents queued this tick or a prior one into their active timers/effects
+  // once the entity has actually arrived, and drives hauling vehicles
+  // (move → load → move → unload) end to end (#437).
+  const arrivalResult = tickArrivalGate(state, emitter);
 
   // 8i. Vehicle-gated haul/fragment completions (#552): tickArrivalGate's
   // own haul/break drive loop reports every action whose full deliver/break
@@ -310,7 +298,9 @@ export function runTick(
   // Reports internal-consistency violations (dangling driver refs,
   // position mismatches, etc.) that should never occur if the
   // mount/itinerary/task machinery upstream is correct; never throws.
-  const worldInvariantViolations = options.checkInvariants ? assertWorldInvariants(state) : [];
+  const worldInvariantViolations = options.checkInvariants
+    ? assertWorldInvariants(state, vehiclePositionsAtTickStart)
+    : [];
 
   // 10. Pending event — auto-pause and report to player
   let firedEvent: FiredEventReport | null = null;
