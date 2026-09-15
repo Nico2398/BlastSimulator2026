@@ -18,6 +18,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { runTick, type TickReport } from '../../../src/core/engine/TickPipeline.js';
@@ -123,6 +124,16 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
     assignSkill(state.employees, employee.id, 'driving.truck', 1);
     purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    // requestHaulFragment (HaulingTask.ts, driven from ArrivalGate's same-tick
+    // boarding resolution) refuses to start a haul with no active
+    // freight_warehouse to deliver to — without one, the boarding that
+    // happens later this same tick immediately interrupts the just-claimed
+    // action back to 'queued' and clears activeActionId, which would make
+    // this test's assertion fail for a reason unrelated to dispatch
+    // ordering. See HaulingTask.test.ts's "rejects when no active
+    // freight_warehouse exists".
+    const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 64, 64);
+    if (!warehouse.success) throw new Error(`Setup: placeBuilding failed — ${warehouse.error}`);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     // No haul_debris action exists yet — syncHaulDispatch must create one and
