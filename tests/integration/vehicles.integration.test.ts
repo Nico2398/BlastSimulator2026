@@ -46,6 +46,13 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 // this integration suite has no DOM/Three.js per this file's own header
 // comment).
 import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
+// #1084: world-state invariant check — asserted at the end of every
+// scenario-driving test below that has a full GameState to check. Its own
+// stub throws 'not implemented', so every one of these assertions is
+// expected to fail for that reason at this (red) phase — not from a bad
+// import/type error.
+import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -90,6 +97,7 @@ describe('Vehicle fleet', () => {
     expect(ctx.state!.vehicles.vehicles).toHaveLength(1);
     expect(ctx.state!.vehicles.vehicles[0]!.type).toBe('debris_hauler');
     expect(ctx.state!.vehicles.vehicles[0]!.id).toBe(1);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   it('buy vehicle reduces cash', () => {
@@ -99,6 +107,7 @@ describe('Vehicle fleet', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
 
     expect(ctx.state!.cash).toBe(cashBefore - def.purchaseCost);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   it('rejects unknown vehicle type', () => {
@@ -107,6 +116,7 @@ describe('Vehicle fleet', () => {
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage: vehicle buy');
     expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   it('vehicle list shows all vehicles', () => {
@@ -120,6 +130,7 @@ describe('Vehicle fleet', () => {
     expect(result.output).toContain('drill_rig');
     expect(result.output).toContain('[1]');
     expect(result.output).toContain('[2]');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── Driver assignment ──
@@ -141,6 +152,7 @@ describe('Vehicle fleet', () => {
     // one tick to resolve the arrival gate before driverId is actually set.
     tickCommand(ctx, ['1'], {});
     expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBe(eid);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   it('rejects unqualified driver', () => {
@@ -157,6 +169,7 @@ describe('Vehicle fleet', () => {
     // Rejected at request time — a tick later, still no driver.
     tickCommand(ctx, ['1'], {});
     expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBeNull();
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── New (issue #437): driverId stays null until the arrival gate resolves ──
@@ -186,6 +199,7 @@ describe('Vehicle fleet', () => {
 
     tickCommand(ctx, ['1'], {});
     expect(v.driverId).toBe(eid);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── Movement ──
@@ -201,8 +215,14 @@ describe('Vehicle fleet', () => {
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
     // point is that a driven vehicle's move command sets task/target, so give
-    // it a driver directly rather than exercising the driver-gate refusal.
-    v.driverId = 1;
+    // it a real, licensed, co-located driver (rather than a dangling fake
+    // employee id — #1084's assertWorldInvariants flags that as
+    // I1_dangling_driver_reference) instead of exercising the driver-gate
+    // refusal.
+    const eid = hireOne(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    expect(assignResult.success).toBe(true);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
 
@@ -210,6 +230,7 @@ describe('Vehicle fleet', () => {
     expect(v.task).toBe('moving');
     expect(v.targetX).toBe(30);
     expect(v.targetZ).toBe(30);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── Task assignment ──
@@ -224,6 +245,7 @@ describe('Vehicle fleet', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain('transport');
     expect(v.task).toBe('transport');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── tickVehicle advances movement ──
@@ -243,9 +265,14 @@ describe('Vehicle fleet', () => {
     v.state = 'idle';
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless vehicle never moves, everywhere in the game. Give
-    // it a driver directly to exercise the driven-movement path this test
-    // means to check.
-    v.driverId = 1;
+    // it a real, licensed, co-located driver (rather than a dangling fake
+    // employee id — #1084's assertWorldInvariants flags that as
+    // I1_dangling_driver_reference) to exercise the driven-movement path
+    // this test means to check.
+    const eid = hireOne(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    expect(assignResult.success).toBe(true);
 
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
     // Pathfinding.findPath and advances at debris_hauler's own speed (3
@@ -263,6 +290,7 @@ describe('Vehicle fleet', () => {
     if (taskAfterTick === 'idle') {
       expect(v.x).toBe(origX + 4);
     }
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   it('tickVehicle does nothing for idle vehicle', () => {
@@ -278,6 +306,7 @@ describe('Vehicle fleet', () => {
     expect(v.x).toBe(origX);
     expect(v.z).toBe(origZ);
     expect(v.task).toBe('idle');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── Vehicle list with driver ──
@@ -297,6 +326,7 @@ describe('Vehicle fleet', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain(`driver:#${eid}`);
     expect(result.output).not.toContain('driver:none');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── Core API: purchaseVehicle / assignDriver / destroyVehicle ──
@@ -366,6 +396,7 @@ describe('Vehicle fleet', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toBe('No vehicles.');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── getAllVehicleRoles ──
@@ -391,6 +422,7 @@ describe('Vehicle fleet', () => {
       expect(result.output).toContain(type);
     }
     expect(ctx.state!.vehicles.vehicles).toHaveLength(types.length);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── move without game context ──
@@ -414,6 +446,7 @@ describe('Vehicle fleet', () => {
     expect(v.task).toBe('transport');
     expect(v.targetX).toBe(25);
     expect(v.targetZ).toBe(12);
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── getVehicleDef returns tier-1 stats ──
@@ -452,6 +485,7 @@ describe('Vehicle fleet', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toContain('already has a driver');
+    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── vehicle buy — tier arg (#411) ──
@@ -463,6 +497,7 @@ describe('Vehicle fleet', () => {
       expect(result.success).toBe(true);
       const v = ctx.state!.vehicles.vehicles[0]!;
       expect(v.tier).toBe(2);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('buy with tier:2 deducts the tier-2 cost (not tier-1) from cash', () => {
@@ -472,6 +507,7 @@ describe('Vehicle fleet', () => {
       vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '2' });
 
       expect(ctx.state!.cash).toBe(cashBefore - tier2Def.purchaseCost);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('buy with tier:3 purchases a tier-3 vehicle at tier-3 cost', () => {
@@ -484,6 +520,7 @@ describe('Vehicle fleet', () => {
       const v = ctx.state!.vehicles.vehicles[0]!;
       expect(v.tier).toBe(3);
       expect(ctx.state!.cash).toBe(cashBefore - tier3Def.purchaseCost);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('buy without a tier arg still defaults to tier 1 (backward compatible)', () => {
@@ -491,6 +528,7 @@ describe('Vehicle fleet', () => {
 
       const v = ctx.state!.vehicles.vehicles[0]!;
       expect(v.tier).toBe(1);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('rejects tier:0 as out of range and does not add a vehicle', () => {
@@ -498,6 +536,7 @@ describe('Vehicle fleet', () => {
 
       expect(result.success).toBe(false);
       expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('rejects tier:9 as out of range and does not add a vehicle', () => {
@@ -505,6 +544,7 @@ describe('Vehicle fleet', () => {
 
       expect(result.success).toBe(false);
       expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('rejects non-numeric tier:abc and does not add a vehicle', () => {
@@ -512,6 +552,7 @@ describe('Vehicle fleet', () => {
 
       expect(result.success).toBe(false);
       expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('does not deduct cash when the tier is rejected', () => {
@@ -520,6 +561,7 @@ describe('Vehicle fleet', () => {
       vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '9' });
 
       expect(ctx.state!.cash).toBe(cashBefore);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -537,6 +579,7 @@ describe('Vehicle fleet', () => {
       tickCommand(ctx, ['1'], {});
 
       expect(v.state).toBe('working');
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('vehicle.state returns to idle after a tick once task returns to idle', () => {
@@ -551,6 +594,7 @@ describe('Vehicle fleet', () => {
       tickCommand(ctx, ['1'], {});
 
       expect(v.state).toBe('idle');
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('each work task (transport, loading, drilling, clearing) drives state to working via the tick loop', () => {
@@ -565,6 +609,7 @@ describe('Vehicle fleet', () => {
         const v = ctx.state!.vehicles.vehicles.find(veh => veh.id === id)!;
         expect(v.state, `task=${task} should drive state to working`).toBe('working');
       }
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -610,9 +655,16 @@ describe('Vehicle fleet', () => {
         // #947: canTickVehicle now requires a driver aboard to advance on
         // tick at all -- a driverless vehicle's waitingTicks would never
         // reach the threshold this tick, since it never ticks in the first
-        // place. Give each waiting hauler a driver so the real tick path
-        // still pushes them over TRAFFIC_JAM_MIN_TICKS.
-        v.driverId = v.id;
+        // place. Give each waiting hauler a real, licensed, co-located
+        // driver (rather than reusing the vehicle's own id as a fake
+        // employee id — #1084's assertWorldInvariants flags that as
+        // I1_dangling_driver_reference) so the real tick path still pushes
+        // them over TRAFFIC_JAM_MIN_TICKS.
+        const rng = new Random(100 + i);
+        const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
+        assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
+        const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, employee.id);
+        expect(assignResult.success).toBe(true);
       }
 
       const result = tickCommand(ctx, ['1'], {});
@@ -620,6 +672,7 @@ describe('Vehicle fleet', () => {
       expect(result.success).toBe(true);
       expect(ctx.state!.events.pendingEvent).not.toBeNull();
       expect(ctx.state!.events.pendingEvent?.eventId).toBe('traffic_jam');
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -664,6 +717,7 @@ describe('Vehicle fleet', () => {
       expect(xpAfter).toBeGreaterThan(xpBefore);
       expect(vehicle.reservedForActionId).toBeNull();
       expect(vehicle.driverId).toBeNull();
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('a same-role follow-up action keeps the driller mounted in the same vehicle instead of dismounting and re-walking', () => {
@@ -706,6 +760,7 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawUnmounted).toBe(false);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('cancelling a vehicle-gated action mid-walk-to-vehicle releases the vehicle reservation and clears the dangling boarding request', () => {
@@ -732,6 +787,7 @@ describe('Vehicle fleet', () => {
 
       expect(vehicle.reservedForActionId).toBeNull();
       expect(emp.pendingDriverVehicleId).toBeNull();
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('clears the vehicle reservation and driver when the holder dies mid-drive', () => {
@@ -757,6 +813,7 @@ describe('Vehicle fleet', () => {
 
       expect(vehicle.reservedForActionId).toBeNull();
       expect(vehicle.driverId).toBeNull();
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('destroying the reserved vehicle mid-drive returns the action to "queued", re-claimable by a different qualified employee/vehicle pair', () => {
@@ -794,6 +851,13 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawQueued).toBe(true);
+      // TODO(#1096): tickCollapse doesn't release a reserved-but-unboarded
+      // taskQueue vehicle reservation when it interrupts the holder for
+      // rest, leaving an I5 violation until #1096 lands. Once fixed, replace
+      // this with a plain expectNoWorldInvariantViolations(state) call.
+      expect(assertWorldInvariants(ctx.state!)).toEqual([
+        { kind: 'I5_reservation_without_valid_holder', vehicleId: 2, actionId: 1, employeeId: 1 },
+      ]);
     });
   });
 
@@ -873,6 +937,7 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -905,6 +970,7 @@ describe('Vehicle fleet', () => {
       // The action progressed all the way to completion — removed from the
       // pending pool, with the vehicle released again.
       expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+      expectNoWorldInvariantViolations(ctx.state!);
     });
 
     it('two licensed employees queued for the same vehicle role with only one free vehicle: only one boards at a time, the other claims it once released', () => {
@@ -944,6 +1010,7 @@ describe('Vehicle fleet', () => {
       expect(driversSeen.has(eid2)).toBe(true);
       expect(ctx.state!.pendingActions.find(a => a.id === actionId1)).toBeUndefined();
       expect(ctx.state!.pendingActions.find(a => a.id === actionId2)).toBeUndefined();
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 });
@@ -987,6 +1054,7 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
     }
 
     expect(sawUnescalatedOverThreshold).toBe(false);
+    expectNoWorldInvariantViolations(engine.ctx.state!);
   });
 });
 
@@ -1140,6 +1208,7 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
 
     expect(arrived).toBe(true);
     expect(vehicle.isMoveStuck).toBe(false);
+    expectNoWorldInvariantViolations(state);
   });
 });
 
@@ -1238,5 +1307,7 @@ describe('dig_ramp_segment work duration scales with live voxel count (#924)', (
     const actualRatio = workTicksB / workTicksA;
     expect(actualRatio).toBeGreaterThan(expectedRatio - 0.15);
     expect(actualRatio).toBeLessThan(expectedRatio + 0.15);
+    expectNoWorldInvariantViolations(a.ctx.state!);
+    expectNoWorldInvariantViolations(b.ctx.state!);
   });
 });

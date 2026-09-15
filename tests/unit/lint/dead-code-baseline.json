@@ -56,7 +56,6 @@
     "src/core/economy/HaulDispatch.ts:HaulActionPayload",
     "src/core/economy/HaulingTask.ts:isHaulEligibleVehicle",
     "src/core/economy/Logistics.ts:FragmentCounts",
-    "src/core/economy/Logistics.ts:FragmentState",
     "src/core/economy/Logistics.ts:hasStorageRoom",
     "src/core/economy/Negotiation.ts:BASE_SUCCESS_RATE",
     "src/core/economy/Negotiation.ts:NegotiationResult",

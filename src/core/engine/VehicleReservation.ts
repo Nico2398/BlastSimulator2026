@@ -383,6 +383,26 @@ export function releaseVehicleOnCompletion(state: GameState, employee: Employee,
   releaseVehicleReservation(state, completedActionId);
 }
 
+/**
+ * Resolves the living employee currently holding `action`'s reservation on
+ * `vehicle`: the action's own holderId when set, falling back to the
+ * vehicle's driverId (the state before an action's holderId is assigned, at
+ * claim time) — undefined when no id resolves, or when the resolved
+ * employee no longer exists or is dead. Shared by reconcileVehicleReservations
+ * below and WorldInvariants.ts's I5 check, which layers one more validity
+ * test (whether the mounting itself still agrees) on top of this lookup.
+ */
+export function resolveReservationHolder(
+  state: GameState,
+  vehicle: Vehicle,
+  action: PendingAction,
+): Employee | undefined {
+  const holderId = action.holderId ?? vehicle.driverId;
+  if (holderId === null) return undefined;
+  const holder = state.employees.employees.find(e => e.id === holderId);
+  return holder && holder.alive ? holder : undefined;
+}
+
 /** One active action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
 export interface VehicleGoneInterruption {
   employee: Employee;
@@ -411,9 +431,7 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       continue;
     }
 
-    const holderId = action.holderId ?? vehicle.driverId;
-    const holder = holderId !== null ? state.employees.employees.find(e => e.id === holderId) : undefined;
-    if (!holder || !holder.alive) {
+    if (!resolveReservationHolder(state, vehicle, action)) {
       releaseVehicleReservation(state, actionId);
     }
   }

@@ -61,6 +61,12 @@ const LIVE_EXPORTS = new Set<string>([
   // Read off `window` by the scenario harness, never imported.
   'src/ui/uiActionProbe.ts:probeUiAction',
   'src/ui/tutorialStateProbe.ts:probeTutorialState',
+  // assertWorldInvariants's return-type surface (#1084). Every caller
+  // consumes Violation objects via structural typing (`.kind`, etc.)
+  // without importing the type by name, which this import-graph analysis
+  // cannot see — the module graph has no edge for it, but the type is live.
+  'src/core/state/WorldInvariants.ts:Violation',
+  'src/core/state/WorldInvariants.ts:ViolationKind',
 ]);
 
 export interface DeadCodeReport {
