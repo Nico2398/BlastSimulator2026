@@ -4,7 +4,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { processFrame } from '../../../src/core/engine/GameLoop.js';
+import { runTick } from '../../../src/core/engine/TickPipeline.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   STARTING_CASH, PAY_CYCLE_TICKS, BASE_TICK_MS,
@@ -18,23 +19,6 @@ import {
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../src/core/config/balance.js';
-import type { EventContext } from '../../../src/core/events/EventPool.js';
-import type { GameState } from '../../../src/core/state/GameState.js';
-
-function buildCtx(state: GameState): EventContext {
-  return {
-    scores: state.scores,
-    employeeCount: state.employees.employees.length,
-    deathCount: 0,
-    corruptionLevel: 0,
-    hasBuilding: () => false,
-    hasDrillPlan: false,
-    tickCount: state.tickCount,
-    lawsuitCount: 0,
-    activeContractCount: 0,
-    weatherId: 'clear',
-  };
-}
 
 // 30 real-minutes at 1x = 1800 ticks
 const TICKS_30MIN = 1800;
@@ -53,15 +37,22 @@ describe('Balance config (12.1)', () => {
   });
 
   it('30-minute idle sim: player has positive cash (costs exist but no immediate bankruptcy)', () => {
-    // Simulate without any employees or buildings — just the passage of time
+    // Simulate without any employees or buildings — just the passage of time.
+    // Drives runTick directly (#1086 — processFrame is deleted; this is the
+    // one core-owned per-tick step tick.ts and this test now share), one
+    // call per tick, seeding a fresh Random the same way tick.ts does
+    // (`seed + tickCount`) rather than reusing processFrame's own
+    // continuously-drawn rng — each runTick call is meant to be independently
+    // seedable by its caller.
     const state = createGame({ seed: 42 });
-    const rng = new Random(42);
+    const emitter = new EventEmitter();
 
     let ticks = 0;
     // Run 30 game-minutes worth of ticks at 1x speed
     while (ticks < TICKS_30MIN) {
       if (state.isPaused) state.isPaused = false; // dismiss events for sim
-      processFrame(state, buildCtx, rng);
+      const rng = new Random(state.seed + state.tickCount);
+      runTick(state, null, rng, emitter, { checkInvariants: false });
       ticks++;
     }
 

@@ -17,12 +17,12 @@ import {
   seedEnergy,
 } from '../../../src/core/mining/EnergyPropagation.js';
 import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
-import { processFrame } from '../../../src/core/engine/GameLoop.js';
+import { runTick } from '../../../src/core/engine/TickPipeline.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import type { HoleCharge } from '../../../src/core/mining/ChargePlan.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
@@ -137,22 +137,6 @@ function setupThousandVoxelBlast(): {
 /** Set up a large 100×20×100 VoxelGrid with solid rock from y=0 to y=19. */
 function setup100x100VoxelGrid(): VoxelGrid {
   return makeSolidGrid(100, 20, 100, 19);
-}
-
-/** Build a minimal EventContext from GameState (same pattern as GameLoop.test.ts). */
-function buildContext(state: GameState): EventContext {
-  return {
-    scores: state.scores,
-    employeeCount: state.employees.employees.length,
-    deathCount: state.damage.deathCount,
-    corruptionLevel: state.corruption.level,
-    hasBuilding: () => false,
-    hasDrillPlan: false,
-    tickCount: state.tickCount,
-    lawsuitCount: 0,
-    activeContractCount: 0,
-    weatherId: 'clear',
-  };
 }
 
 /** Set up a fresh game state with seed 42, 8× speed, 20 employees, and 5 pending actions. */
@@ -397,16 +381,28 @@ describe('Performance Benchmarks', () => {
 
   describe('Frame tick at 8× speed, 20 agents', () => {
     it('processes 100 frames (800 ticks) in under 16ms per frame', () => {
-      const { state, rng } = setup20AgentGameState();
+      // #1086: processFrame (which batched timeScale ticks per call) is
+      // deleted — runTick advances exactly one tick per call, so "8× speed"
+      // is reproduced by calling it 8 times per outer "frame" iteration,
+      // matching processFrame's own internal batching tick-for-tick rather
+      // than folding 8x's worth of work into a single call.
+      const { state } = setup20AgentGameState();
+      const emitter = new EventEmitter();
+      const runFrame = () => {
+        for (let t = 0; t < 8; t++) {
+          const rng = new Random(state.seed + state.tickCount);
+          runTick(state, null, rng, emitter, { checkInvariants: false });
+        }
+      };
 
       // Warmup: 10 frames
       for (let i = 0; i < 10; i++) {
-        processFrame(state, (s) => buildContext(s), rng);
+        runFrame();
       }
 
       const start = performance.now();
       for (let i = 0; i < 100; i++) {
-        processFrame(state, (s) => buildContext(s), rng);
+        runFrame();
       }
       const elapsed = performance.now() - start;
       const avgPerFrame = elapsed / 100;

@@ -1,37 +1,16 @@
-// BlastSimulator2026 — Unit tests: buildEventContext (#592)
+// BlastSimulator2026 — Unit tests: console-layer event/tick wiring
 //
-// buildEventContext (src/console/commands/events.ts) feeds EventContext to the
-// event prerequisite/weighting system. Its employeeCount field used to read
-// state.employees.employees.length unfiltered — same class of bug as
-// avgMorale (Employee.ts's computeAverageMorale): killEmployee never splices
-// the roster, only flips alive:false, so a corpse permanently inflated the
-// count fed to every event's canFire/weightCoeff check.
+// The buildEventContext regression this file used to cover directly (#592)
+// now lives with the live code path itself,
+// tests/unit/engine/TickEventContext.test.ts, since #1086 moved
+// buildEventContext into core as buildTickEventContext. What remains here
+// tests console-layer behaviour that only shows up by driving tickCommand
+// and eventCommand end to end.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
-import { buildEventContext, tickCommand, eventCommand } from '../../../src/console/commands/events.js';
-import { killEmployee } from '../../../src/core/entities/Employee.js';
+import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { REVOLT_TICKS, NEED_WELL_RESTED_THRESHOLD } from '../../../src/core/config/balance.js';
-
-describe('buildEventContext (#592)', () => {
-  it('reports employeeCount over the living roster only, excluding a killed employee still physically present in the array', () => {
-    const { runner, ctx } = createRunner();
-    runner.run('new_game mine_type:desert seed:42');
-    runner.run('employee hire role:driller');
-    runner.run('employee hire role:driller');
-    runner.run('employee hire role:driller');
-    const employees = ctx.state!.employees.employees;
-    killEmployee(ctx.state!.employees, employees[1]!.id);
-
-    // killEmployee only flips alive:false — the roster still physically
-    // holds all 3 entries.
-    expect(ctx.state!.employees.employees).toHaveLength(3);
-
-    const eventCtx = buildEventContext(ctx);
-
-    expect(eventCtx.employeeCount).toBe(2);
-  });
-});
 
 describe('revolt end-condition is unconditional (#682)', () => {
   it('ends the level with worker_revolt once wellBeing holds at 0 for REVOLT_TICKS, with no disable path left', () => {

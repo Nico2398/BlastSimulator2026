@@ -2,6 +2,8 @@
 // Each level represents a mine site with specific parameters and difficulty modifiers.
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
+import type { GameState } from '../state/GameState.js';
+
 // ── Types ──
 
 export interface LevelDef {
@@ -238,4 +240,17 @@ export function getLevel(id: string): LevelDef | undefined {
 /** Get all levels in difficulty order. */
 export function getAllLevels(): readonly LevelDef[] {
   return LEVELS;
+}
+
+/**
+ * The active level's own `contractPriceMultiplier`, or 1 when no level is
+ * active (sandbox/no-game state) or the active id no longer resolves.
+ * Core-owned relocation of console/commands/commandUtils.ts's
+ * resolveContractPriceMultiplier (#1086), so the core-owned tick pipeline
+ * can read it without reaching into src/console/.
+ */
+export function resolveContractPriceMultiplier(state: GameState): number {
+  const levelId = state.campaign.activeLevelId;
+  if (!levelId) return 1;
+  return getLevel(levelId)?.contractPriceMultiplier ?? 1;
 }
