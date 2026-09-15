@@ -62,6 +62,61 @@ function shadeRgb(rgb: readonly [number, number, number], factor: number): strin
   return `rgb(${clamp255(rgb[0] * factor)},${clamp255(rgb[1] * factor)},${clamp255(rgb[2] * factor)})`;
 }
 
+/** Stable small code per cell type, for `StaticLayerInputs`'s flat buffer. */
+const CELL_TYPE_CODE: Record<NavCellType, number> = {
+  walkable: 0, blocked: 1, drill_hole: 2, ramp: 3, void: 4,
+};
+
+/**
+ * Everything `drawTerrain` and `drawGridLines` read, kept as a flat buffer so
+ * `MiniMap` can tell with one linear compare whether the layer it painted
+ * last time is still what these would paint now. Painting them is ~10k
+ * `fillRect` calls on a 96×96 site — ~10 ms, which `MiniMap.update()` used
+ * to spend on every frame and again after every console command, for a
+ * picture that changes only when the terrain does.
+ */
+export class StaticLayerInputs {
+  private key = '';
+  private cells = new Float64Array(0);
+
+  /**
+   * Record what the static layers would draw for `state` and `proj`.
+   * Returns true when that differs from the previous capture — including the
+   * first call — so the caller repaints exactly then.
+   */
+  capture(state: GameState, proj: MapProjection): boolean {
+    const nav = state.navGrid;
+    const world = state.world;
+    const key = [
+      nav ? `${nav.originX},${nav.originZ},${nav.maxX},${nav.maxZ},${nav.maxSurfaceY}` : 'no-nav',
+      world ? `${world.sizeX},${world.sizeZ}` : 'no-world',
+      `${proj.originX},${proj.originZ},${proj.scaleX},${proj.scaleZ}`,
+    ].join('|');
+    let changed = key !== this.key;
+    this.key = key;
+
+    const cellCount = nav ? (nav.maxX - nav.originX) * (nav.maxZ - nav.originZ) : 0;
+    if (this.cells.length !== cellCount * 2) {
+      this.cells = new Float64Array(cellCount * 2);
+      changed = true;
+    }
+    if (!nav) return changed;
+
+    let i = 0;
+    for (let z = nav.originZ; z < nav.maxZ; z++) {
+      for (let x = nav.originX; x < nav.maxX; x++) {
+        const cell = nav.cellAt(x, z);
+        const type = cell ? CELL_TYPE_CODE[cell.type] : -1;
+        const bench = cell ? cell.benchLevel : -1;
+        if (this.cells[i] !== type) { this.cells[i] = type; changed = true; }
+        if (this.cells[i + 1] !== bench) { this.cells[i + 1] = bench; changed = true; }
+        i += 2;
+      }
+    }
+    return changed;
+  }
+}
+
 /**
  * Shade each column by its bench level so the pit's relief reads at a glance.
  * Falls back to a flat rock tint before the NavGrid has been built.

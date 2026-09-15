@@ -71,8 +71,8 @@ describe('reading the workflow runs on a pull request head', () => {
     }
   );
 
-  // `claude-code-review.yml` reports `skipped` on every pipeline PR, and
-  // `Production build` does the same without the `build-check` label.
+  // `claude-code-review.yml` reports `skipped` on every pipeline PR. A skipped
+  // required job is `required-jobs.ts`'s to refuse, not this verdict's.
   it.each(['skipped', 'neutral'])('treats a %s run as green', (conclusion) => {
     expect(verdictOf([run({ conclusion })])).toBe('green');
   });

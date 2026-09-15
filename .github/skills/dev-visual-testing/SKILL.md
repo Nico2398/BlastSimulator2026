@@ -40,7 +40,7 @@ loop runs for tens of minutes, while a single screenshot pays it once.
 |------|-------|
 | Single screenshot (`npm run screenshot`) | Here. Seconds to a minute; this is the channel's core loop. |
 | One named scenario, interaction mode | Here, when you are debugging that scenario. |
-| **All** scenarios in interaction mode | CI (`Scenarios (interaction mode)`, label a PR `full-ci`). Never in a session. |
+| **All** scenarios in interaction mode | CI (`Scenarios (interaction mode)`, on every push and pull request). Never in a session. |
 
 ### ▶ While any browser-driven run is in flight
 

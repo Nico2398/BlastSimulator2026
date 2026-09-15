@@ -98,6 +98,25 @@ export type InteractionStepAction =
   // copy that can drift from it.
   /** Set a form control's value the way typing or picking would. */
   | { type: 'set'; selector: string; value: string }
+  /**
+   * Drive a `-/value/+` stepper (dom.ts's `stepper`) to an exact value:
+   * `selector` names the `[data-field="…"]` container, `value` the figure
+   * its `.bsx-stepper-value` must read afterward. The executor reads the
+   * displayed value, clicks `+` or `-` through the same usability gate
+   * `clickSelector` uses, re-reads, and stops on a match — bounded by
+   * `maxClicks`, and failing by name if a click stops moving the value
+   * (the control's own clamp) before the target is reached.
+   *
+   * Replaces the count-encoded form — N `clickSelector`s on
+   * `.bsx-stepper-btn:last-child` — where N silently assumed the control's
+   * default. PR #1070's first red shard was a drag declared at `spacing:5`
+   * beside a strip still at its 3 m default; #1072 closed that for the grid
+   * tool's spacing with a lint that simulates the clicks, and this closes the
+   * class for every stepper by making the value explicit instead of derived.
+   * `tests/unit/lint/ScenarioStepperValueMatchesCommand.test.ts` pins that
+   * the value equals what the step's own command declares.
+   */
+  | { type: 'setStepper'; selector: string; value: number; maxClicks?: number; timeout?: number }
   /** Click the first usable control whose label matches (case-insensitive). */
   | { type: 'clickLabel'; label: string; region?: string }
   /** Wait for a selector to exist and be genuinely usable, not merely present. */
@@ -259,12 +278,19 @@ export type ScenarioStepRole = 'player' | 'setup' | 'observe' | 'bootstrap' | 'g
  * so interaction mode reuses `checkGoal` from `interaction-driver.ts` directly
  * — one evaluator, not two that can drift apart.
  *
- * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
- * when the scenario runs in interaction mode; command mode has no DOM, so it
- * checks `equals`/`increased`/`decreased` only (`scenario-goal.ts`'s
- * `checkGoalAgainstState`). This is the same asymmetry the rest of the dual
- * -play mechanism already has — interaction mode is strictly the stronger
- * proof, command mode the faster one.
+ * The two modes prove different halves of this object, and neither is
+ * strictly the stronger:
+ *
+ * - `usable`/`blocked`/`tutorialStep` need a live page, so only interaction
+ *   mode checks them. They are the reachability claim itself.
+ * - `equals`/`increased`/`decreased`/`changedBy` are command mode's, checked
+ *   unscoped on every pull request (`scenario-goal.ts`'s
+ *   `checkGoalAgainstState`). Interaction mode re-checks them too, minus the
+ *   trajectory-coupled fields `interaction-goal-scope.ts` names: a step's
+ *   `interaction` array may spend ticks its `command` string has no
+ *   equivalent for, and once the two clocks diverge every field downstream of
+ *   an event draw follows. Asserting those in the browser tests which
+ *   trajectory the run took, not what the step did.
  */
 export interface ScenarioStepGoal {
   /** These numeric fields of the state dump must have grown since before this step's actions ran. */

@@ -152,6 +152,37 @@ describe('TerrainMesh', () => {
       return grid;
     }
 
+    it('getBounds() computes each chunk\'s box once and reuses it until the chunk is remeshed', () => {
+      // Every `__gameState` read a scenario harness makes calls getBounds();
+      // computeBoundingBox() rescans every vertex, so caching it per geometry
+      // is what keeps that read cheap. rebuildChunk() replaces the geometry,
+      // so a remeshed chunk gets a fresh box.
+      const scene = makeScene();
+      const size = 8;
+      const grid = flatSite(size, 4);
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      const spy = vi.spyOn(THREE.BufferGeometry.prototype, 'computeBoundingBox');
+
+      const first = tm.getBounds();
+      const computedOnFirstRead = spy.mock.calls.length;
+      expect(computedOnFirstRead).toBeGreaterThan(0);
+      const second = tm.getBounds();
+      expect(spy.mock.calls.length).toBe(computedOnFirstRead);
+      expect(second).toEqual(first);
+
+      // Carve the whole top layer off one corner column and remesh: the box
+      // shrinks in Y only if the remeshed chunk's box was recomputed.
+      for (let y = 0; y < 4; y++) grid.clearVoxel(0, y, 0);
+      tm.remeshRegion({ minX: 0, minY: 0, minZ: 0, maxX: 1, maxY: 4, maxZ: 1 });
+      const third = tm.getBounds()!;
+      expect(spy.mock.calls.length).toBeGreaterThan(computedOnFirstRead);
+      expect(third.vertexCount).not.toBe(first!.vertexCount);
+
+      spy.mockRestore();
+      tm.dispose();
+    });
+
     it('closes the far X face so the volume is not an open shell', () => {
       const scene = makeScene();
       const size = 8;

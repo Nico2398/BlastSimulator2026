@@ -30,9 +30,9 @@
 import { readdirSync } from 'fs';
 import { resolve } from 'path';
 import { emitDriftReport, type ScenarioResult, type DriftRecord } from './shared/command-runner.js';
-import { SCENARIO_DIR } from './shared/scenario-utils.js';
+import { loadScenarioDef, SCENARIO_DIR } from './shared/scenario-utils.js';
 import { SCREENSHOT_DIR } from './shared/puppeteer-utils.js';
-import { parseArgs, selectShard } from './run-all-scenarios-cli.js';
+import { parseArgs, selectShard, estimateScenarioCost } from './run-all-scenarios-cli.js';
 import { runBatchCommand } from './run-all-scenarios-command-batch.js';
 import { runBatchInteraction } from './run-all-scenarios-interaction-batch.js';
 
@@ -47,7 +47,17 @@ async function main(): Promise<void> {
     .sort();
 
   const selected = filterScenarios.length > 0 ? filterScenarios : scenarioFiles;
-  const names = shard ? selectShard(selected, shard) : selected;
+  // A definition that fails to load costs 1 here and is still run — the
+  // batch loop reports it as a failed scenario, which is where a bad file
+  // should surface, not as a crash before any shard starts.
+  const costOf = (name: string): number => {
+    try {
+      return estimateScenarioCost(loadScenarioDef(name, SCENARIO_DIR), mode);
+    } catch {
+      return 1;
+    }
+  };
+  const names = shard ? selectShard(selected, shard, costOf) : selected;
 
   console.log(`\nBlastSimulator2026 — Batch Scenario Runner`);
   console.log(`Mode: ${mode}`);
@@ -75,6 +85,18 @@ async function main(): Promise<void> {
   console.log(`\n${'='.repeat(50)}`);
   console.log(`BATCH COMPLETE — ${totalTime}s`);
   console.log(`Total: ${results.length}, Passed: ${results.length - failures.length}, Failed: ${failures.length}`);
+
+  // Interaction mode narrows each step's `expect` to the half a browser can
+  // prove without re-running the clock (interaction-goal-scope.ts). Say how
+  // much, so "this channel checked less than the file declares" is on the
+  // record rather than inferred. Command mode asserts every one of them.
+  const deferredGoals = results.reduce((sum, r) => sum + (r.deferredGoals ?? 0), 0);
+  if (deferredGoals > 0) {
+    console.log(
+      `Trajectory-coupled goals left to command mode: ${deferredGoals} `
+      + `(the \`scenario\` channel asserts them unscoped — npm run scenarios)`,
+    );
+  }
 
   if (failures.length > 0) {
     console.log(`\nFailed scenarios:`);

@@ -16,16 +16,16 @@ import type { LandscapeMap, LandscapeTile } from '../../../../src/core/world/Lan
 import type { LandscapeHandle } from '../../../../src/console/commands/world.js';
 import { TerrainMesh } from '../../../../src/renderer/TerrainMesh.js';
 import { LandscapeMesh, type PlayableCut } from '../../../../src/renderer/terrain/LandscapeMesh.js';
-import {
-  meshClaimsCell,
-  haloSurfaceHeight,
-  nodeTouchesMeshedCell,
-} from '../../../../src/renderer/terrain/PlayableCoverage.js';
-import { computeVoxelColumnSurfaceHeight } from '../../../../src/core/world/VoxelGrid.js';
+import { playableCut } from '../../../../src/renderer/GameRendererTerrain.js';
 import { measureSeam } from '../../../helpers/landscapeSeam.js';
 
 const COARSE_STEP = 4;
 const SITE = 32;
+
+/** How far apart the two sheets' normals may be at a node they share, degrees.
+ *  Float32 vertex attributes are only good to ~0.02 degrees, and a step this
+ *  small is ~0.0005 of a lambert term — invisible. A crease is degrees. */
+const NORMAL_AGREEMENT_DEG = 0.05;
 
 /**
  * Ridged and curved at 3-6 m wavelengths — shorter than COARSE_STEP, so no 4 m
@@ -83,19 +83,11 @@ function buildHandle(compId: number): LandscapeHandle {
   };
 }
 
-/** The production cut, assembled the way GameRendererTerrain.playableCut does. */
+/** The production cut itself — never a copy of it: a second derivation of the
+ *  same rule beside the one that ships is how every earlier pass at this seam
+ *  shipped green (#907). */
 function cutFor(grid: VoxelGrid, handle: LandscapeHandle): PlayableCut {
-  return {
-    rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
-    ownsColumn: (x, z) => grid.containsColumn(x, z),
-    boundaryHeightAt: (x, z) => {
-      const live = computeVoxelColumnSurfaceHeight(grid, x, z);
-      if (!Number.isNaN(live)) return live;
-      if (!nodeTouchesMeshedCell(grid, x, z)) return NaN;
-      return haloSurfaceHeight(grid, handle.sampleColumn(x, z).height);
-    },
-    meshClaimsColumn: (x, z) => meshClaimsCell(grid, x, z),
-  };
+  return playableCut(grid, (x, z) => handle.sampleColumn(x, z).height);
 }
 
 function buildBoth(grid: VoxelGrid): { playable: TerrainMesh; landscape: LandscapeMesh; handle: LandscapeHandle } {
@@ -139,6 +131,25 @@ describe('Playable/landscape seam — one continuous ground (#907)', () => {
     expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeLessThan(1e-6);
   });
 
+  it('both sheets light every shared ring node the same way, so no crease traces the site', () => {
+    // Positions matching is only half a join. Each sheet derives its own
+    // normals — the playable mesh from the density field's gradient, the
+    // landscape from its height field's slope — and where the two disagree at
+    // the node they share, lighting breaks across the edge they share. That
+    // reads as a hairline rectangle drawn on open ground around the whole site,
+    // corner and all, with no step in the ground anywhere near it (#1077).
+    const grid = buildGrid();
+    const { playable, landscape } = buildBoth(grid);
+
+    const seam = measureSeam(playable.meshes, landscape.meshes, grid);
+    expect(seam.sharedNodes).toBe(132);
+    // NORMAL_AGREEMENT_DEG, not zero: both sheets store normals as float32, and
+    // one ulp there is already ~0.02 degrees. What this rules out is a crease —
+    // the disagreement was 7.5 degrees on average and 67 at its worst before
+    // the two sheets shared one normal.
+    expect(seam.worstNormalAngle, `worst at ${seam.worstNormalAt}`).toBeLessThan(NORMAL_AGREEMENT_DEG);
+  });
+
   it('holds after the surface at the boundary drops, as a blast crater does', () => {
     const grid = buildGrid();
     // Carve a crater straddling the west edge of the site, deeper than
@@ -154,6 +165,7 @@ describe('Playable/landscape seam — one continuous ground (#907)', () => {
     expect(seam.doubleCovered).toEqual([]);
     expect(seam.uncovered).toEqual([]);
     expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeLessThan(1e-6);
+    expect(seam.worstNormalAngle, `worst at ${seam.worstNormalAt}`).toBeLessThan(NORMAL_AGREEMENT_DEG);
   });
 
   it('holds on an irregular site whose bounding box is not its shape (#473 D8)', () => {

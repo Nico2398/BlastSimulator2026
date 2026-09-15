@@ -15,7 +15,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
-import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
@@ -166,9 +166,14 @@ function estimateTravelTicks(employee: Employee, action: PendingAction): number 
  * ETA/duration seeding) never applies the bonus. Clamped at 0 since this
  * value only ever feeds a sort comparison.
  */
-export function estimateActionCost(state: GameState, employee: Employee, action: PendingAction): number {
+export function estimateActionCost(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+  fragmentOf?: FragmentLookup,
+): number {
   const rawCost = estimateTravelTicks(employee, action) + computeActionWorkTicks(state, employee, action);
-  const bonus = haulActionCarriesOre(state, action) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
+  const bonus = haulActionCarriesOre(state, action, fragmentOf) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
   return Math.max(0, rawCost - bonus);
 }
 
@@ -424,10 +429,19 @@ export function selectBestActionForEmployee(
   const claimable = candidates.filter(isClaimable);
   if (claimable.length === 0) return null;
 
-  const ranked = [...claimable].sort((a, b) => {
-    const costDiff = estimateActionCost(state, employee, a) - estimateActionCost(state, employee, b);
-    return costDiff !== 0 ? costDiff : a.id - b.id;
+  // Each candidate's estimate is computed exactly once, up front, rather
+  // than inside the comparator: the ore-priority bonus resolves the
+  // action's fragment, and a comparator re-resolving it O(n log n) times
+  // over a post-blast pool of thousands is the same per-tick blow-up
+  // createFragmentLookup exists for (HaulDispatch.ts). Same order as
+  // before — cost ascending, id ascending on a tie.
+  const fragmentOf = createFragmentLookup(state);
+  const costed = claimable.map(action => ({ action, cost: estimateActionCost(state, employee, action, fragmentOf) }));
+  costed.sort((a, b) => {
+    const costDiff = a.cost - b.cost;
+    return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
+  const ranked = costed.map(c => c.action);
 
   // Cheap, exact pre-filter (#953): a candidate outside the employee's own
   // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off

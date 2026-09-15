@@ -137,8 +137,11 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
       const actions = step!.interaction!;
       const precedingActions = actions.slice(0, -1);
       for (const action of precedingActions) {
+        // `setStepper` joined the vocabulary after #694: the amount stepper
+        // these steps drive is set by value now rather than clicked N times,
+        // and that is the one preceding action whose type legitimately moved.
         expect(
-          ['clickSelector', 'assert'],
+          ['clickSelector', 'assert', 'setStepper'],
           `step "${command}" — preceding action ${JSON.stringify(action)} changed type unexpectedly`,
         ).toContain(action.type);
       }

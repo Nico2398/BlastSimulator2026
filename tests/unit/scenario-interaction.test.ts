@@ -16,8 +16,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Page } from 'puppeteer';
 import {
   executeActionOnPage, resolveEventIfPendingOnPage, CLOCK_HELD_FAIL_AFTER_POLLS,
-  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES,
+  CLICK_SELECTOR_DEFAULT_TIMEOUT_MS,
+  WAIT_UNTIL_TICK_BATCH,
 } from '../../scripts/shared/interaction-executor.js';
+import {
+  CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, CLICK_SELECTOR_ZERO_SIZE_CLICK_RETRIES,
+} from '../../scripts/shared/click-retry.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 
@@ -192,51 +196,112 @@ describe('a control nothing renders is reported as never-appeared, not as a race
 });
 
 describe('executeActionOnPage — waitUntil (issue #590, #601)', () => {
-  it('resolves once the polled field reaches the target, looping the console\'s own deterministic tick 1', async () => {
-    // #601: one page.evaluate call per tick (tick 1 + event-status check +
-    // conditional resolve + field read, all inside the same browser-side
-    // callback) — no real-time auto-tick toggling any more.
-    const evaluate = vi.fn().mockResolvedValueOnce(25);
+  // The wait's tick / read / auto-resolve / compare loop runs in the page,
+  // up to WAIT_UNTIL_TICK_BATCH ticks per round trip. These run that very
+  // page-side function against a stubbed window, so what they pin is the
+  // loop the browser executes, not a canned answer per round trip.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  function stubGame(holeCountAfter: (ticks: number) => number, pendingEventAt = -1) {
+    let ticks = 0;
+    const gameConsole = vi.fn((cmd: string) => {
+      if (cmd === 'tick 1') ticks++;
+      return { output: '' };
+    });
+    const gameState = vi.fn(() => ({
+      holeCount: holeCountAfter(ticks),
+      tickCount: ticks,
+      pendingEvent: ticks === pendingEventAt,
+    }));
+    vi.stubGlobal('window', { __gameConsole: gameConsole, __gameState: gameState });
+    const evaluate = vi.fn(async (fn: (...a: unknown[]) => unknown, ...args: unknown[]) => fn(...args));
+    return { gameConsole, evaluate, ticksIssued: () => ticks };
+  }
+  const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
+
+  it('resolves once the polled field reaches the target, looping the console\'s own deterministic tick 1 in one round trip', async () => {
+    // #601: the page loops `tick 1` + state read + conditional resolve +
+    // field read itself — no real-time auto-tick toggling any more — and
+    // reports back once, when the field matches or the batch is spent.
+    const { gameConsole, evaluate, ticksIssued } = stubGame(ticks => [0, 3, 9, 25][ticks] ?? 25);
     const page = fakePage({ evaluate });
-    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
     const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
 
     await executeActionOnPage(page, action, step);
 
     expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(ticksIssued()).toBe(3);
+    expect(gameConsole).not.toHaveBeenCalledWith('event choose 0');
+  });
+
+  it('auto-resolves a pending event right after the tick that raised it, inside the same round trip', async () => {
+    const { gameConsole, evaluate } = stubGame(ticks => (ticks >= 3 ? 25 : 0), 2);
+    const page = fakePage({ evaluate });
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(gameConsole.mock.calls.map(([cmd]) => cmd)).toEqual(['tick 1', 'tick 1', 'event choose 0', 'tick 1']);
   });
 
   it('exhausts its tick budget and throws naming the field, its last value, and the tick count', async () => {
-    const evaluate = vi.fn().mockResolvedValue(3);
+    const { evaluate, ticksIssued } = stubGame(() => 3);
     const page = fakePage({ evaluate });
-    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:1', role: 'setup' };
     const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 1, timeoutMs: 30000 };
 
-    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+    await expect(executeActionOnPage(page, action, { ...step, command: 'wait_until field:holeCount equals:25 max_ticks:1' })).rejects.toThrow(
       /"holeCount" never reached 25 — stalled at 3 after 1 tick\(s\)/,
     );
+    expect(ticksIssued()).toBe(1);
+  });
+
+  it('never ticks past maxTicks: a budget larger than one batch is spent in bounded round trips', async () => {
+    const { evaluate, ticksIssued } = stubGame(() => 3);
+    const page = fakePage({ evaluate });
+    const maxTicks = WAIT_UNTIL_TICK_BATCH * 2 + 50;
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks, timeoutMs: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      new RegExp(`stalled at 3 after ${maxTicks} tick\\(s\\)`),
+    );
+    expect(ticksIssued()).toBe(maxTicks);
+    expect(evaluate).toHaveBeenCalledTimes(3);
   });
 
   // Item 5 of the PR #616 review round: a step that times out on the outer
   // deadline (several actions' combined time, none individually stalling)
   // should still name the field/value/tick-count the runner last observed
   // through waitUntil, instead of a bare "Step N timed out after Xms".
-  it('reports its field/value/tick-count on every tick via onProgress', async () => {
-    const evaluate = vi.fn()
-      .mockResolvedValueOnce(3)
-      .mockResolvedValueOnce(9)
-      .mockResolvedValueOnce(25);
+  it('reports its field/value/tick-count after every round trip via onProgress', async () => {
+    const { evaluate } = stubGame(ticks => (ticks >= WAIT_UNTIL_TICK_BATCH + 20 ? 25 : 9));
     const page = fakePage({ evaluate });
-    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
     const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
     const progress: string[] = [];
 
     await executeActionOnPage(page, action, step, (detail) => progress.push(detail));
 
     expect(progress).toEqual([
-      'waitUntil "holeCount" = 3 (want 25), tick 1/400',
-      'waitUntil "holeCount" = 9 (want 25), tick 2/400',
-      'waitUntil "holeCount" = 25 (want 25), tick 3/400',
+      `waitUntil "holeCount" = 9 (want 25), tick ${WAIT_UNTIL_TICK_BATCH}/400`,
+      `waitUntil "holeCount" = 25 (want 25), tick ${WAIT_UNTIL_TICK_BATCH + 20}/400`,
+    ]);
+  });
+
+  it('keeps one round trip per tick when a trace sink is attached, so the trace names every tick', async () => {
+    // compare-scenario-traces.ts (#674) lines the two modes up tick by tick,
+    // and needs each tick reported on its own — the batch is for the
+    // untraced batch runner only.
+    const { evaluate } = stubGame(ticks => [0, 3, 9, 25][ticks] ?? 25);
+    const page = fakePage({ evaluate });
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
+    const trace: unknown[] = [];
+
+    await executeActionOnPage(page, action, step, undefined, (entry) => trace.push(entry));
+
+    expect(evaluate).toHaveBeenCalledTimes(3);
+    expect(trace).toEqual([
+      { command: 'tick 1', success: true, tickCountAfter: 1 },
+      { command: 'tick 1', success: true, tickCountAfter: 2 },
+      { command: 'tick 1', success: true, tickCountAfter: 3 },
     ]);
   });
 });
@@ -540,7 +605,7 @@ describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', (
 
     await executeActionOnPage(page, action, step);
 
-    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]');
+    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]', { button: 'left' });
   });
 
   it('rejects an unknown/non-toggle panel name without touching the page', async () => {
@@ -582,7 +647,7 @@ describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', ()
 
     await executeActionOnPage(page, action, step);
 
-    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]');
+    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]', { button: 'left' });
   });
 
   // Issue #652: ensureStep clicks the tab selector without ever checking
@@ -691,8 +756,8 @@ describe('resolveEventIfPendingOnPage (issue #699)', () => {
     const resolved = await resolveEventIfPendingOnPage(page, 8000);
 
     expect(resolved).toBe(true);
-    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice');
-    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss');
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice', { button: 'left' });
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss', { button: 'left' });
   });
 
   it('resolves via the console (not a dialog click) and returns true when the level has already ended', async () => {
@@ -1173,5 +1238,179 @@ describe('clickSelector — retries a stale zero-size click failure (issue #1053
       'element is covered by div.bs-modal-backdrop',
     );
     expect(click).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('executeActionOnPage — clickIfPresent retries a re-rendered control (PR #1080 shard 5)', () => {
+  it('clicks again when the first click lands on a node the panel just replaced', async () => {
+    // blast-visual-full's per-hole charge step: `[data-hole="H1"]
+    // [data-action="charge-hole"]` is rebuilt by ChargeHoleList on the
+    // update after the amount stepper moved, and the click issued right
+    // after that read Puppeteer's raw "Node is detached from document" —
+    // twice on CI. The refreshed selector resolves to the replacement row,
+    // which inspects as found/visible/uncovered, so the click is retried.
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return true;   // clickIfPresent's own usable probe
+      if (src.includes('getBoundingClientRect')) {
+        return { found: true, pointerEvents: 'auto', display: 'block', visibility: 'visible', disabled: false, width: 40, height: 18, matchCount: 1 };
+      }
+      return null;
+    });
+    let detachedOnce = false;
+    const click = vi.fn(async () => {
+      if (!detachedOnce) { detachedOnce = true; throw new Error('Node is detached from document'); }
+    });
+    const page = fakePage({ evaluate, click });
+    const step: ScenarioStepDef = {
+      command: 'charge hole:H1 explosive:boomite amount:8 stemming:3',
+      role: 'player',
+      interaction: [{ type: 'clickIfPresent', selector: '#bs-blast-panel [data-hole="H1"] [data-action="charge-hole"]' }],
+    };
+    await executeActionOnPage(page, step.interaction![0]!, step);
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('executeActionOnPage — setStepper (PR #1070 shard 1, #1072)', () => {
+  // A fake stepper: `evaluate` answers the usability probe with "usable" and
+  // the value read with the current display text; `click` moves the value
+  // by one step in the direction of the button clicked, clamped like the
+  // real controls are. Shape-based dispatch on the evaluated function's
+  // source rather than a once-sequence, because the loop's length is the
+  // thing under test.
+  function fakeStepper(opts: { start: number; step: number; unit: string; min?: number; max?: number; decimals?: number }) {
+    const state = { value: opts.start, clicks: 0 };
+    const render = () => `${opts.decimals === undefined ? state.value : state.value.toFixed(opts.decimals)} ${opts.unit}`;
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return null;
+      if (src.includes('textContent')) return render();
+      return null;
+    });
+    const click = vi.fn(async (selector: string) => {
+      state.clicks += 1;
+      const delta = selector.endsWith(':last-child') ? opts.step : -opts.step;
+      const next = +(state.value + delta).toFixed(6);
+      state.value = Math.max(opts.min ?? -Infinity, Math.min(opts.max ?? Infinity, next));
+    });
+    return { page: fakePage({ evaluate, click }), state, click };
+  }
+
+  const step: ScenarioStepDef = {
+    command: 'charge hole:* explosive:boomite amount:8 stemming:2',
+    role: 'player',
+    interaction: [{ type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }],
+  };
+
+  it('clicks + until the displayed value reads the target', async () => {
+    const { page, state, click } = fakeStepper({ start: 5, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }, step);
+    expect(state.value).toBe(8);
+    expect(click).toHaveBeenCalledTimes(3);
+    for (const [sel] of click.mock.calls) expect(sel).toBe('#bs-blast-panel [data-field="amount"] .bsx-stepper-btn:last-child');
+  });
+
+  it('clicks - when the target is below the current value', async () => {
+    const { page, state, click } = fakeStepper({ start: 5, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 2 }, step);
+    expect(state.value).toBe(2);
+    expect(click).toHaveBeenCalledTimes(3);
+    for (const [sel] of click.mock.calls) expect(sel).toBe('#bs-blast-panel [data-field="amount"] .bsx-stepper-btn:first-child');
+  });
+
+  it('does not click at all when the value already matches', async () => {
+    const { page, click } = fakeStepper({ start: 8, step: 1, unit: 'kg' });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 8 }, step);
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('matches a toFixed(1) display against an integer target and survives float steps', async () => {
+    // Stemming steps by 0.2 and renders `2.0 m`: five clicks from 1.0 land
+    // on 2.0000000000000004 in plain arithmetic, which must read as done.
+    const { page, state, click } = fakeStepper({ start: 1, step: 0.2, unit: 'm', decimals: 1 });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="stemming"]', value: 2 }, step);
+    expect(state.value).toBeCloseTo(2, 6);
+    expect(click).toHaveBeenCalledTimes(5);
+  });
+
+  it('fails by name when the control clamps before the target, instead of spinning', async () => {
+    const { page, click } = fakeStepper({ start: 18, step: 1, unit: 'm', max: 20 });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-param-strip [data-field="spacing"]', value: 25 }, step),
+    ).rejects.toThrow(/\+ button no longer moves the value \(clamped at 20\), wanted 25/);
+    // 18→19, 19→20, then one click that changes nothing — and stops there.
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('names a target the stepper cannot land on instead of oscillating around it', async () => {
+    // tutorial-interactive.json's original shape: stemming declared 2.5 on a
+    // 0.2 m stepper that starts at 2.0. The old click-count form silently
+    // produced 2.4; this must fail by name on the first crossing, not spin
+    // 2.4 → 2.6 → 2.4 until maxClicks.
+    const { page, click } = fakeStepper({ start: 2, step: 0.2, unit: 'm', decimals: 1 });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="stemming"]', value: 2.5 }, step),
+    ).rejects.toThrow(/2\.5 is not a value this stepper can reach — one click moves it from 2\.4 to 2\.6/);
+    // 2.0 → 2.2 → 2.4 → 2.6 (crossed): three clicks, then stop.
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries a click the panel re-rendered out from under it, like clickSelector does', async () => {
+    // PR #1080's first CI run: blast-visual-full's per-hole charge step died
+    // on Puppeteer's "Node is detached from document" — the Charge panel
+    // re-rendered its stepper between the usability probe and the click.
+    // setStepper drives its buttons through clickSelector's own path, whose
+    // retry treats a found/visible/uncovered node that still refused the
+    // click as transient, so one detached click costs a retry, not the step.
+    const state = { value: 5, clicks: 0, detachedOnce: false };
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('__probeSelector')) return null;
+      if (src.includes('textContent')) return `${state.value} kg`;
+      if (src.includes('getBoundingClientRect')) {
+        // inspectSelector's report for the re-rendered node: attached, sized, clickable.
+        return { found: true, pointerEvents: 'auto', display: 'block', visibility: 'visible', disabled: false, width: 20, height: 20, matchCount: 1 };
+      }
+      return null;
+    });
+    const click = vi.fn(async (selector: string) => {
+      state.clicks += 1;
+      if (!state.detachedOnce) { state.detachedOnce = true; throw new Error('Node is detached from document'); }
+      state.value += selector.endsWith(':last-child') ? 1 : -1;
+    });
+    const page = fakePage({ evaluate, click });
+    await executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 6 }, step);
+    expect(state.value).toBe(6);
+    // One refused click, one retry that landed.
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('honours maxClicks as an outer bound and names what it still read', async () => {
+    const { page } = fakeStepper({ start: 0, step: 1, unit: 'kg' });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 10, maxClicks: 3 }, step),
+    ).rejects.toThrow(/still reads 3 after 3 click\(s\), wanted 10/);
+  });
+
+  it('fails by name when the container has no stepper value to read', async () => {
+    const evaluate = vi.fn(async (fn: unknown) => {
+      const src = String(fn);
+      if (src.includes('textContent')) return null;
+      // inspectSelector's report for the diagnosis in the message.
+      return { found: false, pointerEvents: '', display: '', visibility: '', disabled: false, width: 0, height: 0, matchCount: 0 };
+    });
+    const page = fakePage({ evaluate });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-nowhere [data-field="amount"]', value: 3 }, step),
+    ).rejects.toThrow(/no \.bsx-stepper-value found/);
+  });
+
+  it('fails by name when the displayed value is not a number', async () => {
+    const evaluate = vi.fn(async (fn: unknown) => (String(fn).includes('textContent') ? '—' : null));
+    const page = fakePage({ evaluate });
+    await expect(
+      executeActionOnPage(page, { type: 'setStepper', selector: '#bs-blast-panel [data-field="amount"]', value: 3 }, step),
+    ).rejects.toThrow(/stepper value "—" is not a number/);
   });
 });

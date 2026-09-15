@@ -3,6 +3,7 @@ import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import {
   sampleBaseHeight,
   applyPitMask,
+  applyPlayableBand,
   computeGroundOffset,
   heightToVoxelY,
   createWorldGenContext,
@@ -64,6 +65,49 @@ describe('applyPitMask', () => {
 
   it('does nothing when height already equals centerHeight', () => {
     expect(applyPitMask(50, 50, rect, 100, 100)).toBeCloseTo(50, 10);
+  });
+});
+
+describe('applyPlayableBand — the world follows the site\'s own vertical band (#1077)', () => {
+  const rect = { minX: 0, minZ: 0, maxX: 64, maxZ: 64 };
+  const sizeY = 20;
+
+  it('holds ground the grid cannot represent at the band the grid clamps it to', () => {
+    // TerrainGen fills every column through heightToVoxelYContinuous, so ground
+    // below y = 1 or above y = sizeY - 1 is simply not in the grid. A landscape
+    // that kept the true height there drew a step at the site's rectangle.
+    expect(applyPlayableBand(-3, sizeY, rect, 32, 32)).toBeCloseTo(1, 10);
+    expect(applyPlayableBand(400, sizeY, rect, 32, 32)).toBeCloseTo(sizeY - 1, 10);
+  });
+
+  it('leaves ground already inside the band untouched, inside the rect and out', () => {
+    for (const [x, z] of [[32, 32], [0, 0], [-200, 90], [64, 64]] as const) {
+      expect(applyPlayableBand(7.25, sizeY, rect, x, z)).toBeCloseTo(7.25, 10);
+    }
+  });
+
+  it('still holds the band one cell past the rect — the playable mesh draws that halo', () => {
+    // PlayableCoverage.meshedCellRect marches one cell west/north of the rect,
+    // and the landscape shares those nodes: 96% of the clamp there is still a
+    // step in the ground.
+    expect(applyPlayableBand(-3, sizeY, rect, -1, 30)).toBeCloseTo(1, 10);
+    expect(applyPlayableBand(-3, sizeY, rect, 30, -1)).toBeCloseTo(1, 10);
+  });
+
+  it('releases the band over open ground, so the world keeps its own relief', () => {
+    const free = applyPlayableBand(-3, sizeY, rect, -200, 32);
+    expect(free).toBeCloseTo(-3, 10);
+  });
+
+  it('eases out rather than stepping out — no crease for a silhouette to catch', () => {
+    // Monotone, and flat at both ends (smoothstep): sampled outward from the
+    // rect edge, each step moves the height toward the true one by less than
+    // the span, and the first and last steps move it least.
+    const heights = [0, 2, 6, 12, 18, 24, 30].map(d => applyPlayableBand(-3, sizeY, rect, -d, 32));
+    for (let i = 1; i < heights.length; i++) expect(heights[i]!).toBeLessThanOrEqual(heights[i - 1]! + 1e-12);
+    const firstStep = heights[0]! - heights[1]!;
+    const middleStep = heights[3]! - heights[4]!;
+    expect(firstStep).toBeLessThan(middleStep);
   });
 });
 

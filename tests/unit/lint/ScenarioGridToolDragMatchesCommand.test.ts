@@ -30,11 +30,11 @@
 // fatigue-hard-threshold-vehicle-release.json declaring
 // `rows:2 cols:3 spacing:5` beside a (14,14)-(29,24) drag that, at the
 // untouched 3m default, orders 6 x 4 = 24 holes instead of 6. Nothing caught
-// it: `ci.yml`'s `scenario-interaction` job runs on push to `main`, on
-// schedule/dispatch, or on a PR labelled `full-ci`, and that PR carried no
-// such label — so the failure first appeared on the merge commit, where no
-// PR-scoped workflow was watching. Unit tests run on every PR, so this check
-// fails where the mistake is made.
+// it: the interaction job did not run on that PR (it was optional on pull
+// requests then), so the failure first appeared on the merge commit, where no
+// PR-scoped workflow was watching. The shards now run on every pull request;
+// this check still fails earlier, in the `logic` channel, where the mistake
+// is made.
 //
 // #1072: spacing itself is now part of the comparison, not just hole
 // count/origin — a step can declare a `spacing:` its drag never sets, or
@@ -91,18 +91,25 @@ function parseDeclaredGrid(command: string): PlanShape | null {
 }
 
 /**
- * How far one action moves the spacing stepper, as
- * `#bs-param-strip [data-field="spacing"] .bsx-stepper-btn:last-child`.
- * `:last-child` is the `+` button and `:first-child` the `-` (dom.ts's
- * `stepper` appends dec, value, inc in that order). Only spacing is read:
- * depth does not enter the cols/rows arithmetic this lint checks.
+ * What one action does to the spacing stepper. A `setStepper` on the
+ * spacing field sets it outright (the only form the suite uses now —
+ * `ScenarioStepperValueMatchesCommand.test.ts` forbids the click-count
+ * form); a bare `.bsx-stepper-btn` click is still folded as ±1 so this lint
+ * keeps reading a definition that predates the migration correctly rather
+ * than treating it as a no-op. `:last-child` is the `+` button and
+ * `:first-child` the `-` (dom.ts's `stepper` appends dec, value, inc in
+ * that order). Only spacing is read: depth does not enter the cols/rows
+ * arithmetic this lint checks.
  */
-function spacingStepperDelta(action: InteractionStepAction): number {
-  if (action.type !== 'clickSelector' && action.type !== 'clickIfPresent') return 0;
-  if (!/\[data-field="spacing"\]/.test(action.selector)) return 0;
+function applySpacingAction(spacing: number, action: InteractionStepAction): number {
+  if (action.type === 'setStepper') {
+    return /\[data-field="spacing"\]/.test(action.selector) ? action.value : spacing;
+  }
+  if (action.type !== 'clickSelector' && action.type !== 'clickIfPresent') return spacing;
+  if (!/\[data-field="spacing"\]/.test(action.selector)) return spacing;
   const which = /\.bsx-stepper-btn:(first|last)-child/.exec(action.selector);
-  if (which === null) return 0;
-  return which[1] === 'last' ? 1 : -1;
+  if (which === null) return spacing;
+  return spacing + (which[1] === 'last' ? 1 : -1);
 }
 
 /** Whether a step's own interaction drags the grid tool at all (stateless sanity check). */
@@ -132,7 +139,7 @@ function simulateFileGridDrags(steps: readonly ScenarioStepDef[]): Map<number, P
 
     let drag: { x1: number; z1: number; x2: number; z2: number } | null = null;
     for (const action of actions) {
-      spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, spacing + spacingStepperDelta(action)));
+      spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, applySpacingAction(spacing, action)));
       if (action.type === 'dragTiles') drag = action;
     }
 

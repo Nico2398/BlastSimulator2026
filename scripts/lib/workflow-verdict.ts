@@ -15,7 +15,8 @@ export type Verdict = 'green' | 'red' | 'pending';
  * `stale` sit with the failures because the dedup below already drops a
  * superseded run — one that survives it was cancelled for good. `skipped` and
  * `neutral` are not failures: `claude-code-review.yml` reports `skipped` on
- * every pipeline PR, and `Production build` does the same without `build-check`.
+ * every pipeline PR. A skipped *required* job is a different matter, and it is
+ * `required-jobs.ts`'s to refuse, not this verdict's.
  *
  * Kept in step with `RUN_FAILURES` in `.github/actions/agentic-auto-merge`: the
  * action decides whether the PR merges, this script decides whether the run

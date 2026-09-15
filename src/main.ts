@@ -704,7 +704,8 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // simulation time — otherwise the render loop's own real-time ticking races
 // scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
 // for a mode that wants to flip it after load.
-let autoTickEnabled = new URLSearchParams(window.location.search).get('scenarioMode') !== '1';
+const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
+let autoTickEnabled = !scenarioMode;
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 
 // Drawing control for the browser-driven harnesses (#475). They need pixels
@@ -713,6 +714,16 @@ window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 // rasterisation. Suspending the draw and forcing one frame per capture keeps
 // the images identical and stops the suites paying for frames nobody sees.
 window.__setRenderEnabled = (enabled: boolean) => { scene.setDrawingEnabled(enabled); };
+// A scenario run starts with drawing already suspended, before the loop
+// below draws anything. Every harness suspends drawing as soon as it sees
+// the canvas, and every capture forces its own frame (`captureFrame`), so
+// the frames drawn between page load and that first `suspendDrawing` were
+// never looked at — and without a GPU they are the whole cost of a page
+// boot: ~10 s of shader compilation and software rasterisation per tab,
+// paid once per scenario in the batch runner, before its first step ran.
+// The loop itself still runs: rAF resolves, `onUpdate` fires, the UI
+// updates — only the draw waits for a harness to ask for one.
+if (scenarioMode) scene.setDrawingEnabled(false);
 // Resolves once every model asset is in (or reported failed). A harness that
 // enters a level through __gameConsole skips enterLevel()'s wait on this, so
 // it awaits it here before capturing a frame it wants to show real assets.

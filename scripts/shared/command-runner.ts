@@ -43,7 +43,7 @@ export type { GoalMismatch } from './scenario-goal.js';
  * event genuinely pauses it exactly as it would for a real player — a
  * scenario wanting to prove that dwells on it with `resolveEventIfPending`.
  */
-export function runWaitUntil(
+function runWaitUntil(
   engine: RunnerWithContext,
   action: Extract<InteractionStepAction, { type: 'waitUntil' }>,
 ): { output: string; gameState: Record<string, unknown> | null } {
@@ -76,9 +76,9 @@ export function runWaitUntil(
  * above) and interaction mode (`interaction-executor.ts`) read to drive the
  * tick-loop instead of the step's own `command` string, which is descriptive
  * only and never executed as-is when this is present (issue #590). Exported
- * so callers that replay scenario steps outside `runSteps` (e.g. the
- * command-outcome lint) can detect a `waitUntil` step the same way, rather
- * than re-declaring this predicate.
+ * so the interaction-mode runners (`run-all-scenarios-interaction-batch.ts`,
+ * `scenario-interaction-runner.ts`) can detect a `waitUntil` step the same
+ * way, rather than re-declaring this predicate.
  */
 export function findWaitUntilAction(
   step: ScenarioStepDef,
@@ -98,6 +98,14 @@ export interface ScenarioResult {
   error?: string;
   reportPath?: string;
   driftRecords?: DriftRecord[];
+  /**
+   * Interaction mode only: how many of this scenario's `expect` goals were
+   * left to command mode as trajectory-coupled (`interaction-goal-scope.ts`).
+   * Reported in the batch summary so the browser channel says what it did not
+   * re-assert; command mode checks every one of them unscoped, so this is
+   * never a goal the suite stopped proving.
+   */
+  deferredGoals?: number;
 }
 
 /**
