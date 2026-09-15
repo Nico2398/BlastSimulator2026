@@ -8,6 +8,8 @@
 
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
+import { resolveReservationHolder } from '../engine/VehicleReservation.js';
+import { findInTransitFragment } from '../economy/Logistics.js';
 
 export type ViolationKind =
   | 'I1_dangling_driver_reference'
@@ -99,7 +101,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       });
       continue;
     }
-    const holder = findLivingDriver(state, holderId);
+    const holder = resolveReservationHolder(state, v, action);
     if (!holder) {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',
@@ -160,8 +162,8 @@ function checkI8PayloadNotInTransit(state: GameState): Violation[] {
       violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id });
       continue;
     }
-    const tracked = state.logistics.fragments.find(f => f.fragment.id === v.haulingFragmentId);
-    if (!tracked || tracked.state !== 'in_transit') {
+    const tracked = findInTransitFragment(state.logistics, v.haulingFragmentId);
+    if (!tracked) {
       violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: v.haulingFragmentId });
     }
   }

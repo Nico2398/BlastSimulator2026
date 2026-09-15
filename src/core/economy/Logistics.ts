@@ -105,7 +105,7 @@ function findStoredFragment(state: LogisticsState, fragmentId: number): TrackedF
 }
 
 /** Find a fragment currently in transit by id, or undefined when absent/not in transit. */
-function findInTransitFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
+export function findInTransitFragment(state: LogisticsState, fragmentId: number): TrackedFragment | undefined {
   return state.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
 }
 
