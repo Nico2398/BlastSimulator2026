@@ -223,15 +223,21 @@ module pathfinds from a vehicle's position.
 ## Migration Status
 
 This page specifies the target. `src/core/entities/Vehicle.ts` is the authority on what exists
-today. A phase issue updates its own row as it lands.
+today. A migration issue updates its own row as it lands.
 
 | Phase | Delivers | Status |
 |-------|----------|--------|
-| 0 | Tutorial-conditions box-cut regression scenario, warn-only invariant checker, planner/executor equivalence harness | planned |
-| 1 | Tick pipeline moved into `src/core/engine/`, single vehicle-gated completion path | planned |
-| 2 | `Locomotion` + `occupantIds` as the only mount truth; renderer and 1-tile board/alight | planned |
-| 3 | `Itinerary`, `planItinerary`, `tickLocomotion`, `moveTo`; vehicles stop pathfinding | planned |
+| 0a | Box-cut regression coverage under the tutorial's own conditions, interaction mode | planned |
+| 0b | `assertWorldInvariants`, warn-only, against today's fields | planned |
+| 1a | One vehicle-gated completion path | planned |
+| 1b | Tick pipeline core-owned; the second, test-only loop removed | planned |
+| 2 | `Locomotion` + `occupantIds` as the mount truth, `Mount` its only writer; renderer and 1-tile board/alight | planned |
+| 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | planned |
+| 3b | `tickLocomotion` + `moveTo` become the only movers; vehicles stop pathfinding | planned |
 | 4 | Cost model delegates to the planner; continuity machinery removed | planned |
 | 5 | Haul and break become leg effects | planned |
-| 6 | Dead vehicle fields stripped, tier-correct upkeep, `reposition` goal | planned |
+| 6 | Dead vehicle fields stripped, tier-correct stat reads, `reposition` goal | planned |
 | 7 | Fast transport un-gated | planned |
+
+Phase 2 keeps `driverId` as a read-only mirror of `occupantIds` so the readers that phases 3 to 5
+rewrite or delete are not migrated twice. Phase 6 removes the mirror and the readers left.
