@@ -632,6 +632,45 @@ describe('Vehicle fleet', () => {
       anchor.targetZ = 20;
       anchor.task = 'idle';
       anchor.state = 'idle';
+      // #1087 follow-up: an idle, unreserved blocker sitting on the
+      // contended cell is no longer a permanent obstacle —
+      // handleVehicleOccupancyBlock (VehicleOccupancyReroute.ts) now
+      // relocates one directly (relocateDriverlessVehicle when driverless,
+      // moveVehicle when driven — either shape) the first time any satellite
+      // below hits the reroute threshold, which frees the target for every
+      // satellite ticked afterward in this SAME tick and starves
+      // detectTrafficJam of the >=TRAFFIC_JAM_MIN_VEHICLES simultaneous
+      // waiters it needs. Reserving the anchor for a real pending action —
+      // with a real, licensed holder driving it, so #1084's I5 check stays
+      // clean and `holder.pendingDriverVehicleId` (which ArrivalGate.ts's own
+      // per-tick boarding resolution clears unconditionally, succeed or
+      // fail, and so cannot be relied on to still read true a tick later)
+      // never needs to be the thing that proves validity — keeps it a
+      // genuine, unrelocatable obstacle — exactly the shape a real reserved
+      // drill_rig/debris_hauler mid-claim would be — matching what this test
+      // actually wants to prove instead of accidentally exercising the new
+      // relocation feature.
+      const anchorHolderRng = new Random(999);
+      const { employee: anchorHolder } = hireEmployee(ctx.state!.employees, 'driver', anchorHolderRng, anchor.x, anchor.z);
+      assignSkill(ctx.state!.employees, anchorHolder.id, 'driving.truck', 1);
+      const anchorAssignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, anchor.id, anchorHolder.id);
+      expect(anchorAssignResult.success).toBe(true);
+      const anchorAction: PendingAction = {
+        id: 9999,
+        type: 'haul_debris',
+        requiredSkill: null,
+        requiredVehicleRole: 'debris_hauler',
+        targetX: anchor.x,
+        targetZ: anchor.z,
+        targetY: 0,
+        payload: {},
+        targetEmployeeId: null,
+        status: 'assigned',
+        holderId: anchorHolder.id,
+        queuedAtTick: 0,
+      };
+      ctx.state!.pendingActions.push(anchorAction);
+      anchor.reservedForActionId = anchorAction.id;
 
       // TRAFFIC_JAM_MIN_VEHICLES vehicles, each one grid step from the
       // anchor's cell (their shared target), already at
