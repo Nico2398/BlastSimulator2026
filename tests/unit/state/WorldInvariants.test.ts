@@ -87,112 +87,11 @@ function addFragment(state: GameState, id: number, fragState: FragmentState = 'o
   });
 }
 
-// ── I1: dangling driver reference ───────────────────────────────────────────
-
-describe('assertWorldInvariants — I1_dangling_driver_reference', () => {
-  it('no violation when driverId is null', () => {
-    const state = makeState();
-    addVehicle(state, { driverId: null });
-
-    expect(assertWorldInvariants(state)).toEqual([]);
-  });
-
-  it('no violation when driverId names a living employee', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { x: 0, z: 0 });
-    addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
-
-    expect(assertWorldInvariants(state)).toEqual([]);
-  });
-
-  it('violation when driverId names an id with no matching employee at all', () => {
-    const state = makeState();
-    const v = addVehicle(state, { driverId: 999 });
-
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I1_dangling_driver_reference');
-    expect(violations[0]!.vehicleId).toBe(v.id);
-  });
-
-  it('violation when driverId names an employee who is no longer alive', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { alive: false });
-    const v = addVehicle(state, { driverId: emp.id });
-
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I1_dangling_driver_reference');
-    expect(violations[0]!.vehicleId).toBe(v.id);
-  });
-});
-
-// ── I2: driver position mismatch ────────────────────────────────────────────
-
-describe('assertWorldInvariants — I2_driver_position_mismatch', () => {
-  it('no violation when the driver stands exactly where the vehicle is', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { x: 12, z: 7 });
-    addVehicle(state, { driverId: emp.id, x: 12, z: 7 });
-
-    expect(assertWorldInvariants(state)).toEqual([]);
-  });
-
-  it('violation when the driver\'s x/z disagrees with the vehicle\'s x/z', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { x: 12, z: 7 });
-    const v = addVehicle(state, { driverId: emp.id, x: 20, z: 20 });
-
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I2_driver_position_mismatch');
-    expect(violations[0]!.vehicleId).toBe(v.id);
-    expect(violations[0]!.employeeId).toBe(emp.id);
-  });
-});
-
-// ── I3: employee drives two vehicles ────────────────────────────────────────
-
-describe('assertWorldInvariants — I3_employee_drives_two_vehicles', () => {
-  it('no violation when every driverId is unique (or null)', () => {
-    const state = makeState();
-    const emp1 = addEmployee(state, { x: 0, z: 0 });
-    const emp2 = addEmployee(state, { x: 1, z: 1 });
-    addVehicle(state, { driverId: emp1.id, x: 0, z: 0 });
-    addVehicle(state, { driverId: emp2.id, x: 1, z: 1 });
-    addVehicle(state, { driverId: null });
-
-    expect(assertWorldInvariants(state)).toEqual([]);
-  });
-
-  it('violation when two vehicles share the same non-null driverId — reported once, against the second vehicle claiming it', () => {
-    const state = makeState();
-    const emp = addEmployee(state, { x: 0, z: 0 });
-    const v1 = addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
-    const v2 = addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
-
-    const violations = assertWorldInvariants(state);
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.kind).toBe('I3_employee_drives_two_vehicles');
-    expect(violations[0]!.employeeId).toBe(emp.id);
-    // The second vehicle to claim the shared driverId, in fleet iteration
-    // order, is the one reported — v1 is the "legitimate" first claim.
-    expect(violations[0]!.vehicleId).toBe(v2.id);
-    expect(violations[0]!.vehicleId).not.toBe(v1.id);
-  });
-});
-
-// ── I1-I3, re-expressed against occupantIds/locomotion (#1087) ─────────────
-// Mount/itinerary phase 2 makes `occupantIds`/`locomotion` the source of
-// truth for who rides what — the checks above only ever read `driverId`, so
-// a mismatch expressed purely through occupantIds/locomotion (driverId left
-// null throughout) currently goes undetected. These new cases are red until
-// I1-I3 read the new fields; the existing driverId-based cases above are
-// left untouched.
+// ── I1-I3: occupantIds/locomotion agreement (#1087) ────────────────────────
+// Mount/itinerary phase 2 retargeted I1/I2/I3 from driverId-only checks to
+// occupantIds/locomotion-based ones — driverId is now a plain mirror, not
+// the source of truth, so these fixtures set occupantIds/locomotion
+// directly rather than driverId.
 
 describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', () => {
   it('no violation when a mounted employee is listed in their vehicle\'s occupantIds', () => {

@@ -46,6 +46,7 @@ function employeeMovementDefaults(): Omit<
   'id' | 'name' | 'role' | 'salary' | 'morale' | 'unionized' | 'injured' | 'alive' | 'x' | 'z' | 'qualifications' | 'trainingState'
 > {
   return {
+    locomotion: { kind: 'on_foot' },
     activeActionId: null,
     fatigue: 100,
     collapsing: false,

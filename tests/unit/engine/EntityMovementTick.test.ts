@@ -255,6 +255,8 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     const action = makeVehicleAction({ id: actionId, holderId: driver.id });
     state.pendingActions.push(action);
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = targetX;
@@ -410,6 +412,8 @@ describe('tickVehicleOnNavGrid — sustained-stuck release (#986)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
 
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 3;

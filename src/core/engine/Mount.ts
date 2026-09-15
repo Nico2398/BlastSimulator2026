@@ -9,7 +9,7 @@ import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
-export type MountResult = { success: true } | { success: false; error: string };
+type MountResult = { success: true } | { success: false; error: string };
 
 /**
  * Board an employee onto a vehicle: the employee must be within one tile

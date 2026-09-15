@@ -771,6 +771,8 @@ describe('tickCollapse (7.6)', () => {
     employee.activeActionId = gatedAction.id;
     employee.taskTicksRemaining = 3; // boarded, mid-execution
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = gatedAction.id;
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);

@@ -39,6 +39,8 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const scene = new THREE.Scene();
     const characters = new CharacterMesh(scene);
@@ -102,6 +104,8 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     expect(characters.count).toBe(1);
 
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
 
     expect(characters.count).toBe(0);
@@ -114,6 +118,8 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const scene = new THREE.Scene();
     const characters = new CharacterMesh(scene);
@@ -130,6 +136,8 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     employee.x = 12;
     employee.z = 4;
     vehicle.driverId = null;
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
 
     syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
 
@@ -143,6 +151,8 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const { employee: onFoot } = hireEmployee(state.employees, 'surveyor', new Random(SEED + 1), 8, 8);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const scene = new THREE.Scene();
     const characters = new CharacterMesh(scene);

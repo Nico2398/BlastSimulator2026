@@ -11,11 +11,6 @@ export function isMounted(locomotion: Locomotion): locomotion is { kind: 'mounte
   return locomotion.kind === 'mounted';
 }
 
-/** True when the employee is on foot. */
-export function isOnFoot(locomotion: Locomotion): boolean {
-  return locomotion.kind === 'on_foot';
-}
-
 /** The vehicle id the employee is mounted in, or null when on foot. */
 export function mountedVehicleId(locomotion: Locomotion): number | null {
   return isMounted(locomotion) ? locomotion.vehicleId : null;

@@ -320,6 +320,7 @@ describe('vehicle.ts — driver unassign success message', () => {
   function buyVehicleWithBypassedDriver(ctx: GameContext) {
     const vehicle = buyTestVehicle(ctx);
     vehicle.driverId = 42; // bypass canAssignDriver entirely — only unassignDriver's own state matters here
+    vehicle.occupantIds = [42]; // Mount.alight (#1087) resolves the occupant to release from here, not driverId
     return vehicle;
   }
 

@@ -1194,8 +1194,8 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 18', () => {
-    expect(SAVE_VERSION).toBe(18);
+  it('SAVE_VERSION is 19', () => {
+    expect(SAVE_VERSION).toBe(19);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {

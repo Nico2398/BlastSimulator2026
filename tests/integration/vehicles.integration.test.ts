@@ -807,6 +807,8 @@ describe('Vehicle fleet', () => {
       ctx.state!.pendingActions[0]!.holderId = eid;
       emp.activeActionId = actionId;
       vehicle.driverId = eid;
+      vehicle.occupantIds = [eid];
+      emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
       vehicle.reservedForActionId = actionId;
       emp.taskTicksRemaining = null;
 
@@ -1153,6 +1155,8 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     const action = makeVehicleGatedAction({ id: 9001, holderId: driver.id });
     state.pendingActions.push(action);
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 10;
@@ -1192,6 +1196,8 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     const action2 = makeVehicleGatedAction({ id: 9002, holderId: driver.id, targetX: 15, targetZ: 5 });
     state.pendingActions.push(action2);
     vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'moving';
     vehicle.state = 'moving';
     vehicle.targetX = 15;
