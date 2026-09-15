@@ -232,7 +232,7 @@ today. A migration issue updates its own row as it lands.
 | 1a | One vehicle-gated completion path | landed |
 | 1b | Tick pipeline core-owned; the second, test-only loop removed | landed |
 | 2 | `Locomotion` + `occupantIds` as the mount truth, `Mount` its only writer; renderer and 1-tile board/alight | landed |
-| 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | planned |
+| 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | landed |
 | 3b | `tickLocomotion` + `moveTo` become the only movers; vehicles stop pathfinding | planned |
 | 4 | Cost model delegates to the planner; continuity machinery removed | planned |
 | 5 | Haul and break become leg effects | planned |
