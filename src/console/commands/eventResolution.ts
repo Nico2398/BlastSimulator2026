@@ -3,31 +3,13 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import type { EventDef, EventContext } from '../../core/events/EventPool.js';
+import type { EventDef } from '../../core/events/EventPool.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import { clearLastOutcome } from '../../core/events/EventSystem.js';
-import { getLivingEmployees } from '../../core/entities/Employee.js';
 import { requireGame } from './commandUtils.js';
-
-/** Build the EventContext from the current GameState. */
-export function buildEventContext(ctx: GameContext): EventContext {
-  const s = ctx.state!;
-  return {
-    scores: s.scores,
-    employeeCount: getLivingEmployees(s.employees.employees).length,
-    deathCount: s.damage.deathCount,
-    corruptionLevel: s.corruption.level,
-    hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),
-    hasDrillPlan: s.drillHoles.length > 0,
-    tickCount: s.tickCount,
-    lawsuitCount: s.corruption.attempts.filter(a => a.target === 'judge').length,
-    activeContractCount: s.contracts.active.length,
-    weatherId: 'clear', // TODO: wire actual weather when available
-  };
-}
 
 /**
  * Appends the numbered option list and the "how to decide" hint shared by

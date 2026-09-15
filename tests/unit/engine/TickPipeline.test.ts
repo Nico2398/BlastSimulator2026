@@ -8,9 +8,10 @@
 // observable and assert it did not shift, rather than re-testing the
 // underlying step functions (already covered by their own unit test files).
 //
-// Red phase (#1086): runTick/applyTaskCompletion/checkGameOverConditions are
-// still `throw new Error('not implemented')` stubs, so every test below is
-// expected to fail until the pipeline is actually implemented.
+// Black-box regression suite for runTick's step ordering and the TickReport
+// contract it returns — it does not re-test the underlying step functions
+// (applyTaskCompletion, checkGameOverConditions, etc.), which have their own
+// unit test files.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
