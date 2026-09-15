@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { moveVehicle } from '../entities/Vehicle.js';
-import { board } from './Mount.js';
+import { board, isWithinBoardingRange } from './Mount.js';
 import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
@@ -320,9 +320,8 @@ function resolveBoarding(
   // Boarding happens from within one tile of the vehicle (Chebyshev
   // distance <= 1), not exact cell equality — the employee reads as
   // "arrived" (destinationX/Z cleared) the instant they are close enough to
-  // board, matching Mount.board's own distance check.
-  const distance = Math.max(Math.abs(emp.x - vehicle.x), Math.abs(emp.z - vehicle.z));
-  if (distance > 1) {
+  // board, matching Mount.board's own distance check (isWithinBoardingRange).
+  if (!isWithinBoardingRange(emp.x, emp.z, vehicle.x, vehicle.z)) {
     // The employee reached where the vehicle used to be, but it has since
     // moved elsewhere — cancel rather than chase it silently.
     emp.pendingDriverVehicleId = null;

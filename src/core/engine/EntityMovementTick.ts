@@ -77,7 +77,7 @@ export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventE
  * ticks may run before a navgrid exists (e.g. tests constructing a bare
  * GameState).
  */
-function updateVehicleCellOccupancy(
+export function updateVehicleCellOccupancy(
   state: GameState,
   vehicle: Vehicle,
   wasStationary: boolean,

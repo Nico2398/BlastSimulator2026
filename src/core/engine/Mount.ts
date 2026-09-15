@@ -12,6 +12,15 @@ import { isImpassable } from '../nav/Pathfinding.js';
 type MountResult = { success: true } | { success: false; error: string };
 
 /**
+ * Whether two points are within one tile of each other (Chebyshev distance
+ * <= 1) — the shared "close enough to board" test used both here and by
+ * ArrivalGate's own boarding-arrival check.
+ */
+export function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): boolean {
+  return Math.max(Math.abs(ax - bx), Math.abs(az - bz)) <= 1;
+}
+
+/**
  * Board an employee onto a vehicle: the employee must be within one tile
  * (Chebyshev distance) of the vehicle, licensed and otherwise eligible per
  * `canAssignDriver`, and the vehicle must have a free seat
@@ -26,8 +35,9 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee || !employee.alive) return { success: false, error: 'Employee not found' };
 
-  const distance = Math.max(Math.abs(employee.x - vehicle.x), Math.abs(employee.z - vehicle.z));
-  if (distance > 1) return { success: false, error: 'Employee is too far from the vehicle to board' };
+  if (!isWithinBoardingRange(employee.x, employee.z, vehicle.x, vehicle.z)) {
+    return { success: false, error: 'Employee is too far from the vehicle to board' };
+  }
 
   const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
   if (!eligible.success) return { success: false, error: eligible.error };

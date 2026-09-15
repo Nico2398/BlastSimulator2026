@@ -50,7 +50,7 @@ export function requestBoardVehicle(
   const check = canBoardVehicle(state, vehicleId, employeeId);
   if (!check.success) return check;
 
-  // Defer the actual assignDriver() call (which re-runs canAssignDriver) until
+  // Defer the actual board() call (which re-runs canAssignDriver) until
   // ArrivalGate confirms co-location — walking there is what #437 adds; the
   // checks above only gate *starting* the walk.
   check.employee.pendingDriverVehicleId = vehicleId;

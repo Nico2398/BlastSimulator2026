@@ -243,7 +243,8 @@ export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, z
  * below) — rather than on `employee.activeActionId === null` combined with
  * `driverId === employee.id` alone. That pair is NOT unique to an evacuation
  * drive: a driver boarded directly (the console `vehicle driver` command,
- * `assignDriver`) or one left mounted between two vehicle-gated tasks by
+ * routed through `requestBoardVehicle`/`board()`) or one left mounted between
+ * two vehicle-gated tasks by
  * vehicle-continuity (VehicleContinuity.ts's own dismount-then-reassign
  * ordering can still leave a one-tick gap) both carry activeActionId===null
  * while genuinely idle-but-boarded, not evacuating — treating that as an

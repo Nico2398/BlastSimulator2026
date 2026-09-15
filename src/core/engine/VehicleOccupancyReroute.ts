@@ -13,7 +13,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, type AdvanceAlongPathOutcome } from '../nav/AgentAdvance.js';
 import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../config/balance.js';
-import { markVehicleWaiting, setVehicleIdle, isCellOccupiedByOtherVehicle } from './EntityMovementTick.js';
+import { markVehicleWaiting, setVehicleIdle, isCellOccupiedByOtherVehicle, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 /**
  * Applies an advanceAlongPath outcome to a vehicle: position, moving state,
@@ -147,26 +147,21 @@ export function handleVehicleOccupancyBlock(
  * driver exists to stage a 'moving' task through the ordinary drive
  * machinery (canTickVehicle would never advance it — #947), and none is
  * needed — an unreserved, driverless vehicle has no task of its own in
- * flight to interrupt, so it is simply placed on `x`/`z` outright. Keeps
- * NavCell.vehicleOccupied in sync the same way tickVehicle's own
- * updateVehicleCellOccupancy does for a normal drive, so foot/vehicle
- * pathfinding immediately sees the old cell as free and the new one as
- * occupied rather than waiting for the next tick's reconciliation.
+ * flight to interrupt, so it is simply placed on `x`/`z` outright. Reuses
+ * tickVehicle's own updateVehicleCellOccupancy (EntityMovementTick.ts) to
+ * keep NavCell.vehicleOccupied in sync, so foot/vehicle pathfinding
+ * immediately sees the old cell as free and the new one as occupied rather
+ * than waiting for the next tick's reconciliation.
  */
 function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number): void {
-  const grid = state.navGrid;
-  if (grid) {
-    const oldCell = grid.cellAt(Math.floor(blocker.x), Math.floor(blocker.z));
-    if (oldCell) oldCell.vehicleOccupied = false;
-  }
+  const prevX = Math.floor(blocker.x);
+  const prevZ = Math.floor(blocker.z);
+  const wasStationary = blocker.state !== 'moving';
 
   blocker.x = x;
   blocker.z = z;
 
-  if (grid) {
-    const newCell = grid.cellAt(Math.floor(x), Math.floor(z));
-    if (newCell) newCell.vehicleOccupied = true;
-  }
+  updateVehicleCellOccupancy(state, blocker, wasStationary, prevX, prevZ);
 }
 
 /**
