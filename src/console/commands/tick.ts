@@ -197,7 +197,7 @@ export function tickCommand(
     // timing across several scenarios that have nothing to do with vehicles.
     // The vehicle-continuity case that motivated it is instead handled
     // inline, scoped to vehicle-gated actions only — see
-    // tryContinueVehicleGatedAction below.
+    // completeVehicleGatedActionIfApplicable below.
     const dispatchResult = tickEmployees(state);
     fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
