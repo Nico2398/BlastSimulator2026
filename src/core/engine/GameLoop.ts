@@ -62,7 +62,9 @@ export { processShiftCycle, type ShiftCycleResult } from './ShiftCycle.js';
 
 // Vehicle-continuity inline promotion (#550/#552) lives in
 // VehicleContinuity.ts (#759's file-size split) — re-exported here.
-export { tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
+// tryContinueVehicleGatedAction stays internal to VehicleContinuity.ts (#1085):
+// completeVehicleGatedActionIfApplicable is the sole entry point callers use.
+export { completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
 
 // Task progress ticking and completion lives in TaskProgress.ts (#759's
 // file-size split) — re-exported here.
