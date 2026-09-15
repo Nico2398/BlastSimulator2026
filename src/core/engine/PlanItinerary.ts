@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED } from '../config/balance.js';
-import { computeActionWorkTicks } from './ActionSelection.js';
+import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier, type VehicleRole } from '../entities/Vehicle.js';
@@ -63,7 +63,7 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal): Resolved
  * (ActionSelection.ts) — and returns null when the target is genuinely
  * unreachable on the current NavGrid.
  */
-function planDistance(
+function estimateLegDistance(
   state: GameState,
   fidelity: PlanFidelity,
   agentId: number,
@@ -92,13 +92,13 @@ export function planItinerary(
   const role = resolved.requiredVehicleRole;
 
   if (role === null) {
-    // VEHICLE_TRANSPORT_PLANNING_ENABLED, when true, is where a later phase
-    // (7, fast transport) compares walking against [foot->vehicle, board,
-    // drive, alight, foot->target] for an action that needs no vehicle role.
-    // Inert in this issue — read, not acted on.
-    void VEHICLE_TRANSPORT_PLANNING_ENABLED;
+    if (VEHICLE_TRANSPORT_PLANNING_ENABLED) {
+      /* reserved for gameplay-vehicle-fleet phase 7 (fast transport): compare
+       * this foot leg's cost against boarding+driving and return whichever is
+       * cheaper. Not built in phase 3a. */
+    }
 
-    const dist = planDistance(state, fidelity, employee.id, employee.x, employee.z, resolved.targetX, resolved.targetZ);
+    const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, resolved.targetX, resolved.targetZ);
     if (dist === null) return null;
 
     const footLeg: Leg = {
@@ -108,7 +108,7 @@ export function planItinerary(
       destZ: resolved.targetZ,
       arrival: 'exact',
       onArrive: { kind: 'none' },
-      estTicks: dist / AGENT_WALK_SPEED,
+      estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED),
     };
 
     return { legs: [footLeg], goal, workTicks: 0, estTotalTicks: footLeg.estTicks };
@@ -130,7 +130,7 @@ export function planItinerary(
   let driveFromZ = employee.z;
 
   if (!alreadyMounted) {
-    const footDist = planDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
+    const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
     if (footDist === null) return null;
 
     legs.push({
@@ -140,7 +140,7 @@ export function planItinerary(
       destZ: vehicle.z,
       arrival: 'adjacent',
       onArrive: { kind: 'board', vehicleId: vehicle.id },
-      estTicks: footDist / AGENT_WALK_SPEED,
+      estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
     });
 
     driveFromX = vehicle.x;
@@ -148,7 +148,7 @@ export function planItinerary(
   }
 
   const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
-  const driveDist = planDistance(state, fidelity, vehicle.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ);
+  const driveDist = estimateLegDistance(state, fidelity, vehicle.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ);
   if (driveDist === null) return null;
 
   legs.push({
@@ -158,7 +158,7 @@ export function planItinerary(
     destZ: resolved.targetZ,
     arrival: 'exact',
     onArrive: { kind: 'none' },
-    estTicks: driveDist / def.speed,
+    estTicks: cellsToTravelTicks(driveDist, def.speed),
   });
 
   const estTotalTicks = legs.reduce((sum, leg) => sum + leg.estTicks, 0) + resolved.workTicks;

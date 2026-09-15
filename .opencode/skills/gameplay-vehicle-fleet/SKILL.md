@@ -112,7 +112,8 @@ type ArrivalStep =
 interface Itinerary {
   legs: Leg[];                     // legs[0] is current; consumed front-to-back
   goal: Goal;
-  estTotalTicks: number;
+  workTicks: number;                // ticks of work at the goal, once every leg has arrived
+  estTotalTicks: number;            // sum of every leg's estTicks plus workTicks
 }
 
 type Goal =
