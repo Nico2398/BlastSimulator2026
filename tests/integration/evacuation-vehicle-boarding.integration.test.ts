@@ -15,6 +15,8 @@ import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
 import { isInZone, isZoneClear, type ZoneBounds } from '../../src/core/entities/Zone.js';
+import { tickArrivalGate } from '../../src/core/engine/ArrivalGate.js';
+import { createGame } from '../../src/core/state/GameState.js';
 import { tickUntil } from './helpers.js';
 
 describe('Evacuation vehicle boarding (#1042)', () => {
@@ -54,5 +56,26 @@ describe('Evacuation vehicle boarding (#1042)', () => {
     // The zone reads clear of everything reachable — only the genuinely
     // stranded vehicle (and nothing else) still sits inside it.
     expect(isZoneClear(zone, state.vehicles, state.employees)).toBe(false);
+  });
+
+  // #1087: boarding now resolves from an adjacent tile (Chebyshev distance
+  // <= 1), not only exact cell equality — the same relaxation Mount.board
+  // applies. tickArrivalGate.resolveBoarding is exercised directly here
+  // (rather than through the full zone-clear -> pathfind -> arrive pipeline
+  // above) so the employee's arrival position can be pinned to exactly one
+  // tile off the vehicle's own cell, deterministically.
+  it('boards a vehicle when the employee arrives one tile away (Chebyshev distance 1), not only on the vehicle\'s exact cell', () => {
+    const state = createGame({ seed: 1042 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const rng = new Random(1042);
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 6, 6); // diagonal, Chebyshev distance 1
+    employee.pendingDriverVehicleId = vehicle.id;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+
+    tickArrivalGate(state);
+
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.pendingDriverVehicleId).toBeNull();
   });
 });

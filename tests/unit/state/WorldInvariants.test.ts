@@ -26,6 +26,7 @@ import type { FragmentState } from '../../../src/core/economy/Logistics.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import { VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
 
 // ── Fixture helpers ─────────────────────────────────────────────────────────
 
@@ -182,6 +183,121 @@ describe('assertWorldInvariants — I3_employee_drives_two_vehicles', () => {
     // order, is the one reported — v1 is the "legitimate" first claim.
     expect(violations[0]!.vehicleId).toBe(v2.id);
     expect(violations[0]!.vehicleId).not.toBe(v1.id);
+  });
+});
+
+// ── I1-I3, re-expressed against occupantIds/locomotion (#1087) ─────────────
+// Mount/itinerary phase 2 makes `occupantIds`/`locomotion` the source of
+// truth for who rides what — the checks above only ever read `driverId`, so
+// a mismatch expressed purely through occupantIds/locomotion (driverId left
+// null throughout) currently goes undetected. These new cases are red until
+// I1-I3 read the new fields; the existing driverId-based cases above are
+// left untouched.
+
+describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', () => {
+  it('no violation when a mounted employee is listed in their vehicle\'s occupantIds', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const emp = addEmployee(state, { x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = [emp.id];
+
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it('violation when locomotion says mounted on V but V.occupantIds does not contain the employee', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const emp = addEmployee(state, { x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = []; // mismatch: locomotion claims this vehicle, occupantIds disagrees
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some(x => x.vehicleId === v.id && x.employeeId === emp.id)).toBe(true);
+  });
+
+  it('violation when V.occupantIds contains the employee but their locomotion is not mounted on V', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const emp = addEmployee(state, { x: 0, z: 0 });
+    emp.locomotion = { kind: 'on_foot' }; // mismatch: occupantIds claims this employee, locomotion disagrees
+    v.occupantIds = [emp.id];
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some(x => x.vehicleId === v.id && x.employeeId === emp.id)).toBe(true);
+  });
+});
+
+describe('assertWorldInvariants — I2, mounted employee position agreement (#1087)', () => {
+  it('no violation when a mounted employee\'s x/z matches their vehicle\'s x/z', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 12, z: 7 });
+    const emp = addEmployee(state, { x: 12, z: 7 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = [emp.id];
+
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it('violation when a mounted employee\'s x/z disagrees with their vehicle\'s x/z', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 20, z: 20 });
+    const emp = addEmployee(state, { x: 12, z: 7 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = [emp.id];
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some(x => x.vehicleId === v.id && x.employeeId === emp.id)).toBe(true);
+  });
+});
+
+describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)', () => {
+  it('no violation when occupantIds stays within VEHICLE_SEAT_COUNT and no employee occupies two vehicles', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const emp = addEmployee(state, { x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
+    v.occupantIds = [emp.id];
+
+    expect(v.occupantIds.length).toBeLessThanOrEqual(VEHICLE_SEAT_COUNT[v.type]);
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it('violation when occupantIds.length exceeds VEHICLE_SEAT_COUNT for that role', () => {
+    const state = makeState();
+    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const emp1 = addEmployee(state, { x: 0, z: 0 });
+    const emp2 = addEmployee(state, { x: 0, z: 0 });
+    emp1.locomotion = { kind: 'mounted', vehicleId: v.id };
+    emp2.locomotion = { kind: 'mounted', vehicleId: v.id };
+    // debris_hauler's seat count is 1 — two occupants overflows it.
+    v.occupantIds = [emp1.id, emp2.id];
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some(x => x.vehicleId === v.id)).toBe(true);
+  });
+
+  it('violation when the same employee id appears in two different vehicles\' occupantIds', () => {
+    const state = makeState();
+    const v1 = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v2 = addVehicle(state, { driverId: null, x: 1, z: 1 });
+    const emp = addEmployee(state, { x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v1.id };
+    v1.occupantIds = [emp.id];
+    v2.occupantIds = [emp.id]; // same employee, two vehicles
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some(x => x.employeeId === emp.id)).toBe(true);
   });
 });
 

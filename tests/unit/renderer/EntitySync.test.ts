@@ -156,6 +156,64 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
   });
 });
 
+// ── locomotion-based suppression (#1087) ────────────────────────────────────
+// Mount/itinerary phase 2 makes `employee.locomotion` the read source for
+// which employees get no character mesh — `driverId` is a mirror, not the
+// truth. These two cases set locomotion without ever touching driverId, so
+// they fail against today's syncEntitySets (still driverId-only) and pass
+// once it reads locomotion instead/in addition.
+describe('syncEntitySets — reads employee.locomotion, not just vehicle.driverId (#1087)', () => {
+  it('creates no character mesh for an employee whose locomotion is mounted, even when vehicle.driverId is still null', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    // Deliberately not mirrored onto driverId — locomotion alone must suppress.
+    vehicle.driverId = null;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const scene = new THREE.Scene();
+    const characters = new CharacterMesh(scene);
+    const renderedEmployeeIds = new Set<number>();
+
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+
+    expect(characters.count).toBe(0);
+    expect(renderedEmployeeIds.has(employee.id)).toBe(false);
+  });
+
+  it('regains a character mesh once locomotion flips back to on_foot, mirroring the dismount position', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = null;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const scene = new THREE.Scene();
+    const characters = new CharacterMesh(scene);
+    const renderedEmployeeIds = new Set<number>();
+
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+    expect(characters.count).toBe(0);
+
+    // Alight: dismount position snapped, occupantIds/locomotion cleared.
+    vehicle.x = 12;
+    vehicle.z = 4;
+    employee.x = 12;
+    employee.z = 4;
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
+
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+
+    expect(characters.count).toBe(1);
+    expect(renderedEmployeeIds.has(employee.id)).toBe(true);
+  });
+});
+
 describe('buildingFootprintSurfaceY (#1007)', () => {
   it('samples the 4 footprint corners and returns their minimum', () => {
     const b = makeBuilding(10, 10); // 2x2 footprint -> corners (10,10) (12,10) (10,12) (12,12)
