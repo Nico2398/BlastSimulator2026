@@ -67,6 +67,15 @@ const LIVE_EXPORTS = new Set<string>([
   // cannot see — the module graph has no edge for it, but the type is live.
   'src/core/state/WorldInvariants.ts:Violation',
   'src/core/state/WorldInvariants.ts:ViolationKind',
+  // Itinerary/planItinerary's structurally-consumed surface (#1088). Every
+  // caller — including PlanItinerary.test.ts and the itinerary-equivalence
+  // integration test — builds/compares Leg.onArrive values as object
+  // literals (`{ kind: 'board', vehicleId }`, `.toEqual`, `.kind` checks)
+  // and passes fidelity as bare 'estimate'/'exact' string literals, never
+  // importing either type by name. Same blind spot as Violation/ViolationKind
+  // above: no module-graph edge exists for it, but both types are live.
+  'src/core/engine/Itinerary.ts:ArrivalStep',
+  'src/core/engine/PlanItinerary.ts:PlanFidelity',
 ]);
 
 export interface DeadCodeReport {

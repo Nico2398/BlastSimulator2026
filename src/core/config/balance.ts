@@ -836,6 +836,15 @@ export const VEHICLE_SEAT_COUNT: Record<VehicleRole, number> = {
   building_destroyer: 1,
 };
 
+/**
+ * When true, planItinerary compares walking the full distance on foot
+ * against riding a vehicle for goals that don't strictly require one, and
+ * picks whichever is cheaper. Off in phase 3a — planItinerary only reads
+ * this flag; the comparison itself lands in a later phase
+ * (gameplay-vehicle-fleet phase 7, fast transport).
+ */
+export const VEHICLE_TRANSPORT_PLANNING_ENABLED = false;
+
 // ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
 
 export interface StartingSiteEmployeeSlot {

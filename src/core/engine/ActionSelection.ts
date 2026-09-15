@@ -128,12 +128,14 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
 
 /**
  * Converts a grid-cell distance (from either the octile-heuristic estimate
- * or a real findPath's totalCost) into ticks, at AGENT_WALK_SPEED cells per
- * tick. Single source of truth for both estimateTravelTicks (heuristic) and
- * resolveActionCost (pathfinding) (#614).
+ * or a real findPath's totalCost) into ticks, at `speed` cells per tick.
+ * Single source of truth for both estimateTravelTicks (heuristic) and
+ * resolveActionCost (pathfinding) (#614), and for planItinerary's foot and
+ * drive legs (PlanItinerary.ts, #1088), which pass AGENT_WALK_SPEED and a
+ * vehicle's own speed respectively.
  */
-function cellsToTravelTicks(cells: number): number {
-  return cells / AGENT_WALK_SPEED;
+export function cellsToTravelTicks(cells: number, speed: number): number {
+  return cells / speed;
 }
 
 /**
@@ -145,7 +147,7 @@ function cellsToTravelTicks(cells: number): number {
  * NavGrid has been built yet.
  */
 function estimateTravelTicks(employee: Employee, action: PendingAction): number {
-  return cellsToTravelTicks(octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ));
+  return cellsToTravelTicks(octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ), AGENT_WALK_SPEED);
 }
 
 /**
@@ -270,7 +272,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
   const walkTarget = resolveVehicleGatedWalkTarget(state, employee, action);
 
   if (state.navGrid === null) {
-    return { totalTicks: cellsToTravelTicks(octileHeuristic(employee.x, employee.z, walkTarget.x, walkTarget.z)) + workTicks };
+    return { totalTicks: cellsToTravelTicks(octileHeuristic(employee.x, employee.z, walkTarget.x, walkTarget.z), AGENT_WALK_SPEED) + workTicks };
   }
 
   const path = findPath(state.navGrid, {
@@ -284,7 +286,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
 
   if (!path.found) return null;
 
-  const travelTicks = cellsToTravelTicks(path.totalCost);
+  const travelTicks = cellsToTravelTicks(path.totalCost, AGENT_WALK_SPEED);
   return { totalTicks: travelTicks + workTicks };
 }
 
