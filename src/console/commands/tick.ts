@@ -274,7 +274,8 @@ export function tickCommand(
     // Reports internal-consistency violations (dangling driver refs,
     // position mismatches, etc.) that should never occur if the
     // mount/itinerary/task machinery upstream is correct; never throws.
-    if (!import.meta.env.PROD) {
+    const isProd = typeof import.meta.env !== 'undefined' && import.meta.env.PROD;
+    if (!isProd) {
       for (const violation of assertWorldInvariants(state)) {
         lines.push(`[tick ${state.tickCount}] WORLD INVARIANT VIOLATION: ${violation.kind} ${JSON.stringify(violation)}`);
       }
