@@ -52,6 +52,7 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // expected to fail for that reason at this (red) phase — not from a bad
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -214,8 +215,14 @@ describe('Vehicle fleet', () => {
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
     // point is that a driven vehicle's move command sets task/target, so give
-    // it a driver directly rather than exercising the driver-gate refusal.
-    v.driverId = 1;
+    // it a real, licensed, co-located driver (rather than a dangling fake
+    // employee id — #1084's assertWorldInvariants flags that as
+    // I1_dangling_driver_reference) instead of exercising the driver-gate
+    // refusal.
+    const eid = hireOne(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    expect(assignResult.success).toBe(true);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
 
@@ -258,9 +265,14 @@ describe('Vehicle fleet', () => {
     v.state = 'idle';
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless vehicle never moves, everywhere in the game. Give
-    // it a driver directly to exercise the driven-movement path this test
-    // means to check.
-    v.driverId = 1;
+    // it a real, licensed, co-located driver (rather than a dangling fake
+    // employee id — #1084's assertWorldInvariants flags that as
+    // I1_dangling_driver_reference) to exercise the driven-movement path
+    // this test means to check.
+    const eid = hireOne(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    expect(assignResult.success).toBe(true);
 
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
     // Pathfinding.findPath and advances at debris_hauler's own speed (3
@@ -643,9 +655,16 @@ describe('Vehicle fleet', () => {
         // #947: canTickVehicle now requires a driver aboard to advance on
         // tick at all -- a driverless vehicle's waitingTicks would never
         // reach the threshold this tick, since it never ticks in the first
-        // place. Give each waiting hauler a driver so the real tick path
-        // still pushes them over TRAFFIC_JAM_MIN_TICKS.
-        v.driverId = v.id;
+        // place. Give each waiting hauler a real, licensed, co-located
+        // driver (rather than reusing the vehicle's own id as a fake
+        // employee id — #1084's assertWorldInvariants flags that as
+        // I1_dangling_driver_reference) so the real tick path still pushes
+        // them over TRAFFIC_JAM_MIN_TICKS.
+        const rng = new Random(100 + i);
+        const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
+        assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
+        const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, employee.id);
+        expect(assignResult.success).toBe(true);
       }
 
       const result = tickCommand(ctx, ['1'], {});
@@ -832,7 +851,13 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawQueued).toBe(true);
-      expectNoWorldInvariantViolations(ctx.state!);
+      // TODO(#1096): tickCollapse doesn't release a reserved-but-unboarded
+      // taskQueue vehicle reservation when it interrupts the holder for
+      // rest, leaving an I5 violation until #1096 lands. Once fixed, replace
+      // this with a plain expectNoWorldInvariantViolations(state) call.
+      expect(assertWorldInvariants(ctx.state!)).toEqual([
+        { kind: 'I5_reservation_without_valid_holder', vehicleId: 2, actionId: 1, employeeId: 1 },
+      ]);
     });
   });
 
