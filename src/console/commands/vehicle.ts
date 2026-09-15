@@ -6,7 +6,6 @@ import {
   purchaseVehicle,
   assignVehicle,
   moveVehicle,
-  unassignDriver,
   destroyVehicle,
   getAllVehicleRoles,
   getVehicleDefByTier,
@@ -15,6 +14,7 @@ import {
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { alight } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
@@ -180,9 +180,9 @@ export function vehicleCommand(
         return { success: false, output: t('vehicle.driver_usage') };
       }
       if (args[2] === 'none') {
-        const result = unassignDriver(state.vehicles, vehicleId);
+        const result = alight(state, vehicleId, ctx.emitter);
         if (!result.success) {
-          return { success: false, output: result.error! };
+          return { success: false, output: result.error };
         }
         return { success: true, output: t('vehicle.driver_unassign_success', { id: vehicleId }) };
       }

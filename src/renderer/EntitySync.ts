@@ -4,6 +4,7 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { Building } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { isMounted } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
@@ -85,18 +86,11 @@ export function syncEntitySets(
   }
 
   if (characters) {
-    // Built once per call (not once per employee) so suppressing a seated
-    // driver's mesh stays O(vehicles + employees), not O(vehicles ×
-    // employees) — every employee currently seated as any vehicle's driver
+    // Per-employee check against Locomotion (#1087) — a mounted employee
     // gets no character mesh; x/z tracks the vehicle's own via
     // syncDriverPosition (#922).
-    const seatedDriverIds = new Set<number>();
-    for (const v of state.vehicles.vehicles) {
-      if (v.driverId !== null) seatedDriverIds.add(v.driverId);
-    }
-
     for (const e of state.employees.employees) {
-      if (seatedDriverIds.has(e.id)) {
+      if (isMounted(e.locomotion)) {
         if (renderedEmployeeIds.has(e.id)) {
           characters.removeEmployee(e.id);
           renderedEmployeeIds.delete(e.id);

@@ -13,7 +13,8 @@ import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { completePendingAction } from './TaskLifecycleCore.js';
 import type { Employee } from '../entities/Employee.js';
 import type { VehicleState } from '../entities/Vehicle.js';
-import { unassignDriver } from '../entities/Vehicle.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
+import { alight } from './Mount.js';
 
 /**
  * PendingAction.payload key evacuateZone stamps on any action it interrupts
@@ -259,7 +260,7 @@ export function isMidEvacuationDrive(vehicles: VehicleState, employee: Employee)
  * pendingEvacuationDestination — the employee dismounts and evacuates the
  * rest of the way on foot, mirroring an ordinary on-foot evacuee (#1042).
  */
-export function releaseArrivedEvacuationDrivers(state: GameState): void {
+export function releaseArrivedEvacuationDrivers(state: GameState, emitter?: EventEmitter): void {
   for (const vehicle of state.vehicles.vehicles) {
     if (vehicle.pendingEvacuationDestination === null) continue;
     if (vehicle.driverId === null) continue;
@@ -269,7 +270,7 @@ export function releaseArrivedEvacuationDrivers(state: GameState): void {
 
     if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
 
-    unassignDriver(state.vehicles, vehicle.id);
+    alight(state, vehicle.id, emitter);
     vehicle.pendingEvacuationDestination = null;
   }
 }

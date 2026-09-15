@@ -228,7 +228,7 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
         // already null here and dismountVehicleDriver's abort is a harmless
         // no-op.
         interruptActiveAction(state, driver, actionId, { forceOpenPool: true });
-        dismountVehicleDriver(state, vehicle);
+        dismountVehicleDriver(state, vehicle, emitter);
         emitter?.emit('vehicle:action_abandoned', { vehicleId: vehicle.id, employeeId: driver.id, actionId });
       }
       vehicle.moveConsecutiveFailures = 0;

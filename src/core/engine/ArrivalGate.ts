@@ -9,7 +9,8 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { assignDriver, moveVehicle } from '../entities/Vehicle.js';
+import { moveVehicle } from '../entities/Vehicle.js';
+import { board } from './Mount.js';
 import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
@@ -62,7 +63,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
   // vehicle loops below, so a just-arrived driver is free to be picked up by
   // ordinary dispatch/rest routing the same tick, exactly like an ordinary
   // on-foot evacuee arriving at their own safe cell.
-  releaseArrivedEvacuationDrivers(state);
+  releaseArrivedEvacuationDrivers(state, emitter);
 
   const result: ArrivalGateResult = {
     restStarted: [],
@@ -301,14 +302,14 @@ function resolveBoarding(
   if (!vehicle) {
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_gone' });
-    releaseReservationIfVehicleGated(state, emp);
+    releaseReservationIfVehicleGated(state, emp, emitter);
     return;
   }
 
   if (vehicle.driverId !== null && vehicle.driverId !== emp.id) {
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_taken' });
-    releaseReservationIfVehicleGated(state, emp);
+    releaseReservationIfVehicleGated(state, emp, emitter);
     // A stale evacuation marker on this vehicle must not confuse whoever
     // drives it next (#1042) — the driver who actually took it either isn't
     // evacuating at all, or staged their own marker via clearZone already.
@@ -316,22 +317,26 @@ function resolveBoarding(
     return;
   }
 
-  if (emp.x !== vehicle.x || emp.z !== vehicle.z) {
+  // Boarding happens from within one tile of the vehicle (Chebyshev
+  // distance <= 1), not exact cell equality — the employee reads as
+  // "arrived" (destinationX/Z cleared) the instant they are close enough to
+  // board, matching Mount.board's own distance check.
+  const distance = Math.max(Math.abs(emp.x - vehicle.x), Math.abs(emp.z - vehicle.z));
+  if (distance > 1) {
     // The employee reached where the vehicle used to be, but it has since
     // moved elsewhere — cancel rather than chase it silently.
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_moved' });
-    releaseReservationIfVehicleGated(state, emp);
+    releaseReservationIfVehicleGated(state, emp, emitter);
     vehicle.pendingEvacuationDestination = null;
     return;
   }
 
-  const boarded = assignDriver(state.vehicles, state.employees, vehicle.id, emp.id);
+  const boarded = board(state, vehicle.id, emp.id, emitter);
   emp.pendingDriverVehicleId = null;
   if (boarded.success) {
     result.driversBoarded.push(emp.id);
     state.vehicles.driverBoardingCount++;
-    emitter?.emit('vehicle:driver_boarded', { employeeId: emp.id, vehicleId: vehicle.id });
     // #550: a vehicle-gated action normally already staged targetX/targetZ
     // on this vehicle at claim time (GameLoop.promoteVehicleGatedAction) —
     // but boarding is the one place a driver actually mounts, so re-stage it
@@ -394,10 +399,10 @@ function resolveBoarding(
  * walked to at this point (GameLoop sets it before requesting the board), so
  * it's the lookup key back to which reservation, if any, to release.
  */
-function releaseReservationIfVehicleGated(state: GameState, emp: Employee): void {
+function releaseReservationIfVehicleGated(state: GameState, emp: Employee, emitter?: EventEmitter): void {
   if (emp.activeActionId === null) return;
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);
   if (action && action.requiredVehicleRole !== null) {
-    releaseVehicleReservation(state, action.id);
+    releaseVehicleReservation(state, action.id, emitter);
   }
 }

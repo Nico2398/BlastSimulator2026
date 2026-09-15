@@ -7,16 +7,16 @@ export type Locomotion =
   | { kind: 'mounted'; vehicleId: number };
 
 /** True when the employee is mounted in a vehicle. Narrows to the mounted variant. */
-export function isMounted(_locomotion: Locomotion): _locomotion is { kind: 'mounted'; vehicleId: number } {
-  throw new Error('not implemented');
+export function isMounted(locomotion: Locomotion): locomotion is { kind: 'mounted'; vehicleId: number } {
+  return locomotion.kind === 'mounted';
 }
 
 /** True when the employee is on foot. */
-export function isOnFoot(_locomotion: Locomotion): boolean {
-  throw new Error('not implemented');
+export function isOnFoot(locomotion: Locomotion): boolean {
+  return locomotion.kind === 'on_foot';
 }
 
 /** The vehicle id the employee is mounted in, or null when on foot. */
-export function mountedVehicleId(_locomotion: Locomotion): number | null {
-  throw new Error('not implemented');
+export function mountedVehicleId(locomotion: Locomotion): number | null {
+  return isMounted(locomotion) ? locomotion.vehicleId : null;
 }

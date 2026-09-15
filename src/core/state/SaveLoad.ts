@@ -295,6 +295,45 @@ function migrateV17ToV18(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v18 -> v19: Vehicle gained `occupantIds: number[]` and Employee gained
+ * `locomotion: Locomotion` (#1087). A pre-v19 save only recorded `driverId` —
+ * `occupantIds` defaults to `[driverId]` when set, else `[]`, matching
+ * `purchaseVehicle`'s own default. Each employee's `locomotion` is derived by
+ * finding the vehicle (if any) whose `driverId` names them: mounted on that
+ * vehicle, or `on_foot` otherwise — matching `hireEmployee`'s own default.
+ * Mutates `obj` in place, matching every other migration block in
+ * `deserialize` below.
+ */
+function migrateV18ToV19(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesContainer = obj['vehicles'] as Record<string, unknown> | undefined;
+  const vehiclesList = vehiclesContainer?.['vehicles'] as Array<Record<string, unknown>> | undefined;
+
+  if (Array.isArray(vehiclesList)) {
+    for (const v of vehiclesList) {
+      if (!Array.isArray(v['occupantIds'])) {
+        const driverId = v['driverId'];
+        v['occupantIds'] = typeof driverId === 'number' ? [driverId] : [];
+      }
+    }
+  }
+
+  const employeesContainer = obj['employees'] as Record<string, unknown> | undefined;
+  const employeesList = employeesContainer?.['employees'] as Array<Record<string, unknown>> | undefined;
+
+  if (Array.isArray(employeesList)) {
+    for (const emp of employeesList) {
+      if (emp['locomotion'] !== undefined) continue;
+      const mount = Array.isArray(vehiclesList)
+        ? vehiclesList.find(v => v['driverId'] === emp['id'])
+        : undefined;
+      emp['locomotion'] = mount ? { kind: 'mounted', vehicleId: mount['id'] } : { kind: 'on_foot' };
+    }
+  }
+
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -505,6 +544,11 @@ export function deserialize(json: string): GameState {
   // v17 -> v18: PendingAction.queuedAtTick required, backfilled (#1060).
   if ((obj['version'] as number) < 18) {
     migrateV17ToV18(obj);
+  }
+
+  // v18 -> v19: Vehicle.occupantIds / Employee.locomotion (#1087).
+  if ((obj['version'] as number) < 19) {
+    migrateV18ToV19(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
