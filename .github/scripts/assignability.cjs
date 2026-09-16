@@ -315,6 +315,42 @@ async function graphVerdict(api, root) {
 }
 
 /**
+ * BFS over the transitive `Blocked by` graph from `root`. `visit(dep, deliverable, number)`
+ * runs on each newly-visited node; returning a truthy value stops the walk early and
+ * becomes `stopped`. Not exported — internal, shared by graphVerdict and
+ * strandedPauseVerdict's cycle check.
+ * @returns {Promise<{stopped: any, seen: Set<number>}>}
+ */
+async function walkDependencyGraph(api, root, visit) {
+  throw new Error('not implemented');
+}
+
+/**
+ * @returns {Promise<true | false | 'unreadable'>}
+ */
+async function blockerCyclesBackTo(api, blockerRoot, targetNumber) {
+  throw new Error('not implemented');
+}
+
+/**
+ * Determines whether a `paused`-labelled issue is stranded: every dependency it
+ * declares is open and unassignable for a reason the pipeline cannot resolve on
+ * its own (no `ready` label, a cycle back to this issue, closed-unmerged, or
+ * unreadable).
+ *
+ * @param {IssueApi} api
+ * @param {{number:number, labels:string[]}} issue
+ * @returns {Promise<null | {
+ *   stranded: boolean,
+ *   blockers: {number:number, cause:'no-ready-label'|'cycle'|'closed-unmerged'|'unreadable', reason:string}[]
+ * }>}
+ * `null` means "not evaluated" — the issue does not carry `paused`.
+ */
+async function strandedPauseVerdict(api, issue) {
+  throw new Error('not implemented');
+}
+
+/**
  * The full verdict on one candidate.
  *
  * @param {IssueApi} api
@@ -560,4 +596,5 @@ module.exports = {
   resolveMention,
   resumeTargetFor,
   selectNextAssignable,
+  strandedPauseVerdict,
 };
