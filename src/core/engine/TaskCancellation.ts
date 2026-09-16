@@ -11,7 +11,7 @@ import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
-import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -237,7 +237,7 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
  */
 export function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
   if (!state.navGrid) return octileHeuristic(fromX, fromZ, toX, toZ);
-  const result = findPath(state.navGrid, {
+  const result = findExactPath(state.navGrid, {
     agentId: -1,
     fromX, fromZ, toX, toZ,
     avoidVehicles: true,
