@@ -85,19 +85,46 @@ const BLOCKED_CHAIN_FALLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 function parseDependencies(body) {
   const deps = new Set();
   let inSection = false;
+  // Tracks the sentinel state of the *current* section: once its first
+  // non-empty line reads as "None", nothing else in that section is scanned —
+  // an issue number in the explanatory prose after "None" (the #1103 shape:
+  // "None, see discussion in #55") must not read as a real dependency.
+  let suppressed = false;
+  let sawFirstLine = false;
 
   const OPENS = /^\s*(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b/i;
   const NEXT_SECTION = /^\s*(?:#{1,6}\s+\S|\*\*\S)/;
+  const OPENER_PREFIX =
+    /^\s*(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b\s*:?\**\s*/i;
+  const LIST_MARKER = /^\s*(?:[-*]|\d+\.)\s*/;
+  const NONE_SENTINEL = /^none\b/i;
 
   for (const line of (body || '').split('\n')) {
-    if (OPENS.test(line)) {
+    const opens = OPENS.test(line);
+    if (opens) {
       inSection = true;
+      suppressed = false;
+      sawFirstLine = false;
     } else if (inSection && NEXT_SECTION.test(line)) {
       inSection = false; // the next section starts; the list is over
       continue;
     } else if (!inSection) {
       continue;
     }
+
+    if (!suppressed && !sawFirstLine) {
+      const content = (opens ? line.replace(OPENER_PREFIX, '') : line)
+        .replace(LIST_MARKER, '')
+        .trim();
+      if (content !== '') {
+        sawFirstLine = true;
+        if (NONE_SENTINEL.test(content)) {
+          suppressed = true;
+        }
+      }
+    }
+
+    if (suppressed) continue;
 
     for (const ref of line.matchAll(/#(\d+)/g)) {
       deps.add(parseInt(ref[1], 10));
@@ -260,13 +287,75 @@ function dependencyVerdict(dep, deliverable) {
  * @param {{number: number, body?: string|null}} root
  */
 async function graphVerdict(api, root) {
+  const { stopped } = await walkDependencyGraph(api, root, (dep, deliverable) => {
+    const verdict = dependencyVerdict(dep, deliverable);
+    return verdict.assignable ? undefined : verdict;
+  });
+
+  if (!stopped) return yes();
+
+  if (stopped.graphUnreadable) {
+    switch (stopped.graphUnreadable) {
+      case 'root':
+        return no(
+          'its `Blocked by` relationships could not be read, so no dependency can be ruled out',
+          true
+        );
+      case 'cap':
+        return no(
+          `its dependency graph exceeds ${MAX_DEPENDENCY_NODES} issues, which is not a graph this step will vouch for`
+        );
+      case 'node':
+        // Previously a `core.warning` and then ignored, which let a typo in a
+        // `Blocked by` line read as "no dependency" and start the run anyway.
+        return no(
+          `dependency #${stopped.number} could not be read; a dependency that cannot be verified counts as unmet`,
+          true
+        );
+      case 'expand':
+        return no(
+          `dependency #${stopped.number}'s own \`Blocked by\` relationships could not be read, so its graph cannot be cleared`,
+          true
+        );
+    }
+  }
+
+  // Neither an internal read failure nor an empty walk: `stopped` is the
+  // verdict the visitor returned on the first non-assignable dependency.
+  return stopped;
+}
+
+/**
+ * An internal fail-closed marker `walkDependencyGraph` returns through
+ * `stopped` when some part of the graph could not be read — distinct from a
+ * `visit` callback's own truthy return, which callers pass through as-is.
+ * Never seen outside this file: `dependencyVerdict`'s objects have no
+ * `graphUnreadable` key, and `blockerCyclesBackTo`'s visitor returns `true`.
+ *
+ * @param {'root'|'cap'|'node'|'expand'} kind
+ * @param {number} [number]
+ */
+function graphUnreadable(kind, number) {
+  return { graphUnreadable: kind, number };
+}
+
+/**
+ * BFS over the transitive `Blocked by` graph from `root`. `visit(dep, deliverable, number)`
+ * runs on each newly-visited node; returning a truthy value stops the walk early and
+ * becomes `stopped`. A node's own unreadability — the node itself, or its further
+ * dependencies — stops the walk the same way, fail-closed, via `graphUnreadable`. Not
+ * exported — internal, shared by graphVerdict and strandedPauseVerdict's cycle check.
+ *
+ * @param {IssueApi} api
+ * @param {{number: number, body?: string|null}} root
+ * @param {(dep: object, deliverable: object|null, number: number) => any} visit
+ * @returns {Promise<{stopped: any, seen: Set<number>}>}
+ */
+async function walkDependencyGraph(api, root, visit) {
   const seen = new Set([root.number]);
   const rootDeps = await blockedByFor(api, root);
   if (rootDeps.unknown) {
-    return no(
-      'its `Blocked by` relationships could not be read, so no dependency can be ruled out',
-      true
-    );
+    return { stopped: graphUnreadable('root'), seen };
   }
 
   const queue = [...rootDeps.numbers];
@@ -279,57 +368,54 @@ async function graphVerdict(api, root) {
 
     examined += 1;
     if (examined > MAX_DEPENDENCY_NODES) {
-      return no(
-        `its dependency graph exceeds ${MAX_DEPENDENCY_NODES} issues, which is not a graph this step will vouch for`
-      );
+      return { stopped: graphUnreadable('cap'), seen };
     }
 
     const dep = await api.getIssue(number);
     if (!dep) {
-      // Previously a `core.warning` and then ignored, which let a typo in a
-      // `Blocked by` line read as "no dependency" and start the run anyway.
-      return no(
-        `dependency #${number} could not be read; a dependency that cannot be verified counts as unmet`,
-        true
-      );
+      return { stopped: graphUnreadable('node', number), seen };
     }
 
     const deliverable =
       !dep.isPullRequest && dep.state === 'closed' ? await api.deliverableFor(number) : null;
-    const verdict = dependencyVerdict(dep, deliverable);
-    if (!verdict.assignable) return verdict;
+
+    const result = await visit(dep, deliverable, number);
+    if (result) {
+      return { stopped: result, seen };
+    }
 
     if (!dep.isPullRequest) {
       const deps = await blockedByFor(api, dep);
       if (deps.unknown) {
-        return no(
-          `dependency #${number}'s own \`Blocked by\` relationships could not be read, so its graph cannot be cleared`,
-          true
-        );
+        return { stopped: graphUnreadable('expand', number), seen };
       }
       queue.push(...deps.numbers);
     }
   }
 
-  return yes();
+  return { stopped: undefined, seen };
 }
 
 /**
- * BFS over the transitive `Blocked by` graph from `root`. `visit(dep, deliverable, number)`
- * runs on each newly-visited node; returning a truthy value stops the walk early and
- * becomes `stopped`. Not exported — internal, shared by graphVerdict and
- * strandedPauseVerdict's cycle check.
- * @returns {Promise<{stopped: any, seen: Set<number>}>}
- */
-async function walkDependencyGraph(api, root, visit) {
-  throw new Error('not implemented');
-}
-
-/**
+ * Whether walking `blockerRoot`'s own dependency graph reaches back to
+ * `targetNumber` — the shape a "healthy, `ready`-labelled dependency" turns
+ * out not to be when its own declared blockers cycle back to the issue that
+ * is waiting on it (the #1103 shape: a mutual "Blocked by" reference written
+ * as prose on both sides).
+ *
+ * @param {IssueApi} api
+ * @param {{number: number, body?: string|null}} blockerRoot
+ * @param {number} targetNumber
  * @returns {Promise<true | false | 'unreadable'>}
  */
 async function blockerCyclesBackTo(api, blockerRoot, targetNumber) {
-  throw new Error('not implemented');
+  const { stopped } = await walkDependencyGraph(api, blockerRoot, (dep, deliverable, number) =>
+    number === targetNumber ? true : undefined
+  );
+
+  if (stopped === true) return true;
+  if (stopped) return 'unreadable'; // graphUnreadable: some node hid the answer
+  return false;
 }
 
 /**
@@ -347,7 +433,112 @@ async function blockerCyclesBackTo(api, blockerRoot, targetNumber) {
  * `null` means "not evaluated" — the issue does not carry `paused`.
  */
 async function strandedPauseVerdict(api, issue) {
-  throw new Error('not implemented');
+  const labels = new Set(issue.labels || []);
+  if (!labels.has(PAUSED)) return null;
+
+  const deps = await blockedByFor(api, issue);
+  if (deps.unknown) {
+    return {
+      stranded: true,
+      blockers: [
+        {
+          number: issue.number,
+          cause: 'unreadable',
+          reason: `#${issue.number}'s own \`Blocked by\` relationships could not be read, so whether it is stranded cannot be determined`,
+        },
+      ],
+    };
+  }
+
+  if (deps.numbers.length === 0) {
+    return { stranded: false, blockers: [] };
+  }
+
+  // One entry per still-open (not-landed) dependency: `healthy` when it will
+  // resolve on its own (an open PR, or a `ready` dependency with no cycle
+  // back to `issue`), `blocker` when the pipeline cannot move it forward.
+  // Landed dependencies are not tracked here at all — they are not why the
+  // pause would be stuck.
+  const stillOpen = [];
+
+  for (const number of deps.numbers) {
+    const dep = await api.getIssue(number);
+    if (!dep) {
+      stillOpen.push({
+        blocker: { number, cause: 'unreadable', reason: `dependency #${number} could not be read` },
+      });
+      continue;
+    }
+
+    const deliverable =
+      !dep.isPullRequest && dep.state === 'closed' ? await api.deliverableFor(number) : null;
+    const verdict = dependencyVerdict(dep, deliverable);
+    if (verdict.assignable) {
+      continue; // landed already — not a blocker, not tracked
+    }
+
+    if (dep.isPullRequest) {
+      if (dep.state === 'open') {
+        stillOpen.push({ healthy: true });
+      } else {
+        stillOpen.push({
+          blocker: { number, cause: 'closed-unmerged', reason: verdict.reason },
+        });
+      }
+      continue;
+    }
+
+    if (dep.state === 'open') {
+      const hasReady = (dep.labels || []).includes(READY);
+      const label = labelVerdict(dep);
+      if (!hasReady || !label.assignable) {
+        const reason = !label.assignable
+          ? label.reason
+          : `dependency #${number} is open but not labelled \`ready\``;
+        stillOpen.push({ blocker: { number, cause: 'no-ready-label', reason } });
+        continue;
+      }
+
+      const cycle = await blockerCyclesBackTo(api, dep, issue.number);
+      if (cycle === true) {
+        stillOpen.push({
+          blocker: {
+            number,
+            cause: 'cycle',
+            reason: `dependency #${number} is ready to assign, but its own dependency graph cycles back to #${issue.number}`,
+          },
+        });
+      } else if (cycle === 'unreadable') {
+        stillOpen.push({
+          blocker: {
+            number,
+            cause: 'unreadable',
+            reason: `dependency #${number}'s own dependency graph could not be fully read, so a cycle back to #${issue.number} cannot be ruled out`,
+          },
+        });
+      } else {
+        stillOpen.push({ healthy: true });
+      }
+      continue;
+    }
+
+    // Closed but not landed — `not_planned`, or closed with an unmerged (or
+    // unreadable) deliverable. `dependencyVerdict` already told those two
+    // apart via `unreadable`.
+    stillOpen.push({
+      blocker: {
+        number,
+        cause: verdict.unreadable ? 'unreadable' : 'closed-unmerged',
+        reason: verdict.reason,
+      },
+    });
+  }
+
+  if (stillOpen.length === 0 || stillOpen.some((entry) => entry.healthy)) {
+    return { stranded: false, blockers: [] };
+  }
+
+  return { stranded: true, blockers: stillOpen.map((entry) => entry.blocker) };
 }
 
 /**
