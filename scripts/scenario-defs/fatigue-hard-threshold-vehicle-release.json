@@ -1,6 +1,6 @@
 {
   "name": "fatigue-hard-threshold-vehicle-release",
-  "description": "#1062: drives a single licensed driller through a drill_plan grid large enough that, working alone with no living_quarters anywhere on the map, their fatigue gauge is driven all the way from full down to the hard threshold (NEED_HARD_THRESHOLDS.fatigue = 0, balance.ts) while boarded on their reserved drill_rig. Proves the real tickCollapse call chain (NeedRestoration.ts) fires the instant fatigue reaches exactly 0 — not the pre-#1062 floor of 5 — interrupting the in-flight vehicle-gated drill_hole action, releasing the vehicle reservation, and taking a rest the same tick, then that the SAME driller reboards the SAME vehicle afterward and finishes every remaining hole. With only one driver in this roster holding driving.drill_rig and only one drill_rig vehicle purchased, `orderedHoleCount` eventually reaching 0 is only possible if the vehicle was genuinely released and reclaimed rather than left stranded with a driver who no longer intends to work it — the state-dump schema (console-api.ts's SerializableGameState) has no direct driverId field to assert against directly, so this is the closest machine-checked proxy; the `vehicle list` observe step at the end captures the raw driver-slot text (e.g. 'driver:1') as human-inspectable evidence alongside it.",
+  "description": "#1062: drives a single licensed driller through a drill_plan large enough that, working alone with no living_quarters anywhere on the map, their fatigue gauge is driven all the way from full down to the hard threshold (NEED_HARD_THRESHOLDS.fatigue = 0, balance.ts) while boarded on their reserved drill_rig. Proves the real tickCollapse call chain (NeedRestoration.ts) fires the instant fatigue reaches exactly 0 — not the pre-#1062 floor of 5 — interrupting the in-flight vehicle-gated drill_hole action, releasing the vehicle reservation, and taking a rest the same tick, then that the SAME driller reboards the SAME vehicle afterward and finishes every remaining hole. #1090-followup (restructured, sandbox-measured): #1090 deletes VehicleContinuity.ts's same-tick redispatch, so a freed driller is never immediately redispatched to the next queued hole — there is now always at least one genuinely idle tick between two vehicle-gated actions. That idle tick is exactly the window NEED_SOFT_THRESHOLDS.fatigue's proactive rest-priority routing (#1062, autoInsertNeedTasks/NeedTaskInsertion.ts) uses to claim a queued rest once the gauge drops under 25 — unconditionally, ahead of redispatch to the next hole (claimActionsTargetedAtEmployee's own self-targeted-action priority). Direct-traced against both `main` and this branch: a multi-hole drill_plan (this file's own pre-#1090 6-hole 2x3 grid) never reaches the hard floor on this branch at any grid size tried up to 9 holes — the soft-rest system always intervenes first at the idle boundary between holes, well before the gauge would otherwise reach 0 across several holes' worth of draining. The hard floor is still reachable, and still forces a real release, but only through a SINGLE action whose own uninterrupted duration alone drains the gauge from above the soft threshold down past the hard one — mid-execution, `isMidClaimedTaskExecution` (RestActionHelpers.ts) exempts an already-claimed, already-in-progress action from the soft-rest preemption the idle boundary would otherwise apply, so the proactive system never gets a chance to intervene inside it. Restructured around exactly that: a single, far/deep first hole (spacing/rows/cols collapsed to a 1x1 grid at (63,63), depth 40m — the drill panel's own real stepper maximum, Drill.ts's `Math.min(40, ...)` — diameter left at the drill panel's own real default, DRILL_HOLE_DEFAULT_DIAMETER_M, since the grid tool's strip has no diameter stepper to set one differently) whose own walk-to-vehicle + drive-to-hole + drill-the-hole span alone drains the driller from a fresh 99 down through the hard floor before ever landing, sandbox-confirmed on this branch: collapse fires mid-drill at tick 97, the vehicle reservation is genuinely released and the driller self-claims a rest, and the SAME driller reboards the SAME vehicle and finishes that same interrupted hole once rested. Two ordinary nearby holes are then added via the real, player-clickable Add Hole tool (`drill_plan add`, Drill.ts's `armAddHoleTool` — additive, unlike `drill_plan grid`'s whole-plan replace, so the first hole's own drilled count survives) to prove the freed driller/vehicle pair goes on to pick up genuinely new work afterward, not just resume what it was already doing — sandbox-confirmed: the long return drive to (14,14) alone triggers a SECOND hard-floor collapse/release/reclaim cycle, and both added holes still land. `orderedHoleCount` eventually reaching 0 across all three holes is only possible if the vehicle was genuinely released and reclaimed rather than left stranded with a driver who had stopped working it — the state-dump schema (console-api.ts's SerializableGameState) has no direct driverId field to assert against directly, so this is the closest machine-checked proxy; the `vehicle list` observe step at the end captures the raw driver-slot text (e.g. 'driver:1') as human-inspectable evidence alongside it.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -33,8 +33,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:8 diameter:0.089 start:14,14",
-      "description": "A 2x3 grid (6 holes) is comfortably more combined drive+drill work than the smaller grid that #965's own comment records as already enough to collapse a single unpartnered driller under the OLD, looser floor of 5 — so this one, at the new floor of 0, is not expected to finish before fatigue bottoms out at least once. #1069 CI-fix (real interaction-mode finding, `main` red since #1068 merged): the interaction half of this step described a completely different plan from its own `command` half, and only the interaction shards run it — the drag alone can never carry spacing/depth/diameter, those come from the grid tool's own strip (Drill.ts's DEFAULT_SPACING_M 3 / DEFAULT_DEPTH_M 6 / DRILL_HOLE_DEFAULT_DIAMETER_M 0.089) and the confirm handler computes cols = round((x2-x1)/spacing)+1, rows = round((z2-z1)/spacing)+1. The old (14,14)-(29,24) drag at the untouched 3m default therefore ordered round(15/3)+1 = 6 cols x round(10/3)+1 = 4 rows = 24 holes, not the declared 6 — CI: `orderedHoleCount should be 6 but is 24`. Corrected the way every other grid-tool step in this suite does it (blast-basic.json, blast-drill-plan-visual.json, blast-overcharge.json): two increment clicks on the spacing stepper (3 -> 5) and two on the depth stepper (6 -> 8) before dragging, plus a rectangle sized for the declared pattern — (14,14)-(24,19) computes round(10/5)+1 = 3 cols x round(5/5)+1 = 2 rows = the declared rows:2 cols:3, at the same start:14,14. `diameter:0.089` added to the declared command for the same reason blast-charge-loading-ui.json's own #947 note records: the strip has no diameter stepper, so the real drag always confirms at DRILL_HOLE_DEFAULT_DIAMETER_M, while the command's own omitted-diameter fallback is drillPlan.ts's 0.15 — that gap feeds computeDrillHoleDurationTicks a different per-hole drilling time per mode, which on a file whose whole point is a fatigue budget would make the two channels measure different runs.",
+      "command": "drill_plan grid rows:1 cols:1 spacing:5 depth:40 diameter:0.089 start:63,63",
+      "description": "#1090-followup: a single hole, both far from spawn and at the drill panel's own real stepper maximum depth (40m, Drill.ts) — the combined walk-to-vehicle + long drive + long drill duration alone is enough to drain a fresh driller's fatigue from 99 down through the hard floor before this one hole ever lands, sandbox-confirmed (collapse fires mid-drill at tick 97, this file's own state-dump trace). diameter left at the grid tool's own real default (DRILL_HOLE_DEFAULT_DIAMETER_M) since its strip has no diameter stepper to set one differently, same reasoning the pre-#1090 version of this file already documented for its own drag.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -56,14 +56,14 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 8
+          "value": 40
         },
         {
           "type": "dragTiles",
-          "x1": 14,
-          "z1": 14,
-          "x2": 24,
-          "z2": 19
+          "x1": 63,
+          "z1": 63,
+          "x2": 63,
+          "z2": 63
         },
         {
           "type": "clickSelector",
@@ -73,46 +73,45 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 6,
+          "orderedHoleCount": 1,
           "holeCount": 0
         }
       }
     },
     {
-      "command": "wait_until field:collapsedCount equals:1 max_ticks:200",
-      "description": "Advances real ticks (drive + drill, both draining fatigue) until the driller's own gauge reaches NEED_HARD_THRESHOLDS.fatigue (0) and checkCollapse (EmployeeNeeds.ts) fires — the same tick tickCollapse (NeedRestoration.ts) interrupts whatever vehicle-gated drill_hole action is in flight, releases the drill_rig's reservation, and self-claims a rest. minFatigue reading exactly 0 in the SAME step that collapsedCount first reads 1 is the state-dump proxy for 'a rest is taken the same tick fatigue hits 0' — the gauge is clamped at 0 by tickNeedGauges and does not begin recovering until the rest itself completes several ticks later (checked in the next step), so it cannot yet read above 0 here.",
+      "command": "wait_until field:collapsedCount equals:1 max_ticks:150",
+      "description": "Advances real ticks (walk + drive + drill, all draining fatigue with no idle boundary in between) until the driller's own gauge reaches NEED_HARD_THRESHOLDS.fatigue (0) mid-drill and checkCollapse (EmployeeNeeds.ts) fires — the same tick tickCollapse (NeedRestoration.ts) interrupts the in-flight vehicle-gated drill_hole action, releases the drill_rig's reservation, and self-claims a rest. minFatigue reading exactly 0 in the SAME step that collapsedCount first reads 1 is the state-dump proxy for 'a rest is taken the same tick fatigue hits 0' — the gauge is clamped at 0 by tickNeedGauges and does not begin recovering until the rest itself completes several ticks later (checked in the next step), so it cannot yet read above 0 here. Sandbox-confirmed: collapse fires at tick 97 on this branch, well inside the 150-tick budget.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "collapsedCount",
           "equals": 1,
-          "maxTicks": 200,
+          "maxTicks": 150,
           "timeoutMs": 30000
         }
       ],
-      "timeout": 40,
+      "timeout": 30,
       "role": "setup",
       "expect": {
         "equals": {
           "collapsedCount": 1,
           "minFatigue": 0
-        },
-        "note": "orderedHoleCount is deliberately not asserted here as a fixed number: it depends on how many holes the driller reached before collapsing, which this step does not pin down (and does not need to) — only that collapse genuinely happened before the whole grid was drilled matters, checked below."
+        }
       }
     },
     {
-      "command": "wait_until field:collapsedCount equals:0 max_ticks:400",
-      "description": "Drains the rest itself: with no living_quarters anywhere on the map, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER doubles NEED_REST_DURATIONS.fatigue (balance.ts) and the gauge caps at NEED_REST_NO_BUILDING_CAP rather than the full 100 — collapsing clears the instant that rest completes (completeRestForEmployee, RestActionHelpers.ts).",
+      "command": "wait_until field:collapsedCount equals:0 max_ticks:60",
+      "description": "Drains the rest itself: with no living_quarters anywhere on the map, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER doubles NEED_REST_DURATIONS.fatigue (balance.ts) and the gauge caps at NEED_REST_NO_BUILDING_CAP rather than the full 100 — collapsing clears the instant that rest completes (completeRestForEmployee, RestActionHelpers.ts). Sandbox-confirmed: the rest completes at tick 113 on this branch (16 ticks after the collapse above), well inside the 60-tick budget.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "collapsedCount",
           "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 60000
+          "maxTicks": 60,
+          "timeoutMs": 20000
         }
       ],
-      "timeout": 70,
+      "timeout": 20,
       "role": "setup",
       "expect": {
         "equals": {
@@ -121,23 +120,109 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
-      "description": "Every remaining hole in the grid eventually lands, even though the same driller/drill_rig pair may collapse and recover more than once along the way (a large tick budget is given for exactly that reason). With only this one driving.drill_rig-qualified employee and this one drill_rig vehicle in the whole roster, reaching orderedHoleCount:0 is only possible if the vehicle reservation the collapse above interrupted was genuinely released back to the pool and successfully reclaimed by the same driller afterward, rather than left permanently locked to a driver who had stopped working it — the concrete, machine-checked stand-in for 'the vehicle is released (driverId cleared / reassignable)' this state-dump schema has no direct field to assert on its own.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:60",
+      "description": "The SAME driller reboards the SAME drill_rig once rested and finishes the interrupted first hole. With only this one driving.drill_rig-qualified employee and this one drill_rig vehicle in the whole roster, reaching orderedHoleCount:0 here is only possible if the vehicle reservation the collapse above interrupted was genuinely released back to the pool and successfully reclaimed by the same driller afterward, rather than left permanently locked to a driver who had stopped working it — the concrete, machine-checked stand-in for 'the vehicle is released (driverId cleared / reassignable)' this state-dump schema has no direct field to assert on its own. Sandbox-confirmed: the hole lands at tick 125 (12 ticks after the rest above), well inside the 60-tick budget.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 60,
+          "timeoutMs": 20000
         }
       ],
-      "timeout": 125,
+      "timeout": 20,
       "role": "setup",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 6
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:14 z:14 depth:8 diameter:0.089",
+      "description": "#1090-followup: the freed driller/vehicle pair takes on genuinely NEW work now, not just a resume of the hole it already had — proves the release above was a real, reusable reservation, not a one-shot special case. Uses the real, player-clickable Add Hole tool (`drill_plan add`, Drill.ts's `armAddHoleTool`), which is additive and does not clear the first hole already drilled (unlike `drill_plan grid`, which replaces the whole plan — see DrillPlan.ts's own comment on `clearDrillPlan`). depth set back down to an ordinary 8m via the shared depth stepper (still reading the previous step's 40 — Drill.ts's `gridDepth` field persists across tool arm/disarm, the same class of finding presplit-wall.json's own add-hole step already documents).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "pickTile",
+          "x": 14,
+          "z": 14
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:19 z:14 depth:8 diameter:0.089",
+      "description": "A second nearby hole, same reasoning as the one just above — two remaining holes to finish, not one, so `wait_until orderedHoleCount equals:0` below still proves the vehicle survives more than a single reclaim.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 19,
+          "z": 14
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 2,
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "Both remaining holes eventually land. The long return drive from the far first hole to (14,14) alone triggers a SECOND hard-floor collapse/release/reclaim cycle, sandbox-confirmed (collapse at tick 160, rest clears at tick 176, both remaining holes finish by tick 237) — a large tick budget is given for exactly that reason, mirroring the file's own pre-#1090 note that the same driller/drill_rig pair may collapse and recover more than once along the way.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 3
         }
       }
     },
