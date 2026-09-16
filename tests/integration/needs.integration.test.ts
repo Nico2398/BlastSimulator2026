@@ -724,28 +724,32 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #928 — travel-drain fix, measured on the box-cut geometry over a fixed
-// window against the pre-fix baseline.
+// window.
 //
-// Same repro as the tutorial full-level box-cut performance test
-// (tests/integration/full-level/tutorial.integration.test.ts): a staffed
-// tutorial_pit roster orders a living_quarters, waits 40 ticks, opts into
-// continuous shift mode, then orders the box-cut ramp segment. Over a FIXED
-// window of console ticks starting right after that order (long enough for
-// both the pre- and post-fix box-cut to complete: the pre-fix issue measured
-// 114 ticks to completion, the post-fix run measures 66), this suite proves
-// the two integration-level symptoms the fix addresses:
+// Drives the tutorial's own real hire/train/build/buy/build_ramp setup order
+// — the same pattern the sibling '#945' suite below uses (fixed by issue
+// #1083) — rather than the old `campaign start level:tutorial_pit
+// staffed:true` + `build living_quarters at:12,15` repro: `staffed:true`
+// auto-staffs the roster, skipping every hire/train/licence step a real
+// player performs to reach this point, and (12,15) is not where the
+// tutorial's own script places living quarters (it's (29,11)) — no player
+// ever reaches the old repro's conditions (issue #1094).
+//
+// Over a FIXED window of console ticks starting right after the box-cut
+// ramp order, this suite proves the two integration-level symptoms the
+// #928 travel-drain fix addresses:
 //
 //   - "rest visits" (restTicksRemaining transitioning null -> non-null,
-//     i.e. a rest actually starting) fall, because the asymmetric
+//     i.e. a rest actually starting) stay low, because the asymmetric
 //     working/idle drain no longer forces extra trips.
 //   - "cells walked" (summed |dx|+|dz| across every employee, every tick)
-//     falls, because fewer interrupted walks means less backtracking.
+//     stays low, because fewer interrupted walks means less backtracking.
 //
-// Baselines below were measured directly against the pre-#928 commit
-// (5a17b28, the parent of the skeleton commit) via a `git worktree` checkout
-// running the identical repro and instrumentation — the same methodology
-// tests/integration/full-level/tutorial.integration.test.ts's own
-// PRE_FIX_BASELINE_TICKS documents.
+// MAX_CELLS_WALKED/MAX_REST_VISITS below are freshly measured ceilings
+// against current (already-fixed) production code under this real setup
+// order — not a cross-commit pre/post comparison — following the same
+// measure-first-then-assert convention the '#945' suite below already
+// established in this file (issue #1094).
 //
 // The suite also asserts the walk-survival guard's own integration-level
 // invariant directly: no employee ever has their claimed action's
@@ -758,19 +762,46 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
 // 'employee:collapsed', not 'employee:shift_change', so it can never
 // trigger a false positive here.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. the pre-fix baseline', () => {
+describe("#928 — box-cut geometry: rest visits and cells walked stay under freshly measured ceilings on the tutorial's own real setup", () => {
   const FIXED_WINDOW_TICKS = 150;
-  // Measured directly against 5a17b28 (pre-#928) via the same repro/window.
-  const PRE_FIX_CELLS_WALKED = 285.49593120068437;
-  const PRE_FIX_REST_VISITS = 21;
+  const MAX_CELLS_WALKED = 145.6; // measured 121.34054041723633 under tutorial's real setup + ~20% headroom (tick/geometry-style metric, this file's own margin convention)
+  const MAX_REST_VISITS = 5; // measured 4 under tutorial's real setup + 1 fixed margin (discrete count, this file's own margin convention)
 
-  it('walks fewer cells and starts fewer rests than the pre-fix baseline, with no claimed job dropped mid-walk to it', () => {
+  it('walks fewer cells than the ceiling and starts no more rests than the ceiling, with no claimed job dropped mid-walk to it', () => {
     const engine = createGameEngine();
 
-    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
-    expect(runCommand(engine, 'tick 40').success).toBe(true);
+    // Tutorial's own canonical hire/train/build/buy/build_ramp setup order
+    // (matches tutorial-interactive.json's steps, start through build_ramp,
+    // and the '#945' suite below) rather than `staffed:true` +
+    // `build living_quarters at:12,15` (issue #1094 — see the comment above
+    // this describe block).
+    expect(runCommand(engine, 'campaign start level:tutorial_pit cash:400000').success).toBe(true);
+    expect(runCommand(engine, 'employee hire role:surveyor').success).toBe(true);
+    expect(runCommand(engine, 'employee assign_skill 1 skill:geology level:3').success).toBe(true);
+    expect(runCommand(engine, 'survey seismic x:23 z:23').success).toBe(true);
+    expect(runCommand(engine, 'employee hire role:driller').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:29,11').success).toBe(true);
+    // poll instead of a fixed pad
+    {
+      let t = 0;
+      while (t < 300 && engine.ctx.state!.buildings.buildings.length < 1) {
+        runCommand(engine, 'tick 1'); t++;
+      }
+    }
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(runCommand(engine, 'build driving_center at:29,14').success).toBe(true);
+    {
+      let t = 0;
+      while (t < 300 && engine.ctx.state!.plannedBuildings.length > 0) {
+        runCommand(engine, 'tick 1'); t++;
+      }
+    }
+    expect(runCommand(engine, 'employee train 2 skill:driving.drill_rig').success).toBe(true);
+    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
+    expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
+    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    expect(runCommand(engine, 'vehicle buy rock_digger').success).toBe(true);
     expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
 
     const state = engine.ctx.state!;
@@ -821,8 +852,8 @@ describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. 
       }
     }
 
-    expect(cellsWalked).toBeLessThan(PRE_FIX_CELLS_WALKED);
-    expect(restVisits).toBeLessThan(PRE_FIX_REST_VISITS);
+    expect(cellsWalked).toBeLessThan(MAX_CELLS_WALKED);
+    expect(restVisits).toBeLessThanOrEqual(MAX_REST_VISITS);
     // The walk-survival guard's own integration-level invariant: over the
     // whole window, no claimed job was ever dropped by a proactive forced
     // rest while its holder was still mid-walk to it.
