@@ -391,7 +391,7 @@ describe('beginRestTravel (#1118)', () => {
     expect(employee.pendingActionType).toBe('rest');
   });
 
-  it('on-foot employee, reachable target: still works (regression guard) — moveTo installs a foot-leg itinerary, pendingActionType "rest"', () => {
+  it('on-foot employee, reachable target: keeps the legacy direct destinationX/Z write (moveTo/itinerary continuity is mounted-only), pendingActionType "rest"', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -400,12 +400,8 @@ describe('beginRestTravel (#1118)', () => {
     beginRestTravel(state, employee, 8, 9);
 
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
-    expect(employee.itinerary).not.toBeNull();
-    const legs = employee.itinerary!.legs;
-    expect(legs.length).toBe(1);
-    expect(legs[0]!.mode).toBe('foot');
-    expect(legs[0]!.destX).toBe(8);
-    expect(legs[0]!.destZ).toBe(9);
+    expect(employee.destinationX).toBe(8);
+    expect(employee.destinationZ).toBe(9);
     expect(employee.pendingActionType).toBe('rest');
   });
 

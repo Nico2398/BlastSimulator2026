@@ -15,6 +15,7 @@ import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
 import { NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE } from '../config/balance.js';
 import { moveTo } from './MoveTo.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -194,12 +195,13 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 
 /**
  * Start `emp` travelling to (x, z) as a rest destination, preserving mount
- * continuity: routed through moveTo/planItinerary like any other journey, so
- * a mounted employee drives there instead of desyncing from their vehicle
- * (I2_mounted_position_mismatch, WorldInvariants.ts). Falls back to the
- * legacy destinationX/Z write only when moveTo itself fails to plan a route
- * (e.g. genuinely unreachable target) — Locomotion.ts's legacy foot-walk
- * fallback then takes over exactly as it always has. Sets pendingActionType
+ * continuity: a MOUNTED employee is routed through moveTo/planItinerary like
+ * any other journey, so they drive there instead of desyncing from their
+ * vehicle (I2_mounted_position_mismatch, WorldInvariants.ts). An on-foot
+ * employee, and a mounted employee moveTo fails to route (e.g. genuinely
+ * unreachable target), get the legacy direct destinationX/Z write instead —
+ * Locomotion.ts's legacy foot-walk fallback then takes over exactly as it
+ * always has. Sets pendingActionType
  * alongside the destination so the renderer distinguishes a walk-to-rest from
  * an ordinary task walk (#1013 pictograms) and computeEmployeeActivity
  * (EmployeeActivity.ts) reports actionType: 'rest' for the whole trip, not
@@ -209,11 +211,12 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * event (#1118).
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
-  const result = moveTo(state, emp.id, { x, z });
-  if (!result.success) {
-    emp.destinationX = x;
-    emp.destinationZ = z;
+  if (isMounted(emp.locomotion) && moveTo(state, emp.id, { x, z }).success) {
+    emp.pendingActionType = 'rest';
+    return;
   }
+  emp.destinationX = x;
+  emp.destinationZ = z;
   emp.pendingActionType = 'rest';
 }
 
