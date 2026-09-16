@@ -1052,6 +1052,90 @@ describe('clickSelector — zero-size grace extension (issue #1032)', () => {
   // exactly the brittleness the plan warns against. Once the implementation
   // exists, this interaction is worth covering for real.
 
+  // Issue #1109 CI-fix — sandbox-mode's report-close failed on CI (and,
+  // reproduced locally, 1/3 runs) with the bare "element has zero size
+  // (0x0)" message, no grace context, even though PR #1037's grace already
+  // exists. Diagnosis: BlastReportModal's overlay toggles `display` from
+  // 'none' to '' only once its deferred open fires (BLAST_REPORT_DELAY_MS
+  // plus collapse-playback duration), so the poll's last-read reason at the
+  // CLICK_SELECTOR_DEFAULT_TIMEOUT_MS deadline is 'hidden', not 'zero-size'
+  // — the original grace condition only checked the latter, so it never
+  // engaged, and the loop threw immediately even though the control was
+  // about to open moments later (measured locally at ~5.0-5.13s against a
+  // 5s default budget). 'hidden' now earns the same one-time grace
+  // 'zero-size' already had.
+  it('extends the deadline once instead of throwing when hidden persists past the default timeout, and clicks through once the control becomes visible inside the grace window (#1109)', async () => {
+    let simulatedNow = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => simulatedNow);
+
+    const evaluate = makeProbeEvaluate([
+      // 1st poll: comfortably inside the default budget, still hidden (the
+      // report modal's overlay has not toggled display yet).
+      () => { simulatedNow = 100; return 'hidden'; },
+      // 2nd poll: strictly past CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, and
+      // still hidden — this is the moment grace, not a throw, must be
+      // granted.
+      () => { simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + 100; return 'hidden'; },
+      // 3rd poll: well inside the extended (grace) deadline, and the modal
+      // has finally opened and laid out — the click must proceed.
+      () => { simulatedNow += 100; return null; },
+    ]);
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(page.click).toHaveBeenCalledWith(selector, { button: 'left' });
+  });
+
+  it('grants the hidden grace exactly once — still hidden at the extended deadline throws with a loud, specific diagnosis (#1109)', async () => {
+    let simulatedNow = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => simulatedNow);
+
+    const evaluate = makeProbeEvaluate([
+      // 1st poll: already past the default timeout — grace must be
+      // granted.
+      () => { simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + 100; return 'hidden'; },
+      // 2nd poll: comfortably past the *extended* (grace) deadline too, and
+      // still hidden — a second grace must never be granted, so this must
+      // throw.
+      () => {
+        simulatedNow = CLICK_SELECTOR_DEFAULT_TIMEOUT_MS + CLICK_SELECTOR_ZERO_SIZE_GRACE_MS + 1000;
+        return 'hidden';
+      },
+    ]);
+    const page = fakePage({ evaluate });
+    const action = { type: 'clickSelector' as const, selector };
+    const step: ScenarioStepDef = {
+      command: 'blast',
+      description: 'close the blast report modal',
+      role: 'player',
+      interaction: [action],
+    };
+
+    let caught: unknown;
+    try {
+      await executeActionOnPage(page, action, step);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message).toContain(selector);
+    // The grace-diagnosis phrasing, same as the zero-size case — proves the
+    // 'hidden' reason is now built from the same single fresh read that
+    // decided the grace, rather than reading back the bare "zero size"
+    // message a separate, later inspectSelector() call would race into.
+    expect(message).toMatch(/layout|dimensions|laid out|never (gained|got)/i);
+    expect(message).toMatch(/wait(ed)?|timeout|\d+\s*ms/i);
+  });
+
   it('regression: no wasted poll iteration when the control is usable well before the default timeout (the common case)', async () => {
     const evaluate = vi.fn().mockResolvedValueOnce(null); // usable on the very first probe
     const click = vi.fn().mockResolvedValue(undefined);

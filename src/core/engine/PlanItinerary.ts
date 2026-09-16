@@ -8,7 +8,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
@@ -76,7 +76,7 @@ function estimateLegDistance(
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
   return path.found ? path.totalCost : null;
 }
 

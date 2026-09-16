@@ -13,7 +13,7 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
@@ -1116,5 +1116,77 @@ describe('findPath — occupancy avoidance (#954)', () => {
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: true });
     expect(result.found).toBe(true);
     expect(result.totalCost).toBe(599);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 15: findExactPath — rejects a findPath result whose final waypoint
+// doesn't match the requested destination, rather than silently accepting
+// findPath's own clamp-to-grid-bounds behaviour (#1109)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('findExactPath', () => {
+  it('in-bounds, reachable destination: found true with the same waypoints/totalCost findPath itself returns (happy path)', () => {
+    const grid = makeFlatGrid(10, 10, 'walkable');
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 5, toZ: 5, avoidVehicles: false };
+    const plain = findPath(grid, request);
+    const exact = findExactPath(grid, request);
+
+    expect(plain.found).toBe(true);
+    expect(exact.found).toBe(true);
+    expect(exact.waypoints).toEqual(plain.waypoints);
+    expect(exact.totalCost).toBe(plain.totalCost);
+  });
+
+  it('destination exactly on the grid\'s last valid cell (edge, not outside): found true, not misread as a bounds mismatch (boundary)', () => {
+    // 10×10 grid: last valid cell is (9,9) — inside the grid, not clamped.
+    const grid = makeFlatGrid(10, 10, 'walkable');
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 9, toZ: 9, avoidVehicles: false };
+    const result = findExactPath(grid, request);
+
+    expect(result.found).toBe(true);
+    const last = result.waypoints[result.waypoints.length - 1]!;
+    expect(last.x).toBe(9);
+    expect(last.z).toBe(9);
+  });
+
+  it('destination outside grid bounds past the east edge: found false, even though findPath on the identical request reports found true with a clamped endpoint (rejection)', () => {
+    const grid = makeFlatGrid(10, 10, 'walkable');
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 15, toZ: 5, avoidVehicles: false };
+
+    const plain = findPath(grid, request);
+    expect(plain.found).toBe(true);
+    const clampedLast = plain.waypoints[plain.waypoints.length - 1]!;
+    expect(clampedLast.x).toBe(9); // clamped to the last valid column, not x=15
+
+    const exact = findExactPath(grid, request);
+    expect(exact).toEqual({ found: false, waypoints: [], totalCost: 0 });
+  });
+
+  it('destination outside grid bounds past the south edge: found false, even though findPath on the identical request reports found true with a clamped endpoint (rejection)', () => {
+    const grid = makeFlatGrid(10, 10, 'walkable');
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 5, toZ: 15, avoidVehicles: false };
+
+    const plain = findPath(grid, request);
+    expect(plain.found).toBe(true);
+    const clampedLast = plain.waypoints[plain.waypoints.length - 1]!;
+    expect(clampedLast.z).toBe(9); // clamped to the last valid row, not z=15
+
+    const exact = findExactPath(grid, request);
+    expect(exact).toEqual({ found: false, waypoints: [], totalCost: 0 });
+  });
+
+  it('destination outside grid bounds diagonally (a corner beyond both edges): found false (rejection)', () => {
+    const grid = makeFlatGrid(10, 10, 'walkable');
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 20, toZ: 20, avoidVehicles: false };
+
+    const plain = findPath(grid, request);
+    expect(plain.found).toBe(true);
+    const clampedLast = plain.waypoints[plain.waypoints.length - 1]!;
+    expect(clampedLast.x).toBe(9);
+    expect(clampedLast.z).toBe(9);
+
+    const exact = findExactPath(grid, request);
+    expect(exact).toEqual({ found: false, waypoints: [], totalCost: 0 });
   });
 });

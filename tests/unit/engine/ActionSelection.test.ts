@@ -243,6 +243,30 @@ describe('resolveActionCost', () => {
     expect(result).not.toBeNull();
     expect(result!.totalTicks).toBeGreaterThan(0);
   });
+
+  it('returns null for a target outside state.navGrid\'s bounds, rather than a cost computed against findPath\'s silently clamped-to-grid endpoint (#1109)', () => {
+    // 30×30 grid (makeState default). A target far past the grid's edge
+    // would, under plain findPath, silently clamp onto the grid's last cell
+    // and still report found:true — resolveActionCost must not let that
+    // masquerade as a real, reachable cost.
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 500, targetZ: 500 });
+
+    const plainPath = PathfindingModule.findPath(state.navGrid!, {
+      agentId: emp.id,
+      fromX: emp.x,
+      fromZ: emp.z,
+      toX: action.targetX,
+      toZ: action.targetZ,
+      avoidVehicles: false,
+    });
+    expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -617,7 +641,12 @@ describe('selectBestActionForEmployee', () => {
     const claimableIds = new Set<number>([...claimableUnreachable.map(c => c.id), claimableReachable.id]);
     const isClaimable = (action: PendingAction): boolean => claimableIds.has(action.id);
 
-    const findPathSpy = vi.spyOn(PathfindingModule, 'findPath');
+    // resolveActionCost's real-cost resolution goes through findExactPath
+    // (#1109), not findPath directly, so that's the call this spy must
+    // observe — spying on findPath itself would miss it, since findExactPath
+    // calls findPath as an internal same-module reference vi.spyOn can't
+    // intercept.
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findExactPath');
 
     const result = selectBestActionForEmployee(
       state, emp, [...unclaimable, ...claimableUnreachable, claimableReachable], isClaimable,
@@ -632,14 +661,14 @@ describe('selectBestActionForEmployee', () => {
     // The unclaimable backlog (cheaper-ranked than everything claimable)
     // must never consume a real-cost resolution, and neither must any of the
     // provably-unreachable claimableUnreachable candidates: exactly one real
-    // findPath call happens, against the one candidate that was ever going
-    // to resolve. Old (buggy) code burns the whole budget's `continue`s on
-    // the 10 unclaimable candidates (cheaper-ranked than the whole claimable
-    // subset) and never calls findPath at all.
-    expect(findPathSpy.mock.calls.length).toBeGreaterThan(0);
-    expect(findPathSpy.mock.calls.length).toBeLessThanOrEqual(ACTION_SELECTION_MAX_PATH_ATTEMPTS);
+    // findExactPath call happens, against the one candidate that was ever
+    // going to resolve. Old (buggy) code burns the whole budget's
+    // `continue`s on the 10 unclaimable candidates (cheaper-ranked than the
+    // whole claimable subset) and never calls findExactPath at all.
+    expect(exactPathSpy.mock.calls.length).toBeGreaterThan(0);
+    expect(exactPathSpy.mock.calls.length).toBeLessThanOrEqual(ACTION_SELECTION_MAX_PATH_ATTEMPTS);
 
-    findPathSpy.mockRestore();
+    exactPathSpy.mockRestore();
   });
 
   // ── Climb-limit pocket starvation (#953) ───────────────────────────────
@@ -669,18 +698,20 @@ describe('selectBestActionForEmployee', () => {
     // by raw distance.
     const farReachable = makeAction({ id: 100, targetX: 0, targetZ: 25 });
 
-    const findPathSpy = vi.spyOn(PathfindingModule, 'findPath');
+    // See the #611 test above: resolveActionCost's real resolution goes
+    // through findExactPath, so the spy targets that, not findPath itself.
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findExactPath');
 
     const result = selectBestActionForEmployee(state, emp, [...nearUnreachable, farReachable]);
 
     expect(result).not.toBeNull();
     expect(result!.action.id).toBe(100);
     // Every crater candidate is screened out by the climb-aware reachable-set
-    // pre-filter without spending a real findPath attempt — only the one
+    // pre-filter without spending a real findExactPath attempt — only the one
     // genuinely reachable candidate ever reaches resolveActionCost.
-    expect(findPathSpy.mock.calls.length).toBe(1);
+    expect(exactPathSpy.mock.calls.length).toBe(1);
 
-    findPathSpy.mockRestore();
+    exactPathSpy.mockRestore();
   });
 
   it('an employee standing inside the same climb-isolated pocket as a candidate can still be dispatched to it (#953)', () => {
