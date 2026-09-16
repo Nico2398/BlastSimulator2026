@@ -799,4 +799,142 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction!.payload.collapsedNeed).toBe('fatigue');
     expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
+
+  // ── NEW (#1096) ─────────────────────────────────────────────────────────────
+  // interruptActiveAction only ever touches emp.activeActionId — a vehicle-gated
+  // action sitting unboarded in emp.taskQueue (e.g. re-pinned via
+  // walkOnlyPinnedBy after its original vehicle was destroyed mid-drive, #1085)
+  // is left completely untouched by it, so its vehicle reservation survives the
+  // whole rest unless tickCollapse also calls
+  // releaseUnboardedTaskQueueVehicleReservations. See EmployeeDispatchSteps.ts's
+  // own doc comment on that function and TickPipeline.ts's tickCollapse ordering
+  // for why the steady-state (already-collapsing) branch below is the one that
+  // actually closes the race: a same-tick reclaim onto a freshly-collapsed
+  // employee cannot exist yet at the exact instant of the FIRST tickCollapse call
+  // that interrupts them — only the NEXT tick's pass, while still collapsing,
+  // can observe and release it.
+  describe('#1096: releases a taskQueue-held vehicle reservation on collapse', () => {
+    it('steady-state (already-collapsing) branch releases an unboarded, vehicle-gated taskQueue reservation', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      employee.collapsing = true; // already resting from an earlier collapse
+      employee.fatigue = 0;
+
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+      const gatedAction: PendingAction = {
+        id: 1096, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+        targetX: 5, targetZ: 5, targetY: 0, payload: {},
+        targetEmployeeId: null, status: 'assigned', holderId: employee.id,
+        queuedAtTick: 0,
+      };
+      state.pendingActions.push(gatedAction);
+      employee.taskQueue = [gatedAction.id];
+      vehicle.reservedForActionId = gatedAction.id;
+      // vehicle.driverId stays null — reserved but never boarded, exactly the
+      // reclaim-while-resting shape claimActionsTargetedAtEmployee produces.
+
+      const result = tickCollapse(state);
+
+      // The already-collapsing employee is not reported as newly collapsed.
+      expect(result.collapsed).toHaveLength(0);
+
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(gatedAction.status).toBe('queued');
+      expect(gatedAction.holderId).toBeNull();
+      expect(employee.taskQueue).not.toContain(gatedAction.id);
+    });
+
+    it('fresh-collapse branch also releases a pre-existing unboarded, vehicle-gated taskQueue reservation', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      employee.fatigue = 0; // crosses the collapse threshold THIS tick
+      employee.collapsing = false;
+
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+      const gatedAction: PendingAction = {
+        id: 1097, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+        targetX: 5, targetZ: 5, targetY: 0, payload: {},
+        targetEmployeeId: null, status: 'assigned', holderId: employee.id,
+        queuedAtTick: 0,
+      };
+      state.pendingActions.push(gatedAction);
+      // Predates the collapse trigger — already sitting in taskQueue before
+      // fatigue crossed the threshold this same tick.
+      employee.taskQueue = [gatedAction.id];
+      vehicle.reservedForActionId = gatedAction.id;
+
+      placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+      const result = tickCollapse(state);
+
+      expect(result.collapsed).toEqual([employee.id]);
+      expect(employee.collapsing).toBe(true);
+
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(gatedAction.status).toBe('queued');
+      expect(gatedAction.holderId).toBeNull();
+      expect(employee.taskQueue).not.toContain(gatedAction.id);
+    });
+
+    it('does not touch an active (not taskQueue) vehicle-gated action — interruptActiveAction still owns it', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, 'driving.drill_rig', 1);
+      employee.fatigue = 0;
+      employee.collapsing = false;
+      employee.taskQueue = []; // nothing queued — only the active action exists
+
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const activeAction: PendingAction = {
+        id: 1098, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+        targetX: 3, targetZ: 3, targetY: 0, payload: {},
+        targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+        queuedAtTick: 0,
+      };
+      state.pendingActions.push(activeAction);
+      employee.activeActionId = activeAction.id;
+      employee.taskTicksRemaining = 3; // boarded, mid-execution
+      vehicle.driverId = employee.id;
+      vehicle.occupantIds = [employee.id];
+      employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      vehicle.reservedForActionId = activeAction.id;
+
+      placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+      const result = tickCollapse(state);
+
+      expect(result.collapsed).toEqual([employee.id]);
+      // interruptActiveAction (existing, pre-#1096 behavior) still releases
+      // the active action and its vehicle reservation on its own — the new
+      // taskQueue-release logic must not interfere with or duplicate that.
+      const released = state.pendingActions.find(a => a.id === activeAction.id)!;
+      expect(released.status).toBe('queued');
+      expect(released.holderId).toBeNull();
+      expect(employee.activeActionId).not.toBe(activeAction.id);
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(vehicle.driverId).toBeNull();
+    });
+
+    it('empty taskQueue on an already-collapsing employee: no crash, no unintended release', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      employee.collapsing = true;
+      employee.fatigue = 0;
+      employee.taskQueue = [];
+
+      expect(() => tickCollapse(state)).not.toThrow();
+
+      const result = tickCollapse(state);
+      expect(result.collapsed).toHaveLength(0);
+      expect(employee.taskQueue).toEqual([]);
+    });
+  });
 });

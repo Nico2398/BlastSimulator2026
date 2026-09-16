@@ -8,6 +8,7 @@ import { drillPlanCommand, type MiningContext } from '../../../src/console/comma
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 
 // ── Test context factory ──
 
@@ -374,7 +375,7 @@ describe('vehicle driver — unassign with "none"', () => {
     const ctx = makeCtx();
     const result = vehicleCommand(ctx, ['driver', '9999', 'none'], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Vehicle not found');
+    expect(result.output).toBe(t('mount.vehicle_not_found'));
   });
 
   it('returns an error when the vehicle has no driver', () => {
@@ -382,7 +383,7 @@ describe('vehicle driver — unassign with "none"', () => {
     const vehicleId = addTruckVehicle(ctx);
     const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'none'], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Vehicle has no driver');
+    expect(result.output).toBe(t('mount.vehicle_no_driver'));
   });
 });
 

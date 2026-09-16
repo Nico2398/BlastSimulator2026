@@ -176,11 +176,11 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
     // level2-playthrough-win.json (pre-existing on main too, unrelated to
     // #1089/#1103's own mover work). Deliberately excludes a RESTING holder
     // (restTicksRemaining/pendingRestDuration set): that is the genuine,
-    // still-open #1096 gap (tickCollapse interrupting a holder for rest
-    // without releasing their own taskQueue-held reservation) this same
-    // check exists to keep visible — vehicles.integration.test.ts's own
-    // "destroying the reserved vehicle mid-drive" case pins exactly this
-    // shape as a violation until #1096 lands.
+    // still-open #1110 gap (a shift-rest interruption not releasing the
+    // holder's own taskQueue-held reservation) this same check exists to
+    // keep visible — vehicles.integration.test.ts's own #922 interrupt/
+    // resume case pins exactly this shape as a violation until #1110 lands.
+    // #1096, the tickCollapse half of the same gap, is fixed (#1107).
     const holderGenuinelyBusyElsewhere = holder.activeActionId !== null
       && holder.restTicksRemaining === null
       && holder.pendingRestDuration === null;

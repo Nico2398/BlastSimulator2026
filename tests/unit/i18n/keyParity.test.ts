@@ -286,6 +286,10 @@ describe('en.json / fr.json — key-set parity', () => {
     // stripped from their values (e.g. ui.policy.note_shift_8h,
     // tutorial.step19) -- those are edits, not removals, and don't affect
     // the count. Net -9, both locales.
+    // Baseline is now 3501 (up from 3495): #1101 adds 6 mount.* keys —
+    // mount.alight_failed, mount.employee_not_found, mount.too_far_to_board,
+    // mount.vehicle_full, mount.vehicle_no_driver, mount.vehicle_not_found —
+    // both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     // Baseline is now 3464 (up from 3461): #947 adds 3 keys for the zone-clear
@@ -329,8 +333,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // for MoveTo.ts's error strings — move_to.employee_not_found,
     // move_to.vehicle_not_found, move_to.vehicle_unavailable,
     // move_to.no_route_to_vehicle, move_to.no_route_available — both locales.
+    // Baseline is now 3506 (up from 3500): merging main brings #1101's 6 keys
+    // for Mount.ts's error strings — mount.alight_failed,
+    // mount.employee_not_found, mount.too_far_to_board, mount.vehicle_full,
+    // mount.vehicle_no_driver, mount.vehicle_not_found — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3500);
+    expect(Object.keys(en).length).toBe(3506);
   });
 });
 

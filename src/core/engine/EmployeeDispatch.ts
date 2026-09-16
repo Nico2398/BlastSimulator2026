@@ -171,6 +171,19 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // doc comment (Evacuation.ts) for the shared reasoning across all four
     // call sites (#557).
     if (isMidEvacuation(state, employee)) continue;
+    // Collapsing (walking to rest, or resting) — like the two guards above,
+    // outside the claim system entirely. Without this, claimActionsTargetedAtEmployee
+    // reclaims a still-'queued', walkOnlyPinnedBy-pinned action targeted at this
+    // exact employee (TaskCancellation.ts) every single tick regardless of
+    // activeActionId, undoing tickCollapse's own same-tick
+    // releaseUnboardedTaskQueueVehicleReservations call one step later in the
+    // pipeline (TickPipeline.ts: tickCollapse runs before tickEmployees) —
+    // net effect, a real vehicle stays reserved (pushed onto taskQueue, never
+    // boarded) for the employee's entire rest, tripping
+    // I5_reservation_without_valid_holder (#1096). Dispatch resumes for this
+    // employee the tick their rest completes and collapsing clears
+    // (RestActionHelpers.ts's completeRestForEmployee).
+    if (employee.collapsing) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);

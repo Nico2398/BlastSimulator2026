@@ -4,7 +4,7 @@
 
 import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
 
-export { ROLE_LICENCE_REQUIRED, canAssignDriver, assignDriver, getExcavatorLoadingRate } from './VehicleDriverAssignment.js';
+export { ROLE_LICENCE_REQUIRED, canAssignDriver, getExcavatorLoadingRate } from './VehicleDriverAssignment.js';
 
 // ── Vehicle roles ──
 

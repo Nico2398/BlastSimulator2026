@@ -335,6 +335,40 @@ describe('vehicle.ts — move success message', () => {
   });
 });
 
+// ── driver <id> none: vehicle-not-found routes through mount.vehicle_not_found (#1101) ──
+//
+// Mount.alight's own hardcoded 'Vehicle not found' string is forwarded
+// verbatim as `result.error` by vehicleCommand's `driver <id> none` branch
+// (src/console/commands/vehicle.ts) without going through t() at all today —
+// this only starts passing once alight() itself calls
+// t('mount.vehicle_not_found') and that key exists in en.json/fr.json.
+
+describe('vehicle.ts — driver <id> none: not-found routes through mount.vehicle_not_found', () => {
+  const NOT_FOUND_ID = 999999;
+
+  it('resolves to the exact t(\'mount.vehicle_not_found\') literal by default', () => {
+    const ctx = makeCtx();
+    const englishLiteral = t('mount.vehicle_not_found');
+    const result = vehicleCommand(ctx, ['driver', String(NOT_FOUND_ID), 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(englishLiteral);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const englishLiteral = t('mount.vehicle_not_found');
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['driver', String(NOT_FOUND_ID), 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(englishLiteral);
+    // A missing key falls back to the raw key string itself, which trivially
+    // "differs" from the English literal regardless of locale — that would
+    // make this check pass even with no French translation wired up at all.
+    // Rule it out explicitly so this only passes once a real fr string exists.
+    expect(result.output).not.toBe('mount.vehicle_not_found');
+  });
+});
+
 // ── driver_unassign_success ───────────────────────────────────────────────
 
 describe('vehicle.ts — driver unassign success message', () => {

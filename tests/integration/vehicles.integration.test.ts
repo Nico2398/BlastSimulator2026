@@ -11,15 +11,14 @@ import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js
 import {
   createVehicleState,
   purchaseVehicle,
-  assignDriver,
   destroyVehicle,
   getVehicleDef,
   getVehicleDefByTier,
   getAllVehicleRoles,
 } from '../../src/core/entities/Vehicle.js';
 import type { VehicleTask } from '../../src/core/entities/Vehicle.js';
+import { board } from '../../src/core/engine/Mount.js';
 import {
-  createEmployeeState,
   hireEmployee,
   assignSkill,
   killEmployee,
@@ -291,7 +290,7 @@ describe('Vehicle fleet', () => {
     // test means to check.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
-    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    const assignResult = board(ctx.state!, v.id, eid);
     expect(assignResult.success).toBe(true);
     v.occupantIds = [eid];
     const driver = ctx.state!.employees.employees.find(e => e.id === eid)!;
@@ -345,7 +344,7 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── Core API: purchaseVehicle / assignDriver / destroyVehicle ──
+  // ── Core API: purchaseVehicle / Mount.board / destroyVehicle ──
 
   it('purchaseVehicle core API returns vehicle and cost', () => {
     const vs = createVehicleState();
@@ -361,32 +360,34 @@ describe('Vehicle fleet', () => {
     expect(vs.vehicles).toHaveLength(1);
   });
 
-  it('assignDriver core API rejects unlicensed employee', () => {
-    const vs = createVehicleState();
-    purchaseVehicle(vs, 'debris_hauler', 0, 0);
-    const es = createEmployeeState();
+  it('Mount.board rejects unlicensed employee', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const rng = new Random(42);
-    const { employee } = hireEmployee(es, 'blaster', rng);
-    // blaster has no driving.truck qualification
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    // blaster has no driving.truck qualification, and is co-located with the
+    // vehicle (both default to (0,0)) so the boarding-range check isn't what
+    // rejects this attempt.
 
-    const result = assignDriver(vs, es, 1, employee.id);
+    const result = board(state, 1, employee.id);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('lacks licence');
+    if (!result.success) {
+      expect(result.error).toContain('lacks licence');
+    }
   });
 
-  it('assignDriver core API succeeds with qualified employee', () => {
-    const vs = createVehicleState();
-    purchaseVehicle(vs, 'debris_hauler', 0, 0);
-    const es = createEmployeeState();
+  it('Mount.board succeeds with qualified employee', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const rng = new Random(42);
-    const { employee } = hireEmployee(es, 'driver', rng);
-    assignSkill(es, employee.id, 'driving.truck', 1);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
 
-    const result = assignDriver(vs, es, 1, employee.id);
+    const result = board(state, 1, employee.id);
 
     expect(result.success).toBe(true);
-    expect(vs.vehicles[0]!.driverId).toBe(employee.id);
+    expect(state.vehicles.vehicles[0]!.driverId).toBe(employee.id);
   });
 
   it('destroyVehicle removes vehicle from state', () => {
@@ -667,7 +668,7 @@ describe('Vehicle fleet', () => {
       const anchorHolderRng = new Random(999);
       const { employee: anchorHolder } = hireEmployee(ctx.state!.employees, 'driver', anchorHolderRng, anchor.x, anchor.z);
       assignSkill(ctx.state!.employees, anchorHolder.id, 'driving.truck', 1);
-      const anchorAssignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, anchor.id, anchorHolder.id);
+      const anchorAssignResult = board(ctx.state!, anchor.id, anchorHolder.id);
       expect(anchorAssignResult.success).toBe(true);
       const anchorAction: PendingAction = {
         id: 9999,
@@ -718,7 +719,7 @@ describe('Vehicle fleet', () => {
         const rng = new Random(100 + i);
         const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
         assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
-        const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, employee.id);
+        const assignResult = board(ctx.state!, v.id, employee.id);
         expect(assignResult.success).toBe(true);
         // #1089: only an employee moves — tickLocomotion only ever advances
         // an employee's own itinerary, so a driver assigned via assignDriver
@@ -921,13 +922,11 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawQueued).toBe(true);
-      // TODO(#1096): tickCollapse doesn't release a reserved-but-unboarded
-      // taskQueue vehicle reservation when it interrupts the holder for
-      // rest, leaving an I5 violation until #1096 lands. Once fixed, replace
-      // this with a plain expectNoWorldInvariantViolations(state) call.
-      expect(assertWorldInvariants(ctx.state!)).toEqual([
-        { kind: 'I5_reservation_without_valid_holder', vehicleId: 2, actionId: 1, employeeId: 1 },
-      ]);
+      // #1096: the re-pinned action can be reclaimed onto emp1 while emp1 is
+      // resting (collapsed mid-walk to the newly-available vehicle) —
+      // tickCollapse must release that taskQueue-held reservation too, or it
+      // sits stale (I5_reservation_without_valid_holder) for the whole rest.
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -1138,12 +1137,15 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
-      // TODO(#1096): a long enough resume window (400 ticks) recrosses
-      // WORK_DURATION_TICKS again, and tickCollapse's own reserved-but-
-      // unboarded taskQueue vehicle reservation leak (same root cause as
-      // the "destroying the reserved vehicle mid-drive" case above) can
-      // leave the same single I5 violation behind. Once #1096 lands,
-      // replace this with a plain expectNoWorldInvariantViolations(state).
+      // TODO(#1110): a long enough resume window (400 ticks) recrosses
+      // WORK_DURATION_TICKS again, and the shift-rest interruption path
+      // (ForceShiftRest.ts) does not release the reservation of an action
+      // still sitting unboarded in the interrupted employee's taskQueue,
+      // leaving a single I5 violation behind. #1096 (fixed in #1107) closed
+      // exactly this gap for tickCollapse's `collapsing` employees only —
+      // the employee here is never `collapsing`, so none of #1107's release
+      // calls fire. Once #1110 lands, replace this with a plain
+      // expectNoWorldInvariantViolations(state).
       const violations = assertWorldInvariants(ctx.state!);
       expect(violations.every(v => v.kind === 'I5_reservation_without_valid_holder')).toBe(true);
     });
@@ -1153,17 +1155,17 @@ describe('Vehicle fleet', () => {
   // claim/board/release path already exists in core (VehicleReservation.ts,
   // VehicleBoarding.ts, ArrivalGate.resolveBoarding) and needs no changes for
   // this issue. These two tests pin that no manual affordance
-  // (`vehicleCommand(['driver', ...])` / `assignDriver`) is ever needed for a
+  // (`vehicleCommand(['driver', ...])` / `Mount.board`) is ever needed for a
   // queued vehicle-gated task to claim, board, and complete on its own.
   describe('fully automatic driver claim — no player affordance used (#921)', () => {
-    it('a bought vehicle + a licensed, idle employee + a queued vehicle-gated action: driverId is set to that employee and the action progresses with zero manual "vehicle driver"/assignDriver calls', () => {
+    it('a bought vehicle + a licensed, idle employee + a queued vehicle-gated action: driverId is set to that employee and the action progresses with zero manual "vehicle driver"/Mount.board calls', () => {
       const eid = hireOne(ctx, 'driller');
       employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
 
       // Nothing below this line ever calls vehicleCommand(['driver', ...]) or
-      // the core assignDriver() function — the claim has to happen on its own.
+      // the core Mount.board() function — the claim has to happen on its own.
       const dispatch = employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
       expect(dispatch.success).toBe(true);
       const actionId = ctx.state!.pendingActions[0]!.id;

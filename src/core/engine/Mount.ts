@@ -6,6 +6,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { canAssignDriver, unassignDriver } from '../entities/Vehicle.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
+import { t } from '../i18n/I18n.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
@@ -31,20 +32,20 @@ function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): 
  */
 export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  if (!employee || !employee.alive) return { success: false, error: 'Employee not found' };
+  if (!employee || !employee.alive) return { success: false, error: t('mount.employee_not_found') };
 
   if (!isWithinBoardingRange(employee.x, employee.z, vehicle.x, vehicle.z)) {
-    return { success: false, error: 'Employee is too far from the vehicle to board' };
+    return { success: false, error: t('mount.too_far_to_board') };
   }
 
   const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
   if (!eligible.success) return { success: false, error: eligible.error };
 
   if (vehicle.occupantIds.length >= VEHICLE_SEAT_COUNT[vehicle.type]) {
-    return { success: false, error: 'Vehicle is full' };
+    return { success: false, error: t('mount.vehicle_full') };
   }
 
   vehicle.occupantIds.push(employeeId);
@@ -77,13 +78,13 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
  */
 export function alight(state: GameState, vehicleId: number, emitter?: EventEmitter): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
   const employeeId = vehicle.occupantIds[0] ?? null;
-  if (employeeId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (employeeId === null) return { success: false, error: t('mount.vehicle_no_driver') };
 
   const guard = unassignDriver(state.vehicles, vehicleId);
-  if (!guard.success) return { success: false, error: guard.error ?? 'Cannot alight' };
+  if (!guard.success) return { success: false, error: guard.error ?? t('mount.alight_failed') };
 
   vehicle.occupantIds = vehicle.occupantIds.filter(id => id !== employeeId);
 
