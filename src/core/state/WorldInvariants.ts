@@ -242,10 +242,17 @@ function checkI8PayloadNotInTransit(state: GameState): Violation[] {
   return violations;
 }
 
+/**
+ * I9: an executing task's employee should not still be travelling —
+ * neither via the legacy destinationX/Z walk fields nor (#1090) via an
+ * unconsumed itinerary. A task shouldn't be running (taskTicksRemaining set)
+ * while the employee still has movement left to do by either mechanism.
+ */
 function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const e of state.employees.employees) {
-    if (e.taskTicksRemaining !== null && (e.destinationX !== null || e.destinationZ !== null)) {
+    if (e.taskTicksRemaining !== null
+      && (e.destinationX !== null || e.destinationZ !== null || e.itinerary !== null)) {
       violations.push({ kind: 'I9_executing_task_still_travelling', employeeId: e.id });
     }
   }

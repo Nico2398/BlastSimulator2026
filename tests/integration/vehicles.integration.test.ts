@@ -1569,6 +1569,19 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // Not frozen permanently: the same vehicle, re-boarded by the same
     // driver, is now sent on a second, different, reachable task — outside
     // the crater entirely — and must actually arrive.
+    //
+    // Fatigue accumulated from the whole first drive (activeActionId was set
+    // the entire time, including while stuck) carries over — topped back up
+    // here so this second, ~32-tick work stint doesn't cross tickCollapse's
+    // own hard floor partway through and interrupt it. That interruption
+    // used to double as a free dismount (releaseVehicleReservation, pre-
+    // #1090), which is exactly what let this loop's loose "arrived" check
+    // (position + idle task) pass without the action ever actually
+    // completing; #1090 correctly stops dismounting on interruption, so this
+    // test now needs the action to genuinely finish instead. Needs mechanics
+    // are not what this describe block (#986, sustained-stuck release) means
+    // to exercise.
+    driver.fatigue = 100;
     const action2 = makeVehicleGatedAction({ id: 9002, holderId: driver.id, targetX: 15, targetZ: 5 });
     state.pendingActions.push(action2);
     vehicle.driverId = driver.id;
@@ -1578,6 +1591,15 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     vehicle.state = 'moving';
     vehicle.targetX = 15;
     vehicle.targetZ = 5;
+    // A real vehicle-gated claim always sets this at claim time (mirrors the
+    // first drive's own identical setup line above) — omitting it made
+    // reconcileVehicleReservations' own "reserved vehicle no longer exists"
+    // sweep (case (c), VehicleReservation.ts) misread this hand-rolled
+    // in-flight claim as one whose vehicle vanished, spuriously interrupting
+    // it. That interruption was harmless before #1090 (interruptActiveAction
+    // didn't yet touch the itinerary), but #1090 correctly makes it clear
+    // employee.itinerary too, which would abort this hand-installed drive.
+    vehicle.reservedForActionId = action2.id;
     driver.activeActionId = action2.id;
     // #1089: same reasoning as the first drive above — a real itinerary is
     // what tickLocomotion actually walks.

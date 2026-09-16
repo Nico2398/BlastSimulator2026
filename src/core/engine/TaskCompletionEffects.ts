@@ -14,7 +14,6 @@ import type { TaskProgressResult } from './TaskProgress.js';
 import type { TaskCompletionReport } from './TickPipeline.js';
 import { Random } from '../math/Random.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
-import { completePendingAction } from './TaskDispatch.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
@@ -112,19 +111,17 @@ export function applyTaskCompletion(
     }
 
     // Any completed non-rest action — skill-required (survey, etc.) or
-    // not (a null-skill general_work dispatch) — routes through
-    // tickTaskProgress and carries an actionId here; completePendingAction
-    // removes the completing action's record and ghost, once the work has
-    // actually finished, not at claim time (#547).
+    // not (a null-skill general_work dispatch), vehicle-gated or on-foot —
+    // routes through tickTaskProgress and carries an actionId here.
+    // completeVehicleGatedAction (VehicleReservation.ts, #1090) owns both
+    // releasing any vehicle reservation (a safe no-op when this action
+    // never reserved one) and removing the completed action's record/ghost
+    // (completePendingAction) — one call handles every action type, not just
+    // vehicle-gated ones, since resolveActionCost/planItinerary already own
+    // picking any same-role follow-up and no continuity fast path is needed
+    // here any more.
     if (progress.actionId !== undefined) {
-      // #1090: completeVehicleGatedAction (VehicleReservation.ts) replaces
-      // VehicleContinuity.ts's completeVehicleGatedActionIfApplicable — cost
-      // (and any same-role follow-up) is now the planner's own concern
-      // (resolveActionCost/planItinerary), so this no longer needs its own
-      // continuity fast path or a boolean "did it handle this" contract.
-      // TODO(#1090): stubbed (no-op) at skeleton phase.
-      completeVehicleGatedAction(state, progress.actionId);
-      completePendingAction(state, progress.actionId);
+      completeVehicleGatedAction(state, emp, progress.actionId);
     }
 
     // A completed 'survey' task resolves here — after the surveyor has

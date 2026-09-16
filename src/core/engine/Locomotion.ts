@@ -641,12 +641,11 @@ function handlePostBoardIntent(state: GameState, emp: Employee, vehicle: Vehicle
         // Fragment/depot/eligibility changed between claim and boarding
         // (fragment picked clean, no active warehouse, etc.) — release the
         // action back to the pool instead of leaving the vehicle boarded
-        // with nothing to do.
-        // TODO(#1090): the keepVehicleDriver option was removed along with
-        // the dismount-on-release mechanism — `emp` just boarded this exact
-        // vehicle moments ago in this same tick, so a needless walk-back-
-        // and-reboard the instant the situation clears is implementer's to
-        // avoid via releaseVehicleReservation's own new behavior.
+        // with nothing to do. interruptActiveAction's own vehicle release
+        // (releaseVehicleReservation, #1090) is claim-only — `emp`, who just
+        // boarded this exact vehicle moments ago in this same tick, stays
+        // mounted rather than being walked back off and re-boarded the
+        // instant the situation clears.
         interruptActiveAction(state, emp, action.id);
       }
       // started === null: not a fragment-gated action — the itinerary's own

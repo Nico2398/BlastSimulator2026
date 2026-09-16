@@ -299,7 +299,8 @@ export function runTick(
   // release/dismount) so the PendingAction/ghost clear and the employee
   // keeps working instead of idling.
   for (const completedVehicle of arrivalResult.completedVehicleActions) {
-    completeVehicleGatedAction(state, completedVehicle.actionId);
+    const completedEmployee = state.employees.employees.find(e => e.id === completedVehicle.employeeId);
+    if (completedEmployee) completeVehicleGatedAction(state, completedEmployee, completedVehicle.actionId);
   }
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological

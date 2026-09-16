@@ -13,11 +13,12 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk, isMidClaimedTaskExecution } from './RestActionHelpers.js';
-import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { alight } from './Mount.js';
 
 /**
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
@@ -34,6 +35,16 @@ function finishForceRest(
 ): void {
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
+  // #1090: nothing dismounts automatically on interruption any more, so a
+  // driver forced to rest mid-drive/mid-execution is still mounted right up
+  // to this point. beginRestWalk below moves emp.x/z directly via the legacy
+  // destinationX/Z walk (not moveTo's itinerary), which would otherwise
+  // desync a still-"mounted" employee's position from their vehicle's (I2) —
+  // alight first so mount state stays consistent with the on-foot walk about
+  // to start.
+  if (isMounted(emp.locomotion)) {
+    alight(state, mountedVehicleId(emp.locomotion)!, _emitter);
+  }
   beginRestWalk(emp, restAction.targetX, restAction.targetZ);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
@@ -74,9 +85,9 @@ export function forceShiftRestIfNeeded(
   // case (#945): interrupting a task the employee is actively ticking through
   // forces a walk-back-and-redo once the rest ends, instead of letting the
   // in-progress task finish first. Deliberately a blanket guard (any
-  // in-progress task, not scoped to vehicle-gated work like
-  // forceShiftRestIfNeededByPolicy's own isMidVehicleGatedWork-scoped
-  // version below) — safe unscoped here because this legacy, duration-only
+  // in-progress task, not scoped to any particular action catalog like
+  // forceShiftRestIfNeededByPolicy's own PROTECTED_MID_EXECUTION_ACTION_TYPES-
+  // scoped guard below) — safe unscoped here because this legacy, duration-only
   // path doesn't fire nearly as aggressively as the policy path (only once
   // ticksWorked crosses WORK_DURATION_TICKS, not on every tick a fatigue
   // threshold is crossed), and tickCollapse's own hard floor still backstops
@@ -129,8 +140,12 @@ export function forceShiftRestIfNeeded(
  * (taskTicksRemaining) with no vehicle gate, so interrupting mid-task
  * fragments it into repeated walk-and-restart cycles under an aggressive
  * continuous-mode policy. Extend this set, not a switch, for the next
- * on-foot task type shown to fragment the same way. Vehicle-gated tasks
- * use isMidVehicleGatedWork instead (VehicleReservation.ts).
+ * on-foot task type shown to fragment the same way. A vehicle-gated task's
+ * own mid-execution phase carries no equivalent guard (#1090 deleted the
+ * dismount-on-completion/interruption mechanism this once protected — with
+ * nothing dismounting automatically any more, an interrupted vehicle-gated
+ * task costs no walk-back-and-reboard, so there is nothing left to protect
+ * against here).
  *
  * 'place_building' (#1039), 'charge_hole' and 'survey' (#1049) — all three
  * are requiredVehicleRole: null, timer-driven via taskTicksRemaining, with no
@@ -145,10 +160,9 @@ const PROTECTED_MID_EXECUTION_ACTION_TYPES: ReadonlySet<ActionType> = new Set([
 /**
  * True when `employee.activeActionId` names a PendingAction whose type is in
  * PROTECTED_MID_EXECUTION_ACTION_TYPES — a task in progress (#1039, #1049).
- * Scoped guard for forceShiftRestIfNeededByPolicy, mirroring
- * isMidVehicleGatedWork's own scoping: skip only the specific in-progress
- * work that gets fragmented by proactive shift-cycle rest, not every
- * in-progress task.
+ * Scoped guard for forceShiftRestIfNeededByPolicy: skip only the specific
+ * in-progress work that gets fragmented by proactive shift-cycle rest, not
+ * every in-progress task.
  */
 function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
   if (employee.activeActionId === null) return false;
@@ -164,17 +178,12 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),
  * already walking to a queued rest (pendingRestDuration !== null), already
- * arrived and mid-execution of a boarded vehicle-gated action
- * (taskTicksRemaining !== null && isMidVehicleGatedWork — #945, waits for
- * the driver to naturally dismount, e.g. on segment/task completion with no
- * same-vehicle follow-up, rather than forcing a dismount-and-reboard
- * mid-task; deliberately does NOT also cover the mid-drive-to-target phase
- * or an on-foot task — see the guard's own inline comment for why), already
  * arrived and mid-execution of a task in PROTECTED_MID_EXECUTION_ACTION_TYPES
- * (taskTicksRemaining !== null && isMidProtectedTaskWork — #1039, #1049,
- * same scoping rationale as the vehicle-gated guard: only the executing
- * phase of that catalog's task types is protected, not every in-progress
- * task), or
+ * (taskTicksRemaining !== null && isMidProtectedTaskWork — #1039, #1049: only
+ * the executing phase of that catalog's task types is protected, not every
+ * in-progress task — a boarded vehicle-gated action's own mid-execution
+ * phase carries no equivalent guard since #1090, see
+ * PROTECTED_MID_EXECUTION_ACTION_TYPES's own doc comment for why), or
  * mid-walk to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
  * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
@@ -229,27 +238,6 @@ export function forceShiftRestIfNeededByPolicy(
   // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
   // (see its own comment on the same check) for the same reason.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
-  // Already arrived and mid-execution of a boarded vehicle-gated action
-  // (e.g. dig_ramp_segment — #945; see isMidVehicleGatedWork's own doc
-  // comment, VehicleReservation.ts, for why this is scoped to vehicle-gated
-  // work rather than every in-progress task). Interrupting mid-execution
-  // forces a dismount and a fresh walk-and-reboard once the rest ends,
-  // instead of letting the driver finish this segment (or hand off cleanly
-  // via same-vehicle continuity to the next one) first.
-  //
-  // Deliberately does NOT also cover the mid-drive-to-target phase (taskTicksRemaining
-  // still null) — unlike the mid-execution case above, a long initial approach
-  // drive protected the same way just defers the same crossing to
-  // tickCollapse's unconditional hard floor instead of this policy's own
-  // proactive one, trading a healthy rest at the policy's threshold for a
-  // drive-to-zero collapse with no net reduction in how many times the
-  // vehicle gets boarded (confirmed empirically against #945's own tutorial
-  // box-cut repro below: identical boardingCount either way, but fatigue
-  // bottoming out at 0 instead of recovering at the policy's own threshold).
-  // #922's own VehicleReservation.test.ts already pins mid-drive
-  // interruption as intended behavior for the legacy (non-policy)
-  // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
-  if (isMidClaimedTaskExecution(emp) && isMidVehicleGatedWork(state, emp)) return;
   // Already arrived and mid-execution of a task in
   // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
   // working one (taskTicksRemaining !== null, not just claimed-but-still-
@@ -257,9 +245,8 @@ export function forceShiftRestIfNeededByPolicy(
   // re-crosses, releasing the action back to the pool and forcing a fresh
   // walk-and-restart each time instead of finishing the one work stint
   // already in progress. Scoped to that catalog specifically
-  // (isMidProtectedTaskWork) and to the executing phase only, mirroring
-  // isMidVehicleGatedWork's own scoping above rather than a blanket
-  // taskTicksRemaining !== null skip for any in-progress task — the legacy
+  // (isMidProtectedTaskWork) and to the executing phase only, rather than a
+  // blanket taskTicksRemaining !== null skip for any in-progress task — the legacy
   // path's own comment on that broader guard notes it previously regressed a
   // long-run wellbeing test, so this stays narrow to the task types
   // actually shown to fragment mid-execution. tickCollapse's own unconditional

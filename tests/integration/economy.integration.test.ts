@@ -15,6 +15,7 @@ import {
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
+import { abortVehicleGatedFragmentWork } from '../../src/core/economy/FragmentTaskLifecycle.js';
 import {
   createFinanceState,
   addIncome,
@@ -797,6 +798,32 @@ describe('Economy', () => {
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
+
+    // #1090: syncHaulDispatch queues one open-pool haul_debris action per
+    // on_ground fragment — with a full-grid blast that's every fragment
+    // (hundreds), so this idle, already-mounted, licensed driver now gets
+    // self-dispatched (and, since nothing dismounts on completion any more,
+    // stays claimed on whatever it picks next) the instant the
+    // freight_warehouse goes active — a real haul may already be mid-flight
+    // by the time this probe runs. Reset the vehicle/driver back to a clean
+    // idle-but-mounted state first (aborting any in-flight haul work the
+    // same way releaseVehicleReservation would) so the reachability probe
+    // below exercises exactly what it's meant to — fragment selection from
+    // the vehicle's own current position — rather than racing self-dispatch
+    // for which fragment happens to be claimed first.
+    const probeVehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    const probeDriver = ctx.state!.employees.employees.find(e => e.id === driverId)!;
+    abortVehicleGatedFragmentWork(ctx.state!, probeVehicle);
+    probeVehicle.reservedForActionId = null;
+    probeVehicle.task = 'idle';
+    probeVehicle.state = 'idle';
+    probeDriver.activeActionId = null;
+    probeDriver.taskQueue = [];
+    probeVehicle.driverId = probeDriver.id;
+    probeVehicle.occupantIds = [probeDriver.id];
+    probeDriver.locomotion = { kind: 'mounted', vehicleId: probeVehicle.id };
+    probeDriver.x = probeVehicle.x;
+    probeDriver.z = probeVehicle.z;
 
     // 4. Reachability-aware fragment selection — the fix under test.
     const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId);

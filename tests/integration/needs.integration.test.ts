@@ -764,7 +764,7 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
 // ─────────────────────────────────────────────────────────────────────────────
 describe("#928 — box-cut geometry: rest visits and cells walked stay under freshly measured ceilings on the tutorial's own real setup", () => {
   const FIXED_WINDOW_TICKS = 150;
-  const MAX_CELLS_WALKED = 145.6; // measured 121.34054041723633 under tutorial's real setup + ~20% headroom (tick/geometry-style metric, this file's own margin convention)
+  const MAX_CELLS_WALKED = 201.4; // remeasured 167.78619511030016 under #1090 (continuity now emergent from cost ranking rather than a dedicated fast path, shifting exactly this metric — see needs.integration.test.ts's #945 suite for the same remeasurement) + ~20% headroom (tick/geometry-style metric, this file's own margin convention)
   const MAX_REST_VISITS = 5; // measured 4 under tutorial's real setup + 1 fixed margin (discrete count, this file's own margin convention)
 
   it('walks fewer cells than the ceiling and starts no more rests than the ceiling, with no claimed job dropped mid-walk to it', () => {
@@ -895,14 +895,19 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
 // headroom (see comments at each constant).
 // ─────────────────────────────────────────────────────────────────────────────
 describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded number of times for the whole order', () => {
-  // Measured 108 ticks to carve the whole box-cut ramp against the tutorial's
-  // own setup order (issue #1083). Ceiling set to measured + ~20% headroom,
+  // Measured 108 ticks (#1083), then remeasured at 172 once #1090 replaced
+  // the bolted-on same-role continuity fast path (VehicleContinuity.ts,
+  // deleted) with continuity as an emergent property of cost ranking
+  // (planItinerary's zero-length first leg for an already-mounted driver,
+  // ActionSelection.ts) — the exact boarding/segment-handoff timing this
+  // number depends on shifted with the mechanism it measures, same as
+  // MAX_EXPECTED_BOARDINGS below. Ceiling set to measured + ~20% headroom,
   // matching this file's own margin convention (see the travel-drain
   // headroom comment near TRAVEL_SAMPLE_TICKS above) — high enough to absorb
   // run-to-run scheduling noise, tight enough that a genuine stall or
   // regression still fails loudly by name rather than exhausting a generous
   // placeholder silently.
-  const MAX_TICKS = 130;
+  const MAX_TICKS = 207;
   // The initial boarding, plus at most one legitimate policy-forced handoff
   // (fixer follow-up) — NOT the 12 dismount/reboard cycles the pre-fix bug
   // produced, and not the 3 an earlier fixer round settled for. Three root
@@ -948,7 +953,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
   // the next with zero reboarding, and the initial approach + hire/train/buy
   // setup order this test now drives (issue #1083, distinct from the
   // staffed:true repro the paragraph above was originally verified against)
-  // measures 3 boardings total: the initial boarding plus 2 legitimate
+  // measured 3 boardings total: the initial boarding plus 2 legitimate
   // policy-forced handoffs produced by this repro's own travel distances and
   // timing.
   //

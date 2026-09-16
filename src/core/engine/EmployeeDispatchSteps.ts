@@ -24,6 +24,7 @@ import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alight } from './Mount.js';
+import { moveTo } from './MoveTo.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -478,9 +479,6 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     alight(state, mountedVehicleId(employee.locomotion)!);
   }
 
-  employee.destinationX = action.targetX;
-  employee.destinationZ = action.targetZ;
-
   // tickCollapse/tickNeedRestoration self-claim outside this path and, like
   // this branch, only ever *queue* the rest via pendingRestDuration/
   // pendingRestNeedKey. autoInsertNeedTasks pushes 'rest' actions unclaimed
@@ -490,10 +488,9 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // payload, so resolveRestNeedKey returns null for it and this block is a
   // no-op there.
   if (action.type === 'rest') {
-    // destinationX/Z are already set above (common to every non-vehicle-gated
-    // action); beginRestWalk's own re-set of the same values is redundant but
-    // harmless — what this call actually adds is pendingActionType: 'rest',
-    // so computeEmployeeActivity (#1013) reports the walk-to-rest correctly.
+    // beginRestWalk owns destinationX/Z for a rest action — the legacy
+    // walk field, not moveTo's itinerary — plus pendingActionType: 'rest' so
+    // computeEmployeeActivity (#1013) reports the walk-to-rest correctly.
     beginRestWalk(employee, action.targetX, action.targetZ);
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
@@ -504,6 +501,15 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     }
     return;
   }
+
+  // #1090: every other on-foot action walks via moveTo — the only entry
+  // point that starts movement — rather than setting destinationX/Z
+  // directly. On failure (no route, e.g. genuinely boxed in), the employee
+  // is left claimed-but-idle with no itinerary/destination: it stays queued
+  // for a next-tick retry rather than throwing, mirroring
+  // promoteVehicleGatedAction's own "reservation vanished" no-op above.
+  const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ });
+  if (!moveResult.success) return;
 
   // Non-rest actions queue their task duration here — a skill-required
   // action's claimed employee is guaranteed (by the qualification filters

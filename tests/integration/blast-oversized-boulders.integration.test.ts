@@ -21,6 +21,7 @@ import {
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
+import { abortVehicleGatedFragmentWork } from '../../src/core/economy/FragmentTaskLifecycle.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 /**
@@ -247,6 +248,37 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
 
     const piece = pieces[0]!;
     const pieceMass = piece.fragment.mass;
+
+    // #1090: nothing dismounts on completion any more, so this already-
+    // mounted, idle, licensed hauler is fair game for self-dispatch
+    // (syncHaulDispatch, #552) the instant the freight_warehouse goes
+    // active — by the time this manual haul command runs, the vehicle may
+    // already be mid-haul on a different, self-dispatched fragment
+    // (requestHaulFragment's own already-busy guard would then reject this
+    // exact command). Reset it to a clean idle-but-mounted state first, the
+    // same way completing a haul naturally leaves it, so this manual command
+    // exercises exactly what it's meant to.
+    const haulerVehicle = ctx.state!.vehicles.vehicles.find(v => v.id === haulerId)!;
+    const haulerDriver = ctx.state!.employees.employees.find(e => e.id === haulerDriverId)!;
+    abortVehicleGatedFragmentWork(ctx.state!, haulerVehicle);
+    haulerVehicle.reservedForActionId = null;
+    haulerVehicle.task = 'idle';
+    haulerVehicle.state = 'idle';
+    haulerVehicle.isMoveStuck = false;
+    haulerVehicle.moveConsecutiveFailures = 0;
+    haulerDriver.activeActionId = null;
+    haulerDriver.taskQueue = [];
+    haulerDriver.itinerary = null;
+    // A same-tick self-dispatch race, or the sustained-stuck-abandon path
+    // (#986), may already have dismounted this driver entirely — restore
+    // them to the vehicle's own seat so requestHaulFragment's own
+    // driverId-required guard passes, matching I2 (mounted position ==
+    // vehicle position).
+    haulerVehicle.driverId = haulerDriver.id;
+    haulerVehicle.occupantIds = [haulerDriver.id];
+    haulerDriver.locomotion = { kind: 'mounted', vehicleId: haulerVehicle.id };
+    haulerDriver.x = haulerVehicle.x;
+    haulerDriver.z = haulerVehicle.z;
 
     const haulPiece = vehicleCommand(ctx, ['haul', String(haulerId)], { fragment: String(piece.fragment.id) });
     expect(haulPiece.success).toBe(true);

@@ -7,18 +7,21 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees } from '../entities/Employee.js';
-import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { isDestinationOccupied } from './EntityMovementTick.js';
-import { findFreeVehicleForRole } from './VehicleReservation.js';
+// #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
+// and cellsToTravelTicks from this module — a two-way cycle, safe because
+// every import on both sides is a function called only from inside other
+// function bodies, never evaluated at module-load time (same reasoning as
+// the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
+import { planItinerary } from './PlanItinerary.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 
 /** Every configured NeedKey — used to validate an untyped payload value against the catalog rather than a hardcoded literal (#1062 genericity). */
@@ -139,25 +142,15 @@ export function cellsToTravelTicks(cells: number, speed: number): number {
 }
 
 /**
- * Straight-line (octile-heuristic) travel ticks for `employee` to reach
- * `action`'s target — see `octileHeuristic` in `Pathfinding.ts`. Shared by
- * `estimateActionCost` (always uses this direct-line estimate) and
- * `resolveActionCost`'s null-navGrid branch, which mirrors
- * `tickEmployeeMovement`'s own fallback (EntityMovementTick.ts) when no
- * NavGrid has been built yet.
- */
-function estimateTravelTicks(employee: Employee, action: PendingAction): number {
-  return cellsToTravelTicks(octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ), AGENT_WALK_SPEED);
-}
-
-/**
- * Cheap admissible cost estimate for `employee` performing `action`: octile-
- * heuristic travel ticks (`estimateTravelTicks`) plus work ticks (via
- * `computeActionWorkTicks`). No real pathfinding — used to rank candidates
- * before spending a real `findExactPath` call on only the most promising ones.
- * The octile distance is itself the direct-line estimate
- * `tickEmployeeMovement` (EntityMovementTick.ts) falls back to when
- * `state.navGrid` is null, so no separate null-navGrid branch is needed here.
+ * Cheap admissible cost estimate for `employee` performing `action`: the
+ * itinerary `planItinerary` would build at `'estimate'` fidelity (octile
+ * heuristic, no real pathfinding) for the goal `{ kind: 'work', actionId:
+ * action.id }` — its `estTotalTicks` already sums every leg (walk-to-vehicle,
+ * drive, work) `planItinerary` would plan, so a vehicle-gated action's cost
+ * reflects the whole trip rather than just the walk to board (#1090). `null`
+ * (goal unresolvable — the action vanished between being listed as a
+ * candidate and being costed here) costs `Infinity`, same as an unreachable
+ * target.
  *
  * Ore-bearing haul_debris/fragment_debris candidates (`haulActionCarriesOre`)
  * get ORE_HAUL_PRIORITY_BONUS_TICKS subtracted here so they outrank a
@@ -174,122 +167,27 @@ export function estimateActionCost(
   action: PendingAction,
   fragmentOf?: FragmentLookup,
 ): number {
-  const rawCost = estimateTravelTicks(employee, action) + computeActionWorkTicks(state, employee, action);
+  const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate', { action });
+  const rawCost = itinerary !== null ? itinerary.estTotalTicks : Infinity;
   const bonus = haulActionCarriesOre(state, action, fragmentOf) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
   return Math.max(0, rawCost - bonus);
 }
 
 /**
- * The coordinate `employee` must actually walk to on foot to work `action` —
- * the action's own target for an ordinary on-foot action, but for a
- * vehicle-gated one (#954 follow-up, economy-full-loop regression) the
- * RESERVED VEHICLE's own current position instead: promoteVehicleGatedAction/
- * requestBoardVehicle (VehicleReservation.ts) send the employee walking to
- * board the vehicle first, never straight to the action's own cargo target —
- * only the vehicle itself drives there afterward (moveVehicle). Using
- * action.targetX/targetZ here for a vehicle-gated action validated
- * reachability against a coordinate the employee's own foot-walk never goes
- * near, which cuts both ways: a claim could pass with a cargo target that
- * happens to read as "occupied" (so avoidVehicles' exemption falls out in its
- * favor) while the real walk to a perfectly reachable vehicle never needed
- * that exemption at all, or — the regression this fixes — a claim could pass
- * purely because the cargo target's own occupancy happened to disable
- * avoidVehicles for that resolution, while the real walk (to the reserved
- * vehicle's unoccupied, and therefore avoidVehicles-enabled, cell) finds the
- * employee's current position boxed in by fragment occupancy on every
- * neighbour cell — genuinely unreachable, but reported claimable anyway.
- * Direct-traced via economy-full-loop.json: a driver mid-shift on a
- * rock_fragmenter reserves a debris_hauler haul action ahead of time
- * (reserveOnePoolActionAhead); by the time that reservation is promoted, the
- * rubble their own rock-breaking work just produced surrounds their current
- * cell on all 8 sides, and the debris_hauler's own spawn cell was never
- * marked vehicleOccupied (only a NavGrid rebuild or an actual drive seeds
- * that flag — a freshly bought, never-yet-driven vehicle has neither) — so
- * `isDestinationOccupied` on the vehicle's real position reads false,
- * avoidVehicles stays enabled for that walk, and a boxed-in employee has no
- * legal first step at all, regardless of distance. Falls back to the
- * action's own target when no vehicle is reserved yet and none is currently
- * free (defensive — findVehicleForClaim's own isClaimable gate normally
- * prevents resolveActionCost from ever being asked about such a candidate),
- * and when `employee` already holds the reserved vehicle's driverId (the
- * continuity case — already boarded, no further foot-walk needed at all).
- */
-function resolveVehicleGatedWalkTarget(state: GameState, employee: Employee, action: PendingAction): { x: number; z: number } {
-  if (action.requiredVehicleRole === null) {
-    return { x: action.targetX, z: action.targetZ };
-  }
-
-  const reserved = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-  const vehicle = reserved ?? findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
-
-  if (vehicle === null || vehicle.driverId === employee.id) {
-    return { x: action.targetX, z: action.targetZ };
-  }
-
-  return { x: vehicle.x, z: vehicle.z };
-}
-
-/**
- * Real findExactPath-based cost for `employee` performing `action`, or `null`
- * if the target is unreachable on the current NavGrid — findExactPath
- * refuses a target outside NavGrid bounds (or off its clamped path) rather
- * than silently costing a clamped path the way findPath alone would.
- *
- * With no NavGrid built yet (state.navGrid === null), mirrors
- * tickEmployeeMovement's own fallback (EntityMovementTick.ts): the target is
- * treated as directly reachable via a straight line, so this never returns
- * null purely for lack of a NavGrid.
- *
- * The walk target itself is resolveVehicleGatedWalkTarget's own concern (see
- * its doc comment) — a vehicle-gated action's real foot-walk goes to the
- * reserved vehicle, not the action's cargo target.
- *
- * avoidVehicles mirrors tickEmployeeMovement's own rule for the exact same
- * walk (#954 follow-up fix): an employee's foot travel avoids vehicle/
- * fragment-occupied cells, except when the destination itself is occupied
- * (isDestinationOccupied — boarding a vehicle, charging a hole a drill_rig
- * still sits on). Before this fix the claim-time reachability check here
- * always passed avoidVehicles: false, so it could report an action
- * "reachable" (and cheap) for an employee whose real walk — which DOES avoid
- * occupied cells — can never actually get there, e.g. an employee standing
- * inside a dense post-blast fragment field with zero passable neighbour
- * cells. selectBestActionForEmployee/claimOnePoolCandidate then let that
- * employee claim the action anyway; EntityMovementTick.ts's own
- * MOVE_STUCK_ABANDON_TICKS mechanism (#938) would release it back to the pool
- * ~30 ticks later, but with employees dispatched in ascending-id order and no
- * other employee ever getting a look-in before this one re-claims the SAME
- * unreachable action via the SAME false-positive check, the whole cycle
- * repeats forever — a livelock, not a slow convergence (confirmed live:
- * tutorial-playthrough.json's own freight_warehouse order, with the one
- * employee standing on it after a blast permanently boxed in by fragment
- * occupancy on every one of its 8 neighbour cells, monopolized the claim for
- * 400+ ticks while a second, unblocked, idle employee stood by, qualified and
- * reachable, the whole time). Matching the real walk rule here means an
- * employee this action can never reach now correctly resolves to `null`
- * (unclaimable), so selectBestActionForEmployee/claimOnePoolCandidate leave
- * it queued for a genuinely reachable employee instead.
+ * Real, `planItinerary`-at-`'exact'`-fidelity cost for `employee` performing
+ * `action` (#1090) — the itinerary's own `estTotalTicks`, which already sums
+ * every leg (walk-to-vehicle at walking speed, drive at vehicle speed, work)
+ * a vehicle-gated action needs, not just the walk to board. `null` when
+ * `planItinerary` can't resolve a route — an unreachable vehicle, an
+ * unreachable target, or (`avoidVehicles`, threaded through by
+ * `PlanItinerary.ts`'s own `estimateLegDistance`) an employee genuinely boxed
+ * in by vehicle occupancy on every neighbour cell of an unoccupied
+ * destination — same "stays queued, retries next tick" contract as before:
+ * never throws.
  */
 export function resolveActionCost(state: GameState, employee: Employee, action: PendingAction): { totalTicks: number } | null {
-  const workTicks = computeActionWorkTicks(state, employee, action);
-  const walkTarget = resolveVehicleGatedWalkTarget(state, employee, action);
-
-  if (state.navGrid === null) {
-    return { totalTicks: cellsToTravelTicks(octileHeuristic(employee.x, employee.z, walkTarget.x, walkTarget.z), AGENT_WALK_SPEED) + workTicks };
-  }
-
-  const path = findExactPath(state.navGrid, {
-    agentId: employee.id,
-    fromX: employee.x,
-    fromZ: employee.z,
-    toX: walkTarget.x,
-    toZ: walkTarget.z,
-    avoidVehicles: !isDestinationOccupied(state, walkTarget.x, walkTarget.z),
-  });
-
-  if (!path.found) return null;
-
-  const travelTicks = cellsToTravelTicks(path.totalCost, AGENT_WALK_SPEED);
-  return { totalTicks: travelTicks + workTicks };
+  const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+  return itinerary !== null ? { totalTicks: itinerary.estTotalTicks } : null;
 }
 
 /**
@@ -380,16 +278,14 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 }
 
 /**
- * The three-clause "is this queued action open to `employee`" check shared
- * by `findStarvedActionForEmployee` below and VehicleContinuity.ts's
- * `tryContinueVehicleGatedAction` (its `poolFollowUps` filter): still
- * `queued`, untargeted or targeted at `employee`, and `employee` holds
- * `requiredSkill` when one is set. Each caller layers its own extra clauses
- * on top (vehicle role, evacuation hold, claimability, staleness threshold)
- * — this helper knows about none of them, so a caller's clause can change
- * without touching the other's.
+ * The three-clause "is this queued action open to `employee`" check used by
+ * `findStarvedActionForEmployee` below: still `queued`, untargeted or
+ * targeted at `employee`, and `employee` holds `requiredSkill` when one is
+ * set. Its caller layers its own extra clauses on top (vehicle role,
+ * evacuation hold, staleness threshold) — this helper knows about none of
+ * them, so the caller's clause can change without touching this one.
  */
-export function isQueuedActionAvailableToEmployee(employee: Employee, action: PendingAction): boolean {
+function isQueuedActionAvailableToEmployee(employee: Employee, action: PendingAction): boolean {
   return action.status === 'queued' &&
     (action.targetEmployeeId === null || action.targetEmployeeId === employee.id) &&
     (action.requiredSkill === null || employee.qualifications.some(q => q.category === action.requiredSkill));
@@ -398,10 +294,11 @@ export function isQueuedActionAvailableToEmployee(employee: Employee, action: Pe
 /**
  * Finds a queued, unclaimed, `requiredVehicleRole === null` action that has
  * been waiting at least `ACTION_STARVATION_TICK_THRESHOLD` ticks and is
- * claimable by `employee` — called from VehicleContinuity.ts's
- * `completeVehicleGatedActionIfApplicable`, before it would otherwise invoke
- * `tryContinueVehicleGatedAction`, so a long-starved on-foot action can win
- * dispatch over the same-role vehicle continuity fast path (#1000).
+ * claimable by `employee` — called from EmployeeDispatchSteps.ts's
+ * `fillIdleEmployeeFromQueueOrPool` (`promoteStarved`), ahead of resuming an
+ * ordinary taskQueue entry or claiming from the open pool, so a long-starved
+ * on-foot action can win dispatch over whatever a same-role, still-mounted
+ * driver would otherwise rank cheapest (#1000).
  *
  * Excludes an action under an active evacuation hold (`isEvacuationHoldActive`,
  * Evacuation.ts) exactly like the other two claim-eligibility filters

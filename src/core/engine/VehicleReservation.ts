@@ -29,6 +29,11 @@ import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { alight } from './Mount.js';
+// Direct import from TaskLifecycleCore.ts, not TaskDispatch.ts (see this
+// module's own header comment on the cycle TaskDispatch.ts's re-export would
+// close) — TaskCancellation.ts already imports completePendingAction the
+// same way, for the same reason.
+import { completePendingAction, clearActiveTaskFields } from './TaskLifecycleCore.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -41,26 +46,25 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
  * and is themself the boarded driver of the vehicle reserved for it — whether
  * still driving toward the target (taskTicksRemaining not yet seeded by
  * ArrivalGate) or already arrived and mid-execution (taskTicksRemaining set).
- * Callers combine this with whichever of those two phases they mean to
- * protect — e.g. ForceShiftRest.ts's forceShiftRestIfNeededByPolicy also
- * requires `taskTicksRemaining !== null` (mid-execution only; see its own
- * inline comment for why the mid-drive phase is deliberately left
- * interruptible).
+ * Used by TaskCancellation.ts's interruptActiveAction, combined with
+ * `taskTicksRemaining === null` there (mid-drive phase only — see that call
+ * site's own inline comment for why the mid-execution phase never reaches
+ * that branch at all).
  *
- * Interrupting a boarded, vehicle-gated action forces a full dismount and,
- * later, a fresh walk-and-reboard of that exact vehicle — the real cost
- * #945's tutorial box-cut repro measured (a rock-digger driver dismounted/
- * re-boarded 3+ times over one ramp order). An on-foot (non-vehicle-gated)
- * task has no such cost — interrupting it only discards in-progress ticks,
- * which is why this check is scoped to `requiredVehicleRole !== null` rather
- * than any in-progress task: using this (instead of a blanket
- * taskTicksRemaining !== null guard, regardless of action type) specifically
- * keeps a long-running on-foot task interruptible — a blanket guard let a
- * generic multi-tick `employee dispatch` task defer a policy-forced rest for
- * its whole duration, letting fatigue swing far past the policy's own
- * threshold every work cycle and crash morale over a long run (needs.
- * integration.test.ts's own long-run wellBeing acceptance case, #945
- * follow-up regression).
+ * A boarded, vehicle-gated action's own mid-execution phase carries no
+ * ForceShiftRest.ts guard any more (#1090 deleted the dismount-on-completion/
+ * interruption mechanism a walk-and-reboard cost used to justify protecting
+ * against — see PROTECTED_MID_EXECUTION_ACTION_TYPES's own doc comment,
+ * ForceShiftRest.ts). An on-foot (non-vehicle-gated) task's own interruption
+ * discards in-progress ticks the same way it always has, which is why this
+ * check stays scoped to `requiredVehicleRole !== null` rather than any
+ * in-progress task: using this (instead of a blanket taskTicksRemaining !==
+ * null guard, regardless of action type) specifically keeps a long-running
+ * on-foot task interruptible — a blanket guard let a generic multi-tick
+ * `employee dispatch` task defer a policy-forced rest for its whole duration,
+ * letting fatigue swing far past the policy's own threshold every work cycle
+ * and crash morale over a long run (needs.integration.test.ts's own long-run
+ * wellBeing acceptance case, #945 follow-up regression).
  */
 export function isMidVehicleGatedWork(state: GameState, employee: Employee): boolean {
   if (employee.activeActionId === null) return false;
@@ -118,9 +122,10 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   );
   if (qualifying.length === 0) return null;
 
-  const continuity = qualifying.find(v => v.driverId === employee.id);
-  if (continuity) return continuity;
-
+  // No continuity special-case (#1090): a mounted employee's own vehicle sits
+  // at their exact position (I2), so it is already at distance 0 from them —
+  // nothing else can tie that — and wins the distance-based tie-break below
+  // on its own merits, with no separate branch needed.
   const distanceSquared = (v: Vehicle) => (v.x - employee.x) ** 2 + (v.z - employee.z) ** 2;
   return qualifying.reduce((nearest, v) => {
     const d = distanceSquared(v);
@@ -214,11 +219,9 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
       // active depot) — release the reservation so
       // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
       // and returns the action to the pool instead of leaving it claimed
-      // with nothing actually working it.
-      // TODO(#1090): releaseVehicleReservationKeepDriver (driver-retaining
-      // release) was deleted along with the dismount-on-release mechanism —
-      // implementer replaces this with whatever releaseVehicleReservation's
-      // own new (no-longer-dismounting) behavior becomes.
+      // with nothing actually working it. releaseVehicleReservation is
+      // claim-only (#1090) — the driver stays mounted, exactly what
+      // continuity means here.
       releaseVehicleReservation(state, action.id);
     }
   }
@@ -281,31 +284,63 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitte
 }
 
 /**
- * Unconditional release: clears reservedForActionId, and if the vehicle
- * currently has a driver, unassigns them and resets task/state to idle.
- * Used by cancellation, needs-interruption, and the death/destruction
- * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
+ * Claim-only release (#1090): aborts any in-flight vehicle-gated fragment
+ * work on the reserved vehicle (returning cargo to the ground first if
+ * mid-haul) and clears reservedForActionId. Never dismounts — a mounted
+ * driver stays mounted. Used by cancellation, needs-interruption, ordinary
+ * completion, and the routine (non-death) branches of the reconciliation
+ * sweep; "nothing dismounts automatically any more" is what makes staying
+ * mounted across a same-role follow-up an emergent property of cost ranking
+ * (planItinerary/resolveActionCost) rather than a mechanism this function
+ * drives. No-op if no vehicle is reserved for `actionId`.
+ *
+ * A dead reservation holder is the one release reason that still needs an
+ * explicit dismount — see reconcileVehicleReservations's own dead-holder
+ * branch and TaskCancellation.ts's releaseDeadEmployeeActions, both of which
+ * call dismountVehicleDriver directly rather than through this function.
  */
 export function releaseVehicleReservation(state: GameState, actionId: number): void {
-  const vehicle = findAndAbortReservedVehicle(state, actionId);
-  if (!vehicle) return;
-
-  dismountVehicleDriver(state, vehicle);
+  findAndAbortReservedVehicle(state, actionId);
 }
 
 /**
- * Completion/continuity resolution for a vehicle-gated action (#1090) —
- * replaces VehicleContinuity.ts's completeVehicleGatedActionIfApplicable
- * (deleted). At implementation phase: releases the vehicle reservation (via
- * releaseVehicleReservation above) and completes the PendingAction (via
- * completePendingAction, TaskLifecycleCore.ts) — resolveActionCost/
- * planItinerary already own picking any same-role follow-up, so this no
- * longer needs its own continuity fast path.
- * TODO(#1090): implement — stubbed at skeleton phase.
+ * Completion resolution for a vehicle-gated action (#1090) — replaces
+ * VehicleContinuity.ts's completeVehicleGatedActionIfApplicable (deleted).
+ * Releases the vehicle reservation (via releaseVehicleReservation above —
+ * claim-only, never dismounts the driver), clears `employee`'s own
+ * active-task fields (clearActiveTaskFields, TaskLifecycleCore.ts — a no-op
+ * when tickTaskProgress's employee-timer path already cleared them, but the
+ * only place that ever does for a haul_debris/fragment_debris completion,
+ * whose work is phase-driven and never runs through that timer at all —
+ * without this, the employee's own `activeActionId` stays stuck naming the
+ * just-completed action forever, never reading as idle for dispatch to pick
+ * up a new one, even though the vehicle itself finished and sits idle), and
+ * completes the PendingAction (via completePendingAction,
+ * TaskLifecycleCore.ts). Staying mounted across a same-role follow-up is no
+ * longer a mechanism this function drives — it falls out of
+ * estimateActionCost/resolveActionCost (ActionSelection.ts) naturally
+ * ranking the still-mounted driver's own next same-role action cheapest,
+ * since planItinerary plans them a zero-length first leg.
  */
-export function completeVehicleGatedAction(state: GameState, actionId: number): void {
-  void state;
-  void actionId;
+export function completeVehicleGatedAction(state: GameState, employee: Employee, actionId: number): void {
+  // Reset the vehicle's own display task/state to idle before releasing the
+  // reservation — releaseVehicleReservation is claim-only now and no longer
+  // does this via dismountVehicleDriver (#1090). Without it, task/state
+  // would sit frozen at whatever VEHICLE_ROLE_ARRIVAL_TASK the arrival step
+  // set (Locomotion.ts) — e.g. still reading "drilling" — for as long as the
+  // still-mounted driver goes without a same-role follow-up. Harmless no-op
+  // for haul_debris/fragment_debris, whose own phase machinery
+  // (HaulingTask.ts/BoulderBreaking.ts) already reset these before reporting
+  // completion here.
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (vehicle) {
+    vehicle.task = 'idle';
+    vehicle.state = 'idle';
+    vehicle.waitingTicks = 0;
+  }
+  releaseVehicleReservation(state, actionId);
+  clearActiveTaskFields(employee);
+  completePendingAction(state, actionId);
 }
 
 /**
@@ -419,7 +454,14 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
 
     const holder = resolveReservationHolder(state, vehicle, action);
     if (!holder) {
+      // #1090: the one release reason that still needs an explicit dismount
+      // — resolveReservationHolder returns undefined when the resolved
+      // holder is dead (or, harmlessly, when nobody has boarded yet, in
+      // which case dismountVehicleDriver is already a no-op). A dead
+      // employee left mounted would otherwise violate I1/I2 forever, since
+      // nothing else ever revisits a stale driverId pointing at a corpse.
       releaseVehicleReservation(state, actionId);
+      dismountVehicleDriver(state, vehicle);
       continue;
     }
 
