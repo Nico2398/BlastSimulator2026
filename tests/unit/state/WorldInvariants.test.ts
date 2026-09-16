@@ -27,6 +27,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
+import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 
 // ── Fixture helpers ─────────────────────────────────────────────────────────
 
@@ -475,9 +476,42 @@ describe('assertWorldInvariants — I9_executing_task_still_travelling', () => {
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
+  it('no violation when taskTicksRemaining is set, destination is null, and itinerary is null', () => {
+    const state = makeState();
+    addEmployee(state, {
+      taskTicksRemaining: 10, destinationX: null, destinationZ: null, itinerary: null,
+    });
+
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
   it('violation when taskTicksRemaining is set but a destination is still set', () => {
     const state = makeState();
     const emp = addEmployee(state, { taskTicksRemaining: 10, destinationX: 5, destinationZ: 5 });
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.kind).toBe('I9_executing_task_still_travelling');
+    expect(violations[0]!.employeeId).toBe(emp.id);
+  });
+
+  it('violation when taskTicksRemaining is set but a non-null itinerary is still set, with no stray destination', () => {
+    const state = makeState();
+    const emp = addEmployee(state, {
+      taskTicksRemaining: 10,
+      destinationX: null,
+      destinationZ: null,
+      itinerary: {
+        legs: [{
+          mode: 'foot', vehicleId: null, destX: 5, destZ: 5,
+          arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+        }],
+        goal: { kind: 'reposition', x: 5, z: 5 },
+        workTicks: 0,
+        estTotalTicks: 5,
+      } satisfies Itinerary,
+    });
 
     const violations = assertWorldInvariants(state);
 

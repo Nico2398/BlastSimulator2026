@@ -18,7 +18,6 @@ import { completePendingAction, dispatchPendingAction } from '../../../src/core/
 // planItinerary own that now).
 import { completeVehicleGatedAction } from '../../../src/core/engine/VehicleReservation.js';
 import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
-import { EVACUATION_HOLD_KEY } from '../../../src/core/engine/Evacuation.js';
 import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
@@ -32,7 +31,6 @@ import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities
 import {
   BASE_TASK_DURATION_TICKS,
   MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
-  ACTION_STARVATION_TICK_THRESHOLD,
   NEED_HARD_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 

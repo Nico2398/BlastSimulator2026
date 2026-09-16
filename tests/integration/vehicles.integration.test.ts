@@ -61,7 +61,6 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // expected to fail for that reason at this (red) phase — not from a bad
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 // #1090: cost-delegates-to-planner + continuity deletion — interruptActiveAction
 // is used directly below (mid-drive interruption test) rather than only
 // through a console command, mirroring VehicleReservation.test.ts's own
@@ -1049,7 +1048,6 @@ describe('Vehicle fleet', () => {
       const eid = hireLicensedDriller();
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
-      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
 
       employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
       const actionId = ctx.state!.pendingActions[0]!.id;
