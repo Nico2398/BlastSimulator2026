@@ -11,15 +11,14 @@ import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js
 import {
   createVehicleState,
   purchaseVehicle,
-  assignDriver,
   destroyVehicle,
   getVehicleDef,
   getVehicleDefByTier,
   getAllVehicleRoles,
 } from '../../src/core/entities/Vehicle.js';
 import type { VehicleTask } from '../../src/core/entities/Vehicle.js';
+import { board } from '../../src/core/engine/Mount.js';
 import {
-  createEmployeeState,
   hireEmployee,
   assignSkill,
   killEmployee,
@@ -222,7 +221,7 @@ describe('Vehicle fleet', () => {
     // refusal.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
-    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    const assignResult = board(ctx.state!, v.id, eid);
     expect(assignResult.success).toBe(true);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
@@ -272,7 +271,7 @@ describe('Vehicle fleet', () => {
     // this test means to check.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
-    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
+    const assignResult = board(ctx.state!, v.id, eid);
     expect(assignResult.success).toBe(true);
 
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
@@ -346,32 +345,32 @@ describe('Vehicle fleet', () => {
     expect(vs.vehicles).toHaveLength(1);
   });
 
-  it('assignDriver core API rejects unlicensed employee', () => {
-    const vs = createVehicleState();
-    purchaseVehicle(vs, 'debris_hauler', 0, 0);
-    const es = createEmployeeState();
+  it('Mount.board rejects unlicensed employee', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const rng = new Random(42);
-    const { employee } = hireEmployee(es, 'blaster', rng);
-    // blaster has no driving.truck qualification
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    // blaster has no driving.truck qualification, and is co-located with the
+    // vehicle (both default to (0,0)) so the boarding-range check isn't what
+    // rejects this attempt.
 
-    const result = assignDriver(vs, es, 1, employee.id);
+    const result = board(state, 1, employee.id);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('lacks licence');
   });
 
-  it('assignDriver core API succeeds with qualified employee', () => {
-    const vs = createVehicleState();
-    purchaseVehicle(vs, 'debris_hauler', 0, 0);
-    const es = createEmployeeState();
+  it('Mount.board succeeds with qualified employee', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const rng = new Random(42);
-    const { employee } = hireEmployee(es, 'driver', rng);
-    assignSkill(es, employee.id, 'driving.truck', 1);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
 
-    const result = assignDriver(vs, es, 1, employee.id);
+    const result = board(state, 1, employee.id);
 
     expect(result.success).toBe(true);
-    expect(vs.vehicles[0]!.driverId).toBe(employee.id);
+    expect(state.vehicles.vehicles[0]!.driverId).toBe(employee.id);
   });
 
   it('destroyVehicle removes vehicle from state', () => {
@@ -652,7 +651,7 @@ describe('Vehicle fleet', () => {
       const anchorHolderRng = new Random(999);
       const { employee: anchorHolder } = hireEmployee(ctx.state!.employees, 'driver', anchorHolderRng, anchor.x, anchor.z);
       assignSkill(ctx.state!.employees, anchorHolder.id, 'driving.truck', 1);
-      const anchorAssignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, anchor.id, anchorHolder.id);
+      const anchorAssignResult = board(ctx.state!, anchor.id, anchorHolder.id);
       expect(anchorAssignResult.success).toBe(true);
       const anchorAction: PendingAction = {
         id: 9999,
@@ -703,7 +702,7 @@ describe('Vehicle fleet', () => {
         const rng = new Random(100 + i);
         const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
         assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
-        const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, employee.id);
+        const assignResult = board(ctx.state!, v.id, employee.id);
         expect(assignResult.success).toBe(true);
       }
 
