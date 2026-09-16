@@ -898,6 +898,20 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
 // rock_digger boardings. Both constants are now that measured baseline plus
 // headroom (see comments at each constant).
 // ─────────────────────────────────────────────────────────────────────────────
+// TODO(#1123): this suite is currently RED and cannot be made to pass by
+// raising MAX_TICKS/MAX_EXPECTED_BOARDINGS — a policy-forced rest now drives
+// the SAME vehicle on a full round trip to the (possibly distant)
+// living_quarters for every interruption (#1090's claim-only
+// releaseVehicleReservation + #1118's mount-continuity-through-rest,
+// together), and for a ramp segment far enough that the round trip alone
+// exceeds the fatigue budget between rests, the driver never converges on a
+// single tick ceiling — confirmed via direct instrumentation as an exact,
+// non-terminating periodic cycle, unaffected by a 20,000-tick ceiling. See
+// #1123 for the two candidate fixes (a living_quarters placement retune, or
+// a deliberate rest-in-place distance cap on ForceShiftRest.ts's own
+// rest-routing, mirroring tickCollapse's) and why neither is a safe,
+// in-scope patch here. Once #1123 lands, re-measure both constants below
+// against the real (not raised) convergence point.
 describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded number of times for the whole order', () => {
   // Measured 108 ticks (#1083), then remeasured at 172 once #1090 replaced
   // the bolted-on same-role continuity fast path (VehicleContinuity.ts,

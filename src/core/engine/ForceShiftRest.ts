@@ -14,9 +14,11 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
+import { isMidVehicleGatedWork, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
 /**
@@ -136,12 +138,10 @@ export function forceShiftRestIfNeeded(
  * (taskTicksRemaining) with no vehicle gate, so interrupting mid-task
  * fragments it into repeated walk-and-restart cycles under an aggressive
  * continuous-mode policy. Extend this set, not a switch, for the next
- * on-foot task type shown to fragment the same way. A vehicle-gated task's
- * own mid-execution phase carries no equivalent guard (#1090 deleted the
- * dismount-on-completion/interruption mechanism this once protected — with
- * nothing dismounting automatically any more, an interrupted vehicle-gated
- * task costs no walk-back-and-reboard, so there is nothing left to protect
- * against here).
+ * on-foot task type shown to fragment the same way. Vehicle-gated tasks use
+ * isMidVehicleGatedWork instead (VehicleReservation.ts) — see this file's
+ * own forceShiftRestIfNeededByPolicy for why that guard survives #1090
+ * rather than being deleted alongside the dismount-on-completion mechanism.
  *
  * 'place_building' (#1039), 'charge_hole' and 'survey' (#1049) — all three
  * are requiredVehicleRole: null, timer-driven via taskTicksRemaining, with no
@@ -167,6 +167,45 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
 }
 
 /**
+ * True when `employee` is idle (activeActionId === null) but currently
+ * mounted in a vehicle, and a `queued` (unclaimed) PendingAction exists
+ * whose requiredVehicleRole matches that vehicle's own role.
+ *
+ * #1090 follow-up: TaskCompletionEffects.ts's own completeVehicleGatedAction
+ * call, on completing a vehicle-gated action, deliberately does not re-claim
+ * a same-role follow-up itself any more — "resolveActionCost/planItinerary
+ * already own picking any same-role follow-up", via the ordinary cost-ranked
+ * open-pool dispatch (tickEmployees, EmployeeDispatch.ts), which only runs
+ * again on a LATER tick (TickPipeline.ts's own step 8d already ran earlier
+ * this same tick, before the 8e completion that just freed this employee).
+ * Without this guard, forceShiftRestIfNeededByPolicy's own "#707: genuinely
+ * idle" handling (this function's own doc comment above) claims that idle
+ * window first, on the very next tick, before tickEmployees ever gets a
+ * chance to hand this employee their own vehicle's next same-role action at
+ * near-zero cost (they are already seated in it) — sending them on a full
+ * round trip to the rest building and back instead. For a distant
+ * living_quarters, that round trip alone re-crosses the threshold every
+ * time, so no multi-segment vehicle-gated order (e.g. a box-cut ramp) ever
+ * finishes: confirmed live via needs.integration.test.ts's own #945 suite
+ * and the tutorial-boxcut-full scenario, both of which only converge once
+ * this guard defers to the pool dispatch a queued follow-up is still
+ * genuinely there. Self-limiting rather than a blanket "never force-rest a
+ * mounted idle employee": the moment the queued action is claimed (by this
+ * employee or, if a closer/cheaper one exists, another), this returns false
+ * and forceShiftRestIfNeededByPolicy's normal fatigue/shift checks resume —
+ * an employee mounted in a vehicle nothing queued ever needs is never
+ * deferred, and tickCollapse's own unconditional hard floor (NeedRestoration.ts)
+ * still backstops the case where the queued action is real but never
+ * actually reachable by anyone.
+ */
+function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {
+  if (!isMounted(employee.locomotion)) return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
+  if (!vehicle) return false;
+  return hasQueuedActionForVehicleRole(state, vehicle.type, employee.id);
+}
+
+/**
  * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
  * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
  * > 0) forces rest for real, using any living_quarters tier (tier 1
@@ -174,12 +213,28 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),
  * already walking to a queued rest (pendingRestDuration !== null), already
+ * arrived and mid-execution of a boarded vehicle-gated action
+ * (taskTicksRemaining !== null && isMidVehicleGatedWork — #945, waits for
+ * the driver to naturally finish rather than forcing a mid-segment
+ * dismount-and-reboard; #1090 follow-up: this guard survives #1090's own
+ * dismount-on-completion deletion even though the walk-and-reboard cost
+ * that originally justified it is gone — #1090 briefly deleted it on that
+ * reasoning alone, and the box-cut ramp livelocked: with mount continuity
+ * through rest keeping the SAME vehicle round-tripping the full distance to
+ * the rest building on every threshold crossing (#1118), an interrupted
+ * mid-execution segment re-arms with a fresh, equally short budget every
+ * time it re-approaches, and a site whose living_quarters sits far enough
+ * away that the round trip alone re-crosses the threshold never finishes a
+ * single segment — confirmed live via needs.integration.test.ts's own #945
+ * box-cut suite and the tutorial-boxcut-full scenario, both stalling
+ * forever once the guard was gone). Deliberately NOT covering the
+ * mid-drive-to-target phase (taskTicksRemaining still null) — see the
+ * guard's own inline comment for why that phase stays interruptible), also
  * arrived and mid-execution of a task in PROTECTED_MID_EXECUTION_ACTION_TYPES
- * (taskTicksRemaining !== null && isMidProtectedTaskWork — #1039, #1049: only
- * the executing phase of that catalog's task types is protected, not every
- * in-progress task — a boarded vehicle-gated action's own mid-execution
- * phase carries no equivalent guard since #1090, see
- * PROTECTED_MID_EXECUTION_ACTION_TYPES's own doc comment for why), or
+ * (taskTicksRemaining !== null && isMidProtectedTaskWork — #1039, #1049,
+ * same scoping rationale as the vehicle-gated guard: only the executing
+ * phase of that catalog's task types is protected, not every in-progress
+ * task), or
  * mid-walk to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
  * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
@@ -234,6 +289,23 @@ export function forceShiftRestIfNeededByPolicy(
   // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
   // (see its own comment on the same check) for the same reason.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
+  // Already arrived and mid-execution of a boarded vehicle-gated action
+  // (e.g. dig_ramp_segment — #945; see isMidVehicleGatedWork's own doc
+  // comment, VehicleReservation.ts, and this function's own doc comment
+  // above for why this guard survives #1090). Interrupting mid-execution
+  // forces a fresh walk-and-reboard/re-approach cycle once the rest ends,
+  // instead of letting the driver finish this segment first.
+  //
+  // Deliberately does NOT also cover the mid-drive-to-target phase (taskTicksRemaining
+  // still null) — unlike the mid-execution case above, a long initial approach
+  // drive protected the same way just defers the same crossing to
+  // tickCollapse's unconditional hard floor instead of this policy's own
+  // proactive one, trading a healthy rest at the policy's threshold for a
+  // drive-to-zero collapse with no net reduction in how many times the
+  // vehicle gets boarded. #922's own VehicleReservation.test.ts already pins
+  // mid-drive interruption as intended behavior for the legacy (non-policy)
+  // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
+  if (isMidClaimedTaskExecution(emp) && isMidVehicleGatedWork(state, emp)) return;
   // Already arrived and mid-execution of a task in
   // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
   // working one (taskTicksRemaining !== null, not just claimed-but-still-
@@ -241,8 +313,9 @@ export function forceShiftRestIfNeededByPolicy(
   // re-crosses, releasing the action back to the pool and forcing a fresh
   // walk-and-restart each time instead of finishing the one work stint
   // already in progress. Scoped to that catalog specifically
-  // (isMidProtectedTaskWork) and to the executing phase only, rather than a
-  // blanket taskTicksRemaining !== null skip for any in-progress task — the legacy
+  // (isMidProtectedTaskWork) and to the executing phase only, mirroring
+  // isMidVehicleGatedWork's own scoping above rather than a blanket
+  // taskTicksRemaining !== null skip for any in-progress task — the legacy
   // path's own comment on that broader guard notes it previously regressed a
   // long-run wellbeing test, so this stays narrow to the task types
   // actually shown to fragment mid-execution. tickCollapse's own unconditional
@@ -272,6 +345,11 @@ export function forceShiftRestIfNeededByPolicy(
   // back toward a living_quarters, possibly right back inside the danger
   // zone they were just ordered out of.
   if (isMidEvacuation(state, emp)) return;
+  // #1090 follow-up: idle but mounted, with a same-role follow-up already
+  // queued and unclaimed — about to be picked up by the ordinary cost-ranked
+  // pool dispatch at near-zero cost. See hasClaimableSameRoleFollowUp's own
+  // doc comment for the livelock this closes.
+  if (emp.activeActionId === null && hasClaimableSameRoleFollowUp(state, emp)) return;
 
   const snapshot = {
     id: emp.id, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked,

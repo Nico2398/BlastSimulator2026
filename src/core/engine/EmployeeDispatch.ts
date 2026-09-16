@@ -15,8 +15,10 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
-import { isLicensedForRole } from './VehicleReservation.js';
+import { isLicensedForRole, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { alightIfMounted } from './Mount.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -190,6 +192,36 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);
+      // #1090 follow-up: still idle after this tick's own dispatch attempt
+      // found nothing for them, but mounted — with no dismount-on-completion
+      // any more, a driver whose own work ran out (no same-role follow-up
+      // queued anywhere) would otherwise sit mounted forever, permanently
+      // hostage to nobody, while a DIFFERENT employee's own separately
+      // targeted action for that exact role can never claim the vehicle
+      // (findFreeVehicleForRole only ever considers driverId === null, or
+      // the requesting employee's own current vehicle). Alighting here —
+      // only once this tick's own claim attempt has already had first
+      // refusal, and only when hasQueuedActionForVehicleRole confirms
+      // nothing anywhere still wants this role — frees the vehicle for that
+      // other employee's own claim, the very next tick, without
+      // reintroducing a same-role continuity special case for the common
+      // case where a follow-up genuinely does exist (hasQueuedActionForVehicleRole
+      // true — VehicleReservation.ts's own doc comment on this shared
+      // predicate covers the counterpart guard in ForceShiftRest.ts).
+      if (employee.activeActionId === null && isMounted(employee.locomotion)) {
+        const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
+        // reservedForActionId !== null already means this exact vehicle is
+        // spoken for — either this same employee's own reserved-ahead
+        // taskQueue entry (reserveOnePoolActionAhead, #611 — 'assigned', not
+        // 'queued', so hasQueuedActionForVehicleRole's own query would miss
+        // it and wrongly alight the one employee still holding it) or
+        // another employee's; either way, alighting here would desync the
+        // reservation from a driver assertWorldInvariants' I5 check expects
+        // to still resolve.
+        if (vehicle && vehicle.reservedForActionId === null && !hasQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
+          alightIfMounted(state, employee);
+        }
+      }
     } else {
       reserveOnePoolActionAhead(state, employee, result);
     }

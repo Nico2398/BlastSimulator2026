@@ -1003,15 +1003,16 @@ describe('Vehicle fleet', () => {
       expectNoWorldInvariantViolations(ctx.state!);
     });
 
-    // #1090: ForceShiftRest.ts's finishForceRest gets a NEW alight-before-
-    // rest-walk guard — the rest-walk itself is an on-foot destination, and
-    // since a plain release no longer dismounts (see the test just above),
-    // the mid-drive forced-rest path has to alight deliberately, on its own,
-    // before beginRestWalk sends the employee off on foot. Distinct from the
-    // "resumes without dismount" case above: that one is about release
-    // WITHOUT resting; this one is specifically the forced-rest path, where
-    // alighting IS required.
-    it('a driver forced to rest while mid-drive alights (mount state -> unmounted) before the rest-walk begins (#1090)', () => {
+    // #1118 (via #1090's own merge): ForceShiftRest.ts's finishForceRest
+    // routes every forced rest through beginRestTravel (RestActionHelpers.ts),
+    // which plans a 'reposition' goal through moveTo/planItinerary — mount
+    // continuity preserved for a mid-drive interruption exactly like every
+    // other rest path, not the alight-before-rest-walk this test used to
+    // pin as (#1090's) own new behavior. Only tickCollapse's hard-fatigue-
+    // floor path still alights deliberately (NeedRestoration.ts) — a
+    // policy/shift-cycle-forced rest, mid-drive or mid-execution, keeps the
+    // driver seated and drives them to the rest destination instead.
+    it('a driver forced to rest while mid-drive keeps their mount (#1118) — drives to the rest destination instead of alighting', () => {
       ctx.state!.buildings.unlockedTiers.living_quarters = 2;
       placeBuilding(ctx.state!.buildings, 'living_quarters', 0, 0, 100, 100, 2);
 
@@ -1037,11 +1038,10 @@ describe('Vehicle fleet', () => {
       emp.ticksWorked = WORK_DURATION_TICKS;
       forceShiftRestIfNeeded(ctx.state!, emp, [], []);
 
-      // Deliberately alighted — never left "mounted" as a side effect of a
-      // generic release, but because the rest-walk needs the employee on
-      // foot and finishForceRest alights them on purpose before queuing it.
-      expect(emp.locomotion.kind).toBe('on_foot');
-      expect(vehicle.driverId).toBeNull();
+      // Stays mounted — beginRestTravel's own moveTo call preserves
+      // continuity for a 'reposition' goal, same as every other rest path.
+      expect(emp.locomotion.kind).toBe('mounted');
+      expect(vehicle.driverId).toBe(eid);
       expectNoWorldInvariantViolations(ctx.state!);
     });
 
@@ -1263,9 +1263,12 @@ describe('Vehicle fleet', () => {
       emp.ticksWorked = WORK_DURATION_TICKS;
       tickCommand(ctx, ['1'], {});
 
-      // Dismounted — and never at the original boarding cell, since the
-      // vehicle had already moved on by the time the interruption landed.
-      expect(vehicle.driverId).toBeNull();
+      // #1118 (via #1090's own merge): stays mounted — beginRestTravel
+      // drives them to the rest destination instead of dismounting, same as
+      // every other forced-rest path now. Never at the original boarding
+      // cell either way, since the vehicle had already moved on by the time
+      // the interruption landed.
+      expect(vehicle.driverId).toBe(eid);
       expect(emp.x === boardingX && emp.z === boardingZ).toBe(false);
 
       // Resume: rest completes, the driller reclaims the same action, and

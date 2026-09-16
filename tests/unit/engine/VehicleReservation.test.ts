@@ -383,7 +383,7 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     expect(employee.x).not.toBe(0);
   });
 
-  it('forceShiftRestIfNeeded (ForceShiftRest.ts) still alights the driver at the vehicle\'s current cell — deliberately, via its own alight-before-rest-walk guard (#1090), not as a side effect of releasing the claim', () => {
+  it('forceShiftRestIfNeeded (ForceShiftRest.ts) keeps the driver mounted and drives them to the rest destination (#1118) — not the alight-before-rest-walk guard #1090 briefly added and #1118 supersedes', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -413,8 +413,12 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     employee.ticksWorked = WORK_DURATION_TICKS;
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(vehicle.driverId).toBeNull();
-    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    // #1118: beginRestTravel (RestActionHelpers.ts) routes the rest through
+    // moveTo/planItinerary, preserving mount continuity for a 'reposition'
+    // goal — the driver stays seated and drives to the rest destination
+    // instead of alighting where the interruption landed.
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(employee.x).toBe(vehicleXAtRest);
     expect(employee.z).toBe(vehicleZAtRest);
     expect(employee.x).not.toBe(0);

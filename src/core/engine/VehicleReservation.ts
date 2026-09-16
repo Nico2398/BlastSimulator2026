@@ -36,6 +36,32 @@ import { alight } from './Mount.js';
 import { completePendingAction, clearActiveTaskFields } from './TaskLifecycleCore.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
+/**
+ * True when a `queued` (unclaimed) PendingAction exists whose
+ * requiredVehicleRole matches `role` and whose targeting doesn't rule out
+ * `employeeId` — untargeted (targetEmployeeId === null, open to whoever's
+ * cheapest) or targeted at `employeeId` themself. An action targeted at a
+ * DIFFERENT employee specifically is never a follow-up this employee could
+ * ever claim, no matter how long it sits `queued`.
+ *
+ * #1090 follow-up: shared by ForceShiftRest.ts's hasClaimableSameRoleFollowUp
+ * (defers a forced rest while a same-role follow-up is about to be picked
+ * up) and EmployeeDispatch.ts's own idle-and-mounted-with-nothing-queued
+ * check (alights an employee whose vehicle nothing needs any more, so it
+ * doesn't sit hostage forever to a *different* employee's own targeted
+ * claim on the same role) — both ask the identical question, "is a matching
+ * action this employee could actually claim still out there for this role",
+ * from opposite ends of the same gap #1090's own dismount-on-completion
+ * deletion opened.
+ */
+export function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
+  return state.pendingActions.some(a =>
+    a.status === 'queued'
+    && a.requiredVehicleRole === role
+    && (a.targetEmployeeId === null || a.targetEmployeeId === employeeId),
+  );
+}
+
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
   const requiredLicence = ROLE_LICENCE_REQUIRED[role];

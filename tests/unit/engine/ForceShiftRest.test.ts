@@ -514,16 +514,22 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).not.toBeNull();
   });
 
-  // UPDATED (#1090): #945's own dedicated vehicle-gated mid-execution guard
-  // is deleted along with the dismount-on-completion/interruption mechanism
-  // it used to justify protecting (a walk-and-reboard cost that no longer
-  // exists — nothing dismounts automatically any more, so an interrupted
-  // vehicle-gated task costs no walk-back-and-reboard). A boarded driver
-  // mid-execution of a vehicle-gated action is now interrupted by a
-  // policy-forced rest exactly like any other unprotected task type — see
-  // isMidVehicleGatedWork's own doc comment (VehicleReservation.ts) and
-  // PROTECTED_MID_EXECUTION_ACTION_TYPES's own doc comment (ForceShiftRest.ts).
-  it('#1090: DOES interrupt a boarded vehicle-gated action mid-execution (taskTicksRemaining set) now that dismount-on-completion no longer exists', () => {
+  // #945, RESTORED as a #1090 follow-up: #1090 briefly deleted this
+  // dedicated vehicle-gated mid-execution guard on the reasoning that
+  // nothing dismounts on completion any more, so an interrupted
+  // vehicle-gated task costs no walk-back-and-reboard. That reasoning holds
+  // for the mechanism's original cost, but mount continuity through rest
+  // (#1118) introduces a different cost the guard also happened to prevent:
+  // every interruption re-approaches with the SAME vehicle over the SAME
+  // (possibly long) round trip to the rest building, and an interrupted
+  // mid-execution task re-arms with a fresh, equally short budget every
+  // time — for a site whose living_quarters is far enough that the round
+  // trip alone re-crosses the policy's threshold, no segment ever finishes.
+  // Confirmed live via needs.integration.test.ts's own #945 box-cut suite
+  // and the tutorial-boxcut-full scenario, both livelocking forever once
+  // this guard was gone. See forceShiftRestIfNeededByPolicy's own inline
+  // comment and isMidVehicleGatedWork's own doc comment (VehicleReservation.ts).
+  it('#945: no-op when boarded and mid-execution of a vehicle-gated action (taskTicksRemaining set), even with fatigue deep below threshold', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
@@ -540,11 +546,13 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
-    expect(employee.pendingRestDuration).not.toBeNull();
-    expect(employee.activeActionId).not.toBe(1100);
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.taskTicksRemaining).toBe(3); // untouched
+    expect(employee.activeActionId).toBe(1100); // claim survives, not released
     const claim = state.pendingActions.find(a => a.id === 1100)!;
-    expect(claim.status).toBe('queued');
-    expect(claim.holderId).toBeNull();
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
   });
 
   // NEW (#945 fixer follow-up): the mid-execution guard above is

@@ -1173,7 +1173,12 @@ describe('promoteActionToActive', () => {
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(vehicle.driverId).toBeNull();
     expect(vehicle.occupantIds).toEqual([]);
-    expect(employee.destinationX).toBe(5);
-    expect(employee.destinationZ).toBe(7);
+    // #1090: an on-foot claim walks via moveTo's itinerary now, not the
+    // legacy destinationX/Z fields — see the other promoteActionToActive
+    // tests' own comment on the same change.
+    expect(employee.itinerary).not.toBeNull();
+    const lastLeg = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(lastLeg.destX).toBe(5);
+    expect(lastLeg.destZ).toBe(7);
   });
 });
