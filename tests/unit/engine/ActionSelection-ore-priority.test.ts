@@ -32,9 +32,21 @@ import { createGame, type GameState, type PendingAction } from '../../../src/cor
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import { hireEmployee, type Employee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, assignSkill, type Employee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { AGENT_WALK_SPEED, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
+import { ORE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
+
+// #1090: haul_debris is requiredVehicleRole: 'debris_hauler' — planItinerary
+// now reports a vehicle-gated goal genuinely unresolvable (Infinity/null)
+// when no vehicle of that role exists anywhere (ActionSelection.test.ts's own
+// "returns Infinity ... when no free vehicle of the required role exists
+// anywhere" pins this), replacing the deleted resolveVehicleGatedWalkTarget's
+// defensive on-foot fallback. Every fixture below purchases one at the
+// employee's own starting cell, so the board leg is zero-length and the
+// route is a single drive leg at the vehicle's own (tiered) speed rather than
+// AGENT_WALK_SPEED.
+const DEBRIS_HAULER_SPEED = getVehicleDefByTier('debris_hauler', 1).speed;
 
 // ── NavGrid helpers (mirrors tests/unit/engine/ActionSelection.test.ts) ────
 
@@ -66,6 +78,19 @@ function makeState(width = 60, height = 60): GameState {
 function makeEmployee(state: GameState, x = 0, z = 0): Employee {
   const rng = new Random(42);
   const { employee } = hireEmployee(state.employees, 'driller', rng, x, z);
+  return employee;
+}
+
+/**
+ * A debris_hauler-licensed employee plus a debris_hauler vehicle purchased at
+ * their exact starting cell (#1090: a haul_debris candidate's cost is a real
+ * itinerary now, and planItinerary reports no route at all when no vehicle of
+ * the required role exists — see this file's own header comment).
+ */
+function makeHaulerEmployee(state: GameState, x = 0, z = 0): Employee {
+  const employee = makeEmployee(state, x, z);
+  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+  purchaseVehicle(state.vehicles, 'debris_hauler', x, z);
   return employee;
 }
 
@@ -108,7 +133,7 @@ function makeHaulAction(overrides: Partial<PendingAction> & { id: number; target
 describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
   it('two equal-octile-distance haul_debris candidates: the ore-bearing one wins over the plain one', () => {
     const state = makeState();
-    const emp = makeEmployee(state, 0, 0);
+    const emp = makeHaulerEmployee(state, 0, 0);
 
     // (10,0) and (0,10) are both octile distance 10 from (0,0) on a flat
     // grid — a genuine tie under pure travel-time ranking, so only
@@ -133,14 +158,14 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
 
   it('an ore-bearing candidate a modest extra distance farther than a plain one still wins (within the bonus\'s intended working range)', () => {
     const state = makeState();
-    const emp = makeEmployee(state, 0, 0);
+    const emp = makeHaulerEmployee(state, 0, 0);
 
     // extraTicks stays strictly under the full ORE_HAUL_PRIORITY_BONUS_TICKS
     // for any positive value the implementer sets (half of it) — a small
     // fixed placeholder (1 tick) while the constant is still the stub 0, so
     // this remains meaningful (and still red) even before that value exists.
     const extraTicks = ORE_HAUL_PRIORITY_BONUS_TICKS > 0 ? ORE_HAUL_PRIORITY_BONUS_TICKS / 2 : 1;
-    const extraDistance = extraTicks * AGENT_WALK_SPEED;
+    const extraDistance = extraTicks * DEBRIS_HAULER_SPEED;
     const baseDistance = 10;
 
     addBlastFragments(state.logistics, [
@@ -164,7 +189,7 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
 
   it('with no ore-bearing fragment among the candidates, ranking still picks the nearer plain candidate (no regression)', () => {
     const state = makeState();
-    const emp = makeEmployee(state, 0, 0);
+    const emp = makeHaulerEmployee(state, 0, 0);
 
     addBlastFragments(state.logistics, [
       makeFragment(1, 5, 0, {}),
@@ -189,7 +214,7 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
 describe('resolveActionCost — ore priority bonus never affects the real resolved duration (#671)', () => {
   it("an ore-bearing haul_debris candidate's resolved totalTicks equals real travel+work ticks, with no bonus subtracted", () => {
     const state = makeState();
-    const emp = makeEmployee(state, 0, 0);
+    const emp = makeHaulerEmployee(state, 0, 0);
 
     addBlastFragments(state.logistics, [makeFragment(1, 10, 0, { gloomium: 0.2 })]);
     const ore = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
@@ -197,7 +222,10 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
     const resolved = resolveActionCost(state, emp, ore);
     expect(resolved).not.toBeNull();
 
-    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / AGENT_WALK_SPEED;
+    // #1090: the vehicle sits at the employee's own starting cell (board leg
+    // zero-length) — the whole route is one drive leg at the vehicle's own
+    // (tiered) speed, not AGENT_WALK_SPEED.
+    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / DEBRIS_HAULER_SPEED;
     const expectedWorkTicks = computeActionWorkTicks(state, emp, ore);
 
     expect(resolved!.totalTicks).toBeCloseTo(expectedTravelTicks + expectedWorkTicks, 10);
@@ -205,7 +233,7 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
 
   it("selectBestActionForEmployee's chosen ore-bearing action reports a totalTicks matching the plain (bonus-free) real cost", () => {
     const state = makeState();
-    const emp = makeEmployee(state, 0, 0);
+    const emp = makeHaulerEmployee(state, 0, 0);
 
     // Same equal-octile-distance setup as the ranking test above — the ore
     // candidate wins selection, but its reported totalTicks must still be
@@ -221,7 +249,7 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
     expect(result).not.toBeNull();
     expect(result!.action.id).toBe(ore.id);
 
-    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / AGENT_WALK_SPEED;
+    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / DEBRIS_HAULER_SPEED;
     const expectedWorkTicks = computeActionWorkTicks(state, emp, ore);
     expect(result!.totalTicks).toBeCloseTo(expectedTravelTicks + expectedWorkTicks, 10);
   });

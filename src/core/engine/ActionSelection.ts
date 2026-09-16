@@ -22,6 +22,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 // function bodies, never evaluated at module-load time (same reasoning as
 // the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
 import { planItinerary } from './PlanItinerary.js';
+import { isLicensedForRole } from './VehicleReservation.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 
 /** Every configured NeedKey — used to validate an untyped payload value against the catalog rather than a hardcoded literal (#1062 genericity). */
@@ -216,6 +217,50 @@ export function canReleaseStrandedOnFootAction(
     other.activeActionId === null &&
     other.restTicksRemaining === null &&
     (action.requiredSkill === null || other.qualifications.some(q => q.category === action.requiredSkill)),
+  );
+}
+
+/**
+ * True when a vehicle-gated `action` still sitting in `employee`'s own
+ * taskQueue (reserved ahead but never promoted) is genuinely stranded on
+ * them — `employee` cannot currently reach the reserved vehicle at all
+ * (`resolveActionCost` returns null, exactly like `canReleaseStrandedOnFootAction`'s
+ * own on-foot reachability check above) — and a different, idle, licensed
+ * employee exists who could pick it up instead. Requires the reserved
+ * vehicle to still have no driver: a boarded one is mid-drive/mid-work, not
+ * stranded, regardless of what `resolveActionCost` reports for anyone else.
+ *
+ * Restores (#1090 follow-up, TODO left by the vehicle-fleet migration phase 4
+ * implementer in EmployeeDispatchSteps.ts) the release half of the deleted
+ * `canReassignStrandedReservation` (VehicleReservation.ts, #954 follow-up),
+ * now judged by the same real reachability check every other claim/release
+ * decision in this module already uses instead of that function's own
+ * weaker "nobody has boarded yet" heuristic — an employee who simply hasn't
+ * started walking yet also has `vehicle.driverId === null`, so pairing that
+ * with a genuine `resolveActionCost` failure is what distinguishes actually
+ * stranded from merely not-yet-started.
+ *
+ * Assumes/requires the caller only passes a vehicle-gated action currently
+ * held by `employee` (e.g. sourced from `employee.taskQueue`); this function
+ * does not itself verify taskQueue membership.
+ */
+export function canReleaseStrandedVehicleGatedAction(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+): boolean {
+  if (action.requiredVehicleRole === null) return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  if (!vehicle || vehicle.driverId !== null) return false;
+  if (resolveActionCost(state, employee, action) !== null) return false;
+
+  const role = action.requiredVehicleRole;
+  return state.employees.employees.some(other =>
+    other.id !== employee.id &&
+    other.alive &&
+    other.activeActionId === null &&
+    other.restTicksRemaining === null &&
+    isLicensedForRole(other, role),
   );
 }
 

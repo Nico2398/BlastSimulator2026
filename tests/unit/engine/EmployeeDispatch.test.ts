@@ -1143,7 +1143,7 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
       const holeId = completingAction?.payload['holeId'] as string | undefined;
 
       if (completingAction && completingAction.requiredVehicleRole !== null) {
-        completeVehicleGatedAction(state, progress.actionId);
+        completeVehicleGatedAction(state, emp, progress.actionId);
       } else {
         completePendingAction(state, progress.actionId);
       }

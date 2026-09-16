@@ -171,6 +171,41 @@ export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
   return vehicle.occupantIds.includes(employee.id) || vehicle.occupantIds.length < VEHICLE_SEAT_COUNT[vehicle.type];
 }
 
+/**
+ * A single foot leg straight from `employee`'s own position to
+ * (`targetX`, `targetZ`), at walking speed, plus `workTicks` of work once
+ * there. Shared by planItinerary's own no-vehicle-role branch and its
+ * no-vehicle-available fallback for a vehicle-gated goal (see that call
+ * site's own doc comment) — both plan the identical single-leg itinerary,
+ * differing only in why no vehicle enters the route. Returns null when the
+ * target is unreachable, same "stays queued, retries next tick" contract as
+ * planItinerary itself.
+ */
+function buildFootOnlyItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  targetX: number,
+  targetZ: number,
+  workTicks: number,
+): Itinerary | null {
+  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ));
+  if (dist === null) return null;
+
+  const footLeg: Leg = {
+    mode: 'foot',
+    vehicleId: null,
+    destX: targetX,
+    destZ: targetZ,
+    arrival: 'exact',
+    onArrive: { kind: 'none' },
+    estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED),
+  };
+
+  return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
+}
+
 export function planItinerary(
   state: GameState,
   employee: Employee,
@@ -208,26 +243,14 @@ export function planItinerary(
        * cheaper. Not built in phase 3a. */
     }
 
-    const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, resolved.targetX, resolved.targetZ, !isDestinationOccupied(state, resolved.targetX, resolved.targetZ));
-    if (dist === null) return null;
-
-    const footLeg: Leg = {
-      mode: 'foot',
-      vehicleId: null,
-      destX: resolved.targetX,
-      destZ: resolved.targetZ,
-      arrival: 'exact',
-      onArrive: { kind: 'none' },
-      estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED),
-    };
-
-    return { legs: [footLeg], goal, workTicks: 0, estTotalTicks: footLeg.estTicks };
+    return buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
   }
 
   // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent
   // that, reuse the reservation already made for this action, if any,
   // otherwise the cheapest free vehicle of the required role — same lookup
-  // resolveVehicleGatedWalkTarget (ActionSelection.ts) uses.
+  // resolveVehicleGatedWalkTarget (ActionSelection.ts, deleted along with
+  // this whole function) used.
   let vehicle: Vehicle | undefined;
   if (via !== undefined) {
     vehicle = state.vehicles.vehicles.find(v => v.id === via);
@@ -237,6 +260,13 @@ export function planItinerary(
       ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
       : undefined;
     vehicle = reserved ?? findFreeVehicleForRole(state, role!, employee) ?? undefined;
+    // #1090: unlike the deleted resolveVehicleGatedWalkTarget's own
+    // "defensive" fallback to a plain on-foot walk when no vehicle is
+    // reserved or free, planItinerary reports this goal genuinely
+    // unresolvable — a vehicle-gated action has no valid on-foot substitute,
+    // so a route that doesn't actually exist in the real dispatch (no
+    // vehicle to drive) must not be costed as though it does. Matches
+    // findVehicleForClaim's own real dispatch-time refusal in this state.
     if (!vehicle) return null;
   }
 

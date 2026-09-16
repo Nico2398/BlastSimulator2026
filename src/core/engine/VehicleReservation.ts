@@ -230,10 +230,19 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
 /**
  * Shared prefix of releaseVehicleReservation: find the vehicle reserved for
  * `actionId`, abort any in-flight vehicle-gated fragment work on it
- * (returning cargo to the ground first if mid-haul), and clear the
- * reservation. Returns the vehicle for the caller's own remaining logic, or
- * null when no vehicle is reserved for `actionId` — the caller returns early
- * exactly as before in that case.
+ * (returning cargo to the ground first if mid-haul), clear the reservation,
+ * and reset the vehicle's own display task/state to idle. Returns the
+ * vehicle for the caller's own remaining logic, or null when no vehicle is
+ * reserved for `actionId` — the caller returns early exactly as before in
+ * that case.
+ *
+ * The task/state reset lives here (#1090) because releaseVehicleReservation
+ * is claim-only and no longer resets it via dismountVehicleDriver: without
+ * it, task/state would sit frozen at whatever VEHICLE_ROLE_ARRIVAL_TASK the
+ * arrival step set (Locomotion.ts) — e.g. still reading "drilling" — for as
+ * long as a still-mounted driver goes without a same-role follow-up. Driver
+ * mounting (driverId/locomotion) is untouched here — only the derived
+ * display fields reset.
  */
 function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
@@ -241,6 +250,9 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
 
   abortVehicleGatedFragmentWork(state, vehicle);
   vehicle.reservedForActionId = null;
+  vehicle.task = 'idle';
+  vehicle.state = 'idle';
+  vehicle.waitingTicks = 0;
   return vehicle;
 }
 
@@ -321,23 +333,12 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
  * estimateActionCost/resolveActionCost (ActionSelection.ts) naturally
  * ranking the still-mounted driver's own next same-role action cheapest,
  * since planItinerary plans them a zero-length first leg.
+ *
+ * releaseVehicleReservation itself resets the vehicle's display task/state
+ * to idle (findAndAbortReservedVehicle, #1090) — no separate reset needed
+ * here.
  */
 export function completeVehicleGatedAction(state: GameState, employee: Employee, actionId: number): void {
-  // Reset the vehicle's own display task/state to idle before releasing the
-  // reservation — releaseVehicleReservation is claim-only now and no longer
-  // does this via dismountVehicleDriver (#1090). Without it, task/state
-  // would sit frozen at whatever VEHICLE_ROLE_ARRIVAL_TASK the arrival step
-  // set (Locomotion.ts) — e.g. still reading "drilling" — for as long as the
-  // still-mounted driver goes without a same-role follow-up. Harmless no-op
-  // for haul_debris/fragment_debris, whose own phase machinery
-  // (HaulingTask.ts/BoulderBreaking.ts) already reset these before reporting
-  // completion here.
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
-  if (vehicle) {
-    vehicle.task = 'idle';
-    vehicle.state = 'idle';
-    vehicle.waitingTicks = 0;
-  }
   releaseVehicleReservation(state, actionId);
   clearActiveTaskFields(employee);
   completePendingAction(state, actionId);

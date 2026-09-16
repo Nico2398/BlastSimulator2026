@@ -964,13 +964,46 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
   // neither a normal completion nor a plain (non-rest) interruption ever
   // dismounts any more — only the forced-rest path deliberately alights
   // before its own rest-walk. That removes the "3rd boarding" this suite's
-  // own #1083 baseline attributed to a wasted handoff-then-abort cycle
-  // (see the numbered root causes above): the ceiling tightens to 2 — the
-  // initial boarding, plus at most one legitimate forced-rest handoff — a
-  // count of discrete boarding events, so a small fixed ceiling fits better
-  // than a percentage. Still tight enough that the 12-cycle pre-fix
-  // regression, or a reboard-per-completion regression, fails loudly.
-  const MAX_EXPECTED_BOARDINGS = 2;
+  // own #1083 baseline attributed to a wasted handoff-then-abort cycle (see
+  // the numbered root causes above).
+  //
+  // #1090 fixer follow-up: the ceiling does NOT tighten to 2, though — that
+  // projection assumed deleting the dismount-on-completion mechanism was the
+  // only relevant change. It missed a second, equally deliberate #1090
+  // deletion with its own independent effect on THIS number:
+  // PROTECTED_MID_EXECUTION_ACTION_TYPES's old vehicle-gated branch
+  // (ForceShiftRest.ts, isMidVehicleGatedWork) used to shield a boarded
+  // driver from a policy-forced rest for the ENTIRE mid-execution phase of
+  // every dig_ramp_segment — #1090 explicitly deletes that guard too ("a
+  // boarded, vehicle-gated action's own mid-execution phase carries no
+  // ForceShiftRest.ts guard any more"), on the reasoning that nothing costs
+  // a walk-and-reboard once nothing dismounts on completion. That reasoning
+  // holds for a segment BOUNDARY (nothing to protect there any more) but not
+  // for a segment's own execution: `continuous` mode's shouldForceRest still
+  // fires purely on a fatigue-threshold crossing, several times over a long
+  // multi-segment excavation, and every one of those crossings can now land
+  // mid-dig instead of only in the brief inter-segment drive gap the old
+  // guard left exposed — each still costs a full alight/walk-to-rest/rest/
+  // walk-back/reboard round trip via ForceShiftRest.ts's own deliberate
+  // alight-before-rest-walk (one of the two guards #1090 keeps). Traced
+  // directly on this exact repro: the box-cut's first (longest-approach)
+  // segment needs 3 boardings on ITS OWN, identical under the pre- and
+  // post-#1090 code alike (an on-foot approach is never guarded, before or
+  // after #1090) — the two systems diverge only from segment 7 onward, where
+  // the old code's now-deleted guard let the driver push through all
+  // remaining segments on one boarding (fatigue draining unchecked from 84.7
+  // to 32.0, never once crossing back above the policy's own 60 threshold
+  // while "protected"), while the new code correctly lets `continuous`
+  // mode's fatigue check interrupt those same segments too — 2 more forced
+  // handoffs, for 5 total on this seed. Reintroducing any form of
+  // mid-execution protection to bring this back down is exactly the
+  // mechanism #1090's own task description rules out; a lower, unearned
+  // ceiling would only be pinning a number nothing in this design still
+  // produces. Ceiling set to measured (5) + ~20% headroom, matching this
+  // file's own margin convention (see the travel-drain headroom comment near
+  // TRAVEL_SAMPLE_TICKS above) — still tight enough that the 12-cycle
+  // pre-fix regression fails loudly by name.
+  const MAX_EXPECTED_BOARDINGS = 6;
 
   it('boards the rock_digger vehicle a bounded number of times while carving the whole box-cut ramp', () => {
     const engine = createGameEngine();

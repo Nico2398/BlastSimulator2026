@@ -13,7 +13,8 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction, type SelectedAction,
+  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
+  canReleaseStrandedVehicleGatedAction, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestWalk } from './RestActionHelpers.js';
@@ -195,19 +196,23 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // among those same unreachable candidates may be reserved to a vehicle
       // nobody has boarded yet, with a different, already-idle, already-
       // licensed employee standing by who could use it right now.
-      // TODO(#1090): canReassignStrandedReservation (VehicleReservation.ts)
-      // was deleted along with the dismount-on-release mechanism — the
-      // vehicle-gated half of this release (handing such a candidate back to
-      // the open pool) is implementer's to restore via planItinerary/
-      // resolveActionCost's own reachability check instead.
+      // canReleaseStrandedVehicleGatedAction (ActionSelection.ts) restores
+      // this — the deleted canReassignStrandedReservation's own release half
+      // (VehicleReservation.ts, dismount-on-release mechanism removed by
+      // #1090), now judged by the same real resolveActionCost reachability
+      // check every other claim/release decision in this file already uses.
       for (const candidate of candidates) {
-        if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
+        if (canReleaseStrandedVehicleGatedAction(state, employee, candidate)) {
+          employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
+          releaseActionToOpenPool(state, candidate);
+        } else if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
           // #1025: an on-foot taskQueue candidate this employee can no longer
           // reach (their own current cell got built over — clampToGrid froze
           // them mid-fatigue onto the exact cell a building's footprint later
           // occupies) with no other employee ever offered it, since it never
-          // sat in the open pool. Release it so a different, reachable
-          // employee can pick it up instead of it deadlocking here forever.
+          // sat in the open pool. Release it the same way the vehicle-gated
+          // branch above does, so a different, reachable employee can pick it
+          // up instead of it deadlocking here forever.
           employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
           releaseActionToOpenPool(state, candidate);
         }
@@ -504,12 +509,31 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
 
   // #1090: every other on-foot action walks via moveTo — the only entry
   // point that starts movement — rather than setting destinationX/Z
-  // directly. On failure (no route, e.g. genuinely boxed in), the employee
-  // is left claimed-but-idle with no itinerary/destination: it stays queued
-  // for a next-tick retry rather than throwing, mirroring
-  // promoteVehicleGatedAction's own "reservation vanished" no-op above.
+  // directly, whenever moveTo can actually resolve a route.
   const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ });
-  if (!moveResult.success) return;
+  if (!moveResult.success) {
+    // #1090 follow-up: moveTo's upfront exact-fidelity reachability check
+    // (planItinerary) refuses to install an itinerary for a target that's
+    // unreachable right now, unlike the legacy per-tick stepper it replaced
+    // here, which always started the walk and let every tick's own findPath
+    // attempt retry — incrementing moveConsecutiveFailures until isMoveStuck
+    // flips and MOVE_STUCK_ABANDON_TICKS eventually abandons it
+    // (Locomotion.ts's advanceLegacyFootWalk). Left as a silent no-op, an
+    // employee whose claim target is unreachable right now — but not
+    // provably unreachable forever — locks up permanently: activeActionId
+    // stays set (so the ordinary idle claim/promote steps never revisit
+    // them), while itinerary and destinationX/Z both stay null, which
+    // ArrivalGate reads as "arrived" without the employee ever having moved,
+    // and Locomotion's stuck-tracking never even starts (confirmed live via
+    // console-api.test.ts's own "counts an employee as stuck ... boxed in by
+    // buildings" case — a dispatch outside a sealed pocket froze silently
+    // instead of ever flipping isMoveStuck). Falling back to the legacy
+    // destinationX/Z walk here restores that same resilience for exactly
+    // this one case, without touching the itinerary path any target
+    // reachable at claim time still takes.
+    employee.destinationX = action.targetX;
+    employee.destinationZ = action.targetZ;
+  }
 
   // Non-rest actions queue their task duration here — a skill-required
   // action's claimed employee is guaranteed (by the qualification filters

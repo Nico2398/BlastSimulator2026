@@ -978,8 +978,13 @@ describe('promoteActionToActive', () => {
     promoteActionToActive(state, employee, action);
 
     expect(employee.activeActionId).toBe(1);
-    expect(employee.destinationX).toBe(5);
-    expect(employee.destinationZ).toBe(7);
+    // #1090: an on-foot claim walks via moveTo's itinerary now, not the
+    // legacy destinationX/Z fields — see promoteActionToActive's own doc
+    // comment on the moveTo call.
+    expect(employee.itinerary).not.toBeNull();
+    const lastLeg = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(lastLeg.destX).toBe(5);
+    expect(lastLeg.destZ).toBe(7);
     expect(employee.pendingTaskDuration).not.toBeNull();
     expect(employee.activeTaskSkill).toBe('blasting');
     expect(employee.pendingActionType).toBe('general_work');
@@ -1102,7 +1107,11 @@ describe('promoteActionToActive', () => {
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(vehicle.driverId).toBeNull();
     expect(vehicle.occupantIds).toEqual([]);
-    expect(employee.destinationX).toBe(5);
-    expect(employee.destinationZ).toBe(7);
+    // #1090: itinerary, not legacy destinationX/Z — see the other
+    // promoteActionToActive test's own comment on the same change.
+    expect(employee.itinerary).not.toBeNull();
+    const lastLeg = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(lastLeg.destX).toBe(5);
+    expect(lastLeg.destZ).toBe(7);
   });
 });

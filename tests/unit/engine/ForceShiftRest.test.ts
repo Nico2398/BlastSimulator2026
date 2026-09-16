@@ -485,16 +485,16 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).not.toBeNull();
   });
 
-  // NEW (#945, fixer follow-up): mirrors forceShiftRestIfNeeded's own
-  // taskTicksRemaining guard, but scoped to vehicle-gated work
-  // (isMidVehicleGatedWork, VehicleReservation.ts) rather than a blanket
-  // taskTicksRemaining check — a policy-forced rest must not preempt a
-  // driver already boarded and mid-execution of a vehicle-gated action
-  // (e.g. mid dig_ramp_segment), even with fatigue deep below any threshold
-  // and the shift boundary long since passed. Only a genuine collapse
-  // (tickCollapse, NeedRestoration.ts) is still allowed to interrupt
-  // mid-task — that path is untouched by #945.
-  it('#945: no-op when boarded and mid-execution of a vehicle-gated action (taskTicksRemaining set), even with fatigue deep below threshold', () => {
+  // UPDATED (#1090): #945's own dedicated vehicle-gated mid-execution guard
+  // is deleted along with the dismount-on-completion/interruption mechanism
+  // it used to justify protecting (a walk-and-reboard cost that no longer
+  // exists — nothing dismounts automatically any more, so an interrupted
+  // vehicle-gated task costs no walk-back-and-reboard). A boarded driver
+  // mid-execution of a vehicle-gated action is now interrupted by a
+  // policy-forced rest exactly like any other unprotected task type — see
+  // isMidVehicleGatedWork's own doc comment (VehicleReservation.ts) and
+  // PROTECTED_MID_EXECUTION_ACTION_TYPES's own doc comment (ForceShiftRest.ts).
+  it('#1090: DOES interrupt a boarded vehicle-gated action mid-execution (taskTicksRemaining set) now that dismount-on-completion no longer exists', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
@@ -511,13 +511,11 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
-    expect(employee.pendingRestDuration).toBeNull();
-    expect(employee.pendingRestNeedKey).toBeNull();
-    expect(employee.taskTicksRemaining).toBe(3); // untouched
-    expect(employee.activeActionId).toBe(1100); // claim survives, not released
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1100);
     const claim = state.pendingActions.find(a => a.id === 1100)!;
-    expect(claim.status).toBe('in_progress');
-    expect(claim.holderId).toBe(employee.id);
+    expect(claim.status).toBe('queued');
+    expect(claim.holderId).toBeNull();
   });
 
   // NEW (#945 fixer follow-up): the mid-execution guard above is

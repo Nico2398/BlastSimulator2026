@@ -425,7 +425,7 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
   // (0) and tickCollapse releases the interrupted action through the same
   // interruptActiveAction -> releaseActionToOpenPool -> releaseVehicleReservation
   // chain the cancelAction test above exercises.
-  it('tickCollapse (NeedRestoration.ts) releases the claim but leaves the driver mounted — a hard fatigue collapse no longer dismounts as a side effect of releasing the claim (#1090)', () => {
+  it('tickCollapse (NeedRestoration.ts) releases the claim and explicitly alights the driver before the rest walk (#1090 — one of the two deliberate alight-before-foot-dispatch guards, not the deleted dismount-on-completion mechanism)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -457,11 +457,18 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     const result = tickCollapse(state);
 
     expect(result.collapsed).toEqual([employee.id]);
-    // #1090: the collapse releases the claim, but the driver stays mounted —
-    // never dismounted as a side effect of releasing it.
-    expect(vehicle.driverId).toBe(employee.id);
-    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    // #1090: the collapse releases the claim (claim-only — no dismount as a
+    // side effect of that release), but tickCollapse's own explicit alight
+    // call right before beginRestWalk (one of the two deliberate
+    // alight-before-foot-dispatch guards, alongside ForceShiftRest.ts's) does
+    // dismount the driver here — a legacy destinationX/Z walk about to start
+    // would otherwise desync a still-"mounted" employee's position from
+    // their vehicle's (I2).
+    expect(vehicle.driverId).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(vehicle.reservedForActionId).not.toBe(action.id);
+    // No navGrid in this fixture — findAlightCell (Mount.ts) falls back to
+    // the vehicle's own cell.
     expect(employee.x).toBe(vehicleXAtCollapse);
     expect(employee.z).toBe(vehicleZAtCollapse);
     expect(employee.x).not.toBe(0);
@@ -680,7 +687,7 @@ describe('completeVehicleGatedAction (#1090)', () => {
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
-    completeVehicleGatedAction(state, action.id);
+    completeVehicleGatedAction(state, employee, action.id);
 
     expect(state.pendingActions.find(a => a.id === action.id)).toBeUndefined();
     expect(vehicle.reservedForActionId).toBeNull();
@@ -692,8 +699,10 @@ describe('completeVehicleGatedAction (#1090)', () => {
 
   it('is a no-op (does not throw) when actionId does not resolve to any PendingAction (boundary)', () => {
     const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
 
-    expect(() => completeVehicleGatedAction(state, 999999)).not.toThrow();
+    expect(() => completeVehicleGatedAction(state, employee, 999999)).not.toThrow();
     expect(state.pendingActions).toHaveLength(0);
   });
 
@@ -706,7 +715,7 @@ describe('completeVehicleGatedAction (#1090)', () => {
     employee.activeActionId = action.id;
     // No vehicle purchased/reserved at all for this action.
 
-    expect(() => completeVehicleGatedAction(state, action.id)).not.toThrow();
+    expect(() => completeVehicleGatedAction(state, employee, action.id)).not.toThrow();
     expect(state.pendingActions.find(a => a.id === action.id)).toBeUndefined();
   });
 });
