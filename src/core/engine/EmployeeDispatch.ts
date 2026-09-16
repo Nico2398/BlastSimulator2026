@@ -15,7 +15,7 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
-import { isLicensedForRole, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
+import { isLicensedForRole, hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alightIfMounted } from './Mount.js';
@@ -201,24 +201,32 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       // (findFreeVehicleForRole only ever considers driverId === null, or
       // the requesting employee's own current vehicle). Alighting here —
       // only once this tick's own claim attempt has already had first
-      // refusal, and only when hasQueuedActionForVehicleRole confirms
-      // nothing anywhere still wants this role — frees the vehicle for that
-      // other employee's own claim, the very next tick, without
-      // reintroducing a same-role continuity special case for the common
-      // case where a follow-up genuinely does exist (hasQueuedActionForVehicleRole
-      // true — VehicleReservation.ts's own doc comment on this shared
-      // predicate covers the counterpart guard in ForceShiftRest.ts).
+      // refusal, and only when hasBlockedQueuedActionForVehicleRole confirms
+      // some OTHER employee's queued (or untargeted) action for this exact
+      // role is genuinely starved — frees the vehicle for that other
+      // employee's own claim, the very next tick, without reintroducing a
+      // same-role continuity special case for the common case where a
+      // follow-up this same employee could claim exists instead (they would
+      // already hold it, via fillIdleEmployeeFromQueueOrPool just above).
+      // `hasQueuedActionForVehicleRole` (the employeeId-scoped sibling
+      // predicate) cannot stand in here: it reads identically false for the
+      // real hostage bug this exists to fix AND for a vehicle boarded by a
+      // bare `vehicle driver`/`vehicle move` console command with no
+      // PendingAction behind it at all — evicting the latter's driver within
+      // one dispatch tick of boarding (confirmed live: nav-move-costs-visual,
+      // vehicle-traffic, vehicle-task-states-visual and every other scenario
+      // driving a vehicle by hand).
       if (employee.activeActionId === null && isMounted(employee.locomotion)) {
         const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
         // reservedForActionId !== null already means this exact vehicle is
         // spoken for — either this same employee's own reserved-ahead
         // taskQueue entry (reserveOnePoolActionAhead, #611 — 'assigned', not
-        // 'queued', so hasQueuedActionForVehicleRole's own query would miss
-        // it and wrongly alight the one employee still holding it) or
+        // 'queued', so hasBlockedQueuedActionForVehicleRole's own query would
+        // miss it and wrongly alight the one employee still holding it) or
         // another employee's; either way, alighting here would desync the
         // reservation from a driver assertWorldInvariants' I5 check expects
         // to still resolve.
-        if (vehicle && vehicle.reservedForActionId === null && !hasQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
+        if (vehicle && vehicle.reservedForActionId === null && hasBlockedQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
           alightIfMounted(state, employee);
         }
       }

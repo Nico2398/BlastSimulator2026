@@ -62,6 +62,36 @@ export function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRol
   );
 }
 
+/**
+ * True when a `queued` PendingAction requires `role` and is targeted at
+ * someone other than `employeeId` (or is untargeted) — i.e. genuine demand
+ * for this role that `employeeId` cannot itself be the one to satisfy (an
+ * untargeted one they could claim would already have been claimed by
+ * `fillIdleEmployeeFromQueueOrPool`, since this is only ever asked of an
+ * employee dispatch has *already* had first refusal for this same tick).
+ *
+ * EmployeeDispatch.ts's own idle-and-mounted eviction check uses this
+ * rather than `hasQueuedActionForVehicleRole` above, whose employeeId-scoped
+ * definition returns `false` both when a *different* employee's targeted
+ * claim is starved for a vehicle (the real hostage bug #1090 introduced this
+ * check to fix) AND when literally nothing anywhere needs this role at all
+ * (a vehicle boarded by a bare `vehicle driver` console command, or any
+ * other manual/test drive with no PendingAction behind it) — the two are
+ * opposite outcomes, but `hasQueuedActionForVehicleRole` cannot tell them
+ * apart, so using it to gate eviction evicted every manually-driven idle
+ * vehicle within one dispatch tick of boarding (confirmed live: every
+ * scenario driving a vehicle via `vehicle driver`/`vehicle move` with no
+ * accompanying pending action — nav-move-costs-visual, vehicle-traffic,
+ * vehicle-task-states-visual and others — lost its driver mid-scenario).
+ */
+export function hasBlockedQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
+  return state.pendingActions.some(a =>
+    a.status === 'queued'
+    && a.requiredVehicleRole === role
+    && a.targetEmployeeId !== employeeId,
+  );
+}
+
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
   const requiredLicence = ROLE_LICENCE_REQUIRED[role];
