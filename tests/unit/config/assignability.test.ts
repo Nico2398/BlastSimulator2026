@@ -859,6 +859,54 @@ describe('detecting a stranded pause', () => {
     expect(verdict?.blockers).toEqual([]);
   });
 
+  // A paused issue with no declared dependency at all — no relationship, no
+  // body section, or an explicit `None` — has nothing to strand on.
+  it('is not stranded when there are zero declared dependencies', async () => {
+    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], body: '' }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict).toEqual({ stranded: false, blockers: [] });
+  });
+
+  // Distinct from `no-ready-label`: the dependency carries `ready` but a
+  // second label (`blocked`, `in-progress`, `done`) disqualifies it anyway,
+  // per `labelVerdict`.
+  it('is stranded when the dependency carries `ready` but is disqualified by another label', async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['ready', 'blocked'] },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 10, cause: 'ready-but-disqualified' })
+    );
+  });
+
+  // The dependency itself is a pull request, not an issue — distinct from the
+  // `closed-unmerged` case above, which is an issue whose *deliverable* PR is
+  // still open. An open PR dependency resolves on its own through the
+  // ordinary merge flow, so it is healthy and not a blocker.
+  it('is not stranded when the dependency is itself an open, unmerged pull request', async () => {
+    const api = fakeApi([
+      { number: 10, isPullRequest: true, state: 'open' },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(false);
+  });
+
+  it('is stranded when the dependency is itself a closed, unmerged pull request', async () => {
+    const api = fakeApi([
+      { number: 10, isPullRequest: true, state: 'closed', prMergedAt: null },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 10, cause: 'closed-unmerged' })
+    );
+  });
+
   it('is stranded when the dependency carries no `ready` label', async () => {
     const api = fakeApi([
       { number: 10, labels: [] },

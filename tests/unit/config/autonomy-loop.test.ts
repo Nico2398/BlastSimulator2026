@@ -1669,6 +1669,33 @@ describe('the watchdog re-raises a red CI it would otherwise skip', () => {
   });
 });
 
+describe('the watchdog sweeps stranded paused issues', () => {
+  const watchdog = workflow('agentic-watchdog.yml');
+  const sweep = watchdog.slice(
+    watchdog.indexOf('- name: Sweep stranded paused issues'),
+    watchdog.indexOf('- name: Re-raise a red CI on an open pipeline PR')
+  );
+
+  it('authenticates with the same PAT every other watchdog step uses', () => {
+    expect(sweep).toContain('github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}');
+  });
+
+  it('lists its issue source off the `paused` label', () => {
+    expect(sweep).toContain("labels: 'paused'");
+  });
+
+  // Idempotency guard: an issue the sweep already flagged carries `blocked`
+  // from a prior run, so re-flagging it would re-comment and re-label on
+  // every schedule tick until a human clears it.
+  it('skips an issue that already carries `blocked`', () => {
+    expect(sweep).toContain("labels.includes('blocked')");
+  });
+
+  it('calls strandedPauseVerdict to decide the flag', () => {
+    expect(sweep).toContain('rules.strandedPauseVerdict(api,');
+  });
+});
+
 // Rule 1 of `agentic-workflow-edition`, made executable. Every interval this
 // layer ever held was tuned to the CI of that week and broke when a shard count
 // moved: auto-merge's 10-minute settle poll called PR #499 stuck with 35 minutes
