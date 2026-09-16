@@ -357,7 +357,9 @@ describe('Vehicle fleet', () => {
     const result = board(state, 1, employee.id);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('lacks licence');
+    if (!result.success) {
+      expect(result.error).toContain('lacks licence');
+    }
   });
 
   it('Mount.board succeeds with qualified employee', () => {

@@ -1054,7 +1054,7 @@ describe('Mount.board — happy path: debris_hauler requires driving.truck', () 
   it('returns no error property on success (error is undefined)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBeUndefined();
+    expect('error' in result).toBe(false);
   });
 });
 
@@ -1163,7 +1163,10 @@ describe('Mount.board — error: vehicle not found', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
 
     const result = board(state, 9999, employee.id);
-    expect(result.error).toBe(t('mount.vehicle_not_found'));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(t('mount.vehicle_not_found'));
+    }
   });
 
   it('fleet vehicles array is unchanged after a vehicle-not-found failure', () => {
@@ -1189,7 +1192,10 @@ describe('Mount.board — error: employee not found', () => {
   it('error message is exactly "Employee not found" when employeeId is absent', () => {
     const { state, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
     const result = board(state, vehicleId, 9999);
-    expect(result.error).toBe(t('mount.employee_not_found'));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(t('mount.employee_not_found'));
+    }
   });
 
   it('vehicle.driverId stays null after an employee-not-found failure', () => {
@@ -1215,7 +1221,10 @@ describe('Mount.board — error: employee not alive', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     killEmployee(state.employees, empId);
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe(t('mount.employee_not_found'));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(t('mount.employee_not_found'));
+    }
   });
 
   it('vehicle.driverId stays null after a dead-employee failure', () => {
@@ -1264,7 +1273,10 @@ describe('Mount.board — error: employee lacks licence (no qualifications at al
     // Use drill_rig as a representative case.
     const { state, vehicleId, empId } = makeDriverFixture('drill_rig');
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('vehicle.driverId stays null after a no-licence failure', () => {
@@ -1287,7 +1299,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.excavator');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('building_destroyer needs driving.truck; employee with only driving.drill_rig is rejected', () => {
@@ -1295,7 +1309,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('building_destroyer', 'driving.drill_rig');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('rock_digger needs driving.excavator; employee with only driving.truck is rejected', () => {
@@ -1303,7 +1319,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.truck');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('rock_fragmenter needs driving.excavator; employee with only driving.drill_rig is rejected', () => {
@@ -1311,7 +1329,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.drill_rig');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('drill_rig needs driving.drill_rig; employee with only driving.truck is rejected', () => {
@@ -1319,7 +1339,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.truck');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('drill_rig needs driving.drill_rig; employee with only driving.excavator is rejected', () => {
@@ -1327,7 +1349,9 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.excavator');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Employee lacks licence for this role');
+    if (!result.success) {
+      expect(result.error).toBe('Employee lacks licence for this role');
+    }
   });
 
   it('vehicle.driverId stays null after a wrong-licence failure', () => {
@@ -1358,7 +1382,10 @@ describe('Mount.board — error: employee already driving another vehicle', () =
       'driving.excavator',
     );
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe('Employee already driving another vehicle');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Employee already driving another vehicle');
+    }
   });
 
   it('target vehicle.driverId remains null after an already-driving failure', () => {
@@ -1393,7 +1420,10 @@ describe('Mount.board — error: vehicle already has a driver', () => {
       'driving.excavator',
     );
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe('Vehicle already has a driver');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Vehicle already has a driver');
+    }
   });
 
   it('original driverId is preserved and not overwritten after a vehicle-taken failure', () => {
@@ -1438,7 +1468,10 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     employee.activeActionId = 8; // holds a DIFFERENT action than the reservation
 
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe('Vehicle is reserved for another task');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Vehicle is reserved for another task');
+    }
   });
 
   it('vehicle.driverId stays null after a reservation-mismatch failure', () => {
