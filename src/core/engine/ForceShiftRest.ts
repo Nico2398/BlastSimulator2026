@@ -12,17 +12,23 @@ import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
-import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk, isMidClaimedTaskExecution } from './RestActionHelpers.js';
+import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
+import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
-import { alightIfMounted } from './Mount.js';
 
 /**
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
  * queues restAction, updates emp's activeActionId/destination, records the
  * shift-change bookkeeping (shiftRested/firedEvents/emitter).
+ *
+ * A taskQueue entry (not yet active) predating this forced rest can still
+ * hold a vehicle reservation; interruptActiveAction above only released the
+ * active action. Release it here rather than leaving it reserved for the
+ * whole rest duration — mirrors tickCollapse's own unconditional cleanup
+ * (#1096, #1107) for the shift-rest interruption path (#1110).
  */
 function finishForceRest(
   state: GameState,
@@ -34,15 +40,8 @@ function finishForceRest(
 ): void {
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
-  // #1090: nothing dismounts automatically on interruption any more, so a
-  // driver forced to rest mid-drive/mid-execution is still mounted right up
-  // to this point. beginRestWalk below moves emp.x/z directly via the legacy
-  // destinationX/Z walk (not moveTo's itinerary), which would otherwise
-  // desync a still-"mounted" employee's position from their vehicle's (I2) —
-  // alight first so mount state stays consistent with the on-foot walk about
-  // to start.
-  alightIfMounted(state, emp, _emitter);
-  beginRestWalk(emp, restAction.targetX, restAction.targetZ);
+  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ);
+  releaseUnboardedTaskQueueVehicleReservations(state, emp);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });

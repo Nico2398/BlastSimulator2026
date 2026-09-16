@@ -15,14 +15,14 @@ import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 import { interruptActiveAction, completePendingAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import {
-  createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, beginRestWalk,
+  createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, beginRestTravel,
 } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
+import { alightIfMounted } from './Mount.js';
 import {
   NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
 } from '../config/balance.js';
-import { alightIfMounted } from './Mount.js';
 
 export interface NeedRestorationResult {
   /** Employee IDs that were routed to a rest action. */
@@ -84,14 +84,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // confirms the employee has walked to the building (#437).
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = needKey;
-    // #1090: nothing dismounts automatically on completion any more, so an
-    // idle employee reaching this point can still be mounted (their last
-    // vehicle-gated action finished with no same-role follow-up claimed).
-    // beginRestWalk moves them on foot via the legacy destinationX/Z fields,
-    // not moveTo's itinerary — alight first so mount state stays consistent
-    // (mirrors ForceShiftRest.ts's own identical fix).
-    alightIfMounted(state, emp);
-    beginRestWalk(emp, approach.x, approach.z);
+    beginRestTravel(state, emp, approach.x, approach.z);
     result.routed.push(emp.id);
   }
 
@@ -217,12 +210,16 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // above) the employee is already "arrived" and the gate resolves next tick.
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = collapsedGauge;
-    // #1090: interruptActiveAction above no longer dismounts a mid-drive/
-    // mid-execution vehicle-gated collapse — alight first, same reasoning
-    // and fix as tickNeedRestoration's own identical guard above and
-    // ForceShiftRest.ts's forced-rest paths.
-    alightIfMounted(state, emp);
-    beginRestWalk(emp, targetX, targetZ);
+    // Hard collapse is the one rest trigger that still gives up the vehicle
+    // (#1118): every other rest path (tickNeedRestoration above,
+    // ForceShiftRest.ts) keeps a mounted employee driving via beginRestTravel's
+    // own mount continuity, but a fatigue floor this hard is a genuine "the
+    // employee can no longer be trusted behind the wheel" event. alight's own
+    // guards (unassignDriver — mid-haul lock, e.g.) may refuse; that's fine —
+    // beginRestTravel's moveTo still plans a route for whatever locomotion
+    // state the employee ends up in, mounted or on foot.
+    alightIfMounted(state, emp, _emitter);
+    beginRestTravel(state, emp, targetX, targetZ);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
     // employee after its vehicle was destroyed mid-drive) predating this

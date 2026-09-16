@@ -16,7 +16,7 @@ import {
   canReleaseStrandedVehicleGatedAction, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
-import { beginRestWalk } from './RestActionHelpers.js';
+import { beginRestTravel } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
@@ -470,31 +470,21 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     return;
   }
 
-  // #1103: a currently-mounted employee claiming an on-foot action (this
-  // whole branch — place_building, survey, charge_hole, rest, any
-  // requiredVehicleRole: null action) must alight first. Without this, the
-  // legacy destinationX/Z walk below moves employee.x/z on its own every
-  // tick while the vehicle they're still nominally "mounted" in never
-  // moves (Locomotion.ts's advanceLegacyFootWalk only ever touches the
-  // employee, never a vehicle) — an immediate and then ever-widening I2
-  // (mounted-position-mismatch) violation for the rest of the walk.
-  // Mirrors the identical alight-before-boarding-elsewhere fix in
-  // PlanItinerary.ts's own vehicle-gated branch.
-  alightIfMounted(state, employee);
-
-  // tickCollapse/tickNeedRestoration self-claim outside this path and, like
-  // this branch, only ever *queue* the rest via pendingRestDuration/
-  // pendingRestNeedKey. autoInsertNeedTasks pushes 'rest' actions unclaimed
-  // (busy-employee case), so this is the first point an idle employee
-  // actually starts walking to rest. Bunkhouse Tier 2+ shift-cycle rest
-  // (forceShiftRestIfNeeded) also self-claims and carries no 'needKey'
-  // payload, so resolveRestNeedKey returns null for it and this block is a
-  // no-op there.
+  // #1118: rest is the one requiredVehicleRole: null action that must NOT
+  // alight a mounted employee first — beginRestTravel routes through
+  // moveTo/planItinerary, which preserves mount continuity for a
+  // 'reposition' goal (PlanItinerary.ts), so a mounted employee drives to
+  // their rest destination instead of desyncing from their vehicle
+  // (I2_mounted_position_mismatch). tickCollapse/tickNeedRestoration
+  // self-claim outside this path and, like this branch, only ever *queue*
+  // the rest via pendingRestDuration/pendingRestNeedKey. autoInsertNeedTasks
+  // pushes 'rest' actions unclaimed (busy-employee case), so this is the
+  // first point an idle employee actually starts travelling to rest.
+  // Bunkhouse Tier 2+ shift-cycle rest (forceShiftRestIfNeeded) also
+  // self-claims and carries no 'needKey' payload, so resolveRestNeedKey
+  // returns null for it and the bookkeeping below is a no-op there.
   if (action.type === 'rest') {
-    // beginRestWalk owns destinationX/Z for a rest action — the legacy
-    // walk field, not moveTo's itinerary — plus pendingActionType: 'rest' so
-    // computeEmployeeActivity (#1013) reports the walk-to-rest correctly.
-    beginRestWalk(employee, action.targetX, action.targetZ);
+    beginRestTravel(state, employee, action.targetX, action.targetZ);
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {
@@ -504,6 +494,17 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     }
     return;
   }
+
+  // #1103: a currently-mounted employee claiming any OTHER on-foot action
+  // (place_building, survey, charge_hole, etc.) must alight first. Without
+  // this, the legacy destinationX/Z walk below moves employee.x/z on its own
+  // every tick while the vehicle they're still nominally "mounted" in never
+  // moves (Locomotion.ts's advanceLegacyFootWalk only ever touches the
+  // employee, never a vehicle) — an immediate and then ever-widening I2
+  // (mounted-position-mismatch) violation for the rest of the walk.
+  // Mirrors the identical alight-before-boarding-elsewhere fix in
+  // PlanItinerary.ts's own vehicle-gated branch.
+  alightIfMounted(state, employee);
 
   // #1090: every other on-foot action walks via moveTo — the only entry
   // point that starts movement — rather than setting destinationX/Z

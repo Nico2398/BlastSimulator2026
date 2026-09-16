@@ -6,11 +6,11 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { canAssignDriver, unassignDriver } from '../entities/Vehicle.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { isImpassable } from '../nav/Pathfinding.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 
 type MountResult = { success: true } | { success: false; error: string };
 
@@ -101,7 +101,7 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
     // the instant they alight, since they no longer occupy it. Locomotion.ts
     // always advances a non-null `itinerary` before ever falling back to
     // destinationX/Z, so a caller that alights an employee and then, this
-    // same tick, sets a fresh legacy walk target (beginRestWalk, a
+    // same tick, sets a fresh legacy walk target (beginRestTravel, a
     // reassigned foot task) had that walk silently ignored: Locomotion still
     // takes the itinerary branch, spends the whole tick self-healing the now
     // impossible drive leg (advanceLeg's own occupant-mismatch check aborts
@@ -127,23 +127,6 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
 }
 
 /**
- * Alight `employee` if currently mounted, otherwise a no-op. #1090: nothing
- * dismounts automatically on interruption/completion any more, so an
- * employee about to start an on-foot walk (beginRestWalk's legacy
- * destinationX/Z fields, or promoteActionToActive's moveTo/destinationX/Z
- * fallback) can still be mounted from a vehicle-gated action that just
- * ended or was interrupted. Alight first so mount state stays consistent
- * with the walk about to start — shared by every such call site
- * (ForceShiftRest.ts, NeedRestoration.ts, EmployeeDispatchSteps.ts's
- * promoteActionToActive).
- */
-export function alightIfMounted(state: GameState, employee: Employee, emitter?: EventEmitter): void {
-  if (isMounted(employee.locomotion)) {
-    alight(state, mountedVehicleId(employee.locomotion)!, emitter);
-  }
-}
-
-/**
  * First free, walkable cell among the vehicle's 8 neighbours (in the shared
  * neighbour-offset declaration order), or the vehicle's own cell when none
  * qualifies or no NavGrid has been built yet.
@@ -162,4 +145,17 @@ function findAlightCell(state: GameState, vehicle: Vehicle): { x: number; z: num
   }
 
   return { x: vehicle.x, z: vehicle.z };
+}
+
+/**
+ * Dismount emp from their vehicle if currently mounted. No-op if on foot,
+ * or if alight's own guard (e.g. a mid-haul lock) refuses. Shared by
+ * every call site that needs an unconditional "give up the vehicle"
+ * policy — #1103's non-rest dispatch promotion, #1118's hard-threshold
+ * collapse.
+ */
+export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter): void {
+  if (isMounted(emp.locomotion)) {
+    alight(state, emp.locomotion.vehicleId, emitter);
+  }
 }

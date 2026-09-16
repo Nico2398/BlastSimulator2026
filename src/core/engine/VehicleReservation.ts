@@ -34,6 +34,7 @@ import { alight } from './Mount.js';
 // close) — TaskCancellation.ts already imports completePendingAction the
 // same way, for the same reason.
 import { completePendingAction, clearActiveTaskFields } from './TaskLifecycleCore.js';
+import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -279,6 +280,26 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  * no-op in that case (nothing to release via an action), so that caller
  * holds the vehicle directly and calls this instead of going through
  * releaseVehicleReservation.
+ *
+ * Marks the vehicle's own (possibly non-grid-aligned, mid-drive) resting
+ * cell as `vehicleOccupied` via updateVehicleCellOccupancy — every OTHER
+ * stop (a drive leg's own arrival, EntityMovementTick.ts) already does this
+ * as part of writeVehiclePosition's transition out of 'moving', but a
+ * mid-drive dismount stops the vehicle without ever going through that
+ * arrival path, so without this call its cell never gets flagged: the
+ * NavGrid keeps reporting the tile "unoccupied" forever. `isDestinationOccupied`
+ * (EntityMovementTick.ts) reads exactly that flag to decide whether a foot
+ * leg walking up to BOARD this vehicle may cross other occupied
+ * (vehicle/fragment) tiles — a dismounted vehicle's own tile reading
+ * "unoccupied" flips that decision to avoidVehicles: true for the boarding
+ * walk, which then refuses to route through any real fragment debris on the
+ * way there. Post-blast debris is often unavoidable in a straight line, so
+ * that false "avoid everything" reading strands a would-be driver outside
+ * MOVE_STUCK_ABANDON_TICKS on every single retry, with the vehicle exactly
+ * as unreachable each time — reproduced live via vibration-budget.json's
+ * grid 2 drilling, whose drill_rig was abandoned mid-drive (a proactive
+ * shift rest interrupting the drive leg) and never boarded again (#1110
+ * follow-up).
  */
 export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   abortVehicleGatedFragmentWork(state, vehicle);
@@ -290,9 +311,12 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitte
   // model's own separate syncDriverPosition call (dropped here) had to
   // defend against.
   alight(state, vehicle.id, emitter);
+  const cellX = Math.round(vehicle.x);
+  const cellZ = Math.round(vehicle.z);
   vehicle.task = 'idle';
   vehicle.state = 'idle';
   vehicle.waitingTicks = 0;
+  updateVehicleCellOccupancy(state, vehicle, false, cellX, cellZ);
 }
 
 /**

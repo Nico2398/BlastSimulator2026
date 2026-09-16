@@ -1280,17 +1280,13 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
-      // TODO(#1110): a long enough resume window (400 ticks) recrosses
-      // WORK_DURATION_TICKS again, and the shift-rest interruption path
-      // (ForceShiftRest.ts) does not release the reservation of an action
-      // still sitting unboarded in the interrupted employee's taskQueue,
-      // leaving a single I5 violation behind. #1096 (fixed in #1107) closed
-      // exactly this gap for tickCollapse's `collapsing` employees only —
-      // the employee here is never `collapsing`, so none of #1107's release
-      // calls fire. Once #1110 lands, replace this with a plain
-      // expectNoWorldInvariantViolations(state).
-      const violations = assertWorldInvariants(ctx.state!);
-      expect(violations.every(v => v.kind === 'I5_reservation_without_valid_holder')).toBe(true);
+      // #1110: a long enough resume window (400 ticks) recrosses
+      // WORK_DURATION_TICKS again — the shift-rest interruption path
+      // (ForceShiftRest.ts) must release the reservation of an action still
+      // sitting unboarded in the interrupted employee's taskQueue, the same
+      // way #1096/#1107 already made tickCollapse do for a `collapsing`
+      // employee.
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
@@ -1597,8 +1593,9 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // sweep (case (c), VehicleReservation.ts) misread this hand-rolled
     // in-flight claim as one whose vehicle vanished, spuriously interrupting
     // it. That interruption was harmless before #1090 (interruptActiveAction
-    // didn't yet touch the itinerary), but #1090 correctly makes it clear
-    // employee.itinerary too, which would abort this hand-installed drive.
+    // didn't yet touch the itinerary), but #1090 and #1110's
+    // clearHolderWalkFields fix together make it clear employee.itinerary
+    // too, which would abort this hand-installed drive.
     vehicle.reservedForActionId = action2.id;
     driver.activeActionId = action2.id;
     // #1089: same reasoning as the first drive above — a real itinerary is

@@ -20,6 +20,10 @@ import {
   getNeedMultiplier,
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
+import { assignSkill } from '../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { board } from '../../src/core/engine/Mount.js';
+import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import {
   NEED_SOFT_THRESHOLDS,
   NEED_REST_DURATIONS,
@@ -1068,5 +1072,94 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
 
     expect(ticks).toBeLessThan(MAX_TICKS); // the box-cut must actually finish within the bound
     expect(boardingCount).toBeLessThanOrEqual(MAX_EXPECTED_BOARDINGS);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1118 — mounted-rest continuity: beginRestTravel (RestActionHelpers.ts)
+// replaces beginRestWalk at every rest-dispatch call site so a mounted
+// employee's rest routes through moveTo, which already keeps mount
+// continuity for a 'reposition' goal, instead of writing destinationX/Z
+// directly and desyncing the employee's position from their vehicle's
+// (I2_mounted_position_mismatch). Collapse (tickCollapse, hard threshold)
+// is policy-distinct: the vehicle is explicitly released so it's free for
+// another driver, rather than idling with a collapsed occupant.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#1118 — mounted-rest continuity round-trip', () => {
+  it('hard-threshold collapse: releases the vehicle, with no I2_mounted_position_mismatch at any tick through rest completion, and the vehicle is available to another driver afterward', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 100_000;
+    const empId = hireOne(ctx, 'driller');
+    assignSkill(state.employees, empId, 'driving.drill_rig', 1);
+    const emp = getEmployee(ctx, empId);
+
+    buildLivingQuartersAndComplete(ctx, '20,20');
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
+    vehicle.driverId = empId;
+    vehicle.occupantIds = [empId];
+    emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    emp.activeActionId = null; // idle
+    emp.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue — collapses this tick
+
+    let sawI2Violation = false;
+    const MAX_TICKS = 200;
+    let ticks = 0;
+    do {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      const violations = assertWorldInvariants(state);
+      if (violations.some(v => v.kind === 'I2_mounted_position_mismatch')) sawI2Violation = true;
+    } while (
+      ticks < MAX_TICKS
+      && (emp.collapsing || emp.restTicksRemaining !== null || emp.pendingRestDuration !== null)
+    );
+
+    expect(ticks).toBeLessThan(MAX_TICKS); // the rest must actually complete within the bound
+    expect(sawI2Violation).toBe(false);
+
+    // The collapse policy released the vehicle rather than keeping it mounted.
+    expect(vehicle.occupantIds).not.toContain(empId);
+    expect(vehicle.driverId).not.toBe(empId);
+    expect(emp.locomotion).toEqual({ kind: 'on_foot' });
+
+    // The vehicle is genuinely available to another qualified driver.
+    const otherEmpId = hireOne(ctx, 'driller');
+    assignSkill(state.employees, otherEmpId, 'driving.drill_rig', 1);
+    const otherEmp = getEmployee(ctx, otherEmpId);
+    otherEmp.x = vehicle.x;
+    otherEmp.z = vehicle.z;
+    const boardResult = board(state, vehicle.id, otherEmpId);
+    expect(boardResult.success).toBe(true);
+  });
+
+  it('soft-threshold proactive rest: does NOT release the vehicle — the driver keeps it and drives itself to rest', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 100_000;
+    const empId = hireOne(ctx, 'driller');
+    assignSkill(state.employees, empId, 'driving.drill_rig', 1);
+    const emp = getEmployee(ctx, empId);
+
+    buildLivingQuartersAndComplete(ctx, '20,20');
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
+    vehicle.driverId = empId;
+    vehicle.occupantIds = [empId];
+    emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    emp.activeActionId = null; // idle
+    emp.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25), above the hard threshold (0)
+
+    tickCommand(ctx, ['1'], {});
+    if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+
+    expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(vehicle.occupantIds).toContain(empId);
+    expect(vehicle.driverId).toBe(empId);
+
+    const violations = assertWorldInvariants(state);
+    expect(violations.filter(v => v.kind === 'I2_mounted_position_mismatch')).toHaveLength(0);
   });
 });
