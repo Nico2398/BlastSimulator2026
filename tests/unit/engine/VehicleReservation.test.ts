@@ -1,10 +1,22 @@
-// BlastSimulator2026 — Tests for VehicleReservation.ts (issue #550)
+// BlastSimulator2026 — Tests for VehicleReservation.ts (issue #550, #1090)
 //
 // Owns the exclusive claim a vehicle-gated PendingAction holds on a Vehicle
 // from the moment an employee claims it until the action completes, is
-// cancelled, or the vehicle is destroyed underneath it. Red phase: every
-// function in the module under test is still a `throw new Error('not
-// implemented')` stub, so every test below is expected to fail.
+// cancelled, or the vehicle is destroyed underneath it.
+//
+// #1090 (vehicle-fleet migration phase 4): releaseVehicleReservation is now
+// claim-only — it clears reservedForActionId and never dismounts the driver
+// as a side effect, on completion or on interruption alike. Continuity is an
+// emergent property of a mounted employee's next planned itinerary having a
+// zero-length first leg (PlanItinerary.ts), not a bolted-on mechanism, so
+// findFreeVehicleForRole's own hardcoded driverId===employee.id shortcut is
+// gone too — a mounted employee's own vehicle still wins ties because it
+// sits at the employee's own position (distance 0), not because of a special
+// case. releaseVehicleReservationKeepDriver and canReassignStrandedReservation
+// are deleted outright (VehicleContinuity.ts's mechanism no longer exists).
+// completeVehicleGatedAction replaces VehicleContinuity.ts's
+// completeVehicleGatedActionIfApplicable as the sole vehicle-gated completion
+// entry point.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -16,11 +28,10 @@ import {
   findFreeVehicleForRole,
   reserveVehicle,
   releaseVehicleReservation,
-  releaseVehicleReservationKeepDriver,
   releaseVehicleOnCompletion,
   reconcileVehicleReservations,
   isMidVehicleGatedWork,
-  canReassignStrandedReservation,
+  completeVehicleGatedAction,
 } from '../../../src/core/engine/VehicleReservation.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
@@ -100,21 +111,47 @@ describe('findFreeVehicleForRole', () => {
     expect(picked!.id).not.toBe(broken.id);
   });
 
-  it('picks the vehicle the employee is already driving over a lower-id free one (continuity tie-break)', () => {
+  // #1090: the old continuity shortcut (`qualifying.find(v => v.driverId ===
+  // employee.id)`, checked before the distance comparison) is gone —
+  // continuity is now an emergent property of distance alone, since a
+  // mounted employee's own vehicle sits at their exact position (distance 0)
+  // by construction (Locomotion.ts writes a mounted vehicle's x/z from its
+  // occupant's own). This pins that the mounted vehicle still wins, but
+  // because it is nearer, not because of a special case for driverId.
+  it('picks a mounted vehicle at the employee\'s own position (distance 0) over a farther, lower-id free one — distance alone, no continuity shortcut (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
 
-    const { vehicle: lowerIdFree } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const { vehicle: alreadyDriving } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 1);
-    alreadyDriving.driverId = employee.id;
-    expect(alreadyDriving.id).toBeGreaterThan(lowerIdFree.id);
+    const { vehicle: fartherLowerId } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const { vehicle: mounted } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    mounted.driverId = employee.id;
+    expect(mounted.id).toBeGreaterThan(fartherLowerId.id);
 
     const picked = findFreeVehicleForRole(state, 'drill_rig', employee);
 
     expect(picked).not.toBeNull();
-    expect(picked!.id).toBe(alreadyDriving.id);
+    expect(picked!.id).toBe(mounted.id);
+  });
+
+  // A mounted vehicle is NOT preferred purely by driverId once it is no
+  // longer the nearest — proves the shortcut is genuinely gone, not merely
+  // untested for the tie case above.
+  it('does not favor a mounted vehicle once a different, unreserved free vehicle is strictly nearer (#1090: no continuity shortcut)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+    const { vehicle: mountedButFar } = purchaseVehicle(state.vehicles, 'drill_rig', 30, 30);
+    mountedButFar.driverId = employee.id;
+    const { vehicle: nearerFree } = purchaseVehicle(state.vehicles, 'drill_rig', 6, 5);
+
+    const picked = findFreeVehicleForRole(state, 'drill_rig', employee);
+
+    expect(picked).not.toBeNull();
+    expect(picked!.id).toBe(nearerFree.id);
   });
 
   // #1002: an id-only tie-break could hand a nearby, freshly released
@@ -244,8 +281,8 @@ describe('reserveVehicle', () => {
   });
 });
 
-describe('releaseVehicleReservation', () => {
-  it('clears reservedForActionId and unassigns a boarded driver, resetting task/state to idle', () => {
+describe('releaseVehicleReservation (#1090: claim-only — never dismounts)', () => {
+  it('clears reservedForActionId and resets task/state to idle, but leaves a boarded driver mounted', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -260,7 +297,10 @@ describe('releaseVehicleReservation', () => {
     releaseVehicleReservation(state, 5);
 
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
+    // #1090: releasing the claim is no longer a dismount — the driver stays
+    // exactly where they were, still mounted.
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicle.task).toBe('idle');
     expect(vehicle.state).toBe('idle');
   });
@@ -276,11 +316,21 @@ describe('releaseVehicleReservation', () => {
   });
 });
 
-// ── issue #922: dismount always lands at the vehicle's CURRENT cell, never
-// the boarding cell — traced through the real call chains a player actually
-// triggers (cancellation, forced shift rest), not just releaseVehicleReservation
-// called directly. Drives the vehicle several cells with the real tickVehicle
-// stepper first, so "the vehicle has moved since boarding" is genuine.
+// ── issue #922 / #1090: traced through the real call chains a player
+// actually triggers (cancellation, forced shift rest, a hard fatigue
+// collapse), not just releaseVehicleReservation called directly. Drives the
+// vehicle several cells with the real tickVehicle stepper first, so "the
+// vehicle has moved since boarding" is genuine.
+//
+// #1090 changes what these three chains actually do: releaseVehicleReservation
+// is now claim-only, so cancelAction and tickCollapse leave the driver
+// mounted exactly where the vehicle stopped — no snap needed, because they
+// were never displaced. forceShiftRestIfNeeded's mid-drive interruption is
+// the one exception: its rest-walk needs the employee on foot, so
+// finishForceRest (ForceShiftRest.ts) deliberately alights them — landing at
+// the vehicle's current cell (Mount.alight's own fallback with no NavGrid
+// built), same observable landing spot as before #1090, just via a
+// deliberate call instead of an automatic side effect of releasing the claim.
 
 /** Vehicle-gated PendingAction fixture matching makeAction, with a fixed holder. */
 function makeVehicleGatedHeldAction(id: number, holderId: number): PendingAction {
@@ -289,8 +339,8 @@ function makeVehicleGatedHeldAction(id: number, holderId: number): PendingAction
   });
 }
 
-describe("releaseVehicleReservation's real call chains land the driver at the vehicle's current cell, not the boarding cell (#922)", () => {
-  it('cancelAction (TaskCancellation.ts) snaps the driver to where the vehicle now sits after several cells of real driving', () => {
+describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
+  it('cancelAction (TaskCancellation.ts) releases the claim but leaves the driver mounted, still parked wherever the vehicle actually stopped (#1090: claim-only release)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -322,14 +372,18 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     const result = cancelAction(state, action.id);
 
     expect(result.success).toBe(true);
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    // #1090: cancelling the action no longer dismounts the driver as a side
+    // effect — they stay exactly where the vehicle was, still mounted.
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(employee.x).toBe(vehicleXAtCancel);
     expect(employee.z).toBe(vehicleZAtCancel);
     // Never the original boarding cell — the vehicle demonstrably moved.
     expect(employee.x).not.toBe(0);
   });
 
-  it('forceShiftRestIfNeeded (ForceShiftRest.ts) snaps the driver to where the vehicle now sits, not the boarding cell', () => {
+  it('forceShiftRestIfNeeded (ForceShiftRest.ts) still alights the driver at the vehicle\'s current cell — deliberately, via its own alight-before-rest-walk guard (#1090), not as a side effect of releasing the claim', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -360,6 +414,7 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     forceShiftRestIfNeeded(state, employee, [], []);
 
     expect(vehicle.driverId).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(employee.x).toBe(vehicleXAtRest);
     expect(employee.z).toBe(vehicleZAtRest);
     expect(employee.x).not.toBe(0);
@@ -369,8 +424,8 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
   // chain — checkCollapse fires once fatigue reaches NEED_HARD_THRESHOLDS.fatigue
   // (0) and tickCollapse releases the interrupted action through the same
   // interruptActiveAction -> releaseActionToOpenPool -> releaseVehicleReservation
-  // chain the two tests above exercise for cancelAction/forceShiftRestIfNeeded.
-  it('tickCollapse (NeedRestoration.ts) snaps the driver to where the vehicle now sits, not the boarding cell, and clears driverId', () => {
+  // chain the cancelAction test above exercises.
+  it('tickCollapse (NeedRestoration.ts) releases the claim but leaves the driver mounted — a hard fatigue collapse no longer dismounts as a side effect of releasing the claim (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -402,7 +457,10 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     const result = tickCollapse(state);
 
     expect(result.collapsed).toEqual([employee.id]);
-    expect(vehicle.driverId).toBeNull();
+    // #1090: the collapse releases the claim, but the driver stays mounted —
+    // never dismounted as a side effect of releasing it.
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicle.reservedForActionId).not.toBe(action.id);
     expect(employee.x).toBe(vehicleXAtCollapse);
     expect(employee.z).toBe(vehicleZAtCollapse);
@@ -411,7 +469,7 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
 });
 
 describe('releaseVehicleOnCompletion', () => {
-  it('dismounts the driver and frees the vehicle when reservedForActionId still matches the completed action', () => {
+  it('frees the reservation when reservedForActionId still matches the completed action, leaving the driver mounted (#1090: releaseVehicleReservation is claim-only)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -423,8 +481,9 @@ describe('releaseVehicleOnCompletion', () => {
 
     releaseVehicleOnCompletion(state, employee, 7);
 
-    expect(vehicle.driverId).toBeNull();
     expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
   });
 
   it('leaves driver and reservation untouched when a same-role follow-up already reserved the vehicle for a different action', () => {
@@ -443,7 +502,7 @@ describe('releaseVehicleOnCompletion', () => {
 });
 
 describe('reconcileVehicleReservations', () => {
-  it('releases a reservation whose PendingAction id no longer exists in state.pendingActions', () => {
+  it('releases a reservation whose PendingAction id no longer exists in state.pendingActions, leaving a living driver mounted (#1090: claim-only release)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -457,10 +516,10 @@ describe('reconcileVehicleReservations', () => {
     reconcileVehicleReservations(state);
 
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
   });
 
-  it('releases and dismounts when the reservation holder is dead', () => {
+  it('releases the reservation when the reservation holder is dead (#1090: releaseVehicleReservation no longer dismounts — a dead holder\'s own driverId is a pre-existing dangling reference this call never introduces)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -477,7 +536,6 @@ describe('reconcileVehicleReservations', () => {
     reconcileVehicleReservations(state);
 
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
   });
 
   it("interrupts (status back to 'queued') an employee whose reserved vehicle no longer exists, while still travelling (taskTicksRemaining null)", () => {
@@ -602,115 +660,60 @@ describe('isMidVehicleGatedWork', () => {
   });
 });
 
-// #954 follow-up: a vehicle-gated queue entry reserved via
-// reserveOnePoolActionAhead, but never boarded (driverId still null), can
-// otherwise stay locked to its holder forever once resolveActionCost's own
-// occupancy check correctly and permanently refuses to promote a claim whose
-// holder's own foot-walk to the vehicle is genuinely blocked. No test
-// previously referenced this predicate by name.
-describe('canReassignStrandedReservation', () => {
-  it('is true: reserved vehicle has no driver yet, and a different idle, licensed employee exists', () => {
+// #1090: completeVehicleGatedAction replaces VehicleContinuity.ts's
+// completeVehicleGatedActionIfApplicable — cost (and any same-role follow-up)
+// is now the planner's own concern (resolveActionCost/planItinerary), so this
+// no longer needs its own continuity fast path or a boolean "did it handle
+// this" contract: it just releases the reservation (claim-only, #1090) and
+// completes the PendingAction.
+describe('completeVehicleGatedAction (#1090)', () => {
+  it('releases the reservation and completes the PendingAction, leaving a boarded driver mounted (happy path)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 1, holderId: holder.id, status: 'assigned' });
+    const action = makeAction(state, { id: 1, holderId: employee.id, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
     vehicle.reservedForActionId = action.id;
-    // vehicle.driverId stays null — never boarded.
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
-    expect(canReassignStrandedReservation(state, action)).toBe(true);
+    completeVehicleGatedAction(state, action.id);
+
+    expect(state.pendingActions.find(a => a.id === action.id)).toBeUndefined();
+    expect(vehicle.reservedForActionId).toBeNull();
+    // Nothing dismounts on completion (#1090) — continuity for a same-role
+    // follow-up is now entirely the planner's own emergent ranking.
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
   });
 
-  it('is false when the action requires no vehicle role (boundary: requiredVehicleRole null)', () => {
+  it('is a no-op (does not throw) when actionId does not resolve to any PendingAction (boundary)', () => {
     const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    hireEmployee(state.employees, 'driller', rng); // a different idle employee exists, but is moot here
-    const action = makeAction(state, { id: 2, holderId: holder.id, status: 'assigned', requiredVehicleRole: null });
 
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
+    expect(() => completeVehicleGatedAction(state, 999999)).not.toThrow();
+    expect(state.pendingActions).toHaveLength(0);
   });
 
-  it('is false when no vehicle is currently reserved for the action', () => {
+  it('a vehicle-gated action with no reservation held (already released) still completes the PendingAction cleanly (rejection: nothing to release)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
-    const action = makeAction(state, { id: 3, holderId: holder.id, status: 'assigned' });
-    // No purchaseVehicle/reservedForActionId set for this action at all.
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const action = makeAction(state, { id: 2, holderId: employee.id, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    // No vehicle purchased/reserved at all for this action.
 
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
-  });
-
-  it('is false when the reserved vehicle already has a driver — real boarding progress must never be discarded here', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 4, holderId: holder.id, status: 'assigned' });
-    vehicle.reservedForActionId = action.id;
-    vehicle.driverId = holder.id; // already boarded — has a driver
-
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
-  });
-
-  it('is false when no other employee is licensed for the role, even though one is idle', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    hireEmployee(state.employees, 'driller', rng); // idle, but no driving.drill_rig qualification assigned
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 5, holderId: holder.id, status: 'assigned' });
-    vehicle.reservedForActionId = action.id;
-
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
-  });
-
-  it('is false when the only licensed other employee is not idle (mid-task)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
-    other.activeActionId = 999; // busy on a different action
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 6, holderId: holder.id, status: 'assigned' });
-    vehicle.reservedForActionId = action.id;
-
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
-  });
-
-  it('is false when the only licensed other employee is resting', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
-    other.restTicksRemaining = 5;
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 7, holderId: holder.id, status: 'assigned' });
-    vehicle.reservedForActionId = action.id;
-
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
-  });
-
-  it('is false when the reservation\'s own holder is the only licensed idle employee (excluded — self is never the reassignment target)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee: holder } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, holder.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    const action = makeAction(state, { id: 8, holderId: holder.id, status: 'assigned' });
-    vehicle.reservedForActionId = action.id;
-
-    expect(canReassignStrandedReservation(state, action)).toBe(false);
+    expect(() => completeVehicleGatedAction(state, action.id)).not.toThrow();
+    expect(state.pendingActions.find(a => a.id === action.id)).toBeUndefined();
   });
 });
+
+// #1090: canReassignStrandedReservation (and the stranded-reservation-
+// reassignment branch in EmployeeDispatchSteps.ts that called it) is deleted
+// — the whole mechanism it existed for (VehicleContinuity.ts) is gone.
 
 // ── #974: releaseVehicleReservation must abort vehicle-gated fragment work
 // (haul/break in flight) BEFORE unassigning the driver. unassignDriver
@@ -735,8 +738,8 @@ function makeCargoFragment(id: number, mass = 850): FragmentData {
   };
 }
 
-describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work first (#974)', () => {
-  it('a vehicle mid-haul (to_depot, cargo loaded) releases fully: driver unassigned, reservation cleared, haul state cleared, and the cargo fragment is returned to the ground instead of permanently lost', () => {
+describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work first (#974, updated for #1090\'s claim-only release)', () => {
+  it('a vehicle mid-haul (to_depot, cargo loaded) releases fully: haul state cleared, cargo fragment returned to the ground instead of permanently lost, reservation cleared, driver left mounted (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -758,10 +761,12 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     releaseVehicleReservation(state, 100);
 
-    // The bug this regression pins: without aborting the haul first,
+    // The #974 bug this regression pins: without aborting the haul first,
     // unassignDriver refuses while haulingPhase !== null and driverId stays
-    // stuck forever.
-    expect(vehicle.driverId).toBeNull();
+    // stuck forever. #1090: the driver is never unassigned by a plain
+    // release any more anyway — only the fragment-work abort's own cleanup
+    // (haul state, cargo) matters here now.
+    expect(vehicle.driverId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBeNull();
     expect(vehicle.haulingPhase).toBeNull();
     expect(vehicle.haulingFragmentId).toBeNull();
@@ -774,13 +779,11 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     expect(cargo.vehicleId).toBeNull();
   });
 
-  it('the released vehicle becomes claimable again via findFreeVehicleForRole (permanently-unclaimable bug is actually fixed)', () => {
+  it('the released vehicle remains claimable by its own still-mounted driver via findFreeVehicleForRole — continuity by distance, not a special case (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-    const { employee: freshDriver } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, freshDriver.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
     pickupFragment(state.logistics, 1, String(vehicle.id));
@@ -795,12 +798,16 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     releaseVehicleReservation(state, 101);
 
-    const picked = findFreeVehicleForRole(state, 'debris_hauler', freshDriver);
+    // #1090: the driver is still mounted, so the vehicle qualifies for them
+    // again (findFreeVehicleForRole's own driverId === employee.id branch of
+    // its qualifying filter) — reclaimed via ordinary distance-based ranking,
+    // not a dedicated continuity shortcut.
+    const picked = findFreeVehicleForRole(state, 'debris_hauler', employee);
     expect(picked).not.toBeNull();
     expect(picked!.id).toBe(vehicle.id);
   });
 
-  it('a vehicle mid-break releases fully: driver unassigned, reservation cleared, break state cleared', () => {
+  it('a vehicle mid-break releases fully: break state cleared, reservation cleared, driver left mounted (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -819,7 +826,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     releaseVehicleReservation(state, 102);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBeNull();
     expect(vehicle.breakPhase).toBeNull();
     expect(vehicle.breakFragmentId).toBeNull();
@@ -827,7 +834,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     expect(vehicle.state).toBe('idle');
   });
 
-  it('a vehicle with neither phase set keeps the existing (pre-#974) release behaviour unchanged', () => {
+  it('a vehicle with neither phase set: same claim-only release as the plain case (#1090)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -841,73 +848,13 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     releaseVehicleReservation(state, 103);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBeNull();
     expect(vehicle.task).toBe('idle');
     expect(vehicle.state).toBe('idle');
   });
 });
 
-describe('releaseVehicleReservationKeepDriver clears in-flight fragment work the same way, while keeping its own driver-retention contract (#974)', () => {
-  it('a vehicle mid-haul (to_depot, cargo loaded): reservation clears, haul state clears, cargo returns to ground, but the driver stays seated (this function\'s own existing contract)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
-
-    vehicle.driverId = employee.id;
-    vehicle.reservedForActionId = 200;
-    vehicle.haulingFragmentId = 1;
-    vehicle.haulingPhase = 'to_depot';
-    vehicle.payloadKg = 850;
-
-    releaseVehicleReservationKeepDriver(state, 200);
-
-    expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.haulingFragmentId).toBeNull();
-    // Driver-retention is this function's own contract — untouched.
-    expect(vehicle.driverId).toBe(employee.id);
-    const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
-    expect(cargo.state).toBe('on_ground');
-    expect(cargo.vehicleId).toBeNull();
-  });
-
-  it('a vehicle mid-break: reservation clears, break state clears, driver stays seated', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
-    addBlastFragments(state.logistics, [makeCargoFragment(2, 5000)]);
-
-    vehicle.driverId = employee.id;
-    vehicle.reservedForActionId = 201;
-    vehicle.breakFragmentId = 2;
-    vehicle.breakPhase = 'to_boulder';
-
-    releaseVehicleReservationKeepDriver(state, 201);
-
-    expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.breakPhase).toBeNull();
-    expect(vehicle.breakFragmentId).toBeNull();
-    expect(vehicle.driverId).toBe(employee.id);
-  });
-
-  it('a vehicle with neither phase set keeps the existing (pre-#974) keep-driver release behaviour unchanged', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
-    vehicle.reservedForActionId = 202;
-
-    releaseVehicleReservationKeepDriver(state, 202);
-
-    expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBe(employee.id);
-  });
-});
+// #1090: releaseVehicleReservationKeepDriver is deleted — releaseVehicleReservation
+// itself is now claim-only (see the describe blocks above), so a dedicated
+// driver-retaining variant is redundant and gone along with it.

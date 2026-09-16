@@ -11,8 +11,12 @@ import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { completePendingAction, dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
-import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
-import { tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../../src/core/engine/VehicleContinuity.js';
+// #1090: VehicleContinuity.ts (tryContinueVehicleGatedAction,
+// completeVehicleGatedActionIfApplicable) is deleted — completeVehicleGatedAction
+// (VehicleReservation.ts) is now the sole vehicle-gated completion entry
+// point, with no continuity fast path of its own (resolveActionCost/
+// planItinerary own that now).
+import { completeVehicleGatedAction } from '../../../src/core/engine/VehicleReservation.js';
 import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
 import { EVACUATION_HOLD_KEY } from '../../../src/core/engine/Evacuation.js';
 import {
@@ -1069,289 +1073,13 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// #1000 — a long-starved on-foot action (requiredVehicleRole: null) must win
-// dispatch over tryContinueVehicleGatedAction's same-role vehicle-continuity
-// fast path, so a deep same-role backlog (e.g. haul_debris) can never starve
-// out an unclaimed place_building/survey/demolish_building order forever.
-// ═══════════════════════════════════════════════════════════════════════════
+// #1090: VehicleContinuity.ts's completeVehicleGatedActionIfApplicable (and the #1000/#1002
+// starvation-override/taskQueue-vehicle-release describe blocks that used to live here,
+// testing it directly) is deleted. findStarvedActionForEmployee itself still exists
+// and is covered directly in ActionSelection.test.ts; starvation now wins dispatch
+// purely through the normal cost-ranked pool, with no dedicated vehicle-gated
+// completion fast path to test here any more.
 
-describe('completeVehicleGatedActionIfApplicable — starved on-foot action interrupt (#1000)', () => {
-  const SEED = 42;
-  const STARVED_AT_TICK = 1000;
-
-  function makeFlatNavGrid(width: number, height: number): NavGrid {
-    const cells: NavCell[][] = [];
-    for (let z = 0; z < height; z++) {
-      const row: NavCell[] = [];
-      for (let x = 0; x < width; x++) {
-        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
-      }
-      cells.push(row);
-    }
-    return new NavGrid(width, height, cells);
-  }
-
-  /** Block an entire column (every row) — an impassable vertical wall at world x. */
-  function blockColumn(grid: NavGrid, x: number): void {
-    for (let z = 0; z < grid.height; z++) {
-      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
-    }
-  }
-
-  /**
-   * A driver mid-vehicle-chain on a debris_hauler, having just finished
-   * `completedAction` (id 1): a same-role backlog action (id 2, open,
-   * reachable, no skill required) and an on-foot starved candidate (id 3,
-   * queued, unclaimed, no skill/target-employee restriction, queuedAtTick set
-   * exactly at ACTION_STARVATION_TICK_THRESHOLD) both sit in the pool. Each
-   * test below mutates the returned pieces to probe one boundary of
-   * findStarvedActionForEmployee's filter.
-   */
-  function makeFixture() {
-    const state = createGame({ seed: SEED });
-    state.tickCount = STARVED_AT_TICK;
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.driverId = employee.id;
-    vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-
-    const completedAction: PendingAction = {
-      id: 1,
-      type: 'general_work',
-      requiredSkill: null,
-      requiredVehicleRole: 'debris_hauler',
-      targetX: 0, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'in_progress',
-      holderId: employee.id,
-      queuedAtTick: 0,
-    };
-    vehicle.reservedForActionId = completedAction.id;
-    employee.activeActionId = completedAction.id;
-
-    const sameRoleBacklog: PendingAction = {
-      id: 2,
-      type: 'general_work',
-      requiredSkill: null,
-      requiredVehicleRole: 'debris_hauler',
-      targetX: 2, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'queued',
-      holderId: null,
-      queuedAtTick: 0,
-    };
-
-    const starvedCandidate: PendingAction = {
-      id: 3,
-      type: 'place_building',
-      requiredSkill: null,
-      requiredVehicleRole: null,
-      targetX: 4, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'queued',
-      holderId: null,
-      queuedAtTick: STARVED_AT_TICK - ACTION_STARVATION_TICK_THRESHOLD,
-    };
-
-    state.pendingActions.push(completedAction, sameRoleBacklog, starvedCandidate);
-
-    return { state, employee, vehicle, completedAction, sameRoleBacklog, starvedCandidate };
-  }
-
-  it('a long-starved unclaimed on-foot action wins dispatch over same-role vehicle continuity', () => {
-    const { state, employee, vehicle, sameRoleBacklog, starvedCandidate } = makeFixture();
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(starvedCandidate.id);
-    const landedStarved = state.pendingActions.find(a => a.id === starvedCandidate.id)!;
-    expect(landedStarved.status).toBe('assigned');
-    expect(landedStarved.holderId).toBe(employee.id);
-
-    // The employee dismounts — the vehicle is fully released, not carried
-    // over onto the starved (on-foot) action.
-    expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
-
-    // The same-role backlog candidate that lost out stays open for someone
-    // else — it must not be silently claimed or discarded.
-    expect(state.pendingActions.find(a => a.id === sameRoleBacklog.id)!.status).toBe('queued');
-  });
-
-  it('one tick short of the starvation threshold, same-role vehicle continuity proceeds normally', () => {
-    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
-    starvedCandidate.queuedAtTick = STARVED_AT_TICK - (ACTION_STARVATION_TICK_THRESHOLD - 1);
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
-    expect(state.pendingActions.find(a => a.id === sameRoleBacklog.id)!.status).toBe('assigned');
-
-    const untouchedStarved = state.pendingActions.find(a => a.id === starvedCandidate.id)!;
-    expect(untouchedStarved.status).toBe('queued');
-    expect(untouchedStarved.holderId).toBeNull();
-  });
-
-  it('a starved candidate the employee is not qualified for is skipped — same-role continuity proceeds as if it did not exist', () => {
-    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
-    starvedCandidate.requiredSkill = 'geology'; // employee (a hauler driver) holds no geology qualification
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
-    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
-  });
-
-  it('an unreachable starved candidate is skipped — same-role continuity proceeds normally', () => {
-    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
-    const grid = makeFlatNavGrid(30, 5);
-    blockColumn(grid, 10); // isolates x=25 (the starved candidate's target) from x=0 (employee/vehicle)
-    state.navGrid = grid;
-    starvedCandidate.targetX = 25;
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
-    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
-  });
-
-  it('a starved candidate targeted at a different employee is never force-assigned to this one, even past threshold', () => {
-    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
-    starvedCandidate.targetEmployeeId = employee.id + 9999; // some other employee's id
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
-    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
-  });
-
-  it('falls through to normal continuity when the starved candidate\'s evacuation hold is active (#1000 review)', () => {
-    const { state, employee, sameRoleBacklog, starvedCandidate } = makeFixture();
-    // Employee's own position (0,0) sits inside the active zone, so
-    // isEvacuationHoldActive reads the zone as still occupied.
-    state.zone.activeZone = { x1: 0, z1: 0, x2: 5, z2: 5 };
-    starvedCandidate.payload = { [EVACUATION_HOLD_KEY]: true };
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    expect(employee.activeActionId).toBe(sameRoleBacklog.id);
-    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('queued');
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// #1002 — the #1000 starvation-override dismount (completeVehicleGatedActionIfApplicable's
-// starved branch) bypasses employee.taskQueue entirely when it sends the
-// employee off on an on-foot detour. If that taskQueue already held an
-// earlier same-role follow-up reserveOnePoolActionAhead reserved a vehicle
-// for, that vehicle must not stay reserved-but-idle for the whole detour — it
-// has to be released back to the open pool so a different, idle, same-role
-// driver can claim it immediately.
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('completeVehicleGatedActionIfApplicable — releases a taskQueue-held vehicle reservation on starvation override (#1002)', () => {
-  const SEED = 42;
-  const STARVED_AT_TICK = 1000;
-
-  it("frees the taskQueue-reserved vehicle so a different, idle, same-role employee can claim it the very next tickEmployees call — instead of it sitting locked to the dismounted driver's on-foot detour", () => {
-    const state = createGame({ seed: SEED });
-    state.tickCount = STARVED_AT_TICK;
-    const rng = new Random(SEED);
-
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-
-    const { vehicle: activeVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    activeVehicle.driverId = employee.id;
-
-    const completedAction: PendingAction = {
-      id: 1,
-      type: 'general_work',
-      requiredSkill: null,
-      requiredVehicleRole: 'debris_hauler',
-      targetX: 0, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'in_progress',
-      holderId: employee.id,
-      queuedAtTick: 0,
-    };
-    activeVehicle.reservedForActionId = completedAction.id;
-    employee.activeActionId = completedAction.id;
-
-    // The long-starved on-foot action the override will send `employee` to
-    // instead of continuing the same-role vehicle chain.
-    const starvedCandidate: PendingAction = {
-      id: 2,
-      type: 'place_building',
-      requiredSkill: null,
-      requiredVehicleRole: null,
-      targetX: 4, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'queued',
-      holderId: null,
-      queuedAtTick: STARVED_AT_TICK - ACTION_STARVATION_TICK_THRESHOLD,
-    };
-
-    // Already reserved one pool action ahead (reserveOnePoolActionAhead, a
-    // prior tick): claimed, sitting in employee.taskQueue, with its own
-    // vehicle reserved but never boarded.
-    const { vehicle: queuedVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 8, 0);
-    const queuedFollowUp: PendingAction = {
-      id: 3,
-      type: 'general_work',
-      requiredSkill: null,
-      requiredVehicleRole: 'debris_hauler',
-      targetX: 8, targetZ: 0, targetY: 0,
-      payload: {},
-      targetEmployeeId: null,
-      status: 'assigned',
-      holderId: employee.id,
-      queuedAtTick: 0,
-    };
-    queuedVehicle.reservedForActionId = queuedFollowUp.id;
-    employee.taskQueue = [queuedFollowUp.id];
-
-    state.pendingActions.push(completedAction, starvedCandidate, queuedFollowUp);
-
-    // A second, idle, same-role-licensed employee standing by, who should be
-    // able to claim the just-freed vehicle+action immediately.
-    const { employee: other } = hireEmployee(state.employees, 'driller', rng, 8, 0);
-    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-
-    completeVehicleGatedActionIfApplicable(state, employee, 1);
-
-    // The starvation override fired as in #1000.
-    expect(employee.activeActionId).toBe(starvedCandidate.id);
-    expect(state.pendingActions.find(a => a.id === starvedCandidate.id)!.status).toBe('assigned');
-
-    // The taskQueue-held follow-up is no longer on employee's own queue, and
-    // is fully back in the open pool — not left reserved-but-idle.
-    expect(employee.taskQueue).not.toContain(queuedFollowUp.id);
-    const releasedFollowUp = state.pendingActions.find(a => a.id === queuedFollowUp.id)!;
-    expect(releasedFollowUp.status).toBe('queued');
-    expect(releasedFollowUp.holderId).toBeNull();
-    expect(queuedVehicle.reservedForActionId).toBeNull();
-
-    // A different, idle, same-role employee can claim the freed vehicle+action
-    // on the very next dispatch pass — no need to wait for `employee` to
-    // finish their on-foot detour and return.
-    tickEmployees(state);
-
-    expect(other.activeActionId).toBe(queuedFollowUp.id);
-    expect(state.pendingActions.find(a => a.id === queuedFollowUp.id)!.holderId).toBe(other.id);
-    expect(queuedVehicle.reservedForActionId).toBe(queuedFollowUp.id);
-  });
-});
 
 describe('drill_hole actions — dispatch and landing (#553)', () => {
   const SEED = 42;
@@ -1392,11 +1120,13 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
    * One full dispatch -> movement -> arrival -> work-tick pass, mirroring the
    * real tick command (events.ts) but trimmed to what this suite exercises.
    * On completion of a drill_hole action, performs the same landing step the
-   * console tick pipeline is expected to: continuity-promote the vehicle to a
-   * follow-up hole if one is available, else release it, then move the
-   * completed hole from plannedDrillHoles into drillHoles via
-   * landDrilledHole. Returns the ids of holes that landed this tick, in
-   * completion order.
+   * console tick pipeline is expected to (#1090): completeVehicleGatedAction
+   * releases the vehicle-gated action's own reservation (claim-only — the
+   * driver stays mounted; any same-role follow-up is picked up through the
+   * planner's own cost-ranked dispatch on a later tick, not a dedicated
+   * continuity fast path here), then the completed hole moves from
+   * plannedDrillHoles into drillHoles via landDrilledHole. Returns the ids of
+   * holes that landed this tick, in completion order.
    */
   function runFullTickAndLandDrilledHoles(state: GameState): string[] {
     tickEmployees(state);
@@ -1413,10 +1143,10 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
       const holeId = completingAction?.payload['holeId'] as string | undefined;
 
       if (completingAction && completingAction.requiredVehicleRole !== null) {
-        const continued = tryContinueVehicleGatedAction(state, emp, completingAction);
-        if (!continued) releaseVehicleOnCompletion(state, emp, progress.actionId);
+        completeVehicleGatedAction(state, progress.actionId);
+      } else {
+        completePendingAction(state, progress.actionId);
       }
-      completePendingAction(state, progress.actionId);
 
       if (holeId !== undefined) {
         const idx = state.plannedDrillHoles.findIndex(h => h.id === holeId);

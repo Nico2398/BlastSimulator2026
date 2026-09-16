@@ -62,6 +62,14 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
+// #1090: cost-delegates-to-planner + continuity deletion — interruptActiveAction
+// is used directly below (mid-drive interruption test) rather than only
+// through a console command, mirroring VehicleReservation.test.ts's own
+// pattern of driving the real call chain; forceShiftRestIfNeeded is used
+// directly to pin the new alight-before-rest-walk guard without needing to
+// time a console `tick` sequence against WORK_DURATION_TICKS exactly.
+import { interruptActiveAction } from '../../src/core/engine/TaskDispatch.js';
+import { forceShiftRestIfNeeded } from '../../src/core/engine/ForceShiftRest.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -761,7 +769,7 @@ describe('Vehicle fleet', () => {
       return eid;
     }
 
-    it('walks to the vehicle, boards, drives, works, and completes — XP granted, action removed, vehicle released and driver dismounted', () => {
+    it('walks to the vehicle, boards, drives, works, and completes — XP granted, action removed, vehicle reservation released, driver stays mounted (#1090: no boarding/dismounting on normal completion)', () => {
       const eid = hireLicensedDriller();
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
@@ -784,8 +792,14 @@ describe('Vehicle fleet', () => {
       expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
       const xpAfter = emp.qualifications.find(q => q.category === 'blasting')!.xp;
       expect(xpAfter).toBeGreaterThan(xpBefore);
+      // completeVehicleGatedAction (#1090) releases the CLAIM — the
+      // reservation — but never dismounts: the driver stays seated in the
+      // vehicle they just finished working, ready for the planner's own cost
+      // ranking to pick the same vehicle again for a same-role follow-up
+      // (continuity is now emergent, not a bolted-on mechanism).
       expect(vehicle.reservedForActionId).toBeNull();
-      expect(vehicle.driverId).toBeNull();
+      expect(vehicle.driverId).toBe(eid);
+      expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
       expectNoWorldInvariantViolations(ctx.state!);
     });
 
@@ -926,6 +940,135 @@ describe('Vehicle fleet', () => {
       // resting (collapsed mid-walk to the newly-available vehicle) —
       // tickCollapse must release that taskQueue-held reservation too, or it
       // sits stale (I5_reservation_without_valid_holder) for the whole rest.
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+
+    // #1090: continuity is now emergent (a mounted employee's next planned
+    // itinerary has a zero-length first leg, so it naturally beats an
+    // on-foot candidate's cost) rather than a bolted-on mechanism — so
+    // releasing a vehicle-gated reservation, on its own, must never dismount
+    // the driver. Only a deliberate caller (the forced-rest rest-walk, tested
+    // separately below) alights on purpose.
+    it('an interruption mid-drive that is not a forced rest releases the vehicle claim but leaves mount state untouched — resumes with no re-board event and without the vehicle resetting toward its boarding cell (#1090)', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Simulate "boarded, mid-drive, not yet arrived" — driver aboard, work
+      // timer not yet seeded (taskTicksRemaining null), vehicle already well
+      // off its spawn cell so a reset back toward it is observable.
+      ctx.state!.pendingActions[0]!.status = 'in_progress';
+      ctx.state!.pendingActions[0]!.holderId = eid;
+      emp.activeActionId = actionId;
+      vehicle.driverId = eid;
+      vehicle.occupantIds = [eid];
+      emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      vehicle.reservedForActionId = actionId;
+      emp.taskTicksRemaining = null;
+      vehicle.x = 8; vehicle.z = 8; emp.x = 8; emp.z = 8;
+
+      let boardEvents = 0;
+      ctx.emitter.on('vehicle:driver_boarded', (payload: unknown) => {
+        const { vehicleId } = payload as { employeeId: number; vehicleId: number };
+        if (vehicleId === vehicle.id) boardEvents++;
+      });
+
+      interruptActiveAction(ctx.state!, emp, actionId);
+
+      // The claim itself releases...
+      expect(vehicle.reservedForActionId).toBeNull();
+      // ...but a plain (non-rest) interruption leaves mount state completely
+      // untouched — no dismount as a side effect of releasing the claim.
+      expect(vehicle.driverId).toBe(eid);
+      expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(vehicle.x).toBe(8);
+      expect(vehicle.z).toBe(8);
+
+      // Resuming never re-boards (the employee never left the vehicle) and
+      // the vehicle never resets back toward its original spawn/boarding
+      // cell (0,0) — the interrupted action resumes as the SAME already-
+      // mounted claim, not a fresh walk-and-reboard.
+      let sawResetTowardSpawn = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === actionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.x === 0 && vehicle.z === 0) sawResetTowardSpawn = true;
+      }
+
+      expect(boardEvents).toBe(0);
+      expect(sawResetTowardSpawn).toBe(false);
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+
+    // #1090: ForceShiftRest.ts's finishForceRest gets a NEW alight-before-
+    // rest-walk guard — the rest-walk itself is an on-foot destination, and
+    // since a plain release no longer dismounts (see the test just above),
+    // the mid-drive forced-rest path has to alight deliberately, on its own,
+    // before beginRestWalk sends the employee off on foot. Distinct from the
+    // "resumes without dismount" case above: that one is about release
+    // WITHOUT resting; this one is specifically the forced-rest path, where
+    // alighting IS required.
+    it('a driver forced to rest while mid-drive alights (mount state -> unmounted) before the rest-walk begins (#1090)', () => {
+      ctx.state!.buildings.unlockedTiers.living_quarters = 2;
+      placeBuilding(ctx.state!.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Mid-drive, not yet arrived — the exact phase forceShiftRestIfNeeded's
+      // own #922 unit test already pins as interruptible for the legacy path.
+      ctx.state!.pendingActions[0]!.status = 'in_progress';
+      ctx.state!.pendingActions[0]!.holderId = eid;
+      emp.activeActionId = actionId;
+      vehicle.driverId = eid;
+      vehicle.occupantIds = [eid];
+      emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      vehicle.reservedForActionId = actionId;
+      emp.taskTicksRemaining = null;
+
+      emp.ticksWorked = WORK_DURATION_TICKS;
+      forceShiftRestIfNeeded(ctx.state!, emp, [], []);
+
+      // Deliberately alighted — never left "mounted" as a side effect of a
+      // generic release, but because the rest-walk needs the employee on
+      // foot and finishForceRest alights them on purpose before queuing it.
+      expect(emp.locomotion.kind).toBe('on_foot');
+      expect(vehicle.driverId).toBeNull();
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+
+    it('no boarding/dismounting occurs on normal action completion — completeVehicleGatedAction never triggers alight (#1090)', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      let sawAlightAfterBoarding = false;
+      let boarded = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === actionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId === eid) boarded = true;
+        else if (boarded) sawAlightAfterBoarding = true;
+      }
+
+      // Once boarded, the driller is never dismounted again before the
+      // action fully completes — no reservation-release-triggered alight,
+      // and no completion-triggered alight either.
+      expect(boarded).toBe(true);
+      expect(sawAlightAfterBoarding).toBe(false);
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(vehicle.driverId).toBe(eid);
       expectNoWorldInvariantViolations(ctx.state!);
     });
   });

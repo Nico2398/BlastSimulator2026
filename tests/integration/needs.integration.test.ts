@@ -950,12 +950,22 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
   // staffed:true repro the paragraph above was originally verified against)
   // measures 3 boardings total: the initial boarding plus 2 legitimate
   // policy-forced handoffs produced by this repro's own travel distances and
-  // timing. Ceiling set to that measured baseline (3) plus a +1 fixed margin
-  // — a count of discrete boarding events, so a small fixed margin fits
-  // better than a percentage — tight enough that the 12-cycle pre-fix
-  // regression (or the 3-boarding floor an earlier fixer round wrongly
-  // accepted as unavoidable) still fails loudly.
-  const MAX_EXPECTED_BOARDINGS = 4;
+  // timing.
+  //
+  // #1090: estimateActionCost/resolveActionCost now delegate to
+  // planItinerary, and continuity is emergent (an already-mounted employee's
+  // next planned itinerary has a zero-length first leg, so it naturally
+  // outranks an on-foot candidate) rather than a bolted-on fast path, AND
+  // neither a normal completion nor a plain (non-rest) interruption ever
+  // dismounts any more — only the forced-rest path deliberately alights
+  // before its own rest-walk. That removes the "3rd boarding" this suite's
+  // own #1083 baseline attributed to a wasted handoff-then-abort cycle
+  // (see the numbered root causes above): the ceiling tightens to 2 — the
+  // initial boarding, plus at most one legitimate forced-rest handoff — a
+  // count of discrete boarding events, so a small fixed ceiling fits better
+  // than a percentage. Still tight enough that the 12-cycle pre-fix
+  // regression, or a reboard-per-completion regression, fails loudly.
+  const MAX_EXPECTED_BOARDINGS = 2;
 
   it('boards the rock_digger vehicle a bounded number of times while carving the whole box-cut ramp', () => {
     const engine = createGameEngine();
