@@ -1365,7 +1365,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1378,7 +1378,7 @@
           "tickCount": 0
         }
       },
-      "description": "#553/#593: this charge kills 2. #680: re-measured -- with the tri-state needs-drain retiming, all 24 of the pattern's holes now land before this blast fires (see the drill-wait step above), so both driller/drill_rig pairs are present and this blast now kills 8 (was 7 pre-#680, when one pair was still short a hole and survived to go on and drill pattern 2). The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless -- but, per the charge step's finding above, no player can click Execute to fire it: the bankruptcy overlay has owned the whole screen since tick 132. `expect.blocked` proves that; the command still runs so the real casualty/fleet numbers below keep holding."
+      "description": "#553/#593: this charge kills 2. #680: re-measured -- with the tri-state needs-drain retiming, all 24 of the pattern's holes now land before this blast fires (see the drill-wait step above), so both driller/drill_rig pairs are present and this blast now kills 8 (was 7 pre-#680, when one pair was still short a hole and survived to go on and drill pattern 2). The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless -- but, per the charge step's finding above, no player can click Execute to fire it: the bankruptcy overlay has owned the whole screen since tick 132. `expect.blocked` proves that; the command still runs so the real casualty/fleet numbers below keep holding. #1090-followup (sandbox-measured): this blast now kills 7, not 8 -- deathCount totals 9 (2 + 7), not 10. #1090 deletes VehicleContinuity.ts's same-tick redispatch and routes estimateActionCost/resolveActionCost through planItinerary instead, which changes exactly which employees are still standing near a hole (versus already redispatched elsewhere) at the instant this blast fires; one fewer bystander is caught in it here."
     },
     {
       "command": "state full",
@@ -1391,7 +1391,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1412,7 +1412,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1433,19 +1433,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 0,
           "safety": 50,
-          "ecology": 48.9,
-          "nuisance": 47.25
+          "ecology": 48.86,
+          "nuisance": 47.15
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": "#1103 (mover rebuild, #1089): ecology corrected again, 48.97 -> 48.87, and nuisance 47.425 -> 47.175 -- three genuine fixes landed together for issue #1103 (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle, instead of leaving them nominally \"mounted\" on a vehicle that never moves again; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it, instead of leaving both reserved) -- each shifts exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet, the same cash/ecology/nuisance-only-recalibration shape #1002/#953 above already document for an identical class of dispatch-timing change. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode; the new numbers are exact and reproducible run to run. #953: ecology 50 -> 48.94 and nuisance 50 -> 47.35 are the ramp dug at step 41 showing up in the scores — excavating one is real earthmoving, and this level's first blast now happens on a site that already has a haul road cut into it. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): ecology corrected again, 48.93 -> 48.97, and nuisance 47.325 -> 47.425 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when; that nudges the earthmoving accounted for by the time of this checkpoint. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode (clean, uncontended run — an earlier measurement taken while `npm run test`'s full suite ran concurrently on the same 2-core sandbox produced a stale 47.325 for this one CPU-contended step; every clean rerun since, standalone and in the full `npm run scenarios` batch, reproduces 47.425 exactly); the new number is exact and reproducible run to run. #1107 (merge of main into #1089's branch): ecology corrected again, 48.87 -> 48.9, nuisance 47.175 -> 47.25, and cash -637,450.897 -> -636,943.897 -- tickCollapse now releases a vehicle reservation held by an action still sitting unboarded in a collapsing employee's taskQueue (#1096, PR #1107), and tickEmployees no longer re-reserves it for a collapsing employee on the next tick, so a vehicle returns to the pool for the length of every collapse instead of idling reserved. Same dispatch-timing-only recalibration shape the #1002/#953/#1103 notes above document: deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, standalone and uncontended, matching the same numbers seen in the full `npm run scenarios` batch."
+        "note": "#1090-followup (sandbox-measured): ecology 48.9 -> 48.86, nuisance 47.25 -> 47.15 -- VehicleContinuity.ts's deletion shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every #1103/#1002/#953 fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1103 (mover rebuild, #1089): ecology corrected again, 48.97 -> 48.87, and nuisance 47.425 -> 47.175 -- three genuine fixes landed together for issue #1103 (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle, instead of leaving them nominally \"mounted\" on a vehicle that never moves again; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it, instead of leaving both reserved) -- each shifts exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet, the same cash/ecology/nuisance-only-recalibration shape #1002/#953 above already document for an identical class of dispatch-timing change. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode; the new numbers are exact and reproducible run to run. #953: ecology 50 -> 48.94 and nuisance 50 -> 47.35 are the ramp dug at step 41 showing up in the scores — excavating one is real earthmoving, and this level's first blast now happens on a site that already has a haul road cut into it. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): ecology corrected again, 48.93 -> 48.97, and nuisance 47.325 -> 47.425 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when; that nudges the earthmoving accounted for by the time of this checkpoint. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode (clean, uncontended run — an earlier measurement taken while `npm run test`'s full suite ran concurrently on the same 2-core sandbox produced a stale 47.325 for this one CPU-contended step; every clean rerun since, standalone and in the full `npm run scenarios` batch, reproduces 47.425 exactly); the new number is exact and reproducible run to run. #1107 (merge of main into #1089's branch): ecology corrected again, 48.87 -> 48.9, nuisance 47.175 -> 47.25, and cash -637,450.897 -> -636,943.897 -- tickCollapse now releases a vehicle reservation held by an action still sitting unboarded in a collapsing employee's taskQueue (#1096, PR #1107), and tickEmployees no longer re-reserves it for a collapsing employee on the next tick, so a vehicle returns to the pool for the length of every collapse instead of idling reserved. Same dispatch-timing-only recalibration shape the #1002/#953/#1103 notes above document: deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, standalone and uncontended, matching the same numbers seen in the full `npm run scenarios` batch."
       },
       "description": "#553/#593: wellBeing craters to 0 -- 2 deaths at blast 1 (down from the pre-#593 file's 4, see the blast step above), plus every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it)."
     },
@@ -1460,7 +1460,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1482,7 +1482,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1507,7 +1507,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1527,7 +1527,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1549,7 +1549,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1570,7 +1570,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1607,7 +1607,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1644,7 +1644,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1665,7 +1665,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3,
@@ -1692,7 +1692,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1714,7 +1714,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1738,7 +1738,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1758,7 +1758,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1780,7 +1780,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1800,7 +1800,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1822,7 +1822,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1845,7 +1845,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1988,7 +1988,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2018,7 +2018,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2039,7 +2039,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2060,7 +2060,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2081,7 +2081,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2227,7 +2227,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2249,7 +2249,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2274,7 +2274,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2300,7 +2300,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2321,7 +2321,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2342,7 +2342,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2363,7 +2363,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2388,7 +2388,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2411,7 +2411,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2435,7 +2435,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2455,7 +2455,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2477,7 +2477,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2498,7 +2498,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2511,14 +2511,14 @@
       "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as pattern 1's own accept step. `type:ore_sale` alone happened to still resolve to a genuinely-deliverable contract as of the previous #554/#601 rounds purely because the pool's own rotation coincidentally offered this blast's own ore (rustite) first at those exact tick counts -- not a guarantee: this file's own root-cause fix (freight_warehouse + raised pattern-1 haul wait, see the vehicle-buy-assign and tick-45 steps' own notes) shifts every tick count from blast 1 onward, so the pool this accept actually sees now differs and a bare `type:ore_sale` can no longer be trusted to land on rustite specifically. `type:rubble_disposal` sidesteps that: it consumes raw stored mass regardless of ore content, so it doesn't depend on which specific ore-sale offer the pool happens to be running at this exact tick, only on a rubble-disposal offer existing at all (trace-confirmed). deathCount also moves 10 -> 11 from here to the end of the file -- see this step's own trace note below is carried at the tick-45 step; the extra death is blast 2's own (a different number of holes land charged by shot time now that pattern 1's own wait is 39 ticks longer), not caused by this selector change itself. Same interaction-mode finding as every step past blast 1: accept stays genuinely unreachable (LevelEndScreen since tick 132, this file's own top-level description), `expect.blocked` still proves that, independent of which contract type command mode names. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against."
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:330",
+      "command": "contract deliver type:rubble_disposal amount:360",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:330"
+          "command": "contract deliver type:rubble_disposal amount:360"
         }
       ],
-      "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) and, unlike pattern 1's own two-delivery group, this one contract's own quantity happens to exactly match the amount requested -- the delivery COMPLETES the contract outright (with an early bonus) rather than partially delivering, which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one. #928: amount re-pinned 100 -> 330 -- the single-gauge fatigue model shifted every tick count from here on (fewer proactive need-interruptions, plus the new traveling drain tier and the walk-survival guard in ForceShiftRest.ts), so the pool's own rotation now lands this accept on a different rubble-disposal offer (id 75, quantityKg 330, direct-traced) than the 100kg one this step used to land on; storedMassKg (~1075kg at this tick, direct-traced) comfortably covers it. `expect.blocked` still holds and is still checked in interaction mode only, for the unrelated LevelEndScreen reason (this file's own top-level description) -- see the pattern-1 deliver step's own note for why a succeeding command and a still-blocked interaction control aren't a contradiction. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against.",
+      "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) and, unlike pattern 1's own two-delivery group, this one contract's own quantity happens to exactly match the amount requested -- the delivery COMPLETES the contract outright (with an early bonus) rather than partially delivering, which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one. #928: amount re-pinned 100 -> 330 -- the single-gauge fatigue model shifted every tick count from here on (fewer proactive need-interruptions, plus the new traveling drain tier and the walk-survival guard in ForceShiftRest.ts), so the pool's own rotation now lands this accept on a different rubble-disposal offer (id 75, quantityKg 330, direct-traced) than the 100kg one this step used to land on; storedMassKg (~1075kg at this tick, direct-traced) comfortably covers it. #1090-followup (sandbox-measured): amount re-pinned 330 -> 360 -- VehicleContinuity.ts's deletion shifts every tick count from here on again, so the pool's own rotation now lands this accept on contract #73 (quantityKg 360, direct-traced) instead of the 330kg offer; storedMassKg (~1919.5kg at this tick) comfortably covers it, and the delivery still completes the contract outright (activeContractCount reads 0, not 1, a few steps below) rather than partially delivering. `expect.blocked` still holds and is still checked in interaction mode only, for the unrelated LevelEndScreen reason (this file's own top-level description) -- see the pattern-1 deliver step's own note for why a succeeding command and a still-blocked interaction control aren't a contradiction. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against.",
       "expect": {
         "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
@@ -2535,7 +2535,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2556,7 +2556,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2577,7 +2577,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2612,7 +2612,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2634,7 +2634,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2656,7 +2656,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2678,7 +2678,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2700,7 +2700,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2720,7 +2720,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2742,7 +2742,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2764,7 +2764,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2788,7 +2788,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2809,7 +2809,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2830,7 +2830,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2851,7 +2851,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2877,7 +2877,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2902,7 +2902,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2928,7 +2928,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2949,7 +2949,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2970,7 +2970,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2993,7 +2993,7 @@
       "expect": {
         "blocked": "#bs-event-dialog",
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3015,7 +3015,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3035,7 +3035,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3057,7 +3057,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3078,7 +3078,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3115,7 +3115,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3136,18 +3136,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 0.2999999999999993,
+          "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": "#1090-followup (sandbox-measured): wellBeing 0.3 -> 0 -- VehicleContinuity.ts's deletion shifts dispatch timing enough that wellBeing's own decay lands exactly on its floor by this checkpoint instead of a hair above it."
       }
     },
     {
@@ -3161,7 +3162,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3182,7 +3183,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3203,7 +3204,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3230,7 +3231,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3252,7 +3253,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3276,7 +3277,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3296,7 +3297,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3318,7 +3319,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3338,7 +3339,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3360,7 +3361,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3380,7 +3381,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3402,7 +3403,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3422,7 +3423,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3444,7 +3445,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3466,7 +3467,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3490,7 +3491,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3511,7 +3512,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3532,7 +3533,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3553,7 +3554,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3579,7 +3580,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3604,7 +3605,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3630,7 +3631,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3651,7 +3652,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3672,7 +3673,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3692,7 +3693,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3714,7 +3715,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3734,7 +3735,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3756,7 +3757,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3777,7 +3778,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3790,14 +3791,14 @@
       "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`. This is pattern 4's own contract group -- same reasoning as pattern 3's own accept step above: pattern 4's blast (a few steps below) also clears 0 voxels / yields 0 fragments (this file's own top-level description: both drill_rigs destroyed at blast 2, never replaced, so patterns 3 and 4 are both 'genuinely phantom'). What's deliverable here is the same leftover pattern-1/2 stock pattern 3's own group drew down further, not this pattern's own (nonexistent) output; direct trace confirms storedMassKg still comfortably nonzero at this step. `type:rubble_disposal` reaches it without needing to match a specific ore the pool may or may not be offering at this exact tick. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against. TODO(#815): this contract never becomes available -- the site's economy has already collapsed into bankruptcy well before this point in the file, root cause not yet found. Declared refused (honest, not fixed) until #815 lands. #556: no longer declared refused. The construction time this file now spends on its freight warehouse moves every beat below it, and at this tick the offer pool genuinely carries a rubble_disposal the console accepts. The UI-side claim is unchanged and is what this guard is really about: the level has already ended, so the contracts panel itself stays unreachable (expect.blocked)."
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:350",
+      "command": "contract deliver type:rubble_disposal amount:420",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:350"
+          "command": "contract deliver type:rubble_disposal amount:420"
         }
       ],
-      "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 250kg, so the 350kg requested caps down to 250kg and the delivery COMPLETES the contract outright (with an early bonus), same completes-immediately shape as patterns 2 and 3's own groups above, which is why `activeContractCount` reads 0, not 1, at every step for the rest of this file despite the accept just above genuinely having added one. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main; `usable` on goto-ops also dropped there -- covered by the same overlay as everything else. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against. TODO(#815): same root cause as the accept step above -- never reachable while the site is this far bankrupt. #556: no longer declared refused. The construction time this file now spends on its freight warehouse moves every beat below it, and at this tick the offer pool genuinely carries a rubble_disposal the console accepts. The UI-side claim is unchanged and is what this guard is really about: the level has already ended, so the contracts panel itself stays unreachable (expect.blocked).",
+      "description": "issue #585 (originally command-mode-only): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 250kg, so the 350kg requested caps down to 250kg and the delivery COMPLETES the contract outright (with an early bonus), same completes-immediately shape as patterns 2 and 3's own groups above, which is why `activeContractCount` reads 0, not 1, at every step for the rest of this file despite the accept just above genuinely having added one. #1090-followup (sandbox-measured): amount re-pinned 350 -> 420 -- VehicleContinuity.ts's deletion shifts every tick count from here on again, so the pool's own rotation now lands this accept on contract #151 (420kg, direct-traced) instead of the 250kg offer; storedMassKg (~1644.5kg at this tick) comfortably covers it, and the delivery still completes the contract outright. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main; `usable` on goto-ops also dropped there -- covered by the same overlay as everything else. #674 (declared-vs-actual command mismatch, the one thing .claude/rules/scenario-defs.md forbids outright): the interaction array here still ran the pre-#585 `type:ore_sale` command, so from this step on the two modes accepted and delivered against different contracts -- realigned to this step's own declared `type:rubble_disposal`. The deliver steps' `expect.blocked` moved with it, from a contract card that no longer exists in either mode (the rubble contracts these deliveries land on complete outright, taking their card with them) to `#bs-toolbar [data-panel=\"contracts\"]` -- the control LevelEndScreen's overlay actually covers, and the same selector this file's own accept steps already assert against. TODO(#815): same root cause as the accept step above -- never reachable while the site is this far bankrupt. #556: no longer declared refused. The construction time this file now spends on its freight warehouse moves every beat below it, and at this tick the offer pool genuinely carries a rubble_disposal the console accepts. The UI-side claim is unchanged and is what this guard is really about: the level has already ended, so the contracts panel itself stays unreachable (expect.blocked).",
       "expect": {
         "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
@@ -3814,17 +3815,17 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -636943.8971309054
+          "cash": -780812.2798309447
         },
         "changedBy": {
           "tickCount": 0
         }
       },
-      "description": "#1103 (mover rebuild, #1089): cash corrected again, -637,051.8971309054 -> -637,450.8971309054 -- same three genuine fixes as the step-62 `scores` checkpoint's own #1103 note above (PlanItinerary.ts's off-navmesh-target refusal, EmployeeDispatchSteps.ts/PlanItinerary.ts's alight-before-walking-away-mounted fix, and VehicleContinuity.ts's stale-reservation release), each shifting exactly which vehicle drives which trip and when across this file's ~3,000-tick run; deathCount (10), employeeCount (12), activeContractCount (0), surveyCount (3), and tickCount (unchanged, `changedBy: 0`) all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, cash exact and reproducible run to run. #1008 (footprint-flatness enforced on placement): cash corrected again, -637,109.8971309054 -> -637,127.8971309054 -- the freight_warehouse build step above moved from (2,8) to (6,0), the nearest flat 4x4 site once the new footprint-flatness check rejected (2,8) (see that step's own note). tickCount (3013), deathCount (10), employeeCount (12), activeContractCount (0), and surveyCount (3) all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --mode command --scenario level2-playthrough-win --screenshots`, command mode; every hauling/haul-return trip between the dig site and the warehouse is now a slightly different distance, which shifts the fuel/payroll ticks each trip costs across the file's ~3,000-tick run the same cash-only-recalibration way every fix below already documents, not a defect. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): cash corrected again, -637,076.8971309054 -> -637,109.8971309054 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet; that nudges the fuel/payroll costs accumulated tick-by-tick. deathCount, employeeCount, activeContractCount, and surveyCount all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #959 (merged with #973): cash corrected again, -637,733.8971309054 -> -637,076.8971309054. #973's partial-fragment split (main) and #959's own consumeStoredOre changes (collectedOre decremented for whatever a rubble sale physically removes, barren fragments preferred over ore-bearing ones) were each measured against the same pre-merge base and each re-pinned this step on their own; the merged behaviour is neither number. Selling barren waste first leaves more ore-bearing mass in storage for this file's own later contract-deliver steps to sell for real money, and the split keeps the surplus of every partially-consumed fragment instead of destroying it -- the two together raise cash by exactly 657 over #973 alone. deathCount, employeeCount, activeContractCount, surveyCount and tickCount all reproduce unchanged. Direct-verified via `npm run scenarios`, command mode; the new number is exact and reproducible run to run. deathCount, employeeCount, activeContractCount, surveyCount, and tickCount all reproduce unchanged -- direct-verified via `npx tsx scripts/run-all-scenarios.ts level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #947 (driver-gated vehicle movement -- canTickVehicle now requires a driver aboard to advance on tick at all, and VehicleOccupancyReroute's blocker relocation now requires one too): cash corrected again, -909,884.64 -> -910,556.64 -- a vehicle idle or blocking another one's target cell that previously got silently nudged aside (or drove itself, pre-#947, while nobody was aboard) now sits stuck until a qualified driver actually boards it, shifting exactly when this file's own drill_rigs/haulers are driving versus idle versus waiting for a driver throughout the run; that nudges the fuel/payroll/event-roll costs accumulated tick-by-tick, same cash-only-recalibration shape as every fix below. tickCount (2989), deathCount (8), employeeCount (12), activeContractCount (0), surveyCount (3), and the safety/ecology/nuisance/wellBeing checkpoints at the very next `scores` step all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): cash corrected again, -909,576.64 -> -909,884.64 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting exactly when this file's own crew is resting versus working versus driving throughout; that nudges the fuel/payroll/event-roll costs accumulated tick-by-tick. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints all reproduce unchanged -- same cash-only-recalibration shape as every fix above, not a defect. Sandbox-measured (`npm run scenarios -- --report-drift level2-playthrough-win`), command mode; the new number is exact and reproducible run to run. #554: this file's real conclusion, recalibrated. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). Under #554, `charge hole:*` queues one real charge_hole action per hole instead of writing charges instantly, so charging now costs real driller/blaster time on top of #553's already-queued drilling -- the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, same as before. The extra elapsed time before each blast changes who is still standing near the holes when they go off: blast 1 (23/24 holes landed, one driller/rig pair still short) now kills 7, not 2 -- workers who used to be evacuated by an instant charge are now physically present, having just placed it. A missing `wait_until field:orderedHoleCount equals:0` before pattern 2's charge step (added by this recalibration) let charging fire before all 25 holes had landed under the old fixed-tick budget, permanently uncharging whichever landed late and making blast 2 perpetually invalid; with that fixed, blast 2 now fires for real too (25/25 holes, CATASTROPHIC rating) for 2 more deaths (9 total) before both rigs are destroyed and patterns 3-4 drill nothing, exactly as this file's own pre-existing narrative already assumed for the post-fleet-destruction phase. Four accepted ore-sale contracts (via `type:ore_sale`, #554: switched from hardcoded ids that no longer resolve once the pool has rotated past them) each go on to miss their own delivery deadline (storage never holds anything to deliver), so their penalties land too. #554-followup (issue #586 CI): cash corrected -988,551 -> -1,114,951 -- the three real-time waitUntil steps earlier in this file (charge/drill/charge waits, all blocked by the permanent bankruptcy overlay's speed-8x cover) were replaced with deterministic tick-N chunks sized to the exact same real convergence point each waitUntil itself measured (88/91/322 ticks), which reproduces the identical tickCount trajectory throughout -- but chunked ticks and a pure tick-1 waitUntil loop don't necessarily draw randomized per-tick costs (fuel/payroll/event rolls) in bit-identical fashion tick-for-tick, so a real, small, deterministic (fixed-seed, reproducible run-to-run) divergence in accumulated cash survives even with tickCount matching exactly. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #611: cash corrected again, -1,114,951 -> -1,056,119, and deathCount 9 -> 10 (with ecology/nuisance at the step-120 `scores` checkpoint following suit, 39.77/24.42 -> 39.66/24.15) -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking instead of only inside the bounded top-N reachability window, so an employee idle behind a categorically-unclaimable backlog reaches claimable work sooner; that shifts who is still standing near blast 2's holes when they go off (one more death, 10 total) and shifts every tick-dependent cost (fuel/payroll/event rolls) accumulated afterward. Sandbox-measured, command mode; the new number is exact and reproducible run to run. issue #585 (root-cause fix, supersedes the 'each go on to miss their own delivery deadline' sentence above): this file never built a freight_warehouse anywhere in its 187 steps, and every haul/sell path (Logistics.ts) hard-requires an active one before storedMassKg can move off 0.0 -- not a timing gap the old tick budgets could ever have closed. Fixed by repurposing pattern 1's own unused second rock_digger purchase into a $15,000 freight_warehouse (confirmed idle for the whole file both before and after this fix -- this scenario drills no ramps, the only task type a rock_digger claims) and raising the post-blast-1 haul wait 6 -> 45 ticks (both changes traced and explained on their own steps). All 4 contract-deliver groups now genuinely succeed instead of refusing (`type:rubble_disposal` in place of `type:ore_sale`, chosen per-group via direct trace of what each blast actually yields and what the pool actually offers -- see each accept/deliver step's own note); 3 of the 4 contracts happen to complete outright rather than partially deliver (the pool's own first-offered rubble-disposal quantity is smaller than the amount requested in 3 of the 4 cases), which is why `activeContractCount` reads 0, not 1, at every step from here to the end of the file. Building the warehouse and letting hauling actually run for real also nudges the whole downstream trajectory: deathCount 10 -> 11 (blast 2's own charge-completion timing shifts with the extra 39 ticks the haul wait now spends before pattern 2 starts drilling, changing how many holes are charged by shot time -- confirmed stable at 11 across every tick-64 value that lets blast 2 fire at all, not a one-off), tickCount at the final step 2815 -> 2981, and safety/ecology/nuisance/cash at every downstream checkpoint move with it -- all re-derived via direct trace (createGameEngine + runCommand replay of this exact file, command mode), not guessed, and not re-verified by hand past what each step's own `expect` block states. #622 (merge conflict, issue #594 recovery PR): cash corrected again, -772,744 -> -776,524 -- #622 landed on main (computeTaskXpAwards, EmployeeXpRules.ts: an additional driving-licence XP award for vehicle-gated actions) after this file's own #585 fix was branched, so the two were never traced together; direct trace of the combined #585+#622 file (createGameEngine + runCommand replay, command mode) confirms the interaction is cash-only here -- #585's freight_warehouse fix means real vehicle-gated hauling now runs where it previously didn't, so #622's per-action XP award (and its knock-on proficiency/leveling drift) applies more often than on the pre-#585 trajectory #622 was originally measured against, but not enough to cross any timing threshold that would move deathCount, tickCount, or the safety/ecology/nuisance scores -- every other step in this 187-step file (including every other `equals`/`changedBy` assertion) reproduces unchanged. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #689 (idle-vehicle drill deadlock fix): cash corrected again, -944,538.99 -> -935,913.99 -- an idle, unreserved drill_rig or other vehicle sitting exactly on a different vehicle's target cell now gets relocated instead of leaving that vehicle waiting forever (driving was never licence-gated, only claiming a vehicle-gated task was); this file's own fleet occasionally hits exactly that shape, so relocation shifts a handful of vehicles' pathing/idle ticks and the payroll/fuel costs that ride on them, same cash-only-recalibration pattern as #591/#611/#622 above -- every other assertion in this 187-step file (deathCount, tickCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints) reproduces unchanged. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #671 (ore-priority haul dispatch fix): cash corrected again, -935,913.99 -> -935,426.99 -- HaulDispatch/ActionSelection now rank an ore-bearing fragment above a plain one when picking a hauler's next load, so this file's own hauler fleet picks up a slightly different mix of fragments in a slightly different order across its two real blasts; every other assertion in this 187-step file (deathCount, tickCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints) reproduces unchanged, confirming this is the same cash-only-recalibration shape as #591/#611/#622/#689 above, not a defect -- verified by direct run (`scripts/scenario-test.ts --scenario level2-playthrough-win`), command mode, cash exact and reproducible run to run. #922 (driver-position tracking fix): cash corrected again, -935,236.99 -> -934,440.99 -- a vehicle's driver-employee position now tracks the vehicle for real instead of freezing at its boarding cell for the whole drive, which shifts exactly when this file's own hauling/drilling vehicles are considered to have arrived at their targets and so shifts the fuel/payroll ticks each trip actually costs; deathCount, tickCount, employeeCount, activeContractCount, and surveyCount all reproduce unchanged, confirming this is the same cash-only-recalibration shape as every fix above, not a defect -- verified by direct run (`npx tsx scripts/run-all-scenarios.ts level2-playthrough-win`), command mode, cash exact and reproducible run to run. #928 (single-gauge fatigue model + traveling drain tier + ForceShiftRest walk-survival guard): cash corrected again, -934,440.99 -> -909,576.64, and tickCount at the final step 2988 -> 2989 -- collapsing hunger/breakNeed into fatigue alone changes how often an employee is proactively interrupted, and the new `traveling` drain tier plus the guard against cancelling a walk to an already-claimed job both shift exactly when this file's own crew is mid-task versus mid-walk versus mid-forced-rest throughout; that shifts the fuel/payroll/event-roll costs accumulated tick-by-tick and nudges the final tick count by one. wellBeing/nuisance at every downstream checkpoint move with it (2.3 -> 0, 40.3 -> 50 -- wellBeing was already this file's own floor-adjacent value given the bankruptcy/death toll, and the shifted trajectory pins it at the literal 0 floor instead of just above it); deathCount, employeeCount, activeContractCount, surveyCount, safety, and ecology all reproduce unchanged. This step's own contract-deliver amount (100 -> 330, see that step's own note) is the one non-cash-only change #928 required upstream of this checkpoint -- re-traced end to end (`npm run scenarios level2-playthrough-win`), command mode, every value here exact and reproducible run to run. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): cash corrected again, -637,127.8971309054 -> -637,051.8971309054 -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break both shift exactly when this file's own crew is mid-task versus mid-rest throughout the run, nudging the fuel/payroll/event-roll costs accumulated tick-by-tick; deathCount (10), employeeCount (12), activeContractCount (0), surveyCount (3), and tickCount (3013) all reproduce unchanged -- direct-verified via `npm run scenario -- --scenario level2-playthrough-win`, command mode, cash exact and reproducible run to run."
+      "description": "#1090-followup (sandbox-measured): cash corrected again, -636,943.8971309054 -> -780,812.2798309447 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost delegating to planItinerary) shifts exactly which vehicle drives which trip and when across this file's ~3,000-tick run, the same cash-only-recalibration shape every fix below already documents -- amplified here since the two contract-deliver amounts upstream (see those steps' own #1090-followup notes) also had to move to keep their contracts completing outright, changing the ore mix left in storage for the rest of the run. deathCount (9), employeeCount (12), activeContractCount (0), and surveyCount (3) all reproduce unchanged. #1103 (mover rebuild, #1089): cash corrected again, -637,051.8971309054 -> -637,450.8971309054 -- same three genuine fixes as the step-62 `scores` checkpoint's own #1103 note above (PlanItinerary.ts's off-navmesh-target refusal, EmployeeDispatchSteps.ts/PlanItinerary.ts's alight-before-walking-away-mounted fix, and VehicleContinuity.ts's stale-reservation release), each shifting exactly which vehicle drives which trip and when across this file's ~3,000-tick run; deathCount (10), employeeCount (12), activeContractCount (0), surveyCount (3), and tickCount (unchanged, `changedBy: 0`) all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, cash exact and reproducible run to run. #1008 (footprint-flatness enforced on placement): cash corrected again, -637,109.8971309054 -> -637,127.8971309054 -- the freight_warehouse build step above moved from (2,8) to (6,0), the nearest flat 4x4 site once the new footprint-flatness check rejected (2,8) (see that step's own note). tickCount (3013), deathCount (10), employeeCount (12), activeContractCount (0), and surveyCount (3) all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --mode command --scenario level2-playthrough-win --screenshots`, command mode; every hauling/haul-return trip between the dig site and the warehouse is now a slightly different distance, which shifts the fuel/payroll ticks each trip costs across the file's ~3,000-tick run the same cash-only-recalibration way every fix below already documents, not a defect. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): cash corrected again, -637,076.8971309054 -> -637,109.8971309054 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet; that nudges the fuel/payroll costs accumulated tick-by-tick. deathCount, employeeCount, activeContractCount, and surveyCount all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #959 (merged with #973): cash corrected again, -637,733.8971309054 -> -637,076.8971309054. #973's partial-fragment split (main) and #959's own consumeStoredOre changes (collectedOre decremented for whatever a rubble sale physically removes, barren fragments preferred over ore-bearing ones) were each measured against the same pre-merge base and each re-pinned this step on their own; the merged behaviour is neither number. Selling barren waste first leaves more ore-bearing mass in storage for this file's own later contract-deliver steps to sell for real money, and the split keeps the surplus of every partially-consumed fragment instead of destroying it -- the two together raise cash by exactly 657 over #973 alone. deathCount, employeeCount, activeContractCount, surveyCount and tickCount all reproduce unchanged. Direct-verified via `npm run scenarios`, command mode; the new number is exact and reproducible run to run. deathCount, employeeCount, activeContractCount, surveyCount, and tickCount all reproduce unchanged -- direct-verified via `npx tsx scripts/run-all-scenarios.ts level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #947 (driver-gated vehicle movement -- canTickVehicle now requires a driver aboard to advance on tick at all, and VehicleOccupancyReroute's blocker relocation now requires one too): cash corrected again, -909,884.64 -> -910,556.64 -- a vehicle idle or blocking another one's target cell that previously got silently nudged aside (or drove itself, pre-#947, while nobody was aboard) now sits stuck until a qualified driver actually boards it, shifting exactly when this file's own drill_rigs/haulers are driving versus idle versus waiting for a driver throughout the run; that nudges the fuel/payroll/event-roll costs accumulated tick-by-tick, same cash-only-recalibration shape as every fix below. tickCount (2989), deathCount (8), employeeCount (12), activeContractCount (0), surveyCount (3), and the safety/ecology/nuisance/wellBeing checkpoints at the very next `scores` step all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new number is exact and reproducible run to run. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): cash corrected again, -909,576.64 -> -909,884.64 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting exactly when this file's own crew is resting versus working versus driving throughout; that nudges the fuel/payroll/event-roll costs accumulated tick-by-tick. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints all reproduce unchanged -- same cash-only-recalibration shape as every fix above, not a defect. Sandbox-measured (`npm run scenarios -- --report-drift level2-playthrough-win`), command mode; the new number is exact and reproducible run to run. #554: this file's real conclusion, recalibrated. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). Under #554, `charge hole:*` queues one real charge_hole action per hole instead of writing charges instantly, so charging now costs real driller/blaster time on top of #553's already-queued drilling -- the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, same as before. The extra elapsed time before each blast changes who is still standing near the holes when they go off: blast 1 (23/24 holes landed, one driller/rig pair still short) now kills 7, not 2 -- workers who used to be evacuated by an instant charge are now physically present, having just placed it. A missing `wait_until field:orderedHoleCount equals:0` before pattern 2's charge step (added by this recalibration) let charging fire before all 25 holes had landed under the old fixed-tick budget, permanently uncharging whichever landed late and making blast 2 perpetually invalid; with that fixed, blast 2 now fires for real too (25/25 holes, CATASTROPHIC rating) for 2 more deaths (9 total) before both rigs are destroyed and patterns 3-4 drill nothing, exactly as this file's own pre-existing narrative already assumed for the post-fleet-destruction phase. Four accepted ore-sale contracts (via `type:ore_sale`, #554: switched from hardcoded ids that no longer resolve once the pool has rotated past them) each go on to miss their own delivery deadline (storage never holds anything to deliver), so their penalties land too. #554-followup (issue #586 CI): cash corrected -988,551 -> -1,114,951 -- the three real-time waitUntil steps earlier in this file (charge/drill/charge waits, all blocked by the permanent bankruptcy overlay's speed-8x cover) were replaced with deterministic tick-N chunks sized to the exact same real convergence point each waitUntil itself measured (88/91/322 ticks), which reproduces the identical tickCount trajectory throughout -- but chunked ticks and a pure tick-1 waitUntil loop don't necessarily draw randomized per-tick costs (fuel/payroll/event rolls) in bit-identical fashion tick-for-tick, so a real, small, deterministic (fixed-seed, reproducible run-to-run) divergence in accumulated cash survives even with tickCount matching exactly. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #611: cash corrected again, -1,114,951 -> -1,056,119, and deathCount 9 -> 10 (with ecology/nuisance at the step-120 `scores` checkpoint following suit, 39.77/24.42 -> 39.66/24.15) -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking instead of only inside the bounded top-N reachability window, so an employee idle behind a categorically-unclaimable backlog reaches claimable work sooner; that shifts who is still standing near blast 2's holes when they go off (one more death, 10 total) and shifts every tick-dependent cost (fuel/payroll/event rolls) accumulated afterward. Sandbox-measured, command mode; the new number is exact and reproducible run to run. issue #585 (root-cause fix, supersedes the 'each go on to miss their own delivery deadline' sentence above): this file never built a freight_warehouse anywhere in its 187 steps, and every haul/sell path (Logistics.ts) hard-requires an active one before storedMassKg can move off 0.0 -- not a timing gap the old tick budgets could ever have closed. Fixed by repurposing pattern 1's own unused second rock_digger purchase into a $15,000 freight_warehouse (confirmed idle for the whole file both before and after this fix -- this scenario drills no ramps, the only task type a rock_digger claims) and raising the post-blast-1 haul wait 6 -> 45 ticks (both changes traced and explained on their own steps). All 4 contract-deliver groups now genuinely succeed instead of refusing (`type:rubble_disposal` in place of `type:ore_sale`, chosen per-group via direct trace of what each blast actually yields and what the pool actually offers -- see each accept/deliver step's own note); 3 of the 4 contracts happen to complete outright rather than partially deliver (the pool's own first-offered rubble-disposal quantity is smaller than the amount requested in 3 of the 4 cases), which is why `activeContractCount` reads 0, not 1, at every step from here to the end of the file. Building the warehouse and letting hauling actually run for real also nudges the whole downstream trajectory: deathCount 10 -> 11 (blast 2's own charge-completion timing shifts with the extra 39 ticks the haul wait now spends before pattern 2 starts drilling, changing how many holes are charged by shot time -- confirmed stable at 11 across every tick-64 value that lets blast 2 fire at all, not a one-off), tickCount at the final step 2815 -> 2981, and safety/ecology/nuisance/cash at every downstream checkpoint move with it -- all re-derived via direct trace (createGameEngine + runCommand replay of this exact file, command mode), not guessed, and not re-verified by hand past what each step's own `expect` block states. #622 (merge conflict, issue #594 recovery PR): cash corrected again, -772,744 -> -776,524 -- #622 landed on main (computeTaskXpAwards, EmployeeXpRules.ts: an additional driving-licence XP award for vehicle-gated actions) after this file's own #585 fix was branched, so the two were never traced together; direct trace of the combined #585+#622 file (createGameEngine + runCommand replay, command mode) confirms the interaction is cash-only here -- #585's freight_warehouse fix means real vehicle-gated hauling now runs where it previously didn't, so #622's per-action XP award (and its knock-on proficiency/leveling drift) applies more often than on the pre-#585 trajectory #622 was originally measured against, but not enough to cross any timing threshold that would move deathCount, tickCount, or the safety/ecology/nuisance scores -- every other step in this 187-step file (including every other `equals`/`changedBy` assertion) reproduces unchanged. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #689 (idle-vehicle drill deadlock fix): cash corrected again, -944,538.99 -> -935,913.99 -- an idle, unreserved drill_rig or other vehicle sitting exactly on a different vehicle's target cell now gets relocated instead of leaving that vehicle waiting forever (driving was never licence-gated, only claiming a vehicle-gated task was); this file's own fleet occasionally hits exactly that shape, so relocation shifts a handful of vehicles' pathing/idle ticks and the payroll/fuel costs that ride on them, same cash-only-recalibration pattern as #591/#611/#622 above -- every other assertion in this 187-step file (deathCount, tickCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints) reproduces unchanged. Sandbox-measured, command mode; the new number is exact and reproducible run to run. #671 (ore-priority haul dispatch fix): cash corrected again, -935,913.99 -> -935,426.99 -- HaulDispatch/ActionSelection now rank an ore-bearing fragment above a plain one when picking a hauler's next load, so this file's own hauler fleet picks up a slightly different mix of fragments in a slightly different order across its two real blasts; every other assertion in this 187-step file (deathCount, tickCount, activeContractCount, surveyCount, and the safety/ecology/nuisance checkpoints) reproduces unchanged, confirming this is the same cash-only-recalibration shape as #591/#611/#622/#689 above, not a defect -- verified by direct run (`scripts/scenario-test.ts --scenario level2-playthrough-win`), command mode, cash exact and reproducible run to run. #922 (driver-position tracking fix): cash corrected again, -935,236.99 -> -934,440.99 -- a vehicle's driver-employee position now tracks the vehicle for real instead of freezing at its boarding cell for the whole drive, which shifts exactly when this file's own hauling/drilling vehicles are considered to have arrived at their targets and so shifts the fuel/payroll ticks each trip actually costs; deathCount, tickCount, employeeCount, activeContractCount, and surveyCount all reproduce unchanged, confirming this is the same cash-only-recalibration shape as every fix above, not a defect -- verified by direct run (`npx tsx scripts/run-all-scenarios.ts level2-playthrough-win`), command mode, cash exact and reproducible run to run. #928 (single-gauge fatigue model + traveling drain tier + ForceShiftRest walk-survival guard): cash corrected again, -934,440.99 -> -909,576.64, and tickCount at the final step 2988 -> 2989 -- collapsing hunger/breakNeed into fatigue alone changes how often an employee is proactively interrupted, and the new `traveling` drain tier plus the guard against cancelling a walk to an already-claimed job both shift exactly when this file's own crew is mid-task versus mid-walk versus mid-forced-rest throughout; that shifts the fuel/payroll/event-roll costs accumulated tick-by-tick and nudges the final tick count by one. wellBeing/nuisance at every downstream checkpoint move with it (2.3 -> 0, 40.3 -> 50 -- wellBeing was already this file's own floor-adjacent value given the bankruptcy/death toll, and the shifted trajectory pins it at the literal 0 floor instead of just above it); deathCount, employeeCount, activeContractCount, surveyCount, safety, and ecology all reproduce unchanged. This step's own contract-deliver amount (100 -> 330, see that step's own note) is the one non-cash-only change #928 required upstream of this checkpoint -- re-traced end to end (`npm run scenarios level2-playthrough-win`), command mode, every value here exact and reproducible run to run. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): cash corrected again, -637,127.8971309054 -> -637,051.8971309054 -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break both shift exactly when this file's own crew is mid-task versus mid-rest throughout the run, nudging the fuel/payroll/event-roll costs accumulated tick-by-tick; deathCount (10), employeeCount (12), activeContractCount (0), surveyCount (3), and tickCount (3013) all reproduce unchanged -- direct-verified via `npm run scenario -- --scenario level2-playthrough-win`, command mode, cash exact and reproducible run to run."
     },
     {
       "command": "scores",
@@ -3837,18 +3838,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
+          "wellBeing": 6.3000000000000025,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": "#1090-followup (sandbox-measured): wellBeing 2.3 -> 6.3 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost now delegating to planItinerary) shifts exactly which trips each vehicle makes and when across this file's ~3,000-tick run, the same cash-only-recalibration shape every upstream fix in this file's own history already documents, just landing on a needs-driven score this time instead of only cash. The pattern-4 contract-delivery amount upstream also needed re-pinning to keep completing outright (see that step's own note) -- activeContractCount still reads 0 here. deathCount, employeeCount, activeContractCount, surveyCount, safety, ecology, and nuisance reproduce unchanged."
       }
     },
     {
@@ -3862,11 +3864,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
+          "wellBeing": 6.3000000000000025,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
@@ -3887,12 +3889,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 3013,
-          "deathCount": 10,
+          "tickCount": 3014,
+          "deathCount": 9,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
+          "wellBeing": 6.3000000000000025,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50,
@@ -3900,7 +3902,7 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "Findings #59-#60 (unchanged): `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default), so this file runs against the substitute new_game world throughout. #553: bankrupt/levelEnded/levelEndReason are this file's new real conclusion -- the mine was formally seized at tick 132 (Bankruptcy.ts's BANKRUPTCY_GRACE_TICKS after cash first fell under the $5,000 threshold, straight after the 3-vehicle fleet purchase), and nothing after that point un-seizes it. #554: tickCount at this final step moved 2320->2815 and safety 50->45.6 -- queued charging (on top of #553's queued drilling) adds real elapsed time across this file's blast/tick sequence, and blast 2 now actually fires (see the finances step's own description above) which nudges safety off its floor before it settles again. issue #585: tickCount moved 2815 -> 2981 and safety 45.6 -> 59.7 -- see the finances step's own note for the full explanation (freight_warehouse + raised haul wait, direct-trace-confirmed). #928: tickCount moved 2988 -> 2989, wellBeing 2.3 -> 0, nuisance 40.3 -> 50 -- see the finances step's own note for the full explanation (single-gauge fatigue model + traveling drain tier + ForceShiftRest walk-survival guard)."
+        "note": "Findings #59-#60 (unchanged): `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default), so this file runs against the substitute new_game world throughout. #553: bankrupt/levelEnded/levelEndReason are this file's new real conclusion -- the mine was formally seized at tick 132 (Bankruptcy.ts's BANKRUPTCY_GRACE_TICKS after cash first fell under the $5,000 threshold, straight after the 3-vehicle fleet purchase), and nothing after that point un-seizes it. #554: tickCount at this final step moved 2320->2815 and safety 50->45.6 -- queued charging (on top of #553's queued drilling) adds real elapsed time across this file's blast/tick sequence, and blast 2 now actually fires (see the finances step's own description above) which nudges safety off its floor before it settles again. issue #585: tickCount moved 2815 -> 2981 and safety 45.6 -> 59.7 -- see the finances step's own note for the full explanation (freight_warehouse + raised haul wait, direct-trace-confirmed). #928: tickCount moved 2988 -> 2989, wellBeing 2.3 -> 0, nuisance 40.3 -> 50 -- see the finances step's own note for the full explanation (single-gauge fatigue model + traveling drain tier + ForceShiftRest walk-survival guard). #1090-followup (sandbox-measured): tickCount 3013 -> 3014, deathCount 10 -> 9 (see the blast-2 step's own #1090-followup note), wellBeing 2.3 -> 6.3 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost delegating to planItinerary) shifts exactly which vehicle makes which trip and when across this file's ~3,000-tick run, one of this file's own long-documented cash-only-recalibration shifts, just landing on a few of the discrete/needs-driven fields this time too (the two contract-deliver amounts upstream also needed re-pinning to keep completing outright -- see those steps' own notes -- so activeContractCount still reads 0 here, unchanged). bankrupt/levelEnded/levelEndReason are unaffected -- the mine was already seized at tick 132, long before any of this file's timing drift."
       }
     }
   ]
