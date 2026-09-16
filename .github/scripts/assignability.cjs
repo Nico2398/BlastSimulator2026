@@ -659,6 +659,11 @@ function resumeTargetFor(deliverable) {
  * Selection order is the issue number, ascending: the oldest eligible task goes
  * first, and the order does not depend on when labels happened to be applied.
  *
+ * `completedIssue` is the issue whose own run fired this chain. It is exempt
+ * from the single-flight check below — its labels are still the finishing run's
+ * — and it is never the answer: see the loop for why that is decided on the
+ * number rather than on the rules.
+ *
  * `unreadable` lists the candidates that were skipped because a fact about them
  * could not be read, rather than because they are ineligible. Empty is the
  * normal case; non-empty with no issue picked means the queue was not read, and
@@ -692,6 +697,33 @@ async function selectNextAssignable(api, options = {}) {
 
   const unreadable = [];
   for (const issue of ready) {
+    // --- The run that just ended never starts the next one ---
+    // `completed` is the issue whose own halt, merge or close fired this chain.
+    // Whatever it left behind, it left one moment ago, and nothing about it has
+    // improved since: a `paused` issue is waiting on a dependency that has not
+    // landed, a `blocked` one on a human who has not answered, a closed one is
+    // finished. Re-picking it is never the right assignment and is always a
+    // wasted session.
+    //
+    // It also has to be refused *here*, before the per-candidate rules, because
+    // those rules read an issue body that may not have been written yet. Issue
+    // #1090 on 16 Sep 2026 is the case: the run applied `paused` — which is the
+    // event this chain fires on — and only then edited its `## Blocked by`
+    // section to name the dependency it had just filed. The chain ran in that
+    // gap, read a body whose only dependencies were two that had already
+    // landed, and assigned #1090 to itself 23 seconds after it stopped. Nothing
+    // went red; the log reads `Assigned issue #1090 to @claude` like any healthy
+    // chain, and the blocker it was actually waiting on (#1125, a higher number)
+    // could never be reached while the loop held.
+    //
+    // Ordering the run's two writes would close that one gap and leave the
+    // shape of the bug — a decision taken on a body the deciding job races the
+    // writing of. This refuses on the number, which needs to read nothing.
+    if (completed !== null && issue.number === completed) {
+      log(`#${issue.number}: skipped — its own run is what fired this chain.`);
+      continue;
+    }
+
     const verdict = await assessCandidate(api, issue);
     if (!verdict.assignable) {
       log(`#${issue.number}: skipped — ${verdict.reason}.`);
