@@ -235,7 +235,7 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
  * grid, nothing can block a straight line in the first place, so the original
  * proxy is exact rather than approximate.
  */
-function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
+export function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
   if (!state.navGrid) return octileHeuristic(fromX, fromZ, toX, toZ);
   const result = findPath(state.navGrid, {
     agentId: -1,
