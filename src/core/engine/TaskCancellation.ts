@@ -203,11 +203,13 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
  * Estimated on-foot walking cost from (fromX, fromZ) to (toX, toZ), used only
  * by hasCloserIdleCandidate to rank candidates.
  *
- * With a NavGrid built, runs the real A* search (Pathfinding.findPath, the
- * same one EntityMovementTick.ts actually walks employees along, with
+ * With a NavGrid built, runs the real A* search (Pathfinding.findExactPath,
+ * the same one EntityMovementTick.ts actually walks employees along, with
  * avoidVehicles: true matching an employee's own foot travel) rather than the
  * plain octile straight-line heuristic hasCloserIdleCandidate used before
- * #954 (#954 fix). Straight-line distance was a reasonable proxy for real
+ * #954 (#954 fix). findExactPath refuses a target outside NavGrid bounds
+ * rather than silently costing a clamped path the way findPath alone would
+ * (#1113 fix). Straight-line distance was a reasonable proxy for real
  * walking cost only as long as nothing could block a straight line — once
  * fragments/parked vehicles started blocking foot pathfinding (#954), a
  * nominally-closer candidate can have a far longer REAL routed distance than
