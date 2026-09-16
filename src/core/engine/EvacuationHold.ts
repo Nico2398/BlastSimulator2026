@@ -269,7 +269,16 @@ export function releaseArrivedEvacuationDrivers(state: GameState, emitter?: Even
     // boarding) — must not be dismounted mid-task.
     if (vehicle.reservedForActionId !== null) continue;
 
-    if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
+    // #1089: compare against the evacuation destination itself, not
+    // vehicle.targetX/Z — those are now written only by Locomotion's
+    // writeVehiclePosition, mid-drive, and stay at the vehicle's own
+    // pre-board spawn position for the whole tick the board and the
+    // evacuation-drive itinerary are first installed (no movement has run
+    // yet to overwrite them). Comparing against the stale default there
+    // read as "already arrived" the instant the driver boarded, dismounting
+    // them before the drive ever started.
+    const dest = vehicle.pendingEvacuationDestination;
+    if (vehicle.x !== dest.x || vehicle.z !== dest.z) continue;
 
     alight(state, vehicle.id, emitter);
     vehicle.pendingEvacuationDestination = null;

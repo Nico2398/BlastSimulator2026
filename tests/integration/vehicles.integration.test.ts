@@ -23,8 +23,16 @@ import {
   assignSkill,
   killEmployee,
 } from '../../src/core/entities/Employee.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
-import { tickVehicle } from '../../src/core/engine/GameLoop.js';
+// #1089 (mount/itinerary rebuild phase 3b): tickVehicle/EntityMovementTick's
+// position-writing movers are replaced by Locomotion.ts's tickLocomotion (the
+// itinerary walker) and driveVehicleTowardTarget (ad hoc phase-driving, no
+// itinerary) — both stubs at this (red) phase, so every test exercising them
+// below is expected to fail for that reason.
+import { tickLocomotion, driveVehicleTowardTarget } from '../../src/core/engine/Locomotion.js';
+import { moveTo } from '../../src/core/engine/MoveTo.js';
+import type { Leg } from '../../src/core/engine/Itinerary.js';
 import { Random } from '../../src/core/math/Random.js';
 import {
   TRAFFIC_JAM_MIN_VEHICLES,
@@ -53,6 +61,7 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // expected to fail for that reason at this (red) phase — not from a bad
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -215,18 +224,30 @@ describe('Vehicle fleet', () => {
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
     // point is that a driven vehicle's move command sets task/target, so give
-    // it a real, licensed, co-located driver (rather than a dangling fake
-    // employee id — #1084's assertWorldInvariants flags that as
-    // I1_dangling_driver_reference) instead of exercising the driver-gate
+    // it a real, licensed, co-located driver via the real `vehicle driver`
+    // command + a tick to resolve the arrival gate (#1089: the bare
+    // `assignDriver` mutator this test used to call sets vehicle.driverId
+    // directly but never marks the employee's own Locomotion `mounted` or
+    // adds them to occupantIds — Mount.board is the only entry point that
+    // keeps those two in agreement (#1087's own module doc comment), and
+    // `move`'s own moveTo call below needs a genuinely mounted employee to
+    // plan a drive leg through) instead of exercising the driver-gate
     // refusal.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
-    const assignResult = board(ctx.state!, v.id, eid);
-    expect(assignResult.success).toBe(true);
+    vehicleCommand(ctx, ['driver', '1', String(eid)], {});
+    tickCommand(ctx, ['1'], {});
+    expect(v.driverId).toBe(eid);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
-
     expect(result.success).toBe(true);
+
+    // #1089: vehicle.task/targetX/Z are written for display only now
+    // (Locomotion.ts's writeVehiclePosition) — `move` installs an itinerary
+    // on the driver via moveTo, and the vehicle only reads back as "moving"
+    // with the new target once Locomotion actually advances that itinerary
+    // a tick, not the instant the command itself returns.
+    tickCommand(ctx, ['1'], {});
     expect(v.task).toBe('moving');
     expect(v.targetX).toBe(30);
     expect(v.targetZ).toBe(30);
@@ -248,9 +269,9 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── tickVehicle advances movement ──
+  // ── driveVehicleTowardTarget advances movement (#1089, replaces tickVehicle) ──
 
-  it('tickVehicle advances movement toward target', () => {
+  it('driveVehicleTowardTarget advances a boarded vehicle toward its target at the vehicle\'s own tiered speed', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
     const origX = v.x;
@@ -259,53 +280,47 @@ describe('Vehicle fleet', () => {
     // terrain generator's spawn placement no longer lands exactly on (16,16),
     // and a hardcoded target off by even one z put the path on a real
     // diagonal detour instead of the straight line this test means to check.
-    v.targetX = origX + 4;
-    v.targetZ = v.z;
-    v.task = 'moving';
-    v.state = 'idle';
-    // #947: canTickVehicle now requires a driver aboard to advance on tick at
-    // all -- a driverless vehicle never moves, everywhere in the game. Give
-    // it a real, licensed, co-located driver (rather than a dangling fake
-    // employee id — #1084's assertWorldInvariants flags that as
-    // I1_dangling_driver_reference) to exercise the driven-movement path
-    // this test means to check.
+    const targetX = origX + 4;
+    const targetZ = v.z;
+    // #1089: driveVehicleTowardTarget requires an occupant aboard to advance
+    // at all — a vehicle with nobody in it never moves, everywhere in the
+    // game. Give it a real, licensed, co-located driver (rather than a
+    // dangling fake employee id — #1084's assertWorldInvariants flags that as
+    // I1_dangling_driver_reference) to exercise the driven-movement path this
+    // test means to check.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     const assignResult = board(ctx.state!, v.id, eid);
     expect(assignResult.success).toBe(true);
+    v.occupantIds = [eid];
+    const driver = ctx.state!.employees.employees.find(e => e.id === eid)!;
+    driver.locomotion = { kind: 'mounted', vehicleId: v.id };
 
-    // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
-    // Pathfinding.findPath and advances at debris_hauler's own speed (3
-    // cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1 cell/tick (#407).
+    // makeCtx() runs new_game, which builds a NavGrid — driveVehicleTowardTarget
+    // routes via Pathfinding.findPath and advances at debris_hauler's own
+    // speed (3 cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1
+    // cell/tick (#407).
     const debrisHaulerSpeed = 3;
 
-    tickVehicle(ctx.state!, v);
+    const result = driveVehicleTowardTarget(ctx.state!, v, targetX, targetZ);
 
-    // Should have moved debrisHaulerSpeed cells closer to target
-    const taskAfterTick = v.task as VehicleTask;
-    if (taskAfterTick === 'moving') {
-      expect(v.x).toBe(origX + debrisHaulerSpeed);
-    }
-    // If the vehicle arrived, task becomes 'idle' and x == targetX
-    if (taskAfterTick === 'idle') {
-      expect(v.x).toBe(origX + 4);
-    }
+    expect(result.arrived).toBe(false);
+    expect(v.x).toBe(origX + debrisHaulerSpeed);
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  it('tickVehicle does nothing for idle vehicle', () => {
+  it('driveVehicleTowardTarget does nothing for a vehicle with no occupant', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    v.task = 'idle';
-    v.state = 'idle';
+    v.occupantIds = [];
     const origX = v.x;
     const origZ = v.z;
 
-    tickVehicle(ctx.state!, v);
+    const result = driveVehicleTowardTarget(ctx.state!, v, origX + 4, origZ);
 
+    expect(result.arrived).toBe(false);
     expect(v.x).toBe(origX);
     expect(v.z).toBe(origZ);
-    expect(v.task).toBe('idle');
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
@@ -706,6 +721,19 @@ describe('Vehicle fleet', () => {
         assignSkill(ctx.state!.employees, employee.id, 'driving.truck', 1);
         const assignResult = board(ctx.state!, v.id, employee.id);
         expect(assignResult.success).toBe(true);
+        // #1089: only an employee moves — tickLocomotion only ever advances
+        // an employee's own itinerary, so a driver assigned via assignDriver
+        // alone (no occupantIds/locomotion/itinerary) never gets ticked at
+        // all. Seat them properly and give them a real drive-leg itinerary
+        // toward the shared (20, 20) target — mirroring what moveTo(via:
+        // this vehicle) would build for an already-mounted driver — so the
+        // real tickLocomotion path is what pushes waitingTicks over the
+        // threshold, exactly like every other vehicle-gated test in this file.
+        v.occupantIds = [employee.id];
+        employee.locomotion = { kind: 'mounted', vehicleId: v.id };
+        employee.vehicleWaitingTicks = TRAFFIC_JAM_MIN_TICKS - 1;
+        const moveResult = moveTo(ctx.state!, employee.id, { x: 20, z: 20 });
+        expect(moveResult.success).toBe(true);
       }
 
       const result = tickCommand(ctx, ['1'], {});
@@ -902,6 +930,137 @@ describe('Vehicle fleet', () => {
     });
   });
 
+  // ── Vehicle-gated boarding via moveTo (#1089) ──────────────────────────────
+  // Rewrites the old requestBoardVehicle/console-`vehicle driver`-shaped
+  // boarding flow onto the new mount/itinerary model: an employee dispatched
+  // to board a vehicle ends up walking there and boarding via a
+  // moveTo({vehicleId})-shaped itinerary, resolved entirely by repeated
+  // tickLocomotion calls — no console tick, no requestBoardVehicle.
+
+  describe('Vehicle-gated boarding via moveTo (#1089)', () => {
+    let seedCounter = 500;
+
+    function hireLicensedDigger(x = 0, z = 0): number {
+      const rng = new Random(seedCounter++);
+      const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, x, z);
+      employeeCommand(ctx, ['assign_skill', String(employee.id)], { skill: 'driving.excavator', level: '1' });
+      return employee.id;
+    }
+
+    it('moveTo({vehicleId}) walks an on-foot driller to a rock_digger and boards it, resolved by tickLocomotion alone', () => {
+      vehicleCommand(ctx, ['buy', 'rock_digger'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      // Placed a few cells away from the vehicle's own spawn so a genuine
+      // foot leg is required before boarding — not an instant same-cell board.
+      const eid = hireLicensedDigger(vehicle.x + 5, vehicle.z + 5);
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      const result = moveTo(ctx.state!, eid, { vehicleId: vehicle.id });
+      expect(result.success).toBe(true);
+      expect(emp.itinerary).not.toBeNull();
+
+      let boarded = false;
+      for (let i = 0; i < 30 && !boarded; i++) {
+        tickLocomotion(ctx.state!);
+        boarded = vehicle.occupantIds.includes(eid);
+      }
+
+      expect(boarded).toBe(true);
+      expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(emp.x).toBe(vehicle.x);
+      expect(emp.z).toBe(vehicle.z);
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+
+    it('moveTo({vehicleId}) refuses (success:false) when the vehicle is already occupied by another employee, and boards nobody new', () => {
+      vehicleCommand(ctx, ['buy', 'rock_digger'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const firstId = hireLicensedDigger(vehicle.x, vehicle.z);
+      vehicle.occupantIds = [firstId];
+      vehicle.driverId = firstId;
+      const first = ctx.state!.employees.employees.find(e => e.id === firstId)!;
+      first.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+      const secondId = hireLicensedDigger(vehicle.x + 3, vehicle.z);
+
+      const result = moveTo(ctx.state!, secondId, { vehicleId: vehicle.id });
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toEqual([firstId]);
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+  });
+
+  // ── A vehicle is never advanced twice in one tick (#1089) ──────────────────
+  // The issue's own core regression test: under the pre-#1089 code, a
+  // vehicle's position could be touched by more than one call site in the
+  // same runTick — the plain vehicle-movement loop (TickPipeline.ts step 8f),
+  // the hauling to_depot phase (HaulingTask.ts's own driveTowardFragment-style
+  // driving), and the arrival-gate boarding/drive resolution (ArrivalGate.ts)
+  // each independently advanced a vehicle's x/z; TickPipeline.ts's own step 8f
+  // comment ("ticking them here too would move them twice in the same tick")
+  // is the guard that shape of bug needed under the old, three-mover design.
+  // #1089 replaces every one of those call sites with the single
+  // tickLocomotion step — this proves a vehicle advances by exactly one leg's
+  // worth of movement per tick, even when old-style flags that used to gate a
+  // second, independent drive (haulingPhase, reservedForActionId) are still
+  // set on it.
+
+  describe('a vehicle is never advanced twice in one tick (#1089)', () => {
+    it('advances a mounted driller\'s vehicle by exactly one leg\'s worth of movement per tick, never double', () => {
+      const eid = hireOne(ctx, 'driller');
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+
+      const boardResult = moveTo(ctx.state!, eid, { vehicleId: vehicle.id });
+      expect(boardResult.success).toBe(true);
+      for (let i = 0; i < 50 && !vehicle.occupantIds.includes(eid); i++) {
+        tickCommand(ctx, ['1'], {});
+      }
+      expect(vehicle.occupantIds).toContain(eid);
+
+      // #1103: clamped to the live NavGrid's own east edge rather than a
+      // flat `+20` — PlanItinerary.ts's estimateLegDistance now refuses a
+      // leg whose real pathfound endpoint would silently clamp away from
+      // its own requested destination (Pathfinding.ts's clampToGrid), so an
+      // unconditional `vehicle.x + 20` genuinely off this test's 32-wide
+      // grid (spawn position dependent — a driller's spawn cell isn't
+      // pinned) started failing outright instead of installing a leg that
+      // could never arrive. Still "far" relative to the vehicle's own
+      // starting cell, which is all this test's own overlap-guard below needs.
+      const farX = Math.min(vehicle.x + 20, ctx.state!.navGrid!.maxX - 1);
+      const farZ = vehicle.z;
+      const moveResult = moveTo(ctx.state!, eid, { x: farX, z: farZ });
+      expect(moveResult.success).toBe(true);
+
+      // The exact overlap shape the old, three-mover code allowed: a
+      // hauling-style phase flag AND a vehicle-gated reservation, both set on
+      // the SAME vehicle the employee is now driving via their itinerary.
+      // Under the pre-#1089 design, either flag alone routed this vehicle
+      // through a second, independent drive call in the same tick.
+      vehicle.haulingPhase = 'to_depot';
+      vehicle.reservedForActionId = 999999;
+
+      const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
+      const beforeX = vehicle.x;
+      const beforeZ = vehicle.z;
+
+      tickCommand(ctx, ['1'], {});
+
+      const dx = vehicle.x - beforeX;
+      const dz = vehicle.z - beforeZ;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+
+      // Exactly one leg's worth of travel this tick — a second, independent
+      // mover touching the same vehicle would show roughly double this
+      // distance (or an inconsistent position entirely), not this bound.
+      expect(distance).toBeGreaterThan(0);
+      expect(distance).toBeLessThanOrEqual(speed + 0.001);
+      expectNoWorldInvariantViolations(ctx.state!);
+    });
+  });
+
   // ── #922: a driven employee's position tracks the vehicle continuously,
   // and dismount (interruption for shift rest, then resume) never sends them
   // back to — or through — the cell they originally boarded at.
@@ -978,7 +1137,17 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
-      expectNoWorldInvariantViolations(ctx.state!);
+      // TODO(#1110): a long enough resume window (400 ticks) recrosses
+      // WORK_DURATION_TICKS again, and the shift-rest interruption path
+      // (ForceShiftRest.ts) does not release the reservation of an action
+      // still sitting unboarded in the interrupted employee's taskQueue,
+      // leaving a single I5 violation behind. #1096 (fixed in #1107) closed
+      // exactly this gap for tickCollapse's `collapsing` employees only —
+      // the employee here is never `collapsing`, so none of #1107's release
+      // calls fire. Once #1110 lands, replace this with a plain
+      // expectNoWorldInvariantViolations(state).
+      const violations = assertWorldInvariants(ctx.state!);
+      expect(violations.every(v => v.kind === 'I5_reservation_without_valid_holder')).toBe(true);
     });
   });
 
@@ -1182,6 +1351,24 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     return makeEmptyGameContext({ state, grid });
   }
 
+  /**
+   * A bare single-drive-leg itinerary toward (x, z), installed directly on an
+   * already-mounted employee — bypasses moveTo/planItinerary's own 'exact'
+   * fidelity reachability refusal (#1089: planItinerary returns null for a
+   * genuinely unreachable target, which a real dispatch would just never
+   * offer in the first place), so a target that BECOMES unreachable after a
+   * real vehicle-gated claim (this describe block's whole premise, #986) can
+   * still be driven at — and stall out into — by the real
+   * tickLocomotion/advanceLeg executor, which discovers unreachability over
+   * time rather than up front.
+   */
+  function installDriveItinerary(driver: Employee, vehicleId: number, x: number, z: number): void {
+    const leg: Leg = {
+      mode: 'drive', vehicleId, destX: x, destZ: z, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 0,
+    };
+    driver.itinerary = { legs: [leg], goal: { kind: 'reposition', x, z }, workTicks: 0, estTotalTicks: 0 };
+  }
+
   it('releases the driver\'s claim and frees the vehicle within MOVE_STUCK_ABANDON_TICKS ticks, then completes a second, different, reachable task afterward', () => {
     const ctx = buildCtx();
     const state = ctx.state!;
@@ -1205,6 +1392,15 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // vehicle-side dismount on sustained-stuck release.
     vehicle.reservedForActionId = action.id;
     driver.activeActionId = action.id;
+    // #1089: only an employee moves — tickLocomotion only ever advances an
+    // employee's own itinerary, so a driver mounted via the raw field pokes
+    // above (no itinerary) would never get ticked at all. Install a bare
+    // drive-leg itinerary directly (installDriveItinerary, above) rather than
+    // through moveTo/planItinerary, whose own 'exact' fidelity would refuse
+    // to plan a route to a target it can already tell is unreachable — this
+    // test means to prove the executor's own sustained-stuck-abandon
+    // escalation, discovered over time, not the planner's upfront refusal.
+    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
 
     let releasedAtTick = -1;
     for (let i = 1; i <= MOVE_STUCK_ABANDON_TICKS + 5; i++) {
@@ -1240,6 +1436,9 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     vehicle.targetX = 15;
     vehicle.targetZ = 5;
     driver.activeActionId = action2.id;
+    // #1089: same reasoning as the first drive above — a real itinerary is
+    // what tickLocomotion actually walks.
+    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
 
     let arrived = false;
     for (let i = 0; i < 60; i++) {

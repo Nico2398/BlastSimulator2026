@@ -7,7 +7,7 @@ import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
-import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
 import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -95,7 +95,15 @@ describe('evacuateZone', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
     hireEmployee(state.employees, 'driller', rng, 35, 35); // outside the zone
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
-    vehicle.driverId = 999; // driver aboard — this test proves the "ordered" path, not the #947 driver gate
+    // #1089: moveTo(state, v.driverId, ...) now needs a real employee to
+    // attach an itinerary to — a dangling driverId (the old model's
+    // moveVehicle didn't care who, or whether anyone, held it) just fails
+    // silently. Give it a real, co-located, mounted driver instead — this
+    // test still proves the "ordered" path, not the #947 driver gate.
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, vehicle.x, vehicle.z);
+    vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const beforeEmployeeX = employee.x;
     const beforeVehicleX = vehicle.x;
@@ -109,6 +117,11 @@ describe('evacuateZone', () => {
     // Routed out instead.
     expect(employee.destinationX).not.toBeNull();
     expect(isInZone(employee.destinationX!, employee.destinationZ!, zone)).toBe(false);
+    // #1089: evacuateZone only installs the itinerary — vehicle.task/targetX/
+    // targetZ are written by tickLocomotion's own drive-leg advance (the only
+    // place a vehicle's fields change), not synchronously at plan time like
+    // the old moveVehicle. One real tick is what actually starts the drive.
+    tickLocomotion(state);
     expect(vehicle.task).toBe('moving');
     expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
 
@@ -165,7 +178,7 @@ describe('evacuateZone', () => {
     expect(result.orderedEmployeeIds).not.toContain(employee.id);
   });
 
-  it('strands a driverless vehicle standing in-zone, and a subsequent tickVehicle tick leaves it exactly where it stands (#947)', () => {
+  it('strands a driverless vehicle standing in-zone, and a subsequent tickLocomotion tick leaves it exactly where it stands (#947)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     state.navGrid = flatWalkableGrid(40);
     const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
@@ -183,8 +196,9 @@ describe('evacuateZone', () => {
     expect(vehicle.z).toBe(beforeZ);
 
     // End-to-end: a driverless, stranded vehicle never actually moves on a
-    // subsequent tick either, not just at the moment evacuateZone returns.
-    tickVehicle(state, vehicle);
+    // subsequent tick either, not just at the moment evacuateZone returns —
+    // #1089: only an employee moves, and none is mounted here.
+    tickLocomotion(state);
 
     expect(vehicle.x).toBe(beforeX);
     expect(vehicle.z).toBe(beforeZ);
@@ -382,7 +396,12 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
     pickupFragment(state.logistics, 1, String(vehicle.id));
-    vehicle.driverId = 999; // driver aboard — proves the "ordered" path, not the #947 driver gate
+    // #1089: a real, co-located, mounted driver — see the first describe
+    // block's own comment on why a dangling driverId no longer works.
+    const { employee: driver1 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
+    vehicle.driverId = driver1.id;
+    vehicle.occupantIds = [driver1.id];
+    driver1.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.haulingFragmentId = 1;
     vehicle.haulingPhase = 'to_depot';
     vehicle.haulingDepotBuildingId = 999;
@@ -391,6 +410,10 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     vehicle.state = 'working';
 
     evacuateZone(state, zone);
+    // #1089: vehicle.task/targetX/targetZ are written by tickLocomotion's own
+    // drive-leg advance, not synchronously at plan time — one real tick is
+    // what actually starts the drive (see the sibling describe block above).
+    tickLocomotion(state);
 
     // The bug this regression pins: without routing through
     // abortVehicleGatedFragmentWork, the cargo fragment stays 'in_transit'
@@ -414,13 +437,17 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     addBlastFragments(state.logistics, [makeCargoFragment(2, 850)]);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
-    vehicle.driverId = 999;
+    const { employee: driver2 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
+    vehicle.driverId = driver2.id;
+    vehicle.occupantIds = [driver2.id];
+    driver2.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.haulingFragmentId = 2;
     vehicle.haulingPhase = 'to_fragment';
     vehicle.task = 'moving';
     vehicle.state = 'moving';
 
     evacuateZone(state, zone);
+    tickLocomotion(state);
 
     expect(vehicle.haulingPhase).toBeNull();
     expect(vehicle.haulingFragmentId).toBeNull();
@@ -440,13 +467,17 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     addBlastFragments(state.logistics, [makeCargoFragment(3, 5000)]);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 15, 15);
-    vehicle.driverId = 999;
+    const { employee: driver3 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
+    vehicle.driverId = driver3.id;
+    vehicle.occupantIds = [driver3.id];
+    driver3.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.breakFragmentId = 3;
     vehicle.breakPhase = 'to_boulder';
     vehicle.task = 'moving';
     vehicle.state = 'moving';
 
     evacuateZone(state, zone);
+    tickLocomotion(state);
 
     expect(vehicle.breakPhase).toBeNull();
     expect(vehicle.breakFragmentId).toBeNull();
@@ -460,11 +491,15 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     state.navGrid = flatWalkableGrid(40);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
-    vehicle.driverId = 999;
+    const { employee: driver4 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
+    vehicle.driverId = driver4.id;
+    vehicle.occupantIds = [driver4.id];
+    driver4.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'idle';
     vehicle.state = 'idle';
 
     expect(() => evacuateZone(state, zone)).not.toThrow();
+    tickLocomotion(state);
 
     expect(vehicle.haulingPhase).toBeNull();
     expect(vehicle.breakPhase).toBeNull();

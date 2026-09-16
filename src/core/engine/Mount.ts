@@ -14,10 +14,11 @@ type MountResult = { success: true } | { success: false; error: string };
 
 /**
  * Whether two points are within one tile of each other (Chebyshev distance
- * <= 1) — the shared "close enough to board" test used both here and by
- * ArrivalGate's own boarding-arrival check.
+ * <= 1) — the "close enough to board" test `board` itself uses. Locomotion.ts's
+ * own adjacent-arrival leg check (#1089) computes the identical Chebyshev
+ * test inline rather than importing this, so it stays module-private.
  */
-export function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): boolean {
+function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): boolean {
   return Math.max(Math.abs(ax - bx), Math.abs(az - bz)) <= 1;
 }
 
@@ -53,6 +54,15 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   employee.z = vehicle.z;
   employee.locomotion = { kind: 'mounted', vehicleId };
 
+  // #1083's lifetime counter — every prior mover (requestBoardVehicle/
+  // ArrivalGate.resolveBoarding, pre-#1089) incremented it on a successful
+  // board; this is now the one place a board ever succeeds. Scoped to the
+  // seat that actually becomes the driver (occupantIds[0]) rather than every
+  // successful board, so a future multi-seat passenger doesn't inflate it.
+  if (vehicle.driverId === employeeId) {
+    state.vehicles.driverBoardingCount++;
+  }
+
   emitter?.emit('employee:mounted', { employeeId, vehicleId });
   emitter?.emit('vehicle:driver_boarded', { employeeId, vehicleId });
 
@@ -84,6 +94,29 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
     employee.x = cell.x;
     employee.z = cell.z;
     employee.locomotion = { kind: 'on_foot' };
+    // #1089 regression fix: any itinerary this employee was mid-flight on
+    // named THIS vehicle (a drive leg, or a board leg for it) — now stale
+    // the instant they alight, since they no longer occupy it. Locomotion.ts
+    // always advances a non-null `itinerary` before ever falling back to
+    // destinationX/Z, so a caller that alights an employee and then, this
+    // same tick, sets a fresh legacy walk target (beginRestWalk, a
+    // reassigned foot task) had that walk silently ignored: Locomotion still
+    // takes the itinerary branch, spends the whole tick self-healing the now
+    // impossible drive leg (advanceLeg's own occupant-mismatch check aborts
+    // it) instead of ever looking at destinationX/Z, and the walk doesn't
+    // actually start until the NEXT tick — one tick later than it should
+    // every single time an employee is dismounted with a stale itinerary
+    // still attached. Confirmed live: a `set_policy mode:continuous` forced
+    // rest interrupting a driller mid-drive (ForceShiftRest.ts) lost exactly
+    // one tick per rest this way, compounding into vibration-budget.json's
+    // own 22-tick-slower drift and level2/3-playthrough-win.json's cash
+    // drift over a run with many such cycles. Clearing it here, the one
+    // place an employee ever stops being mounted, fixes every caller
+    // (dismountVehicleDriver, the console `vehicle driver <id> none`
+    // command, and any future one) at its root instead of each one
+    // separately remembering to.
+    employee.itinerary = null;
+    employee.pendingDriverVehicleId = null;
   }
 
   emitter?.emit('employee:alighted', { employeeId, vehicleId });

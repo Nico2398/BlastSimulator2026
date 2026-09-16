@@ -135,6 +135,30 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // leaves it to resolve on its own first; dispatch resumes for this
     // employee the very next tick either way (#552).
     if (employee.pendingDriverVehicleId !== null) continue;
+    // #1089 regression fix: an employee mid-itinerary with NO PendingAction
+    // behind it — a bare `moveTo` the console's `vehicle move`/`assign
+    // task:moving` commands install directly on an already-mounted driver
+    // (MoveTo.ts, vehicle.ts) — reads exactly like an idle employee here
+    // (activeActionId stays null the whole drive; that itinerary is not a
+    // claim), so without this guard fillIdleEmployeeFromQueueOrPool claims
+    // them a fresh action (setting activeActionId/destinationX/Z for a
+    // legacy foot task, say) while their itinerary is still mid-drive.
+    // Locomotion.ts always advances `itinerary` before falling back to
+    // destinationX/Z (#1089), so that itinerary — once genuinely stuck (an
+    // unreachable target a path resolves toward but never arrives at, e.g.
+    // an off-navmesh `to:` coordinate) — silently pins the employee driving
+    // forever, and the freshly claimed action never gets a single tick of
+    // real progress (confirmed live: level1-playthrough-win.json's own
+    // corridor-clearing `vehicle move 3 to:10,-2` — the same off-map
+    // fallback landing tile a real click resolves to, per that step's own
+    // finding — leaves employee #4 driving nowhere from tick ~16 onward;
+    // tickEmployees then claims them for a `place_building` order at tick
+    // 104 anyway, which then never lands because their real position never
+    // moves again). An employee already holding a real claim (activeActionId
+    // set) is untouched by this guard — mid-drive-for-a-claimed-action is the
+    // normal, expected busy state `reserveOnePoolActionAhead` below already
+    // handles.
+    if (employee.activeActionId === null && employee.itinerary !== null) continue;
     // Mid-walk to a safe cell (evacuateZone) — like the boarding case just
     // above, walking outside the claim system entirely. Without this guard,
     // claimActionsTargetedAtEmployee would happily promote a pre-existing

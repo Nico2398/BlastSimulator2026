@@ -6,21 +6,15 @@
 // loop, after entity movement has been advanced.
 
 import type { GameState } from '../state/GameState.js';
-import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { moveVehicle } from '../entities/Vehicle.js';
-import { board, isWithinBoardingRange } from './Mount.js';
 import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
-import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
-import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
-import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
+import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
-import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
-import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -28,9 +22,17 @@ export interface ArrivalGateResult {
   restStarted: number[];
   /** Employee IDs whose task timer was started this tick because they arrived. */
   taskStarted: number[];
-  /** Employee IDs who successfully boarded a vehicle this tick because they arrived. */
+  /**
+   * Employee IDs who successfully boarded a vehicle this tick because they
+   * arrived. Boarding itself now resolves inside tickLocomotion's own arrival
+   * step (#1089) rather than here — always empty; kept on the shape so
+   * console/tick.ts's existing report formatting stays untouched.
+   */
   driversBoarded: number[];
-  /** Employee IDs whose pending boarding was cancelled this tick, with a reason. */
+  /**
+   * Employee IDs whose pending boarding was cancelled this tick, with a
+   * reason. Always empty for the same reason as `driversBoarded` above.
+   */
   boardingCancelled: Array<{ employeeId: number; reason: 'vehicle_gone' | 'vehicle_taken' | 'vehicle_moved' | string }>;
   /**
    * Vehicle-gated actions (haul_debris/fragment_debris and any future
@@ -44,18 +46,17 @@ export interface ArrivalGateResult {
 /**
  * Advance the arrival gate by one tick: for every employee/vehicle with a
  * pending position-dependent action, check whether they have arrived at
- * their destination and, if so, start the corresponding timer/effect (or
- * cancel it if the precondition no longer holds).
+ * their destination and, if so, start the corresponding timer/effect.
  *
- * Must run after tickEmployeeMovement/tickVehicle have advanced positions for
- * this tick — arrival is read off their result (destinationX/Z nulled by
- * tickEmployeeMovement on arrival is the same signal EntityMovementTick.ts
- * already uses; this module reuses it rather than tracking arrival a second
- * way).
+ * Must run after tickLocomotion has advanced positions for this tick —
+ * arrival is read off its result: destinationX/Z nulled by the legacy
+ * foot-only mover, itinerary nulled by the itinerary mover, on arrival
+ * (#1089) — this module reuses those signals rather than tracking arrival a
+ * second way.
  *
- * `grid`, when provided, is threaded through to `seedTaskTimerFields` so a
- * `dig_ramp_segment` action's duration can be computed off the live voxel
- * count (#924).
+ * `grid`, when provided, is threaded through to a vehicle-gated action's own
+ * seedTaskTimerFields call below so a `dig_ramp_segment` action's duration
+ * can be computed off the live voxel count (#924).
  */
 export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
   // Dismount any evacuation driver whose vehicle has reached its
@@ -76,10 +77,18 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
 
-    // tickEmployeeMovement clears destinationX/Z the instant x/z reaches it
-    // (and never sets it at all when the employee started already on target)
-    // — null on both axes is exactly "nothing left to walk toward this tick".
-    const arrived = emp.destinationX === null && emp.destinationZ === null;
+    // "Arrived" now covers both movers: tickEmployeeMovement's own legacy
+    // destinationX/Z clears the instant x/z reaches it (and is never set at
+    // all when the employee started already on target), and tickLocomotion
+    // clears itinerary the instant the employee's final leg completes —
+    // whichever one (never both) is currently in flight for this employee
+    // must have finished for "nothing left to travel toward this tick" to
+    // hold. A vehicle-gated action's own itinerary keeps `itinerary` non-null
+    // for its whole foot-to-vehicle-and-drive journey (#1089) — this is what
+    // used to need the now-deleted generic vehicle-drive loop's own separate
+    // arrival check; an itinerary that only clears at the true destination
+    // makes that special-casing unnecessary.
+    const arrived = emp.destinationX === null && emp.destinationZ === null && emp.itinerary === null;
     if (!arrived) continue;
 
     let workStarted = false;
@@ -93,18 +102,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
       workStarted = true;
     }
 
-    // A vehicle-gated action's work timer starts only once the VEHICLE
-    // (not the employee) reaches action.targetX/targetZ — the vehicle-drive
-    // loop below owns that promotion entirely (#550). Skip it here even
-    // though the employee themself reads as "arrived" (aboard, no
-    // destination of their own) the instant they board; otherwise the timer
-    // would start while the vehicle is still mid-drive.
-    const activeAction = emp.activeActionId !== null
-      ? state.pendingActions.find(a => a.id === emp.activeActionId)
-      : undefined;
-    const isVehicleGated = activeAction !== undefined && activeAction.requiredVehicleRole !== null;
-
-    if (!isVehicleGated && emp.pendingTaskDuration !== null) {
+    if (emp.pendingTaskDuration !== null) {
       emp.taskTicksRemaining = emp.pendingTaskDuration;
       emp.activeTaskTotalTicks = emp.pendingTaskDuration;
       emp.pendingTaskDuration = null;
@@ -115,6 +113,35 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
       // handler blind to what it just did (see survey.integration.test.ts).
       result.taskStarted.push(emp.id);
       workStarted = true;
+    } else if (emp.taskTicksRemaining === null && emp.activeActionId !== null) {
+      // A vehicle-gated action's own work timer is never staged at claim
+      // time (VehicleReservation.promoteVehicleGatedAction's own doc
+      // comment, #1089) — compute and start it here instead, the instant
+      // the employee (and, by I2, their vehicle) actually reaches the
+      // target, mirroring the pre-itinerary vehicle-drive loop's identical
+      // deferral. haul_debris/fragment_debris are excluded — their own
+      // phase machinery (HaulingTask.ts/BoulderBreaking.ts) drives
+      // completion instead, so seeding a work timer for them here would
+      // race it. Also requires the employee to still be genuinely mounted
+      // in the vehicle reserved for this action — "arrived" (itinerary ===
+      // null) also covers a drive leg that just ABORTED (its vehicle
+      // destroyed/reassigned underneath it, Locomotion.advanceLeg), which
+      // leaves the employee back on_foot with the same activeActionId still
+      // set; that case must fall through to reconcileVehicleReservations's
+      // own interruption below instead of being mistaken for a real arrival.
+      const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+      if (action && action.requiredVehicleRole !== null
+        && action.type !== 'haul_debris' && action.type !== 'fragment_debris') {
+        const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+        if (vehicle && isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id) {
+          seedTaskTimerFields(state, emp, action, grid);
+          emp.taskTicksRemaining = emp.pendingTaskDuration!;
+          emp.activeTaskTotalTicks = emp.pendingTaskDuration!;
+          emp.pendingTaskDuration = null;
+          result.taskStarted.push(emp.id);
+          workStarted = true;
+        }
+      }
     }
 
     // The employee has physically reached the target and started working —
@@ -123,10 +150,6 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
     if (workStarted && emp.activeActionId !== null) {
       const action = state.pendingActions.find(a => a.id === emp.activeActionId);
       if (action) action.status = 'in_progress';
-    }
-
-    if (emp.pendingDriverVehicleId !== null) {
-      resolveBoarding(state, emp, result, emitter);
     }
   }
 
@@ -188,91 +211,6 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
     }
   }
 
-  // Vehicle-gated actions (#550): drive every boarded, reserved vehicle
-  // toward the target promoteActionToActive (EmployeeDispatchSteps.ts) or
-  // promoteVehicleGatedAction (VehicleReservation.ts) set on claim (moveVehicle, or on the tick a boarding above just
-  // completed) — the sole place a reserved vehicle's x/z is ever advanced,
-  // per this file's header comment. Once it arrives, seed the holder's
-  // work-timer fields (deferred at claim time specifically for this) and
-  // swap the vehicle from "moving" into its role's arrival task instead of
-  // the idle state tickVehicle's own arrival handling would otherwise leave
-  // it in.
-  for (const vehicle of state.vehicles.vehicles) {
-    if (vehicle.reservedForActionId === null || vehicle.driverId === null) continue;
-
-    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
-    // Hauling/fragment-breaking actions are driven end to end by the
-    // tickHaulingProgress/tickBreakProgress loops above (#552) — including
-    // the very tick they complete, while reservedForActionId still names them
-    // (it survives a successful haul/break specifically so GameLoop's
-    // completion pass can still find the vehicle) — so this generic
-    // single-target arrival loop must skip them by action type, not just by
-    // haulingPhase/breakPhase (which read null again the instant either
-    // finishes). Matches this file's header comment: vehicles ticked in
-    // exactly one place.
-    if (action && (action.type === 'haul_debris' || action.type === 'fragment_debris')) continue;
-
-    const alreadyAtTarget = vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ;
-    if (!alreadyAtTarget) {
-      tickVehicle(state, vehicle, emitter);
-    }
-    if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
-
-    if (!action) continue;
-
-    const holder = action.holderId !== null ? state.employees.employees.find(e => e.id === action.holderId) : undefined;
-    if (!holder) continue;
-
-    // #928: the holder must still actively consider THIS action their
-    // current one before the vehicle's own arrival re-arms a work timer for
-    // them. Without this, a vehicle that keeps driving/arriving under its
-    // own steam (this loop drives it regardless of the holder's own state)
-    // can resurrect a stale claim on an employee who has since moved on —
-    // interrupted into a rest, or reassigned to something else entirely —
-    // re-seeding taskTicksRemaining on someone who is, e.g., simultaneously
-    // resting (restTicksRemaining !== null). That phantom task's own later,
-    // perfectly normal completion (tickTaskProgress) then overwrites
-    // activeActionId out from under the employee's own real, concurrent
-    // rest — direct-traced (blast-execution-visual.json, #928) to
-    // permanently stall a handful of charge_hole actions' own
-    // orderedChargeCount once RestCompletion.ts's/ShiftCycle.ts's own rest-
-    // completion handlers (correctly, separately guarded — see their own
-    // #928 notes) stopped trusting that stale activeActionId enough to
-    // delete whatever it named. Release the stale claim back to the open
-    // pool instead of leaving the vehicle permanently parked on a target
-    // nobody is coming back to finish.
-    if (holder.activeActionId !== action.id) {
-      releaseActionToOpenPool(state, action);
-      continue;
-    }
-
-    // Gate on the holder's own work timer rather than action.status — status
-    // already flips 'assigned' -> 'in_progress' at boarding time (mirroring
-    // #547's "claimed, walking" vs "committed" distinction), well before the
-    // vehicle itself reaches the target, so it can't double as "already
-    // seeded" here. taskTicksRemaining !== null means either a previous tick
-    // already seeded it (vehicle parked at target since) or work is already
-    // underway some other way — nothing left to do.
-    if (holder.taskTicksRemaining !== null) continue;
-
-    // seedTaskTimerFields computes and stages pendingTaskDuration but,
-    // deliberately, does not promote it — promoteVehicleGatedAction (GameLoop.ts)
-    // never calls it at claim time for this reason. Compute it now if nothing
-    // staged it already, then promote in the same step so the work timer
-    // starts the very tick the vehicle arrives, not one tick later.
-    if (holder.pendingTaskDuration === null) {
-      seedTaskTimerFields(state, holder, action, grid);
-    }
-    const duration = holder.pendingTaskDuration!;
-    holder.taskTicksRemaining = duration;
-    holder.activeTaskTotalTicks = duration;
-    holder.pendingTaskDuration = null;
-    action.status = 'in_progress';
-
-    vehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[vehicle.type];
-    tickVehicleTaskState(vehicle);
-  }
-
   // reconcileVehicleReservations only reports which active actions need
   // interrupting (their reserved vehicle vanished underneath them) rather
   // than interrupting them itself — that call lives in TaskDispatch.ts,
@@ -283,125 +221,4 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
   }
 
   return result;
-}
-
-/**
- * Resolve a pending driver-boarding request for an employee who has just
- * arrived at the vehicle's position (or cancel it if the vehicle is no
- * longer boardable).
- */
-function resolveBoarding(
-  state: GameState,
-  emp: Employee,
-  result: ArrivalGateResult,
-  emitter?: EventEmitter,
-): void {
-  const vehicleId = emp.pendingDriverVehicleId!;
-  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-
-  if (!vehicle) {
-    emp.pendingDriverVehicleId = null;
-    result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_gone' });
-    releaseReservationIfVehicleGated(state, emp, emitter);
-    return;
-  }
-
-  if (vehicle.driverId !== null && vehicle.driverId !== emp.id) {
-    emp.pendingDriverVehicleId = null;
-    result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_taken' });
-    releaseReservationIfVehicleGated(state, emp, emitter);
-    // A stale evacuation marker on this vehicle must not confuse whoever
-    // drives it next (#1042) — the driver who actually took it either isn't
-    // evacuating at all, or staged their own marker via clearZone already.
-    vehicle.pendingEvacuationDestination = null;
-    return;
-  }
-
-  // Boarding happens from within one tile of the vehicle (Chebyshev
-  // distance <= 1), not exact cell equality — the employee reads as
-  // "arrived" (destinationX/Z cleared) the instant they are close enough to
-  // board, matching Mount.board's own distance check (isWithinBoardingRange).
-  if (!isWithinBoardingRange(emp.x, emp.z, vehicle.x, vehicle.z)) {
-    // The employee reached where the vehicle used to be, but it has since
-    // moved elsewhere — cancel rather than chase it silently.
-    emp.pendingDriverVehicleId = null;
-    result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_moved' });
-    releaseReservationIfVehicleGated(state, emp, emitter);
-    vehicle.pendingEvacuationDestination = null;
-    return;
-  }
-
-  const boarded = board(state, vehicle.id, emp.id, emitter);
-  emp.pendingDriverVehicleId = null;
-  if (boarded.success) {
-    result.driversBoarded.push(emp.id);
-    state.vehicles.driverBoardingCount++;
-    // #550: a vehicle-gated action normally already staged targetX/targetZ
-    // on this vehicle at claim time (GameLoop.promoteVehicleGatedAction) —
-    // but boarding is the one place a driver actually mounts, so re-stage it
-    // here from the reserved action itself rather than trust it was already
-    // done; task was deliberately left alone until now so an unmanned
-    // vehicle never drove itself — now that a driver is aboard, hand it to
-    // tickVehicle (ArrivalGate's own vehicle-drive loop, below) the same way
-    // moveVehicle would.
-    if (vehicle.reservedForActionId !== null) {
-      const reservedAction = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
-
-      if (reservedAction) {
-        // #552: haul_debris/fragment_debris route through the existing
-        // request*/tick* drive machinery (HaulingTask.ts/BoulderBreaking.ts)
-        // instead of the generic single-target drive loop below — starting
-        // the actual haul/break request is what the two-/one-leg workflow
-        // needs, and the request functions stage their own targetX/targetZ
-        // (fragment approach cell) rather than the action's own
-        // targetX/targetZ. startVehicleGatedFragmentWork returns null for any
-        // other action type, in which case the generic single-target drive
-        // below applies as before.
-        const started = startVehicleGatedFragmentWork(state, vehicle, reservedAction);
-
-        if (started === false) {
-          // Fragment/depot/eligibility changed between claim and boarding
-          // (fragment picked clean, no active warehouse, etc.) — release the
-          // action back to the pool instead of leaving the vehicle boarded
-          // with nothing to do; a later dispatch/claim pass retries once the
-          // situation clears (no error, no crash — same contract as the
-          // claim-time isHaulOrFragmentActionClaimable gate). keepVehicleDriver
-          // (#552) leaves `emp` seated — they just boarded this exact vehicle
-          // moments ago in this same tick (a few lines up), so dismounting
-          // them immediately would only force a needless walk-back-and-reboard
-          // the instant the situation clears.
-          interruptActiveAction(state, emp, reservedAction.id, { keepVehicleDriver: true });
-          return;
-        }
-        if (started === null) {
-          vehicle.targetX = reservedAction.targetX;
-          vehicle.targetZ = reservedAction.targetZ;
-        }
-      }
-
-      vehicle.task = 'moving';
-      vehicle.waitingTicks = 0;
-    } else if (vehicle.pendingEvacuationDestination !== null) {
-      // Boarded to drive a vehicle clear of an evacuating zone (#1042) rather
-      // than for a vehicle-gated action — no reservation to hand off to, so
-      // start the drive here instead.
-      moveVehicle(state.vehicles, vehicle.id, vehicle.pendingEvacuationDestination.x, vehicle.pendingEvacuationDestination.z);
-    }
-  } else {
-    result.boardingCancelled.push({ employeeId: emp.id, reason: boarded.error ?? 'unknown' });
-  }
-}
-
-/**
- * A cancelled boarding must not leave a dangling vehicle reservation behind
- * (#550) — `emp.activeActionId` still names the vehicle-gated action being
- * walked to at this point (GameLoop sets it before requesting the board), so
- * it's the lookup key back to which reservation, if any, to release.
- */
-function releaseReservationIfVehicleGated(state: GameState, emp: Employee, emitter?: EventEmitter): void {
-  if (emp.activeActionId === null) return;
-  const action = state.pendingActions.find(a => a.id === emp.activeActionId);
-  if (action && action.requiredVehicleRole !== null) {
-    releaseVehicleReservation(state, action.id, emitter);
-  }
 }

@@ -38,6 +38,8 @@ function makeEmployee(id: number, overrides: Partial<Employee> = {}): Employee {
     pendingDriverVehicleId: null,
     taskQueue: [],
     locomotion: { kind: 'on_foot' },
+    itinerary: null,
+    vehicleWaitingTicks: 0,
     ...overrides,
   };
 }

@@ -39,7 +39,7 @@ import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js'
 import { cancelAction } from '../../../src/core/engine/TaskCancellation.js';
 import { forceShiftRestIfNeeded } from '../../../src/core/engine/ForceShiftRest.js';
 import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
-import { tickVehicle } from '../../../src/core/engine/EntityMovementTick.js';
+import { driveVehicleTowardTarget } from '../../../src/core/engine/Locomotion.js';
 import { WORK_DURATION_TICKS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
@@ -313,7 +313,7 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
 
     // Real driving — several cells, no NavGrid (state.navGrid is null on a
     // freshly-created game), so tickVehicleDirectLine advances one cell/tick.
-    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
     expect(vehicle.x).toBeGreaterThan(0); // sanity: it actually moved
 
     const vehicleXAtCancel = vehicle.x;
@@ -350,7 +350,7 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     employee.x = 0;
     employee.z = 0;
 
-    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
     expect(vehicle.x).toBeGreaterThan(0);
 
     const vehicleXAtRest = vehicle.x;
@@ -391,7 +391,7 @@ describe("releaseVehicleReservation's real call chains land the driver at the ve
     employee.x = 0;
     employee.z = 0;
 
-    for (let i = 0; i < 5; i++) tickVehicle(state, vehicle);
+    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
     expect(vehicle.x).toBeGreaterThan(0);
 
     const vehicleXAtCollapse = vehicle.x;

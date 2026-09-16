@@ -22,6 +22,8 @@ import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReas
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { alight } from './Mount.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -90,6 +92,20 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
  * Never both in the same tick.
  */
 export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+  // Computed once, up front, so both the taskQueue-resume branch below and
+  // the empty/all-unreachable-taskQueue fallback further down can check it —
+  // see promoteStarved's own call site below for why an ordinary (non-rest)
+  // taskQueue resumption must not win over it.
+  const starved = findStarvedActionForEmployee(state, employee);
+  const promoteStarved = (): boolean => {
+    if (starved === null) return false;
+    const claimedStarved = claimPendingAction(state, starved.action.id, employee.id);
+    if (claimedStarved === null) return false;
+    result.claimed.push(claimedStarved.id);
+    promoteActionToActive(state, employee, claimedStarved);
+    return true;
+  };
+
   if (employee.taskQueue.length > 0) {
     // Prune stale entries first: a queued id goes stale when the action it
     // named was claimed here (e.g. by claimActionsTargetedAtEmployee pushing
@@ -109,12 +125,41 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       const candidates = employee.taskQueue.map(id => state.pendingActions.find(a => a.id === id)!);
 
       // Prefer a queued rest candidate when it's reachable this tick (#1062
-      // rest-priority ordering); fall back to ranking the full queue when it
-      // isn't, or when nothing in the queue is a rest action at all.
+      // rest-priority ordering) — ahead of everything else, starvation
+      // included: a needs-driven rest is never worth delaying a tick to go
+      // work a starved job instead.
       const restCandidate = candidates.find(a => a.type === 'rest');
-      const selection = restCandidate !== undefined
-        ? selectBestActionForEmployee(state, employee, [restCandidate]) ?? selectBestActionForEmployee(state, employee, candidates)
-        : selectBestActionForEmployee(state, employee, candidates);
+      const restSelection = restCandidate !== undefined ? selectBestActionForEmployee(state, employee, [restCandidate]) : null;
+      if (restSelection !== null) {
+        promoteActionToActive(state, employee, restSelection.action);
+        employee.taskQueue = employee.taskQueue.filter(id => id !== restSelection.action.id);
+        return;
+      }
+
+      // #1089 fix: a starved action (see promoteStarved's own doc comment
+      // above) wins over resuming this employee's own ordinary (non-rest)
+      // taskQueue reservation. Without this, an employee whose
+      // reserveOnePoolActionAhead (step 3) keeps one reachable vehicle-gated
+      // follow-up queued at all times never has an empty or fully-unreachable
+      // taskQueue at the instant they go idle — the plain "resume from
+      // taskQueue" ranking just below always wins first, and the starvation
+      // check at the bottom of this function (needed for the empty-taskQueue
+      // case) is never reached for them, defeating the whole point of the
+      // override exactly as its own #1000-followup doc comment (below,
+      // claimOnePoolCandidate's excludeOnFootActions) already warns against
+      // for the reserve-ahead side of this same gap. Direct-traced via
+      // rock-fragmenter-breaking.json in interaction mode (#1089): the one
+      // idle debris_hauler driver cycled hauling job after hauling job,
+      // always with one more already reserved ahead in taskQueue, while two
+      // `place_building` orders starved 900+ ticks with nobody ever idle
+      // long enough (by this function's own accounting) to serve them. The
+      // pre-empted taskQueue entry is not lost — it was never promoted to
+      // active, so it simply stays reserved for this employee's next idle
+      // tick, the same as any other reachable-but-not-yet-claimed candidate.
+      if (promoteStarved()) return;
+
+      // Nothing starved to prefer — fall back to ranking the full queue.
+      const selection = selectBestActionForEmployee(state, employee, candidates);
       if (selection !== null) {
         promoteActionToActive(state, employee, selection.action);
         employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
@@ -189,15 +234,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
   // orders sat 'queued' and fully claimable (reachable, no required skill,
   // no vehicle needed) for 3,000 ticks while the one idle driver re-selected
   // the same haul_debris action on every one of them.
-  const starved = findStarvedActionForEmployee(state, employee);
-  if (starved !== null) {
-    const claimedStarved = claimPendingAction(state, starved.action.id, employee.id);
-    if (claimedStarved !== null) {
-      result.claimed.push(claimedStarved.id);
-      promoteActionToActive(state, employee, claimedStarved);
-      return;
-    }
-  }
+  if (promoteStarved()) return;
 
   const selection = claimOnePoolCandidate(state, employee);
   if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
@@ -430,6 +467,20 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   if (action.requiredVehicleRole !== null) {
     promoteVehicleGatedAction(state, employee, action);
     return;
+  }
+
+  // #1103: a currently-mounted employee claiming an on-foot action (this
+  // whole branch — place_building, survey, charge_hole, rest, any
+  // requiredVehicleRole: null action) must alight first. Without this, the
+  // legacy destinationX/Z walk below moves employee.x/z on its own every
+  // tick while the vehicle they're still nominally "mounted" in never
+  // moves (Locomotion.ts's advanceLegacyFootWalk only ever touches the
+  // employee, never a vehicle) — an immediate and then ever-widening I2
+  // (mounted-position-mismatch) violation for the rest of the walk.
+  // Mirrors the identical alight-before-boarding-elsewhere fix in
+  // PlanItinerary.ts's own vehicle-gated branch.
+  if (isMounted(employee.locomotion)) {
+    alight(state, mountedVehicleId(employee.locomotion)!);
   }
 
   employee.destinationX = action.targetX;

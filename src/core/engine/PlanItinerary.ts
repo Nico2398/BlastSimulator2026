@@ -9,11 +9,11 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 
 export type PlanFidelity = 'estimate' | 'exact';
 
@@ -62,6 +62,27 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal): Resolved
  * yet — mirroring resolveActionCost's own null-navGrid convention
  * (ActionSelection.ts) — and returns null when the target is genuinely
  * unreachable on the current NavGrid.
+ *
+ * Uses `findExactPath` (Pathfinding.ts) rather than `findPath` directly:
+ * `findPath` can report `found: true` after its own `clampToGrid` silently
+ * redirected an out-of-bounds (toX, toZ) onto the nearest in-grid cell — a
+ * "successful" path whose real endpoint is not the leg's own destX/destZ.
+ * `findExactPath` rejects exactly that case (#1109). Locomotion's
+ * `isLegArrived` checks the UNCLAMPED destX/destZ exactly, so a leg built
+ * from a clamped path can never actually arrive: every following tick
+ * re-resolves the identical clamped, already-there path, reports "moved"
+ * with zero real movement, and never once hits a failed-path tick to trip
+ * the stuck-abandon safety net (#1103, confirmed live:
+ * level1-playthrough-win.json's own `vehicle move 3 to:10,-2` — a
+ * corridor-clearing coordinate one row past the navmesh's own south edge —
+ * parks employee #4 at the clamped (10,0) from tick 15 onward, indefinitely,
+ * and EmployeeDispatch.ts's own mid-itinerary dispatch guard (#1089) then
+ * correctly refuses to double-book them, permanently removing one of three
+ * survivors from the roster for the rest of the run). Failing the plan here
+ * — same outcome as a genuinely unreachable target — is what the
+ * corridor-clearing use case already expects: the console's `vehicle move`
+ * command surfaces "No route available" instead of installing a leg that
+ * can never resolve.
  */
 function estimateLegDistance(
   state: GameState,
@@ -80,18 +101,72 @@ function estimateLegDistance(
   return path.found ? path.totalCost : null;
 }
 
+/**
+ * The foot-to-vehicle leg every fresh (not-yet-mounted) vehicle-gated
+ * itinerary starts with: walk to within one tile of `vehicle` and board it.
+ * Shared by planItinerary's own vehicle-gated branch below and MoveTo.ts's
+ * board-only itinerary (`moveTo(state, id, {vehicleId})`), which is exactly
+ * this one leg with nothing appended after it.
+ */
+export function buildBoardLeg(
+  state: GameState,
+  employee: Employee,
+  vehicle: Vehicle,
+  fidelity: PlanFidelity,
+): Leg | null {
+  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
+  if (footDist === null) return null;
+
+  return {
+    mode: 'foot',
+    vehicleId: vehicle.id,
+    destX: vehicle.x,
+    destZ: vehicle.z,
+    arrival: 'adjacent',
+    onArrive: { kind: 'board', vehicleId: vehicle.id },
+    estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
+  };
+}
+
+/**
+ * Whether `vehicle` has a free seat for `employee` — already aboard counts as
+ * free (continuity never needs a second seat). Shared with MoveTo.ts's
+ * board-only itinerary, which runs the identical availability check before
+ * committing to a route.
+ */
+export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
+  return vehicle.occupantIds.includes(employee.id) || vehicle.occupantIds.length < VEHICLE_SEAT_COUNT[vehicle.type];
+}
+
 export function planItinerary(
   state: GameState,
   employee: Employee,
   goal: Goal,
   fidelity: PlanFidelity,
+  // #1089: a caller-supplied vehicle hint — moveTo's `via` — names the exact
+  // vehicle to plan a reposition goal through, overriding the goal's own
+  // (null, for 'reposition') role-based selection below. Reused by a 'work'
+  // goal too (harmless: no caller passes both today), so the override lives
+  // in one place rather than being special-cased per goal kind.
+  opts?: { via?: number },
 ): Itinerary | null {
   const resolved = resolveGoal(state, employee, goal);
   if (resolved === null) return null;
 
   const role = resolved.requiredVehicleRole;
+  // A 'reposition' goal carries no role of its own — an employee already
+  // mounted planning one implicitly keeps driving the vehicle they're in
+  // (Zone.ts's already-driven-relocate case: `moveTo(state, v.driverId, {x,
+  // z})`, no explicit `via`) rather than stepping off it to walk, which
+  // would desync their position from the vehicle's (I2) without ever
+  // alighting. An explicit `via` always wins when both are present.
+  const via = opts?.via ?? (
+    goal.kind === 'reposition' && isMounted(employee.locomotion)
+      ? mountedVehicleId(employee.locomotion) ?? undefined
+      : undefined
+  );
 
-  if (role === null) {
+  if (role === null && via === undefined) {
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED) {
       /* reserved for gameplay-vehicle-fleet phase 7 (fast transport): compare
        * this foot leg's cost against boarding+driving and return whichever is
@@ -114,14 +189,21 @@ export function planItinerary(
     return { legs: [footLeg], goal, workTicks: 0, estTotalTicks: footLeg.estTicks };
   }
 
-  // Vehicle-gated: reuse the reservation already made for this action, if
-  // any, otherwise the cheapest free vehicle of the required role — same
-  // lookup resolveVehicleGatedWalkTarget (ActionSelection.ts) uses.
-  const reserved = resolved.actionId !== null
-    ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
-    : undefined;
-  const vehicle = reserved ?? findFreeVehicleForRole(state, role, employee);
-  if (!vehicle) return null;
+  // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent
+  // that, reuse the reservation already made for this action, if any,
+  // otherwise the cheapest free vehicle of the required role — same lookup
+  // resolveVehicleGatedWalkTarget (ActionSelection.ts) uses.
+  let vehicle: Vehicle | undefined;
+  if (via !== undefined) {
+    vehicle = state.vehicles.vehicles.find(v => v.id === via);
+    if (!vehicle || !hasFreeSeatFor(vehicle, employee)) return null;
+  } else {
+    const reserved = resolved.actionId !== null
+      ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
+      : undefined;
+    vehicle = reserved ?? findFreeVehicleForRole(state, role!, employee) ?? undefined;
+    if (!vehicle) return null;
+  }
 
   const alreadyMounted = isMounted(employee.locomotion) && mountedVehicleId(employee.locomotion) === vehicle.id;
 
@@ -130,18 +212,31 @@ export function planItinerary(
   let driveFromZ = employee.z;
 
   if (!alreadyMounted) {
-    const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
-    if (footDist === null) return null;
+    // #1103: an employee currently mounted in a DIFFERENT vehicle (e.g. an
+    // idle rock_digger driver picked up for a debris_hauler haul) must alight
+    // from it before walking to board this one — otherwise the foot leg
+    // below moves employee.x/z on its own while the old vehicle, whose x/z is
+    // written only from ITS OWN occupant's advance (Locomotion.ts), never
+    // moves, instantly splitting the two positions apart (I2). A zero-length
+    // leg at the employee's own current position applies its 'alight' step
+    // the very same tick it becomes current (Locomotion.advanceItinerary's
+    // own continuity-leg handling) rather than idling a tick for a movement
+    // that would never fire.
+    if (isMounted(employee.locomotion)) {
+      legs.push({
+        mode: 'foot',
+        vehicleId: null,
+        destX: employee.x,
+        destZ: employee.z,
+        arrival: 'exact',
+        onArrive: { kind: 'alight' },
+        estTicks: 0,
+      });
+    }
 
-    legs.push({
-      mode: 'foot',
-      vehicleId: vehicle.id,
-      destX: vehicle.x,
-      destZ: vehicle.z,
-      arrival: 'adjacent',
-      onArrive: { kind: 'board', vehicleId: vehicle.id },
-      estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
-    });
+    const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
+    if (boardLeg === null) return null;
+    legs.push(boardLeg);
 
     driveFromX = vehicle.x;
     driveFromZ = vehicle.z;

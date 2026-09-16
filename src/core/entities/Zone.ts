@@ -2,8 +2,9 @@
 // Players define safety zones before blasting and evacuate entities.
 
 import type { VehicleState } from './Vehicle.js';
-import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
+import type { GameState } from '../state/GameState.js';
+import { moveTo } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
 import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
@@ -70,6 +71,7 @@ export function defineZone(state: ZoneState, bounds: ZoneBounds): void {
  */
 export function clearZone(
   zone: ZoneBounds,
+  state: GameState,
   vehicles: VehicleState,
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
@@ -101,7 +103,10 @@ export function clearZone(
     if (v.driverId !== null) {
       const dest = findSafeDestination(v.x, v.z, zone);
       if (dest) {
-        moveVehicle(vehicles, v.id, dest.x, dest.z);
+        // Already driven — plain reposition; moveTo's own implicit
+        // continuity (already mounted in `v`) plans straight to a drive
+        // leg, no boarding needed.
+        moveTo(state, v.driverId, { x: dest.x, z: dest.z });
         result.orderedVehicleIds.push(v.id);
       } else {
         result.strandedVehicleIds.push(v.id);
@@ -133,10 +138,12 @@ export function clearZone(
       continue;
     }
 
-    driver.pendingDriverVehicleId = v.id;
-    driver.destinationX = v.x;
-    driver.destinationZ = v.z;
+    // Stage the safe destination before starting the walk (#1042): the
+    // moment tickLocomotion's own board arrival step resolves, it reads this
+    // to kick off the drive to safety — see Locomotion.ts's
+    // handlePostBoardIntent.
     v.pendingEvacuationDestination = { x: dest.x, z: dest.z };
+    moveTo(state, driver.id, { vehicleId: v.id });
     boardingEmployeeIds.add(driver.id);
     result.orderedVehicleIds.push(v.id);
   }

@@ -329,8 +329,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // notification.order_blocked_no_vehicle, notification.order_blocked_no_driver,
     // notification.pip.blocked_orders_label, notification.pip.blocked_orders_tip —
     // both locales translated.
+    // Baseline is now 3500 (up from 3495): #1103's review-fix pass adds 5 keys
+    // for MoveTo.ts's error strings — move_to.employee_not_found,
+    // move_to.vehicle_not_found, move_to.vehicle_unavailable,
+    // move_to.no_route_to_vehicle, move_to.no_route_available — both locales.
+    // Baseline is now 3506 (up from 3500): merging main brings #1101's 6 keys
+    // for Mount.ts's error strings — mount.alight_failed,
+    // mount.employee_not_found, mount.too_far_to_board, mount.vehicle_full,
+    // mount.vehicle_no_driver, mount.vehicle_not_found — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3501);
+    expect(Object.keys(en).length).toBe(3506);
   });
 });
 

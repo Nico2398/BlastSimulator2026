@@ -1080,4 +1080,29 @@ describe('promoteActionToActive', () => {
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.pendingRestNeedKey).toBeNull();
   });
+
+  // #1103: a mounted employee claiming an on-foot action must alight first,
+  // or the legacy destinationX/Z walk below moves employee.x/z on its own
+  // while the vehicle they're still nominally "mounted" in never moves —
+  // an immediate I2 (mounted-position-mismatch) violation. See this file's
+  // own doc comment on the fix.
+  it('#1103: alights a mounted employee before walking to an on-foot action, leaving the vehicle idle with no occupant', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const action = makeAction({ id: 7, targetX: 5, targetZ: 7, requiredSkill: 'blasting' });
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(employee.destinationX).toBe(5);
+    expect(employee.destinationZ).toBe(7);
+  });
 });

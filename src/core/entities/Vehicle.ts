@@ -249,23 +249,6 @@ export function assignVehicle(
   return true;
 }
 
-/** Move a vehicle to target coordinates. */
-export function moveVehicle(
-  state: VehicleState,
-  vehicleId: number,
-  targetX: number,
-  targetZ: number,
-): boolean {
-  const vehicle = state.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return false;
-
-  vehicle.task = 'moving';
-  vehicle.targetX = targetX;
-  vehicle.targetZ = targetZ;
-  vehicle.waitingTicks = 0;
-  return true;
-}
-
 /** Destroy a vehicle (e.g., hit by a projectile). */
 export function destroyVehicle(state: VehicleState, vehicleId: number): boolean {
   const idx = state.vehicles.findIndex(v => v.id === vehicleId);

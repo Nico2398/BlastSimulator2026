@@ -5,18 +5,18 @@ import type { GameContext } from './world.js';
 import {
   purchaseVehicle,
   assignVehicle,
-  moveVehicle,
   destroyVehicle,
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
+  canAssignDriver,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { alight } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
+import { moveTo } from '../../core/engine/MoveTo.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
@@ -143,6 +143,22 @@ export function vehicleCommand(
       }
       const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
       const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
+      // #1089: an employee is the only mobile agent — vehicle.task/targetX/Z
+      // are written only for display now (Locomotion.ts's writeVehiclePosition),
+      // and nothing reads them to drive movement any more. A `task:moving`
+      // assign with real coordinates must install an itinerary on the
+      // driver via moveTo the same way `move` below does, or the vehicle
+      // (already confirmed driven, above) silently never moves — exactly
+      // the #1089 fixer-pass regression `move` itself already hit. A task
+      // other than 'moving', or 'moving' with no `to:` coords, stays a
+      // plain display-field assignment — nothing to drive toward.
+      if (task === 'moving' && targetX !== undefined && targetZ !== undefined) {
+        const result = moveTo(state, target.driverId!, { x: targetX, z: targetZ });
+        if (!result.success) {
+          return { success: false, output: result.error };
+        }
+        return { success: true, output: t('vehicle.assign_success', { id, task }) };
+      }
       // `target` above already confirmed a vehicle with `id` exists, and
       // nothing mutates `state.vehicles` between that lookup and here, so
       // assignVehicle cannot fail its own not-found check — its boolean
@@ -167,11 +183,20 @@ export function vehicleCommand(
       if (target.driverId === null) {
         return { success: false, output: t('vehicle.move_no_driver', { id }) };
       }
-      // `target` above already confirmed a vehicle with `id` exists, and
-      // nothing mutates `state.vehicles` between that lookup and here, so
-      // moveVehicle cannot fail its own not-found check — its boolean return
-      // is not re-checked.
-      moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!);
+      // #1089: drive the vehicle's own driver there via moveTo — the only
+      // entry point that installs an itinerary Locomotion actually walks.
+      // moveVehicle (Vehicle.ts) only ever wrote vehicle.task/targetX/Z,
+      // which Locomotion now writes for display only (writeVehiclePosition)
+      // and never reads to move anything — calling it here left the
+      // vehicle sitting at its spawn point forever despite reporting
+      // "moving" (confirmed live: level1-playthrough-win.json's own
+      // corridor-clearing `vehicle move` steps never actually relocated the
+      // blocking vehicles, silently defeating the scenario's own documented
+      // deadlock workaround).
+      const result = moveTo(state, target.driverId, { x: toCoords[0]!, z: toCoords[1]! });
+      if (!result.success) {
+        return { success: false, output: result.error };
+      }
       return { success: true, output: t('vehicle.move_success', { id, x: toCoords[0]!, z: toCoords[1]! }) };
     }
     case 'driver': {
@@ -193,12 +218,20 @@ export function vehicleCommand(
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: t('vehicle.not_found', { id: vehicleId }) };
       }
-      // Validates licence/availability now, but the employee must physically
-      // walk to the vehicle before they actually become its driver — resolved
-      // by ArrivalGate.tickArrivalGate once they arrive (#437).
-      const result = requestBoardVehicle(state, vehicleId, employeeId);
+      // Validates licence/availability now — the same canAssignDriver check
+      // Mount.board re-runs at arrival time (#1089) — so a request that can
+      // never succeed (unlicensed employee, vehicle already has a driver) is
+      // rejected immediately rather than only once the employee has walked
+      // all the way there. The employee still must physically walk to the
+      // vehicle before they actually become its driver — resolved by
+      // tickLocomotion's own board arrival step once they arrive.
+      const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+      if (!eligible.success) {
+        return { success: false, output: eligible.error };
+      }
+      const result = moveTo(state, employeeId, { vehicleId });
       if (!result.success) {
-        return { success: false, output: result.error! };
+        return { success: false, output: result.error };
       }
       return { success: true, output: t('vehicle.driver_board_success', { employeeId, vehicleId }) };
     }

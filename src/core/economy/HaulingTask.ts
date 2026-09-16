@@ -8,7 +8,8 @@ import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
-import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
+import { tickVehicleTaskState } from '../engine/EntityMovementTick.js';
+import { driveVehicleTowardTarget } from '../engine/Locomotion.js';
 import { pickupFragment, deliverToDepot, returnFragmentToGround } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
@@ -133,9 +134,9 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
   vehicle.task = 'moving';
   vehicle.targetX = approach.x;
   vehicle.targetZ = approach.z;
-  tickVehicle(state, vehicle);
+  const { arrived } = driveVehicleTowardTarget(state, vehicle, approach.x, approach.z);
 
-  if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
+  if (arrived) {
     deliverToDepot(state.logistics, vehicle.haulingFragmentId!, state.collectedOre);
     vehicle.payloadKg = 0;
     vehicle.haulingFragmentId = null;

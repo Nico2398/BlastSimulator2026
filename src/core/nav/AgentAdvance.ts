@@ -32,7 +32,7 @@ export interface AdvanceAlongPathInput {
   navGrid?: NavGrid | null;
 }
 
-export interface AdvanceAlongPathOutcome {
+interface AdvanceAlongPathOutcome {
   /** Whether a path was found this tick — false means the agent did not move. */
   pathFound: boolean;
   /** New position — unchanged from input when pathFound is false. */

@@ -17,6 +17,16 @@ import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entit
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
+// #1089: boarding itself, and a vehicle-gated action's own drive, now resolve
+// entirely inside tickLocomotion's own itinerary walk (Locomotion.ts) rather
+// than in a dedicated vehicle-drive loop here — ArrivalGate.ts's own
+// driversBoarded/boardingCancelled result fields are kept on the shape but
+// always empty now (see that file's own doc comments). Every test below that
+// used to poke pendingDriverVehicleId/vehicle.driverId/vehicle.targetX/Z
+// directly and call tickArrivalGate alone now drives the same scenario
+// through moveTo (real itinerary) + tickLocomotion (the real mover) instead.
+import { moveTo } from '../../../src/core/engine/MoveTo.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { reconcileVehicleReservations } from '../../../src/core/engine/VehicleReservation.js';
 // reconcileVehicleReservations no longer performs the interruption itself
 // (import-cycle fix, #550) — it only reports which actions need it. Unit
@@ -164,7 +174,7 @@ describe('tickArrivalGate — task arrival', () => {
   });
 });
 
-describe('tickArrivalGate — vehicle boarding', () => {
+describe('tickArrivalGate — vehicle boarding (boarding itself now resolves in tickLocomotion, #1089)', () => {
   it('assigns the driver once the employee has arrived at a still-driverless, still-in-place vehicle', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
@@ -172,23 +182,21 @@ describe('tickArrivalGate — vehicle boarding', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
     const emitter = new EventEmitter();
     const boardedEvents: Array<{ employeeId: number; vehicleId: number }> = [];
     emitter.on('vehicle:driver_boarded', (data) => boardedEvents.push(data));
 
-    const result = tickArrivalGate(state, emitter);
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(state, emitter);
 
     expect(vehicle.driverId).toBe(employee.id);
     expect(employee.pendingDriverVehicleId).toBeNull();
-    expect(result.driversBoarded).toEqual([employee.id]);
     expect(boardedEvents).toEqual([{ employeeId: employee.id, vehicleId: vehicle.id }]);
   });
 
-  it('cancels the boarding with reason "vehicle_gone" when the vehicle was destroyed en route', () => {
+  it('refuses to plan a board (moveTo returns success:false) for a vehicle that no longer exists', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
@@ -198,60 +206,54 @@ describe('tickArrivalGate — vehicle boarding', () => {
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = goneId;
 
-    const result = tickArrivalGate(state);
+    const moveResult = moveTo(state, employee.id, { vehicleId: goneId });
 
+    expect(moveResult.success).toBe(false);
     expect(employee.pendingDriverVehicleId).toBeNull();
-    expect(result.driversBoarded).toEqual([]);
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_gone' }]);
   });
 
-  it('cancels the boarding with reason "vehicle_taken" when another driver claimed the vehicle first', () => {
+  it('refuses to plan a board (moveTo returns success:false) when another driver already claimed the vehicle', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { employee: otherDriver } = hireEmployee(state.employees, 'driver', new Random(SEED + 1));
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.occupantIds = [otherDriver.id];
     vehicle.driverId = otherDriver.id;
+    otherDriver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
-    const result = tickArrivalGate(state);
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
 
+    expect(moveResult.success).toBe(false);
     expect(vehicle.driverId).toBe(otherDriver.id);
     expect(employee.pendingDriverVehicleId).toBeNull();
-    expect(result.driversBoarded).toEqual([]);
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_taken' }]);
   });
 
-  it('cancels the boarding with reason "vehicle_moved" when the vehicle is no longer where the employee arrived', () => {
+  it('cancels the boarding (board arrival step fails) when the vehicle drove off before the employee\'s walk finished', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    // Vehicle drove off before the employee finished walking to its old spot.
+    employee.x = 5;
+    employee.z = 5;
+
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
+
+    // Vehicle drove off before the employee's (already-arrived, adjacent)
+    // board step resolves — mirrors the old "vehicle_moved" cancellation.
     vehicle.x = 40;
     vehicle.z = 40;
 
-    employee.x = 5;
-    employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
-
-    const result = tickArrivalGate(state);
+    tickLocomotion(state);
 
     expect(vehicle.driverId).toBeNull();
-    expect(employee.pendingDriverVehicleId).toBeNull();
-    expect(result.driversBoarded).toEqual([]);
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_moved' }]);
+    expect(employee.itinerary).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
   });
 });
 
@@ -263,19 +265,18 @@ describe('tickArrivalGate — driverBoardingCount (issue #1083)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
     expect(state.vehicles.driverBoardingCount).toBe(0);
 
-    tickArrivalGate(state);
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(state);
 
     expect(vehicle.driverId).toBe(employee.id);
     expect(state.vehicles.driverBoardingCount).toBe(1);
   });
 
-  it('does not increment driverBoardingCount when a boarding attempt is cancelled (boardingCancelled branch)', () => {
+  it('does not increment driverBoardingCount when moveTo itself refuses the board (vehicle already gone)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
@@ -285,15 +286,12 @@ describe('tickArrivalGate — driverBoardingCount (issue #1083)', () => {
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = goneId;
 
     expect(state.vehicles.driverBoardingCount).toBe(0);
 
-    const result = tickArrivalGate(state);
+    const moveResult = moveTo(state, employee.id, { vehicleId: goneId });
 
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_gone' }]);
+    expect(moveResult.success).toBe(false);
     expect(state.vehicles.driverBoardingCount).toBe(0);
   });
 });
@@ -309,64 +307,73 @@ describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
-    const result = tickArrivalGate(state);
-
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    // First tick resolves the board and installs the evacuation-drive
+    // itinerary (Locomotion.handlePostBoardIntent) — that itinerary's own
+    // drive leg only starts advancing (and writes vehicle.targetX/Z) on the
+    // NEXT tick (#1089: a board arrival step that installs a brand-new
+    // itinerary supersedes the one the walking loop was iterating, so it
+    // stops there for the tick rather than also advancing the new one).
+    tickLocomotion(state);
     expect(vehicle.driverId).toBe(employee.id);
-    expect(result.driversBoarded).toEqual([employee.id]);
+    tickLocomotion(state);
+
     expect(vehicle.targetX).toBe(40);
     expect(vehicle.targetZ).toBe(40);
   });
 
-  it('clears pendingEvacuationDestination when a boarding attempt is cancelled with reason "vehicle_taken"', () => {
+  it('clears pendingEvacuationDestination when a boarding attempt is cancelled because another driver took the vehicle first', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { employee: otherDriver } = hireEmployee(state.employees, 'driver', new Random(SEED + 1));
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.driverId = otherDriver.id; // claimed first
     vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
-    // otherDriver is already mid-drive toward the evacuation destination, not
-    // arrived — without this, releaseArrivedEvacuationDrivers reads the
-    // vehicle's default target (== its spawn position) as "already there" and
-    // dismounts otherDriver before this employee's boarding attempt ever runs.
-    vehicle.targetX = 40;
-    vehicle.targetZ = 40;
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
-    const result = tickArrivalGate(state);
+    // Plans successfully — the vehicle is still free at plan time.
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
 
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_taken' }]);
+    // Another driver claims the vehicle in the same tick, before this
+    // employee's own (already-adjacent) board arrival step resolves.
+    vehicle.occupantIds = [otherDriver.id];
+    vehicle.driverId = otherDriver.id;
+    otherDriver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    tickLocomotion(state);
+
+    expect(vehicle.driverId).toBe(otherDriver.id);
+    expect(employee.itinerary).toBeNull();
     expect(vehicle.pendingEvacuationDestination).toBeNull();
   });
 
-  it('clears pendingEvacuationDestination when a boarding attempt is cancelled with reason "vehicle_moved"', () => {
+  it('clears pendingEvacuationDestination when a boarding attempt is cancelled because the vehicle moved away first', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    // Vehicle drove off before the employee finished walking to its old spot.
-    vehicle.x = 40;
-    vehicle.z = 40;
     vehicle.pendingEvacuationDestination = { x: 60, z: 60 };
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
-    const result = tickArrivalGate(state);
+    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
 
-    expect(result.boardingCancelled).toEqual([{ employeeId: employee.id, reason: 'vehicle_moved' }]);
+    // Vehicle drove off before the employee's (already-arrived, adjacent)
+    // board step resolves.
+    vehicle.x = 40;
+    vehicle.z = 40;
+
+    tickLocomotion(state);
+
+    expect(vehicle.driverId).toBeNull();
+    expect(employee.itinerary).toBeNull();
     expect(vehicle.pendingEvacuationDestination).toBeNull();
   });
 });
@@ -422,14 +429,16 @@ describe('tickArrivalGate — combined multi-employee tick', () => {
     tasked.pendingActionPayload = { method: 'aerial' };
 
     driver.x = 9; driver.z = 9;
-    driver.destinationX = null; driver.destinationZ = null;
-    driver.pendingDriverVehicleId = vehicle.id;
+    // #1089: boarding resolves in tickLocomotion, not tickArrivalGate — plan
+    // the drive's real itinerary first.
+    const moveResult = moveTo(state, driver.id, { vehicleId: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(state);
 
     const result = tickArrivalGate(state);
 
     expect(result.restStarted).toEqual([resting.id]);
     expect(result.taskStarted).toEqual([tasked.id]);
-    expect(result.driversBoarded).toEqual([driver.id]);
     expect(resting.restTicksRemaining).toBe(2);
     expect(tasked.taskTicksRemaining).toBe(3);
     expect(vehicle.driverId).toBe(driver.id);
@@ -472,11 +481,14 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
 
     employee.x = 5;
     employee.z = 5;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.pendingDriverVehicleId = vehicle.id;
 
-    tickArrivalGate(state);
+    // #1089: promoteVehicleGatedAction's own real call — moveTo(via:
+    // vehicle) — builds the board-then-drive itinerary; tickLocomotion is
+    // what actually walks it (boarding itself no longer resolves in
+    // tickArrivalGate).
+    const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(state);
 
     expect(vehicle.driverId).toBe(employee.id);
     // The vehicle, not the employee, drives the rest of the way to the
@@ -493,44 +505,38 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
-    vehicle.driverId = employee.id;
-    vehicle.targetX = 20;
-    vehicle.targetZ = 20;
-    // Vehicle is mid-drive — not yet at its target.
-    vehicle.x = 10;
-    vehicle.z = 10;
 
-    const action = makeVehicleGatedAction({ id: 2, holderId: employee.id, targetX: 20, targetZ: 20, status: 'in_progress' });
+    const action = makeVehicleGatedAction({ id: 2, holderId: employee.id, targetX: 20, targetZ: 20, status: 'assigned' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
     vehicle.reservedForActionId = action.id;
+    employee.x = 10;
+    employee.z = 10;
 
-    // Employee is aboard: no destination of their own, but a task is queued
-    // and waiting for the vehicle's arrival to actually start.
-    employee.x = vehicle.x;
-    employee.z = vehicle.z;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.taskTicksRemaining = null;
-    employee.pendingTaskDuration = 6;
-    employee.activeTaskSkill = null;
-    employee.pendingActionType = action.type;
-    employee.pendingActionPayload = action.payload;
-
+    // #1089: VehicleReservation.promoteVehicleGatedAction's own doc comment —
+    // a vehicle-gated action never stages pendingTaskDuration/
+    // taskTicksRemaining at claim time; ArrivalGate.tickArrivalGate seeds it
+    // itself, once the employee (and, by I2, their vehicle) actually reaches
+    // the target.
+    const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(state); // boards + starts the drive
+    expect(vehicle.driverId).toBe(employee.id);
     tickArrivalGate(state);
 
-    // Still driving — the work timer must not have started yet, even though
-    // the employee's own destinationX/Z read as "arrived".
+    // Still driving — the work timer must not have started yet.
     expect(employee.taskTicksRemaining).toBeNull();
-    expect(employee.pendingTaskDuration).toBe(6);
 
-    // The vehicle itself now reaches the target.
-    vehicle.x = 20;
-    vehicle.z = 20;
+    // Drive the rest of the way to the target.
+    for (let i = 0; i < 50 && (vehicle.x !== 20 || vehicle.z !== 20); i++) {
+      tickLocomotion(state);
+    }
+    expect(vehicle.x).toBe(20);
+    expect(vehicle.z).toBe(20);
 
     tickArrivalGate(state);
 
-    expect(employee.taskTicksRemaining).toBe(6);
+    expect(employee.taskTicksRemaining).not.toBeNull();
     expect(employee.pendingTaskDuration).toBeNull();
   });
 });
@@ -590,33 +596,23 @@ describe("tickArrivalGate — a driver's x/z tracks the vehicle continuously acr
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
-    vehicle.targetX = 20;
-    vehicle.targetZ = 0;
-    // Mid-drive, already boarded: a real boarding (ArrivalGate.resolveBoarding)
-    // always flips task to 'moving' the instant the driver mounts — mirror
-    // that here, or canTickVehicle (EntityMovementTick.ts) blocks the vehicle
-    // from moving at all and the "off the boarding cell" assertion below
-    // would trivially never fire.
-    vehicle.task = 'moving';
 
-    const action = makeVehicleGatedAction({ id: 5, holderId: employee.id, targetX: 20, targetZ: 0, status: 'in_progress' });
+    const action = makeVehicleGatedAction({ id: 5, holderId: employee.id, targetX: 20, targetZ: 0, status: 'assigned' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
     vehicle.reservedForActionId = action.id;
+    employee.x = 0;
+    employee.z = 0;
 
-    // Already boarded: no destination of their own, but the work timer
-    // hasn't started because the vehicle hasn't arrived yet.
-    employee.x = vehicle.x;
-    employee.z = vehicle.z;
-    employee.destinationX = null;
-    employee.destinationZ = null;
-    employee.taskTicksRemaining = null;
-    employee.pendingTaskDuration = 6;
+    // #1089: only an employee moves — tickLocomotion (not tickArrivalGate)
+    // is the real per-tick mover now; I2 (WorldInvariants.ts) is what
+    // guarantees the driver's own x/z always equals their vehicle's.
+    const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+    expect(moveResult.success).toBe(true);
 
     let sawEmployeeOffOriginalBoardingCell = false;
-    for (let i = 0; i < 15 && (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ); i++) {
-      tickArrivalGate(state);
+    for (let i = 0; i < 15 && (vehicle.x !== action.targetX || vehicle.z !== action.targetZ); i++) {
+      tickLocomotion(state);
       // The driver must track the vehicle exactly, every single tick —
       // never lag a tick behind and never stay frozen at the boarding cell
       // while the vehicle drives on ahead of them.

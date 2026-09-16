@@ -3,7 +3,7 @@
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
 import type { GameState } from '../state/GameState.js';
-import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
+import { tickLocomotion } from './Locomotion.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
 import {
   estimateActionCost, resolveActionCost, selectBestActionForEmployee,
@@ -20,10 +20,13 @@ import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS } from '..
 // re-exports above.
 export { estimateActionCost, resolveActionCost, selectBestActionForEmployee, seedTaskTimerFields, type SelectedAction };
 
-// Vehicle and employee per-tick movement (NavGrid pathing, stuck-tracking) live
-// in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
-// stays the single public surface for tick-orchestration callers.
-export { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult };
+// Locomotion (#1089) — the only mover — lives in Locomotion.ts; re-exported
+// here so GameLoop.ts stays the single public surface for tick-orchestration
+// callers. tickVehicleTaskState (EntityMovementTick.ts) and
+// driveVehicleTowardTarget/LocomotionResult (Locomotion.ts) are not
+// re-exported — every current caller imports them directly from their own
+// module instead (TickPipeline.ts, HaulingTask.ts, BoulderBreaking.ts).
+export { tickLocomotion };
 
 // Arrival-gated position-dependent actions (survey, rest/eating, vehicle
 // boarding, hauling) live in ArrivalGate.ts (#437) — re-exported here for the

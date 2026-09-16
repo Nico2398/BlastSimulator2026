@@ -3499,5 +3499,10 @@
   "vehicle.scrap_success": "Vehicle #{id} scrapped. Residual value: ${value}",
   "vehicle.break_usage": "Usage: vehicle break <vehicleId> fragment:<fragmentId>",
   "vehicle.break_success": "Vehicle #{id} breaking fragment #{fragmentId}.",
-  "vehicle.usage": "Usage: vehicle (list|buy|assign|move|driver|haul|scrap|break)"
+  "vehicle.usage": "Usage: vehicle (list|buy|assign|move|driver|haul|scrap|break)",
+  "move_to.employee_not_found": "Employee not found",
+  "move_to.vehicle_not_found": "Vehicle not found",
+  "move_to.vehicle_unavailable": "Vehicle unavailable",
+  "move_to.no_route_to_vehicle": "No route to vehicle",
+  "move_to.no_route_available": "No route available"
 }
