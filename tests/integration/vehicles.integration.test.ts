@@ -329,7 +329,7 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── Core API: purchaseVehicle / assignDriver / destroyVehicle ──
+  // ── Core API: purchaseVehicle / Mount.board / destroyVehicle ──
 
   it('purchaseVehicle core API returns vehicle and cost', () => {
     const vs = createVehicleState();
@@ -984,17 +984,17 @@ describe('Vehicle fleet', () => {
   // claim/board/release path already exists in core (VehicleReservation.ts,
   // VehicleBoarding.ts, ArrivalGate.resolveBoarding) and needs no changes for
   // this issue. These two tests pin that no manual affordance
-  // (`vehicleCommand(['driver', ...])` / `assignDriver`) is ever needed for a
+  // (`vehicleCommand(['driver', ...])` / `Mount.board`) is ever needed for a
   // queued vehicle-gated task to claim, board, and complete on its own.
   describe('fully automatic driver claim — no player affordance used (#921)', () => {
-    it('a bought vehicle + a licensed, idle employee + a queued vehicle-gated action: driverId is set to that employee and the action progresses with zero manual "vehicle driver"/assignDriver calls', () => {
+    it('a bought vehicle + a licensed, idle employee + a queued vehicle-gated action: driverId is set to that employee and the action progresses with zero manual "vehicle driver"/Mount.board calls', () => {
       const eid = hireOne(ctx, 'driller');
       employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
 
       // Nothing below this line ever calls vehicleCommand(['driver', ...]) or
-      // the core assignDriver() function — the claim has to happen on its own.
+      // the core Mount.board() function — the claim has to happen on its own.
       const dispatch = employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
       expect(dispatch.success).toBe(true);
       const actionId = ctx.state!.pendingActions[0]!.id;

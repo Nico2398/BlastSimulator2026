@@ -21,6 +21,7 @@ import {
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
 import { board } from '../../../src/core/engine/Mount.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   createEmployeeState,
@@ -1162,7 +1163,7 @@ describe('Mount.board — error: vehicle not found', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
 
     const result = board(state, 9999, employee.id);
-    expect(result.error).toBe('Vehicle not found');
+    expect(result.error).toBe(t('mount.vehicle_not_found'));
   });
 
   it('fleet vehicles array is unchanged after a vehicle-not-found failure', () => {
@@ -1188,7 +1189,7 @@ describe('Mount.board — error: employee not found', () => {
   it('error message is exactly "Employee not found" when employeeId is absent', () => {
     const { state, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
     const result = board(state, vehicleId, 9999);
-    expect(result.error).toBe('Employee not found');
+    expect(result.error).toBe(t('mount.employee_not_found'));
   });
 
   it('vehicle.driverId stays null after an employee-not-found failure', () => {
@@ -1214,7 +1215,7 @@ describe('Mount.board — error: employee not alive', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     killEmployee(state.employees, empId);
     const result = board(state, vehicleId, empId);
-    expect(result.error).toBe('Employee not found');
+    expect(result.error).toBe(t('mount.employee_not_found'));
   });
 
   it('vehicle.driverId stays null after a dead-employee failure', () => {

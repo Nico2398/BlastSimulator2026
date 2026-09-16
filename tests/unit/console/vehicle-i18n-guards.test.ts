@@ -340,6 +340,11 @@ describe('vehicle.ts — driver <id> none: not-found routes through mount.vehicl
     const result = vehicleCommand(ctx, ['driver', String(NOT_FOUND_ID), 'none'], {});
     expect(result.success).toBe(false);
     expect(result.output).not.toBe(englishLiteral);
+    // A missing key falls back to the raw key string itself, which trivially
+    // "differs" from the English literal regardless of locale — that would
+    // make this check pass even with no French translation wired up at all.
+    // Rule it out explicitly so this only passes once a real fr string exists.
+    expect(result.output).not.toBe('mount.vehicle_not_found');
   });
 });
 
