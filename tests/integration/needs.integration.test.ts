@@ -762,12 +762,12 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
 // 'employee:collapsed', not 'employee:shift_change', so it can never
 // trigger a false positive here.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('#928 — box-cut geometry: rest visits and cells walked both fall vs. the pre-fix baseline', () => {
+describe("#928 — box-cut geometry: rest visits and cells walked stay under freshly measured ceilings on the tutorial's own real setup", () => {
   const FIXED_WINDOW_TICKS = 150;
-  const MAX_CELLS_WALKED = 145.6; // measured 121.34054041723633 under tutorial's real setup + ~20% headroom (tick/geometry-style metric, dev-testing-strategy margin convention)
-  const MAX_REST_VISITS = 5; // measured 4 under tutorial's real setup + 1 fixed margin (discrete count, dev-testing-strategy margin convention)
+  const MAX_CELLS_WALKED = 145.6; // measured 121.34054041723633 under tutorial's real setup + ~20% headroom (tick/geometry-style metric, this file's own margin convention)
+  const MAX_REST_VISITS = 5; // measured 4 under tutorial's real setup + 1 fixed margin (discrete count, this file's own margin convention)
 
-  it('walks fewer cells and starts fewer rests than the pre-fix baseline, with no claimed job dropped mid-walk to it', () => {
+  it('walks fewer cells than the ceiling and starts no more rests than the ceiling, with no claimed job dropped mid-walk to it', () => {
     const engine = createGameEngine();
 
     // Tutorial's own canonical hire/train/build/buy/build_ramp setup order
