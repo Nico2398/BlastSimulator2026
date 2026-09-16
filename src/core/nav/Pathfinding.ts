@@ -557,6 +557,17 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   return ordinary;
 }
 
+/**
+ * Wraps `findPath` but rejects a path whose final waypoint does not match
+ * the requested destination (rather than accepting `findPath`'s silent
+ * clamp-to-grid-bounds behavior), for callers that need the request's exact
+ * endpoint reached, not just "a path found" (#1109).
+ */
+export function findExactPath(_grid: NavGrid, _request: PathRequest): PathResult {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 function findOrdinaryPath(
   grid: NavGrid,
   sx: number,
