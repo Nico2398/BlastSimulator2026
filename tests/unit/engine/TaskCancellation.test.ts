@@ -11,10 +11,12 @@ import { describe, it, expect } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { releaseDeadEmployeeActions, cancelAction } from '../../../src/core/engine/TaskCancellation.js';
+import { releaseDeadEmployeeActions, cancelAction, walkingDistanceEstimate } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
+import { findPath } from '../../../src/core/nav/Pathfinding.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 const SEED = 42;
 const DEAD_ID = 7;
@@ -33,6 +35,17 @@ function makeAction(overrides: Partial<PendingAction> & { id: number }): Pending
     queuedAtTick: 0,
     ...overrides,
   };
+}
+
+/** Flat, fully-walkable NavGrid of the given size (mirrors ActionSelection.test.ts's own helper). */
+function makeFlatGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
 }
 
 describe('releaseDeadEmployeeActions (#557 review)', () => {
@@ -272,5 +285,32 @@ describe('cancelAction — must not clear a DIFFERENT active action\'s holder fi
     expect(employee.taskTicksRemaining).toBe(5);
     const storedA = state.pendingActions.find(a => a.id === actionA.id);
     expect(storedA!.status).toBe('in_progress');
+  });
+});
+
+// ── walkingDistanceEstimate must not trust findPath's silent out-of-bounds
+// clamp (#1113, mirrors #1109's fix to resolveActionCost/ActionSelection.ts)
+// ─────────────────────────────────────────────────────────────────────────
+describe('walkingDistanceEstimate — out-of-bounds target (#1113)', () => {
+  it('returns Infinity for a target outside state.navGrid\'s bounds, rather than a distance computed against findPath\'s silently clamped-to-grid endpoint', () => {
+    // 30x30 grid. A target far past the grid's edge clamps under plain
+    // findPath onto the grid's last cell and still reports found:true —
+    // walkingDistanceEstimate must not let that masquerade as a real,
+    // reachable distance.
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatGrid(30, 30);
+    const fromX = 0, fromZ = 0;
+    const toX = 500, toZ = 500; // genuinely outside the 30x30 grid
+
+    const plainPath = findPath(state.navGrid, {
+      agentId: -1,
+      fromX, fromZ, toX, toZ,
+      avoidVehicles: true,
+    });
+    expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+
+    const distance = walkingDistanceEstimate(state, fromX, fromZ, toX, toZ);
+
+    expect(distance).toBe(Infinity);
   });
 });

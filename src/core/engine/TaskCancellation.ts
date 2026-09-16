@@ -11,7 +11,7 @@ import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
-import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -203,11 +203,13 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
  * Estimated on-foot walking cost from (fromX, fromZ) to (toX, toZ), used only
  * by hasCloserIdleCandidate to rank candidates.
  *
- * With a NavGrid built, runs the real A* search (Pathfinding.findPath, the
- * same one EntityMovementTick.ts actually walks employees along, with
+ * With a NavGrid built, runs the real A* search (Pathfinding.findExactPath,
+ * the same one EntityMovementTick.ts actually walks employees along, with
  * avoidVehicles: true matching an employee's own foot travel) rather than the
  * plain octile straight-line heuristic hasCloserIdleCandidate used before
- * #954 (#954 fix). Straight-line distance was a reasonable proxy for real
+ * #954 (#954 fix). findExactPath refuses a target outside NavGrid bounds
+ * rather than silently costing a clamped path the way findPath alone would
+ * (#1113 fix). Straight-line distance was a reasonable proxy for real
  * walking cost only as long as nothing could block a straight line — once
  * fragments/parked vehicles started blocking foot pathfinding (#954), a
  * nominally-closer candidate can have a far longer REAL routed distance than
@@ -235,9 +237,9 @@ function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, acti
  * grid, nothing can block a straight line in the first place, so the original
  * proxy is exact rather than approximate.
  */
-function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
+export function walkingDistanceEstimate(state: GameState, fromX: number, fromZ: number, toX: number, toZ: number): number {
   if (!state.navGrid) return octileHeuristic(fromX, fromZ, toX, toZ);
-  const result = findPath(state.navGrid, {
+  const result = findExactPath(state.navGrid, {
     agentId: -1,
     fromX, fromZ, toX, toZ,
     avoidVehicles: true,
