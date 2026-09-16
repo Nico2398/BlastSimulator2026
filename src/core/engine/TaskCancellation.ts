@@ -419,7 +419,7 @@ export function releaseActionToOpenPool(
  * multi-leg walk-to-vehicle/drive plan lives, and tickLocomotion prefers a
  * non-null itinerary over destinationX/Z unconditionally (`tickLocomotion`,
  * Locomotion.ts). Interrupting the action that itinerary belongs to and then
- * immediately claiming a new one via the legacy beginRestWalk path (every
+ * immediately claiming a new one via the legacy beginRestTravel path (every
  * needs-driven rest — tickCollapse, ForceShiftRest.ts) sets destinationX/Z
  * for the NEW action while the OLD itinerary silently survives and keeps
  * being walked instead: the employee drifts toward the abandoned action's

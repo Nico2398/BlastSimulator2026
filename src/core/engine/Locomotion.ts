@@ -100,7 +100,7 @@ export function driveVehicleTowardTarget(
 
 /**
  * Advance an employee walking toward destinationX/destinationZ directly —
- * RestActionHelpers.ts's beginRestWalk and Zone.ts's foot-evacuee branch both
+ * RestActionHelpers.ts's beginRestTravel and Zone.ts's foot-evacuee branch both
  * keep writing these fields rather than building an itinerary (gameplay-
  * vehicle-fleet's phase 3b scope). Unchanged from the old tickEmployeeMovement.
  */

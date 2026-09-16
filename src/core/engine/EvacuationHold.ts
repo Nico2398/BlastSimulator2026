@@ -141,7 +141,7 @@ export function clearResolvedEvacuationHolds(state: GameState): void {
  *
  * Discarding is safe specifically for 'rest': the need that requested it
  * (fatigue) is untouched by any of this — clearing pendingRestDuration/
- * pendingRestNeedKey/restTicksRemaining below (none of which
+ * pendingRestNeedKey/restTicksRemaining/collapsing below (none of which
  * interruptActiveAction's clearHolderWalkFields/clearActiveTaskFields ever
  * touch, since those predate rest-mode fields entirely) just makes the
  * employee eligible again for tickNeedRestoration/tickCollapse/
@@ -149,10 +149,15 @@ export function clearResolvedEvacuationHolds(state: GameState): void {
  * one that resolves its target fresh, through the now-populated
  * `state.zone.activeZone`, so findNearestBuildingOfType's own exclusion
  * finally applies and routes to a safe rest-in-place instead. Leaving any of
- * those three fields non-null here would instead permanently block that
+ * those four fields non-null here would instead permanently block that
  * re-entry (every one of those three functions' own early-return guards
- * checks pendingRestDuration/restTicksRemaining first) — silently starving
- * this employee's needs for the rest of the session.
+ * checks pendingRestDuration/restTicksRemaining/collapsing first) — silently
+ * starving this employee's needs for the rest of the session. `collapsing`
+ * specifically (#1118): a discarded rest action can be a tickCollapse-driven
+ * one (`collapsing` true), and leaving that flag set would keep this
+ * employee stuck mid-collapse forever with no rest action left to resolve
+ * it — checkCollapse never re-fires while collapsing is already true
+ * (Employee.ts).
  *
  * Never applied to any other action type: an interrupted dig_ramp_segment,
  * survey, or haul is still the same valid work once the zone genuinely
@@ -165,6 +170,7 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
   emp.pendingRestDuration = null;
   emp.pendingRestNeedKey = null;
   emp.restTicksRemaining = null;
+  emp.collapsing = false;
 }
 
 /**

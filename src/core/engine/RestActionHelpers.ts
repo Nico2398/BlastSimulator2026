@@ -14,6 +14,8 @@ import type { Employee, NeedKey } from '../entities/Employee.js';
 import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
 import { NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE } from '../config/balance.js';
+import { moveTo } from './MoveTo.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -192,13 +194,27 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 }
 
 /**
- * Start `emp` walking toward (x, z) as a rest destination — lets the
- * renderer distinguish a walk-to-rest from an ordinary task walk (#1013
- * pictograms). Sets pendingActionType alongside the destination so
- * computeEmployeeActivity (EmployeeActivity.ts) reports actionType: 'rest'
- * for the whole walk, not just once the rest itself is executing.
+ * Start `emp` travelling to (x, z) as a rest destination, preserving mount
+ * continuity: a MOUNTED employee is routed through moveTo/planItinerary like
+ * any other journey, so they drive there instead of desyncing from their
+ * vehicle (I2_mounted_position_mismatch, WorldInvariants.ts). An on-foot
+ * employee, and a mounted employee moveTo fails to route (e.g. genuinely
+ * unreachable target), get the legacy direct destinationX/Z write instead —
+ * Locomotion.ts's legacy foot-walk fallback then takes over exactly as it
+ * always has. Sets pendingActionType
+ * alongside the destination so the renderer distinguishes a walk-to-rest from
+ * an ordinary task walk (#1013 pictograms) and computeEmployeeActivity
+ * (EmployeeActivity.ts) reports actionType: 'rest' for the whole trip, not
+ * just once the rest itself is executing. The one shared entry point every
+ * rest-creating path calls, except hard-collapse (tickCollapse,
+ * NeedRestoration.ts), which alights first — a genuine "give up the vehicle"
+ * event (#1118).
  */
-export function beginRestWalk(emp: Employee, x: number, z: number): void {
+export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
+  if (isMounted(emp.locomotion) && moveTo(state, emp.id, { x, z }).success) {
+    emp.pendingActionType = 'rest';
+    return;
+  }
   emp.destinationX = x;
   emp.destinationZ = z;
   emp.pendingActionType = 'rest';

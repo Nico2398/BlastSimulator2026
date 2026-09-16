@@ -1105,4 +1105,62 @@ describe('promoteActionToActive', () => {
     expect(employee.destinationX).toBe(5);
     expect(employee.destinationZ).toBe(7);
   });
+
+  // #1118: a queued rest action promoted to active must NOT trigger the
+  // #1103 forced-alight above — beginRestTravel (RestActionHelpers.ts)
+  // routes a mounted employee's rest through moveTo, which already keeps
+  // mount continuity for a 'reposition' goal, instead of writing
+  // destinationX/Z directly and stranding the employee off the vehicle's own
+  // position (I2_mounted_position_mismatch).
+  it('#1118: a mounted employee whose queued rest action is promoted to active stays mounted (no forced alight), with a drive-leg itinerary installed', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const action = makeAction({
+      id: 8, type: 'rest', targetX: 5, targetZ: 7, payload: { needKey: 'fatigue' },
+    });
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.activeActionId).toBe(8);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicle.occupantIds).toEqual([employee.id]);
+    expect(employee.itinerary).not.toBeNull();
+    const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
+    expect(driveLeg).toBeDefined();
+    expect(driveLeg!.vehicleId).toBe(vehicle.id);
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  // #1118 regression guard: the #1103 forced-alight must survive for every
+  // OTHER non-vehicle-gated action type — this test must not accidentally
+  // pass by disabling that fix while adding the rest-specific carve-out
+  // above. place_building specifically, per the issue's own named example.
+  it('#1118 regression guard: a mounted employee whose queued place_building action is promoted to active still gets alighted', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const action = makeAction({
+      id: 9, type: 'place_building', targetX: 5, targetZ: 7, payload: { buildingType: 'living_quarters' },
+    });
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(employee.destinationX).toBe(5);
+    expect(employee.destinationZ).toBe(7);
+  });
 });

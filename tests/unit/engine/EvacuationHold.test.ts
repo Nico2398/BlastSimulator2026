@@ -177,6 +177,48 @@ describe('discardStaleRestAction', () => {
     expect(employee.pendingRestNeedKey).toBeNull();
     expect(employee.restTicksRemaining).toBeNull();
   });
+
+  // #1118: discardStaleRestAction clears the rest-mode fields but, until now,
+  // left `collapsing` untouched — a collapsing employee discarded by an
+  // evacuation stayed marked collapsing forever, ineligible for
+  // tickNeedRestoration/tickCollapse to ever route them to a fresh rest
+  // again (isMidCollapseOrForcedRest's own OR — see RestActionHelpers.ts's
+  // doc comment on that function). Hygiene fix: clear it alongside the other
+  // three fields when it was true going in.
+  it('#1118: also clears employee.collapsing when it was true going in', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
+    employee.collapsing = true;
+    employee.pendingRestDuration = 4;
+    employee.pendingRestNeedKey = 'fatigue';
+    const action = makeAction({
+      id: 2, type: 'rest', targetEmployeeId: employee.id, holderId: employee.id, status: 'assigned',
+    });
+    state.pendingActions.push(action);
+
+    discardStaleRestAction(state, employee, action.id);
+
+    expect(employee.collapsing).toBe(false);
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.restTicksRemaining).toBeNull();
+  });
+
+  it('#1118 boundary: leaves collapsing false (unchanged) when it was already false going in', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
+    employee.collapsing = false;
+    const action = makeAction({
+      id: 3, type: 'rest', targetEmployeeId: employee.id, holderId: employee.id, status: 'assigned',
+    });
+    state.pendingActions.push(action);
+
+    discardStaleRestAction(state, employee, action.id);
+
+    expect(employee.collapsing).toBe(false);
+  });
 });
 
 describe('isMidEvacuationDrive (#1042)', () => {
