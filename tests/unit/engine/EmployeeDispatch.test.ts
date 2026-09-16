@@ -1683,19 +1683,54 @@ describe('employeeWorkState (#680, #928)', () => {
   // loop: seedTaskTimerFields followed in the same tick, same block, by
   // taskTicksRemaining = duration; pendingTaskDuration = null — never
   // observably left non-null across a tick boundary for this action family).
-  // So a vehicle-gated action's own claim never reads as 'traveling' at any
-  // phase — walking to board, mid-drive, or working — only ever 'working'
-  // once activeActionId is set (boarding is itself gated on
-  // pendingDriverVehicleId, a field employeeWorkState does not consult at
-  // all) or 'idle' before a vehicle is even reserved.
-  it('a vehicle-gated action never observably reads "traveling" — activeActionId alone yields "working"', () => {
+  // With no itinerary and no legacy destinationX/Z set either (the synthetic
+  // case below — not a state a real employee reaches, since boarding and
+  // mid-drive both run through moveTo/itinerary, see the next test), this
+  // still falls through to 'working' with no other signal to read.
+  it('activeActionId alone, no itinerary/destination, yields "working"', () => {
     const state = createGame({ seed: SEED });
     const employee = makeIdleEmployee(state);
     employee.activeActionId = 9; // claimed a vehicle-gated action
-    employee.pendingDriverVehicleId = 3; // mid-walk to board — not consulted by employeeWorkState
+    employee.pendingDriverVehicleId = 3; // mid-walk to board — not itself consulted by employeeWorkState
     // pendingTaskDuration is never set for this family until the vehicle
     // arrives, and is cleared in the very same step that seeds it.
 
     expect(employeeWorkState(employee)).toBe('working');
+  });
+
+  // #1090 livelock follow-up (#1123): a vehicle-gated action's own approach
+  // drive — claimed, not yet arrived, so pendingTaskDuration/taskTicksRemaining
+  // both stay null the whole way (ArrivalGate.ts's own deferral, #1089) — was
+  // misread as 'working' by the fallback above, because pendingTaskDuration is
+  // the ONLY "still travelling" signal the on-foot case (#928) ever needed.
+  // A mounted, itinerary-driven drive never sets that field, so the mid-drive
+  // phase silently drained fatigue at the 'working' rate (2/tick) instead of
+  // 'traveling' (1/tick) — confirmed live via needs.integration.test.ts's own
+  // #945 box-cut suite: a mounted forced-rest round trip billed at double the
+  // intended rate blew straight through the fatigue budget every time,
+  // producing a permanent livelock with no distance cap involved at all.
+  // itinerary (or, for the legacy foot-walk fallback, destinationX/Z — see
+  // beginRestTravel's own doc comment, RestActionHelpers.ts) is non-null for
+  // exactly the same "not yet arrived" window ArrivalGate.tickArrivalGate's
+  // own `arrived` check already reads, so it closes the gap the same way
+  // pendingTaskDuration does for the on-foot case.
+  it('returns "traveling" for a claimed, not-yet-arrived vehicle-gated action (itinerary set, no pendingTaskDuration)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.activeActionId = 9; // claimed a vehicle-gated action, mid-drive
+    employee.itinerary = { legs: [], goal: { kind: 'reposition', x: 12, z: 34 }, workTicks: 0, estTotalTicks: 10 };
+    // pendingTaskDuration/taskTicksRemaining both null — not yet arrived.
+
+    expect(employeeWorkState(employee)).toBe('traveling');
+  });
+
+  it('returns "traveling" for a mid-drive employee falling back to the legacy destinationX/Z write', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.activeActionId = 9;
+    employee.destinationX = 12;
+    employee.destinationZ = 34;
+
+    expect(employeeWorkState(employee)).toBe('traveling');
   });
 });

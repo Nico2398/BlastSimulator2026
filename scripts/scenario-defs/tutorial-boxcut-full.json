@@ -1,6 +1,6 @@
 {
   "name": "tutorial-boxcut-full",
-  "description": "Issue #1083 baseline-measurement scenario: replays the tutorial's own canonical hire/train/build/buy/build_ramp order (steps copied verbatim from tutorial-interactive.json, start through build_ramp) and then keeps ticking past it until the whole box-cut ramp order has carved (orderedRampSegmentCount:0). No blast step is ever reached in this file, so skipBlastPlayback does not apply here. The terminal step's maxTicks (130) and atMost boarding ceiling (vehicleBoardingCount: 4) are the real measured phase-0a baseline (108 ticks command mode / 20 ticks interaction mode to reach orderedRampSegmentCount:0, 3 boardings measured in both, plus headroom per the #945 MAX_EXPECTED_BOARDINGS convention) — not a design target, and later work is expected to lower them further.",
+  "description": "Issue #1083 baseline-measurement scenario, remeasured by #1090's own #1123 livelock follow-up: replays the tutorial's own canonical hire/train/build/buy/build_ramp order (steps copied verbatim from tutorial-interactive.json, start through build_ramp) and then keeps ticking past it until the whole box-cut ramp order has carved (orderedRampSegmentCount:0). No blast step is ever reached in this file, so skipBlastPlayback does not apply here. The terminal step's maxTicks (142) and atMost boarding ceiling (vehicleBoardingCount: 2) are the real measured baseline after fixing employeeWorkState's fatigue-classification bug (see that step's own description) — 118 ticks / 1 boarding command mode, plus headroom per the #945 MAX_EXPECTED_BOARDINGS convention — not a design target, and later work is expected to lower them further.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:400000",
@@ -608,16 +608,16 @@
       }
     },
     {
-      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:130",
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:142",
       "timeout": 300,
-      "description": "Box-cut completion: keep ticking until every ramp segment has carved (issue #1083 baseline measurement). max_ticks and the atMost boarding ceiling were deliberately generous placeholders until this run's own measurement: this same maxTicks drives both engines (runWaitUntil, command-runner.ts, and its interaction-mode equivalent), and the two diverge — command mode (headless, explicit `tick 1` loop) reaches orderedRampSegmentCount:0 after 108 ticks, matching the #945 integration guard's own identical repro in needs.integration.test.ts, while interaction mode (real browser, real-render-loop, driven by the tutorial's own waitForTutorialStep polling) reaches it after only 20. vehicleBoardingCount lands at 3 in both. Ceiling set to 130 — matching #945's own established convention exactly (measured 108 + ~20% headroom for a tick count) — which comfortably bounds interaction mode's own much lower figure too; the atMost boarding ceiling is set to 4 (measured 3 + 1 fixed margin, same #945 MAX_EXPECTED_BOARDINGS convention). Both are the phase-0a baseline this scenario now enforces, not a design target — later work is expected to lower them.",
+      "description": "Box-cut completion: keep ticking until every ramp segment has carved. #1123 follow-up (resolved as part of #1090, not #1123's own candidate list): this step previously stalled at a non-convergent livelock under command mode — a policy-forced rest kept the SAME vehicle round-tripping to living_quarters on every fatigue-threshold crossing, and employeeWorkState (EmployeeDispatch.ts) billed the whole approach drive at the 'working' fatigue rate instead of 'traveling' (a vehicle-gated action's own pendingTaskDuration is deliberately never staged until arrival, ArrivalGate.ts/#1089, so the old fallback misread 'not yet arrived' as 'already working'), burning through the fatigue budget twice as fast as intended. Fixed by also treating a non-null itinerary/destinationX/Z as 'traveling' — no distance cap needed. Remeasured (command mode) at 118 ticks / 1 rock_digger boarding to reach orderedRampSegmentCount:0 — better than every prior baseline (108 ticks/3 boardings pre-#1090, then non-convergent once #1118 added mount-continuity-through-rest) because the driver's fatigue budget is no longer over-spent on the very first approach drive. Interaction mode was previously measured faster than command mode at the old baseline (20 vs 108 ticks) and is expected to stay comfortably inside this ceiling too, though not independently remeasured by this fix (a core-engine change, no renderer/UI touched). Ceiling set to 142 (118 measured × ~20% headroom, matching #945's own established convention in needs.integration.test.ts); the atMost boarding ceiling is set to 2 (measured 1 + 1 fixed margin, same #945 MAX_EXPECTED_BOARDINGS convention).",
       "role": "setup",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedRampSegmentCount",
           "equals": 0,
-          "maxTicks": 130,
+          "maxTicks": 142,
           "timeoutMs": 60000
         }
       ],
@@ -626,7 +626,7 @@
           "orderedRampSegmentCount": 0
         },
         "atMost": {
-          "vehicleBoardingCount": 4
+          "vehicleBoardingCount": 2
         }
       }
     }

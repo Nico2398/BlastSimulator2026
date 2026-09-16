@@ -238,11 +238,36 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
 /**
  * Work-state classification for NEED_DRAIN_RATES purposes (#680, extended to
- * 'traveling' by #928). See EmployeeWorkState for the four states.
+ * 'traveling' by #928, and again for a vehicle-gated mid-drive by #1090's own
+ * livelock follow-up). See EmployeeWorkState for the four states.
+ *
+ * pendingTaskDuration/pendingRestDuration cover the on-foot outbound-walk and
+ * return-to-rest cases (#928) — but a vehicle-gated action's own duration is
+ * deliberately never staged into pendingTaskDuration until the vehicle
+ * physically arrives (ArrivalGate.ts's own doc comment, #1089), so those two
+ * fields alone stay null for the whole approach drive to a claimed
+ * dig_ramp_segment/drill_hole/etc, and the old fallback below read that
+ * (activeActionId already set, nothing else claimed yet) as 'working' — full
+ * fatigue drain for a leg where no work is actually happening yet, exactly
+ * the bug #928 fixed for the on-foot case. `itinerary` (or, for the rare
+ * fallback to a direct-write walk, destinationX/Z — see beginRestTravel's own
+ * doc comment, RestActionHelpers.ts) is non-null for exactly this same "still
+ * travelling, not yet arrived" window regardless of mover
+ * (ArrivalGate.tickArrivalGate's own `arrived` check reads the identical
+ * three fields), so it closes the gap the same way pendingTaskDuration does
+ * for the on-foot case. Confirmed live via needs.integration.test.ts's #945
+ * box-cut suite and the tutorial-boxcut-full scenario: a mounted forced-rest
+ * round trip billed its drive at the 'working' rate (2/tick, further
+ * multiplied by low morale) instead of 'traveling' (1/tick), so a round trip
+ * that fit the fatigue budget at the correct rate blew straight through it —
+ * a permanent livelock, not a distance problem needing a cap.
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
   if (emp.restTicksRemaining !== null) return 'resting';
-  if (emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null) return 'traveling';
+  if (
+    emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null
+    || emp.itinerary !== null || emp.destinationX !== null || emp.destinationZ !== null
+  ) return 'traveling';
   if (emp.activeActionId !== null) return 'working';
   return 'idle';
 }

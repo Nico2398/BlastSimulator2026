@@ -898,130 +898,67 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
 // rock_digger boardings. Both constants are now that measured baseline plus
 // headroom (see comments at each constant).
 // ─────────────────────────────────────────────────────────────────────────────
-// TODO(#1123): this suite is currently RED and cannot be made to pass by
-// raising MAX_TICKS/MAX_EXPECTED_BOARDINGS — a policy-forced rest now drives
-// the SAME vehicle on a full round trip to the (possibly distant)
+// #1123 follow-up (resolved by #1090's own livelock fix, not by #1123's own
+// candidate list): the suite went permanently RED — a policy-forced rest
+// drove the SAME vehicle on a full round trip to the (possibly distant)
 // living_quarters for every interruption (#1090's claim-only
 // releaseVehicleReservation + #1118's mount-continuity-through-rest,
-// together), and for a ramp segment far enough that the round trip alone
-// exceeds the fatigue budget between rests, the driver never converges on a
-// single tick ceiling — confirmed via direct instrumentation as an exact,
-// non-terminating periodic cycle, unaffected by a 20,000-tick ceiling. See
-// #1123 for the two candidate fixes (a living_quarters placement retune, or
-// a deliberate rest-in-place distance cap on ForceShiftRest.ts's own
-// rest-routing, mirroring tickCollapse's) and why neither is a safe,
-// in-scope patch here. Once #1123 lands, re-measure both constants below
-// against the real (not raised) convergence point.
+// together), non-convergent at any tick ceiling for a ramp segment far
+// enough that the round trip "should" exceed the fatigue budget between
+// rests. It doesn't, once measured correctly: the round trip's own ticks
+// were never the problem. employeeWorkState (EmployeeDispatch.ts) billed the
+// ENTIRE approach drive to a vehicle-gated action — mounted, itinerary-driven,
+// not yet arrived — at the 'working' fatigue rate (2/tick, further multiplied
+// by low morale) instead of 'traveling' (1/tick), because a vehicle-gated
+// action's own pendingTaskDuration is deliberately never staged until arrival
+// (ArrivalGate.ts, #1089), and employeeWorkState's fallback read "activeActionId
+// set, pendingTaskDuration still null" as arrived-and-working rather than
+// still-travelling. That is a pure classification bug, not a distance
+// problem: fixed by also treating a non-null itinerary/destinationX/Z as
+// 'traveling' (see employeeWorkState's own doc comment for the full
+// reasoning). No distance cap needed anywhere, and ForceShiftRest.ts's own
+// "no distance cap" comment stands unmodified. Re-measured after the fix:
+// the whole box-cut ramp converges in 118 ticks with a single rock_digger
+// boarding — better than every one of #1083's/#1090's own prior baselines,
+// because the driver's fatigue no longer over-drains on the very first
+// approach drive and the whole order chains on one boarding.
 describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded number of times for the whole order', () => {
-  // Measured 108 ticks (#1083), then remeasured at 172 once #1090 replaced
-  // the bolted-on same-role continuity fast path (VehicleContinuity.ts,
-  // deleted) with continuity as an emergent property of cost ranking
-  // (planItinerary's zero-length first leg for an already-mounted driver,
-  // ActionSelection.ts) — the exact boarding/segment-handoff timing this
-  // number depends on shifted with the mechanism it measures, same as
-  // MAX_EXPECTED_BOARDINGS below. Ceiling set to measured + ~20% headroom,
-  // matching this file's own margin convention (see the travel-drain
-  // headroom comment near TRAVEL_SAMPLE_TICKS above) — high enough to absorb
-  // run-to-run scheduling noise, tight enough that a genuine stall or
-  // regression still fails loudly by name rather than exhausting a generous
-  // placeholder silently.
-  const MAX_TICKS = 207;
-  // The initial boarding, plus at most one legitimate policy-forced handoff
-  // (fixer follow-up) — NOT the 12 dismount/reboard cycles the pre-fix bug
-  // produced, and not the 3 an earlier fixer round settled for. Three root
-  // causes were fixed:
-  //  1. tickTaskCompletion.ts's dig_ramp_segment completion marked the
-  //     segment's own tracker.done AFTER the same-tick vehicle-continuity
-  //     attempt (tryContinueVehicleGatedAction) already ran — so
-  //     isRampSegmentClaimable always saw the just-finished segment as not
-  //     yet done and rejected every same-vehicle follow-up, dismounting the
-  //     driver once per segment regardless of fatigue. Reordered so the
-  //     segment is marked done first.
-  //  2. ForceShiftRest.ts's forceShiftRestIfNeededByPolicy needed a guard
-  //     against preempting a driver already arrived and mid-execution of a
-  //     vehicle-gated segment (isMidVehicleGatedWork, VehicleReservation.ts)
-  //     — but scoped to vehicle-gated work specifically, not a blanket
-  //     taskTicksRemaining check: a blanket guard also deferred a policy-
-  //     forced rest for an unrelated, long-running on-foot task's entire
-  //     duration, letting fatigue swing far past the policy's own threshold
-  //     every work cycle (needs.integration.test.ts's own pre-existing
-  //     "#678" long-run wellBeing/revolt acceptance cases, regressed by an
-  //     earlier, broader version of this same guard).
-  //  3. TaskCancellation.ts's interruptActiveAction pinned a mid-INTERRUPTED
-  //     action back to the same employee (the #556/#867 walk-only pin) only
-  //     when employee.pendingTaskDuration !== null — which a vehicle-gated
-  //     action's own mid-drive phase never sets (seedTaskTimerFields is
-  //     deferred until the VEHICLE, not the employee, reaches the target),
-  //     so an interrupted driver's own action fell straight through to an
-  //     unpinned open-pool release. On this map the rock_digger's only other
-  //     licensed driver was farther from the segment target than the
-  //     interrupted driver's own already-covered position, so cost-ranking
-  //     alone (estimateActionCost) should never have preferred them — but
-  //     with no pin at all, the open pool offered the action to them anyway,
-  //     and they drove only 3 ticks before their own fatigue forced them off
-  //     again too: an aborted takeover, a wasted dismount/reboard cycle, and
-  //     the 3rd boarding an earlier fixer round wrongly accepted as an
-  //     unavoidable floor. Extending the existing pin to also cover a
-  //     vehicle-gated mid-drive interruption (isMidVehicleGatedWork,
-  //     narrowed to taskTicksRemaining === null so mid-execution — already
-  //     separately protected — is untouched) reuses hasCloserIdleCandidate's
-  //     existing distance comparison to decide whether releasing the pin is
-  //     even worth it, exactly as #556/#867 already do for an on-foot walk.
-  // With all three fixed, every one of the ramp's 12 segments hands off to
-  // the next with zero reboarding, and the initial approach + hire/train/buy
-  // setup order this test now drives (issue #1083, distinct from the
-  // staffed:true repro the paragraph above was originally verified against)
-  // measured 3 boardings total: the initial boarding plus 2 legitimate
-  // policy-forced handoffs produced by this repro's own travel distances and
-  // timing.
+  // Measured 108 ticks (#1083) pre-#1090, 172 once #1090 replaced the
+  // bolted-on same-role continuity fast path (VehicleContinuity.ts, deleted)
+  // with continuity as an emergent property of cost ranking (planItinerary's
+  // zero-length first leg for an already-mounted driver, ActionSelection.ts),
+  // then livelocked entirely once #1118 added mount-continuity-through-rest
+  // (see this describe block's own comment above) — the exact
+  // boarding/segment-handoff timing this number depends on shifts with the
+  // mechanism it measures, same as MAX_EXPECTED_BOARDINGS below. Remeasured
+  // at 118 once the employeeWorkState fatigue-classification bug above was
+  // fixed. Ceiling set to measured + ~20% headroom, matching this file's own
+  // margin convention (see the travel-drain headroom comment near
+  // TRAVEL_SAMPLE_TICKS above) — high enough to absorb run-to-run scheduling
+  // noise, tight enough that a genuine stall or regression still fails
+  // loudly by name rather than exhausting a generous placeholder silently.
+  const MAX_TICKS = 142; // 118 measured × 1.2 headroom
+  // History (each remeasurement superseded by the next, kept for context —
+  // not the current number): 12 dismount/reboard cycles pre-#549-era fix,
+  // then 3 once #549/#556/#867's continuity fixes landed (see git history on
+  // this comment for the three root causes), then 5 once #1090 deleted the
+  // dismount-on-completion mechanism and its own PROTECTED_MID_EXECUTION_ACTION_TYPES
+  // vehicle-gated guard (each fatigue-threshold crossing mid-segment now
+  // costs a real alight/rest/reboard round trip instead of being shielded).
   //
-  // #1090: estimateActionCost/resolveActionCost now delegate to
-  // planItinerary, and continuity is emergent (an already-mounted employee's
-  // next planned itinerary has a zero-length first leg, so it naturally
-  // outranks an on-foot candidate) rather than a bolted-on fast path, AND
-  // neither a normal completion nor a plain (non-rest) interruption ever
-  // dismounts any more — only the forced-rest path deliberately alights
-  // before its own rest-walk. That removes the "3rd boarding" this suite's
-  // own #1083 baseline attributed to a wasted handoff-then-abort cycle (see
-  // the numbered root causes above).
-  //
-  // #1090 fixer follow-up: the ceiling does NOT tighten to 2, though — that
-  // projection assumed deleting the dismount-on-completion mechanism was the
-  // only relevant change. It missed a second, equally deliberate #1090
-  // deletion with its own independent effect on THIS number:
-  // PROTECTED_MID_EXECUTION_ACTION_TYPES's old vehicle-gated branch
-  // (ForceShiftRest.ts, isMidVehicleGatedWork) used to shield a boarded
-  // driver from a policy-forced rest for the ENTIRE mid-execution phase of
-  // every dig_ramp_segment — #1090 explicitly deletes that guard too ("a
-  // boarded, vehicle-gated action's own mid-execution phase carries no
-  // ForceShiftRest.ts guard any more"), on the reasoning that nothing costs
-  // a walk-and-reboard once nothing dismounts on completion. That reasoning
-  // holds for a segment BOUNDARY (nothing to protect there any more) but not
-  // for a segment's own execution: `continuous` mode's shouldForceRest still
-  // fires purely on a fatigue-threshold crossing, several times over a long
-  // multi-segment excavation, and every one of those crossings can now land
-  // mid-dig instead of only in the brief inter-segment drive gap the old
-  // guard left exposed — each still costs a full alight/walk-to-rest/rest/
-  // walk-back/reboard round trip via ForceShiftRest.ts's own deliberate
-  // alight-before-rest-walk (one of the two guards #1090 keeps). Traced
-  // directly on this exact repro: the box-cut's first (longest-approach)
-  // segment needs 3 boardings on ITS OWN, identical under the pre- and
-  // post-#1090 code alike (an on-foot approach is never guarded, before or
-  // after #1090) — the two systems diverge only from segment 7 onward, where
-  // the old code's now-deleted guard let the driver push through all
-  // remaining segments on one boarding (fatigue draining unchecked from 84.7
-  // to 32.0, never once crossing back above the policy's own 60 threshold
-  // while "protected"), while the new code correctly lets `continuous`
-  // mode's fatigue check interrupt those same segments too — 2 more forced
-  // handoffs, for 5 total on this seed. Reintroducing any form of
-  // mid-execution protection to bring this back down is exactly the
-  // mechanism #1090's own task description rules out; a lower, unearned
-  // ceiling would only be pinning a number nothing in this design still
-  // produces. Ceiling set to measured (5) + ~20% headroom, matching this
-  // file's own margin convention (see the travel-drain headroom comment near
-  // TRAVEL_SAMPLE_TICKS above) — still tight enough that the 12-cycle
-  // pre-fix regression fails loudly by name.
-  const MAX_EXPECTED_BOARDINGS = 6;
+  // #1123 follow-up (see this describe block's own comment above): none of
+  // that 5 was actually irreducible. employeeWorkState billed every
+  // approach drive to a vehicle-gated action at the 'working' fatigue rate
+  // instead of 'traveling' — a plain classification bug, not a consequence
+  // of #1090's design. Fixed, and remeasured at 1: the whole 10-segment ramp
+  // now chains on the driver's initial boarding, with fatigue never
+  // revisiting the policy's threshold before the order finishes. Ceiling set
+  // to measured (1) + 1 fixed margin, matching this suite's own prior
+  // integer-count convention (see the scenario file's own identical
+  // "measured + 1" note, tutorial-boxcut-full.json) — tight enough that a
+  // reintroduced dismount-on-completion or a new mid-drive misclassification
+  // still fails loudly by name.
+  const MAX_EXPECTED_BOARDINGS = 2;
 
   it('boards the rock_digger vehicle a bounded number of times while carving the whole box-cut ramp', () => {
     const engine = createGameEngine();
