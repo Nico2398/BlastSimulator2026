@@ -465,31 +465,31 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
   });
 
   // Regression guard for the #954 occupancy livelock, now at the
-  // planItinerary delegation boundary (#1090). An employee boxed in by
-  // fragment/vehicle occupancy on every neighbour cell, with the action's own
-  // destination cell itself unoccupied — this is deliberately identical to
-  // the "returns null when an employee is boxed in by fragment occupancy..."
-  // regression test above, which pins resolveActionCost's own CURRENT inline
-  // avoidVehicles calculation as correctly returning null. Once
-  // resolveActionCost/estimateActionCost delegate to planItinerary
-  // (PlanItinerary.ts) instead of computing their own occupancy rule inline,
-  // that inline calculation is gone — every call site of PlanItinerary.ts's
-  // own estimateLegDistance currently passes a hardcoded avoidVehicles:
-  // false placeholder rather than the real occupancy-aware exemption
-  // (PlanItinerary.ts's own doc comment on estimateLegDistance names this
-  // explicitly as implementer's job to wire in). Pinned here directly against
-  // resolveActionCost's own observable contract — genuinely RED right now
-  // (today's unmodified resolveActionCost still returns null for this exact
-  // setup) and turns GREEN once the delegated implementation's own per-leg
-  // occupancy rule is wired in for real.
-  it('does not return null for a boxed-in employee once delegated to planItinerary with a correctly-wired avoidVehicles rule (#954/#1090)', () => {
+  // planItinerary delegation boundary (#1090) — the VEHICLE-occupancy half of
+  // avoidVehicles' exemption, not the fragment-occupancy half already pinned
+  // by "returns null when an employee is boxed in by fragment occupancy..."
+  // above. avoidVehicles only ever ignores VEHICLE occupants on the way to an
+  // unoccupied destination — it never exempts fragment occupants (see
+  // isDestinationOccupied / the `avoidVehicles` cell-passability check in
+  // NavGrid.ts), so an employee boxed in by fragments must still resolve to
+  // null (that's the other test's job) while one boxed in by VEHICLES, with
+  // the destination itself unoccupied, must resolve to a real cost once
+  // avoidVehicles: true is correctly threaded through. Today, every call site
+  // of PlanItinerary.ts's own estimateLegDistance passes a hardcoded
+  // avoidVehicles: false placeholder (PlanItinerary.ts's own doc comment on
+  // estimateLegDistance names wiring the real occupancy-aware exemption in as
+  // implementer's job) — genuinely RED right now (today's stub never ignores
+  // the boxing-in vehicle occupants, so resolveActionCost returns null for
+  // this exact setup) and turns GREEN once the delegated implementation's own
+  // per-leg occupancy rule is wired in for real.
+  it('does not return null for an employee boxed in by VEHICLE occupancy on every neighbour cell, once delegated to planItinerary with a correctly-wired avoidVehicles rule (#954/#1090)', () => {
     const state = makeState(10, 10);
     const emp = makeEmployee(state, 5, 5);
     const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
     for (const [dx, dz] of offsets) {
-      state.navGrid!.addFragmentOccupant(5 + dx!, 5 + dz!);
+      state.navGrid!.cells[5 + dz!]![5 + dx!]!.vehicleOccupied = true;
     }
-    const action = makeAction({ id: 1, targetX: 8, targetZ: 8 });
+    const action = makeAction({ id: 1, targetX: 8, targetZ: 8 }); // unoccupied destination
     state.pendingActions.push(action);
 
     const result = resolveActionCost(state, emp, action);
