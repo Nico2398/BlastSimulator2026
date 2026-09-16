@@ -98,6 +98,7 @@ export interface CollapseResult {
  * Check all alive, non-injured employees for collapse thresholds.
  * On collapse, creates a rest PendingAction targeting nearest suitable building.
  */
+// TODO: release unboarded taskQueue vehicle reservations on collapse interruption (#1096)
 export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): CollapseResult {
   const result: CollapseResult = { collapsed: [] };
 
@@ -123,6 +124,9 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // there is nothing left to release back to the pool.
     const priorActionId = emp.activeActionId;
     const collapsedGauge = checkCollapse(emp);
+    // TODO(#1096): steady-state (already-collapsing) branch also needs
+    // releaseUnboardedTaskQueueVehicleReservations(state, emp) before this
+    // continue, else a taskQueue-held reservation survives the whole rest.
     if (!collapsedGauge) continue;
 
     // Needs-driven interruption (#549): release the ONE active action back to
