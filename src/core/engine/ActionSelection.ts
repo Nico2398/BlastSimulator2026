@@ -128,7 +128,7 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
 
 /**
  * Converts a grid-cell distance (from either the octile-heuristic estimate
- * or a real findPath's totalCost) into ticks, at `speed` cells per tick.
+ * or a real findExactPath's totalCost) into ticks, at `speed` cells per tick.
  * Single source of truth for both estimateTravelTicks (heuristic) and
  * resolveActionCost (pathfinding) (#614), and for planItinerary's foot and
  * drive legs (PlanItinerary.ts, #1088), which pass AGENT_WALK_SPEED and a
@@ -154,7 +154,7 @@ function estimateTravelTicks(employee: Employee, action: PendingAction): number 
  * Cheap admissible cost estimate for `employee` performing `action`: octile-
  * heuristic travel ticks (`estimateTravelTicks`) plus work ticks (via
  * `computeActionWorkTicks`). No real pathfinding — used to rank candidates
- * before spending a real `findPath` call on only the most promising ones.
+ * before spending a real `findExactPath` call on only the most promising ones.
  * The octile distance is itself the direct-line estimate
  * `tickEmployeeMovement` (EntityMovementTick.ts) falls back to when
  * `state.navGrid` is null, so no separate null-navGrid branch is needed here.
@@ -230,8 +230,10 @@ function resolveVehicleGatedWalkTarget(state: GameState, employee: Employee, act
 }
 
 /**
- * Real findPath-based cost for `employee` performing `action`, or `null` if
- * the target is unreachable on the current NavGrid.
+ * Real findExactPath-based cost for `employee` performing `action`, or `null`
+ * if the target is unreachable on the current NavGrid — findExactPath
+ * refuses a target outside NavGrid bounds (or off its clamped path) rather
+ * than silently costing a clamped path the way findPath alone would.
  *
  * With no NavGrid built yet (state.navGrid === null), mirrors
  * tickEmployeeMovement's own fallback (EntityMovementTick.ts): the target is
@@ -341,7 +343,7 @@ export interface SelectedAction {
  * backlog of candidates that categorically fail it (#611: e.g. haul actions
  * requiring a vehicle-role licence the employee doesn't hold) can never burn
  * through the `ACTION_SELECTION_MAX_PATH_ATTEMPTS` budget without a single
- * real `findPath` resolution — every attempt in the bounded loop is now
+ * real `findExactPath` resolution — every attempt in the bounded loop is now
  * spent on `resolveActionCost` only, never on discovering unclaimability.
  *
  * Returns `null` when `candidates` is empty, when every candidate fails
@@ -447,7 +449,7 @@ export function selectBestActionForEmployee(
 
   // Cheap, exact pre-filter (#953): a candidate outside the employee's own
   // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
-  // interior) can never be reached by any real findPath, so it's skipped
+  // interior) can never be reached by any real findExactPath, so it's skipped
   // below without spending one of the bounded real-pathfind attempts — frees
   // the budget for a farther candidate that might actually resolve. One
   // flood fill for the whole call, reused as an O(1) check per candidate.
