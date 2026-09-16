@@ -100,6 +100,10 @@ const deliverablePr = (number, merged, labels = [], head = null) => ({
 /** The shape `assignability.cjs` reasons about, from a REST issue payload. */
 const normalise = (issue) => ({
   number: issue.number,
+  // The database id, which is not the number. Only one caller needs it — the
+  // `dependencies/blocked_by` endpoint identifies the blocker by id, and
+  // passing the number instead is accepted and silently wrong.
+  id: issue.id ?? null,
   state: issue.state,
   stateReason: issue.state_reason ?? null,
   labels: labelNames(issue),
@@ -505,6 +509,39 @@ function createIssueApi(
 
       dependencies.set(number, result);
       return result;
+    },
+
+    /**
+     * Records `blockerId` as a "Blocked by" relationship of issue `number` —
+     * the only write in this module, and the counterpart to `declaredBlockedBy`
+     * above.
+     *
+     * `blockerId` is the blocker's **database id**, not its number. The
+     * endpoint accepts a number-shaped value without complaint and records
+     * something nobody meant, so the caller reads the id off the issue rather
+     * than assuming the two are interchangeable.
+     *
+     * Never throws: a reconciliation that cannot write is reported by its
+     * caller rather than crashing a job whose other half has already run.
+     * A 422 is success — GitHub answers it for a relationship that already
+     * exists, which is the state this function is trying to reach, and Rule 5
+     * says the second run must be a no-op rather than a failure.
+     *
+     * @param {number} number the issue that is blocked
+     * @param {number} blockerId the database id of the issue blocking it
+     * @returns {Promise<{ok: true} | {ok: false, reason: string}>}
+     */
+    async addBlockedBy(number, blockerId) {
+      try {
+        await github.request(
+          'POST /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by',
+          { owner, repo, issue_number: number, issue_id: blockerId }
+        );
+        return { ok: true };
+      } catch (error) {
+        if ((error.status ?? 0) === 422) return { ok: true };
+        return { ok: false, reason: String(error.status ?? error.message) };
+      }
     },
 
     /**

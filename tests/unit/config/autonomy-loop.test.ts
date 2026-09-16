@@ -174,6 +174,37 @@ describe('chaining past a run that ended blocked', () => {
     expect(failure).toContain('completed_issue: ${{ github.event.issue.number }}');
   });
 
+  // A pause declares its dependency twice — the body's `## Blocked by` section
+  // and the `blocked_by` relationship — and `blockedByFor` reads the union, so
+  // writing only the section holds the queue correctly and leaves the
+  // authoritative source empty with nothing going red. #1090 paused that way on
+  // 16 Sep 2026. The relationship is derived from the section here rather than
+  // remembered alongside it, which is only true while this job stays wired.
+  it('records every declared dependency as a relationship on either halt label', () => {
+    expect(failure).toContain('reconcile-dependencies:');
+    expect(failure).toContain('reconcile-dependencies.cjs');
+    expect(failure).toMatch(
+      /reconcile-dependencies:\s*\n\s*if: github\.event\.label\.name == 'blocked' \|\| github\.event\.label\.name == 'paused'/
+    );
+  });
+
+  // GITHUB_TOKEN deliberately: a relationship raises no workflow event and
+  // nothing listens for one, so this write must not carry the PAT that exists
+  // to raise them. Pinned because "fixing" it to the PAT would look like a
+  // correction.
+  it('reconciles with GITHUB_TOKEN, raising nothing', () => {
+    const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
+    expect(job).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+    expect(job).not.toContain('PAT_TOKEN_COPILOT_AUTOMATION');
+  });
+
+  // A dependency the queue is meant to honour that exists in prose only is the
+  // state this job was added to stop, so it goes red rather than logging.
+  it('fails loud when a declared dependency cannot be recorded', () => {
+    const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
+    expect(job).toContain('core.setFailed');
+  });
+
   // `paused` is the other terminal-without-merging outcome: the run stopped on a
   // dependency it filed, put the issue back at `ready` behind that dependency,
   // and ended. It releases the queue exactly as `blocked` does, and if this
