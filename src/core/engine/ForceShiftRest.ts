@@ -23,6 +23,11 @@ import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } 
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
  * queues restAction, updates emp's activeActionId/destination, records the
  * shift-change bookkeeping (shiftRested/firedEvents/emitter).
+ *
+ * TODO(#1110): call releaseUnboardedTaskQueueVehicleReservations(state, emp)
+ * here (EmployeeDispatchSteps.ts) — mirrors tickCollapse's own unconditional
+ * cleanup (#1107) — so a vehicle reservation held by an unboarded queued task
+ * is released rather than leaked when a shift rest interrupts this employee.
  */
 function finishForceRest(
   state: GameState,
