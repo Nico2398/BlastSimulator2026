@@ -440,18 +440,33 @@ async function clickUsableSelector(
           continue;
         }
       }
-      // A control that is attached and otherwise unblocked but still
-      // reads zero-size at the deadline may just be waiting on a heavy
-      // render/animation to release layout on a slow CI runner (#1032) —
-      // grant it one extension before treating this as a genuine
-      // never-lays-out failure. Bounded to once per call, same shape as
-      // the covered-retry above.
-      if (!zeroSizeGraceGranted && reason === 'zero-size') {
+      // A control that is attached and otherwise unblocked but still reads
+      // zero-size *or* hidden at the deadline may just be waiting on a heavy
+      // render/animation on a slow CI runner (#1032) — grant it one
+      // extension before treating this as a genuine failure. 'hidden' earns
+      // the same grace as 'zero-size': a modal that toggles visibility via
+      // its own ancestor's `display` (BlastReportModal's overlay, deferred
+      // open behind BLAST_REPORT_DELAY_MS + collapse-playback duration) is
+      // "not yet rendered" for exactly the same reason a modal whose layout
+      // box has not settled is "not yet usable" — both are the render loop
+      // running behind schedule, not a permanent block (`sandbox-mode`'s
+      // report-close measured at ~5.0-5.13s to open locally, against a 5s
+      // default budget: a guaranteed intermittent miss with no grace).
+      // Bounded to once per call, same shape as the covered-retry above.
+      if (!zeroSizeGraceGranted && (reason === 'zero-size' || reason === 'hidden')) {
         zeroSizeGraceGranted = true;
         deadline += CLICK_SELECTOR_ZERO_SIZE_GRACE_MS;
         continue;
       }
-      const zeroSizeContext: ZeroSizeDiagnosisContext | undefined = reason === 'zero-size'
+      // Built from this same already-fresh `reason`, not a second,
+      // later `inspectSelector` read: a separate read taken after the
+      // deadline check raced the DOM (the modal's ancestor `display`
+      // flipping between the two reads) and reported 'zero-size' even
+      // when `reason` here was 'hidden' a moment earlier, producing the
+      // bare "element has zero size (0x0)" message with no grace context
+      // on a control that was never actually granted (or denied) the
+      // grace it should have raced for.
+      const zeroSizeContext: ZeroSizeDiagnosisContext | undefined = (reason === 'zero-size' || reason === 'hidden')
         ? { waitedMs: Date.now() - pollStartedAt, graceGranted: zeroSizeGraceGranted }
         : undefined;
       throw new Error(
@@ -461,7 +476,6 @@ async function clickUsableSelector(
     await new Promise((r) => setTimeout(r, 150));
   }
   await clickWithTransientRetry(page, selector, btn);
-
 }
 
 export async function executeActionOnPage(

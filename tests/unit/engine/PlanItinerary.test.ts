@@ -194,23 +194,28 @@ describe('planItinerary', () => {
       expect(itinerary).toBeNull();
     });
 
-    // #1103: findPath's own clampToGrid silently redirects an out-of-bounds
-    // target onto the nearest in-grid cell, reporting `found: true` — but the
-    // leg it would build names the UNCLAMPED (out-of-bounds) destX/destZ, so
-    // Locomotion's isLegArrived can never match the clamped position it
-    // actually reaches, stranding the employee at the clamped cell forever.
-    // estimateLegDistance must reject this (return null) rather than accept a
-    // "successful" path to the wrong endpoint.
-    it('reposition target just outside NavGrid bounds is rejected, not silently clamped to the nearest in-grid cell', () => {
+    it('target outside the NavGrid\'s bounds: null rather than an itinerary costed against findPath\'s silently clamped-to-grid endpoint (#1109)', () => {
+      // 30×30 grid (makeState default) — a reposition goal far past the east
+      // edge would, under plain findPath, silently clamp onto the grid's last
+      // column and still report found:true. estimateLegDistance must refuse
+      // this via findExactPath instead of returning a distance computed
+      // against that wrong, clamped cell.
       const state = makeState(30, 30);
       const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
 
-      // z=35 is outside the 30x30 grid (valid z: 0..29) — findPath's
-      // clampToGrid would redirect this onto z=29 and report found: true.
-      const goal: Goal = { kind: 'reposition', x: 10, z: 35 };
-      const clamped = findPath(state.navGrid!, { agentId: employee.id, fromX: employee.x, fromZ: employee.z, toX: goal.x, toZ: goal.z, avoidVehicles: false });
-      expect(clamped.found).toBe(true); // confirms the hazard: findPath itself "succeeds"
+      const outOfBoundsX = 500;
+      const outOfBoundsZ = 500;
+      const plainPath = findPath(state.navGrid!, {
+        agentId: employee.id,
+        fromX: employee.x,
+        fromZ: employee.z,
+        toX: outOfBoundsX,
+        toZ: outOfBoundsZ,
+        avoidVehicles: false,
+      });
+      expect(plainPath.found).toBe(true); // findPath itself still clamps silently
 
+      const goal: Goal = { kind: 'reposition', x: outOfBoundsX, z: outOfBoundsZ };
       const itinerary = planItinerary(state, employee, goal, 'exact');
       expect(itinerary).toBeNull();
     });

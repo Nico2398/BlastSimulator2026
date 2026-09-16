@@ -8,7 +8,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
@@ -63,24 +63,26 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal): Resolved
  * (ActionSelection.ts) — and returns null when the target is genuinely
  * unreachable on the current NavGrid.
  *
- * Also returns null when `findPath` reports `found: true` but its own
- * `clampToGrid` silently redirected an out-of-bounds (toX, toZ) onto the
- * nearest in-grid cell (Pathfinding.ts) — a "successful" path whose real
- * endpoint is not the leg's own destX/destZ. Locomotion's `isLegArrived`
- * checks the UNCLAMPED destX/destZ exactly, so a leg built from such a path
- * can never actually arrive: every following tick re-resolves the identical
- * clamped, already-there path, reports "moved" with zero real movement, and
- * never once hits a failed-path tick to trip the stuck-abandon safety net
- * (#1103, confirmed live: level1-playthrough-win.json's own `vehicle move 3
- * to:10,-2` — a corridor-clearing coordinate one row past the navmesh's own
- * south edge — parks employee #4 at the clamped (10,0) from tick 15 onward,
- * indefinitely, and EmployeeDispatch.ts's own mid-itinerary dispatch guard
- * (#1089) then correctly refuses to double-book them, permanently removing
- * one of three survivors from the roster for the rest of the run). Failing
- * the plan here — same outcome as a genuinely unreachable target — is what
- * the corridor-clearing use case already expects: the console's `vehicle
- * move` command surfaces "No route available" instead of installing a leg
- * that can never resolve.
+ * Uses `findExactPath` (Pathfinding.ts) rather than `findPath` directly:
+ * `findPath` can report `found: true` after its own `clampToGrid` silently
+ * redirected an out-of-bounds (toX, toZ) onto the nearest in-grid cell — a
+ * "successful" path whose real endpoint is not the leg's own destX/destZ.
+ * `findExactPath` rejects exactly that case (#1109). Locomotion's
+ * `isLegArrived` checks the UNCLAMPED destX/destZ exactly, so a leg built
+ * from a clamped path can never actually arrive: every following tick
+ * re-resolves the identical clamped, already-there path, reports "moved"
+ * with zero real movement, and never once hits a failed-path tick to trip
+ * the stuck-abandon safety net (#1103, confirmed live:
+ * level1-playthrough-win.json's own `vehicle move 3 to:10,-2` — a
+ * corridor-clearing coordinate one row past the navmesh's own south edge —
+ * parks employee #4 at the clamped (10,0) from tick 15 onward, indefinitely,
+ * and EmployeeDispatch.ts's own mid-itinerary dispatch guard (#1089) then
+ * correctly refuses to double-book them, permanently removing one of three
+ * survivors from the roster for the rest of the run). Failing the plan here
+ * — same outcome as a genuinely unreachable target — is what the
+ * corridor-clearing use case already expects: the console's `vehicle move`
+ * command surfaces "No route available" instead of installing a leg that
+ * can never resolve.
  */
 function estimateLegDistance(
   state: GameState,
@@ -95,13 +97,8 @@ function estimateLegDistance(
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
-  if (!path.found) return null;
-
-  const last = path.waypoints[path.waypoints.length - 1];
-  if (!last || last.x !== Math.floor(toX) || last.z !== Math.floor(toZ)) return null;
-
-  return path.totalCost;
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
+  return path.found ? path.totalCost : null;
 }
 
 /**

@@ -557,6 +557,34 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   return ordinary;
 }
 
+/**
+ * Wraps `findPath` but rejects a path whose final waypoint does not match
+ * the requested destination (rather than accepting `findPath`'s silent
+ * clamp-to-grid-bounds behavior), for callers that need the request's exact
+ * endpoint reached, not just "a path found" (#1109).
+ */
+export function findExactPath(grid: NavGrid, request: PathRequest): PathResult {
+  const path = findPath(grid, request);
+  if (!path.found) return path;
+
+  // Compare against the RAW requested destination (floored, unclamped) —
+  // not clampToGrid's output, which is what findPath itself already
+  // targeted internally. Comparing against that would make this guard
+  // always agree with findPath's own endpoint and never fire. In-bounds
+  // requests floor to the same cell clampToGrid would have clamped to, so
+  // behavior there is unchanged; an out-of-bounds request floors to a cell
+  // outside the grid, which never matches the path's actual (in-grid) last
+  // waypoint, correctly triggering rejection.
+  const rawTargetX = Math.floor(request.toX);
+  const rawTargetZ = Math.floor(request.toZ);
+  const last = path.waypoints[path.waypoints.length - 1];
+  if (!last || last.x !== rawTargetX || last.z !== rawTargetZ) {
+    return { found: false, waypoints: [], totalCost: 0 };
+  }
+
+  return path;
+}
+
 function findOrdinaryPath(
   grid: NavGrid,
   sx: number,
