@@ -182,6 +182,18 @@ describe('reading declared dependencies out of an issue body', () => {
     expect(deps('## Context\n\nSee #55 for background.\n')).toEqual([]);
   });
 
+  // #1103, 15 Sep 2026: the body cited the blocker's own number only to
+  // explain *why* the issue was filed, and the indiscriminate `#\d+` scan
+  // read that as a declared dependency — creating a mutual cycle that
+  // stranded the pause `strandedPauseVerdict` exists to catch. The first
+  // non-empty line of a `Blocked by` section beginning with the word `None`
+  // means the section declares nothing, whatever it mentions afterward.
+  it('reads a `None` sentinel as declaring nothing, even when the section goes on to mention an issue', () => {
+    const body =
+      '## Blocked by\n\nNone — this is standalone debugging work. It is filed as a dependency of #1089 only because the branch is shared.\n';
+    expect(deps(body)).toEqual([]);
+  });
+
   it('survives an empty or missing body', () => {
     expect(deps('')).toEqual([]);
     expect((rules.parseDependencies as (b: unknown) => number[])(null)).toEqual([]);
@@ -773,6 +785,153 @@ describe('resuming a paused run', () => {
           closers: [],
         })
       ).toBeNull();
+    });
+  });
+});
+
+// A `paused` issue stays in the queue on its dependency alone — `graphVerdict`
+// already holds it back until that dependency lands. What it cannot see is
+// whether the dependency ever *will* land: if it is unassignable for a reason
+// the pipeline cannot resolve on its own, the pause is permanent and the queue
+// never comes back to the issue. `strandedPauseVerdict` is a diagnostic, not a
+// selection rule — nothing in `selectNextAssignable` calls it.
+describe('detecting a stranded pause', () => {
+  /** Wraps `fakeApi` with call counters, to prove a non-paused issue is never read. */
+  const spy = (issues: FakeIssue[]) => {
+    const base = fakeApi(issues);
+    const calls = { getIssue: 0, declaredBlockedBy: 0 };
+    return {
+      calls,
+      api: {
+        ...base,
+        async getIssue(n: number) {
+          calls.getIssue += 1;
+          return base.getIssue(n);
+        },
+        async declaredBlockedBy(n: number) {
+          calls.declaredBlockedBy += 1;
+          return base.declaredBlockedBy(n);
+        },
+      },
+    };
+  };
+
+  it('is not evaluated on an issue that does not carry `paused`', async () => {
+    const { api, calls } = spy([{ number: 20, labels: ['ready'] }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready'] });
+    expect(verdict).toBeFalsy();
+    expect(calls.getIssue).toBe(0);
+    expect(calls.declaredBlockedBy).toBe(0);
+  });
+
+  // The false-positive guard: an ordinary pause, still healthily waiting.
+  it('is not stranded when the declared dependency is open, ready, and does not cycle back', async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['ready'] },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(false);
+  });
+
+  it('is stranded when the dependency carries no `ready` label', async () => {
+    const api = fakeApi([
+      { number: 10, labels: [] },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 10, cause: 'no-ready-label' })
+    );
+  });
+
+  // #1103's own shape, verbatim: the blocker's body cites the paused issue's
+  // number only to explain the relationship, and the indiscriminate `#\d+`
+  // scan in `parseDependencies` reads it as a declared dependency, producing
+  // a mutual cycle. `ready` is on the blocker here so this case is isolated
+  // from cause 1.
+  it('is stranded when the dependency cycles back through its own body', async () => {
+    const pausedNum = 1089;
+    const blockerNum = 1090;
+    const api = fakeApi([
+      {
+        number: blockerNum,
+        labels: ['ready'],
+        body:
+          '## Blocked by\n\nNone — this is standalone debugging work. It is filed as a dependency of ' +
+          `#${pausedNum} only because the branch is shared.\n`,
+      },
+      {
+        number: pausedNum,
+        labels: ['ready', 'paused'],
+        body: `## Blocked by\n- #${blockerNum}\n`,
+      },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, {
+      number: pausedNum,
+      labels: ['ready', 'paused'],
+    });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: blockerNum, cause: 'cycle' })
+    );
+  });
+
+  it('is stranded when the dependency is closed with its own pull request unmerged', async () => {
+    const api = fakeApi([
+      {
+        number: 10,
+        state: 'closed',
+        stateReason: 'completed',
+        closers: [{ number: 11, merged: false }],
+      },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 10, cause: 'closed-unmerged' })
+    );
+  });
+
+  it('fails closed when the dependency cannot be read at all', async () => {
+    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #999\n' }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 999, cause: 'unreadable' })
+    );
+  });
+
+  it("fails closed when the paused issue's own dependency relationships could not be read", async () => {
+    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], relationshipsUnknown: true }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(expect.objectContaining({ cause: 'unreadable' }));
+  });
+
+  // Mirrors `blockedByFor`'s own coverage of the union: either source alone
+  // must be enough to find, and strand on, an unassignable dependency.
+  describe('the dependency source union', () => {
+    it('is stranded off a dependency declared only through the GitHub relationship', async () => {
+      const api = fakeApi([
+        { number: 10, labels: [] },
+        { number: 20, labels: ['ready', 'paused'], blockedBy: [10] },
+      ]);
+      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+      expect(verdict?.stranded).toBe(true);
+      expect(verdict?.blockers).toContainEqual(expect.objectContaining({ number: 10 }));
+    });
+
+    it('is stranded off a dependency declared only through the body section', async () => {
+      const api = fakeApi([
+        { number: 10, labels: [] },
+        { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      ]);
+      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+      expect(verdict?.stranded).toBe(true);
+      expect(verdict?.blockers).toContainEqual(expect.objectContaining({ number: 10 }));
     });
   });
 });
