@@ -17,8 +17,7 @@ import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { alight } from './Mount.js';
+import { alightIfMounted } from './Mount.js';
 
 /**
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
@@ -42,9 +41,7 @@ function finishForceRest(
   // desync a still-"mounted" employee's position from their vehicle's (I2) —
   // alight first so mount state stays consistent with the on-foot walk about
   // to start.
-  if (isMounted(emp.locomotion)) {
-    alight(state, mountedVehicleId(emp.locomotion)!, _emitter);
-  }
+  alightIfMounted(state, emp, _emitter);
   beginRestWalk(emp, restAction.targetX, restAction.targetZ);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });

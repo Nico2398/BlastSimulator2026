@@ -22,8 +22,7 @@ import {
   NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
 } from '../config/balance.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { alight } from './Mount.js';
+import { alightIfMounted } from './Mount.js';
 
 export interface NeedRestorationResult {
   /** Employee IDs that were routed to a rest action. */
@@ -91,9 +90,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // beginRestWalk moves them on foot via the legacy destinationX/Z fields,
     // not moveTo's itinerary — alight first so mount state stays consistent
     // (mirrors ForceShiftRest.ts's own identical fix).
-    if (isMounted(emp.locomotion)) {
-      alight(state, mountedVehicleId(emp.locomotion)!);
-    }
+    alightIfMounted(state, emp);
     beginRestWalk(emp, approach.x, approach.z);
     result.routed.push(emp.id);
   }
@@ -224,9 +221,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // mid-execution vehicle-gated collapse — alight first, same reasoning
     // and fix as tickNeedRestoration's own identical guard above and
     // ForceShiftRest.ts's forced-rest paths.
-    if (isMounted(emp.locomotion)) {
-      alight(state, mountedVehicleId(emp.locomotion)!);
-    }
+    alightIfMounted(state, emp);
     beginRestWalk(emp, targetX, targetZ);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this

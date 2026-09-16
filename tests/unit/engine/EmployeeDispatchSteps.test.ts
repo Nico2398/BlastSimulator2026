@@ -394,12 +394,16 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
     expect(result.claimed).toEqual([]);
   });
 
-  // #954 follow-up (economy-full-loop regression): a vehicle-gated queue entry
-  // reserved ahead of time (reserveOnePoolActionAhead) but never boarded can
-  // otherwise stay locked to its holder forever once resolveActionCost's own
-  // occupancy check correctly refuses to promote a claim whose holder's own
-  // foot-walk to the reserved vehicle is genuinely blocked — see
-  // canReassignStrandedReservation's own doc comment (VehicleReservation.ts).
+  // #954 follow-up (economy-full-loop regression), #1090 update: a
+  // vehicle-gated queue entry reserved ahead of time (reserveOnePoolActionAhead)
+  // but never boarded can otherwise stay locked to its holder forever once
+  // resolveActionCost's own occupancy check correctly refuses to promote a
+  // claim whose holder's own foot-walk to the reserved vehicle is genuinely
+  // blocked — now released via canReleaseStrandedVehicleGatedAction
+  // (ActionSelection.ts), judged by the same real resolveActionCost
+  // reachability check every other claim/release decision uses (the deleted
+  // canReassignStrandedReservation's own dismount-on-release mechanism,
+  // VehicleReservation.ts, was removed by #1090).
   describe('stranded vehicle-gated reservation release (#954 follow-up)', () => {
     it('releases a queue entry back to the open pool when its reserved vehicle has no driver and a different idle, licensed employee is available — who then claims it', () => {
       const state = createGame({ seed: SEED });
@@ -409,7 +413,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       const rng = new Random(SEED);
       const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 0, 0);
       // holder deliberately NOT licensed for drill_rig — irrelevant to
-      // canReassignStrandedReservation, which only requires a DIFFERENT
+      // canReleaseStrandedVehicleGatedAction, which only requires a DIFFERENT
       // licensed idle employee, but keeps holder's own fallback pool claim
       // from muddying the assertions below.
       const { employee: other } = hireEmployee(state.employees, 'driller', rng, 25, 0);

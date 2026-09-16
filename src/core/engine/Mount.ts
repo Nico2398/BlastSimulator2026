@@ -4,11 +4,13 @@
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import type { Employee } from '../entities/Employee.js';
 import { canAssignDriver, unassignDriver } from '../entities/Vehicle.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { isImpassable } from '../nav/Pathfinding.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 
 type MountResult = { success: true } | { success: false; error: string };
 
@@ -122,6 +124,23 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   emitter?.emit('employee:alighted', { employeeId, vehicleId });
 
   return { success: true };
+}
+
+/**
+ * Alight `employee` if currently mounted, otherwise a no-op. #1090: nothing
+ * dismounts automatically on interruption/completion any more, so an
+ * employee about to start an on-foot walk (beginRestWalk's legacy
+ * destinationX/Z fields, or promoteActionToActive's moveTo/destinationX/Z
+ * fallback) can still be mounted from a vehicle-gated action that just
+ * ended or was interrupted. Alight first so mount state stays consistent
+ * with the walk about to start — shared by every such call site
+ * (ForceShiftRest.ts, NeedRestoration.ts, EmployeeDispatchSteps.ts's
+ * promoteActionToActive).
+ */
+export function alightIfMounted(state: GameState, employee: Employee, emitter?: EventEmitter): void {
+  if (isMounted(employee.locomotion)) {
+    alight(state, mountedVehicleId(employee.locomotion)!, emitter);
+  }
 }
 
 /**
