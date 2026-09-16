@@ -236,6 +236,35 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     expect(claim.status).toBe('in_progress');
     expect(claim.holderId).toBe(employee.id);
   });
+
+  // #1118: finishForceRest (this function's shared tail with the policy
+  // variant) routes through beginRestTravel (RestActionHelpers.ts) instead
+  // of beginRestWalk — a mounted employee forced into a shift rest keeps
+  // driving the vehicle they're in, rather than desyncing their position
+  // from it (I2_mounted_position_mismatch) the way a plain destinationX/Z
+  // field-write would.
+  it('#1118: a mounted employee forced into shift rest stays mounted, with a drive-leg itinerary installed toward the rest target, no forced alight', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const prior = pushHeldAction(state, employee.id, 1130);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.itinerary).not.toBeNull();
+    const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
+    expect(driveLeg).toBeDefined();
+    expect(driveLeg!.vehicleId).toBe(vehicle.id);
+  });
 });
 
 describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
@@ -641,6 +670,33 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.activeActionId).not.toBe(1105);
+  });
+
+  // #1118: mirrors the legacy forceShiftRestIfNeeded's own #1118 test above —
+  // the policy-aware variant shares finishForceRest's tail, so a mounted
+  // employee forced into a policy rest stays mounted too.
+  it('#1118: a mounted employee forced into a policy rest stays mounted, with a drive-leg itinerary installed toward the rest target, no forced alight', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const prior = pushHeldAction(state, employee.id, 1131);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(vehicle.driverId).toBe(employee.id);
+    expect(employee.itinerary).not.toBeNull();
+    const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
+    expect(driveLeg).toBeDefined();
+    expect(driveLeg!.vehicleId).toBe(vehicle.id);
   });
 });
 

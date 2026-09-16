@@ -18,6 +18,7 @@ import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActi
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { assertWorldInvariants } from '../../../src/core/state/WorldInvariants.js';
 import {
   NEED_REST_DURATIONS,
 } from '../../../src/core/config/balance.js';
@@ -231,6 +232,34 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     expect(result.routed).toHaveLength(0);
     expect(employee.activeActionId).toBeNull();
+  });
+
+  // #1118: tickNeedRestoration routes a mounted employee's soft-threshold
+  // rest through beginRestTravel (RestActionHelpers.ts) instead of
+  // beginRestWalk — a mounted employee keeps the vehicle and drives to rest,
+  // rather than desyncing their position from it (I2_mounted_position_mismatch)
+  // the way a plain destinationX/Z field-write would.
+  it('#1118: an idle mounted employee crossing the soft fatigue threshold stays mounted, with a drive-leg itinerary installed toward the rest building', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25)
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickNeedRestoration(state);
+
+    expect(result.routed).toContain(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(employee.itinerary).not.toBeNull();
+    const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
+    expect(driveLeg).toBeDefined();
+    expect(driveLeg!.vehicleId).toBe(vehicle.id);
   });
 });
 
@@ -936,5 +965,38 @@ describe('tickCollapse (7.6)', () => {
       expect(result.collapsed).toHaveLength(0);
       expect(employee.taskQueue).toEqual([]);
     });
+  });
+
+  // #1118: collapse policy is release-the-vehicle, distinct from the
+  // proactive/soft-threshold path (which keeps the driver mounted, see
+  // tickNeedRestoration's own #1118 test above). An idle mounted employee
+  // crossing the hard fatigue threshold gets explicitly dismounted before
+  // beginRestTravel is called, so the vehicle is freed for another driver
+  // rather than idling with a collapsed occupant who never intends to work
+  // it — mirrors the release attempted for a boarded, actively-working
+  // vehicle-gated action (#1062's own test above), but for an idle mount.
+  it('#1118: an idle mounted employee crossing the hard fatigue threshold has their vehicle released (occupantIds cleared, driver dismounted to on_foot)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.activeActionId = null; // idle — nothing being actively worked
+    employee.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+    expect(vehicle.occupantIds).not.toContain(employee.id);
+    expect(vehicle.driverId).not.toBe(employee.id);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+
+    const violations = assertWorldInvariants(state);
+    expect(violations.filter(v => v.kind === 'I2_mounted_position_mismatch')).toHaveLength(0);
   });
 });

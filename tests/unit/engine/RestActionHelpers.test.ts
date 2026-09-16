@@ -7,13 +7,36 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
-  deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestWalk,
+  deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestWalk, beginRestTravel,
   createRestPendingAction, isMidClaimedTaskExecution,
 } from '../../../src/core/engine/RestActionHelpers.js';
 import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
 
 const DEDUCT_SEED = 42;
+
+/** Flat, fully walkable NavGrid of the given size — mirrors the identical
+ * helper in EmployeeDispatchSteps.test.ts. */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
+
+/** Impassable vertical wall spanning every row at world x. */
+function blockColumn(grid: NavGrid, x: number): void {
+  for (let z = 0; z < grid.height; z++) {
+    grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+}
 
 // #928: hunger and breakNeed (and their non-zero NEED_REST_COSTS entries)
 // were removed — fatigue, the sole surviving gauge, has always cost 0
@@ -361,5 +384,93 @@ describe('isMidClaimedTaskExecution (#1062)', () => {
     employee.taskTicksRemaining = 0;
 
     expect(isMidClaimedTaskExecution(employee)).toBe(true);
+  });
+});
+
+// #1118: beginRestTravel replaces beginRestWalk at every rest-dispatch call
+// site (NeedRestoration.ts's tickNeedRestoration/tickCollapse,
+// ForceShiftRest.ts's finishForceRest, EmployeeDispatchSteps.ts's
+// promoteActionToActive) so a mounted employee sent to rest routes through
+// moveTo (MoveTo.ts) — which already builds a {kind:'reposition', x, z} goal
+// that PlanItinerary.ts's existing mount-continuity check picks up for a
+// mounted employee for free — instead of writing destinationX/Z directly and
+// leaving the vehicle behind (I2_mounted_position_mismatch). Falls back to
+// the old direct-write behavior only when moveTo itself fails (unreachable
+// target).
+describe('beginRestTravel (#1118)', () => {
+  const SEED = 42;
+
+  it('mounted employee, reachable target: installs an itinerary drive leg to (x, z), stays mounted, sets pendingActionType "rest", and does NOT touch legacy destinationX/Z', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    beginRestTravel(state, employee, 12, 34);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const driveLeg = legs[legs.length - 1]!;
+    expect(driveLeg.mode).toBe('drive');
+    expect(driveLeg.vehicleId).toBe(vehicle.id);
+    expect(driveLeg.destX).toBe(12);
+    expect(driveLeg.destZ).toBe(34);
+    expect(employee.pendingActionType).toBe('rest');
+    // moveTo succeeded — no fallback to the legacy destination fields.
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+  });
+
+  it('mounted employee, unreachable target (no route on a built navGrid): falls back to legacy destinationX/Z, sets pendingActionType "rest"', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const grid = makeFlatNavGrid(30, 10);
+    blockColumn(grid, 15); // seals off everything east of x=15 from (0,0)
+    state.navGrid = grid;
+
+    beginRestTravel(state, employee, 20, 5);
+
+    expect(employee.destinationX).toBe(20);
+    expect(employee.destinationZ).toBe(5);
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  it('on-foot employee, reachable target: still works (regression guard) — moveTo installs a foot-leg itinerary, pendingActionType "rest"', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+
+    beginRestTravel(state, employee, 8, 9);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBe(1);
+    expect(legs[0]!.mode).toBe('foot');
+    expect(legs[0]!.destX).toBe(8);
+    expect(legs[0]!.destZ).toBe(9);
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  it('resting in place (target equals current position): no crash, pendingActionType "rest" set', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+
+    expect(() => beginRestTravel(state, employee, 5, 5)).not.toThrow();
+
+    expect(employee.pendingActionType).toBe('rest');
   });
 });
