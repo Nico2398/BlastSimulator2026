@@ -14,6 +14,7 @@ import type { Employee, NeedKey } from '../entities/Employee.js';
 import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
 import { NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE } from '../config/balance.js';
+import { moveTo } from './MoveTo.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -192,24 +193,28 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 }
 
 /**
- * Start `emp` walking toward (x, z) as a rest destination — lets the
- * renderer distinguish a walk-to-rest from an ordinary task walk (#1013
- * pictograms). Sets pendingActionType alongside the destination so
- * computeEmployeeActivity (EmployeeActivity.ts) reports actionType: 'rest'
- * for the whole walk, not just once the rest itself is executing.
+ * Start `emp` travelling to (x, z) as a rest destination, preserving mount
+ * continuity: routed through moveTo/planItinerary like any other journey, so
+ * a mounted employee drives there instead of desyncing from their vehicle
+ * (I2_mounted_position_mismatch, WorldInvariants.ts). Falls back to the
+ * legacy destinationX/Z write only when moveTo itself fails to plan a route
+ * (e.g. genuinely unreachable target) — Locomotion.ts's legacy foot-walk
+ * fallback then takes over exactly as it always has. Sets pendingActionType
+ * alongside the destination so the renderer distinguishes a walk-to-rest from
+ * an ordinary task walk (#1013 pictograms) and computeEmployeeActivity
+ * (EmployeeActivity.ts) reports actionType: 'rest' for the whole trip, not
+ * just once the rest itself is executing. The one shared entry point every
+ * rest-creating path calls, except hard-collapse (tickCollapse,
+ * NeedRestoration.ts), which alights first — a genuine "give up the vehicle"
+ * event (#1118).
  */
-export function beginRestWalk(emp: Employee, x: number, z: number): void {
-  emp.destinationX = x;
-  emp.destinationZ = z;
+export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
+  const result = moveTo(state, emp.id, { x, z });
+  if (!result.success) {
+    emp.destinationX = x;
+    emp.destinationZ = z;
+  }
   emp.pendingActionType = 'rest';
-}
-
-/**
- * Start emp travelling to (x, z) to rest, preserving mount continuity when
- * possible. STUB — real behavior added by @implementer. See issue #1118.
- */
-export function beginRestTravel(_state: GameState, _emp: Employee, _x: number, _z: number): void {
-  throw new Error('not implemented');
 }
 
 /**
