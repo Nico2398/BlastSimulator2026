@@ -13,6 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 import { interruptActiveAction, completePendingAction } from './TaskDispatch.js';
+import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import {
   createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, beginRestWalk,
 } from './RestActionHelpers.js';
@@ -123,7 +124,19 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // there is nothing left to release back to the pool.
     const priorActionId = emp.activeActionId;
     const collapsedGauge = checkCollapse(emp);
-    if (!collapsedGauge) continue;
+    if (!collapsedGauge) {
+      // Already-collapsing employee, no fresh threshold crossing this tick.
+      // tickCollapse runs before tickEmployees in the same tick
+      // (TickPipeline.ts), so a walk-only-pinned action reclaimed onto this
+      // still-resting employee's taskQueue by claimActionsTargetedAtEmployee
+      // didn't exist yet at the instant this employee was first interrupted
+      // — it's created moments later, same tick. This pass, one tick later,
+      // is what catches and releases it (#1096).
+      if (emp.collapsing) {
+        releaseUnboardedTaskQueueVehicleReservations(state, emp);
+      }
+      continue;
+    }
 
     // Needs-driven interruption (#549): release the ONE active action back to
     // 'queued' (holder/exclusivity cleared) instead of leaving it permanently
@@ -197,6 +210,13 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = collapsedGauge;
     beginRestWalk(emp, targetX, targetZ);
+
+    // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
+    // employee after its vehicle was destroyed mid-drive) predating this
+    // collapse can still hold a vehicle reservation; interruptActiveAction
+    // above only released the active action. Release it now rather than
+    // leaving it reserved for the whole rest duration (#1096).
+    releaseUnboardedTaskQueueVehicleReservations(state, emp);
   }
 
   return result;
