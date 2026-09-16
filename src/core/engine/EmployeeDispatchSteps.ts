@@ -22,8 +22,7 @@ import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReas
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { alight } from './Mount.js';
+import { alightIfMounted } from './Mount.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -503,9 +502,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // (mounted-position-mismatch) violation for the rest of the walk.
   // Mirrors the identical alight-before-boarding-elsewhere fix in
   // PlanItinerary.ts's own vehicle-gated branch.
-  if (isMounted(employee.locomotion)) {
-    alight(state, mountedVehicleId(employee.locomotion)!);
-  }
+  alightIfMounted(state, employee);
 
   employee.destinationX = action.targetX;
   employee.destinationZ = action.targetZ;

@@ -18,8 +18,7 @@ import {
   createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, beginRestTravel,
 } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { alight } from './Mount.js';
+import { alightIfMounted } from './Mount.js';
 import {
   NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   needRestSearchRadius,
@@ -219,9 +218,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // guards (unassignDriver — mid-haul lock, e.g.) may refuse; that's fine —
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
-    if (isMounted(emp.locomotion)) {
-      alight(state, mountedVehicleId(emp.locomotion)!, _emitter);
-    }
+    alightIfMounted(state, emp, _emitter);
     beginRestTravel(state, emp, targetX, targetZ);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
