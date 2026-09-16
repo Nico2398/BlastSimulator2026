@@ -910,6 +910,46 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
     expect(employee.activeActionId).toBe(drillAction.id);
     expect(state.pendingActions.find(a => a.id === drillAction.id)!.holderId).toBe(employee.id);
   });
+
+  // #1110: an employee mid-forced-rest (restTicksRemaining set, walking to or
+  // already at a shift-boundary rest — ForceShiftRest.ts) has activeActionId
+  // set to the rest action's own id, so without the isMidCollapseOrForcedRest
+  // guard in EmployeeDispatch.ts's tickEmployees, claimActionsTargetedAtEmployee
+  // would still reclaim a targeted action for them every tick — pushing it
+  // onto taskQueue (since activeActionId !== null) and reserving its vehicle
+  // for nobody to board, tripping I5_reservation_without_valid_holder — same
+  // shape as the #1042 mid-evacuation-drive case above, for the shift-rest
+  // trigger instead.
+  it('an employee mid-forced-rest does not claim a targeted vehicle-gated action, and does not reserve its vehicle (#1110)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    // Mid-forced-rest: restTicksRemaining set, activeActionId pointed at the
+    // rest action itself (mirrors ForceShiftRest.ts's completeRestForEmployee
+    // shape) — reads exactly like a busy-but-claimable employee to
+    // claimActionsTargetedAtEmployee without the guard.
+    employee.restTicksRemaining = 50;
+    employee.activeActionId = 999;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    const action = makeVehicleGatedAction({ id: 1, targetEmployeeId: employee.id });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(employee.taskQueue).not.toContain(action.id);
+    expect(state.pendingActions.find(a => a.id === action.id)!.status).toBe('queued');
+    expect(vehicle.reservedForActionId).toBeNull();
+  });
+
+  // Mirror case: an ordinary employee (not resting, not collapsing) is
+  // unaffected by the #1110 guard and still claims a targeted vehicle-gated
+  // action normally — already proven above by 'promotes a claimed
+  // vehicle-gated action onto pendingDriverVehicleId (walk-to-vehicle) ...',
+  // which uses this same makeVehicleGatedAction + targetEmployeeId shape with
+  // no rest/collapse fields set.
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
