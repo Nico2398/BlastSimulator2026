@@ -13,7 +13,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { TaskProgressResult } from './TaskProgress.js';
 import type { TaskCompletionReport } from './TickPipeline.js';
 import { Random } from '../math/Random.js';
-import { completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
+import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { completePendingAction } from './TaskDispatch.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
@@ -117,17 +117,14 @@ export function applyTaskCompletion(
     // removes the completing action's record and ghost, once the work has
     // actually finished, not at claim time (#547).
     if (progress.actionId !== undefined) {
-      // #1085: route through the same shared completion function the
-      // phase-driven (haul_debris/fragment_debris) path already used, so the
-      // starvation override, the vehicle-continuity promotion and the
-      // reservation release happen once, in one place, regardless of which
-      // kind of work just finished. Returns false for a non-vehicle-gated
-      // action (or an already-removed one) — completePendingAction below is
-      // the same fallback that already ran for those.
-      const handled = completeVehicleGatedActionIfApplicable(state, emp, progress.actionId);
-      if (!handled) {
-        completePendingAction(state, progress.actionId);
-      }
+      // #1090: completeVehicleGatedAction (VehicleReservation.ts) replaces
+      // VehicleContinuity.ts's completeVehicleGatedActionIfApplicable — cost
+      // (and any same-role follow-up) is now the planner's own concern
+      // (resolveActionCost/planItinerary), so this no longer needs its own
+      // continuity fast path or a boolean "did it handle this" contract.
+      // TODO(#1090): stubbed (no-op) at skeleton phase.
+      completeVehicleGatedAction(state, progress.actionId);
+      completePendingAction(state, progress.actionId);
     }
 
     // A completed 'survey' task resolves here — after the surveyor has

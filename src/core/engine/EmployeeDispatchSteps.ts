@@ -18,7 +18,7 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestWalk } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation, isLicensedForRole } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
@@ -193,25 +193,20 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // #954 follow-up (economy-full-loop regression): a vehicle-gated entry
       // among those same unreachable candidates may be reserved to a vehicle
       // nobody has boarded yet, with a different, already-idle, already-
-      // licensed employee standing by who could use it right now —
-      // canReassignStrandedReservation's own doc comment (VehicleReservation.ts)
-      // has the full trace. Handing it back to the open pool here, rather
-      // than leaving it locked to this employee until its own retry
-      // eventually succeeds (which resolveActionCost's #954 occupancy
-      // check can now correctly refuse forever), lets that other employee
-      // claim it the very next time they're offered the pool below.
+      // licensed employee standing by who could use it right now.
+      // TODO(#1090): canReassignStrandedReservation (VehicleReservation.ts)
+      // was deleted along with the dismount-on-release mechanism — the
+      // vehicle-gated half of this release (handing such a candidate back to
+      // the open pool) is implementer's to restore via planItinerary/
+      // resolveActionCost's own reachability check instead.
       for (const candidate of candidates) {
-        if (canReassignStrandedReservation(state, candidate)) {
-          employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
-          releaseActionToOpenPool(state, candidate);
-        } else if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
+        if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
           // #1025: an on-foot taskQueue candidate this employee can no longer
           // reach (their own current cell got built over — clampToGrid froze
           // them mid-fatigue onto the exact cell a building's footprint later
           // occupies) with no other employee ever offered it, since it never
-          // sat in the open pool. Release it the same way the vehicle-gated
-          // branch above does, so a different, reachable employee can pick it
-          // up instead of it deadlocking here forever.
+          // sat in the open pool. Release it so a different, reachable
+          // employee can pick it up instead of it deadlocking here forever.
           employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
           releaseActionToOpenPool(state, candidate);
         }

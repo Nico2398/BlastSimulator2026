@@ -38,7 +38,7 @@ import {
   tickTaskProgress,
   tickLocomotion,
   tickArrivalGate,
-  completeVehicleGatedActionIfApplicable,
+  completeVehicleGatedAction,
   employeeWorkState,
   BASE_TICK_MS,
 } from './GameLoop.js';
@@ -240,7 +240,7 @@ export function runTick(
   // timing across several scenarios that have nothing to do with vehicles.
   // The vehicle-continuity case that motivated it is instead handled
   // inline, scoped to vehicle-gated actions only — see
-  // completeVehicleGatedActionIfApplicable below.
+  // completeVehicleGatedAction below.
   const dispatchResult = tickEmployees(state);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
@@ -299,8 +299,7 @@ export function runTick(
   // release/dismount) so the PendingAction/ghost clear and the employee
   // keeps working instead of idling.
   for (const completedVehicle of arrivalResult.completedVehicleActions) {
-    const emp = state.employees.employees.find(e => e.id === completedVehicle.employeeId);
-    if (emp) completeVehicleGatedActionIfApplicable(state, emp, completedVehicle.actionId);
+    completeVehicleGatedAction(state, completedVehicle.actionId);
   }
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological

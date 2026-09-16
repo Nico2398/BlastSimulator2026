@@ -9,7 +9,7 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
+import { releaseVehicleReservation, isMidVehicleGatedWork } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 
@@ -251,7 +251,7 @@ export function interruptActiveAction(
   state: GameState,
   employee: Employee,
   actionId: number | null,
-  options?: { keepVehicleDriver?: boolean; forceOpenPool?: boolean },
+  options?: { forceOpenPool?: boolean },
 ): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
@@ -357,11 +357,7 @@ export function interruptActiveAction(
         }
       }
 
-      // options.keepVehicleDriver (#552) skips the dismount for the one
-      // caller (ArrivalGate.ts's resolveBoarding) interrupting an action
-      // whose driver had *just* boarded this same tick for it — every other
-      // caller keeps the full dismount-and-idle release.
-      releaseActionToOpenPool(state, action, options);
+      releaseActionToOpenPool(state, action);
     }
   }
 
@@ -381,23 +377,15 @@ export function interruptActiveAction(
  * evacuated employee claimed but never started walking to, with no
  * per-employee walk state of its own to unwind.
  *
- * options.keepVehicleDriver (#552): see interruptActiveAction's own call
- * site above — releaseDeadEmployeeActions never passes this, a dead
- * employee has no boarding-continuity case to protect.
  */
 export function releaseActionToOpenPool(
   state: GameState,
   action: PendingAction,
-  options?: { keepVehicleDriver?: boolean },
 ): void {
   action.status = 'queued';
   action.holderId = null;
 
-  if (options?.keepVehicleDriver) {
-    releaseVehicleReservationKeepDriver(state, action.id);
-  } else {
-    releaseVehicleReservation(state, action.id);
-  }
+  releaseVehicleReservation(state, action.id);
 
   const ghost = state.ghostPreviews.find(g => g.id === action.id);
   if (ghost) {

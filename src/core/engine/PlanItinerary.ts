@@ -83,6 +83,12 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal): Resolved
  * corridor-clearing use case already expects: the console's `vehicle move`
  * command surfaces "No route available" instead of installing a leg that
  * can never resolve.
+ *
+ * `avoidVehicles` (#1090, #954): threaded straight through to
+ * `findExactPath`, mirroring `resolveActionCost`'s own occupancy rule
+ * (ActionSelection.ts) now that goal resolution (and its vehicle-gated walk
+ * target) moves into this planner. Every call site below passes `false` at
+ * skeleton phase — implementer wires each leg's real occupancy rule in.
  */
 function estimateLegDistance(
   state: GameState,
@@ -92,12 +98,13 @@ function estimateLegDistance(
   fromZ: number,
   toX: number,
   toZ: number,
+  avoidVehicles: boolean,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles });
   return path.found ? path.totalCost : null;
 }
 
@@ -114,7 +121,7 @@ export function buildBoardLeg(
   vehicle: Vehicle,
   fidelity: PlanFidelity,
 ): Leg | null {
-  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z);
+  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z, false);
   if (footDist === null) return null;
 
   return {
@@ -173,7 +180,7 @@ export function planItinerary(
        * cheaper. Not built in phase 3a. */
     }
 
-    const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, resolved.targetX, resolved.targetZ);
+    const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, resolved.targetX, resolved.targetZ, false);
     if (dist === null) return null;
 
     const footLeg: Leg = {
@@ -243,7 +250,7 @@ export function planItinerary(
   }
 
   const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
-  const driveDist = estimateLegDistance(state, fidelity, vehicle.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ);
+  const driveDist = estimateLegDistance(state, fidelity, vehicle.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, false);
   if (driveDist === null) return null;
 
   legs.push({
