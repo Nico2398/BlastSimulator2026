@@ -894,13 +894,11 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawQueued).toBe(true);
-      // TODO(#1096): tickCollapse doesn't release a reserved-but-unboarded
-      // taskQueue vehicle reservation when it interrupts the holder for
-      // rest, leaving an I5 violation until #1096 lands. Once fixed, replace
-      // this with a plain expectNoWorldInvariantViolations(state) call.
-      expect(assertWorldInvariants(ctx.state!)).toEqual([
-        { kind: 'I5_reservation_without_valid_holder', vehicleId: 2, actionId: 1, employeeId: 1 },
-      ]);
+      // #1096: the re-pinned action can be reclaimed onto emp1 while emp1 is
+      // resting (collapsed mid-walk to the newly-available vehicle) —
+      // tickCollapse must release that taskQueue-held reservation too, or it
+      // sits stale (I5_reservation_without_valid_holder) for the whole rest.
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
