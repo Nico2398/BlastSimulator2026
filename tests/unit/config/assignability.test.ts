@@ -563,6 +563,26 @@ describe('picking the next issue', () => {
     expect((await select(api, 20)).issue?.number).toBe(30);
   });
 
+  // #1090, 16 Sep 2026. The run applied `paused` — the event the chain fires on
+  // — and edited its `## Blocked by` section afterwards, so the chain read a
+  // body naming only dependencies that had already landed and handed the issue
+  // straight back to a new session, 23 seconds after the last one stopped. The
+  // refusal is on the number precisely because the body cannot be trusted to
+  // have been written yet.
+  it('never chains back to the issue whose own run fired it', async () => {
+    const api = fakeApi([
+      { number: 1090, labels: ['ready', 'paused'], pipelinePr: { number: 1116, merged: false, labels: ['paused'] } },
+      { number: 1125, labels: ['ready'] },
+    ]);
+    expect((await select(api, 1090)).issue?.number).toBe(1125);
+  });
+
+  it('leaves the queue idle rather than re-picking the issue that just halted', async () => {
+    const api = fakeApi([{ number: 1090, labels: ['ready', 'paused'] }]);
+    const result = await select(api, 1090);
+    expect(result.issue).toBeNull();
+  });
+
   it('reports an idle queue rather than failing', async () => {
     const result = await select(fakeApi([]));
     expect(result.issue).toBeNull();
