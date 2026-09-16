@@ -348,8 +348,12 @@ function graphUnreadable(kind, number) {
  *
  * @param {IssueApi} api
  * @param {{number: number, body?: string|null}} root
- * @param {(dep: object, deliverable: object|null, number: number) => any} visit
- * @returns {Promise<{stopped: any, seen: Set<number>}>}
+ * @param {(dep: object, deliverable: object|null, number: number) => ({graphUnreadable: string, number?: number}|{assignable: false, reason: string, unreadable: boolean}|true|undefined)} visit
+ * @returns {Promise<{stopped: {graphUnreadable: 'root'|'cap'|'node'|'expand', number?: number}|{assignable: false, reason: string, unreadable: boolean}|true|undefined, seen: Set<number>}>}
+ *   `stopped` is `graphUnreadable(...)`'s marker shape when some part of the
+ *   graph could not be read, the visitor's own truthy return value otherwise
+ *   (a `no(...)` verdict from `graphVerdict`, or `true` from
+ *   `blockerCyclesBackTo`), or `undefined` when the walk finished clean.
  */
 async function walkDependencyGraph(api, root, visit) {
   const seen = new Set([root.number]);
@@ -419,16 +423,16 @@ async function blockerCyclesBackTo(api, blockerRoot, targetNumber) {
 }
 
 /**
- * Determines whether a `paused`-labelled issue is stranded: every dependency it
- * declares is open and unassignable for a reason the pipeline cannot resolve on
- * its own (no `ready` label, a cycle back to this issue, closed-unmerged, or
- * unreadable).
+ * Determines whether a `paused`-labelled issue is stranded: every not-yet-landed
+ * dependency it declares is unassignable for a reason the pipeline cannot
+ * resolve on its own (no `ready` label, `ready` but disqualified by another
+ * label, a cycle back to this issue, closed-unmerged, or unreadable).
  *
  * @param {IssueApi} api
  * @param {{number:number, labels:string[]}} issue
  * @returns {Promise<null | {
  *   stranded: boolean,
- *   blockers: {number:number, cause:'no-ready-label'|'cycle'|'closed-unmerged'|'unreadable', reason:string}[]
+ *   blockers: {number:number, cause:'no-ready-label'|'ready-but-disqualified'|'cycle'|'closed-unmerged'|'unreadable', reason:string}[]
  * }>}
  * `null` means "not evaluated" — the issue does not carry `paused`.
  */
@@ -497,11 +501,23 @@ async function strandedPauseVerdict(api, issue) {
     if (dep.state === 'open') {
       const hasReady = (dep.labels || []).includes(READY);
       const label = labelVerdict(dep);
-      if (!hasReady || !label.assignable) {
-        const reason = !label.assignable
-          ? label.reason
-          : `dependency #${number} is open but not labelled \`ready\``;
-        stillOpen.push({ blocker: { number, cause: 'no-ready-label', reason } });
+      if (!hasReady) {
+        stillOpen.push({
+          blocker: {
+            number,
+            cause: 'no-ready-label',
+            reason: `dependency #${number} is open but not labelled \`ready\``,
+          },
+        });
+        continue;
+      }
+      if (!label.assignable) {
+        // It carries `ready`, but another label disqualifies it (`blocked`,
+        // `in-progress`, `done`) — distinct from lacking `ready` altogether,
+        // which is the more common and more actionable shape.
+        stillOpen.push({
+          blocker: { number, cause: 'ready-but-disqualified', reason: label.reason },
+        });
         continue;
       }
 
