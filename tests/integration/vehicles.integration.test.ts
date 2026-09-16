@@ -1430,6 +1430,14 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     vehicle.state = 'moving';
     vehicle.targetX = 15;
     vehicle.targetZ = 5;
+    // Same reasoning as action1's own setup above: a real claim always sets
+    // this at claim time, and reconcileVehicleReservations (VehicleReservation.ts,
+    // its own case (c)) reads it every tick to detect a vehicle-gated action
+    // whose reserved vehicle no longer exists — leaving it unset here makes
+    // this second, otherwise-healthy claim look exactly like that case,
+    // genuinely interrupting (and, since #1110's clearHolderWalkFields fix,
+    // clearing the itinerary of) a drive that was never actually stranded.
+    vehicle.reservedForActionId = action2.id;
     driver.activeActionId = action2.id;
     // #1089: same reasoning as the first drive above — a real itinerary is
     // what tickLocomotion actually walks.
