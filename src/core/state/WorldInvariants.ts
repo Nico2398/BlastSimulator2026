@@ -162,7 +162,31 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       });
       continue;
     }
-    const valid = v.driverId === holderId || holder.pendingDriverVehicleId === v.id;
+    // #1103: a vehicle reserved for an action still sitting in its holder's
+    // OWN taskQueue (reserveOnePoolActionAhead, EmployeeDispatchSteps.ts) is
+    // legitimately not yet boarded — but only while the holder is genuinely
+    // busy WORKING a different active action (activeActionId set, not
+    // resting or walking to rest) and will walk to claim this one once that
+    // finishes (VehicleContinuity.ts's tryContinueVehicleGatedAction is the
+    // common case: continuity transfers the ABOUT-TO-FREE vehicle straight
+    // onto it instead). Neither v.driverId nor pendingDriverVehicleId
+    // reflects that yet, so without this the check flagged this ordinary,
+    // transient "reserved ahead, not yet started" state as a violation on
+    // every multi-action taskQueue — confirmed live on
+    // level2-playthrough-win.json (pre-existing on main too, unrelated to
+    // #1089/#1103's own mover work). Deliberately excludes a RESTING holder
+    // (restTicksRemaining/pendingRestDuration set): that is the genuine,
+    // still-open #1096 gap (tickCollapse interrupting a holder for rest
+    // without releasing their own taskQueue-held reservation) this same
+    // check exists to keep visible — vehicles.integration.test.ts's own
+    // "destroying the reserved vehicle mid-drive" case pins exactly this
+    // shape as a violation until #1096 lands.
+    const holderGenuinelyBusyElsewhere = holder.activeActionId !== null
+      && holder.restTicksRemaining === null
+      && holder.pendingRestDuration === null;
+    const valid = v.driverId === holderId
+      || holder.pendingDriverVehicleId === v.id
+      || (holderGenuinelyBusyElsewhere && holder.taskQueue.includes(action.id));
     if (!valid) {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',

@@ -1021,7 +1021,16 @@ describe('Vehicle fleet', () => {
       }
       expect(vehicle.occupantIds).toContain(eid);
 
-      const farX = vehicle.x + 20;
+      // #1103: clamped to the live NavGrid's own east edge rather than a
+      // flat `+20` — PlanItinerary.ts's estimateLegDistance now refuses a
+      // leg whose real pathfound endpoint would silently clamp away from
+      // its own requested destination (Pathfinding.ts's clampToGrid), so an
+      // unconditional `vehicle.x + 20` genuinely off this test's 32-wide
+      // grid (spawn position dependent — a driller's spawn cell isn't
+      // pinned) started failing outright instead of installing a leg that
+      // could never arrive. Still "far" relative to the vehicle's own
+      // starting cell, which is all this test's own overlap-guard below needs.
+      const farX = Math.min(vehicle.x + 20, ctx.state!.navGrid!.maxX - 1);
       const farZ = vehicle.z;
       const moveResult = moveTo(ctx.state!, eid, { x: farX, z: farZ });
       expect(moveResult.success).toBe(true);

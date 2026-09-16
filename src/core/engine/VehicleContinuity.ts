@@ -81,6 +81,21 @@ export function tryContinueVehicleGatedAction(
   if (queuedFollowUps.length > 0) {
     const followUp = queuedFollowUps[0]!;
     employee.taskQueue = employee.taskQueue.filter(id => id !== followUp.id);
+    // #1103: `followUp` already carries its OWN vehicle reservation from the
+    // reserveOnePoolActionAhead call that originally queued it — made at a
+    // moment `vehicle` (the one finishing right now) wasn't free yet, so a
+    // DIFFERENT vehicle was picked. Reassigning `vehicle`'s reservation to
+    // `followUp` below without first releasing that other one leaves BOTH
+    // vehicles reserved for the same action: the other one permanently
+    // orphaned (no driver ever boards it, no completion path ever clears
+    // it, since promoteVehicleGatedAction's own `find` picks whichever of
+    // the two reservations happens to come first) — an I5
+    // (reservation-without-valid-holder) world-invariant violation
+    // confirmed live on level2-playthrough-win.json. Continuity's whole
+    // premise is staying mounted on the vehicle finishing NOW, so the other,
+    // no-longer-needed reservation is simply released back to the pool.
+    const priorVehicle = state.vehicles.vehicles.find(v => v.id !== vehicle.id && v.reservedForActionId === followUp.id);
+    if (priorVehicle) priorVehicle.reservedForActionId = null;
     vehicle.reservedForActionId = followUp.id;
     promoteActionToActive(state, employee, followUp);
     return true;

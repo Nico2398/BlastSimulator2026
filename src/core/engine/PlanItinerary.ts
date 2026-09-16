@@ -62,6 +62,25 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal): Resolved
  * yet — mirroring resolveActionCost's own null-navGrid convention
  * (ActionSelection.ts) — and returns null when the target is genuinely
  * unreachable on the current NavGrid.
+ *
+ * Also returns null when `findPath` reports `found: true` but its own
+ * `clampToGrid` silently redirected an out-of-bounds (toX, toZ) onto the
+ * nearest in-grid cell (Pathfinding.ts) — a "successful" path whose real
+ * endpoint is not the leg's own destX/destZ. Locomotion's `isLegArrived`
+ * checks the UNCLAMPED destX/destZ exactly, so a leg built from such a path
+ * can never actually arrive: every following tick re-resolves the identical
+ * clamped, already-there path, reports "moved" with zero real movement, and
+ * never once hits a failed-path tick to trip the stuck-abandon safety net
+ * (#1103, confirmed live: level1-playthrough-win.json's own `vehicle move 3
+ * to:10,-2` — a corridor-clearing coordinate one row past the navmesh's own
+ * south edge — parks employee #4 at the clamped (10,0) from tick 15 onward,
+ * indefinitely, and EmployeeDispatch.ts's own mid-itinerary dispatch guard
+ * (#1089) then correctly refuses to double-book them, permanently removing
+ * one of three survivors from the roster for the rest of the run). Failing
+ * the plan here — same outcome as a genuinely unreachable target — is what
+ * the corridor-clearing use case already expects: the console's `vehicle
+ * move` command surfaces "No route available" instead of installing a leg
+ * that can never resolve.
  */
 function estimateLegDistance(
   state: GameState,
@@ -77,7 +96,12 @@ function estimateLegDistance(
   }
 
   const path = findPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false });
-  return path.found ? path.totalCost : null;
+  if (!path.found) return null;
+
+  const last = path.waypoints[path.waypoints.length - 1];
+  if (!last || last.x !== Math.floor(toX) || last.z !== Math.floor(toZ)) return null;
+
+  return path.totalCost;
 }
 
 /**
@@ -191,6 +215,28 @@ export function planItinerary(
   let driveFromZ = employee.z;
 
   if (!alreadyMounted) {
+    // #1103: an employee currently mounted in a DIFFERENT vehicle (e.g. an
+    // idle rock_digger driver picked up for a debris_hauler haul) must alight
+    // from it before walking to board this one — otherwise the foot leg
+    // below moves employee.x/z on its own while the old vehicle, whose x/z is
+    // written only from ITS OWN occupant's advance (Locomotion.ts), never
+    // moves, instantly splitting the two positions apart (I2). A zero-length
+    // leg at the employee's own current position applies its 'alight' step
+    // the very same tick it becomes current (Locomotion.advanceItinerary's
+    // own continuity-leg handling) rather than idling a tick for a movement
+    // that would never fire.
+    if (isMounted(employee.locomotion)) {
+      legs.push({
+        mode: 'foot',
+        vehicleId: null,
+        destX: employee.x,
+        destZ: employee.z,
+        arrival: 'exact',
+        onArrive: { kind: 'alight' },
+        estTicks: 0,
+      });
+    }
+
     const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
     if (boardLeg === null) return null;
     legs.push(boardLeg);

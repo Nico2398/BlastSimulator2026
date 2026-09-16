@@ -22,6 +22,8 @@ import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReas
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { alight } from './Mount.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -430,6 +432,20 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   if (action.requiredVehicleRole !== null) {
     promoteVehicleGatedAction(state, employee, action);
     return;
+  }
+
+  // #1103: a currently-mounted employee claiming an on-foot action (this
+  // whole branch — place_building, survey, charge_hole, rest, any
+  // requiredVehicleRole: null action) must alight first. Without this, the
+  // legacy destinationX/Z walk below moves employee.x/z on its own every
+  // tick while the vehicle they're still nominally "mounted" in never
+  // moves (Locomotion.ts's advanceLegacyFootWalk only ever touches the
+  // employee, never a vehicle) — an immediate and then ever-widening I2
+  // (mounted-position-mismatch) violation for the rest of the walk.
+  // Mirrors the identical alight-before-boarding-elsewhere fix in
+  // PlanItinerary.ts's own vehicle-gated branch.
+  if (isMounted(employee.locomotion)) {
+    alight(state, mountedVehicleId(employee.locomotion)!);
   }
 
   employee.destinationX = action.targetX;

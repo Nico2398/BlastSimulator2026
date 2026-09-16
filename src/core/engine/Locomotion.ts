@@ -347,9 +347,10 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
  * vehicle: waits, and once `emp.vehicleWaitingTicks` reaches
  * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, attempts a one-shot reroute avoiding
  * every other vehicle's current cell. A successful reroute applies its
- * outcome immediately (same tick); a failed one escalates the employee (not
- * the vehicle) to stuck, once, on the rising edge. Absorbed from the old
- * VehicleOccupancyReroute.ts.
+ * outcome immediately (same tick); a failed one falls back to relocating
+ * whatever blocks the destination cell itself (#689, restored below) before
+ * finally escalating the employee (not the vehicle) to stuck, once, on the
+ * rising edge. Absorbed from the old VehicleOccupancyReroute.ts.
  */
 function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
@@ -390,10 +391,112 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     return 'moved';
   }
 
+  // #1103: every route avoiding live vehicles is blocked, including the
+  // destination cell itself — restore #689's blocker-relocation fallback,
+  // dropped when this function was absorbed from the old
+  // VehicleOccupancyReroute.ts (#1089). A driverless, unreserved, idle
+  // vehicle squatting exactly on this leg's destination (e.g. a rig whose
+  // driver was reassigned mid-drilling by Mount's Chebyshev-radius boarding)
+  // has no task of its own to interrupt, so it is simply relocated to the
+  // nearest free cell; a driven one relocates by really driving itself clear
+  // via moveTo. Confirmed live: level1-lose-ecology.json's own H44 stalled
+  // at holeCount 48/49 forever without this — an idle drill_rig from a
+  // finished crew parked squarely on the one hole still left to drill.
+  if (relocateDestinationBlocker(state, leg.destX, leg.destZ, vehicle.id)) return 'blocked';
+
   emp.isMoveStuck = true;
   vehicle.isMoveStuck = true;
   if (!wasStuckBefore) emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
   return 'blocked';
+}
+
+/**
+ * Restores #689's deadlock-clearing fallback for the itinerary mover: when
+ * no route to (destX, destZ) avoids every other live vehicle, and that is
+ * because another vehicle sits exactly ON the destination cell itself,
+ * relocate that blocker instead of leaving the requester stuck forever.
+ * Returns true when a relocation was attempted (already relocating, or just
+ * started one) — the caller stays 'blocked' for this tick either way, and
+ * the escalation-to-stuck fallback below only fires when this returns false
+ * (no blocker, or one that cannot be relocated at all).
+ */
+function relocateDestinationBlocker(state: GameState, destX: number, destZ: number, requesterVehicleId: number): boolean {
+  const blocker = state.vehicles.vehicles.find(v => v.id !== requesterVehicleId && v.x === destX && v.z === destZ);
+  if (!blocker) return false;
+
+  // Already relocating — this trigger or a prior tick's — give it time to
+  // clear rather than pile on a second relocation order.
+  if (blocker.state === 'moving') return true;
+  if (blocker.task !== 'idle' || blocker.reservedForActionId !== null) return false;
+
+  const freeCell = findNearestFreeCellForVehicle(state, blocker);
+  if (!freeCell) return false;
+
+  if (blocker.driverId !== null) {
+    moveTo(state, blocker.driverId, { x: freeCell.x, z: freeCell.z });
+  } else {
+    relocateDriverlessVehicle(state, blocker, freeCell.x, freeCell.z);
+  }
+  return true;
+}
+
+/**
+ * Direct repositioning for a driverless idle blocker (#689/#1087 follow-up):
+ * no driver exists to drive it clear through the ordinary itinerary
+ * machinery, and none is needed — an unreserved, driverless vehicle has no
+ * task of its own in flight to interrupt, so it is simply placed on (x, z)
+ * outright. Keeps NavCell.vehicleOccupied in sync via
+ * updateVehicleCellOccupancy so foot/vehicle pathfinding immediately sees
+ * the old cell as free and the new one as occupied.
+ */
+function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number): void {
+  const prevX = Math.floor(blocker.x);
+  const prevZ = Math.floor(blocker.z);
+  const wasStationary = blocker.state !== 'moving';
+
+  blocker.x = x;
+  blocker.z = z;
+
+  updateVehicleCellOccupancy(state, blocker, wasStationary, prevX, prevZ);
+}
+
+/**
+ * Nearest walkable, unoccupied NavGrid cell adjacent to `blocker`'s current
+ * position (#689) — an expanding ring search (immediate neighbours first,
+ * then two cells out) so a blocker wedged against another obstacle still
+ * finds somewhere to go. Returns null when nothing nearby qualifies.
+ */
+function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x: number; z: number } | null {
+  const grid = state.navGrid;
+  if (!grid) return null;
+
+  const bx = Math.floor(blocker.x);
+  const bz = Math.floor(blocker.z);
+  let best: { x: number; z: number } | null = null;
+  let bestDistSq = Infinity;
+
+  for (let radius = 1; radius <= 2; radius++) {
+    for (let x = bx - radius; x <= bx + radius; x++) {
+      for (let z = bz - radius; z <= bz + radius; z++) {
+        if (x === bx && z === bz) continue;
+        const onRing = Math.max(Math.abs(x - bx), Math.abs(z - bz)) === radius;
+        if (!onRing) continue;
+
+        const cell = grid.cellAt(x, z);
+        if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
+        if (isOccupiedByOtherVehicle(state, blocker.id, x, z)) continue;
+
+        const distSq = (x - bx) ** 2 + (z - bz) ** 2;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = { x, z };
+        }
+      }
+    }
+    if (best) return best;
+  }
+
+  return best;
 }
 
 /** Writes a driving employee's advance onto their vehicle — the only place a vehicle's x/z ever changes. */
