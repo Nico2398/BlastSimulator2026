@@ -721,3 +721,181 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     expect(employee.activeActionId).not.toBe(1201);
   });
 });
+
+// #1110: the shift-rest interruption path leaked a vehicle reservation held
+// by an action still sitting unboarded in the interrupted employee's
+// taskQueue — the same leak #1096 (fixed in #1107) closed for tickCollapse's
+// `collapsing` employees, via releaseUnboardedTaskQueueVehicleReservations
+// (EmployeeDispatchSteps.ts). Neither forceShiftRestIfNeeded nor
+// forceShiftRestIfNeededByPolicy ever set `collapsing`, so none of #1107's
+// release calls fire on this path — finishForceRest (the shared tail both
+// call) must call it directly.
+describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest interruption', () => {
+  /** Apply a policy the way set_policy does: bump revision, set shiftMode/thresholds. */
+  function applyPolicy(state: GameState, overrides: Partial<ReturnType<typeof createSitePolicy>> = {}): void {
+    Object.assign(state.sitePolicy, overrides);
+    state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
+  }
+
+  /** A queued, vehicle-gated action sitting in `employee.taskQueue`, unboarded. */
+  function pushQueuedGatedAction(state: GameState, employeeId: number, id: number): PendingAction {
+    const action: PendingAction = {
+      id, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      targetX: 5, targetZ: 5, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'assigned', holderId: employeeId,
+      queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    return action;
+  }
+
+  it('forceShiftRestIfNeeded releases an unboarded, vehicle-gated taskQueue reservation when it forces a rest', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const prior = pushHeldAction(state, employee.id, 1110);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    const gatedAction = pushQueuedGatedAction(state, employee.id, 1111);
+    employee.taskQueue = [gatedAction.id];
+    vehicle.reservedForActionId = gatedAction.id;
+    // vehicle.driverId stays null — reserved but never boarded.
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(gatedAction.status).toBe('queued');
+    expect(gatedAction.holderId).toBeNull();
+    expect(employee.taskQueue).not.toContain(gatedAction.id);
+  });
+
+  it('forceShiftRestIfNeededByPolicy releases an unboarded, vehicle-gated taskQueue reservation when it forces a rest', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const prior = pushHeldAction(state, employee.id, 1112);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    const gatedAction = pushQueuedGatedAction(state, employee.id, 1113);
+    employee.taskQueue = [gatedAction.id];
+    vehicle.reservedForActionId = gatedAction.id;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(gatedAction.status).toBe('queued');
+    expect(gatedAction.holderId).toBeNull();
+    expect(employee.taskQueue).not.toContain(gatedAction.id);
+  });
+
+  it('forceShiftRestIfNeeded: the active action (already released by interruptActiveAction) is unaffected by the new call — no double-release, no crash with an empty taskQueue', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    const activeAction: PendingAction = {
+      id: 1114, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      targetX: 5, targetZ: 5, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
+      queuedAtTick: 0,
+    };
+    state.pendingActions.push(activeAction);
+    employee.activeActionId = activeAction.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    employee.taskQueue = []; // nothing queued — only the active action exists
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
+    vehicle.reservedForActionId = activeAction.id;
+
+    expect(() => forceShiftRestIfNeeded(state, employee, [], [])).not.toThrow();
+
+    // interruptActiveAction (existing, pre-#1110 behavior) released the
+    // active action and its vehicle reservation on its own — the new
+    // taskQueue-release logic must not interfere with or duplicate that, and
+    // must not crash on an empty taskQueue.
+    const released = state.pendingActions.find(a => a.id === activeAction.id)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    expect(employee.activeActionId).not.toBe(activeAction.id);
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(employee.taskQueue).toEqual([]);
+  });
+
+  it('leaves a boarded vehicle (driverId already set) for a taskQueue action untouched — releaseUnboardedTaskQueueVehicleReservations\' own guard still holds through this new call site', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const otherEmployee = hireEmployee(state.employees, 'driller', rng, 10, 10).employee;
+
+    const prior = pushHeldAction(state, employee.id, 1115);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    const gatedAction = pushQueuedGatedAction(state, employee.id, 1116);
+    employee.taskQueue = [gatedAction.id];
+    vehicle.reservedForActionId = gatedAction.id;
+    vehicle.driverId = otherEmployee.id; // already boarded by someone else
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(vehicle.reservedForActionId).toBe(gatedAction.id);
+    expect(vehicle.driverId).toBe(otherEmployee.id);
+    expect(gatedAction.status).toBe('assigned');
+    expect(gatedAction.holderId).toBe(employee.id);
+    expect(employee.taskQueue).toContain(gatedAction.id);
+  });
+
+  it('a second shift-rest interruption on the same employee/queue later in the run does not leak either', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // First interruption.
+    const prior1 = pushHeldAction(state, employee.id, 1117);
+    employee.activeActionId = prior1.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+    const gatedAction1 = pushQueuedGatedAction(state, employee.id, 1118);
+    employee.taskQueue = [gatedAction1.id];
+    vehicle.reservedForActionId = gatedAction1.id;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(employee.taskQueue).not.toContain(gatedAction1.id);
+
+    // Rest completes; employee resumes work, re-claims a (new) vehicle-gated
+    // action into the taskQueue, and works long enough to cross
+    // WORK_DURATION_TICKS a second time.
+    employee.restTicksRemaining = null;
+    employee.pendingRestDuration = null;
+    employee.pendingTaskDuration = null;
+    employee.taskTicksRemaining = null;
+
+    const prior2 = pushHeldAction(state, employee.id, 1119);
+    employee.activeActionId = prior2.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    const gatedAction2 = pushQueuedGatedAction(state, employee.id, 1120);
+    employee.taskQueue = [gatedAction2.id];
+    vehicle.reservedForActionId = gatedAction2.id;
+    // vehicle.driverId stays null — reserved but never boarded, again.
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(gatedAction2.status).toBe('queued');
+    expect(gatedAction2.holderId).toBeNull();
+    expect(employee.taskQueue).not.toContain(gatedAction2.id);
+  });
+});

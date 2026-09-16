@@ -61,7 +61,6 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // expected to fail for that reason at this (red) phase — not from a bad
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -1137,17 +1136,13 @@ describe('Vehicle fleet', () => {
       }
 
       expect(sawBoardingCellRevisited).toBe(false);
-      // TODO(#1110): a long enough resume window (400 ticks) recrosses
-      // WORK_DURATION_TICKS again, and the shift-rest interruption path
-      // (ForceShiftRest.ts) does not release the reservation of an action
-      // still sitting unboarded in the interrupted employee's taskQueue,
-      // leaving a single I5 violation behind. #1096 (fixed in #1107) closed
-      // exactly this gap for tickCollapse's `collapsing` employees only —
-      // the employee here is never `collapsing`, so none of #1107's release
-      // calls fire. Once #1110 lands, replace this with a plain
-      // expectNoWorldInvariantViolations(state).
-      const violations = assertWorldInvariants(ctx.state!);
-      expect(violations.every(v => v.kind === 'I5_reservation_without_valid_holder')).toBe(true);
+      // #1110: a long enough resume window (400 ticks) recrosses
+      // WORK_DURATION_TICKS again — the shift-rest interruption path
+      // (ForceShiftRest.ts) must release the reservation of an action still
+      // sitting unboarded in the interrupted employee's taskQueue, the same
+      // way #1096/#1107 already made tickCollapse do for a `collapsing`
+      // employee.
+      expectNoWorldInvariantViolations(ctx.state!);
     });
   });
 
