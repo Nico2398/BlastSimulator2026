@@ -413,11 +413,32 @@ export function releaseActionToOpenPool(
  * the action to the pool instead). Needed because cancellation/interruption
  * can happen while the employee is still walking to the target, a lifecycle
  * stage tickTaskProgress's normal-completion path never sees.
+ *
+ * `itinerary` must be cleared here too, not just the legacy destinationX/Z
+ * pair: a vehicle-gated action's own itinerary (#1089) is the ONLY place its
+ * multi-leg walk-to-vehicle/drive plan lives, and tickLocomotion prefers a
+ * non-null itinerary over destinationX/Z unconditionally (`tickLocomotion`,
+ * Locomotion.ts). Interrupting the action that itinerary belongs to and then
+ * immediately claiming a new one via the legacy beginRestWalk path (every
+ * needs-driven rest — tickCollapse, ForceShiftRest.ts) sets destinationX/Z
+ * for the NEW action while the OLD itinerary silently survives and keeps
+ * being walked instead: the employee drifts toward the abandoned action's
+ * stale target, the new rest destination is never reached, and once the
+ * stale itinerary's own leg gets stuck for MOVE_STUCK_ABANDON_TICKS,
+ * advanceLeg's own abandon path (Locomotion.ts) calls interruptActiveAction
+ * again — this time on the NEW rest action, whose activeActionId/destination
+ * fields get wiped exactly like this one's, but pendingRestDuration and
+ * `collapsing` are untouched — orphaning the employee in a permanent
+ * collapsing/mid-forced-rest limbo (isMidCollapseOrForcedRest,
+ * RestActionHelpers.ts) that no dispatch pass ever reclaims them from
+ * (reproduced live via vibration-budget.json's grid 2 drilling, #1110
+ * follow-up).
  */
 function clearHolderWalkFields(emp: Employee): void {
   clearActiveTaskFields(emp);
   emp.destinationX = null;
   emp.destinationZ = null;
+  emp.itinerary = null;
   emp.moveConsecutiveFailures = 0;
   emp.isMoveStuck = false;
   emp.pendingTaskDuration = null;

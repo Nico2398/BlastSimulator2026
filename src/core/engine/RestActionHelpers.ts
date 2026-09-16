@@ -214,3 +214,29 @@ export function beginRestWalk(emp: Employee, x: number, z: number): void {
 export function isMidClaimedTaskExecution(employee: Employee): boolean {
   return employee.taskTicksRemaining !== null;
 }
+
+/**
+ * True when `employee` is mid-collapse (walking to a forced rest, or already
+ * resting) via either of the two independent triggers that put them there:
+ * tickCollapse's fatigue-driven collapse (`collapsing`, #1096/#1107) or
+ * ForceShiftRest.ts's shift-boundary rest (`restTicksRemaining` while walking,
+ * `pendingRestDuration` while resting, #1110). Both conditions are OR'd
+ * because either one alone already removes the employee from
+ * claimActionsTargetedAtEmployee eligibility for the same reason: reclaiming
+ * a still-'queued', walkOnlyPinnedBy-pinned action targeted at this employee
+ * mid-rest reserves its vehicle for the whole rest with nobody aboard,
+ * tripping I5_reservation_without_valid_holder (EmployeeDispatch.ts's
+ * tickEmployees is the sole caller). `collapsing` is always set and cleared
+ * atomically alongside `pendingRestDuration`/`restTicksRemaining`
+ * (checkCollapse/tickCollapse, ArrivalGate.ts, completeRestForEmployee above)
+ * — except discardStaleRestAction (EvacuationHold.ts), which nulls the two
+ * rest fields for a taskQueue-held (not active) rest action during
+ * evacuation without touching `collapsing`. That asymmetry does not collapse
+ * this OR to a single field check: each sub-condition must stay independently
+ * truthy where it already was.
+ */
+export function isMidCollapseOrForcedRest(employee: Employee): boolean {
+  return employee.collapsing
+    || employee.restTicksRemaining !== null
+    || employee.pendingRestDuration !== null;
+}
