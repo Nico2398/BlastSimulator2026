@@ -157,3 +157,71 @@ jobs:
               issue_number: context.payload.issue.number,
               body: report.join('\n')
             });
+
+  # The relationship half of a declared dependency, derived rather than
+  # remembered.
+  #
+  # `agentic-decision-autonomy`'s pausing procedure has a run write its
+  # dependency in two places: the body's `## Blocked by` section and GitHub's
+  # own `blocked_by` relationship. `blockedByFor` (assignability.cjs) reads the
+  # union, which is what makes writing only one of them invisible — the queue
+  # holds the issue correctly on the body half alone, so the omission produces
+  # no error, no stall and nothing red. Issue #1090 paused that way on
+  # 16 Sep 2026 and held correctly the whole time the relationship was missing;
+  # it surfaced only when a human opened the Relationships panel.
+  #
+  # Prose is the wrong guard for a two-part write whose halves are not equally
+  # load-bearing, so the section is now the one thing a run writes and this job
+  # derives the relationship from it. Runs on `blocked` as well as `paused`: a
+  # blocked issue can declare a dependency too, and the invariant is the same.
+  #
+  # Its own job, not a step on `chain`: releasing the queue is the thing that
+  # must not be held up by a bookkeeping write, and a reconcile that fails has
+  # to go red on its own (Rule 4) without taking the chain down with it.
+  reconcile-dependencies:
+    if: github.event.label.name == 'blocked' || github.event.label.name == 'paused'
+    runs-on: ubuntu-latest
+    steps:
+      # The decision rules are read from the workspace, like every other
+      # consumer of `.github/scripts/`.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      # GITHUB_TOKEN deliberately (Rule 2): a dependency relationship raises no
+      # workflow event and nothing in the pipeline listens for one, so this
+      # write must not carry the PAT that exists to raise events. `issues:
+      # write` above is the only scope the endpoint needs.
+      - name: Record every declared dependency as a relationship
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { reconcileDependencies } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/reconcile-dependencies.cjs`);
+            const { createIssueApi } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-api.cjs`);
+
+            const api = createIssueApi(github, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              log: core.info,
+            });
+
+            const number = context.payload.issue.number;
+            const { created, skipped, failed } = await reconcileDependencies(api, number, { log: core.info });
+
+            if (created.length > 0) {
+              core.info(`#${number}: recorded ${created.length} declared dependency relationship(s): ${created.map(n => `#${n}`).join(', ')}.`);
+            }
+            if (skipped) core.notice(`#${number}: ${skipped}.`);
+
+            // Fail loud. A dependency the queue is meant to honour that exists
+            // in prose only is precisely the state this job was added to stop,
+            // and a warning in a job log is not somewhere anyone is watching.
+            if (failed.length > 0) {
+              core.setFailed(
+                `#${number}: could not record ${failed.length} declared dependency relationship(s) — `
+                + failed.map(f => `#${f.number} (${f.reason})`).join(', ')
+              );
+            }

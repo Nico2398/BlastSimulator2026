@@ -126,7 +126,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 | An existing unit your change could reuse with a small generalizing edit | **Edit it here.** Behaviour-preserving for its current callers and covered by their tests, so it is part of your change — never pre-existing debt to record around while copying the logic — `dev-design-principles` |
 | A defect — behaviour that is observably wrong, or a verification channel that fails to prove what it claims | File it — `agentic-issue-creation`. This is the finding the mechanism exists for. |
 | Something in your way that you can **work around** | File it, then bypass it with a `TODO(#N)` naming that issue, and finish your task on the bypass. The filed issue removes the bypass when it lands. |
-| Something in your way with **no way around it** — your task cannot be delivered at all | File it, then **pause**: your issue returns to `ready` with the new issue as its `Blocked by`, and any work already done goes on a draft PR labelled `paused` — `agentic-decision-autonomy` |
+| Something in your way with **no way around it** — your task cannot be delivered at all | File it, then **pause**: your issue returns to `ready` with the new issue named under its `## Blocked by` heading (the `blocked_by` relationship is derived from that section when the label lands), and any work already done goes on a draft PR labelled `paused` — `agentic-decision-autonomy` |
 | A default you chose that a human may want to revisit | File the decision — `agentic-decision-autonomy` |
 | That your own task is bigger than one run | File the scope you cut, so the remainder is not lost — `agentic-issue-creation` |
 
