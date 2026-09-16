@@ -54,7 +54,6 @@ import { findDrivenVehicle } from '../../src/core/entities/EmployeeActivity.js';
 // expected to fail for that reason at this (red) phase — not from a bad
 // import/type error.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
