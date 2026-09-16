@@ -10,7 +10,7 @@ import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
-import { resolveReservationHolder } from '../engine/VehicleReservation.js';
+import { resolveReservationHolder, isPendingReserveAhead } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
 
 export type ViolationKind =
@@ -181,12 +181,12 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
     // keep visible — vehicles.integration.test.ts's own #922 interrupt/
     // resume case pins exactly this shape as a violation until #1110 lands.
     // #1096, the tickCollapse half of the same gap, is fixed (#1107).
-    const holderGenuinelyBusyElsewhere = holder.activeActionId !== null
-      && holder.restTicksRemaining === null
-      && holder.pendingRestDuration === null;
     const valid = v.driverId === holderId
       || holder.pendingDriverVehicleId === v.id
-      || (holderGenuinelyBusyElsewhere && holder.taskQueue.includes(action.id));
+      // isPendingReserveAhead (VehicleReservation.ts) is this exact "busy
+      // elsewhere, reserved ahead in taskQueue" shape — shared with
+      // reconcileVehicleReservations's own identical staleness test (#1089).
+      || isPendingReserveAhead(holder, action.id);
     if (!valid) {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',

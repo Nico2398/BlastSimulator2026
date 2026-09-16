@@ -401,6 +401,36 @@ export interface VehicleGoneInterruption {
 }
 
 /**
+ * True when `actionId`'s reservation is an ordinary reserve-ahead
+ * (reserveOnePoolActionAhead, EmployeeDispatchSteps.ts) still sitting in
+ * `holder`'s own `taskQueue`, not yet promoted — `holder.activeActionId`
+ * naming a DIFFERENT action is exactly what that state looks like, since the
+ * whole point of reserving ahead is claiming a follow-up while genuinely busy
+ * on something else. Restricted to a holder genuinely working elsewhere (not
+ * resting, not walking to rest) the same way WorldInvariants.ts's I5 check
+ * already does (#1103) — this is that identical shape, needed a second time
+ * by reconcileVehicleReservations below, which independently reinvented the
+ * same "activeActionId doesn't name this reservation" test (#928) with no
+ * exception for it: an employee busy on one action with a DIFFERENT one
+ * reserved ahead onto their vehicle read exactly like #928's genuine staleness
+ * case (a driver reassigned without going through interruptActiveAction), so
+ * every reserve-ahead reservation got released the instant it was made, its
+ * action bounced back to 'queued' via ArrivalGate's own interruptActiveAction
+ * call — but interruptActiveAction has no reason to also drop it from
+ * `taskQueue` (it is not the employee's active action), so the stale id
+ * stayed there and the very next reserve-ahead re-claimed and re-pushed the
+ * SAME action id a second time, producing a `[id, id]` duplicate that starves
+ * `findStarvedActionForEmployee` forever behind it (confirmed live via
+ * rock-fragmenter-breaking.json's interaction-mode run, #1089).
+ */
+export function isPendingReserveAhead(holder: Employee, actionId: number): boolean {
+  return holder.activeActionId !== null
+    && holder.restTicksRemaining === null
+    && holder.pendingRestDuration === null
+    && holder.taskQueue.includes(actionId);
+}
+
+/**
  * Per-tick reconciliation: releases any reservation whose PendingAction
  * no longer exists or whose holder is dead, and reports any employee whose
  * vehicle-gated active action's reserved vehicle no longer exists in
@@ -440,7 +470,15 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       continue;
     }
 
-    if (vehicle.driverId === holder.id && holder.activeActionId !== actionId) {
+    if (
+      vehicle.driverId === holder.id
+      && holder.activeActionId !== actionId
+      // #1089 fix: a reservation still sitting in the holder's own taskQueue
+      // (reserveOnePoolActionAhead) is legitimately not the active action —
+      // see isPendingReserveAhead's own doc comment for the duplicate-queue
+      // bug this exception closes.
+      && !isPendingReserveAhead(holder, actionId)
+    ) {
       releaseVehicleReservation(state, actionId);
     }
   }
