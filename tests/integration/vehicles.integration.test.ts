@@ -225,18 +225,30 @@ describe('Vehicle fleet', () => {
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
     // point is that a driven vehicle's move command sets task/target, so give
-    // it a real, licensed, co-located driver (rather than a dangling fake
-    // employee id — #1084's assertWorldInvariants flags that as
-    // I1_dangling_driver_reference) instead of exercising the driver-gate
+    // it a real, licensed, co-located driver via the real `vehicle driver`
+    // command + a tick to resolve the arrival gate (#1089: the bare
+    // `assignDriver` mutator this test used to call sets vehicle.driverId
+    // directly but never marks the employee's own Locomotion `mounted` or
+    // adds them to occupantIds — Mount.board is the only entry point that
+    // keeps those two in agreement (#1087's own module doc comment), and
+    // `move`'s own moveTo call below needs a genuinely mounted employee to
+    // plan a drive leg through) instead of exercising the driver-gate
     // refusal.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
-    const assignResult = assignDriver(ctx.state!.vehicles, ctx.state!.employees, v.id, eid);
-    expect(assignResult.success).toBe(true);
+    vehicleCommand(ctx, ['driver', '1', String(eid)], {});
+    tickCommand(ctx, ['1'], {});
+    expect(v.driverId).toBe(eid);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
-
     expect(result.success).toBe(true);
+
+    // #1089: vehicle.task/targetX/Z are written for display only now
+    // (Locomotion.ts's writeVehiclePosition) — `move` installs an itinerary
+    // on the driver via moveTo, and the vehicle only reads back as "moving"
+    // with the new target once Locomotion actually advances that itinerary
+    // a tick, not the instant the command itself returns.
+    tickCommand(ctx, ['1'], {});
     expect(v.task).toBe('moving');
     expect(v.targetX).toBe(30);
     expect(v.targetZ).toBe(30);

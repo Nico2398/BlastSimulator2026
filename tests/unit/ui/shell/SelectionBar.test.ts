@@ -291,9 +291,18 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
     // point is that the dispatched command string parses and reaches the real
-    // command handler, not the driver gate, so give it a driver directly
-    // (same pattern as Zone.test.ts's own #947 fixtures).
-    vehicle.driverId = 1;
+    // command handler, not the driver gate, so give it a driver — a genuinely
+    // mounted one (#1089: `move` now installs an itinerary on the driver via
+    // moveTo, which needs a real Employee record and an agreeing
+    // Locomotion/occupantIds pair to plan a drive leg through — a bare
+    // `vehicle.driverId = <id>` with no such employee, this test's own
+    // pre-#1089 fixture, no longer resolves).
+    const { employee } = hireEmployee(ctx.state!.employees, 'driver', new Random(1));
+    employee.x = vehicle.x;
+    employee.z = vehicle.z;
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
 
     const command = extractTemplate()
       .replace('${entity.id}', String(vehicle.id))
@@ -304,6 +313,12 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     const result = runner.run(command);
     expect(result.success, result.output).toBe(true);
 
+    // #1089: vehicle.task/targetX/Z are written for display only now
+    // (Locomotion.ts's writeVehiclePosition) — `move` installs an itinerary
+    // on the driver via moveTo, and the vehicle only reads back as "moving"
+    // with the new target once Locomotion actually advances that itinerary
+    // a tick, not the instant the command itself returns.
+    runner.run('tick 1');
     const moved = ctx.state!.vehicles.vehicles.find(v => v.id === vehicle.id)!;
     expect(moved.task).toBe('moving');
     expect(moved.targetX).toBe(12);

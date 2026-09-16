@@ -5,7 +5,6 @@ import type { GameContext } from './world.js';
 import {
   purchaseVehicle,
   assignVehicle,
-  moveVehicle,
   destroyVehicle,
   getAllVehicleRoles,
   getVehicleDefByTier,
@@ -144,6 +143,22 @@ export function vehicleCommand(
       }
       const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
       const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
+      // #1089: an employee is the only mobile agent — vehicle.task/targetX/Z
+      // are written only for display now (Locomotion.ts's writeVehiclePosition),
+      // and nothing reads them to drive movement any more. A `task:moving`
+      // assign with real coordinates must install an itinerary on the
+      // driver via moveTo the same way `move` below does, or the vehicle
+      // (already confirmed driven, above) silently never moves — exactly
+      // the #1089 fixer-pass regression `move` itself already hit. A task
+      // other than 'moving', or 'moving' with no `to:` coords, stays a
+      // plain display-field assignment — nothing to drive toward.
+      if (task === 'moving' && targetX !== undefined && targetZ !== undefined) {
+        const result = moveTo(state, target.driverId!, { x: targetX, z: targetZ });
+        if (!result.success) {
+          return { success: false, output: result.error };
+        }
+        return { success: true, output: t('vehicle.assign_success', { id, task }) };
+      }
       // `target` above already confirmed a vehicle with `id` exists, and
       // nothing mutates `state.vehicles` between that lookup and here, so
       // assignVehicle cannot fail its own not-found check — its boolean
@@ -168,11 +183,20 @@ export function vehicleCommand(
       if (target.driverId === null) {
         return { success: false, output: t('vehicle.move_no_driver', { id }) };
       }
-      // `target` above already confirmed a vehicle with `id` exists, and
-      // nothing mutates `state.vehicles` between that lookup and here, so
-      // moveVehicle cannot fail its own not-found check — its boolean return
-      // is not re-checked.
-      moveVehicle(state.vehicles, id, toCoords[0]!, toCoords[1]!);
+      // #1089: drive the vehicle's own driver there via moveTo — the only
+      // entry point that installs an itinerary Locomotion actually walks.
+      // moveVehicle (Vehicle.ts) only ever wrote vehicle.task/targetX/Z,
+      // which Locomotion now writes for display only (writeVehiclePosition)
+      // and never reads to move anything — calling it here left the
+      // vehicle sitting at its spawn point forever despite reporting
+      // "moving" (confirmed live: level1-playthrough-win.json's own
+      // corridor-clearing `vehicle move` steps never actually relocated the
+      // blocking vehicles, silently defeating the scenario's own documented
+      // deadlock workaround).
+      const result = moveTo(state, target.driverId, { x: toCoords[0]!, z: toCoords[1]! });
+      if (!result.success) {
+        return { success: false, output: result.error };
+      }
       return { success: true, output: t('vehicle.move_success', { id, x: toCoords[0]!, z: toCoords[1]! }) };
     }
     case 'driver': {

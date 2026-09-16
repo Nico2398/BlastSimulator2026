@@ -52,6 +52,26 @@ function hireTestDriver(ctx: GameContext, role: EmployeeRole = 'driver') {
   return employee;
 }
 
+/**
+ * Hires a driver and mounts them onto `vehicle` directly — bypassing the
+ * full walk-to-board flow (Mount.board), which these message-text tests
+ * have no need to exercise. #1089: an employee is the only mobile agent,
+ * so `vehicle move`/`assign task:moving` now drive through moveTo, which
+ * requires a REAL employee at `vehicle.driverId` (unlike the pre-#1089
+ * model, where a bare numeric driverId was enough to satisfy the driver
+ * gate) — replaces this file's old `vehicle.driverId = 42` bypass for the
+ * two success-path tests below.
+ */
+function mountTestDriver(ctx: GameContext, vehicle: { id: number; x: number; z: number; driverId: number | null; occupantIds: number[] }) {
+  const employee = hireTestDriver(ctx);
+  employee.x = vehicle.x;
+  employee.z = vehicle.z;
+  employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+  vehicle.driverId = employee.id;
+  vehicle.occupantIds = [employee.id];
+  return employee;
+}
+
 function makeFragment(id: number, x: number, z: number, volume: number): FragmentData {
   return {
     id,
@@ -232,11 +252,10 @@ describe('vehicle.ts — assign task:moving refuses a driverless vehicle', () =>
   it('regression: assign task:moving succeeds and stages the task when a driver is aboard', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    vehicle.driverId = 42; // bypass boarding — only driverId matters here (same pattern as move's #947 tests)
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    mountTestDriver(ctx, vehicle); // #1089: a real, mounted driver — moveTo needs one to plan an itinerary
+    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving', to: '7,9' });
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicle.id} assigned to moving.`);
-    expect(vehicle.task).toBe('moving');
   });
 });
 
@@ -294,10 +313,12 @@ describe('vehicle.ts — move success message', () => {
     const vehicle = buyTestVehicle(ctx);
     // #947: canTickVehicle now requires a driver aboard to advance on tick at
     // all -- a driverless `vehicle move` is refused outright. This test's own
-    // point is the success message's exact text, not the driver gate, so
-    // bypass canAssignDriver directly (same pattern as the driver-unassign
-    // tests below).
-    vehicle.driverId = 42;
+    // point is the success message's exact text, not the driver gate, so a
+    // real driver is mounted directly (bypassing the walk-to-board flow) —
+    // #1089: moveTo (which `move` now drives through) needs a real employee
+    // at `driverId`, unlike the old bare-numeric-id bypass this test used
+    // pre-#1089.
+    mountTestDriver(ctx, vehicle);
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicle.id} moving to (7,9).`);
@@ -306,7 +327,7 @@ describe('vehicle.ts — move success message', () => {
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    vehicle.driverId = 42; // #947: bypass canAssignDriver — see the test above
+    mountTestDriver(ctx, vehicle); // #1089: bypass the walk-to-board flow — see the test above
     setLocale('fr');
     const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
     expect(result.success).toBe(true);
