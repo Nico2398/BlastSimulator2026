@@ -184,6 +184,21 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // employee the tick their rest completes and collapsing clears
     // (RestActionHelpers.ts's completeRestForEmployee).
     if (employee.collapsing) continue;
+    // Walking to a forced shift rest, or already resting (restTicksRemaining
+    // !== null / pendingRestDuration !== null — ForceShiftRest.ts) — same gap
+    // as the collapsing guard just above, for the shift-rest interruption
+    // path instead of the tickCollapse one (#1110). Without this,
+    // claimActionsTargetedAtEmployee below reclaims a still-'queued',
+    // walkOnlyPinnedBy-pinned action targeted at this exact employee
+    // (TaskCancellation.ts) on every tick of the rest, and since
+    // employee.activeActionId is the rest action (not null), the reclaimed
+    // action is pushed onto taskQueue rather than promoted — reserving its
+    // vehicle for the whole rest with nobody aboard, restarting the exact
+    // I5_reservation_without_valid_holder gap finishForceRest's own one-time
+    // releaseUnboardedTaskQueueVehicleReservations call (called only once, at
+    // the moment rest begins) cannot see, because this claim happens on a
+    // later tick, after that one-time cleanup already ran.
+    if (employee.restTicksRemaining !== null || employee.pendingRestDuration !== null) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);
