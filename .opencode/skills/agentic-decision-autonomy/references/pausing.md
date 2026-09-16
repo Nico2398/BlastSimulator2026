@@ -13,6 +13,10 @@ Read this before halting a run on a dependency. The decision of *whether* to pau
    gh label create paused --color fbca04 --force \
      --description "A run stopped here on a dependency; the queue returns to it when that dependency lands"
    ```
+
+   The blocker's `ready` label is not checked at file time — it is checked after the fact, hourly, by `agentic-watchdog.yml`'s stranded-pause sweep, which calls `strandedPauseVerdict` in `assignability.cjs`. File the blocker with `ready` at file time regardless (this step already says so); the sweep is the safety net for when that step is missed, not a substitute for it.
+
+   **Warning:** if the blocker's own `## Blocked by` section contains prose that happens to name your paused issue's number — explaining *why* it was filed as a dependency, for instance — that prose used to be read as a declared dependency (not commentary), creating a mutual-blocking cycle neither issue could escape. `parseDependencies` now treats a section whose first non-empty line begins with `None` as declaring nothing, which closes that specific shape — but keep any explanation of the relationship in a `## Context` or `## Resuming` section regardless, never in `## Blocked by` itself, since not every phrasing is covered by that guard.
 5. **Comment on your issue** naming the blocker, what you finished, and the PR that holds it. Stop with `PAUSED: waiting on #<blocker>`.
 
 What then happens without anyone watching: `assignability.cjs` skips your issue while the blocker is open, `handle-failure.yml` chains the queue on to the next issue, the pipeline works the blocker, and when the blocker's PR merges your issue becomes assignable again. The next run is told to resume from your draft PR's branch rather than start over.
