@@ -243,6 +243,30 @@ describe('resolveActionCost', () => {
     expect(result).not.toBeNull();
     expect(result!.totalTicks).toBeGreaterThan(0);
   });
+
+  it('returns null for a target outside state.navGrid\'s bounds, rather than a cost computed against findPath\'s silently clamped-to-grid endpoint (#1109)', () => {
+    // 30×30 grid (makeState default). A target far past the grid's edge
+    // would, under plain findPath, silently clamp onto the grid's last cell
+    // and still report found:true — resolveActionCost must not let that
+    // masquerade as a real, reachable cost.
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({ id: 1, targetX: 500, targetZ: 500 });
+
+    const plainPath = PathfindingModule.findPath(state.navGrid!, {
+      agentId: emp.id,
+      fromX: emp.x,
+      fromZ: emp.z,
+      toX: action.targetX,
+      toZ: action.targetZ,
+      avoidVehicles: false,
+    });
+    expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -193,6 +193,32 @@ describe('planItinerary', () => {
       const itinerary = planItinerary(state, employee, goal, 'exact');
       expect(itinerary).toBeNull();
     });
+
+    it('target outside the NavGrid\'s bounds: null rather than an itinerary costed against findPath\'s silently clamped-to-grid endpoint (#1109)', () => {
+      // 30×30 grid (makeState default) — a reposition goal far past the east
+      // edge would, under plain findPath, silently clamp onto the grid's last
+      // column and still report found:true. estimateLegDistance must refuse
+      // this via findExactPath instead of returning a distance computed
+      // against that wrong, clamped cell.
+      const state = makeState(30, 30);
+      const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+
+      const outOfBoundsX = 500;
+      const outOfBoundsZ = 500;
+      const plainPath = findPath(state.navGrid!, {
+        agentId: employee.id,
+        fromX: employee.x,
+        fromZ: employee.z,
+        toX: outOfBoundsX,
+        toZ: outOfBoundsZ,
+        avoidVehicles: false,
+      });
+      expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+
+      const goal: Goal = { kind: 'reposition', x: outOfBoundsX, z: outOfBoundsZ };
+      const itinerary = planItinerary(state, employee, goal, 'exact');
+      expect(itinerary).toBeNull();
+    });
   });
 
   it('fidelity agreement: same leg structure for estimate vs exact, but estTicks differ where an obstacle forces a detour', () => {
