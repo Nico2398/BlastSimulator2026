@@ -834,6 +834,31 @@ describe('detecting a stranded pause', () => {
     expect(verdict?.stranded).toBe(false);
   });
 
+  // The real #1089/#1103 incident, end to end: #1089's pause declared #1103 as
+  // its dependency, and #1103's own body cited #1089 back only to explain why
+  // it was filed — the exact prose the None-sentinel hardening in
+  // `parseDependencies` now reads as declaring nothing. Before that hardening
+  // this shape parsed as a mutual cycle and stranded the pause; this is the
+  // regression proof that it no longer does.
+  it('is not stranded once the None-sentinel hardening resolves the #1089/#1103 mutual-cycle shape', async () => {
+    const api = fakeApi([
+      {
+        number: 1103,
+        labels: ['ready'],
+        body:
+          '## Blocked by\n\nNone — this is standalone debugging work. It is filed as a dependency of #1089 only because the branch is shared.\n',
+      },
+      {
+        number: 1089,
+        labels: ['ready', 'paused'],
+        body: '## Blocked by\n- #1103\n',
+      },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 1089, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(false);
+    expect(verdict?.blockers).toEqual([]);
+  });
+
   it('is stranded when the dependency carries no `ready` label', async () => {
     const api = fakeApi([
       { number: 10, labels: [] },
@@ -900,6 +925,25 @@ describe('detecting a stranded pause', () => {
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 999, cause: 'unreadable' })
+    );
+  });
+
+  // One level deeper than the test above: the direct dependency (#10) is
+  // itself readable, `ready`, and open — it passes the no-ready-label check
+  // and reaches `blockerCyclesBackTo` — but #10's own declared dependency
+  // (#999) cannot be read, so walking #10's graph can't rule out a cycle back
+  // to #20. That has to fail closed the same way an unreadable dependency
+  // does, attributed to #10 (the blocker `strandedPauseVerdict` is actually
+  // choosing between), not to the unreadable node buried inside its graph.
+  it("is stranded when the dependency's own dependency graph hits an unreadable node", async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['ready'], body: '## Blocked by\n- #999\n' },
+      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    expect(verdict?.stranded).toBe(true);
+    expect(verdict?.blockers).toContainEqual(
+      expect.objectContaining({ number: 10, cause: 'unreadable' })
     );
   });
 
