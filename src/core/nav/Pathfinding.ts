@@ -567,12 +567,18 @@ export function findExactPath(grid: NavGrid, request: PathRequest): PathResult {
   const path = findPath(grid, request);
   if (!path.found) return path;
 
-  // Same derivation findPath itself uses to turn request.toX/toZ into a
-  // target cell (clampToGrid floors and clamps into the grid's covered box),
-  // so this guard can never diverge from what findPath actually targeted.
-  const target = clampToGrid(grid, request.toX, request.toZ);
+  // Compare against the RAW requested destination (floored, unclamped) —
+  // not clampToGrid's output, which is what findPath itself already
+  // targeted internally. Comparing against that would make this guard
+  // always agree with findPath's own endpoint and never fire. In-bounds
+  // requests floor to the same cell clampToGrid would have clamped to, so
+  // behavior there is unchanged; an out-of-bounds request floors to a cell
+  // outside the grid, which never matches the path's actual (in-grid) last
+  // waypoint, correctly triggering rejection.
+  const rawTargetX = Math.floor(request.toX);
+  const rawTargetZ = Math.floor(request.toZ);
   const last = path.waypoints[path.waypoints.length - 1];
-  if (!last || last.x !== target.x || last.z !== target.z) {
+  if (!last || last.x !== rawTargetX || last.z !== rawTargetZ) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
