@@ -12,6 +12,7 @@ import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
+import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestWalk, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
@@ -24,10 +25,11 @@ import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } 
  * queues restAction, updates emp's activeActionId/destination, records the
  * shift-change bookkeeping (shiftRested/firedEvents/emitter).
  *
- * TODO(#1110): call releaseUnboardedTaskQueueVehicleReservations(state, emp)
- * here (EmployeeDispatchSteps.ts) — mirrors tickCollapse's own unconditional
- * cleanup (#1107) — so a vehicle reservation held by an unboarded queued task
- * is released rather than leaked when a shift rest interrupts this employee.
+ * A taskQueue entry (not yet active) predating this forced rest can still
+ * hold a vehicle reservation; interruptActiveAction above only released the
+ * active action. Release it here rather than leaving it reserved for the
+ * whole rest duration — mirrors tickCollapse's own unconditional cleanup
+ * (#1096, #1107) for the shift-rest interruption path (#1110).
  */
 function finishForceRest(
   state: GameState,
@@ -40,6 +42,7 @@ function finishForceRest(
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
   beginRestWalk(emp, restAction.targetX, restAction.targetZ);
+  releaseUnboardedTaskQueueVehicleReservations(state, emp);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });
