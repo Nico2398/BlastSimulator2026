@@ -497,3 +497,61 @@ describe('vehicle.ts — no game loaded (bonus fix: requireGame(ctx))', () => {
     expect(result.output).toBe(t('console.no_game_loaded'));
   });
 });
+
+// ── MoveTo.ts errors, newly reachable now that move/assign task:moving/
+// driver route through moveTo instead of the old void moveVehicle (#1103) ──
+//
+// MoveTo.ts's own error strings (src/core/engine/MoveTo.ts) are wrapped
+// through t('move_to.*') at the source, the same pattern #1108 used for
+// Mount.ts's errors — result.error already arrives translated, so vehicle.ts
+// needs no code change to surface it correctly.
+
+describe('vehicle.ts — move: no route available (MoveTo.ts, #1103)', () => {
+  const NO_ROUTE_EN = 'No route available';
+
+  it('resolves to the exact English literal when the target is unreachable', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    mountTestDriver(ctx, vehicle); // real, mounted driver — moveTo needs one to plan an itinerary
+    // z=9999 is far outside the 32x32 grid — findPath's own clampToGrid
+    // cannot make the leg's real (unclamped) destination reachable.
+    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '5,9999' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(NO_ROUTE_EN);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx);
+    mountTestDriver(ctx, vehicle);
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '5,9999' });
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(NO_ROUTE_EN);
+  });
+});
+
+describe('vehicle.ts — driver <id> <employee>: no route to vehicle (MoveTo.ts, #1103)', () => {
+  const NO_ROUTE_TO_VEHICLE_EN = 'No route to vehicle';
+
+  it('resolves to the exact English literal when the vehicle sits outside the reachable grid', () => {
+    const ctx = makeCtx();
+    // Placed far outside the 32x32 grid — canAssignDriver's own checks (licence,
+    // availability) all pass, so moveTo's own buildBoardLeg is what fails here.
+    const vehicle = buyTestVehicle(ctx, 'debris_hauler', 5, -9999);
+    const driver = hireTestDriver(ctx);
+    const result = vehicleCommand(ctx, ['driver', String(vehicle.id), String(driver.id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(NO_ROUTE_TO_VEHICLE_EN);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    const vehicle = buyTestVehicle(ctx, 'debris_hauler', 5, -9999);
+    const driver = hireTestDriver(ctx);
+    setLocale('fr');
+    const result = vehicleCommand(ctx, ['driver', String(vehicle.id), String(driver.id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(NO_ROUTE_TO_VEHICLE_EN);
+  });
+});

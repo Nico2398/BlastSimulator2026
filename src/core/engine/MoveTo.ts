@@ -6,6 +6,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
+import { t } from '../i18n/I18n.js';
 
 type MoveResult = { success: true } | { success: false; error: string };
 
@@ -29,15 +30,15 @@ export function moveTo(
   opts?: { via?: number },
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  if (!employee) return { success: false, error: 'Employee not found' };
+  if (!employee) return { success: false, error: t('move_to.employee_not_found') };
 
   if ('vehicleId' in target) {
     const vehicle = state.vehicles.vehicles.find(v => v.id === target.vehicleId);
-    if (!vehicle) return { success: false, error: 'Vehicle not found' };
-    if (!hasFreeSeatFor(vehicle, employee)) return { success: false, error: 'Vehicle unavailable' };
+    if (!vehicle) return { success: false, error: t('move_to.vehicle_not_found') };
+    if (!hasFreeSeatFor(vehicle, employee)) return { success: false, error: t('move_to.vehicle_unavailable') };
 
     const leg = buildBoardLeg(state, employee, vehicle, 'exact');
-    if (leg === null) return { success: false, error: 'No route to vehicle' };
+    if (leg === null) return { success: false, error: t('move_to.no_route_to_vehicle') };
 
     employee.itinerary = {
       legs: [leg],
@@ -50,7 +51,7 @@ export function moveTo(
   }
 
   const itinerary = planItinerary(state, employee, { kind: 'reposition', x: target.x, z: target.z }, 'exact', opts);
-  if (itinerary === null) return { success: false, error: 'No route available' };
+  if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
   employee.itinerary = itinerary;
   syncPendingDriverVehicleId(employee);

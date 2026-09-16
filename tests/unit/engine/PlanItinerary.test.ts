@@ -193,6 +193,27 @@ describe('planItinerary', () => {
       const itinerary = planItinerary(state, employee, goal, 'exact');
       expect(itinerary).toBeNull();
     });
+
+    // #1103: findPath's own clampToGrid silently redirects an out-of-bounds
+    // target onto the nearest in-grid cell, reporting `found: true` — but the
+    // leg it would build names the UNCLAMPED (out-of-bounds) destX/destZ, so
+    // Locomotion's isLegArrived can never match the clamped position it
+    // actually reaches, stranding the employee at the clamped cell forever.
+    // estimateLegDistance must reject this (return null) rather than accept a
+    // "successful" path to the wrong endpoint.
+    it('reposition target just outside NavGrid bounds is rejected, not silently clamped to the nearest in-grid cell', () => {
+      const state = makeState(30, 30);
+      const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+
+      // z=35 is outside the 30x30 grid (valid z: 0..29) — findPath's
+      // clampToGrid would redirect this onto z=29 and report found: true.
+      const goal: Goal = { kind: 'reposition', x: 10, z: 35 };
+      const clamped = findPath(state.navGrid!, { agentId: employee.id, fromX: employee.x, fromZ: employee.z, toX: goal.x, toZ: goal.z, avoidVehicles: false });
+      expect(clamped.found).toBe(true); // confirms the hazard: findPath itself "succeeds"
+
+      const itinerary = planItinerary(state, employee, goal, 'exact');
+      expect(itinerary).toBeNull();
+    });
   });
 
   it('fidelity agreement: same leg structure for estimate vs exact, but estTicks differ where an obstacle forces a detour', () => {

@@ -172,6 +172,54 @@ describe('tickLocomotion', () => {
     expect(vehicle.z).toBe(stuckZ);
   });
 
+  // #1103: an idle, driverless, unreserved vehicle squatting exactly on
+  // another vehicle's drive-leg destination has no task of its own to
+  // interrupt — relocateDestinationBlocker must move it clear once the
+  // reroute-avoiding-vehicles attempt fails (destination itself is
+  // occupied, so no such route exists), rather than leaving the requester
+  // stuck forever. Mirrors the "waits...then stuck" test above, but the
+  // blocker sits ON destX/destZ instead of merely on the route.
+  it('relocates an idle, unreserved vehicle squatting on another vehicle\'s destination cell instead of leaving the requester stuck forever', () => {
+    const state = buildCorridorState(6);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 4, destZ: 1,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 4,
+      }],
+      goal: { kind: 'reposition', x: 4, z: 1 },
+      workTicks: 0,
+      estTotalTicks: 4,
+    } satisfies Itinerary;
+
+    // Idle, driverless, unreserved blocker sitting exactly on the drive
+    // leg's own destination cell.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 1);
+    expect(blocker.task).toBe('idle');
+    expect(blocker.driverId).toBeNull();
+    expect(blocker.reservedForActionId).toBeNull();
+
+    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 5; i++) {
+      tickLocomotion(state);
+    }
+
+    // The blocker moved off the destination cell...
+    expect(blocker.x === 4 && blocker.z === 1).toBe(false);
+    // ...and the requester is no longer permanently stuck: it has either
+    // reached the destination (itinerary cleared) or is still progressing
+    // toward it (not marked stuck).
+    if (driver.itinerary !== null) {
+      expect(driver.isMoveStuck).toBe(false);
+    } else {
+      expect(vehicle.x).toBe(4);
+      expect(vehicle.z).toBe(1);
+    }
+  });
+
   it('applies a non-final leg\'s onArrive step (board) on arrival and continues the itinerary to the next leg', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);

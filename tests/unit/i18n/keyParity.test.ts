@@ -325,8 +325,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // notification.order_blocked_no_vehicle, notification.order_blocked_no_driver,
     // notification.pip.blocked_orders_label, notification.pip.blocked_orders_tip —
     // both locales translated.
+    // Baseline is now 3500 (up from 3495): #1103's review-fix pass adds 5 keys
+    // for MoveTo.ts's error strings — move_to.employee_not_found,
+    // move_to.vehicle_not_found, move_to.vehicle_unavailable,
+    // move_to.no_route_to_vehicle, move_to.no_route_available — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3495);
+    expect(Object.keys(en).length).toBe(3500);
   });
 });
 

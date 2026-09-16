@@ -3493,5 +3493,10 @@
   "vehicle.scrap_success": "Véhicule #{id} mis à la casse. Valeur résiduelle : {value} $",
   "vehicle.break_usage": "Utilisation : vehicle break <vehicleId> fragment:<fragmentId>",
   "vehicle.break_success": "Véhicule #{id} fragmente le bloc #{fragmentId}.",
-  "vehicle.usage": "Utilisation : vehicle (list|buy|assign|move|driver|haul|scrap|break)"
+  "vehicle.usage": "Utilisation : vehicle (list|buy|assign|move|driver|haul|scrap|break)",
+  "move_to.employee_not_found": "Employé introuvable",
+  "move_to.vehicle_not_found": "Véhicule introuvable",
+  "move_to.vehicle_unavailable": "Véhicule indisponible",
+  "move_to.no_route_to_vehicle": "Aucun itinéraire vers le véhicule",
+  "move_to.no_route_available": "Aucun itinéraire disponible"
 }
