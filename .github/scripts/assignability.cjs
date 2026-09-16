@@ -436,7 +436,13 @@ async function strandedPauseVerdict(api, issue) {
   const labels = new Set(issue.labels || []);
   if (!labels.has(PAUSED)) return null;
 
-  const deps = await blockedByFor(api, issue);
+  // Callers only owe `{number, labels}` — the doc comment's contract — so the
+  // body a `Blocked by` section lives in is not guaranteed to be on `issue`
+  // itself. Fetch the full issue for `blockedByFor`'s body scan; the GitHub
+  // relationship source doesn't need it, but the body-declared side of the
+  // union silently read as empty without this fetch.
+  const full = (await api.getIssue(issue.number)) || issue;
+  const deps = await blockedByFor(api, full);
   if (deps.unknown) {
     return {
       stranded: true,

@@ -846,11 +846,12 @@ describe('detecting a stranded pause', () => {
     );
   });
 
-  // #1103's own shape, verbatim: the blocker's body cites the paused issue's
-  // number only to explain the relationship, and the indiscriminate `#\d+`
-  // scan in `parseDependencies` reads it as a declared dependency, producing
-  // a mutual cycle. `ready` is on the blocker here so this case is isolated
-  // from cause 1.
+  // A genuine mutual cycle, distinct from #1103's bug (a mention inside a
+  // `None` sentinel section, already hardened by the `parseDependencies`
+  // test above — that shape now parses to zero dependencies, so it cannot
+  // exercise this branch). Here the blocker's own `Blocked by` section
+  // plainly declares the paused issue back. `ready` is on the blocker here
+  // so this case is isolated from cause 1.
   it('is stranded when the dependency cycles back through its own body', async () => {
     const pausedNum = 1089;
     const blockerNum = 1090;
@@ -858,9 +859,7 @@ describe('detecting a stranded pause', () => {
       {
         number: blockerNum,
         labels: ['ready'],
-        body:
-          '## Blocked by\n\nNone — this is standalone debugging work. It is filed as a dependency of ' +
-          `#${pausedNum} only because the branch is shared.\n`,
+        body: `## Blocked by\n- #${pausedNum}\n`,
       },
       {
         number: pausedNum,
