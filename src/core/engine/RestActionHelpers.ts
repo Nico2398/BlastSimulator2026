@@ -205,6 +205,14 @@ export function beginRestWalk(emp: Employee, x: number, z: number): void {
 }
 
 /**
+ * Start emp travelling to (x, z) to rest, preserving mount continuity when
+ * possible. STUB — real behavior added by @implementer. See issue #1118.
+ */
+export function beginRestTravel(_state: GameState, _emp: Employee, _x: number, _z: number): void {
+  throw new Error('not implemented');
+}
+
+/**
  * True when `employee` has physically arrived at, and is actively ticking
  * down, an already-claimed action — the one stated soft-threshold contract
  * every need-driven rest path honors: finish the action already in progress
