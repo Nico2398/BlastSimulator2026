@@ -7,7 +7,7 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees } from '../entities/Employee.js';
-import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
@@ -275,7 +275,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
     return { totalTicks: cellsToTravelTicks(octileHeuristic(employee.x, employee.z, walkTarget.x, walkTarget.z), AGENT_WALK_SPEED) + workTicks };
   }
 
-  const path = findPath(state.navGrid, {
+  const path = findExactPath(state.navGrid, {
     agentId: employee.id,
     fromX: employee.x,
     fromZ: employee.z,

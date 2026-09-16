@@ -563,9 +563,20 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
  * clamp-to-grid-bounds behavior), for callers that need the request's exact
  * endpoint reached, not just "a path found" (#1109).
  */
-export function findExactPath(_grid: NavGrid, _request: PathRequest): PathResult {
-  // TODO: implement
-  throw new Error('not implemented');
+export function findExactPath(grid: NavGrid, request: PathRequest): PathResult {
+  const path = findPath(grid, request);
+  if (!path.found) return path;
+
+  // Same derivation findPath itself uses to turn request.toX/toZ into a
+  // target cell (clampToGrid floors and clamps into the grid's covered box),
+  // so this guard can never diverge from what findPath actually targeted.
+  const target = clampToGrid(grid, request.toX, request.toZ);
+  const last = path.waypoints[path.waypoints.length - 1];
+  if (!last || last.x !== target.x || last.z !== target.z) {
+    return { found: false, waypoints: [], totalCost: 0 };
+  }
+
+  return path;
 }
 
 function findOrdinaryPath(
