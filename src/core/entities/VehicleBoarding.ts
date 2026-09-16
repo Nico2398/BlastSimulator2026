@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Vehicle boarding request
 //
-// Shares its licence/availability validation with `assignDriver` (Vehicle.ts)
+// Shares its licence/availability validation with `Mount.board` (Mount.ts)
 // via `canAssignDriver`, but defers the actual driver assignment until the
 // employee has physically arrived at the vehicle, via ArrivalGate.ts. This
 // module only records the request/intent.
