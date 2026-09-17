@@ -1075,6 +1075,12 @@ describe('promoteActionToActive', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0); // has 'blasting'
 
     const action = makeAction({ id: 1, targetX: 5, targetZ: 7, requiredSkill: 'blasting' });
+    // #1093: promoteActionToActive's on-foot branch now routes through
+    // moveTo(state, employee.id, { actionId }), which resolves the goal by
+    // looking the action up in state.pendingActions by id (PlanItinerary.ts's
+    // resolveGoal) — mirroring claimPendingAction's own real-flow guarantee
+    // that an action promoted this way always already lives in the pool.
+    state.pendingActions.push(action);
 
     promoteActionToActive(state, employee, action);
 
@@ -1246,6 +1252,10 @@ describe('promoteActionToActive', () => {
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const action = makeAction({ id: 7, targetX: 5, targetZ: 7, requiredSkill: 'blasting' });
+    // #1093: see the other promoteActionToActive test's comment on this push
+    // — moveTo's { actionId } goal requires the action to already be in the
+    // pool, as it always is via claimPendingAction in real dispatch.
+    state.pendingActions.push(action);
 
     promoteActionToActive(state, employee, action);
 
@@ -1306,6 +1316,10 @@ describe('promoteActionToActive', () => {
     const action = makeAction({
       id: 9, type: 'place_building', targetX: 5, targetZ: 7, payload: { buildingType: 'living_quarters' },
     });
+    // #1093: see the first promoteActionToActive test's comment on this push
+    // — moveTo's { actionId } goal requires the action to already be in the
+    // pool, as it always is via claimPendingAction in real dispatch.
+    state.pendingActions.push(action);
 
     promoteActionToActive(state, employee, action);
 

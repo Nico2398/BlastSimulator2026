@@ -1,0 +1,177 @@
+{
+  "name": "vehicle-fast-transport",
+  "description": "Issue #1093 (mount/itinerary rebuild phase 7): a distant on-foot general_work order (requiredVehicleRole: null) is dispatched to a driller who also holds the driving.truck licence, with one free tier-1 debris hauler ($25,000, speed 3) parked near the driller's own spawn point. VEHICLE_TRANSPORT_PLANNING_ENABLED's planner comparison, wired through planItinerary (findCheapestTransportItinerary), has the driller board the hauler, ride most of the ~15-cell trip at speed 3 rather than walking the whole way at AGENT_WALK_SPEED (2), alight within TRANSPORT_ALIGHT_FINISH_WALK_CELLS of the target, and finish on foot -- driverBoardingCount (vehicleBoardingCount in the state dump) reads at least 1 by the time the order resolves, and the hauler releases cleanly (no reservation, no occupant) once it does.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32 cash:100000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:32 cash:100000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "employeeCount": 0,
+          "vehicleCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Spawns near world centre (~16,16) -- close to both the debris hauler bought below and far from the dispatched target on the map's east edge.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "description": "Grants the licence a debris hauler's driver seat requires (ROLE_LICENCE_REQUIRED.debris_hauler, gameplay-vehicle-fleet). No UI control hands out an exact licence for free -- the player-facing path is Driving Center training -- so this is a bootstrap primitive, same class as every other assign_skill step in the suite.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "increased": [
+          "qualificationCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "description": "Spawns near world centre too (purchaseVehicle's own grid-centre stagger, vehicle.ts) -- close enough to the driller for boarding to be cheap, and fast enough (speed 3, vs AGENT_WALK_SPEED 2) that riding most of the way to the far dispatch target below should beat walking it outright.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:31 z:16",
+      "description": "A far, plain on-foot order -- requiredVehicleRole: null, ~15 cells from the driller's own spawn point -- exactly the goal shape phase 7's planner comparison targets (gameplay-vehicle-fleet: 'For an on-foot action the planner may compare walking against [foot -> vehicle, board, drive, alight, foot -> target] and pick the cheaper'). No UI control drives this exact dispatch (employees.ts's own case comment), same bootstrap primitive nav-pathfinding-visual.json already uses.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:31 z:16"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:400",
+      "description": "Advances time until the dispatched order resolves (pendingActionCount drops back to 0, TaskLifecycleCore.ts's own splice-on-completion), rather than a hand-measured tick pad -- see dev-scenario-authoring's wait-on-a-condition rule. With findCheapestTransportItinerary wired into planItinerary, the driller rides the hauler for most of the trip and vehicleBoardingCount moves off its starting 0 by the time this step's own goal is checked.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "increased": [
+          "vehicleBoardingCount"
+        ],
+        "atMost": {
+          "vehicleBoardingCount": 2
+        },
+        "note": "vehicleBoardingCount (state.vehicles.driverBoardingCount) rising by at least 1 during this wait is the proof the driller actually boarded the free hauler rather than walking the whole ~15-cell trip -- the same field tutorial-boxcut-full.json's own atMost ceiling already uses for this purpose. atMost:2 bounds it: one board leg to reach the hauler, at most one more if an interruption ever forces a re-board, never the walk-the-whole-way zero this order takes today."
+      }
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe",
+      "description": "Once phase 7 lands, the hauler's own row should show it idle again -- no reservation, no driver -- released cleanly after the ride, mirroring vehicles.integration.test.ts's own post-arrival assertions for this same feature."
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 20,
+      "pitch": 60
+    }
+  ]
+}

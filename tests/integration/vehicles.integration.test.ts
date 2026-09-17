@@ -1990,3 +1990,152 @@ describe('dig_ramp_segment — starvation override on the timer-driven completio
     expectNoWorldInvariantViolations(ctx.state!);
   });
 });
+
+// ── #1093: fast transport un-gated (mount/itinerary rebuild phase 7) ──────
+//
+// A plain on-foot 'work' goal (requiredVehicleRole: null — general_work,
+// survey, etc.) is walked by default. Phase 7 wires
+// findCheapestTransportItinerary into planItinerary's own
+// `role === null && via === undefined` branch so a distant such goal compares
+// walking against riding a free, licensed vehicle for most of the trip,
+// alighting near the target and finishing on foot, and takes whichever is
+// cheaper. Drives the REAL production tick pipeline (tickCommand, same as
+// this file's own #986/#1130 describe blocks above) through an identical
+// setup with and without a free vehicle available, and compares how many
+// ticks each takes to arrive: with a free vehicle available, the ride beats
+// the walk outright and the driver boards at least once.
+
+describe('fast transport (#1093)', () => {
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /** A fully walkable flat NavGrid, wide enough for a genuinely distant on-foot order. */
+  function buildFlatCtx(width: number): GameContext {
+    const grid = new VoxelGrid(width, 2, 10);
+    for (let x = 0; x < width; x++) {
+      for (let z = 0; z < 10; z++) grid.setVoxel(x, 0, z, solidVoxel());
+    }
+    const state = createGame({ seed: 42 });
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.cash = 1_000_000;
+    return makeEmptyGameContext({ state, grid });
+  }
+
+  const FAR_TARGET_X = 50;
+  const FAR_TARGET_Z = 5;
+  const MAX_ARRIVAL_TICKS = 400;
+
+  /**
+   * Ticks `ctx` forward, asserting no world-invariant violation mid-ride,
+   * until `employee` both holds `action` as its active action and has
+   * genuinely arrived (taskTicksRemaining becomes non-null — the same
+   * "arrived" definition itinerary-equivalence.integration.test.ts's own
+   * measureItineraryEquivalence uses). Returns the tick count spent from
+   * claim to arrival, or throws if it never happens within the budget.
+   */
+  function runToArrival(ctx: GameContext, action: PendingAction, employee: Employee): number {
+    const state = ctx.state!;
+    let tickAtClaim: number | null = null;
+
+    for (let i = 0; i < MAX_ARRIVAL_TICKS; i++) {
+      tickCommand(ctx, ['1'], {});
+      expectNoWorldInvariantViolations(state);
+
+      if (tickAtClaim === null && employee.activeActionId === action.id) {
+        tickAtClaim = state.tickCount;
+      }
+      if (tickAtClaim !== null && employee.taskTicksRemaining !== null) {
+        return state.tickCount - tickAtClaim;
+      }
+    }
+
+    throw new Error(`employee never arrived at action ${action.id} within ${MAX_ARRIVAL_TICKS} ticks`);
+  }
+
+  /** Minimal plain on-foot PendingAction fixture — requiredVehicleRole: null, unlike this file's own vehicle-gated fixtures above. */
+  function makeFootAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: FAR_TARGET_X, targetZ: FAR_TARGET_Z, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: 0,
+      ...overrides,
+    };
+  }
+
+  it('a far on-foot order is reached in fewer ticks with a free debris hauler nearby than with no vehicle at all', () => {
+    // With a free hauler.
+    const ctxWithVehicle = buildFlatCtx(60);
+    const stateWithVehicle = ctxWithVehicle.state!;
+    const rngWith = new Random(42);
+    const { employee: employeeWith } = hireEmployee(stateWithVehicle.employees, 'driller', rngWith, 0, 5);
+    assignSkill(stateWithVehicle.employees, employeeWith.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    purchaseVehicle(stateWithVehicle.vehicles, 'debris_hauler', 3, 5);
+    const actionWith = makeFootAction({ id: 1 });
+    stateWithVehicle.pendingActions.push(actionWith);
+
+    const ticksWithVehicle = runToArrival(ctxWithVehicle, actionWith, employeeWith);
+
+    // Without any vehicle at all — identical setup, no purchaseVehicle call.
+    const ctxNoVehicle = buildFlatCtx(60);
+    const stateNoVehicle = ctxNoVehicle.state!;
+    const rngNo = new Random(42);
+    const { employee: employeeNo } = hireEmployee(stateNoVehicle.employees, 'driller', rngNo, 0, 5);
+    assignSkill(stateNoVehicle.employees, employeeNo.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const actionNo = makeFootAction({ id: 1 });
+    stateNoVehicle.pendingActions.push(actionNo);
+
+    const ticksNoVehicle = runToArrival(ctxNoVehicle, actionNo, employeeNo);
+
+    expect(
+      ticksWithVehicle,
+      `with a free hauler nearby (speed 3) the driller should ride most of a ${FAR_TARGET_X}-cell trip instead of walking it at AGENT_WALK_SPEED (2): ${ticksWithVehicle} ticks with vs ${ticksNoVehicle} without`,
+    ).toBeLessThan(ticksNoVehicle);
+  });
+
+  it('the hauler is released cleanly after arrival — no reservation, no occupant, no driver', () => {
+    const ctx = buildFlatCtx(60);
+    const state = ctx.state!;
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle: hauler } = purchaseVehicle(state.vehicles, 'debris_hauler', 3, 5);
+    const action = makeFootAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    runToArrival(ctx, action, employee);
+    // Run a little further so the action (and any drive leg still trailing behind it) genuinely completes.
+    for (let i = 0; i < 60; i++) {
+      tickCommand(ctx, ['1'], {});
+      expectNoWorldInvariantViolations(state);
+      if (!state.pendingActions.some(a => a.id === action.id)) break;
+    }
+
+    expect(vehicleDriverId(hauler)).toBeNull();
+    expect(hauler.reservedForActionId).toBeNull();
+    expect(hauler.occupantIds).toHaveLength(0);
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('boards the hauler at least once en route — proves the itinerary actually rode it rather than merely arriving no slower', () => {
+    const ctx = buildFlatCtx(60);
+    const state = ctx.state!;
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 3, 5);
+    const action = makeFootAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    const boardingCountBefore = state.vehicles.driverBoardingCount ?? 0;
+    runToArrival(ctx, action, employee);
+
+    expect(state.vehicles.driverBoardingCount ?? 0).toBeGreaterThan(boardingCountBefore);
+  });
+});

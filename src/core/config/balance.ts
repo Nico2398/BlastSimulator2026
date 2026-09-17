@@ -844,12 +844,21 @@ export const VEHICLE_SEAT_COUNT: Record<VehicleRole, number> = {
 
 /**
  * When true, planItinerary compares walking the full distance on foot
- * against riding a vehicle for goals that don't strictly require one, and
- * picks whichever is cheaper. Off in phase 3a — planItinerary only reads
- * this flag; the comparison itself lands in a later phase
- * (gameplay-vehicle-fleet phase 7, fast transport).
+ * against riding a free vehicle for goals that don't strictly require one,
+ * and picks whichever is cheaper. The comparison itself lives in
+ * PlanItinerary.ts (gameplay-vehicle-fleet phase 7, fast transport), scoped
+ * to `'work'` goals only — a driller riding a hauler to their next dig
+ * rather than walking, never a change to which vehicle an action requires.
  */
-export const VEHICLE_TRANSPORT_PLANNING_ENABLED = false;
+export const VEHICLE_TRANSPORT_PLANNING_ENABLED = true;
+
+/**
+ * Bounded estimate (grid cells) for the on-foot remainder after a transport
+ * ride alights adjacent to its target rather than exactly on it. Mirrors
+ * `buildBoardLeg`'s own convention of a fixed, deliberate approximation
+ * rather than a real remaining-distance calculation.
+ */
+export const TRANSPORT_ALIGHT_FINISH_WALK_CELLS = 1;
 
 // ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
 

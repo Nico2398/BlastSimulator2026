@@ -17,7 +17,7 @@ import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleDefByTier, type Vehic
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { computeActionWorkTicks } from '../../../src/core/engine/ActionSelection.js';
-import { planItinerary, estimateLegDistance } from '../../../src/core/engine/PlanItinerary.js';
+import { planItinerary, estimateLegDistance, findCheapestTransportItinerary, type ResolvedGoal } from '../../../src/core/engine/PlanItinerary.js';
 import type { Goal } from '../../../src/core/engine/Itinerary.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 import { octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
@@ -366,6 +366,177 @@ describe('planItinerary', () => {
     planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
 
     expect(state).toEqual(before);
+  });
+});
+
+// ── transport planning (phase 7, #1093) ─────────────────────────────────────
+// A non-vehicle-gated 'work' goal (requiredVehicleRole: null — general_work,
+// survey, etc.) plans a plain foot-only itinerary by default. Phase 7 wires
+// findCheapestTransportItinerary into planItinerary's own
+// `role === null && via === undefined` branch, so a distant such goal instead
+// compares walking against riding a free, licensed vehicle for most of the
+// trip and picks whichever is cheaper — never for a vehicle whose speed can't
+// beat AGENT_WALK_SPEED (rock_digger, speed 1), and never for
+// 'reposition'/'rest' goals, which carry no actionId for
+// findCheapestTransportItinerary to scope its comparison to.
+describe('transport planning (phase 7, #1093)', () => {
+  it('distant work goal with a free tier-1 debris hauler nearby: itinerary rides the hauler most of the way, alights near the target, finishes on foot, and beats walking outright', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, targetX: 20, targetZ: 0 }); // requiredVehicleRole defaults to null — a plain on-foot goal
+    state.pendingActions.push(action);
+    const goal: Goal = { kind: 'work', actionId: action.id };
+
+    const itinerary = planItinerary(state, employee, goal, 'exact');
+    expect(itinerary).not.toBeNull();
+
+    const driveLeg = itinerary!.legs.find(l => l.mode === 'drive');
+    expect(driveLeg, `expected a drive leg riding the free hauler; got legs: ${JSON.stringify(itinerary!.legs)}`).toBeDefined();
+    expect(driveLeg!.vehicleId).toBe(vehicle.id);
+    // Fixed post-#1093 landing (buildings.integration.test.ts's #1000
+    // starved-backlog regression): the drive leg now targets a real,
+    // computed alight WAYPOINT with `arrival: 'exact'`, not the goal's own
+    // target under a loose `arrival: 'adjacent'` tolerance. 'adjacent'
+    // accepts distance <= 1 — including 0 — so a single fast tick could (and
+    // did) overshoot straight onto the target cell itself; for a
+    // `place_building` goal that cell becomes permanently NavGrid-blocked
+    // the instant construction completes, stranding a vehicle parked there
+    // for good (see PlanItinerary.ts's `resolveRideAlightPoint`/
+    // `targetBecomesBlocked` doc comments).
+    expect(driveLeg!.arrival).toBe('exact');
+    expect(driveLeg!.onArrive).toEqual({ kind: 'alight', releaseVehicleForActionId: action.id });
+
+    // Trailing foot leg finishes the last stretch into the exact target.
+    const lastLeg = itinerary!.legs[itinerary!.legs.length - 1]!;
+    expect(lastLeg.mode).toBe('foot');
+    expect(lastLeg.arrival).toBe('exact');
+    expect(lastLeg.destX).toBe(action.targetX);
+    expect(lastLeg.destZ).toBe(action.targetZ);
+
+    // Foot-only baseline for the identical goal/position: same setup, minus the vehicle.
+    const footState = makeState();
+    const footEmployee = hireLicensedDriller(footState, 'debris_hauler', 0, 0);
+    const footAction = makeAction({ id: 1, targetX: 20, targetZ: 0 });
+    footState.pendingActions.push(footAction);
+    const footItinerary = planItinerary(footState, footEmployee, { kind: 'work', actionId: footAction.id }, 'exact');
+    expect(footItinerary).not.toBeNull();
+    expect(footItinerary!.legs.every(l => l.mode === 'foot')).toBe(true);
+
+    expect(itinerary!.estTotalTicks).toBeLessThan(footItinerary!.estTotalTicks);
+  });
+
+  it('same goal, only a free rock digger available (speed 1): stays foot-only — a digger never beats walking speed 2', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'rock_digger', 0, 0);
+    purchaseVehicle(state.vehicles, 'rock_digger', 2, 0);
+    const action = makeAction({ id: 1, targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs.some(l => l.mode === 'drive')).toBe(false);
+    expect(itinerary!.legs.every(l => l.mode === 'foot')).toBe(true);
+  });
+
+  it('same goal, no free vehicle at all: foot-only itinerary, identical to today\'s behavior', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    // No purchaseVehicle call — the fleet is empty.
+    const action = makeAction({ id: 1, targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it('purity: neither planItinerary nor findCheapestTransportItinerary reserves the candidate vehicle as a side effect of merely planning', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+    const goal: Goal = { kind: 'work', actionId: action.id };
+
+    const beforePlan = structuredClone(state);
+    planItinerary(state, employee, goal, 'exact');
+    expect(state).toEqual(beforePlan);
+    expect(vehicle.reservedForActionId).toBeNull();
+
+    const resolved: ResolvedGoal = {
+      targetX: action.targetX,
+      targetZ: action.targetZ,
+      requiredVehicleRole: null,
+      workTicks: computeActionWorkTicks(state, employee, action),
+      actionId: action.id,
+    };
+    const footDist = estimateLegDistance(state, 'exact', employee.id, employee.x, employee.z, action.targetX, action.targetZ, true)!;
+    const footCost = footDist / AGENT_WALK_SPEED;
+
+    const beforeFindCheapest = structuredClone(state);
+    findCheapestTransportItinerary(state, employee, goal, 'exact', resolved, footCost);
+    expect(state).toEqual(beforeFindCheapest);
+    expect(vehicle.reservedForActionId).toBeNull();
+  });
+
+  it("'reposition' goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+
+    const goal: Goal = { kind: 'reposition', x: 20, z: 0 };
+    const itinerary = planItinerary(state, employee, goal, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it("'rest' goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const { success, building } = placeBuilding(state.buildings, 'living_quarters', 20, 0, 100, 100);
+    expect(success).toBe(true);
+
+    const goal: Goal = { kind: 'rest', buildingId: building!.id };
+    const itinerary = planItinerary(state, employee, goal, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it("'place_building' work goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby that would otherwise ride cheaper (targetBecomesBlocked exclusion)", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, type: 'place_building', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it("'level_ground' work goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby that would otherwise ride cheaper (targetBecomesBlocked exclusion)", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, type: 'level_ground', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
   });
 });
 

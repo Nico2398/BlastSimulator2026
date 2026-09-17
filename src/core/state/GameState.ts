@@ -141,6 +141,19 @@ export type ActionType =
   | 'general_work';
 
 /**
+ * True for the two action types whose own target cell(s) stop being walkable
+ * once the action completes — `place_building` (the footprint goes
+ * permanently NavGrid-blocked) and `level_ground` (actively carved out from
+ * under whoever's standing there). Shared by `TaskDispatch.ts` (which of
+ * these two carries a ghost-preview footprint) and `PlanItinerary.ts`'s
+ * `targetBecomesBlocked` (which of these two a transport ride must never
+ * alight on) — one discriminant, checked in one place.
+ */
+export function isFootprintAction(type: ActionType): boolean {
+  return type === 'place_building' || type === 'level_ground';
+}
+
+/**
  * Lifecycle status of a PendingAction — 'queued' (waiting, unclaimed),
  * 'assigned' (claimed by an employee still walking to the target), or
  * 'in_progress' (the employee has arrived and is executing it). The record
