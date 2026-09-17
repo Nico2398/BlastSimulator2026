@@ -1052,4 +1052,66 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
     const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
     expect(netProfit).toBeGreaterThanOrEqual(level.unlockThreshold);
   }, 120_000);
+
+  // #1130: windDownOnceExhausted's crew-size gate was generalized from a
+  // strict "exactly one employee total" to a form that also tolerates a
+  // permanently-unionized non-driver straggler the sell-ore layoff loop
+  // could never have fired in the first place (fireEmployee always refuses
+  // a unionized employee). The full playthrough above never actually
+  // distinguishes the two guards -- stagnantTicks never reaches the 300-tick
+  // threshold either way on that run -- so this drives the exact fixture
+  // the generalization exists for directly, with no dependency on reaching
+  // that stretch of a 4000-tick playthrough.
+  it('windDownOnceExhausted generalized crew-size guard fires the deeper teardown for a driver + permanently-unionized straggler + one vehicle, where the old strict guard would not (#1130)', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('campaign start level:tutorial_pit').success).toBe(true);
+    const state = ctx.state!;
+
+    // Build the exact fixture the generalized guard is meant to tolerate:
+    // one driver (ordinarily fireable) + one non-driver who is permanently
+    // unionized (fireEmployee always refuses them, so no layoff loop could
+    // ever get the roster down to 1 the old guard's way) + one vehicle.
+    expect(run('employee hire role:driver').success).toBe(true);
+    expect(run('employee hire role:surveyor').success).toBe(true);
+    expect(run('vehicle buy debris_hauler').success).toBe(true);
+
+    const driver = state.employees.employees.find((e) => e.role === 'driver');
+    const straggler = state.employees.employees.find((e) => e.role !== 'driver');
+    expect(driver, 'fixture setup: no driver on the roster').toBeDefined();
+    expect(straggler, 'fixture setup: no non-driver on the roster').toBeDefined();
+    driver!.unionized = false;
+    straggler!.unionized = true;
+
+    expect(state.employees.employees.length).toBe(2);
+    expect(state.vehicles.vehicles.length).toBe(1);
+
+    // The old strict guard (pre-#1130): `state.employees.employees.length
+    // !== 1`. With 2 employees on this fixture's roster, that condition is
+    // true, so the old code returns immediately on every call, before ever
+    // touching `stagnation` -- it would never reach, let alone cross, the
+    // 300-tick threshold below, no matter how long the state stayed
+    // stagnant. Proves this fixture actually distinguishes the two guards,
+    // rather than happening to satisfy both.
+    const oldStrictGuardWouldSkip = state.employees.employees.length !== 1;
+    expect(oldStrictGuardWouldSkip).toBe(true);
+
+    // Drive windDownOnceExhausted directly, well past its 300-tick
+    // threshold, with storedMassKg/completedHistory held fixed (no ticking
+    // at all) so every call after the first sees genuine stagnation. Call 1
+    // only seeds the tracker's baseline (its -1 sentinels never match the
+    // real values, so it resets stagnantTicks to 0 and returns); calls 2-301
+    // walk stagnantTicks from 0 up through the 300 threshold.
+    const stagnation: StagnationTracker = { lastStoredMassKg: -1, lastCompletedCount: -1, stagnantTicks: 0 };
+    for (let i = 0; i < 301; i++) windDownOnceExhausted(run, state, stagnation);
+
+    // The deeper teardown fired under the new, generalized guard: the
+    // driver (not unionized) got fired, the permanently-unionized straggler
+    // stayed (fireEmployee refuses them -- exactly why the old strict guard
+    // could never have driven this crew down to 1 on its own), and the
+    // single vehicle got scrapped.
+    expect(state.employees.employees.map((e) => e.id)).toEqual([straggler!.id]);
+    expect(state.vehicles.vehicles.length).toBe(0);
+  });
 });

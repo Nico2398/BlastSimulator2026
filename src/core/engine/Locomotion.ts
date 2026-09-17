@@ -231,8 +231,6 @@ function clearItineraryOnFailure(emp: Employee): void {
  * advanced, or a leg/itinerary that failed and was cleared.
  */
 function advanceItinerary(state: GameState, emp: Employee, result: LocomotionResult, emitter?: EventEmitter): void {
-  let moved = false;
-
   for (;;) {
     const itinerary = emp.itinerary;
     if (itinerary === null) break;
@@ -246,8 +244,13 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     const leg = itinerary.legs[0]!;
 
     if (!isLegArrived(emp.x, emp.z, leg)) {
+      // advanceLeg itself records emp.id (and, for a drive leg, the
+      // vehicle's id) into result.moved whenever the position genuinely
+      // advanced this tick — independent of whether the tick also returns
+      // 'blocked' via the isStuck-abandon branch below. "Position moved"
+      // and "action got abandoned" are independent outcomes of the same
+      // tick; do not fold them back into one boolean here.
       const outcome = advanceLeg(state, emp, leg, result, emitter);
-      if (outcome === 'moved') moved = true;
       if (outcome === 'aborted') {
         clearItineraryOnFailure(emp);
         break;
@@ -279,8 +282,6 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     }
     // Continue the loop for the next leg — may complete this same tick.
   }
-
-  if (moved) result.moved.push(emp.id);
 }
 
 type LegMoveOutcome = 'moved' | 'blocked' | 'aborted';
@@ -314,7 +315,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   if (isDrive && state.navGrid && path.found) {
     const nextStep = nextGridStep(emp.x, emp.z, path.waypoints);
     if (nextStep && isOccupiedByOtherVehicle(state, vehicle!.id, nextStep.x, nextStep.z)) {
-      return handleOccupancyBlock(state, emp, vehicle!, leg, emitter);
+      return handleOccupancyBlock(state, emp, vehicle!, leg, result, emitter);
     }
   }
 
@@ -348,6 +349,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     emp.x = outcome.x;
     emp.z = outcome.z;
     if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
+
+    // Position genuinely advanced this tick — record it regardless of
+    // whether the isStuck-abandon branch below also fires (an oscillating
+    // tick can be both "moved" and "abandoned" at once; they're independent).
+    result.moved.push(emp.id);
+    if (isDrive) result.moved.push(vehicle!.id);
   }
 
   if (!outcome.pathFound || outcome.isStuck) {
@@ -407,7 +414,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
  * finally escalating the employee (not the vehicle) to stuck, once, on the
  * rising edge. Absorbed from the old VehicleOccupancyReroute.ts.
  */
-function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, emitter?: EventEmitter): LegMoveOutcome {
+function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
   emp.vehicleWaitingTicks++;
   vehicle.waitingTicks = emp.vehicleWaitingTicks;
@@ -454,6 +461,8 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     emp.x = outcome.x;
     emp.z = outcome.z;
     writeVehiclePosition(state, vehicle, outcome.x, outcome.z, leg);
+    result.moved.push(emp.id);
+    result.moved.push(vehicle.id);
     return 'moved';
   }
 
