@@ -795,6 +795,96 @@ describe('findPath — multi-level routing', () => {
     expect(picks.every(x => x === picks[0])).toBe(true);
   });
 
+  // ── #1129: single-level analogue — deterministic route choice under a
+  // near-tied detour, with no bench-level/ramp involved at all. ──
+  //
+  // #1129's root cause is two DIFFERENT (near-adjacent, one-tick-apart)
+  // start points producing differently-shaped but cost-consistent routes —
+  // which AgentAdvance's RouteCommitment guards against across ticks (see
+  // tests/unit/nav/AgentAdvance.test.ts). At this layer, stateless per call,
+  // the guarantee findPath itself can make is narrower: the SAME request
+  // (same start, same goal) must always resolve to the SAME route, never
+  // flip-flopping between two equal-cost detours depending on incidental
+  // heap/exploration order. This is the single-level version of the
+  // ramp-tie-break test above — a wall with two symmetric gaps, blocked
+  // cells only (no ramp, no bench-level change), midpoint start exactly
+  // equidistant from both gaps.
+  it('picks the same detour gap consistently across repeated calls from a tied start, with no ramp/bench-level involved', () => {
+    const width = 21;
+    const height = 3;
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        // A single-level wall along z=1, gaps at x=8 and x=12 — everything
+        // stays benchLevel 0 throughout, so ordinary A* detours around the
+        // wall rather than findMultiLevelPath's ramp search ever engaging.
+        if (z === 1 && x !== 8 && x !== 12) {
+          row.push(makeCell('blocked', 0));
+        } else {
+          row.push(makeCell('walkable', 0));
+        }
+      }
+      cells.push(row);
+    }
+    const grid = new NavGrid(width, height, cells);
+
+    // The midpoint (x=10) is exactly equidistant from both gaps by the
+    // octile metric — cost to either is tied. A deterministic tie-break
+    // must resolve to the same gap on every call, not depend on heap-
+    // insertion or map-iteration order.
+    const gapXFromTiedStart = (): number | undefined => {
+      const result = findPath(grid, { agentId: 1, fromX: 10, fromZ: 0, toX: 10, toZ: 2, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      const gapWp = result.waypoints.find(wp => wp.z === 1);
+      return gapWp?.x;
+    };
+
+    const picks = Array.from({ length: 5 }, () => gapXFromTiedStart());
+    expect(picks[0]).toBeDefined();
+    expect(picks.every(x => x === picks[0])).toBe(true);
+  });
+
+  // ── #1129: regression fixture pinning the reported real cost numbers ──
+  //
+  // The oscillation was confirmed live with routes costing 9.657 and 7.657 —
+  // a difference of exactly one tick's walk distance at AGENT_WALK_SPEED (2),
+  // not a raw tie. This grid reproduces that same cost relationship between
+  // two near-adjacent start columns, one tick's walk apart, toward the same
+  // goal: pathfinding's own contract (determinism per fixed request) must
+  // still hold for each of them individually, even though the two starts'
+  // routes are free to differ from EACH OTHER in shape — the cross-tick
+  // guard that stops that difference from producing a walk-back is
+  // AgentAdvance's job, not this layer's (see AgentAdvance.test.ts's core
+  // regression case, built on this same grid shape).
+  it('resolves deterministically per start, for two near-adjacent starts whose costs differ by exactly one tick\'s walk distance', () => {
+    const grid = makeFlatGrid(30, 30, 'walkable');
+    const goal = { toX: 22, toZ: 24, agentId: 1, avoidVehicles: false } as const;
+
+    // A is one tick's walk (AGENT_WALK_SPEED=2) closer to the goal (z=24)
+    // than B — matching tick 1 -> tick 2 of AgentAdvance.test.ts's core
+    // regression case, where the agent walks from A's position to B's.
+    const fromA = { ...goal, fromX: 24, fromZ: 20 };
+    const fromB = { ...goal, fromX: 24, fromZ: 18 };
+
+    const resultsA = Array.from({ length: 3 }, () => findPath(grid, fromA));
+    const resultsB = Array.from({ length: 3 }, () => findPath(grid, fromB));
+
+    expect(resultsA.every(r => r.found)).toBe(true);
+    expect(resultsB.every(r => r.found)).toBe(true);
+    // Same request in, same route out — every repeat call from A agrees with
+    // the first, and likewise for B.
+    expect(resultsA.every(r => r.totalCost === resultsA[0]!.totalCost)).toBe(true);
+    expect(resultsA.every(r => JSON.stringify(r.waypoints) === JSON.stringify(resultsA[0]!.waypoints))).toBe(true);
+    expect(resultsB.every(r => r.totalCost === resultsB[0]!.totalCost)).toBe(true);
+    expect(resultsB.every(r => JSON.stringify(r.waypoints) === JSON.stringify(resultsB[0]!.waypoints))).toBe(true);
+    // B starts exactly one tick's walk distance FARTHER from the goal than A
+    // along a straight line on an open flat grid (z=18 vs z=20, goal z=24),
+    // so its optimal cost is exactly AGENT_WALK_SPEED (2) more than A's —
+    // the same cost relationship the real 9.657/7.657 pair carries.
+    expect(resultsB[0]!.totalCost - resultsA[0]!.totalCost).toBeCloseTo(2, 5);
+  });
+
   it('includes the ramp cell in the waypoints of a multi-level path', () => {
     // 10×10 grid with void wall and single ramp
     const grid = makeTwoLevelGrid(10, 10, 4);

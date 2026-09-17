@@ -1082,7 +1082,7 @@ describe('interruptActiveAction (#549)', () => {
     // Reproduces the #954 livelock shape: plain octile straight-line distance
     // judges `closer` as nearer to the target, but a fragment wall spans the
     // ENTIRE width of the grid at z=10, fully partitioning `closer`'s side
-    // from the target — walkingDistanceEstimate's findPath call reports
+    // from the target — hasCloserIdleCandidate's estimateLegDistance call reports
     // `found: false` for `closer`, scoring Infinity, never merely "worse".
     // `emp` (nominally farther) has a clear, short real route on the far
     // side of the wall, so its own finite distance beats closer's Infinity
@@ -1137,7 +1137,7 @@ describe('interruptActiveAction (#549)', () => {
     // Companion to the Infinity-branch test above: this time the fragment
     // wall leaves a gap, so `closer`'s real route around it RESOLVES — it's
     // not unreachable, just longer than a straight line would suggest, and
-    // longer than `emp`'s own clear route. walkingDistanceEstimate must
+    // longer than `emp`'s own clear route. hasCloserIdleCandidate must
     // still prefer `emp`'s finite-and-shorter real distance over `closer`'s
     // finite-but-longer one; before the #954 fix (octileHeuristic-only
     // ranking), straight-line distance alone would have released the pin to

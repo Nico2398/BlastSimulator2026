@@ -142,7 +142,6 @@
     "src/core/mining/SoftwarePreview.ts:getHoleSurfaceYs",
     "src/core/mining/Survey.ts:PerformSurveyResult",
     "src/core/mining/Tubing.ts:TubingResult",
-    "src/core/nav/AgentAdvance.ts:AgentPath",
     "src/core/scores/ScoreManager.ts:ScoreId",
     "src/core/state/EventEmitter.ts:GameEventMap",
     "src/core/state/GameState.ts:WorldState",

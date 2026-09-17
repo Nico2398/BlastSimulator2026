@@ -14,7 +14,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
-import { advanceAlongPath } from '../nav/AgentAdvance.js';
+import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
@@ -29,6 +29,44 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
 import { dismountVehicleDriver } from './VehicleReservation.js';
+
+/** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
+function readCommitted(emp: Employee): RouteCommitment {
+  return {
+    waypointX: emp.committedWaypointX ?? null,
+    waypointZ: emp.committedWaypointZ ?? null,
+    destX: emp.committedDestX ?? null,
+    destZ: emp.committedDestZ ?? null,
+    remainingCost: emp.committedRemainingCost ?? null,
+    fromX: emp.committedFromX ?? null,
+    fromZ: emp.committedFromZ ?? null,
+  };
+}
+
+/** Writes an `advanceAlongPath` outcome's route-commitment (#1129) back onto `emp` for next tick. */
+function writeCommitted(emp: Employee, committed: RouteCommitment): void {
+  emp.committedWaypointX = committed.waypointX;
+  emp.committedWaypointZ = committed.waypointZ;
+  emp.committedDestX = committed.destX;
+  emp.committedDestZ = committed.destZ;
+  emp.committedRemainingCost = committed.remainingCost;
+  emp.committedFromX = committed.fromX ?? null;
+  emp.committedFromZ = committed.fromZ ?? null;
+}
+
+/** Reads `emp`'s carried move-history shift-register (#1130) into the shape `advanceAlongPath` takes. */
+function readMoveHistory(emp: Employee): { moveHistoryX: number | null; moveHistoryZ: number | null } {
+  return {
+    moveHistoryX: emp.moveHistoryX ?? null,
+    moveHistoryZ: emp.moveHistoryZ ?? null,
+  };
+}
+
+/** Writes an `advanceAlongPath` outcome's move-history fields (#1130) back onto `emp` for next tick. */
+function writeMoveHistory(emp: Employee, moveHistoryX: number | null, moveHistoryZ: number | null): void {
+  emp.moveHistoryX = moveHistoryX;
+  emp.moveHistoryZ = moveHistoryZ;
+}
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
 interface LocomotionResult {
@@ -78,10 +116,12 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     return;
   }
 
+  const avoidVehicles = !isDestinationOccupied(state, destX, destZ);
+
   const path = state.navGrid
     ? findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ,
-        avoidVehicles: !isDestinationOccupied(state, destX, destZ),
+        avoidVehicles,
       })
     : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: destX, z: destZ }] };
 
@@ -89,13 +129,17 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     x: emp.x, z: emp.z, walkSpeed: AGENT_WALK_SPEED,
     destinationX: destX, destinationZ: destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
+    committed: readCommitted(emp),
+    ...readMoveHistory(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
+  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
 
-  if (!outcome.pathFound) {
+  if (!outcome.pathFound || outcome.isStuck) {
     if (emp.isMoveStuck) {
       if (outcome.becameStuck) {
         result.stuck.push(emp.id);
@@ -110,7 +154,7 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
         emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
       }
     }
-    return;
+    if (!outcome.pathFound) return;
   }
 
   emp.x = outcome.x;
@@ -151,8 +195,6 @@ function clearItineraryOnFailure(emp: Employee): void {
  * advanced, or a leg/itinerary that failed and was cleared.
  */
 function advanceItinerary(state: GameState, emp: Employee, result: LocomotionResult, emitter?: EventEmitter): void {
-  let moved = false;
-
   for (;;) {
     const itinerary = emp.itinerary;
     if (itinerary === null) break;
@@ -166,8 +208,13 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     const leg = itinerary.legs[0]!;
 
     if (!isLegArrived(emp.x, emp.z, leg)) {
+      // advanceLeg itself records emp.id (and, for a drive leg, the
+      // vehicle's id) into result.moved whenever the position genuinely
+      // advanced this tick — independent of whether the tick also returns
+      // 'blocked' via the isStuck-abandon branch below. "Position moved"
+      // and "action got abandoned" are independent outcomes of the same
+      // tick; do not fold them back into one boolean here.
       const outcome = advanceLeg(state, emp, leg, result, emitter);
-      if (outcome === 'moved') moved = true;
       if (outcome === 'aborted') {
         clearItineraryOnFailure(emp);
         break;
@@ -199,8 +246,6 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     }
     // Continue the loop for the next leg — may complete this same tick.
   }
-
-  if (moved) result.moved.push(emp.id);
 }
 
 type LegMoveOutcome = 'moved' | 'blocked' | 'aborted';
@@ -234,7 +279,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   if (isDrive && state.navGrid && path.found) {
     const nextStep = nextGridStep(emp.x, emp.z, path.waypoints);
     if (nextStep && isOccupiedByOtherVehicle(state, vehicle!.id, nextStep.x, nextStep.z)) {
-      return handleOccupancyBlock(state, emp, vehicle!, leg, emitter);
+      return handleOccupancyBlock(state, emp, vehicle!, leg, result, emitter);
     }
   }
 
@@ -242,17 +287,41 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     x: emp.x, z: emp.z, walkSpeed: speed,
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
+    committed: readCommitted(emp),
+    ...readMoveHistory(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
+  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
   if (isDrive) {
     vehicle!.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle!.isMoveStuck = outcome.isStuck;
   }
 
-  if (!outcome.pathFound) {
+  // Position/waitingTicks only advance on a genuinely found path — a period-2
+  // oscillation (outcome.isStuck true, pathFound still true) really did walk
+  // this tick, just back to where it stood 2 ticks ago, so this still counts
+  // as the entity's real position; only the abandon check below additionally
+  // fires on it.
+  if (outcome.pathFound) {
+    emp.vehicleWaitingTicks = 0;
+    if (isDrive) vehicle!.waitingTicks = 0;
+
+    emp.x = outcome.x;
+    emp.z = outcome.z;
+    if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
+
+    // Position genuinely advanced this tick — record it regardless of
+    // whether the isStuck-abandon branch below also fires (an oscillating
+    // tick can be both "moved" and "abandoned" at once; they're independent).
+    result.moved.push(emp.id);
+    if (isDrive) result.moved.push(vehicle!.id);
+  }
+
+  if (!outcome.pathFound || outcome.isStuck) {
     if (outcome.becameStuck) emitter?.emit('agent:stuck', { employeeId: emp.id });
     emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
 
@@ -296,13 +365,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     return 'blocked';
   }
 
-  emp.vehicleWaitingTicks = 0;
-  if (isDrive) vehicle!.waitingTicks = 0;
-
-  emp.x = outcome.x;
-  emp.z = outcome.z;
-  if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
-
   return 'moved';
 }
 
@@ -316,7 +378,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
  * finally escalating the employee (not the vehicle) to stuck, once, on the
  * rising edge. Absorbed from the old VehicleOccupancyReroute.ts.
  */
-function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, emitter?: EventEmitter): LegMoveOutcome {
+function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
   emp.vehicleWaitingTicks++;
   vehicle.waitingTicks = emp.vehicleWaitingTicks;
@@ -332,11 +394,22 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
       destinationX: leg.destX, destinationZ: leg.destZ,
       consecutiveFailures: 0, isStuck: false,
       path: reroute,
+      // A reroute is trusted immediately — never compared against a stale
+      // main-route commitment from before the occupancy block, and never
+      // against pre-reroute move history either (the same reasoning as
+      // `committed` above): a rerouted hop is a different route from a
+      // different resolved target, so a coincidental match against where the
+      // agent stood 2 ticks before the reroute is not an oscillation.
+      committed: NULL_ROUTE_COMMITMENT,
+      moveHistoryX: null,
+      moveHistoryZ: null,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
     emp.isMoveStuck = false;
     emp.vehicleWaitingTicks = 0;
+    writeCommitted(emp, outcome.committed);
+    writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
     vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle.isMoveStuck = false;
     vehicle.waitingTicks = 0;
@@ -352,6 +425,8 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     emp.x = outcome.x;
     emp.z = outcome.z;
     writeVehiclePosition(state, vehicle, outcome.x, outcome.z, leg);
+    result.moved.push(emp.id);
+    result.moved.push(vehicle.id);
     return 'moved';
   }
 

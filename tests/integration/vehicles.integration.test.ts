@@ -15,9 +15,10 @@ import {
   getVehicleDef,
   getVehicleDefByTier,
   getAllVehicleRoles,
+  ROLE_LICENCE_REQUIRED,
 } from '../../src/core/entities/Vehicle.js';
 import type { VehicleTask } from '../../src/core/entities/Vehicle.js';
-import { board } from '../../src/core/engine/Mount.js';
+import { board, alight } from '../../src/core/engine/Mount.js';
 import {
   hireEmployee,
   assignSkill,
@@ -41,6 +42,7 @@ import {
   WORK_DURATION_TICKS,
   MOVE_STUCK_ABANDON_TICKS,
   ACTION_STARVATION_TICK_THRESHOLD,
+  ACTION_STUCK_BACKOFF_TICKS,
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { createGame } from '../../src/core/state/GameState.js';
@@ -1623,6 +1625,156 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
 
     expect(arrived).toBe(true);
     expect(vehicle.isMoveStuck).toBe(false);
+    expectNoWorldInvariantViolations(state);
+  });
+});
+
+// ── #1130: dispatch backoff after a vehicle abandons a stuck action ───────
+//
+// interruptActiveAction(..., { forceOpenPool: true }) is the exact call
+// Locomotion.ts's own abandon-after-stuck path makes (see its own header
+// comment on options.forceOpenPool, and the #986 describe block above, which
+// exercises that abandon happening for real via sustained unreachability).
+// This describe block drives the SAME real call directly — mirroring this
+// file's own established "interruptActiveAction is used directly...
+// mirroring VehicleReservation.test.ts's own pattern of driving the real
+// call chain" convention (see this file's header comment above) — to isolate
+// the DISPATCH side of #1130: once an action is released this way, the full
+// tickCommand pipeline's own automatic claim step must not hand the
+// identical action straight back to the same now-idle vehicle before
+// ACTION_STUCK_BACKOFF_TICKS ticks have passed.
+
+describe('vehicle-gated stuck-abandon dispatch backoff (#1130)', () => {
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /** A fully walkable flat NavGrid, wide enough for a short reachable drive. */
+  function buildFlatCtx(): GameContext {
+    const grid = new VoxelGrid(20, 2, 10);
+    for (let x = 0; x < 20; x++) {
+      for (let z = 0; z < 10; z++) grid.setVoxel(x, 0, z, solidVoxel());
+    }
+    const state = createGame({ seed: 42 });
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.cash = 1_000_000;
+    return makeEmptyGameContext({ state, grid });
+  }
+
+  /** Minimal vehicle-gated PendingAction fixture, mirrors this file's own #986 helper. */
+  function makeHaulAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 15, targetZ: 5, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: overrides.queuedAtTick ?? 0,
+      ...overrides,
+    };
+  }
+
+  it('a lone vehicle does not reclaim the identical action it just abandoned as stuck on the very next tick — it goes idle, then reclaims it once ACTION_STUCK_BACKOFF_TICKS have passed with nothing else around', () => {
+    const ctx = buildFlatCtx();
+    const state = ctx.state!;
+    const rng = new Random(42);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
+
+    const action = makeHaulAction({ id: 7001, holderId: driver.id, status: 'assigned' });
+    state.pendingActions.push(action);
+    vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    vehicle.reservedForActionId = action.id;
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.activeActionId = action.id;
+
+    const abandonTick = state.tickCount;
+    // The exact call Locomotion.ts's own abandon-after-stuck path makes.
+    interruptActiveAction(state, driver, action.id, { forceOpenPool: true });
+    // Mirrors that same call site's own dismount, so the vehicle is genuinely
+    // idle and eligible for redispatch rather than still mounted mid-drive.
+    alight(state, vehicle.id);
+    vehicle.task = 'idle';
+    vehicle.state = 'idle';
+
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(action.stuckBackoffUntilTick).toBe(abandonTick + ACTION_STUCK_BACKOFF_TICKS);
+    expect(driver.activeActionId).toBeNull();
+
+    // The very next tick: still backed off, still idle, action still unclaimed.
+    tickCommand(ctx, ['1'], {});
+    expect(action.holderId).toBeNull();
+    expect(action.status).toBe('queued');
+    expect(driver.activeActionId).toBeNull();
+
+    // Through the rest of the backoff window: never reclaimed early.
+    for (let i = state.tickCount; i < abandonTick + ACTION_STUCK_BACKOFF_TICKS - 1; i++) {
+      tickCommand(ctx, ['1'], {});
+      expect(action.holderId).toBeNull();
+    }
+
+    // Once the window has fully elapsed, with no other candidate at all on
+    // the roster, the lone vehicle reclaims the very same action.
+    let reclaimedAtTick = -1;
+    for (let i = 0; i < 5; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (action.holderId === driver.id) {
+        reclaimedAtTick = state.tickCount;
+        break;
+      }
+    }
+
+    expect(reclaimedAtTick).toBeGreaterThanOrEqual(abandonTick + ACTION_STUCK_BACKOFF_TICKS);
+    expect(action.status).not.toBe('queued');
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('a different, unrelated action is unaffected by another action\'s backoff, and remains claimable immediately', () => {
+    const ctx = buildFlatCtx();
+    const state = ctx.state!;
+    const rng = new Random(42);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
+
+    // Deliberately the geometrically CHEAPER target (closer to the driver's
+    // own position than `unrelated` below) — without the backoff filter,
+    // cost ranking alone would pick this one right back, masking the very
+    // bug this test exists to catch.
+    const backedOff = makeHaulAction({ id: 7002, holderId: driver.id, status: 'assigned', targetX: 2, targetZ: 5 });
+    state.pendingActions.push(backedOff);
+    vehicle.driverId = driver.id;
+    vehicle.occupantIds = [driver.id];
+    vehicle.reservedForActionId = backedOff.id;
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.activeActionId = backedOff.id;
+
+    interruptActiveAction(state, driver, backedOff.id, { forceOpenPool: true });
+    alight(state, vehicle.id);
+    vehicle.task = 'idle';
+    vehicle.state = 'idle';
+    expect(backedOff.stuckBackoffUntilTick).not.toBeNull();
+
+    // A second, unrelated, farther-and-so-costlier action — different
+    // target, never touched by the interruption above — pushed onto the
+    // SAME pool the idle driver/vehicle will scan next tick.
+    const unrelated = makeHaulAction({ id: 7003, targetX: 15, targetZ: 5 });
+    state.pendingActions.push(unrelated);
+
+    tickCommand(ctx, ['1'], {});
+
+    // Claimed immediately — the OTHER action's backoff never touches it.
+    expect(unrelated.holderId).toBe(driver.id);
+    expect(unrelated.status).not.toBe('queued');
+    // The backed-off action, meanwhile, is still untouched.
+    expect(backedOff.holderId).toBeNull();
+    expect(backedOff.status).toBe('queued');
     expectNoWorldInvariantViolations(state);
   });
 });

@@ -13,7 +13,7 @@ import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
   isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
-  canReleaseStrandedVehicleGatedAction, type SelectedAction,
+  canReleaseStrandedVehicleGatedAction, isActionPastStuckBackoff, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel } from './RestActionHelpers.js';
@@ -54,7 +54,10 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // #557: never re-claim a stale evacuation-relay leftover while its
       // zone is still occupied — see isEvacuationHoldActive's own doc
       // comment (Evacuation.ts).
-      && !isEvacuationHoldActive(state, a))
+      && !isEvacuationHoldActive(state, a)
+      // #1130: a forced stuck-abandon release backs this action off for a
+      // cooldown — see isActionPastStuckBackoff's own doc comment.
+      && isActionPastStuckBackoff(state, a))
     .sort((a, b) => {
       // Rest actions win ties over any other targeted action, so a rest
       // queued alongside other work for this employee is always the first
@@ -347,7 +350,9 @@ export function claimOnePoolCandidate(
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently
     // blocks later work once the zone genuinely clears.
-    !isEvacuationHoldActive(state, a)
+    !isEvacuationHoldActive(state, a) &&
+    // #1130: see isActionPastStuckBackoff's own doc comment.
+    isActionPastStuckBackoff(state, a)
   );
 
   const selection = selectBestActionForEmployee(
