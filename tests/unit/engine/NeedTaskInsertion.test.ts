@@ -172,8 +172,19 @@ describe('autoInsertNeedTasks (7.7)', () => {
     employee.fatigue = 20;
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    vehicle.occupantIds = [employee.id];
+    // Mid-evacuation-drive is read off the driver's own itinerary since
+    // #1092: a `reposition` goal whose last leg puts them back on foot, the
+    // shape only clearZone (Zone.ts) ever plans.
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 40, destZ: 40,
+        arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9,
+      }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
 

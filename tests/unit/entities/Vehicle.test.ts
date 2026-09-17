@@ -11,14 +11,14 @@ import {
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
-  unassignDriver,
+  canReleaseDriver,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
 import { VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
-import { board } from '../../../src/core/engine/Mount.js';
+import { board, alight } from '../../../src/core/engine/Mount.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -1527,82 +1527,86 @@ describe('Mount.board — success: reservation holder boards their own reserved 
   });
 });
 
-// ── unassignDriver — frees a vehicle's driver so it can be reassigned ─────────
+// ── canReleaseDriver — may the driver seat be emptied right now? ─────────────
+// #1092: a question, not an operation. `Mount.alight` is the one writer of
+// occupantIds (the `vehicles` rule), and it calls this first — so what these
+// cover is the answer, and `alight`'s own tests (Mount.test.ts) cover the
+// seat actually emptying on the back of it.
 
-describe('unassignDriver — happy path', () => {
-  it('clears occupantIds and reports success', () => {
+describe('canReleaseDriver — happy path', () => {
+  it('says yes for a driven vehicle carrying nothing, without touching occupantIds itself', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
-    const result = unassignDriver(state.vehicles, vehicleId);
+    const result = canReleaseDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(true);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.occupantIds).toHaveLength(0);
+    expect(vehicle.occupantIds).toEqual([empId]);
   });
 
-  it('the freed employee can be assigned to a different vehicle afterward', () => {
+  it('alight, which gates on it, frees the employee to board a different vehicle afterward', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
-    unassignDriver(state.vehicles, vehicleId);
+    expect(canReleaseDriver(state.vehicles, vehicleId).success).toBe(true);
+    expect(alight(state, vehicleId).success).toBe(true);
     const { vehicle: otherVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     const result = board(state, otherVehicle.id, empId);
     expect(result.success).toBe(true);
   });
 });
 
-describe('unassignDriver — error: vehicle not found', () => {
+describe('canReleaseDriver — error: vehicle not found', () => {
   it('returns a failure result', () => {
     const vs = createVehicleState();
-    const result = unassignDriver(vs, 9999);
+    const result = canReleaseDriver(vs, 9999);
     expect(result.success).toBe(false);
   });
 
   it('error message names the reason', () => {
     const vs = createVehicleState();
-    const result = unassignDriver(vs, 9999);
+    const result = canReleaseDriver(vs, 9999);
     expect(result.error).toBe('Vehicle not found');
   });
 });
 
-describe('unassignDriver — error: vehicle has no driver', () => {
-  it('returns a failure result without touching the vehicle', () => {
+describe('canReleaseDriver — boundary: vehicle has no driver at all', () => {
+  it('says yes — an empty seat is trivially releasable, and alight owns refusing that case', () => {
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    const result = unassignDriver(vs, vehicle.id);
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Vehicle has no driver');
+    const result = canReleaseDriver(vs, vehicle.id);
+    expect(result.success).toBe(true);
     expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
-describe('unassignDriver — error: vehicle is mid-haul', () => {
-  // #1091: unassignDriver's mid-haul guard reads `vehicle.payload !== null`
-  // now that haulingPhase/haulingFragmentId are gone — payload is only set
-  // once haul_load's arrival effect fires, so this guard only ever catches
-  // the loaded, driving-to-depot leg.
-  it('refuses to unassign and preserves occupantIds[0] once a fragment is loaded (driving to the depot)', () => {
+describe('canReleaseDriver — error: vehicle is mid-haul', () => {
+  // #1091: the mid-haul guard reads `vehicle.payload !== null` now that
+  // haulingPhase/haulingFragmentId are gone — payload is only set once
+  // haul_load's arrival effect fires, so this guard only ever catches the
+  // loaded, driving-to-depot leg.
+  it('says no, and alight then refuses too, once a fragment is loaded (driving to the depot)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     vehicle.payload = { fragmentId: 1, massKg: 500 };
 
-    const result = unassignDriver(state.vehicles, vehicleId);
+    const result = canReleaseDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(false);
     expect(result.error).toBe('Vehicle is mid-haul');
+    expect(alight(state, vehicleId).success).toBe(false);
     expect(vehicle.occupantIds[0]).toBe(empId);
   });
 
-  // TODO(#1091): the to-fragment leg (before load_haul fires) has no signal
-  // on Vehicle any more — unassignDriver can't distinguish "driving toward a
-  // fragment" from "idle", so it allows the unassign. See Vehicle.ts's own
-  // TODO(#1091) comment on unassignDriver.
-  it('allows unassign before the fragment is loaded — driving-to-fragment leg has no payload signal yet', () => {
+  // TODO(#1091): the to-fragment leg (before haul_load fires) has no signal
+  // on Vehicle any more — this guard can't distinguish "driving toward a
+  // fragment" from "idle", so it allows the release.
+  it('says yes before the fragment is loaded — driving-to-fragment leg has no payload signal yet', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     expect(vehicle.payload).toBeNull();
 
-    const result = unassignDriver(state.vehicles, vehicleId);
-    expect(result.success).toBe(true);
+    expect(canReleaseDriver(state.vehicles, vehicleId).success).toBe(true);
+    expect(alight(state, vehicleId).success).toBe(true);
     expect(vehicle.occupantIds).toHaveLength(0);
   });
 });

@@ -348,10 +348,9 @@ describe('EmployeePictograms', () => {
     const emp = makeEmployee({ id: 1 });
     const vehicle: Vehicle = {
       id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-      targetX: 0, targetZ: 0, driverId: 1, state: 'idle', payload: null,
+      targetX: 0, targetZ: 0, state: 'idle', payload: null,
       waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
       reservedForActionId: null,
-      pendingEvacuationDestination: null,
       occupantIds: [1],
     };
 

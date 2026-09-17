@@ -5,7 +5,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
-import { canAssignDriver, unassignDriver, vehicleDriverId } from '../entities/Vehicle.js';
+import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
 import { isMounted } from '../entities/EmployeeLocomotion.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
@@ -72,7 +72,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
 
 /**
  * Alight the driving/riding employee from a vehicle. Refuses mid-haul (via
- * `unassignDriver`'s own fail-closed guard) so a haul never gets orphaned
+ * `canReleaseDriver`'s own fail-closed guard) so a haul never gets orphaned
  * mid-flight. On success, the employee steps onto a free walkable cell
  * within one tile of the vehicle (or the vehicle's own cell, as a fallback)
  * and returns to `on_foot`.
@@ -84,7 +84,7 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   const employeeId = vehicle.occupantIds[0] ?? null;
   if (employeeId === null) return { success: false, error: t('mount.vehicle_no_driver') };
 
-  const guard = unassignDriver(state.vehicles, vehicleId);
+  const guard = canReleaseDriver(state.vehicles, vehicleId);
   if (!guard.success) return { success: false, error: guard.error ?? t('mount.alight_failed') };
 
   vehicle.occupantIds = vehicle.occupantIds.filter(id => id !== employeeId);

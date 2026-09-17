@@ -236,7 +236,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // ForceShiftRest.ts) keeps a mounted employee driving via beginRestTravel's
     // own mount continuity, but a fatigue floor this hard is a genuine "the
     // employee can no longer be trusted behind the wheel" event. alight's own
-    // guards (unassignDriver — mid-haul lock, e.g.) may refuse; that's fine —
+    // guards (canReleaseDriver — mid-haul lock, e.g.) may refuse; that's fine —
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
     alightIfMounted(state, emp, _emitter);

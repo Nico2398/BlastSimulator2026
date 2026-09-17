@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -195,10 +195,10 @@ describe('vehicle driver — successful assignment', () => {
     expect(result.success).toBe(true);
 
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
-    expect(vehicle!.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle!)).toBeNull();
 
     tickCommand(ctx, ['1'], {});
-    expect(vehicle!.driverId).toBe(employeeId);
+    expect(vehicleDriverId(vehicle!)).toBe(employeeId);
   });
 
   it('assigns a drill_rig driver with the driving.drill_rig licence, once a tick resolves arrival', () => {
@@ -210,10 +210,10 @@ describe('vehicle driver — successful assignment', () => {
 
     expect(result.success).toBe(true);
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
-    expect(vehicle!.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle!)).toBeNull();
 
     tickCommand(ctx, ['1'], {});
-    expect(vehicle!.driverId).toBe(employeeId);
+    expect(vehicleDriverId(vehicle!)).toBe(employeeId);
   });
 });
 
@@ -354,7 +354,7 @@ describe('vehicle driver — unassign with "none"', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicleId} driver unassigned.`);
-    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.driverId).toBeNull();
+    expect(vehicleDriverId(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!)).toBeNull();
   });
 
   it('the freed employee can board a different vehicle afterward', () => {

@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
@@ -56,7 +56,6 @@ function makeDrivenFragmenter(state: ReturnType<typeof createGame>, x = 0, z = 0
   assignSkill(state.employees, employee.id, 'driving.excavator', 1);
   // #1089/#1091: planItinerary/driving reads the driver off
   // vehicle.occupantIds[0]/employee.locomotion, not the driverId mirror alone.
-  vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
@@ -125,7 +124,7 @@ describe('requestBreakBoulder — precondition failures', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     assignSkill(state.employees, employee.id, 'driving.truck', 1);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
@@ -228,7 +227,7 @@ describe('requestBreakBoulder — happy path', () => {
     // Installs a driving itinerary on the driver ending in the boulder_split
     // arrival effect, per gameplay-vehicle-fleet's own
     // "[drive -> boulder, effect 'split']" shape.
-    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
     expect(driver.itinerary).not.toBeNull();
     const splitLegs = legsWithEffect(driver.itinerary!, 'boulder_split');
     expect(splitLegs).toHaveLength(1);

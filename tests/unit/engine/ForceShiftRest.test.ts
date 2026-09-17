@@ -19,7 +19,7 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
@@ -247,7 +247,6 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -258,7 +257,7 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     forceShiftRestIfNeeded(state, employee, [], []);
 
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.itinerary).not.toBeNull();
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
@@ -400,8 +399,19 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    vehicle.occupantIds = [employee.id];
+    // Mid-evacuation-drive is read off the driver's own itinerary since
+    // #1092: a `reposition` goal whose last leg puts them back on foot, the
+    // shape only clearZone (Zone.ts) ever plans.
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 40, destZ: 40,
+        arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9,
+      }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
     employee.fatigue = 1;
 
@@ -536,7 +546,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const prior = pushHeldAction(state, employee.id, 1100);
     prior.requiredVehicleRole = 'rock_digger';
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.reservedForActionId = prior.id;
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10; // well past the shift boundary
@@ -573,7 +583,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     const prior = pushHeldAction(state, employee.id, 1101);
     prior.requiredVehicleRole = 'rock_digger';
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.reservedForActionId = prior.id;
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
@@ -686,7 +696,6 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -697,7 +706,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.itinerary).not.toBeNull();
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
@@ -720,7 +729,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.payload = { fragmentId: 1, massKg: 500 };
     const prior = pushHeldAction(state, employee.id, 1200);
     prior.requiredVehicleRole = 'debris_hauler';
@@ -741,7 +750,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.payload = null;
     const prior = pushHeldAction(state, employee.id, 1201);
     prior.requiredVehicleRole = 'debris_hauler';
@@ -845,7 +854,6 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     employee.activeActionId = activeAction.id;
     employee.ticksWorked = WORK_DURATION_TICKS;
     employee.taskQueue = []; // nothing queued — only the active action exists
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     vehicle.reservedForActionId = activeAction.id;
 
@@ -877,12 +885,12 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     const gatedAction = pushQueuedGatedAction(state, employee.id, 1116);
     employee.taskQueue = [gatedAction.id];
     vehicle.reservedForActionId = gatedAction.id;
-    vehicle.driverId = otherEmployee.id; // already boarded by someone else
+    vehicle.occupantIds = [otherEmployee.id]; // already boarded by someone else
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
     expect(vehicle.reservedForActionId).toBe(gatedAction.id);
-    expect(vehicle.driverId).toBe(otherEmployee.id);
+    expect(vehicleDriverId(vehicle)).toBe(otherEmployee.id);
     expect(gatedAction.status).toBe('assigned');
     expect(gatedAction.holderId).toBe(employee.id);
     expect(employee.taskQueue).toContain(gatedAction.id);

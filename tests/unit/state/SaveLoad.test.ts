@@ -1123,15 +1123,18 @@ describe('FilePersistence', () => {
   });
 });
 
-// ── v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042) ─────
+// ── v16 saves, after the v16→v17 step was retired (#1042, #1092) ───────────
 // SAVE_VERSION bumped 16→17 when Vehicle gained a
 // `pendingEvacuationDestination: { x: number; z: number } | null` field — the
 // safe cell a qualified employee drives a boarded, evacuating vehicle toward.
-// A pre-v17 save has no such destination staged on any vehicle — it must
-// default to null, matching purchaseVehicle's own default.
+// #1092 deleted that field again, and the v20→v21 step strips it from every
+// save older than 21 — which is every v16 one — so the v16→v17 step could
+// only ever have defaulted a field four later steps then removed. It is gone;
+// what still has to hold for a v16 fixture is that it loads through the whole
+// chain and comes out with no trace of the field either way.
 
-describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDestination (#1042)', () => {
-  it('a v16 fixture with a vehicle missing pendingEvacuationDestination loads with pendingEvacuationDestination: null', () => {
+describe('deserialize — a v16 save loads with no pendingEvacuationDestination, set or unset (#1042, #1092)', () => {
+  it('a v16 fixture whose vehicle never carried the field loads clean', () => {
     const state = createGame({ seed: 42 });
     purchaseVehicle(state.vehicles, 'debris_hauler');
 
@@ -1146,25 +1149,27 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
     const restored = deserialize(JSON.stringify(parsed));
 
     expect(restored.vehicles.vehicles).toHaveLength(1);
-    expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
+    expect('pendingEvacuationDestination' in restored.vehicles.vehicles[0]!).toBe(false);
   });
 
-  it('a pre-v17 save with pendingEvacuationDestination already set is left untouched by the migration (regression)', () => {
+  it('a v16 fixture with a destination already staged has it stripped rather than carried forward', () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.pendingEvacuationDestination = { x: 12, z: 34 };
 
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
     parsed['version'] = 16;
+    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
+    vehicleList[0]!['pendingEvacuationDestination'] = { x: 12, z: 34 };
 
     const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.pendingEvacuationDestination).toEqual({ x: 12, z: 34 });
+    expect('pendingEvacuationDestination' in restoredVehicle).toBe(false);
   });
 
-  it('a v16 fixture with a malformed pendingEvacuationDestination is reset to null rather than passed through', () => {
+  it('a v16 fixture with a malformed destination is stripped too, never passed through (boundary)', () => {
     const state = createGame({ seed: 42 });
     purchaseVehicle(state.vehicles, 'debris_hauler');
 
@@ -1175,12 +1180,12 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
     const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
     expect(vehicleList).toHaveLength(1);
     // Wrong shape entirely — not the { x: number; z: number } | null the
-    // field actually is. Missing/wrong-typed z, hardened for by #1042.
+    // field ever was.
     vehicleList[0]!['pendingEvacuationDestination'] = { x: 'bad' };
 
     const restored = deserialize(JSON.stringify(parsed));
 
-    expect(restored.vehicles.vehicles[0]!.pendingEvacuationDestination).toBeNull();
+    expect('pendingEvacuationDestination' in restored.vehicles.vehicles[0]!).toBe(false);
   });
 });
 
@@ -1194,8 +1199,8 @@ describe('deserialize — v16→v17 migration for Vehicle.pendingEvacuationDesti
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 20', () => {
-    expect(SAVE_VERSION).toBe(20);
+  it('SAVE_VERSION is 21', () => {
+    expect(SAVE_VERSION).toBe(21);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1257,8 +1262,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 20', () => {
-    expect(SAVE_VERSION).toBe(20);
+  it('SAVE_VERSION is 21', () => {
+    expect(SAVE_VERSION).toBe(21);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1267,7 +1272,6 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
     const { employee: driver } = hireEmployee(state.employees, 'driver', rng, 5, 5);
     const { employee: onFoot } = hireEmployee(state.employees, 'surveyor', new Random(43), 8, 8);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.driverId = driver.id;
 
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -1276,6 +1280,10 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
     const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
     const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
     delete vehiclesList[0]!['occupantIds'];
+    // A v18 save recorded the mount as `driverId` alone — a field the current
+    // Vehicle type no longer declares, so it is staged on the raw JSON here
+    // rather than through the live object the fixture was built from.
+    vehiclesList[0]!['driverId'] = driver.id;
 
     const employeesContainer = parsed['employees'] as Record<string, unknown>;
     const employeesList = employeesContainer['employees'] as Array<Record<string, unknown>>;
@@ -1299,7 +1307,6 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
     const state = createGame({ seed: 42 });
     const { employee } = hireEmployee(state.employees, 'surveyor', new Random(42), 1, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.driverId = null;
 
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -1308,6 +1315,7 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
     const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
     const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
     delete vehiclesList[0]!['occupantIds'];
+    vehiclesList[0]!['driverId'] = null;
 
     const employeesContainer = parsed['employees'] as Record<string, unknown>;
     const employeesList = employeesContainer['employees'] as Array<Record<string, unknown>>;
@@ -1335,8 +1343,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 20', () => {
-    expect(SAVE_VERSION).toBe(20);
+  it('SAVE_VERSION is 21', () => {
+    expect(SAVE_VERSION).toBe(21);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {

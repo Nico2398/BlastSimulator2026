@@ -101,7 +101,6 @@ describe('evacuateZone', () => {
     // silently. Give it a real, co-located, mounted driver instead — this
     // test still proves the "ordered" path, not the #947 driver gate.
     const { employee: driver } = hireEmployee(state.employees, 'driller', rng, vehicle.x, vehicle.z);
-    vehicle.driverId = driver.id;
     vehicle.occupantIds = [driver.id];
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -184,7 +183,7 @@ describe('evacuateZone', () => {
     const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
     const beforeX = vehicle.x;
     const beforeZ = vehicle.z;
 
@@ -212,7 +211,7 @@ describe('evacuateZone', () => {
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 12, 12);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     const result = evacuateZone(state, zone);
 
@@ -232,7 +231,7 @@ describe('evacuateZone — boards a driverless vehicle instead of stranding it o
     const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 16, 16);
     assignSkill(state.employees, employee.id, 'driving.excavator', 1);
@@ -250,7 +249,7 @@ describe('evacuateZone — boards a driverless vehicle instead of stranding it o
     const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
     // No employees hired at all — nobody anywhere the real reachability
     // check could ever accept.
 
@@ -417,7 +416,6 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     // #1089: a real, co-located, mounted driver — see the first describe
     // block's own comment on why a dangling driverId no longer works.
     const { employee: driver1 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
-    vehicle.driverId = driver1.id;
     vehicle.occupantIds = [driver1.id];
     driver1.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -456,7 +454,6 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
     const { employee: driver2 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
-    vehicle.driverId = driver2.id;
     vehicle.occupantIds = [driver2.id];
     driver2.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -491,7 +488,6 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 15, 15);
     const { employee: driver3 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
-    vehicle.driverId = driver3.id;
     vehicle.occupantIds = [driver3.id];
     driver3.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -520,7 +516,6 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
     const { employee: driver4 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
-    vehicle.driverId = driver4.id;
     vehicle.occupantIds = [driver4.id];
     driver4.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.task = 'idle';

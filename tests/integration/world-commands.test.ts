@@ -12,6 +12,7 @@ import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
+import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 describe('Console — world commands', () => {
   let ctx: GameContext;
@@ -85,7 +86,7 @@ describe('Console — world commands', () => {
       const remaining = [...vehicles];
       for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
         const idx = remaining.findIndex(v =>
-          v.type === slot.role && v.tier === slot.tier && v.driverId === null && v.state === 'idle',
+          v.type === slot.role && v.tier === slot.tier && vehicleDriverId(v) === null && v.state === 'idle',
         );
         expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
         remaining.splice(idx, 1);

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import {
   claimActionsTargetedAtEmployee,
   fillIdleEmployeeFromQueueOrPool,
@@ -504,7 +504,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
 
       const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 0);
-      vehicle.driverId = holder.id; // already boarded
+      vehicle.occupantIds = [holder.id]; // already boarded
       const action = makeAction({
         id: 51, targetX: 20, targetZ: 0, requiredVehicleRole: 'drill_rig',
         status: 'assigned', holderId: holder.id, targetEmployeeId: null,
@@ -982,7 +982,7 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     const { employee: otherDriver } = hireEmployee(state.employees, 'driller', rng, 10, 10);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.driverId = otherDriver.id; // already boarded, by someone else
+    vehicle.occupantIds = [otherDriver.id]; // already boarded, by someone else
 
     const action = makeAction({
       id: 3, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
@@ -998,7 +998,7 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     expect(action.status).toBe('assigned');
     expect(action.holderId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBe(3);
-    expect(vehicle.driverId).toBe(otherDriver.id);
+    expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
   });
 
   it('releases every unboarded vehicle-gated entry among a mixed taskQueue, leaving the on-foot one alone', () => {
@@ -1242,7 +1242,6 @@ describe('promoteActionToActive', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -1251,7 +1250,7 @@ describe('promoteActionToActive', () => {
     promoteActionToActive(state, employee, action);
 
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(vehicle.occupantIds).toEqual([]);
     // #1090: itinerary, not legacy destinationX/Z — see the other
     // promoteActionToActive test's own comment on the same change.
@@ -1272,7 +1271,6 @@ describe('promoteActionToActive', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -1284,7 +1282,7 @@ describe('promoteActionToActive', () => {
 
     expect(employee.activeActionId).toBe(8);
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(vehicle.occupantIds).toEqual([employee.id]);
     expect(employee.itinerary).not.toBeNull();
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
@@ -1302,7 +1300,6 @@ describe('promoteActionToActive', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -1313,7 +1310,7 @@ describe('promoteActionToActive', () => {
     promoteActionToActive(state, employee, action);
 
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(vehicle.occupantIds).toEqual([]);
     // #1090: an on-foot claim walks via moveTo's itinerary now, not the
     // legacy destinationX/Z fields — see the other promoteActionToActive

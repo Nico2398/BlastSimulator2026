@@ -273,9 +273,9 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
 }
 
 /**
- * Unassign a vehicle's driver, freeing the employee to be reassigned
- * elsewhere. Refuses while the vehicle is carrying a loaded haul so it
- * doesn't get orphaned mid-flight with cargo aboard and nobody driving it.
+ * Whether a vehicle's driver seat may be emptied right now. Refuses while
+ * the vehicle is carrying a loaded haul so it doesn't get orphaned
+ * mid-flight with cargo aboard and nobody driving it.
  *
  * `payload !== null` is the only guard needed (#1091): the itinerary model's
  * "not yet loaded" leg (driving toward the fragment, cargo not aboard yet)
@@ -285,11 +285,13 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
  * that has actually picked something up (`payload` set) risks being
  * orphaned with cargo nobody is driving.
  *
- * Guard-only since #1092: there is no `driverId` field left to clear — the
- * driver seat is `occupantIds[0]`, and `Mount.alight` (the one writer of
- * `occupantIds`) is what actually empties it once this guard passes.
+ * A question, not an operation, since #1092: `driverId` is gone, the driver
+ * seat is `occupantIds[0]`, and `Mount.alight` — the one writer of
+ * `occupantIds`, per the `vehicles` rule — is what actually empties it once
+ * this answers yes. It was named `unassignDriver` while it still did the
+ * unassigning itself.
  */
-export function unassignDriver(
+export function canReleaseDriver(
   vehicleState: VehicleState,
   vehicleId: number,
 ): { success: boolean; error?: string } {

@@ -13,9 +13,9 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payload: null,
+    targetX: 5, targetZ: 5, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -114,13 +114,13 @@ describe('fleetDetailSections — makeLoadGauge', () => {
 describe('fleetDetailSections — makeDriverRow', () => {
   it('shows the real driver name when driverId matches a roster employee', () => {
     const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ driverId: 6 }), state);
+    const row = makeDriverRow(makeVehicle({ occupantIds: [6] }), state);
     expect(row.textContent).toContain('Dorian Kask');
   });
 
   it('falls back to "#<driverId>" when no roster employee matches driverId', () => {
     const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ driverId: 99 }), state);
+    const row = makeDriverRow(makeVehicle({ occupantIds: [99] }), state);
     expect(row.textContent).toContain('#99');
     expect(row.textContent).not.toContain('Dorian Kask');
   });

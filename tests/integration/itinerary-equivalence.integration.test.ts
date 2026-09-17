@@ -139,7 +139,6 @@ function measureItineraryEquivalence(seed: number, c: ItineraryEquivalenceCase):
     employee.x = vehicle.x;
     employee.z = vehicle.z;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
   }
 

@@ -356,10 +356,10 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
 
 /**
  * Full dismount of `vehicle`'s driver, if any: returns any loaded cargo to
- * the ground first, so that unassignDriver's own fail-closed guard
+ * the ground first, so that canReleaseDriver's own fail-closed guard
  * (Vehicle.ts — it refuses the dismount while `payload` is set) is
  * guaranteed to succeed rather than silently no-op. A caller that skipped
- * that and ignored unassignDriver's return value could flip task/state to
+ * that and ignored canReleaseDriver's return value could flip task/state to
  * idle while the driver seat and payload stayed set, reproducing the exact
  * stuck-forever bug this dismount exists to fix (#986 review follow-up).
  *

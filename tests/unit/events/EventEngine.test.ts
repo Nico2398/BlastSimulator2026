@@ -39,14 +39,12 @@ function makeWaitingVehicle(
     task: 'moving',
     targetX,
     targetZ,
-    driverId: null,
     state: 'waiting',
     payload: null,
     waitingTicks,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
     reservedForActionId: null,
-    pendingEvacuationDestination: null,
     occupantIds: [],
   };
 }

@@ -182,7 +182,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Haul'))).toBe(true);
   });
 
-  // ── vehicle "Move Here" (gap G4: `vehicle move <id> to:<x,z>` had no button) ──
+  // ── vehicle "Move Here" (gap G4: `vehicle reposition <id> <x> <z>` had no button) ──
 
   it('the vehicle set carries a move_here data-action selector', () => {
     const { bar, root } = makeBar();
@@ -256,10 +256,10 @@ describe('SelectionBar', () => {
 describe('SelectionBar move_here — the command src/main.ts dispatches', () => {
   const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
 
-  /** The `vehicle move …` template literal handed to window.__gameConsole. */
+  /** The `vehicle reposition …` template literal handed to window.__gameConsole. */
   function extractTemplate(): string {
-    const match = /__gameConsole\(`(vehicle move [^`]*)`\)/.exec(mainTs);
-    expect(match, 'src/main.ts dispatches no `vehicle move …` command').not.toBeNull();
+    const match = /__gameConsole\(`(vehicle reposition [^`]*)`\)/.exec(mainTs);
+    expect(match, 'src/main.ts dispatches no `vehicle reposition …` command').not.toBeNull();
     return match![1]!;
   }
 
@@ -267,8 +267,8 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     expect(mainTs).toContain("case 'move_here':");
   });
 
-  it('dispatches `vehicle move <id> to:<x>,<z>` built from the latched aim tile', () => {
-    expect(extractTemplate()).toBe('vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}');
+  it('dispatches `vehicle reposition <id> <x> <z>` built from the latched aim tile', () => {
+    expect(extractTemplate()).toBe('vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}');
   });
 
   it('reads the LATCHED aim, not the live hover, and warns when there is no target', () => {
@@ -288,33 +288,28 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     const { runner, ctx } = createRunner();
     runner.run('new_game mine_type:desert seed:1 size:32');
     const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 0, 0);
-    // #947: canTickVehicle now requires a driver aboard to advance on tick at
-    // all -- a driverless `vehicle move` is refused outright. This test's own
-    // point is that the dispatched command string parses and reaches the real
-    // command handler, not the driver gate, so give it a driver — a genuinely
-    // mounted one (#1089: `move` now installs an itinerary on the driver via
-    // moveTo, which needs a real Employee record and an agreeing
-    // Locomotion/occupantIds pair to plan a drive leg through — a bare
-    // `vehicle.driverId = <id>` with no such employee, this test's own
-    // pre-#1089 fixture, no longer resolves).
+    // `reposition` would otherwise pick an idle licensed driver itself; this
+    // test's own point is that the dispatched command string parses and
+    // reaches the real command handler, so a genuinely mounted driver is put
+    // aboard up front (#1089: moveTo needs a real Employee record and an
+    // agreeing Locomotion/occupantIds pair to plan a drive leg through).
     const { employee } = hireEmployee(ctx.state!.employees, 'driver', new Random(1));
     employee.x = vehicle.x;
     employee.z = vehicle.z;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
 
     const command = extractTemplate()
       .replace('${entity.id}', String(vehicle.id))
       .replace('${terrain.tileX}', '12')
       .replace('${terrain.tileZ}', '7');
-    expect(command).toBe(`vehicle move ${vehicle.id} to:12,7`);
+    expect(command).toBe(`vehicle reposition ${vehicle.id} 12 7`);
 
     const result = runner.run(command);
     expect(result.success, result.output).toBe(true);
 
     // #1089: vehicle.task/targetX/Z are written for display only now
-    // (Locomotion.ts's writeVehiclePosition) — `move` installs an itinerary
+    // (Locomotion.ts's writeVehiclePosition) — `reposition` installs an itinerary
     // on the driver via moveTo, and the vehicle only reads back as "moving"
     // with the new target once Locomotion actually advances that itinerary
     // a tick, not the instant the command itself returns.

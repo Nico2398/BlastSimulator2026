@@ -35,12 +35,11 @@ function makeState(seed: number): GameState {
  * shape moveTo's own "already mounted" continuity check
  * (isMounted(employee.locomotion)) requires to plan straight to a drive leg
  * — mirrors what a real board() call leaves behind, without walking there
- * first. `vehicle.driverId` is also set — Zone.ts's clearZone still reads
- * that field directly (not yet migrated to occupantIds[0], #1092) — so
- * both stay in lockstep here until it is.
+ * first. `occupantIds[0]` is the driver seat clearZone reads through
+ * `vehicleDriverId` (#1092), so filling it is what makes this a driven
+ * vehicle as far as the evacuation is concerned.
  */
 function mountDriver(vehicle: Vehicle, driver: Employee): void {
-  vehicle.driverId = driver.id;
   vehicle.occupantIds = [driver.id];
   driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 }

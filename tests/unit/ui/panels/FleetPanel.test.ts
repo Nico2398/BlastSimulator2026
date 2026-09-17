@@ -13,9 +13,9 @@ import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payload: null,
+    targetX: 5, targetZ: 5, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -102,14 +102,14 @@ describe('FleetPanel', () => {
 
   it('shows no Haul button for a debris_hauler with nothing reachable to haul (haulEligibility.ts, real eligibility check)', () => {
     const { panel } = makePanel();
-    panel.update(makeState([makeVehicle({ id: 5, type: 'debris_hauler', driverId: 1 })], [makeEmployee({ id: 1 })]));
+    panel.update(makeState([makeVehicle({ id: 5, type: 'debris_hauler', occupantIds: [1] })], [makeEmployee({ id: 1 })]));
     expect(panel.root.querySelector('.bs-vehicle-haul-btn')).toBeNull();
   });
 
   it('shows no Break button for a rock_fragmenter with a reachable oversized fragment (breakEligibility.ts retired, #618)', () => {
     const { panel } = makePanel();
     const state = makeState(
-      [makeVehicle({ id: 5, type: 'rock_fragmenter', x: 0, z: 0, targetX: 0, targetZ: 0, driverId: 1 })],
+      [makeVehicle({ id: 5, type: 'rock_fragmenter', x: 0, z: 0, targetX: 0, targetZ: 0, occupantIds: [1] })],
       [makeEmployee({ id: 1 })],
     );
     state.navGrid = makeFlatNavGrid(20);
@@ -172,7 +172,7 @@ describe('FleetPanel', () => {
   it('shows the real driver name', () => {
     const { panel } = makePanel();
     panel.update(makeState(
-      [makeVehicle({ id: 2, driverId: 6 })],
+      [makeVehicle({ id: 2, occupantIds: [6] })],
       [makeEmployee({ id: 6, name: 'Dorian Kask' })],
     ));
     expect(panel.root.textContent).toContain('Dorian Kask');
@@ -223,7 +223,7 @@ describe('FleetPanel', () => {
       id: 6, name: 'Dorian Kask',
       qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
     });
-    const vehicle = makeVehicle({ id: 2, type: 'debris_hauler', driverId: null });
+    const vehicle = makeVehicle({ id: 2, type: 'debris_hauler' });
 
     panel.update(makeState([vehicle], [licensed]));
 

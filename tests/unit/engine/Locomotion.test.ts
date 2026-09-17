@@ -18,7 +18,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
@@ -218,7 +218,7 @@ describe('tickLocomotion', () => {
     // leg's own destination cell.
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 1);
     expect(blocker.task).toBe('idle');
-    expect(blocker.driverId).toBeNull();
+    expect(vehicleDriverId(blocker)).toBeNull();
     expect(blocker.reservedForActionId).toBeNull();
 
     for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 5; i++) {
@@ -396,7 +396,6 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
     vehicle.occupantIds = [driver.id];
-    vehicle.driverId = driver.id;
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     driver.activeActionId = 88;
     const action = { ...makeGeneralWorkAction(88), holderId: driver.id, status: 'assigned' as const, requiredVehicleRole: 'rock_digger' as const };
@@ -426,7 +425,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     expect(result.abandoned).toEqual(expect.arrayContaining([{ employeeId: driver.id, actionId: 88 }]));
     expect(driver.activeActionId).toBeNull();
     // Dismounted — the vehicle's driver reservation is released along with the abandon.
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
   });
 
   it('does not abandon when pathFound is true and isStuck is false — the ordinary, non-stuck advancing path is untouched', () => {

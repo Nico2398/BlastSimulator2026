@@ -350,7 +350,6 @@ describe('beginRestTravel (#1118)', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -376,7 +375,6 @@ describe('beginRestTravel (#1118)', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 

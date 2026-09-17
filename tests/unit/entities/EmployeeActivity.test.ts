@@ -40,9 +40,9 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
+    targetX: 0, targetZ: 0, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -85,7 +85,7 @@ describe('computeEmployeeActivity', () => {
 
   it('reports driving when a vehicle lists them as driver, before falling through to walking/idle', () => {
     const emp = makeEmployee({ id: 6, destinationX: null });
-    const vehicles = [makeVehicle({ id: 9, driverId: 6 })];
+    const vehicles = [makeVehicle({ id: 9, occupantIds: [6] })];
     const activity = computeEmployeeActivity(emp, vehicles);
     expect(activity.kind).toBe('driving');
     expect(activity.vehicleId).toBe(9);
@@ -93,7 +93,7 @@ describe('computeEmployeeActivity', () => {
 
   it('working takes priority over driving (e.g. a driver dispatched to foot work mid-tick)', () => {
     const emp = makeEmployee({ id: 6, taskTicksRemaining: 3 });
-    const vehicles = [makeVehicle({ id: 9, driverId: 6 })];
+    const vehicles = [makeVehicle({ id: 9, occupantIds: [6] })];
     expect(computeEmployeeActivity(emp, vehicles).kind).toBe('working');
   });
 
@@ -124,9 +124,9 @@ describe('computeEmployeeActivity', () => {
 describe('findDrivenVehicle', () => {
   it('returns the vehicle whose driverId matches the given employee id', () => {
     const vehicles = [
-      makeVehicle({ id: 1, driverId: null }),
-      makeVehicle({ id: 2, driverId: 6 }),
-      makeVehicle({ id: 3, driverId: null }),
+      makeVehicle({ id: 1 }),
+      makeVehicle({ id: 2, occupantIds: [6] }),
+      makeVehicle({ id: 3 }),
     ];
 
     const driven = findDrivenVehicle(6, vehicles);
@@ -137,8 +137,8 @@ describe('findDrivenVehicle', () => {
 
   it('returns null when the employee is not driving any vehicle', () => {
     const vehicles = [
-      makeVehicle({ id: 1, driverId: null }),
-      makeVehicle({ id: 2, driverId: 6 }),
+      makeVehicle({ id: 1 }),
+      makeVehicle({ id: 2, occupantIds: [6] }),
     ];
 
     expect(findDrivenVehicle(7, vehicles)).toBeNull();
@@ -149,7 +149,7 @@ describe('findDrivenVehicle', () => {
   });
 
   it('never matches another employee\'s driven vehicle (rejection: wrong id)', () => {
-    const vehicles = [makeVehicle({ id: 1, driverId: 5 })];
+    const vehicles = [makeVehicle({ id: 1, occupantIds: [5] })];
 
     expect(findDrivenVehicle(6, vehicles)).toBeNull();
   });

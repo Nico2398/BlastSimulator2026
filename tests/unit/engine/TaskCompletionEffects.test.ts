@@ -13,7 +13,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import type { TaskProgressResult } from '../../../src/core/engine/TaskProgress.js';
 
 const SEED = 42;
@@ -62,7 +62,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_digger, 1);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
 
     const segment0Action: PendingAction = {
       id: 10,
@@ -133,7 +133,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
     // applyTaskCompletion itself does not drive that.
     expect(employee.activeActionId).toBeNull();
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBe(employee.id); // still mounted — release is claim-only
+    expect(vehicleDriverId(vehicle)).toBe(employee.id); // still mounted — release is claim-only
     expect(state.pendingActions.find(a => a.id === segment1Action.id)!.status).toBe('queued');
     expect(state.pendingActions.find(a => a.id === segment1Action.id)!.holderId).toBeNull();
     expect(state.pendingActions.find(a => a.id === segment0Action.id)).toBeUndefined();

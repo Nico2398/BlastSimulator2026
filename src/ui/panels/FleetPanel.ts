@@ -346,7 +346,12 @@ export class FleetPanel extends PanelBase {
     const btn = button('ghost', t('ui.fleet.reposition'), { icon: 'drive' });
     btn.className += ' bs-fleet-reposition-btn';
     btn.style.cssText += ';height:28px;font-size:10px;flex:1';
-    btn.dataset['vehicleId'] = String(v.id);
+    // `data-action`, not `data-vehicle-id`: the card wrapper already carries
+    // the id, and duplicating the key onto a descendant makes every
+    // `[data-vehicle-id]` card query count each card twice. Scoping is by
+    // the card's own `[data-vtype]` ancestor — see
+    // vehicle-reposition-before-blast.json's own click selector.
+    btn.dataset['action'] = 'reposition';
 
     const reason = v.reservedForActionId !== null
       ? t('ui.fleet.reposition_busy')

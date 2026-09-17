@@ -17,7 +17,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
-import { moveTo } from '../../../src/core/engine/MoveTo.js';
+import { moveTo, alightOnArrival } from '../../../src/core/engine/MoveTo.js';
 
 const SEED = 42;
 
@@ -82,7 +82,6 @@ describe('moveTo — coordinate destination via a named vehicle', () => {
     assignSkill(state.employees, employee.id, 'driving.excavator', 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 20, 20);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const result = moveTo(state, employee.id, { x: 30, z: 30 }, { via: vehicle.id });
@@ -101,7 +100,6 @@ describe('moveTo — coordinate destination via a named vehicle', () => {
     const { employee: occupant } = hireEmployee(state.employees, 'driller', rng, 8, 8);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 8, 8);
     vehicle.occupantIds = [occupant.id];
-    vehicle.driverId = occupant.id;
     occupant.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const rng2 = new Random(SEED + 1);
@@ -137,7 +135,6 @@ describe('moveTo — board a vehicle', () => {
     const { employee: occupant } = hireEmployee(state.employees, 'driller', rng, 8, 8);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 8, 8);
     vehicle.occupantIds = [occupant.id];
-    vehicle.driverId = occupant.id;
     occupant.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const rng2 = new Random(SEED + 1);
@@ -157,5 +154,78 @@ describe('moveTo — board a vehicle', () => {
     expect(() => moveTo(state, employee.id, { vehicleId: 999999 })).not.toThrow();
     const result = moveTo(state, employee.id, { vehicleId: 999999 });
     expect(result.success).toBe(false);
+  });
+});
+
+// ── alightOnArrival (#1092) ──────────────────────────────────────────────────
+// Turns an itinerary already installed on an employee into one that ends with
+// them stepping off the vehicle. It is what makes an evacuation drive
+// (Zone.ts's clearZone) put its driver back on foot the moment the vehicle is
+// clear, replacing the `pendingEvacuationDestination` marker and the separate
+// arrived-driver sweep that used to dismount off it.
+
+describe('alightOnArrival', () => {
+  it('turns the final leg\'s no-op arrival step into an alight', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'driving.drill_rig', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    expect(moveTo(state, employee.id, { x: 6, z: 6 }, { via: vehicle.id }).success).toBe(true);
+    const legs = employee.itinerary!.legs;
+    expect(legs[legs.length - 1]!.onArrive).toEqual({ kind: 'none' });
+
+    alightOnArrival(employee);
+
+    expect(legs[legs.length - 1]!.onArrive).toEqual({ kind: 'alight' });
+  });
+
+  it('leaves every earlier leg untouched — only the last one gains the alight', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'driving.drill_rig', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+
+    expect(moveTo(state, employee.id, { x: 9, z: 9 }, { via: vehicle.id }).success).toBe(true);
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(1);
+    // The walk-to-vehicle leg's own board step is what the journey exists for.
+    expect(legs[0]!.onArrive).toEqual({ kind: 'board', vehicleId: vehicle.id });
+
+    alightOnArrival(employee);
+
+    expect(legs[0]!.onArrive).toEqual({ kind: 'board', vehicleId: vehicle.id });
+    expect(legs[legs.length - 1]!.onArrive).toEqual({ kind: 'alight' });
+  });
+
+  it('never overwrites an arrival step the journey already exists for (boundary)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'driving.drill_rig', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+
+    // A board-only itinerary: its single leg's arrival step IS the board.
+    expect(moveTo(state, employee.id, { vehicleId: vehicle.id }).success).toBe(true);
+    const legs = employee.itinerary!.legs;
+    const last = legs[legs.length - 1]!;
+    expect(last.onArrive.kind).toBe('board');
+
+    alightOnArrival(employee);
+
+    expect(last.onArrive.kind).toBe('board');
+  });
+
+  it('is a no-op for an employee with no itinerary at all, and for undefined (rejection)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(employee.itinerary).toBeNull();
+
+    expect(() => alightOnArrival(employee)).not.toThrow();
+    expect(() => alightOnArrival(undefined)).not.toThrow();
+    expect(employee.itinerary).toBeNull();
   });
 });

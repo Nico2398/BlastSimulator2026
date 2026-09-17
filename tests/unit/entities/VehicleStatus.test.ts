@@ -15,9 +15,9 @@ import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/ba
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
+    targetX: 0, targetZ: 0, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -106,7 +106,6 @@ describe('computeVehicleStatus', () => {
     // the new mover instead of a dangling fake employee id).
     const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(1), 0, 1);
     vehicle.occupantIds = [driver.id];
-    vehicle.driverId = driver.id;
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Stationary blocker sitting on the only possible route — never ticked.

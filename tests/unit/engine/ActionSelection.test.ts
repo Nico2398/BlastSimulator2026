@@ -341,7 +341,6 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
       targetZ: 3, // same side of the wall as the vehicle (x=20) — only the drive leg matters
     });
     vehicle.reservedForActionId = action.id;
-    vehicle.driverId = emp.id;
     vehicle.occupantIds = [emp.id];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id }; // I1: mount truth is Locomotion, not driverId alone
     blockColumn(state.navGrid!, 10); // would block a fresh walk to the vehicle, but continuity plans no such leg
@@ -425,7 +424,6 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
     purchaseVehicle(state.vehicles, 'debris_hauler', 5, 15); // a second, separate, free vehicle
     const mounted = makeEmployee(state, 5, 5);
     assignSkill(state.employees, mounted.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-    mountedVehicle.driverId = mounted.id;
     mountedVehicle.occupantIds = [mounted.id];
     mounted.locomotion = { kind: 'mounted', vehicleId: mountedVehicle.id };
 

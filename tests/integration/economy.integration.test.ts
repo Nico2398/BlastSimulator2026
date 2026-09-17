@@ -825,7 +825,6 @@ describe('Economy', () => {
     probeVehicle.state = 'idle';
     probeDriver.activeActionId = null;
     probeDriver.taskQueue = [];
-    probeVehicle.driverId = probeDriver.id;
     probeVehicle.occupantIds = [probeDriver.id];
     probeDriver.locomotion = { kind: 'mounted', vehicleId: probeVehicle.id };
     probeDriver.x = probeVehicle.x;
