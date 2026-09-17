@@ -76,6 +76,26 @@ runs:
           const runLiveness = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/run-liveness.cjs`);
           const api = createIssueApi(github, { owner, repo, log: core.info });
 
+          // Whichever account `inputs.token` resolves to — the same PAT
+          // `agentic-assign` writes assignment comments with, since both this
+          // action and that one are always invoked with
+          // `PAT_TOKEN_COPILOT_AUTOMATION`. `decideRunLiveness` trusts an
+          // assignment comment's phrase match only when it also comes from
+          // this login, so a comment anyone else posts containing the same
+          // phrase cannot read as evidence the run is still alive. See
+          // issue #1136's security finding. A failed read leaves this `null`,
+          // which the same fail-closed check turns into "no trusted comment
+          // found" rather than a crash.
+          let trustedAuthorLogin = null;
+          try {
+            const { data: self } = await github.rest.users.getAuthenticated();
+            trustedAuthorLogin = self.login;
+          } catch (error) {
+            core.warning(
+              `Could not resolve this run's own identity (${error.status ?? error.message}) — assignment comments will not be trusted as evidence this sweep.`
+            );
+          }
+
           // Every recent run across both runner workflows, unfiltered by
           // status — `run-liveness.cjs` reasons about status itself, and a
           // status filter is exactly the eventually-consistent read that
@@ -133,6 +153,7 @@ runs:
               now: Date.now(),
               graceWindowMinutes,
               excludeRunId: context.runId,
+              trustedAuthorLogin,
             });
 
             if (verdict.verdict !== 'lost') {

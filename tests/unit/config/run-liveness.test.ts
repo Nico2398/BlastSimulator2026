@@ -23,25 +23,43 @@ const require = createRequire(import.meta.url);
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const liveness = require(join(ROOT, '.github/scripts/run-liveness.cjs'));
-const { decideRunLiveness, resolveGraceWindowMinutes, DEFAULT_GRACE_WINDOW_MINUTES, LIVE_RUN_STATUSES } =
-  liveness;
+const {
+  decideRunLiveness,
+  resolveGraceWindowMinutes,
+  DEFAULT_GRACE_WINDOW_MINUTES,
+  LIVE_RUN_STATUSES,
+  isTrustedAssignmentAuthor,
+} = liveness;
 
 const NOW = 1_700_000_000_000; // fixed instant, epoch ms
 const isoSecondsAgo = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
 const isoMinutesAgo = (minutes: number) => isoSecondsAgo(minutes * 60);
 
+// The identity `agentic-recover-blocked` resolves via `users.getAuthenticated()`
+// for the token it shares with `agentic-assign` — see issue #1136's security
+// finding. Every fixture below that is meant to read as a genuine assignment
+// comment carries this author; `trustedAuthorLogin` in `baseInput` names it as
+// the trusted one, mirroring what the real caller passes in.
+const PIPELINE_LOGIN = 'agentic-pipeline-bot';
+const pipelineUser = { login: PIPELINE_LOGIN, type: 'User' };
+
 /** Base input every case overrides from — everything readable, nothing found. */
 const baseInput = (overrides: Partial<Record<string, unknown>> = {}) => ({
   issueNumber: 1130,
-  assignmentComments: [] as { body: string; created_at: string }[],
+  assignmentComments: [] as { body: string; created_at: string; user?: unknown }[],
   assignmentCommentsUnknown: false,
   workflowRuns: [] as { id: number; status?: string; created_at: string }[],
   workflowRunsUnknown: false,
   now: NOW,
+  trustedAuthorLogin: PIPELINE_LOGIN,
   ...overrides,
 });
 
-const assignmentComment = (body: string, created_at: string) => ({ body, created_at });
+const assignmentComment = (body: string, created_at: string, user: unknown = pipelineUser) => ({
+  body,
+  created_at,
+  user,
+});
 
 const ASSIGNMENT_BODY = 'The autonomous pipeline assignment for issue #1130 is now in progress.';
 
@@ -315,5 +333,153 @@ describe('decideRunLiveness — return shape', () => {
     expect(typeof result.reason).toBe('string');
     expect(result.reason.length).toBeGreaterThan(0);
     expect(typeof result.evidence).toBe('object');
+  });
+});
+
+describe('isTrustedAssignmentAuthor', () => {
+  it('trusts a login matching the trusted author, case-insensitively', () => {
+    expect(isTrustedAssignmentAuthor({ login: PIPELINE_LOGIN.toUpperCase() }, PIPELINE_LOGIN)).toBe(true);
+  });
+
+  it('rejects a different login', () => {
+    expect(isTrustedAssignmentAuthor({ login: 'some-random-account' }, PIPELINE_LOGIN)).toBe(false);
+  });
+
+  it('rejects when there is no trusted author to compare against', () => {
+    expect(isTrustedAssignmentAuthor({ login: PIPELINE_LOGIN }, null)).toBe(false);
+    expect(isTrustedAssignmentAuthor({ login: PIPELINE_LOGIN }, undefined)).toBe(false);
+    expect(isTrustedAssignmentAuthor({ login: PIPELINE_LOGIN }, '')).toBe(false);
+  });
+
+  it('rejects a comment with no user at all', () => {
+    expect(isTrustedAssignmentAuthor(null, PIPELINE_LOGIN)).toBe(false);
+    expect(isTrustedAssignmentAuthor(undefined, PIPELINE_LOGIN)).toBe(false);
+    expect(isTrustedAssignmentAuthor({}, PIPELINE_LOGIN)).toBe(false);
+  });
+});
+
+describe('decideRunLiveness — comment-spoofing (issue #1136 security finding)', () => {
+  // This repository is public: anyone can post a comment containing the exact
+  // assignment phrase, and GitHub timestamps it with real wall-clock time, so
+  // it always reads as fresh. Only a comment from the trusted pipeline
+  // identity may count toward the age check — a phrase match alone must not.
+  it('does not treat a phrase-matching comment from an untrusted author as this issue\'s assignment', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [
+          assignmentComment(ASSIGNMENT_BODY, isoSecondsAgo(6), { login: 'attacker', type: 'User' }),
+        ],
+        workflowRuns: [],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    // Read as "no genuine assignment comment found" rather than "live" or
+    // "lost" — the module's fail-closed direction, never a spoofed comment
+    // manufacturing liveness.
+    expect(result.verdict).toBe('undetermined');
+    expect(result.verdict).not.toBe('lost');
+  });
+
+  it('does not fall back to "live" just because an untrusted comment is fresh, when a real stale one exists', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [
+          // The real assignment, old enough that its run should be lost...
+          assignmentComment(ASSIGNMENT_BODY, isoMinutesAgo(DEFAULT_GRACE_WINDOW_MINUTES + 25)),
+          // ...and an attacker re-posting the phrase every few seconds to try
+          // to keep it reading as fresh.
+          assignmentComment(ASSIGNMENT_BODY, isoSecondsAgo(6), { login: 'attacker', type: 'User' }),
+        ],
+        workflowRuns: [],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    // The spoofed comment must not be picked as "the newest assignment
+    // comment" — only the trusted one counts, so this reads lost, not live.
+    expect(result.verdict).toBe('lost');
+  });
+
+  it('trusts nothing when the caller could not resolve its own identity', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [assignmentComment(ASSIGNMENT_BODY, isoSecondsAgo(6))],
+        workflowRuns: [],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+        trustedAuthorLogin: null,
+      })
+    );
+    expect(result.verdict).toBe('undetermined');
+    expect(result.verdict).not.toBe('lost');
+  });
+});
+
+describe('ASSIGNMENT_COMMENT_PATTERN — discriminating boundary', () => {
+  // Every fixture above pairs issue #1130 with a body mentioning #1130. These
+  // prove the pattern actually distinguishes this issue's own assignment
+  // phrasing from a comment that happens to mention the number, or the
+  // phrasing for some other issue.
+  it('does not match a comment mentioning the right issue number for an unrelated reason', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [
+          assignmentComment('See also #1130\'s original report for context.', isoSecondsAgo(6)),
+        ],
+        workflowRuns: [],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('undetermined');
+    expect(result.verdict).not.toBe('lost');
+  });
+
+  it('does not match the assignment phrasing written for a different issue', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [
+          assignmentComment(
+            '@claude — autonomous pipeline assignment for issue #999 (ready).',
+            isoSecondsAgo(6)
+          ),
+        ],
+        workflowRuns: [],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('undetermined');
+    expect(result.verdict).not.toBe('lost');
+  });
+});
+
+describe('decideRunLiveness — excludeRunId', () => {
+  // `action.yml` passes `excludeRunId: context.runId` — the sweeping run's
+  // own workflow run must never count toward the live-status short-circuit,
+  // or every sweep would read itself as proof the candidate is live.
+  it('does not let the caller\'s own run short-circuit to live, and falls through to the age check', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [
+          assignmentComment(ASSIGNMENT_BODY, isoMinutesAgo(DEFAULT_GRACE_WINDOW_MINUTES + 25)),
+        ],
+        // The only workflow run present is the caller's own — excluded, so
+        // nothing here should read as a live status.
+        workflowRuns: [{ id: 4242, status: 'in_progress', created_at: isoSecondsAgo(6) }],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+        excludeRunId: 4242,
+      })
+    );
+    expect(result.verdict).toBe('lost');
+    expect(result.evidence.mostRecentRun).toBeNull();
+  });
+
+  it('still counts a different run as live even when excludeRunId names another one', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: [assignmentComment(ASSIGNMENT_BODY, isoSecondsAgo(6))],
+        workflowRuns: [{ id: 999, status: 'in_progress', created_at: isoSecondsAgo(6) }],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+        excludeRunId: 4242,
+      })
+    );
+    expect(result.verdict).toBe('live');
   });
 });

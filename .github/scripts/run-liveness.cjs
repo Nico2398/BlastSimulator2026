@@ -33,11 +33,49 @@ const DEFAULT_GRACE_WINDOW_MINUTES = 5;
  * what identifies the comment as this issue's own assignment rather than some
  * other mention of the issue number.
  *
+ * The phrase alone is not proof, though: this repository is public, and
+ * `assignmentCommentsFor` (`issue-api.cjs`) returns every comment on the
+ * issue with no author filter. Anyone with a GitHub account — an attacker, or
+ * a human quoting the phrase in a reply — can post a comment containing this
+ * exact text at any time, and GitHub timestamps it with real, un-backdatable
+ * wall-clock time, so it always reads as fresh. That pushes `decideRunLiveness`
+ * toward `'live'`/`'undetermined'`, never toward `'lost'` — the failure mode
+ * is a genuinely dead run reading as live forever, which reopens the exact
+ * stall this module exists to catch, from the opposite direction. See
+ * issue #1136's security finding. `isTrustedAssignmentAuthor` below is the
+ * second half of the check this pattern alone cannot make.
+ *
  * @param {number} number
  * @returns {RegExp}
  */
 const ASSIGNMENT_COMMENT_PATTERN = (number) =>
   new RegExp(`autonomous pipeline assignment for issue #${number}\\b`);
+
+/**
+ * Whether a comment's author is the identity that actually posts assignment
+ * comments — the same account `agentic-assign` writes with
+ * (`PAT_TOKEN_COPILOT_AUTOMATION`; see `.github/actions/agentic-assign/action.yml`
+ * and `.github/actions/agentic-recover-blocked/action.yml`, which authenticates
+ * as that same token and resolves its own login via `users.getAuthenticated()`
+ * to pass in here).
+ *
+ * `trustedAuthorLogin` unset, or a comment with no resolvable `user.login`,
+ * both fail the check rather than pass it — an unverifiable author is not a
+ * verified one. That is the module's existing fail-closed polarity: it never
+ * turns a comment into "lost" evidence by omission, only ever costs it
+ * standing as "live" evidence, which is the safe direction here.
+ *
+ * Login comparison is case-insensitive, matching GitHub's own username rules.
+ *
+ * @param {{login?: string, type?: string}|null|undefined} user
+ * @param {string|null|undefined} trustedAuthorLogin
+ * @returns {boolean}
+ */
+function isTrustedAssignmentAuthor(user, trustedAuthorLogin) {
+  if (typeof trustedAuthorLogin !== 'string' || trustedAuthorLogin.length === 0) return false;
+  if (typeof user?.login !== 'string' || user.login.length === 0) return false;
+  return user.login.toLowerCase() === trustedAuthorLogin.toLowerCase();
+}
 
 /**
  * Workflow run statuses that count as still live — never second-guessed by
@@ -63,13 +101,14 @@ function undetermined(issueNumber, reason, evidence) {
  *
  * @param {{
  *   issueNumber: number,
- *   assignmentComments: Array<{body: string, created_at: string}>,
+ *   assignmentComments: Array<{body: string, created_at: string, user?: {login?: string, type?: string}|null}>,
  *   assignmentCommentsUnknown?: boolean,
  *   workflowRuns: Array<{id: number, status: string, created_at: string}>,
  *   workflowRunsUnknown?: boolean,
  *   now: number,
  *   graceWindowMinutes?: number,
  *   excludeRunId?: number,
+ *   trustedAuthorLogin?: string|null,
  * }} input
  * @returns {{ verdict: 'live'|'lost'|'undetermined', reason: string, evidence: object }}
  */
@@ -83,6 +122,7 @@ function decideRunLiveness(input) {
     now,
     graceWindowMinutes,
     excludeRunId = null,
+    trustedAuthorLogin = null,
   } = input;
 
   const effectiveGraceWindowMinutes =
@@ -113,11 +153,18 @@ function decideRunLiveness(input) {
     });
   }
 
-  // Step 2: find this issue's own assignment comment(s).
+  // Step 2: find this issue's own assignment comment(s) — the phrase match
+  // and the author check both have to hold. A comment merely mentioning the
+  // phrase (or the issue number) from an untrusted author is not evidence of
+  // anything; see `ASSIGNMENT_COMMENT_PATTERN`'s doc comment for why the
+  // phrase alone is spoofable in a public repository.
   const pattern = ASSIGNMENT_COMMENT_PATTERN(issueNumber);
-  const matched = assignmentComments.filter((comment) => pattern.test(comment?.body || ''));
+  const matched = assignmentComments.filter(
+    (comment) =>
+      pattern.test(comment?.body || '') && isTrustedAssignmentAuthor(comment?.user, trustedAuthorLogin)
+  );
   if (matched.length === 0) {
-    return undetermined(issueNumber, 'no assignment comment found — cannot establish assignment age.', {
+    return undetermined(issueNumber, 'no assignment comment found from a trusted author — cannot establish assignment age.', {
       assignmentCommentFound: false,
     });
   }
@@ -136,7 +183,7 @@ function decideRunLiveness(input) {
     .filter((entry) => entry.timestamp !== null)
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Step 6: an assignment comment was found but none of its timestamps parse.
+  // Step 4: an assignment comment was found but none of its timestamps parse.
   if (dated.length === 0) {
     return undetermined(issueNumber, 'assignment comment found but its timestamp could not be parsed.', {
       assignmentCommentFound: true,
@@ -179,6 +226,9 @@ function decideRunLiveness(input) {
       evidence,
     };
   }
+  // Step 6: same grace window, judged by the most recent run's own age
+  // instead of the assignment comment's — a run can be created slightly
+  // after its assignment comment posts.
   if (runAgeMs !== null && runAgeMs < graceWindowMs) {
     return {
       verdict: 'live',
@@ -216,4 +266,5 @@ module.exports = {
   DEFAULT_GRACE_WINDOW_MINUTES,
   ASSIGNMENT_COMMENT_PATTERN,
   LIVE_RUN_STATUSES,
+  isTrustedAssignmentAuthor,
 };

@@ -1717,6 +1717,118 @@ describe('the GitHub half', () => {
       expect(await client.labelAppliedAt(1, 'blocked', now)).toBe(now);
     });
   });
+
+  // `run-liveness.cjs` reasons about which of these, if any, is genuinely this
+  // issue's own assignment comment — see issue #1136. This accessor itself
+  // stays generic: every comment, unfiltered, `user` included so the caller
+  // can tell a genuine pipeline comment from a spoofed one.
+  describe('assignmentCommentsFor', () => {
+    it('reads every page of comments and reports the author of each', async () => {
+      const pages: Record<number, { data: unknown[] }> = {
+        1: {
+          data: Array.from({ length: 100 }, (_, i) => ({
+            body: `filler ${i}`,
+            created_at: '2026-08-01T00:00:00Z',
+            user: { login: 'someone', type: 'User' },
+          })),
+        },
+        2: {
+          data: [
+            {
+              body: '@claude — autonomous pipeline assignment for issue #1 (ready).',
+              created_at: '2026-08-02T00:00:00Z',
+              user: { login: 'agentic-pipeline-bot', type: 'User' },
+            },
+          ],
+        },
+      };
+      const client = api({
+        listComments: async ({ page }: { page: number }) => pages[page] ?? { data: [] },
+      });
+      const result = await client.assignmentCommentsFor(1);
+      expect(result.unknown).toBe(false);
+      expect(result.comments).toHaveLength(101);
+      expect(result.comments[100]).toEqual({
+        body: '@claude — autonomous pipeline assignment for issue #1 (ready).',
+        created_at: '2026-08-02T00:00:00Z',
+        user: { login: 'agentic-pipeline-bot', type: 'User' },
+      });
+    });
+
+    it('reports null user rather than guessing one when a comment carries none', async () => {
+      const client = api({
+        listComments: async () => ({
+          data: [{ body: 'no user on this payload', created_at: '2026-08-01T00:00:00Z' }],
+        }),
+      });
+      const result = await client.assignmentCommentsFor(1);
+      expect(result.comments[0].user).toBeNull();
+    });
+
+    // Fail closed: a read that could not complete must never read as "this
+    // issue has no comments" — that is indistinguishable from a genuinely
+    // silent issue to every caller downstream.
+    it('reports unknown, not empty, when the read fails', async () => {
+      const client = createIssueApi(
+        {
+          rest: {
+            issues: {
+              ...octokit().rest.issues,
+              listComments: async () => {
+                throw Object.assign(new Error('Server Error'), { status: 500 });
+              },
+            },
+            git: octokit().rest.git,
+            pulls: octokit().rest.pulls,
+          },
+          graphql: octokit().graphql,
+        },
+        { owner: 'o', repo: 'r', sleep: instant }
+      );
+      const result = await client.assignmentCommentsFor(1);
+      expect(result).toEqual({ comments: [], unknown: true });
+    });
+
+    it('asks again on a transient failure before succeeding', async () => {
+      let attempts = 0;
+      const client = createIssueApi(
+        {
+          rest: {
+            issues: {
+              ...octokit().rest.issues,
+              listComments: async () => {
+                attempts += 1;
+                if (attempts < 2) {
+                  throw Object.assign(new Error('Bad Gateway'), { status: 502 });
+                }
+                return { data: [{ body: 'ok', created_at: '2026-08-01T00:00:00Z', user: null }] };
+              },
+            },
+            git: octokit().rest.git,
+            pulls: octokit().rest.pulls,
+          },
+          graphql: octokit().graphql,
+        },
+        { owner: 'o', repo: 'r', sleep: instant }
+      );
+      const result = await client.assignmentCommentsFor(1);
+      expect(result.unknown).toBe(false);
+      expect(attempts).toBe(2);
+    });
+
+    it('caches the read — one call however many rules ask about the same issue', async () => {
+      let calls = 0;
+      const client = api({
+        listComments: async () => {
+          calls += 1;
+          return { data: [] };
+        },
+      });
+      await client.assignmentCommentsFor(1);
+      await client.assignmentCommentsFor(1);
+      expect(calls).toBe(1);
+    });
+  });
 });
 
 // Structural assertions cannot show that the guards actually do anything, and

@@ -458,12 +458,22 @@ function createIssueApi(
     },
 
     /**
-     * The comments on this issue that assigned it to a run — the evidence
-     * `run-liveness.cjs` reasons about when deciding whether an in-flight run
-     * is genuinely lost or merely not yet visible. See issue #1136.
+     * Every comment on this issue, unfiltered — `run-liveness.cjs` reasons
+     * about which of them, if any, is genuinely this issue's own assignment
+     * comment. See issue #1136.
+     *
+     * Despite the name, this does **not** filter for the assignment phrase or
+     * for authorship — it is the generic accessor, mirroring `deliverableFor`
+     * and `declaredBlockedBy` above: a plain read here, the domain-specific
+     * rule (the `ASSIGNMENT_COMMENT_PATTERN` match, and which author counts as
+     * the pipeline's own) in the caller. This repository is public, and
+     * anyone can post a comment containing the exact assignment phrase for
+     * some other issue's real assignment — `user` is returned precisely so a
+     * caller can tell a genuine pipeline comment from one that merely quotes
+     * or spoofs the phrase, rather than trusting phrase-match alone.
      *
      * @param {number} number
-     * @returns {Promise<{comments: {body: string, created_at: string}[], unknown: boolean}>}
+     * @returns {Promise<{comments: {body: string, created_at: string, user: {login: string, type: string}|null}[], unknown: boolean}>}
      */
     async assignmentCommentsFor(number) {
       if (assignmentComments.has(number)) return assignmentComments.get(number);
@@ -488,6 +498,7 @@ function createIssueApi(
           comments: items.map((comment) => ({
             body: comment.body || '',
             created_at: comment.created_at,
+            user: comment.user ? { login: comment.user.login, type: comment.user.type } : null,
           })),
           unknown: !complete,
         };
