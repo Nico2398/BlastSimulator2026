@@ -384,3 +384,76 @@ describe('advanceAlongPath — route-commitment guard (#1129)', () => {
     expect(result.committed.remainingCost).toBeCloseTo(5, 5);
   });
 });
+
+// ── #1129 fix (ba8bdc1b): retrace guard false-positive + off-grid arrival ──
+//
+// The route-commitment guard above landed with two bugs of its own, fixed in
+// ba8bdc1b with no regression coverage. Both are exercised here directly
+// against the specific branch each fix touches.
+
+describe('advanceAlongPath — stationary-at-dead-end does not misfire the retrace guard (#1129 bug 1)', () => {
+  it('holds position instead of routing off toward the raw destination when parked at a zero-distance-hop commitment', () => {
+    // Agent is parked at (10,0) — a NavGrid-clamped dead end short of a raw
+    // destination (50,0) far off to the east. Every tick's fresh replan can
+    // only ever hand back (10,0) again (nothing further is reachable), and
+    // the carried commitment reflects a hop that moved zero distance: its
+    // `fromX/fromZ` (where the hop started) equals its own `waypointX/waypointZ`
+    // (where it ended) — the ordinary shape once an agent is genuinely stuck
+    // in place, not the two-different-points shape a real retrace requires.
+    const destinationX = 50;
+    const destinationZ = 0;
+    const committedAtDeadEnd: RouteCommitment = {
+      waypointX: 10, waypointZ: 0,
+      destX: destinationX, destZ: destinationZ,
+      remainingCost: 0,
+      fromX: 10, fromZ: 0, // zero-distance hop: from === waypoint
+    };
+    // Single-waypoint fresh path whose only entry is that same stationary
+    // cell — the clamped replan's own target, tick after tick.
+    const freshPath = { found: true, waypoints: [{ x: 10, z: 0 }], totalCost: 0 };
+
+    const result = advanceAlongPath(baseInput({
+      x: 10, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX, destinationZ,
+      path: freshPath,
+      committed: committedAtDeadEnd,
+    }));
+
+    // Pre-fix, the unguarded isRetrace check treats this self-referential
+    // "from" as a retrace signature and forces a straight, unclamped hop at
+    // the raw destination (50,0) — the agent would end this tick partway
+    // toward x=50. The fix's extra guard clause requires fromX/fromZ to
+    // differ from waypointX/waypointZ before calling it a retrace, so a
+    // parked agent simply re-adopts the fresh (still-stationary) target and
+    // does not move.
+    expect(result.x).toBe(10);
+    expect(result.z).toBe(0);
+  });
+});
+
+describe('advanceAlongPath — off-grid destination still completes the leg (#1129 bug 2)', () => {
+  it('reports the leg complete on reaching the fresh path\'s own last waypoint even though it never equals the raw destination', () => {
+    // destinationX/Z (100,0) sits far outside anything the NavGrid could
+    // route to — findPath's own clampToGrid means the route's actual last
+    // waypoint is (5,0), which will never equal the raw destination
+    // coordinates. Agent starts one short hop away from that clamped
+    // endpoint, well within walkSpeed for a single tick.
+    const result = advanceAlongPath(baseInput({
+      x: 4, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 100, destinationZ: 0,
+      path: { found: true, waypoints: [{ x: 4, z: 0 }, { x: 5, z: 0 }] },
+      committed: NULL_ROUTE_COMMITMENT,
+    }));
+
+    // Pre-fix, legComplete required hopTarget to exactly equal
+    // destinationX/Z — (5,0) never equals (100,0), so the agent would reach
+    // (5,0) and report isPathComplete: false forever, stuck one cell short
+    // with no further path to walk. The fix's second arm (hopTarget equals
+    // the fresh path's own last waypoint) completes the leg here instead.
+    expect(result.x).toBe(5);
+    expect(result.z).toBe(0);
+    expect(result.isPathComplete).toBe(true);
+  });
+});
