@@ -146,6 +146,28 @@ export interface Employee {
   /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle, morale −2/tick until the path clears. */
   isMoveStuck: boolean;
   /**
+   * Route-commitment fields (#1129) — the in-flight waypoint and cost
+   * baseline the employee committed to on a previous tick, so a fresh
+   * per-tick replan (findExactPath) that returns a differently-shaped but
+   * equal-cost route does not make the employee abandon an in-flight hop and
+   * walk back to where it started. Null when no commitment is in flight.
+   * Mirrors AgentAdvance.ts's RouteCommitment shape field-for-field.
+   */
+  committedWaypointX?: number | null;
+  committedWaypointZ?: number | null;
+  committedDestX?: number | null;
+  committedDestZ?: number | null;
+  committedRemainingCost?: number | null;
+  /**
+   * Position the current committed hop started from (#1129) — mirrors
+   * `RouteCommitment.fromX`/`fromZ`. Round-tripped by
+   * Locomotion.ts's readCommitted/writeCommitted so the retrace guard in
+   * `resolveTargetWaypoint` actually sees a `from` position on a real tick,
+   * not just inside a fixture that threads a `RouteCommitment` directly.
+   */
+  committedFromX?: number | null;
+  committedFromZ?: number | null;
+  /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside
    * destinationX/destinationZ by the claim step; consumed by
@@ -265,6 +287,13 @@ export function hireEmployee(
     destinationZ: null,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
+    committedWaypointX: null,
+    committedWaypointZ: null,
+    committedDestX: null,
+    committedDestZ: null,
+    committedRemainingCost: null,
+    committedFromX: null,
+    committedFromZ: null,
     pendingRestDuration: null,
     pendingRestNeedKey: null,
     pendingTaskDuration: null,

@@ -3,7 +3,9 @@
 // duplicated this sequence end to end (#407 review round 2).
 
 import { describe, it, expect } from 'vitest';
-import { advanceAlongPath, type AdvanceAlongPathInput } from '../../../src/core/nav/AgentAdvance.js';
+import {
+  advanceAlongPath, NULL_ROUTE_COMMITMENT, type AdvanceAlongPathInput, type RouteCommitment,
+} from '../../../src/core/nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, NAV_MAX_CLIMB_HEIGHT, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -17,6 +19,11 @@ function baseInput(overrides?: Partial<AdvanceAlongPathInput>): AdvanceAlongPath
     consecutiveFailures: 0,
     isStuck: false,
     path: { found: true, waypoints: [{ x: 10, z: 0 }] },
+    // #1129: AdvanceAlongPathInput now carries a mandatory route-commitment
+    // baseline (RouteCommitment) across ticks. NULL_ROUTE_COMMITMENT is the
+    // "no commitment yet" default every pre-existing test in this file
+    // implicitly wants — none of them exercise the commitment guard itself.
+    committed: NULL_ROUTE_COMMITMENT,
     ...overrides,
   };
 }
@@ -233,5 +240,220 @@ describe('advanceAlongPath — waypoints the agent has already walked', () => {
     // No grid to prove the skip is legal, so waypoint 1 stands and the agent
     // walks back toward it — the pre-#953 behaviour, unchanged.
     expect(result.x).toBeGreaterThan(0.3);
+  });
+});
+
+// ── #1129: cross-tick route-commitment guard ────────────────────────────────
+//
+// Every drive/foot leg recomputes its route from scratch each tick
+// (findExactPath). Two near-adjacent start points toward the same goal can
+// get two differently-shaped but cost-consistent routes back — advancing
+// along the second route can land the agent back at (or near) the first
+// route's start point, oscillating forever. `RouteCommitment` persists the
+// in-flight target waypoint and its cost baseline across ticks so a fresh
+// replan only overrides it when clearly better (beyond
+// ROUTE_COMMIT_TIE_EPSILON), not just differently shaped at an equal cost.
+//
+// The skeleton wires `committed` straight through `advanceAlongPath`
+// unmodified (`resolveTargetWaypoint` is a stub that throws and is never
+// called) — every case below fails against that pass-through until the
+// implementer wires the guard in.
+
+describe('advanceAlongPath — route-commitment guard (#1129)', () => {
+  it('core regression: does not walk back to the tick-1 start when tick-2 replans a differently-shaped, near-equal-cost route', () => {
+    // Path A (tick 1): from (24,20), first real hop to (24,18) — walkSpeed 2
+    // covers that hop exactly in one tick. totalCost 9.657, matching the
+    // reported oscillation's cost.
+    const destinationX = 22;
+    const destinationZ = 24;
+    const pathA = {
+      found: true,
+      waypoints: [{ x: 24, z: 20 }, { x: 24, z: 18 }, { x: 25, z: 17 }, { x: 22, z: 24 }],
+      totalCost: 9.657,
+    };
+    const tick1 = advanceAlongPath(baseInput({
+      x: 24, z: 20,
+      walkSpeed: AGENT_WALK_SPEED, // 2
+      destinationX, destinationZ,
+      path: pathA,
+      committed: NULL_ROUTE_COMMITMENT,
+    }));
+
+    // Path B (tick 2): freshly recomputed from tick 1's resulting position.
+    // Its first real hop points BACK at (24,20) — tick 1's own start — while
+    // its total cost is exactly one tick's walk distance (2) cheaper than
+    // path A's, the cost-consistent-but-differently-shaped property from the
+    // issue (9.657 vs 7.657).
+    const pathB = {
+      found: true,
+      waypoints: [{ x: tick1.x, z: tick1.z }, { x: 24, z: 20 }, { x: 25, z: 19 }, { x: 22, z: 24 }],
+      totalCost: 7.657,
+    };
+    const tick2 = advanceAlongPath(baseInput({
+      x: tick1.x, z: tick1.z,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX, destinationZ,
+      path: pathB,
+      // Threaded straight from tick 1's own outcome, as the real per-tick
+      // caller would.
+      committed: tick1.committed,
+    }));
+
+    const distToDest = (x: number, z: number): number =>
+      Math.hypot(x - destinationX, z - destinationZ);
+
+    // (a) Net distance to destination strictly decreases from tick 0's start
+    // to tick 2's resulting position — it must not return to (or past) it.
+    expect(distToDest(tick2.x, tick2.z)).toBeLessThan(distToDest(24, 20));
+
+    // (b) Tick 2 must not have walked the agent back toward tick 1's start —
+    // i.e. it must not have landed back on (24,20).
+    expect(tick2.x === 24 && tick2.z === 20).toBe(false);
+  });
+
+  it('discards a stale commitment when the destination changes', () => {
+    const stale: RouteCommitment = {
+      waypointX: 5, waypointZ: 5, destX: 1, destZ: 1, remainingCost: 3,
+    };
+    const freshPath = { found: true, waypoints: [{ x: 0, z: 0 }, { x: 2, z: 2 }], totalCost: 4 };
+
+    const result = advanceAlongPath(baseInput({
+      x: 0, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 10, // different from stale.destX/destZ
+      path: freshPath,
+      committed: stale,
+    }));
+
+    // The commitment written back must describe THIS leg's destination and
+    // target, not the stale one from a previous leg.
+    expect(result.committed.destX).toBe(10);
+    expect(result.committed.destZ).toBe(10);
+    expect(result.committed.waypointX).toBe(2);
+    expect(result.committed.waypointZ).toBe(2);
+  });
+
+  it('discards a commitment whose waypoint has become impassable, staying reactive to the grid', () => {
+    const flat = heightGrid([
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+    // The committed waypoint (2,2) is out of this 5x3 grid's z range (0-2) —
+    // use (2,1) instead, then block it.
+    flat.cells[1]![2] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false, surfaceY: 0 };
+
+    const committedButBlocked: RouteCommitment = {
+      waypointX: 2, waypointZ: 1, destX: 10, destZ: 10, remainingCost: 5,
+    };
+    const freshPath = { found: true, waypoints: [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 10, z: 10 }], totalCost: 6 };
+
+    const result = advanceAlongPath(baseInput({
+      x: 0, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 10,
+      path: freshPath,
+      committed: committedButBlocked,
+      navGrid: flat,
+    }));
+
+    // The now-blocked (2,1) must not survive as the resolved commitment —
+    // the fresh path's own target takes over.
+    expect(result.committed.waypointX).toBe(4);
+    expect(result.committed.waypointZ).toBe(0);
+  });
+
+  it('adopts a fresh route clearly better than the committed one (beyond ROUTE_COMMIT_TIE_EPSILON)', () => {
+    const committed: RouteCommitment = {
+      waypointX: 3, waypointZ: 3, destX: 10, destZ: 10, remainingCost: 10,
+    };
+    // Fresh cost 5 is 5 below the committed remainingCost of 10 — well past
+    // the epsilon tie band, a genuine improvement.
+    const freshPath = { found: true, waypoints: [{ x: 0, z: 0 }, { x: 7, z: 7 }, { x: 10, z: 10 }], totalCost: 5 };
+
+    const result = advanceAlongPath(baseInput({
+      x: 0, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 10,
+      path: freshPath,
+      committed,
+    }));
+
+    expect(result.committed.waypointX).toBe(7);
+    expect(result.committed.waypointZ).toBe(7);
+    expect(result.committed.remainingCost).toBeCloseTo(5, 5);
+  });
+});
+
+// ── #1129 fix (ba8bdc1b): retrace guard false-positive + off-grid arrival ──
+//
+// The route-commitment guard above landed with two bugs of its own, fixed in
+// ba8bdc1b with no regression coverage. Both are exercised here directly
+// against the specific branch each fix touches.
+
+describe('advanceAlongPath — stationary-at-dead-end does not misfire the retrace guard (#1129 bug 1)', () => {
+  it('holds position instead of routing off toward the raw destination when parked at a zero-distance-hop commitment', () => {
+    // Agent is parked at (10,0) — a NavGrid-clamped dead end short of a raw
+    // destination (50,0) far off to the east. Every tick's fresh replan can
+    // only ever hand back (10,0) again (nothing further is reachable), and
+    // the carried commitment reflects a hop that moved zero distance: its
+    // `fromX/fromZ` (where the hop started) equals its own `waypointX/waypointZ`
+    // (where it ended) — the ordinary shape once an agent is genuinely stuck
+    // in place, not the two-different-points shape a real retrace requires.
+    const destinationX = 50;
+    const destinationZ = 0;
+    const committedAtDeadEnd: RouteCommitment = {
+      waypointX: 10, waypointZ: 0,
+      destX: destinationX, destZ: destinationZ,
+      remainingCost: 0,
+      fromX: 10, fromZ: 0, // zero-distance hop: from === waypoint
+    };
+    // Single-waypoint fresh path whose only entry is that same stationary
+    // cell — the clamped replan's own target, tick after tick.
+    const freshPath = { found: true, waypoints: [{ x: 10, z: 0 }], totalCost: 0 };
+
+    const result = advanceAlongPath(baseInput({
+      x: 10, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX, destinationZ,
+      path: freshPath,
+      committed: committedAtDeadEnd,
+    }));
+
+    // Pre-fix, the unguarded isRetrace check treats this self-referential
+    // "from" as a retrace signature and forces a straight, unclamped hop at
+    // the raw destination (50,0) — the agent would end this tick partway
+    // toward x=50. The fix's extra guard clause requires fromX/fromZ to
+    // differ from waypointX/waypointZ before calling it a retrace, so a
+    // parked agent simply re-adopts the fresh (still-stationary) target and
+    // does not move.
+    expect(result.x).toBe(10);
+    expect(result.z).toBe(0);
+  });
+});
+
+describe('advanceAlongPath — off-grid destination still completes the leg (#1129 bug 2)', () => {
+  it('reports the leg complete on reaching the fresh path\'s own last waypoint even though it never equals the raw destination', () => {
+    // destinationX/Z (100,0) sits far outside anything the NavGrid could
+    // route to — findPath's own clampToGrid means the route's actual last
+    // waypoint is (5,0), which will never equal the raw destination
+    // coordinates. Agent starts one short hop away from that clamped
+    // endpoint, well within walkSpeed for a single tick.
+    const result = advanceAlongPath(baseInput({
+      x: 4, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 100, destinationZ: 0,
+      path: { found: true, waypoints: [{ x: 4, z: 0 }, { x: 5, z: 0 }] },
+      committed: NULL_ROUTE_COMMITMENT,
+    }));
+
+    // Pre-fix, legComplete required hopTarget to exactly equal
+    // destinationX/Z — (5,0) never equals (100,0), so the agent would reach
+    // (5,0) and report isPathComplete: false forever, stuck one cell short
+    // with no further path to walk. The fix's second arm (hopTarget equals
+    // the fresh path's own last waypoint) completes the leg here instead.
+    expect(result.x).toBe(5);
+    expect(result.z).toBe(0);
+    expect(result.isPathComplete).toBe(true);
   });
 });

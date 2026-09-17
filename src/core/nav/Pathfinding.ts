@@ -81,6 +81,29 @@ const DIRECT_LINE_TOLERANCE = 1.1;
  */
 const ASTAR_HEURISTIC_WEIGHT = 1.3;
 
+/**
+ * Deterministic tie-break for the A* open-set (#1129): two neighbours whose
+ * f-scores differ by less than this are treated as tied, and the tie is
+ * broken by a fixed, position-derived key (`cellIndex`) rather than by heap
+ * insertion/expansion order. Plain float f-score comparisons let a heap-order
+ * artifact — which of two equal-f nodes got pushed/popped first — silently
+ * decide the route, so a start point that drifts by a sub-cell fraction
+ * between ticks (`findExactPath` recomputing every tick from the agent's own
+ * continuously-shifting position) could get back a differently-shaped route
+ * of the identical cost, which is exactly the shape of route the cross-tick
+ * commitment guard in `AgentAdvance.ts` exists to damp (#1129).
+ *
+ * Must stay far smaller than the smallest real cost difference the grid can
+ * produce (`MIN_WALKABLE_COST`, ≥1.0 per orthogonal step) even summed across
+ * every cell in the biggest grid this game builds — `grid.width * grid.height
+ * * ASTAR_TIE_BREAK_EPSILON` — or the tie-break would start reordering
+ * genuinely different-cost routes instead of merely stabilizing identical-
+ * cost ones. At 1e-7 and a generous 500×500 grid upper bound, that product is
+ * 0.025 — a 40× margin under MIN_WALKABLE_COST (1.0 / 0.025), roughly 1.6
+ * orders of magnitude.
+ */
+const ASTAR_TIE_BREAK_EPSILON = 1e-7;
+
 // ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
 // ---------------------------------------------------------------------------
@@ -183,6 +206,15 @@ function cellCoords(grid: NavGrid, index: number): { x: number; z: number } {
     x: grid.originX + (index % grid.width),
     z: grid.originZ + ((index / grid.width) | 0),
   };
+}
+
+/**
+ * A* open-set key with a deterministic, position-derived tie-break added on
+ * (#1129) — see `ASTAR_TIE_BREAK_EPSILON`'s own doc comment for why the
+ * offset stays negligible against any genuine cost difference.
+ */
+function tieBreakKey(fScore: number, pos: number): number {
+  return fScore + pos * ASTAR_TIE_BREAK_EPSILON;
 }
 
 // ---------------------------------------------------------------------------
@@ -623,7 +655,7 @@ function findOrdinaryPath(
   stampArr[startPos] = currentStamp;
   cameFromArr[startPos] = -1;
   const hStart = octileHeuristic(sx, sz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
-  openHeap.push({ key: hStart, pos: startPos, g: 0 });
+  openHeap.push({ key: tieBreakKey(hStart, startPos), pos: startPos, g: 0 });
 
   while (openHeap.size > 0 && exploredCount < budget) {
     const current = openHeap.pop()!;
@@ -664,7 +696,7 @@ function findOrdinaryPath(
         stampArr[neighborPos] = currentStamp;
         cameFromArr[neighborPos] = current.pos;
         const h = octileHeuristic(nx, nz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
-        openHeap.push({ key: tentativeG + h, pos: neighborPos, g: tentativeG });
+        openHeap.push({ key: tieBreakKey(tentativeG + h, neighborPos), pos: neighborPos, g: tentativeG });
       }
     }
   }

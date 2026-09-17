@@ -14,7 +14,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
-import { advanceAlongPath } from '../nav/AgentAdvance.js';
+import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
@@ -29,6 +29,30 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
 import { dismountVehicleDriver } from './VehicleReservation.js';
+
+/** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
+function readCommitted(emp: Employee): RouteCommitment {
+  return {
+    waypointX: emp.committedWaypointX ?? null,
+    waypointZ: emp.committedWaypointZ ?? null,
+    destX: emp.committedDestX ?? null,
+    destZ: emp.committedDestZ ?? null,
+    remainingCost: emp.committedRemainingCost ?? null,
+    fromX: emp.committedFromX ?? null,
+    fromZ: emp.committedFromZ ?? null,
+  };
+}
+
+/** Writes an `advanceAlongPath` outcome's route-commitment (#1129) back onto `emp` for next tick. */
+function writeCommitted(emp: Employee, committed: RouteCommitment): void {
+  emp.committedWaypointX = committed.waypointX;
+  emp.committedWaypointZ = committed.waypointZ;
+  emp.committedDestX = committed.destX;
+  emp.committedDestZ = committed.destZ;
+  emp.committedRemainingCost = committed.remainingCost;
+  emp.committedFromX = committed.fromX ?? null;
+  emp.committedFromZ = committed.fromZ ?? null;
+}
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
 interface LocomotionResult {
@@ -114,10 +138,12 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     return;
   }
 
+  const avoidVehicles = !isDestinationOccupied(state, destX, destZ);
+
   const path = state.navGrid
     ? findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ,
-        avoidVehicles: !isDestinationOccupied(state, destX, destZ),
+        avoidVehicles,
       })
     : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: destX, z: destZ }] };
 
@@ -125,11 +151,13 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     x: emp.x, z: emp.z, walkSpeed: AGENT_WALK_SPEED,
     destinationX: destX, destinationZ: destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
+    committed: readCommitted(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
 
   if (!outcome.pathFound) {
     if (emp.isMoveStuck) {
@@ -278,11 +306,13 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     x: emp.x, z: emp.z, walkSpeed: speed,
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
+    committed: readCommitted(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
   if (isDrive) {
     vehicle!.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle!.isMoveStuck = outcome.isStuck;
@@ -368,11 +398,15 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
       destinationX: leg.destX, destinationZ: leg.destZ,
       consecutiveFailures: 0, isStuck: false,
       path: reroute,
+      // A reroute is trusted immediately — never compared against a stale
+      // main-route commitment from before the occupancy block.
+      committed: NULL_ROUTE_COMMITMENT,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
     emp.isMoveStuck = false;
     emp.vehicleWaitingTicks = 0;
+    writeCommitted(emp, outcome.committed);
     vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle.isMoveStuck = false;
     vehicle.waitingTicks = 0;
