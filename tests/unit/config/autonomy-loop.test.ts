@@ -699,12 +699,14 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
   });
 
   // #614: a concurrency-blocked run can be reported by the Actions API as
-  // `pending`, not only `queued` — the narrower two-status check missed it
-  // live and blocked a run that went on to open its PR. Full set mirrors
-  // agentic-ci-failure.yml's own LIVE array for the identical check.
+  // `pending`, not only `queued`. #1136 moved the status set and the
+  // liveness verdict itself out of this file and into `run-liveness.cjs`
+  // (checked below, under "cannot drift between its two copies") — this
+  // action now only has to prove it delegates, excluding its own run.
   it('only recovers when nothing is queued or live behind this run', () => {
-    expect(action).toContain("['queued', 'in_progress', 'waiting', 'requested', 'pending']");
-    expect(action).toContain('run.id !== context.runId');
+    expect(action).toContain('run-liveness.cjs');
+    expect(action).toContain('runLiveness.decideRunLiveness');
+    expect(action).toContain('excludeRunId: context.runId');
   });
 
   it('excludes its own issue from the sweep', () => {
@@ -713,20 +715,27 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
   });
 });
 
-// #614: the "is a runner session live" predicate is deliberately inlined
-// twice — here and in agentic-ci-failure.yml's guard — because the latter
-// runs with no checkout and cannot `require()` a shared .cjs module. Pinning
-// each copy on its own was not enough: agentic-ci-failure.yml has carried
-// the full non-terminal status set since #507 (13 Aug), agentic-recover-blocked
+// #614: the "is a runner session live" predicate used to be inlined twice —
+// here and in agentic-ci-failure.yml's guard — because the latter runs with
+// no checkout and cannot `require()` a shared .cjs module. Pinning each copy
+// on its own was not enough: agentic-ci-failure.yml has carried the full
+// non-terminal status set since #507 (13 Aug), agentic-recover-blocked
 // shipped with only `['queued', 'in_progress']` three weeks later in #641,
 // and nothing compared the two, so #614's `pending` run was invisible to one
-// check and would have been caught by the other. Assert the copies equal
-// each other, not just that each individually contains what it should.
+// check and would have been caught by the other.
+//
+// #1136 removed the duplicate on the checked-out side entirely:
+// agentic-recover-blocked now `require()`s `run-liveness.cjs`'s
+// `LIVE_RUN_STATUSES` as its one source of truth instead of carrying its own
+// copy. agentic-ci-failure.yml still cannot — no checkout there — so its
+// inline `LIVE` array remains the second copy, and this still has to prove
+// that copy cannot drift from the shared module's.
 describe('the runner-liveness predicate cannot drift between its two copies', () => {
   const recover = readFileSync(
     join(ROOT, '.github/actions/agentic-recover-blocked/action.yml'), 'utf8'
   );
   const failsafe = workflow('agentic-ci-failure.yml');
+  const runLiveness = require(join(ROOT, '.github/scripts/run-liveness.cjs'));
 
   const extract = (source: string, name: string): string => {
     const match = new RegExp(`const ${name} = (\\[[^\\]]*\\]);`).exec(source);
@@ -738,13 +747,17 @@ describe('the runner-liveness predicate cannot drift between its two copies', ()
     expect(extract(recover, 'RUNNERS')).toBe(extract(failsafe, 'RUNNERS'));
   });
 
-  it('polls the same set of non-terminal run statuses in both copies', () => {
-    const recoverLive = extract(recover, 'LIVE');
-    const failsafeLive = extract(failsafe, 'LIVE');
-    expect(recoverLive).toBe(failsafeLive);
-    // Pin the content too, not only the agreement — two copies that agree on
-    // a narrowed set would pass the line above and still reproduce #614.
-    expect(recoverLive).toBe("['queued', 'in_progress', 'waiting', 'requested', 'pending']");
+  it('no longer carries its own status list — it requires the shared one', () => {
+    expect(recover).toContain(".github/scripts/run-liveness.cjs");
+    expect(recover).not.toMatch(/const LIVE = \[/);
+  });
+
+  it('polls the same set of non-terminal run statuses as the shared module', () => {
+    const failsafeLive = JSON.parse(extract(failsafe, 'LIVE').replace(/'/g, '"'));
+    expect(failsafeLive).toEqual(runLiveness.LIVE_RUN_STATUSES);
+    // Pin the content too, not only the agreement — a narrowed set on both
+    // sides would pass the line above and still reproduce #614.
+    expect(failsafeLive).toEqual(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
   });
 });
 
@@ -1785,6 +1798,14 @@ describe('no verdict in the Actions layer is decided on a duration', () => {
     // read — the verdict is the read's own result, never how long it took.
     '.github/scripts/issue-api.cjs': 'event ordering + network backoff',
     '.github/scripts/assignability.cjs': 'event ordering + brake anchor',
+    // Wall-clock grace window tolerating listWorkflowRuns/comment-read eventual
+    // consistency before concluding a run is lost — not a sleep, evaluated once
+    // at read time in an always() teardown; see issue #1136.
+    '.github/scripts/run-liveness.cjs': 'eventual-consistency grace window, not a sleep',
+    // Passes `Date.now()` and the grace-window input straight through to
+    // `run-liveness.cjs`'s own verdict — the same non-sleep, read-time grace
+    // window as that module, just at the call site; see issue #1136.
+    '.github/actions/agentic-recover-blocked/action.yml': 'eventual-consistency grace window, not a sleep',
   };
 
   const AGENTIC_FILES = [
