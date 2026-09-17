@@ -279,7 +279,7 @@ function buildFootOnlyItinerary(
  * themselves via tickHaulingProgress/tickBreakProgress phase machines on
  * `Vehicle`).
  */
-export function planFragmentTaskItinerary(
+function planFragmentTaskItinerary(
   state: GameState,
   employee: Employee,
   goal: Goal,

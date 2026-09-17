@@ -32,7 +32,7 @@ import { scale, vec3, ZERO } from '../math/Vec3.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
 
 /** Registered arrival effect ids an itinerary leg's `onArrive` may name. */
-export type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
+type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
 
 type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: EventEmitter) => boolean;
 
@@ -102,7 +102,15 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
   if (vehicle.payload === null) return false;
 
   const { fragmentId } = vehicle.payload;
-  deliverToDepot(state.logistics, fragmentId, state.collectedOre);
+  // deliverToDepot's own success/failure must be honored (#1091 fix): it
+  // returns false without mutating anything when the named fragment isn't
+  // actually tracked 'in_transit' any more (a stale payload, or a fragment
+  // reclaimed by something else) — ignoring that and always clearing payload/
+  // completing the action regardless would silently report a delivery that
+  // never happened.
+  const delivered = deliverToDepot(state.logistics, fragmentId, state.collectedOre);
+  if (!delivered) return false;
+
   vehicle.payload = null;
   emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
   completeFragmentGatedAction(state, vehicle);

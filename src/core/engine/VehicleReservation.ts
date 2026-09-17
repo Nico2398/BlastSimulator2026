@@ -591,6 +591,22 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       // see isPendingReserveAhead's own doc comment for the duplicate-queue
       // bug this exception closes.
       && !isPendingReserveAhead(holder, actionId)
+      // #1091 fix: a policy-driven interruption (a hard collapse, today —
+      // NeedRestoration.ts's tickCollapse) that pinned this exact reservation
+      // via isCommittedToOwnCargo's own carve-out (releaseActionToOpenPool,
+      // TaskCancellation.ts) moves the holder's activeActionId on to their
+      // OWN new rest action the very same tick, which reads identically to
+      // #928's genuine staleness case — the driver "moved on to something
+      // else" — even though this is exactly the deliberate "keep the
+      // reservation and the loaded cargo together" case the carve-out exists
+      // for. Without this exemption, this sweep undid that carve-out within
+      // the same tick it was applied: the still-mounted driver's own
+      // resting activeActionId immediately reads as staleness, releasing the
+      // reservation and returning the cargo to the ground anyway — dropping
+      // cargo evacuation/collapse explicitly promises to preserve (confirmed
+      // live: collapse-vehicle-recovery.integration.test.ts's own mid-
+      // haul_unload case, #1091).
+      && !isCommittedToOwnCargo(state, action)
     ) {
       releaseVehicleReservation(state, actionId);
     }
