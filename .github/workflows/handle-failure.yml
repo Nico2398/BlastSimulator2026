@@ -24,7 +24,7 @@ name: "Pipeline: handle a run that halted without merging"
 # pipeline last merged anything and stops at AGENTIC_BLOCKED_CHAIN_LIMIT.
 on:
   issues:
-    types: [labeled]
+    types: [labeled, edited]
 
 permissions:
   issues: write
@@ -179,7 +179,9 @@ jobs:
   # must not be held up by a bookkeeping write, and a reconcile that fails has
   # to go red on its own (Rule 4) without taking the chain down with it.
   reconcile-dependencies:
-    if: github.event.label.name == 'blocked' || github.event.label.name == 'paused'
+    if: >-
+      (github.event.action == 'labeled' && (github.event.label.name == 'blocked' || github.event.label.name == 'paused')) ||
+      (github.event.action == 'edited' && github.event.changes.body != null && (contains(github.event.issue.labels.*.name, 'blocked') || contains(github.event.issue.labels.*.name, 'paused')))
     runs-on: ubuntu-latest
     steps:
       # The decision rules are read from the workspace, like every other
