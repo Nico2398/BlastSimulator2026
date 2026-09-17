@@ -145,6 +145,27 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // interruptedActionPayload, and taskQueue is left untouched so the
     // employee's remaining queued work survives the collapse.
     if (priorActionId !== null) {
+      // #1091 fix: checkCollapse (EmployeeNeeds.ts) already nulled
+      // emp.activeActionId a few lines above, but interruptActiveAction's own
+      // mid-vehicle-gated-drive pin (TaskCancellation.ts's own doc comment,
+      // #945/#556) reads isMidVehicleGatedWork(state, emp), which re-derives
+      // its answer from emp.activeActionId rather than taking the action id
+      // as a parameter. With it already null, that check always read false
+      // here specifically — every OTHER interruptActiveAction call site
+      // (Evacuation.ts, ForceShiftRest.ts, ArrivalGate.ts) captures its own
+      // "prior" id without ever nulling activeActionId first, so this was the
+      // one caller where the pin could never apply. That silently dropped the
+      // #1091 committed-cargo carve-over's own targetEmployeeId pin on a hard
+      // collapse mid-haul: the reservation stayed on the collapsing driver's
+      // still-mounted vehicle, but the action itself went fully open-pool,
+      // letting a completely different (and not necessarily even licensed)
+      // employee claim it later with no free seat to ever board — stranding
+      // the cargo in_transit forever (confirmed live:
+      // collapse-vehicle-recovery.integration.test.ts's own mid-haul_unload
+      // case). Restoring it for the duration of this one call is enough —
+      // interruptActiveAction's own clearHolderWalkFields (via
+      // clearActiveTaskFields) nulls it right back out before returning.
+      emp.activeActionId = priorActionId;
       interruptActiveAction(state, emp, priorActionId);
     }
 

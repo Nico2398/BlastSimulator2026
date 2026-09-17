@@ -132,10 +132,17 @@ function resolveTrackedFragment(
 
 /**
  * Claim-time eligibility gate. Pass-through (true) for any action that is not
- * haul_debris/fragment_debris. For haul_debris: true iff the fragment is
- * still on_ground and there is enough free storage room for its mass. For
- * fragment_debris: true iff the fragment is still on_ground and still
- * oversized.
+ * haul_debris/fragment_debris. For fragment_debris: true iff the fragment is
+ * still on_ground and still oversized. For haul_debris: true iff the
+ * fragment is still on_ground and there is enough free storage room for its
+ * mass, OR (#1091 — the paused-with-cargo resume case) the fragment is
+ * `in_transit` and the vehicle carrying it is still reserved for this exact
+ * action — a policy-driven interruption/pause leaves that reservation and
+ * the loaded cargo intact instead of returning it to the ground
+ * (`isCommittedToOwnCargo`, VehicleReservation.ts), so without this branch
+ * the action would sit `queued` forever with no vehicle ever able to reclaim
+ * it: the fragment reads `in_transit`, not `on_ground`, to every other
+ * caller.
  */
 export function isHaulOrFragmentActionClaimable(
   state: GameState,
@@ -145,17 +152,25 @@ export function isHaulOrFragmentActionClaimable(
   if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return true;
 
   const tracked = resolveTrackedFragment(state, action, lookup);
-  if (!tracked || tracked.state !== 'on_ground') return false;
+  if (!tracked) return false;
 
   if (action.type === 'fragment_debris') {
-    return isOversized(tracked.fragment.volume);
+    return tracked.state === 'on_ground' && isOversized(tracked.fragment.volume);
   }
 
-  // haul_debris: a fragment heavier than the room left in storage can never
-  // be delivered right now — claiming it would just send a hauler to load,
-  // drive, and be turned away at the depot every tick (mirrors the same
-  // room check findReachableGroundFragment/HaulingTask.ts already applies to
-  // the manual Haul button's own candidate search).
+  if (tracked.state === 'in_transit') {
+    return state.vehicles.vehicles.some(
+      v => v.reservedForActionId === action.id && v.payload?.fragmentId === tracked.fragment.id,
+    );
+  }
+
+  if (tracked.state !== 'on_ground') return false;
+
+  // A fragment heavier than the room left in storage can never be delivered
+  // right now — claiming it would just send a hauler to load, drive, and be
+  // turned away at the depot every tick (mirrors the same room check
+  // findReachableGroundFragment/HaulingTask.ts already applies to the
+  // manual Haul button's own candidate search).
   const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
   return tracked.fragment.mass <= roomKg;
 }

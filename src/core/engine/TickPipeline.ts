@@ -38,7 +38,6 @@ import {
   tickTaskProgress,
   tickLocomotion,
   tickArrivalGate,
-  completeVehicleGatedAction,
   employeeWorkState,
   BASE_TICK_MS,
 } from './GameLoop.js';
@@ -49,7 +48,7 @@ import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManag
 import { CONTRACT_REFRESH_INTERVAL } from '../config/balance.js';
 import { isExposed, processSmuggling } from '../events/MafiaActions.js';
 import { resolveContractPriceMultiplier } from '../campaign/Level.js';
-import { assertWorldInvariants } from '../state/WorldInvariants.js';
+import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 
@@ -240,7 +239,9 @@ export function runTick(
   // timing across several scenarios that have nothing to do with vehicles.
   // The vehicle-continuity case that motivated it is instead handled
   // inline, scoped to vehicle-gated actions only — see
-  // completeVehicleGatedAction below.
+  // completeVehicleGatedAction, called from ArrivalEffects.ts's own
+  // haul_unload/boulder_split effects (#1091) rather than from a
+  // completion-pass loop in this file.
   const dispatchResult = tickEmployees(state);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
@@ -289,31 +290,32 @@ export function runTick(
   // 8h. Arrival gate — must run after locomotion above: promotes rest/task
   // intents queued this tick or a prior one into their active timers/effects
   // once the entity has actually arrived, and drives hauling vehicles
-  // (move → load → move → unload) end to end (#437).
+  // (move → load → move → unload) end to end (#437). Vehicle-gated haul/
+  // fragment completion no longer needs a separate pass after this call
+  // (#1091): ArrivalEffects.ts's own haul_unload/boulder_split effects call
+  // completeVehicleGatedAction the instant they succeed, inside this call.
   const arrivalResult = tickArrivalGate(state, emitter, grid ?? undefined);
-
-  // 8i. Vehicle-gated haul/fragment completions (#552): tickArrivalGate's
-  // own haul/break drive loop reports every action whose full deliver/break
-  // cycle finished this tick — finish it through the same completion path
-  // as every other action (continuity-promote a same-role follow-up, else
-  // release/dismount) so the PendingAction/ghost clear and the employee
-  // keeps working instead of idling.
-  for (const completedVehicle of arrivalResult.completedVehicleActions) {
-    const completedEmployee = state.employees.employees.find(e => e.id === completedVehicle.employeeId);
-    if (completedEmployee) completeVehicleGatedAction(state, completedEmployee, completedVehicle.actionId);
-  }
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).
   const gameOver = checkGameOverConditions(state, emitter);
 
-  // 9b. World invariant check (#1084) — dev/test builds only, warn-only.
-  // Reports internal-consistency violations (dangling driver refs,
-  // position mismatches, etc.) that should never occur if the
-  // mount/itinerary/task machinery upstream is correct; never throws.
+  // 9b. World invariant check (#1084) — dev/test builds only. Reports
+  // internal-consistency violations (dangling driver refs, position
+  // mismatches, etc.) that should never occur if the mount/itinerary/task
+  // machinery upstream is correct; collect-and-continue for every kind
+  // except FATAL_VIOLATION_KINDS (#1091), which throws immediately instead —
+  // a desynced payload/logistics pairing (I8) corrupts every later tick that
+  // computes against it, so continuing to run on it hides the defect rather
+  // than surfacing it where it happened.
   const worldInvariantViolations = options.checkInvariants
     ? assertWorldInvariants(state, vehiclePositionsAtTickStart)
     : [];
+
+  const fatalViolation = worldInvariantViolations.find(v => FATAL_VIOLATION_KINDS.has(v.kind));
+  if (fatalViolation) {
+    throw new Error(`Fatal world invariant violation: ${JSON.stringify(fatalViolation)}`);
+  }
 
   // 10. Pending event — auto-pause and report to player
   let firedEvent: FiredEventReport | null = null;

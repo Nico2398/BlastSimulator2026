@@ -27,7 +27,7 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
-import { startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { returnFragmentToGround } from '../economy/Logistics.js';
 import { alight } from './Mount.js';
 // Direct import from TaskLifecycleCore.ts, not TaskDispatch.ts (see this
 // module's own header comment on the cycle TaskDispatch.ts's re-export would
@@ -83,13 +83,37 @@ export function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRol
  * scenario driving a vehicle via `vehicle driver`/`vehicle move` with no
  * accompanying pending action — nav-move-costs-visual, vehicle-traffic,
  * vehicle-task-states-visual and others — lost its driver mid-scenario).
+ *
+ * An untargeted haul_debris action is excluded when no active
+ * freight_warehouse exists anywhere (#1091): the doc comment above assumes
+ * "an untargeted one they could claim would already have been claimed",
+ * which only holds when claimability depends solely on THIS employee's own
+ * reachability — planFragmentTaskItinerary's own depot leg (PlanItinerary.ts)
+ * makes a fresh haul's plannability depend on a GLOBAL precondition instead
+ * (an active depot to eventually deliver to), identical for every employee.
+ * Without this exclusion, an idle debris_hauler driver boarded before any
+ * warehouse exists gets evicted the very next tick — nothing was actually
+ * "freed" for anyone, since nobody else could complete it either — stranding
+ * the vehicle driverless until something re-dispatches a new driver to it
+ * (confirmed live: a fleet purchased and crewed ahead of its first
+ * freight_warehouse never hauled anything, tutorial/economy integration
+ * suites' own haul-and-store cases). A foreign-TARGETED haul_debris action
+ * still counts regardless — the original #1090 hostage case this guard
+ * exists for — since only that one specific employee could ever claim it
+ * once a depot does exist, so freeing the vehicle for them is never wasted.
  */
 export function hasBlockedQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
   return state.pendingActions.some(a =>
     a.status === 'queued'
     && a.requiredVehicleRole === role
-    && a.targetEmployeeId !== employeeId,
+    && a.targetEmployeeId !== employeeId
+    && (a.type !== 'haul_debris' || a.targetEmployeeId !== null || hasActiveFreightWarehouse(state)),
   );
+}
+
+/** Whether any active freight_warehouse exists anywhere on the map — the global precondition a fresh haul_debris action's own depot leg needs (findHaulDepotApproach, HaulingTask.ts). */
+function hasActiveFreightWarehouse(state: GameState): boolean {
+  return state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active);
 }
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
@@ -134,23 +158,15 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, not already mid vehicle-gated
- * fragment work (haulingPhase/breakPhase both null — #974 follow-up: a
- * debris_hauler/rock_fragmenter driven out-of-band by the manual `vehicle
- * haul`/`vehicle break` console command never sets reservedForActionId, so
- * without this check a continuity claim could "free-ride" a driver who
- * appears idle to the dispatch system onto a vehicle that is, in reality,
- * already mid-haul/mid-break on unrelated cargo. The claim would then fail
- * at promotion time (requestHaulFragment/requestBreakBoulder's own
- * already-busy guard) and releaseVehicleReservationKeepDriver's
- * abortVehicleGatedFragmentWork call would abort that unrelated in-flight
- * work, discarding real progress instead of the harmless no-op it was before
- * #974 — traced via blast-oversized-boulders.integration.test.ts's manually
- * hauled piece being aborted mid-drive by a same-tick self-dispatch claim for
- * a different fragment), and either undriven (driverId === null) or already
- * driven by `employee` themself (the continuity case — lets a claim
- * naturally re-pick the vehicle the employee is already sitting in for their
- * next same-role task).
+ * (reservedForActionId === null), not `broken`, and either undriven
+ * (driverId === null) or already driven by `employee` themself (the
+ * continuity case — lets a claim naturally re-pick the vehicle the employee
+ * is already sitting in for their next same-role task). A vehicle already
+ * mid vehicle-gated fragment work carries a non-null reservedForActionId for
+ * its whole itinerary (#1091 — itinerary-driven hauling/breaking has no
+ * separate phase field left to check), so the reservedForActionId filter
+ * alone already excludes it; no separate haulingPhase/breakPhase check is
+ * needed any more.
  * Ties broken by straight-line distance to `employee` (nearest wins — the
  * employee has to walk there before driving it anywhere, so a farther,
  * otherwise-identical vehicle is a pure extra cost with nothing gained),
@@ -173,8 +189,6 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.state !== 'broken' &&
     v.reservedForActionId === null &&
-    v.haulingPhase === null &&
-    v.breakPhase === null &&
     (v.driverId === null || v.driverId === employee.id),
   );
   if (qualifying.length === 0) return null;
@@ -199,12 +213,35 @@ export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
 }
 
 /**
+ * True when `action` is a haul_debris action whose reserved vehicle already
+ * carries the exact fragment it targets (#1091) — the paused-with-cargo
+ * resume case: an earlier haul_load leg already ran, a policy-driven
+ * interruption/pause left the reservation and the cargo both intact (see
+ * releaseActionToOpenPool's own use of this, TaskCancellation.ts), and this
+ * action is waiting to be reclaimed so its own remaining haul_unload leg can
+ * finish the delivery. Always false for fragment_debris — breaking never
+ * loads anything onto `vehicle.payload`, it splits the boulder in place.
+ */
+export function isCommittedToOwnCargo(state: GameState, action: PendingAction): boolean {
+  if (action.type !== 'haul_debris') return false;
+  const fragmentId = action.payload['fragmentId'];
+  if (typeof fragmentId !== 'number') return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  return !!vehicle && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId;
+}
+
+/**
  * Vehicle-gate check shared by both of EmployeeDispatchSteps.ts's claim sites (#550): for
  * a non-vehicle action this is always a pass-through no-op; for a
- * vehicle-gated one it finds (but does not yet reserve) a qualifying free
- * vehicle via findFreeVehicleForRole above. `ok: false` means this employee
- * cannot claim this action right now — same "stays queued, retries next
- * tick" outcome as selectBestActionForEmployee returning null for an
+ * vehicle-gated one it first checks whether a vehicle is already reserved for
+ * this exact action (#1091 — the paused-with-cargo resume case: a policy-driven
+ * interruption left the reservation, and possibly loaded cargo, intact on its
+ * own vehicle instead of releasing it, see isCommittedToOwnCargo's own doc
+ * comment) and returns that one directly; only when nothing is already
+ * reserved does it fall back to finding (but not yet reserving) a qualifying
+ * free vehicle via findFreeVehicleForRole above. `ok: false` means this
+ * employee cannot claim this action right now — same "stays queued, retries
+ * next tick" outcome as selectBestActionForEmployee returning null for an
  * unreachable target, not an error.
  */
 export function findVehicleForClaim(
@@ -213,6 +250,10 @@ export function findVehicleForClaim(
   employee: Employee,
 ): { ok: true; vehicle: Vehicle | null } | { ok: false } {
   if (action.requiredVehicleRole === null) return { ok: true, vehicle: null };
+
+  const alreadyReserved = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  if (alreadyReserved) return { ok: true, vehicle: alreadyReserved };
+
   const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
   return vehicle === null ? { ok: false } : { ok: true, vehicle };
 }
@@ -233,10 +274,18 @@ export function findVehicleForClaim(
  * (its own `pendingTaskDuration !== null` guard, #922) and what keeps
  * `dig_ramp_segment`'s own live-voxel-count duration formula reading the
  * grid at actual arrival rather than at claim time, before an externally
- * timed clearing has had a chance to land (#924). haul_debris/fragment_debris
- * are driven end to end by their own phase machinery
- * (HaulingTask.ts/BoulderBreaking.ts) regardless — they never seed a work
- * timer through this path at all.
+ * timed clearing has had a chance to land (#924).
+ *
+ * haul_debris/fragment_debris (#1091) plan a 'work' goal instead of the plain
+ * 'reposition' every other vehicle-gated action gets — that routes them to
+ * PlanItinerary.ts's planFragmentTaskItinerary instead of the generic
+ * single-drive-leg shape, which plans their extra fragment/depot legs and the
+ * load/unload/split effect at the end of each. No separate continuity
+ * handoff is needed for them any more: an already-mounted driver's own
+ * continuity (no boarding walk) and a resumed, already-loaded haul (only the
+ * depot leg left) are both resolved by planFragmentTaskItinerary itself (its
+ * own alreadyMounted / payload-match checks), not by anything special-cased
+ * here.
  */
 export function promoteVehicleGatedAction(state: GameState, employee: Employee, action: PendingAction): void {
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
@@ -246,42 +295,33 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   // sweep interrupts the action back to the pool.
   if (!vehicle) return;
 
-  const continuity = vehicle.driverId === employee.id;
   const isFragmentGated = action.type === 'haul_debris' || action.type === 'fragment_debris';
 
   // #1089: a fresh boarding and the continuity case (already driving this
-  // vehicle) both collapse into one moveTo call — planItinerary drops the
-  // leading foot leg when the employee is already mounted in `vehicle`, so
-  // continuity needs no boarding walk either way.
-  const result = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
-  if (!result.success) return;
-
-  // #552: haul_debris/fragment_debris are driven end to end by their own
-  // request*/tick* phase machinery (HaulingTask.ts/BoulderBreaking.ts), not
-  // the itinerary's own drive leg above. A fresh boarding's own arrival step
-  // (Locomotion.ts) starts that work the tick the employee actually boards;
-  // continuity never walks through a board arrival step at all (the driver
-  // is already seated this exact tick), so it has to be kicked off here
-  // instead — mirroring what the fresh-boarding arrival step does.
-  if (continuity && isFragmentGated) {
-    const started = startVehicleGatedFragmentWork(state, vehicle, action);
-    if (started === true) {
-      // Phase machinery now owns driving this vehicle — the itinerary's own
-      // single drive leg (targeting the fragment's raw position, not the
-      // approach cell requestHaulFragment/requestBreakBoulder just staged)
-      // would otherwise fight it for the same vehicle's x/z next tick.
-      employee.itinerary = null;
-    } else if (started === false) {
-      // Conditions changed between claim and promotion (fragment gone, no
-      // active depot) — release the reservation so
-      // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
-      // and returns the action to the pool instead of leaving it claimed
-      // with nothing actually working it. releaseVehicleReservation is
-      // claim-only (#1090) — the driver stays mounted, exactly what
-      // continuity means here.
-      releaseVehicleReservation(state, action.id);
-    }
+  // vehicle) both collapse into one moveTo call — planItinerary/
+  // planFragmentTaskItinerary drop the leading foot leg when the employee is
+  // already mounted in `vehicle`, so continuity needs no boarding walk either
+  // way.
+  if (isFragmentGated) {
+    moveTo(state, employee.id, { actionId: action.id }, { via: vehicle.id });
+  } else {
+    moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
   }
+}
+
+/**
+ * Returns `vehicle`'s cargo to the ground and clears `payload` (#1091 —
+ * replaces the old abortVehicleGatedFragmentWork's haul branch; breaking
+ * never sets `payload` at all, so there is no equivalent break branch any
+ * more). No-op when nothing is loaded. Shared by findAndAbortReservedVehicle
+ * and dismountVehicleDriver below — both need an unconditional (never
+ * "keep the cargo aboard") abort, unlike releaseActionToOpenPool's own softer
+ * isCommittedToOwnCargo-gated release (TaskCancellation.ts, VehicleReservation.ts).
+ */
+function returnVehicleCargoToGround(state: GameState, vehicle: Vehicle): void {
+  if (vehicle.payload === null) return;
+  returnFragmentToGround(state.logistics, vehicle.payload.fragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  vehicle.payload = null;
 }
 
 /**
@@ -305,7 +345,7 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
   if (!vehicle) return null;
 
-  abortVehicleGatedFragmentWork(state, vehicle);
+  returnVehicleCargoToGround(state, vehicle);
   vehicle.reservedForActionId = null;
   vehicle.task = 'idle';
   vehicle.state = 'idle';
@@ -314,22 +354,19 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
 }
 
 /**
- * Full dismount of `vehicle`'s driver, if any: aborts any in-flight
- * vehicle-gated fragment work (haulingPhase/breakPhase) first, so that
- * unassignDriver's own fail-closed guard (Vehicle.ts — it refuses to clear
- * driverId while haulingPhase is set) is guaranteed to succeed rather than
- * silently no-op. A caller that skipped the abort and ignored
- * unassignDriver's return value could flip task/state to idle while
- * driverId/haulingPhase stayed set — next tick's tickHaulingProgress would
- * then find haulingPhase !== null, re-drive the vehicle at the same
- * unreachable target, and reproduce the exact stuck-forever bug this
- * dismount exists to fix (#986 review follow-up).
+ * Full dismount of `vehicle`'s driver, if any: returns any loaded cargo to
+ * the ground first, so that unassignDriver's own fail-closed guard
+ * (Vehicle.ts — it refuses to clear driverId while `payload` is set) is
+ * guaranteed to succeed rather than silently no-op. A caller that skipped
+ * that and ignored unassignDriver's return value could flip task/state to
+ * idle while driverId/payload stayed set, reproducing the exact
+ * stuck-forever bug this dismount exists to fix (#986 review follow-up).
  *
- * No-op (past the abort) if the vehicle currently has no driver.
+ * No-op (past the cargo return) if the vehicle currently has no driver.
  *
  * Shared by releaseVehicleReservation, whose `findAndAbortReservedVehicle`
- * already aborts as part of clearing the reservation (a second, idempotent
- * abort here is a harmless no-op in that case), and by Locomotion.ts's own
+ * already returns cargo as part of clearing the reservation (a second,
+ * idempotent no-op here in that case), and by Locomotion.ts's own
  * sustained-stuck release (advanceLeg's abandon branch) for a vehicle driven
  * with no PendingAction at all (a manual `vehicle driver`/`vehicle haul`
  * console command) — interruptActiveAction(..., actionId: null, ...) is a
@@ -358,7 +395,7 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  * follow-up).
  */
 export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
-  abortVehicleGatedFragmentWork(state, vehicle);
+  returnVehicleCargoToGround(state, vehicle);
   if (vehicle.driverId === null) return;
 
   // #1089: Locomotion.ts is now the only writer of a vehicle's x/z, and it
@@ -554,6 +591,22 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       // see isPendingReserveAhead's own doc comment for the duplicate-queue
       // bug this exception closes.
       && !isPendingReserveAhead(holder, actionId)
+      // #1091 fix: a policy-driven interruption (a hard collapse, today —
+      // NeedRestoration.ts's tickCollapse) that pinned this exact reservation
+      // via isCommittedToOwnCargo's own carve-out (releaseActionToOpenPool,
+      // TaskCancellation.ts) moves the holder's activeActionId on to their
+      // OWN new rest action the very same tick, which reads identically to
+      // #928's genuine staleness case — the driver "moved on to something
+      // else" — even though this is exactly the deliberate "keep the
+      // reservation and the loaded cargo together" case the carve-out exists
+      // for. Without this exemption, this sweep undid that carve-out within
+      // the same tick it was applied: the still-mounted driver's own
+      // resting activeActionId immediately reads as staleness, releasing the
+      // reservation and returning the cargo to the ground anyway — dropping
+      // cargo evacuation/collapse explicitly promises to preserve (confirmed
+      // live: collapse-vehicle-recovery.integration.test.ts's own mid-
+      // haul_unload case, #1091).
+      && !isCommittedToOwnCargo(state, action)
     ) {
       releaseVehicleReservation(state, actionId);
     }

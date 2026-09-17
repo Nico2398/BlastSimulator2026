@@ -359,17 +359,20 @@ describe('evacuateZone — stale rest targets and taskQueue entries (#557 follow
   });
 });
 
-// ── #994: evacuateZone must abort in-flight vehicle-gated fragment work
-// (haul/break) through the same abortVehicleGatedFragmentWork helper #974
-// already routed VehicleReservation.ts's two release paths through, instead
-// of calling abortHaul/abortBreak directly. A vehicle whose haulingPhase is
-// 'to_depot' has already picked up a cargo fragment (state 'in_transit',
-// vehicleId set) — calling abortHaul alone clears the vehicle's own haul
-// fields but never touches the fragment, so it is stranded 'in_transit'
-// forever: unclaimable (pickupFragment/findNearestReachableFragment only see
-// 'on_ground') and unsellable (only 'stored' fragments count toward a sale).
-// The fix routes through abortVehicleGatedFragmentWork instead, whose
-// haulingPhase branch returns any picked-up cargo to the ground first.
+// ── #994, updated for #1091's itinerary model: evacuateZone must resolve
+// in-flight vehicle-gated fragment work (haul/break) the same way it resolves
+// any other active action — through the per-employee interruptActiveAction
+// loop above, not a dedicated abort call. That loop's own
+// isCommittedToOwnCargo carry-over (releaseActionToOpenPool,
+// TaskCancellation.ts) is what decides the fragment's fate now: a haul that
+// already picked up its cargo (vehicle.payload set) survives evacuation with
+// its reservation AND payload both intact, exactly like any other
+// policy-driven interruption/pause — no dropping cargo to the ground purely
+// because a blast zone opened up. A haul still mid-drive to the fragment (no
+// cargo committed yet), or any break (which never sets `payload` at all), has
+// nothing to preserve, so the ordinary claim-only release runs instead
+// (Evacuation.ts's own doc comment above evacuateZone spells out why no
+// separate vehicle-gated handling is needed any more).
 
 function makeCargoFragment(id: number, mass = 850): FragmentData {
   return {
@@ -386,10 +389,25 @@ function makeCargoFragment(id: number, mass = 850): FragmentData {
   };
 }
 
-describe('evacuateZone aborts in-flight vehicle-gated fragment work without losing cargo (#994)', () => {
+/** Minimal vehicle-gated PendingAction fixture for the evacuation cases below. */
+function makeFragmentGatedAction(overrides: Partial<PendingAction> & { id: number; holderId: number }): PendingAction {
+  return {
+    type: 'haul_debris',
+    requiredSkill: null,
+    requiredVehicleRole: 'debris_hauler',
+    targetX: 0, targetZ: 0, targetY: 0,
+    payload: {},
+    targetEmployeeId: null,
+    status: 'in_progress',
+    queuedAtTick: 0,
+    ...overrides,
+  };
+}
+
+describe('evacuateZone resolves in-flight vehicle-gated fragment work like any other interruption (#994, #1091)', () => {
   const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
 
-  it('a vehicle mid-haul (to_depot, cargo already picked up) returns the fragment to the ground instead of leaving it in_transit forever', () => {
+  it('a vehicle mid-haul (to_depot, cargo already picked up) keeps its reservation and cargo intact instead of dropping it (#1091: isCommittedToOwnCargo carry-over)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     state.navGrid = flatWalkableGrid(40);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
@@ -402,10 +420,12 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     vehicle.driverId = driver1.id;
     vehicle.occupantIds = [driver1.id];
     driver1.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.haulingFragmentId = 1;
-    vehicle.haulingPhase = 'to_depot';
-    vehicle.haulingDepotBuildingId = 999;
-    vehicle.payloadKg = 850;
+
+    const action = makeFragmentGatedAction({ id: 501, holderId: driver1.id, payload: { fragmentId: 1 } });
+    state.pendingActions.push(action);
+    driver1.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    vehicle.payload = { fragmentId: 1, massKg: 850 };
     vehicle.task = 'transport';
     vehicle.state = 'working';
 
@@ -415,23 +435,21 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     // what actually starts the drive (see the sibling describe block above).
     tickLocomotion(state);
 
-    // The bug this regression pins: without routing through
-    // abortVehicleGatedFragmentWork, the cargo fragment stays 'in_transit'
-    // with vehicleId still set, forever unclaimable and unsellable.
+    // The cargo already loaded is not dropped — the fragment stays in_transit
+    // on this same vehicle, and the reservation survives evacuation exactly
+    // like any other policy-driven interruption (#1091).
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
-    expect(cargo.state).toBe('on_ground');
-    expect(cargo.vehicleId).toBeNull();
-
-    // Haul state itself still clears, same as before.
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.haulingFragmentId).toBeNull();
+    expect(cargo.state).toBe('in_transit');
+    expect(cargo.vehicleId).toBe(String(vehicle.id));
+    expect(vehicle.reservedForActionId).toBe(action.id);
+    expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 850 });
 
     // Vehicle is still ordered out of the zone like any other evacuee.
     expect(vehicle.task).toBe('moving');
     expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
   });
 
-  it('a vehicle mid-haul (to_fragment, cargo not yet picked up) clears haul state with no fragment side effects', () => {
+  it('a vehicle mid-haul (to_fragment, cargo not yet picked up) releases the reservation with no fragment side effects', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     state.navGrid = flatWalkableGrid(40);
     addBlastFragments(state.logistics, [makeCargoFragment(2, 850)]);
@@ -441,16 +459,21 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     vehicle.driverId = driver2.id;
     vehicle.occupantIds = [driver2.id];
     driver2.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.haulingFragmentId = 2;
-    vehicle.haulingPhase = 'to_fragment';
+
+    const action = makeFragmentGatedAction({ id: 502, holderId: driver2.id, payload: { fragmentId: 2 } });
+    state.pendingActions.push(action);
+    driver2.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
 
     evacuateZone(state, zone);
     tickLocomotion(state);
 
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.haulingFragmentId).toBeNull();
+    // No cargo committed yet — the ordinary claim-only release runs
+    // (isCommittedToOwnCargo is false), unlike the cargo-loaded case above.
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.payload).toBeNull();
 
     // Nothing was carried — the fragment is untouched, still on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 2)!;
@@ -461,7 +484,7 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
   });
 
-  it('a vehicle mid-break (breakPhase set) still aborts the break as before (behavior-preserving)', () => {
+  it('a vehicle mid-break releases the reservation the same way — breaking never carries payload to begin with (behavior-preserving)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     state.navGrid = flatWalkableGrid(40);
     addBlastFragments(state.logistics, [makeCargoFragment(3, 5000)]);
@@ -471,22 +494,27 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     vehicle.driverId = driver3.id;
     vehicle.occupantIds = [driver3.id];
     driver3.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.breakFragmentId = 3;
-    vehicle.breakPhase = 'to_boulder';
+
+    const action = makeFragmentGatedAction({
+      id: 503, holderId: driver3.id, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter', payload: { fragmentId: 3 },
+    });
+    state.pendingActions.push(action);
+    driver3.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
     vehicle.task = 'moving';
     vehicle.state = 'moving';
 
     evacuateZone(state, zone);
     tickLocomotion(state);
 
-    expect(vehicle.breakPhase).toBeNull();
-    expect(vehicle.breakFragmentId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.payload).toBeNull();
 
     expect(vehicle.task).toBe('moving');
     expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
   });
 
-  it('a vehicle with neither haulingPhase nor breakPhase set is unaffected — no-op, no crash', () => {
+  it('a vehicle with no reservation at all is unaffected — no-op, no crash', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     state.navGrid = flatWalkableGrid(40);
 
@@ -501,8 +529,8 @@ describe('evacuateZone aborts in-flight vehicle-gated fragment work without losi
     expect(() => evacuateZone(state, zone)).not.toThrow();
     tickLocomotion(state);
 
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.breakPhase).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.payload).toBeNull();
     expect(vehicle.task).toBe('moving');
     expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
   });

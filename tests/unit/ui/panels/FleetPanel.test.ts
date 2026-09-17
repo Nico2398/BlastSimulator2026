@@ -13,10 +13,9 @@ import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payloadKg: 0,
+    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
-    breakFragmentId: null, breakPhase: null, reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null, pendingEvacuationDestination: null,
     occupantIds: [],
     ...overrides,
   };

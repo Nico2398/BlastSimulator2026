@@ -22,7 +22,59 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
+import { addBlastFragments } from '../../src/core/economy/Logistics.js';
+import { syncHaulDispatch } from '../../src/core/economy/HaulDispatch.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { tickUntil } from './helpers.js';
+
+function makeFragment(id: number, x: number, z: number, mass = 900): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 0.3,
+    mass,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+  };
+}
+
+/**
+ * Sets up a staffed new_game with a built, active freight_warehouse, hands
+ * the roster's single driving.truck-licensed driver the debris_hauler, and
+ * returns both — the fixture shared by the two mid-haul interruption tests
+ * below (#1091).
+ */
+function setupStaffedHauler(warehouseAt: { x: number; z: number }): {
+  run: (cmd: string) => unknown;
+  state: GameState;
+  vehicleId: number;
+  driverId: number;
+} {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+
+  expect(run('new_game seed:42 size:32 staffed:true')).toMatchObject({ success: true });
+  const state = ctx.state!;
+
+  expect(run(`build freight_warehouse at:${warehouseAt.x},${warehouseAt.z}`)).toMatchObject({ success: true });
+  tickUntil(run, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 300);
+  expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
+
+  const vehicle = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+  const driver = state.employees.employees.find(
+    e => e.qualifications.some(q => q.category === 'driving.truck'),
+  )!;
+
+  expect(run(`vehicle driver ${vehicle.id} ${driver.id}`)).toMatchObject({ success: true });
+  tickUntil(run, () => vehicle.driverId === driver.id, 50);
+  expect(vehicle.driverId).toBe(driver.id);
+
+  return { run, state, vehicleId: vehicle.id, driverId: driver.id };
+}
 
 /** Sets up a staffed new_game, hands employee #1 the drill_rig, and lets them drill at least one hole before the test forces a collapse. */
 function setupDrivingDriller(): { run: (cmd: string) => unknown; state: GameState } {
@@ -138,5 +190,98 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     // anyone else (nobody else on this roster holds driving.drill_rig).
     tickUntil(run, () => vehicle.driverId === driver.id, 500);
     expect(vehicle.driverId).toBe(driver.id);
+  });
+});
+
+describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
+  it('a collapse mid-haul_load leg (before loading) alights cleanly, leaves the fragment on the ground, and resumes to complete the haul', () => {
+    // Fragment is far from the debris_hauler's spawn (~(3,2)) so several
+    // ticks of driving are needed before the itinerary's own haul_load leg
+    // actually arrives — enough room to force the collapse mid-drive.
+    const { run, state, vehicleId, driverId } = setupStaffedHauler({ x: 4, z: 18 });
+    const driver = state.employees.employees.find(e => e.id === driverId)!;
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+
+    addBlastFragments(state.logistics, [makeFragment(9001, 4, 28)], state.navGrid);
+    // requestHaulFragment (behind `vehicle haul`) claims an already-self-
+    // dispatched haul_debris action (#1091 — HaulDispatch.ts's
+    // syncHaulDispatch) rather than creating one itself; a real tick would
+    // seed it via TickPipeline.ts, but calling it directly here avoids
+    // consuming one of the "a couple of ticks in" drive ticks asserted below.
+    syncHaulDispatch(state);
+    expect(run(`vehicle haul ${vehicleId} fragment:9001`)).toMatchObject({ success: true });
+
+    // A couple of ticks in: still driving, not yet arrived/loaded.
+    run('tick 1');
+    run('tick 1');
+    const trackedBeforeCollapse = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
+    expect(trackedBeforeCollapse.state).toBe('on_ground');
+    expect(vehicle.payload).toBeNull();
+
+    driver.fatigue = 0; // NEED_HARD_THRESHOLDS.fatigue (0) — collapses next tick
+    tickUntil(run, () => driver.collapsing, 50);
+    expect(driver.collapsing).toBe(true);
+
+    // Alighted cleanly: released the vehicle, never loaded the fragment.
+    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.payload).toBeNull();
+    const trackedAtCollapse = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
+    expect(trackedAtCollapse.state).toBe('on_ground');
+
+    tickUntil(run, () => !driver.collapsing, 400);
+    expect(driver.collapsing).toBe(false);
+
+    // Resuming re-drives, loads, and completes the haul to storage — the
+    // same fragment id, delivered exactly once.
+    tickUntil(run, () => state.logistics.fragments.find(f => f.fragment.id === 9001)?.state === 'stored', 1500);
+    const trackedFinal = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
+    expect(trackedFinal.state).toBe('stored');
+    expect(vehicle.payload).toBeNull();
+  });
+
+  it('a collapse mid-haul_unload leg (already loaded) alights cleanly, keeps the SAME fragment in transit, and resuming delivers it exactly once', () => {
+    // Fragment is placed right next to the debris_hauler's spawn so loading
+    // happens within the first tick or two; the freight_warehouse is placed
+    // far away so several ticks of driving are needed to actually deliver —
+    // enough room to force the collapse mid-drive-to-depot.
+    const { run, state, vehicleId, driverId } = setupStaffedHauler({ x: 4, z: 18 });
+    const driver = state.employees.employees.find(e => e.id === driverId)!;
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+
+    addBlastFragments(state.logistics, [makeFragment(9002, 5, 6)], state.navGrid);
+    syncHaulDispatch(state);
+    expect(run(`vehicle haul ${vehicleId} fragment:9002`)).toMatchObject({ success: true });
+
+    tickUntil(run, () => vehicle.payload !== null, 30);
+    expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
+    // Loaded — the fragment must no longer show as a separate on-ground entry.
+    expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
+
+    driver.fatigue = 0; // NEED_HARD_THRESHOLDS.fatigue (0) — collapses next tick
+    tickUntil(run, () => driver.collapsing, 50);
+    expect(driver.collapsing).toBe(true);
+
+    // #1091: alightIfMounted's own alight call is refused here —
+    // unassignDriver (Vehicle.ts) refuses to unassign a driver while
+    // `payload !== null`, specifically so a loaded haul is never orphaned
+    // mid-flight with nobody driving it (NeedRestoration.ts's own doc comment
+    // on tickCollapse: "alight's own guards ... may refuse; that's fine").
+    // The driver stays mounted despite collapsing, and the cargo travels with
+    // the vehicle exactly as it was — payload still names the same fragment.
+    expect(vehicle.driverId).toBe(driver.id);
+    expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
+    expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
+    expect(state.logistics.fragments.filter(f => f.fragment.id === 9002)).toHaveLength(1);
+
+    tickUntil(run, () => !driver.collapsing, 400);
+    expect(driver.collapsing).toBe(false);
+
+    // Resuming re-boards and drives the SAME fragment the rest of the way to
+    // the depot — no second pickup, no duplicate haul.
+    tickUntil(run, () => state.logistics.fragments.find(f => f.fragment.id === 9002)?.state === 'stored', 1500);
+    const delivered = state.logistics.fragments.filter(f => f.fragment.id === 9002);
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]!.state).toBe('stored');
+    expect(vehicle.payload).toBeNull();
   });
 });

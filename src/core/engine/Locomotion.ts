@@ -26,7 +26,7 @@ import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { board, alight } from './Mount.js';
 import { isDestinationOccupied, updateVehicleCellOccupancy, tickVehicleTaskState } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
-import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
 import { dismountVehicleDriver } from './VehicleReservation.js';
 
@@ -96,42 +96,6 @@ export function tickLocomotion(state: GameState, emitter?: EventEmitter): Locomo
   }
 
   return result;
-}
-
-/**
- * Advance a single already-boarded vehicle's driver toward (targetX, targetZ)
- * by one tick, independent of any itinerary — used by HaulingTask.ts's
- * to_depot phase and FragmentTaskLifecycle.ts's driveTowardFragment for their
- * own ad hoc phase-driving. Writes vehicle.x/z from the driver's own advance.
- * No-op (returns arrived:false) when the vehicle has no occupant.
- */
-export function driveVehicleTowardTarget(
-  state: GameState,
-  vehicle: Vehicle,
-  targetX: number,
-  targetZ: number,
-  emitter?: EventEmitter,
-): { arrived: boolean } {
-  const driverId = vehicle.occupantIds[0];
-  if (driverId === undefined) return { arrived: false };
-  const driver = state.employees.employees.find(e => e.id === driverId);
-  if (!driver) return { arrived: false };
-
-  const leg: Leg = {
-    mode: 'drive',
-    vehicleId: vehicle.id,
-    destX: targetX,
-    destZ: targetZ,
-    arrival: 'exact',
-    onArrive: { kind: 'none' },
-    estTicks: 0,
-  };
-
-  if (isLegArrived(driver.x, driver.z, leg)) return { arrived: true };
-
-  const outcome = advanceLeg(state, driver, leg, { moved: [], arrived: [], stuck: [], abandoned: [] }, emitter);
-  if (outcome === 'aborted') return { arrived: false };
-  return { arrived: isLegArrived(driver.x, driver.z, leg) };
 }
 
 // ── Legacy on-foot movement (destinationX/Z, no itinerary) ──
@@ -649,8 +613,9 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   // that file's own #550 header). A plain reposition drive (moveTo(x,z) with
   // no reservation — an evacuation-clear, or a manual `vehicle driver`/test
   // drive) never had a task of its own to arrive INTO, and settles on idle.
+  let drivenVehicle: Vehicle | undefined;
   if (leg.mode === 'drive' && leg.vehicleId !== null) {
-    const drivenVehicle = state.vehicles.vehicles.find(v => v.id === leg.vehicleId);
+    drivenVehicle = state.vehicles.vehicles.find(v => v.id === leg.vehicleId);
     if (drivenVehicle) {
       drivenVehicle.task = 'idle';
       drivenVehicle.state = 'idle';
@@ -663,7 +628,20 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   }
 
   const step = leg.onArrive;
-  if (step.kind === 'none' || step.kind === 'effect') return true;
+  if (step.kind === 'none') return true;
+
+  if (step.kind === 'effect') {
+    // A drive leg's own effect step always resolves against the vehicle that
+    // very leg just drove (drivenVehicle, resolved above) — never re-looked
+    // up (#1091).
+    if (!drivenVehicle) return true;
+    const ok = applyArrivalEffect(state, drivenVehicle, step.effectId, emitter);
+    if (!ok) {
+      interruptActiveAction(state, emp, drivenVehicle.reservedForActionId, { forceOpenPool: true });
+      return false;
+    }
+    return true;
+  }
 
   if (step.kind === 'board') {
     const vehicle = state.vehicles.vehicles.find(v => v.id === step.vehicleId);
@@ -694,41 +672,20 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
 }
 
 /**
- * Whatever was staged on `vehicle` before this exact board resolved — a
- * vehicle-gated action's own haul/break work (#552), or an evacuation drive
- * clear (#1042) — starts now, the moment the driver is actually seated.
- * Absorbed from the old ArrivalGate.resolveBoarding, which lived right next
- * to its own `board()` call for the same reason boarding itself moved here
- * (#1089): both are "what a board resolves into", not two separate concerns.
+ * Whatever was staged on `vehicle` before this exact board resolved — an
+ * evacuation drive clear (#1042) — starts now, the moment the driver is
+ * actually seated. Absorbed from the old ArrivalGate.resolveBoarding, which
+ * lived right next to its own `board()` call for the same reason boarding
+ * itself moved here (#1089): both are "what a board resolves into", not two
+ * separate concerns.
+ *
+ * A vehicle-gated action's own haul/break work no longer hands off here
+ * (#1091): boarding is just another leg of an itinerary that already
+ * contains every subsequent drive leg and its arrival effect
+ * (PlanItinerary.ts's planFragmentTaskItinerary), so there is nothing left to
+ * start once the board leg itself resolves.
  */
 function handlePostBoardIntent(state: GameState, emp: Employee, vehicle: Vehicle): void {
-  if (vehicle.reservedForActionId !== null) {
-    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
-    if (action) {
-      const started = startVehicleGatedFragmentWork(state, vehicle, action);
-      if (started === true) {
-        // Phase machinery (HaulingTask.ts/BoulderBreaking.ts) now owns
-        // driving this vehicle end to end — the itinerary's own remaining
-        // drive leg would otherwise fight it for the same vehicle's x/z.
-        emp.itinerary = null;
-        syncPendingDriverVehicleId(emp);
-      } else if (started === false) {
-        // Fragment/depot/eligibility changed between claim and boarding
-        // (fragment picked clean, no active warehouse, etc.) — release the
-        // action back to the pool instead of leaving the vehicle boarded
-        // with nothing to do. interruptActiveAction's own vehicle release
-        // (releaseVehicleReservation, #1090) is claim-only — `emp`, who just
-        // boarded this exact vehicle moments ago in this same tick, stays
-        // mounted rather than being walked back off and re-boarded the
-        // instant the situation clears.
-        interruptActiveAction(state, emp, action.id);
-      }
-      // started === null: not a fragment-gated action — the itinerary's own
-      // already-queued drive leg drives the rest of the way.
-    }
-    return;
-  }
-
   if (vehicle.pendingEvacuationDestination !== null) {
     // Boarded to drive a vehicle clear of an evacuating zone (#1042) rather
     // than for a vehicle-gated action — no reservation to hand off to.

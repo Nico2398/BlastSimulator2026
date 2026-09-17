@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Tests for tickLocomotion and driveVehicleTowardTarget
+// BlastSimulator2026 — Tests for tickLocomotion
 // (src/core/engine/Locomotion.ts, #1089 mount/itinerary rebuild phase 3b).
 //
 // tickLocomotion is the ONLY mover: it walks every alive employee's current
@@ -22,7 +22,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
-import { tickLocomotion, driveVehicleTowardTarget } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
@@ -310,6 +310,20 @@ describe('tickLocomotion', () => {
   });
 });
 
+// #1091: driveVehicleTowardTarget (the old ad-hoc, itinerary-independent
+// drive primitive) is deleted — no remaining caller needs a drive step
+// outside the itinerary model any more. Its three behaviors here have real
+// equivalents already covered elsewhere in this same file, through the
+// itinerary/tickLocomotion path that is now the ONLY mover (this file's own
+// header comment): a boarded vehicle advancing at its own tiered speed with
+// the driver's position tracking it ("advances a mounted employee at the
+// vehicle's tiered speed..." above), arrival exactly at the target leg
+// destination ("clears the itinerary once the FINAL leg is reached" above),
+// and an unoccupied vehicle never moving ("never changes an unoccupied
+// vehicle's x/z across 10 ticks..." above). No replacement case was added
+// here — deleting the low-level entry point removed the tests for it rather
+// than the behavior itself.
+
 // ── #1130: abandon on a period-2 oscillation, not just a failed replan ─────
 //
 // advanceAlongPath (AgentAdvance.ts) now reports isStuck: true on a tick
@@ -485,58 +499,5 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     // through the reroute unmodified.
     expect(driver.moveHistoryX).not.toBe(42);
     expect(driver.moveHistoryZ).not.toBe(42);
-  });
-});
-
-describe('driveVehicleTowardTarget', () => {
-  it('advances an already-boarded vehicle toward (targetX, targetZ) at its own tiered speed, independent of any itinerary', () => {
-    const state = buildFlatNavGridState(20, 5);
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    employee.itinerary = null; // ad hoc phase-driving — no itinerary involved at all
-
-    const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
-
-    const result = driveVehicleTowardTarget(state, vehicle, 12, 0);
-
-    expect(result.arrived).toBe(false);
-    expect(vehicle.x).toBe(speed);
-    expect(vehicle.z).toBe(0);
-    // The driver's own position tracks the vehicle.
-    expect(employee.x).toBe(speed);
-    expect(employee.z).toBe(0);
-  });
-
-  it('reports arrived: true and the vehicle sits exactly at the target once reached (boundary: within one tick\'s reach)', () => {
-    const state = buildFlatNavGridState(20, 5);
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-
-    let result = { arrived: false };
-    for (let i = 0; i < 10 && !result.arrived; i++) {
-      result = driveVehicleTowardTarget(state, vehicle, 3, 0);
-    }
-
-    expect(result.arrived).toBe(true);
-    expect(vehicle.x).toBe(3);
-    expect(vehicle.z).toBe(0);
-  });
-
-  it('is a no-op (arrived: false, position unchanged) when the vehicle has no occupant (rejection)', () => {
-    const state = buildFlatNavGridState(20, 5);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.occupantIds = [];
-
-    const result = driveVehicleTowardTarget(state, vehicle, 19, 4);
-
-    expect(result.arrived).toBe(false);
-    expect(vehicle.x).toBe(5);
-    expect(vehicle.z).toBe(5);
   });
 });

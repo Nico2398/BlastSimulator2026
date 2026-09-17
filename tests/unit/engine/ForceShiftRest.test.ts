@@ -21,7 +21,6 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
-import { isMidLoadedHaul } from '../../../src/core/economy/FragmentTaskLifecycle.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { ActionType, PendingAction } from '../../../src/core/state/GameState.js';
@@ -706,42 +705,15 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   });
 });
 
-// #974: isMidLoadedHaul has no dedicated unit test — deleting the guard only
-// broke a ~163s full scenario-JSON replay, not any targeted unit test.
-describe('isMidLoadedHaul (#974)', () => {
-  it('is true for an employee driving a vehicle mid loaded haul leg (haulingPhase === \'to_depot\')', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.driverId = employee.id;
-    vehicle.haulingPhase = 'to_depot';
-
-    expect(isMidLoadedHaul(state, employee)).toBe(true);
-  });
-
-  it('is false for an employee driving a vehicle not yet loaded (haulingPhase === \'to_fragment\') — deliberately unprotected', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.driverId = employee.id;
-    vehicle.haulingPhase = 'to_fragment';
-
-    expect(isMidLoadedHaul(state, employee)).toBe(false);
-  });
-
-  it('is false when the employee is not driving any vehicle', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-
-    expect(isMidLoadedHaul(state, employee)).toBe(false);
-  });
-});
-
-describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoadedHaul (#974)', () => {
-  it('no-op when the employee is driving a vehicle mid loaded haul leg (haulingPhase === \'to_depot\'), even with fatigue deep below threshold', () => {
+// #1091: isMidLoadedHaul moved into ForceShiftRest.ts itself as a private
+// helper (checks vehicle.payload !== null instead of the deleted
+// haulingPhase === 'to_depot') — no longer exported from
+// FragmentTaskLifecycle.ts, so it has no dedicated direct-call unit test any
+// more; its behavior is covered indirectly through
+// forceShiftRestIfNeededByPolicy below, same as the #974 header comment
+// already noted was true even for the old exported version.
+describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoadedHaul (#974, #1091)', () => {
+  it('no-op when the employee is driving a vehicle mid loaded haul leg (payload set), even with fatigue deep below threshold', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     Object.assign(state.sitePolicy, { shiftMode: 'shift_8h' });
@@ -749,7 +721,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.driverId = employee.id;
-    vehicle.haulingPhase = 'to_depot';
+    vehicle.payload = { fragmentId: 1, massKg: 500 };
     const prior = pushHeldAction(state, employee.id, 1200);
     prior.requiredVehicleRole = 'debris_hauler';
     employee.activeActionId = prior.id;
@@ -762,7 +734,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     expect(employee.activeActionId).toBe(1200);
   });
 
-  it('DOES interrupt when the vehicle is not yet loaded (haulingPhase === \'to_fragment\') — this leg is deliberately unprotected', () => {
+  it('DOES interrupt when the vehicle is not yet loaded (payload null) — this leg is deliberately unprotected', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     Object.assign(state.sitePolicy, { shiftMode: 'shift_8h' });
@@ -770,7 +742,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.driverId = employee.id;
-    vehicle.haulingPhase = 'to_fragment';
+    vehicle.payload = null;
     const prior = pushHeldAction(state, employee.id, 1201);
     prior.requiredVehicleRole = 'debris_hauler';
     employee.activeActionId = prior.id;

@@ -3504,5 +3504,9 @@
   "move_to.vehicle_not_found": "Vehicle not found",
   "move_to.vehicle_unavailable": "Vehicle unavailable",
   "move_to.no_route_to_vehicle": "No route to vehicle",
-  "move_to.no_route_available": "No route available"
+  "move_to.no_route_available": "No route available",
+  "haul.no_action_queued": "No haul action queued for this fragment",
+  "haul.claim_failed": "Failed to claim haul action",
+  "break.no_action_queued": "No break action queued for this fragment",
+  "break.claim_failed": "Failed to claim break action"
 }

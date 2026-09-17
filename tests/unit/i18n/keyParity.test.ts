@@ -337,8 +337,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // for Mount.ts's error strings — mount.alight_failed,
     // mount.employee_not_found, mount.too_far_to_board, mount.vehicle_full,
     // mount.vehicle_no_driver, mount.vehicle_not_found — both locales.
+    // Baseline is now 3510 (up from 3506): #1091's review-fix pass adds 4 keys
+    // for haul/break claim-failure strings — haul.no_action_queued,
+    // haul.claim_failed, break.no_action_queued, break.claim_failed —
+    // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3506);
+    expect(Object.keys(en).length).toBe(3510);
   });
 });
 

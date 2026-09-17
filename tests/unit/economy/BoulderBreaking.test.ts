@@ -1,22 +1,30 @@
-// BlastSimulator2026 — Tests for BoulderBreaking (issue #484)
+// BlastSimulator2026 — Tests for BoulderBreaking (issue #484, itinerary-driven #1091)
 //
-// requestBreakBoulder dispatches a rock_fragmenter toward an oversized
-// on-ground fragment without breaking it immediately; tickBreakProgress
-// splits it into sub-fragments (via fragmentBoulder) only on arrival.
-// Mirrors HaulingTask.test.ts's shape (eligibility gate, request, per-tick
-// progress) for the break workflow instead of the haul one.
+// requestBreakBoulder validates eligibility and installs the itinerary
+// machinery (a PendingAction claimed/reserved for the vehicle, and an
+// itinerary on the driver with a single drive leg ending in the
+// ArrivalEffects.ts 'boulder_split' effect) rather than starting a per-tick
+// phase machine — ArrivalEffects.test.ts covers what happens once that leg
+// actually arrives. Mirrors HaulingTask.test.ts's shape for the break
+// workflow instead of the haul one.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import { requestBreakBoulder, tickBreakProgress } from '../../../src/core/economy/BoulderBreaking.js';
+import {
+  requestBreakBoulder,
+  isBreakEligibleVehicle,
+  findReachableOversizedFragment,
+} from '../../../src/core/economy/BoulderBreaking.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { isOversized, OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
+import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import type { Itinerary, ArrivalStep } from '../../../src/core/engine/Itinerary.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 
 const SEED = 42;
 
@@ -40,31 +48,63 @@ function makeIdleFragmenter(state: ReturnType<typeof createGame>, x = 0, z = 0) 
   return purchaseVehicle(state.vehicles, 'rock_fragmenter', x, z).vehicle;
 }
 
-/** A rock_fragmenter with a licensed driver already boarded (driverId set). */
+/** A rock_fragmenter with a licensed driver already boarded (driverId set, occupied, mounted). */
 function makeDrivenFragmenter(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   const vehicle = makeIdleFragmenter(state, x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.excavator', 1);
-  // #1089: driveVehicleTowardTarget (Locomotion.ts) reads the driver off
-  // vehicle.occupantIds[0], not the driverId mirror alone.
+  // #1089/#1091: planItinerary/driving reads the driver off
+  // vehicle.occupantIds[0]/employee.locomotion, not the driverId mirror alone.
   vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
 }
 
-/**
- * Moves a driven vehicle AND its mounted driver together (I2) —
- * driveVehicleTowardTarget (Locomotion.ts) reads arrival off the DRIVER's
- * own position, not the vehicle's.
- */
-function moveVehicleAndDriver(state: ReturnType<typeof createGame>, vehicle: Vehicle, x: number, z: number): void {
-  vehicle.x = x;
-  vehicle.z = z;
-  const driver = state.employees.employees.find(e => e.id === vehicle.occupantIds[0]);
-  if (driver) { driver.x = x; driver.z = z; }
+function makeFlatNavGrid(size: number): NavGrid {
+  const cells: NavCell[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false })));
+  return new NavGrid(size, size, cells, 0);
 }
+
+/** Every leg across `itinerary` whose arrival step is the named effect. */
+function legsWithEffect(itinerary: Itinerary, effectId: string) {
+  return itinerary.legs.filter(leg => (leg.onArrive as ArrivalStep).kind === 'effect' && (leg.onArrive as { effectId: string }).effectId === effectId);
+}
+
+// ── isBreakEligibleVehicle ───────────────────────────────────────────────────
+
+describe('isBreakEligibleVehicle', () => {
+  it('true for a rock_fragmenter with a driver and no reserved action', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeDrivenFragmenter(state);
+    expect(isBreakEligibleVehicle(vehicle)).toBe(true);
+  });
+
+  it('false for a non-rock_fragmenter vehicle', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for a rock_fragmenter with no driver assigned', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeIdleFragmenter(state);
+    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for a rock_fragmenter already reserved for another action', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeDrivenFragmenter(state);
+    vehicle.reservedForActionId = 42;
+    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for undefined', () => {
+    expect(isBreakEligibleVehicle(undefined)).toBe(false);
+  });
+});
 
 // ── requestBreakBoulder — precondition failures ─────────────────────────────
 
@@ -105,11 +145,10 @@ describe('requestBreakBoulder — precondition failures', () => {
     expect(result.error).toBeDefined();
   });
 
-  it('rejects a rock_fragmenter already mid-break (breakPhase !== null)', () => {
+  it('rejects a rock_fragmenter already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
-    vehicle.breakFragmentId = 999;
-    vehicle.breakPhase = 'to_boulder';
+    vehicle.reservedForActionId = 42;
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
@@ -152,102 +191,94 @@ describe('requestBreakBoulder — precondition failures', () => {
   });
 });
 
-// ── requestBreakBoulder — happy path defers movement/breaking ──────────────
+// ── requestBreakBoulder — happy path installs the itinerary machinery ──────
 
 describe('requestBreakBoulder — happy path', () => {
-  it('sets break intent toward the fragment approach cell without breaking it immediately', () => {
-    const state = createGame({ seed: SEED });
-    const vehicle = makeDrivenFragmenter(state, 0, 0);
-    const fragment = makeFragment(1, 5, 7, 1.0);
-    addBlastFragments(state.logistics, [fragment]);
-
-    const result = requestBreakBoulder(state, vehicle.id, 1);
-    const approach = fragmentApproachCell(fragment);
-
-    expect(result.success).toBe(true);
-    expect(result.error).toBeUndefined();
-    expect(vehicle.breakFragmentId).toBe(1);
-    expect(vehicle.breakPhase).toBe('to_boulder');
-    expect(vehicle.targetX).toBe(approach.x);
-    expect(vehicle.targetZ).toBe(approach.z);
-    // The core contract under test: no synchronous split.
-    expect(state.logistics.fragments[0]!.state).toBe('on_ground');
-    expect(state.logistics.fragments[0]!.fragment.id).toBe(1);
-  });
-});
-
-// ── tickBreakProgress — arrival splits the boulder ──────────────────────────
-
-describe('tickBreakProgress — arrival at the boulder', () => {
-  it('replaces the boulder with sub-fragments preserving volume/mass/rock/ore, all under threshold', () => {
-    const state = createGame({ seed: SEED });
-    const vehicle = makeDrivenFragmenter(state, 0, 0);
-    const fragment = makeFragment(1, 5, 5, 1.3, 2600);
-    fragment.oreDensities = { blingite: 0.4, cruarium: 0.1 };
-    addBlastFragments(state.logistics, [fragment]);
-    requestBreakBoulder(state, vehicle.id, 1);
-
-    // Arrived: vehicle position matches the break target.
-    moveVehicleAndDriver(state, vehicle, vehicle.targetX, vehicle.targetZ);
-
-    const brokenId = tickBreakProgress(state, vehicle);
-
-    expect(brokenId).toBe(1);
-    expect(state.logistics.fragments.some(f => f.fragment.id === 1)).toBe(false);
-
-    const pieces = state.logistics.fragments;
-    expect(pieces.length).toBeGreaterThan(0);
-
-    let totalVolume = 0;
-    let totalMass = 0;
-    for (const p of pieces) {
-      expect(p.state).toBe('on_ground');
-      expect(isOversized(p.fragment.volume)).toBe(false);
-      expect(p.fragment.rockId).toBe(fragment.rockId);
-      expect(p.fragment.oreDensities).toEqual(fragment.oreDensities);
-      totalVolume += p.fragment.volume;
-      totalMass += p.fragment.mass;
-    }
-
-    expect(Math.abs(totalVolume - fragment.volume)).toBeLessThan(1e-9);
-    expect(Math.abs(totalMass - fragment.mass)).toBeLessThan(1e-9);
-
-    expect(vehicle.breakFragmentId).toBeNull();
-    expect(vehicle.breakPhase).toBeNull();
-    expect(vehicle.task).toBe('idle');
-  });
-});
-
-// ── tickBreakProgress — NavGrid fragment-occupancy transfer (#954) ─────────
-//
-// The original boulder's cell occupant count is removed once (regardless of
-// how many sub-fragments replace it), then re-added once per sub-fragment
-// landing on that same cell — only ever indirectly covered before, through
-// Logistics.addBlastFragments's own wiring in the full-loop integration test.
-
-describe('tickBreakProgress — NavGrid fragment-occupancy transfer (#954)', () => {
-  function makeFlatNavGrid(size: number): NavGrid {
-    const cells: NavCell[][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false })));
-    return new NavGrid(size, size, cells, 0);
-  }
-
-  it('removes the boulder\'s single occupant and adds one per resulting sub-fragment on the same cell', () => {
+  it('claims the vehicle for a fragment_debris action and installs an itinerary driving to the boulder\'s approach cell', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenFragmenter(state, 0, 0);
-    const fragment = makeFragment(1, 5, 5, 1.3, 2600);
+    const fragment = makeFragment(1, 5, 7, 1.0);
+    const actionsBefore = state.pendingActions.length;
     addBlastFragments(state.logistics, [fragment], state.navGrid);
-    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
+    // requestBreakBoulder claims an already-self-dispatched fragment_debris
+    // action (#1091 — see HaulDispatch.ts's syncHaulDispatch) rather than
+    // creating one itself; in real gameplay TickPipeline.ts runs this every
+    // tick well before a player could issue a manual break request.
+    syncHaulDispatch(state);
 
-    requestBreakBoulder(state, vehicle.id, 1);
-    moveVehicleAndDriver(state, vehicle, vehicle.targetX, vehicle.targetZ);
+    const result = requestBreakBoulder(state, vehicle.id, 1);
 
-    const brokenId = tickBreakProgress(state, vehicle);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    // The core contract under test: no synchronous split.
+    expect(state.logistics.fragments[0]!.state).toBe('on_ground');
+    expect(state.logistics.fragments[0]!.fragment.id).toBe(1);
 
-    expect(brokenId).toBe(1);
-    const pieceCount = state.logistics.fragments.length;
-    expect(pieceCount).toBeGreaterThan(0);
-    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(pieceCount);
+    // Claims the vehicle so no other request/dispatch can double-book it.
+    expect(vehicle.reservedForActionId).not.toBeNull();
+    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('fragment_debris');
+    expect(action!.payload['fragmentId']).toBe(1);
+    // Exactly one new action overall — syncHaulDispatch created it, and
+    // requestBreakBoulder only claims it rather than creating a duplicate.
+    expect(state.pendingActions.length).toBe(actionsBefore + 1);
+
+    // Installs a driving itinerary on the driver ending in the boulder_split
+    // arrival effect, per gameplay-vehicle-fleet's own
+    // "[drive -> boulder, effect 'split']" shape.
+    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    expect(driver.itinerary).not.toBeNull();
+    const splitLegs = legsWithEffect(driver.itinerary!, 'boulder_split');
+    expect(splitLegs).toHaveLength(1);
+
+    const approach = fragmentApproachCell(fragment, state, vehicle.id);
+    expect(splitLegs[0]!.destX).toBe(approach.x);
+    expect(splitLegs[0]!.destZ).toBe(approach.z);
+  });
+});
+
+// ── findReachableOversizedFragment ───────────────────────────────────────────
+
+describe('findReachableOversizedFragment', () => {
+  it('picks the nearest reachable oversized on-ground fragment', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenFragmenter(state, 0, 0);
+    const near = makeFragment(1, 2, 2, OVERSIZED_FRAGMENT_THRESHOLD + 0.5);
+    const far = makeFragment(2, 8, 8, OVERSIZED_FRAGMENT_THRESHOLD + 0.5);
+    addBlastFragments(state.logistics, [far, near]);
+
+    expect(findReachableOversizedFragment(state, vehicle.id)).toBe(1);
+  });
+
+  it('never returns a non-oversized fragment even when it is nearest', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenFragmenter(state, 0, 0);
+    const nearButNotOversized = makeFragment(1, 2, 2, OVERSIZED_FRAGMENT_THRESHOLD);
+    const farOversized = makeFragment(2, 8, 8, OVERSIZED_FRAGMENT_THRESHOLD + 0.5);
+    addBlastFragments(state.logistics, [nearButNotOversized, farOversized]);
+
+    expect(findReachableOversizedFragment(state, vehicle.id)).toBe(2);
+  });
+
+  it('returns null when there are zero oversized on-ground fragments', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenFragmenter(state, 0, 0);
+    addBlastFragments(state.logistics, [makeFragment(1, 2, 2, OVERSIZED_FRAGMENT_THRESHOLD)]);
+
+    expect(findReachableOversizedFragment(state, vehicle.id)).toBeNull();
+  });
+
+  it('returns null for an ineligible vehicle (no driver)', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeIdleFragmenter(state, 0, 0);
+    addBlastFragments(state.logistics, [makeFragment(1, 2, 2, OVERSIZED_FRAGMENT_THRESHOLD + 1)]);
+
+    expect(findReachableOversizedFragment(state, vehicle.id)).toBeNull();
   });
 });

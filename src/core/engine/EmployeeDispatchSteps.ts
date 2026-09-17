@@ -489,7 +489,35 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // self-claims and carries no 'needKey' payload, so resolveRestNeedKey
   // returns null for it and the bookkeeping below is a no-op there.
   if (action.type === 'rest') {
-    beginRestTravel(state, employee, action.targetX, action.targetZ);
+    // #1091 follow-up: a no-building "rest in place" action carries a
+    // targetX/targetZ snapshotted from wherever the employee stood at
+    // INSERTION time (autoInsertNeedTasks, NeedTaskInsertion.ts) — but this
+    // action can sit `queued` for many ticks before an idle employee ever
+    // reaches this promotion. A mounted employee mid-haul drifts continuously
+    // in the meantime, so by promotion time their real position has almost
+    // always moved on from that stale snapshot, if only by a sub-grid-cell
+    // fraction. moveTo/planItinerary's own 'reposition' goal is itinerary-
+    // gated on EXACT arrival (`isLegArrived`, Locomotion.ts) while every
+    // route the pathfinder can actually walk is grid-cell-quantized
+    // (`findPath`'s trivial start===goal case, Pathfinding.ts) — so a target
+    // that differs from the employee's current cell by less than one full
+    // cell, but is not bit-for-bit identical to it, can never be reached at
+    // all: the itinerary installs, the vehicle never moves (already
+    // standing on the only cell the path ever names), and the employee sits
+    // "traveling" (NEED_DRAIN_RATES) draining fatigue every tick until a hard
+    // collapse eventually fires — confirmed live via
+    // rock-fragmenter-breaking.json's own storedMassKg regression, where
+    // exactly this stale-target mismatch, not a broken arrival effect, ran a
+    // debris_hauler's driver fatigue to 0 before their very first delivery.
+    // A building-backed target is immune (it's a fixed approach cell, never
+    // re-derived), so this only re-reads the employee's CURRENT position for
+    // the no-building fallback, never mutating the action's own stored
+    // targetX/targetZ (EvacuationHold.ts/Evacuation.ts still need the
+    // original snapshot for their own danger-zone checks).
+    const [targetX, targetZ] = action.payload['buildingId'] === undefined
+      ? [employee.x, employee.z]
+      : [action.targetX, action.targetZ];
+    beginRestTravel(state, employee, targetX, targetZ);
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {
@@ -497,6 +525,21 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
         employee.pendingRestNeedKey = needKey;
       }
     }
+    // #1091 follow-up: this is the THIRD rest-promotion path (the other two,
+    // NeedRestoration.ts's tickCollapse and ForceShiftRest.ts's
+    // finishForceRest, already call this) — an ordinary taskQueue-priority
+    // rest promoted here (fillIdleEmployeeFromQueueOrPool's own restCandidate
+    // branch) can just as easily leave an unrelated, unboarded, reserved-ahead
+    // vehicle sitting in `employee.taskQueue` for the whole rest duration as
+    // either of those two triggers can — WorldInvariants.ts's own I5 check
+    // deliberately excludes a RESTING holder from isPendingReserveAhead's
+    // exemption specifically because all three rest triggers were assumed to
+    // release this before resting starts; this one didn't. Confirmed live via
+    // rock-fragmenter-breaking.json: a debris_hauler driver, mid-build,
+    // reserved a haul_debris action ahead into taskQueue, then this branch
+    // promoted their own proactive fatigue rest without releasing it —
+    // tripping I5 for the whole 16-tick rest.
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
     return;
   }
 

@@ -7,7 +7,7 @@ import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../ent
 import { clearZone, isInZone } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
-import { abortVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
+import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
@@ -172,15 +172,19 @@ export function findSafeEvacuationCell(
  * Order matters: every alive, in-zone employee's active action is
  * interrupted (releasing its walk/task-claim fields, including destinationX/
  * Z) BEFORE clearZone runs — clearZone is what sets the real evacuation
- * destination, and interruptActiveAction would stomp it if run after.
- * Likewise, a vehicle mid-haul or mid-break is driven by HaulingTask.ts's/
- * BoulderBreaking.ts's own phase loops rather than the generic mover, so its
- * phase is aborted first via abortVehicleGatedFragmentWork (FragmentTaskLifecycle.ts,
- * #974/#994) — which also returns any already-picked-up cargo to the ground
- * before clearing the haul, so a mid-'to_depot' evacuation doesn't strand the
- * fragment in transit forever — otherwise clearZone's moveVehicle call stages
- * a target the tick loop never advances toward (see EntityMovementTick.ts's
- * tickVehicle-skip condition on haulingPhase/reservedForActionId).
+ * destination, and interruptActiveAction would stomp it if run after. A
+ * driven vehicle mid-haul/mid-break needs no separate handling any more
+ * (#1091): its driver's own position equals the vehicle's (I2), so the
+ * per-employee interruption loop above already resolves it — including the
+ * softer isCommittedToOwnCargo carry-over for a loaded haul
+ * (VehicleReservation.ts), which survives evacuation exactly like any other
+ * policy-driven interruption rather than dropping cargo to the ground.
+ * clearZone's own moveTo call for a driven vehicle simply installs a fresh
+ * itinerary over whatever the driver was doing, mount continuity and all —
+ * there is no separate per-vehicle phase machine left to fight it. Only a
+ * driverless vehicle can be reserved with nobody to interrupt this way; the
+ * loop below releases that reservation explicitly so clearZone's own
+ * driverless-rescue branch finds it genuinely free.
  */
 export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResult {
   for (const emp of state.employees.employees) {
@@ -221,7 +225,9 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
 
   for (const vehicle of state.vehicles.vehicles) {
     if (!isInZone(vehicle.x, vehicle.z, zone)) continue;
-    abortVehicleGatedFragmentWork(state, vehicle);
+    if (vehicle.driverId === null && vehicle.reservedForActionId !== null) {
+      releaseVehicleReservation(state, vehicle.reservedForActionId);
+    }
   }
 
   // Stamp every already-queued, unheld action (targetEmployeeId === null or

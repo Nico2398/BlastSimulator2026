@@ -34,6 +34,7 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(cash = 1_000_000): GameContext {
@@ -425,10 +426,18 @@ describe('vehicle.ts — driver board success message', () => {
 describe('vehicle.ts — haul success message', () => {
   function setupHaulableVehicle(ctx: GameContext): { vehicleId: number; fragmentId: number } {
     const vehicle = buyTestVehicle(ctx, 'debris_hauler');
-    vehicle.driverId = 42; // bypass boarding — requestHaulFragment only requires driverId !== null
+    // #1091: requestHaulFragment now installs a real itinerary via moveTo,
+    // which needs a genuine employee record at vehicle.driverId — the old
+    // `vehicle.driverId = 42` bare-number bypass no longer resolves to
+    // anyone (mountTestDriver's own doc comment above).
+    mountTestDriver(ctx, vehicle);
     placeBuilding(ctx.state!.buildings, 'freight_warehouse', 0, 0, ctx.grid!.sizeX, ctx.grid!.sizeZ);
     const fragmentId = 1;
     addBlastFragments(ctx.state!.logistics, [makeFragment(fragmentId, vehicle.x, vehicle.z, OVERSIZED_FRAGMENT_THRESHOLD - 0.1)]);
+    // requestHaulFragment claims an already-self-dispatched haul_debris
+    // action (#1091 — see HaulDispatch.ts's syncHaulDispatch) rather than
+    // creating one itself.
+    syncHaulDispatch(ctx.state!);
     return { vehicleId: vehicle.id, fragmentId };
   }
 
@@ -478,9 +487,16 @@ describe('vehicle.ts — scrap success message', () => {
 describe('vehicle.ts — break success message', () => {
   function setupBreakableVehicle(ctx: GameContext): { vehicleId: number; fragmentId: number } {
     const vehicle = buyTestVehicle(ctx, 'rock_fragmenter');
-    vehicle.driverId = 42; // bypass boarding — requestBreakBoulder only requires driverId !== null
+    // #1091: requestBreakBoulder now installs a real itinerary via moveTo,
+    // which needs a genuine employee record at vehicle.driverId — see
+    // setupHaulableVehicle's own identical fix above.
+    mountTestDriver(ctx, vehicle);
     const fragmentId = 1;
     addBlastFragments(ctx.state!.logistics, [makeFragment(fragmentId, vehicle.x, vehicle.z, OVERSIZED_FRAGMENT_THRESHOLD + 0.5)]);
+    // requestBreakBoulder claims an already-self-dispatched fragment_debris
+    // action (#1091 — see HaulDispatch.ts's syncHaulDispatch) rather than
+    // creating one itself.
+    syncHaulDispatch(ctx.state!);
     return { vehicleId: vehicle.id, fragmentId };
   }
 

@@ -21,7 +21,7 @@ import {
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
-import { abortVehicleGatedFragmentWork } from '../../src/core/economy/FragmentTaskLifecycle.js';
+import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 /**
@@ -260,7 +260,13 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     // exercises exactly what it's meant to.
     const haulerVehicle = ctx.state!.vehicles.vehicles.find(v => v.id === haulerId)!;
     const haulerDriver = ctx.state!.employees.employees.find(e => e.id === haulerDriverId)!;
-    abortVehicleGatedFragmentWork(ctx.state!, haulerVehicle);
+    // #1091: abortVehicleGatedFragmentWork is deleted — releaseVehicleReservation
+    // (VehicleReservation.ts) is the real abort path now: it returns any
+    // in-flight cargo to the ground and clears the reservation/display
+    // task-state in one call (findAndAbortReservedVehicle's own doc comment).
+    if (haulerVehicle.reservedForActionId !== null) {
+      releaseVehicleReservation(ctx.state!, haulerVehicle.reservedForActionId);
+    }
     haulerVehicle.reservedForActionId = null;
     haulerVehicle.task = 'idle';
     haulerVehicle.state = 'idle';

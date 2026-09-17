@@ -15,7 +15,6 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
-import { isMidLoadedHaul } from '../economy/FragmentTaskLifecycle.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -198,6 +197,22 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  * still backstops the case where the queued action is real but never
  * actually reachable by anyone.
  */
+/**
+ * True when `employee` drives a vehicle currently carrying cargo (#1091 —
+ * itinerary-era equivalent of the old `haulingPhase === 'to_depot'` check,
+ * FragmentTaskLifecycle.ts's deleted `isMidLoadedHaul`). Even though
+ * `isCommittedToOwnCargo` (VehicleReservation.ts, used by
+ * releaseActionToOpenPool) now keeps both the reservation and the cargo
+ * intact across a policy-driven interruption instead of returning it to the
+ * ground, resuming still costs a fresh walk back to reboard the same
+ * vehicle before the remaining haul_unload leg can run — deferring the
+ * interruption here avoids that extra cost while the driver can simply
+ * finish the drive uninterrupted.
+ */
+function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
+  return state.vehicles.vehicles.some(v => v.driverId === employee.id && v.payload !== null);
+}
+
 function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {
   if (!isMounted(employee.locomotion)) return false;
   const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));

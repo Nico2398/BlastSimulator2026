@@ -15,10 +15,9 @@ import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/ba
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payloadKg: 0,
+    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
-    breakFragmentId: null, breakPhase: null, reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null, pendingEvacuationDestination: null,
     occupantIds: [],
     ...overrides,
   };
@@ -30,12 +29,17 @@ describe('computeVehicleStatus', () => {
   });
 
   it('reports broken, taking priority over every other field', () => {
-    const v = makeVehicle({ state: 'broken', isMoveStuck: true, haulingPhase: 'to_depot' });
+    // #1091: mid-haul (to_depot leg — cargo already loaded) is now
+    // reservedForActionId set + payload set, replacing the deleted
+    // haulingPhase field.
+    const v = makeVehicle({ state: 'broken', isMoveStuck: true, reservedForActionId: 1, payload: { fragmentId: 1, massKg: 100 } });
     expect(computeVehicleStatus(v).kind).toBe('broken');
   });
 
   it('reports stuck with the waiting-ticks count, even mid-haul', () => {
-    const v = makeVehicle({ isMoveStuck: true, waitingTicks: 14, haulingPhase: 'to_fragment' });
+    // #1091: mid-haul (to_fragment leg — not yet loaded) is reservedForActionId
+    // set with payload still null.
+    const v = makeVehicle({ isMoveStuck: true, waitingTicks: 14, reservedForActionId: 1, payload: null });
     const status = computeVehicleStatus(v);
     expect(status.kind).toBe('stuck');
     expect(status.ticks).toBe(14);
@@ -49,7 +53,10 @@ describe('computeVehicleStatus', () => {
   });
 
   it('reports hauling with the current phase', () => {
-    const v = makeVehicle({ state: 'moving', haulingPhase: 'to_depot' });
+    // #1091: a debris_hauler reserved for an action is "hauling" for its
+    // whole itinerary — payload set distinguishes the 'to_depot' leg
+    // (already loaded) from 'to_fragment' (not yet loaded).
+    const v = makeVehicle({ state: 'moving', reservedForActionId: 1, payload: { fragmentId: 1, massKg: 100 } });
     const status = computeVehicleStatus(v);
     expect(status.kind).toBe('hauling');
     expect(status.haulingPhase).toBe('to_depot');

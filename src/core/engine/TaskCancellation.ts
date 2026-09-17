@@ -9,7 +9,7 @@ import { SURVEY_COSTS, ACTION_STUCK_BACKOFF_TICKS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation, isMidVehicleGatedWork, dismountVehicleDriver } from './VehicleReservation.js';
+import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { syncPendingDriverVehicleId } from './MoveTo.js';
 import { estimateLegDistance } from './PlanItinerary.js';
@@ -42,6 +42,15 @@ export interface CancelActionResult {
  *
  * The action and its ghost are removed via completePendingAction, discarding
  * any in-progress work — a cancel produces no result and no XP.
+ *
+ * Unlike interruptActiveAction/releaseActionToOpenPool's own softer
+ * isCommittedToOwnCargo-gated release, an explicit player cancel of a loaded
+ * haul_debris action always returns its cargo to the ground:
+ * releaseVehicleReservation (called unconditionally below)
+ * -> findAndAbortReservedVehicle (VehicleReservation.ts) unconditionally
+ * drops any `payload` back onto the ground before clearing the reservation,
+ * with no committed-cargo exception — cancelling is a deliberate "stop this
+ * for good", not a pause expected to resume (#1091).
  */
 export function cancelAction(state: GameState, actionId: number): CancelActionResult {
   const action = state.pendingActions.find(a => a.id === actionId);
@@ -362,6 +371,17 @@ export function interruptActiveAction(
  * evacuated employee claimed but never started walking to, with no
  * per-employee walk state of its own to unwind.
  *
+ * The reservation release is skipped entirely when `isCommittedToOwnCargo`
+ * (VehicleReservation.ts) — a haul_debris action whose reserved vehicle
+ * already carries the exact fragment it targets (#1091) — so a policy-driven
+ * interruption/pause (this function's every caller) leaves the reservation
+ * AND the cargo intact on the same vehicle instead of returning it to the
+ * ground: `findVehicleForClaim`'s own fast path then finds that same vehicle
+ * again the moment this now-`queued` action is reclaimed, resuming the
+ * delivery with no lost progress. An explicit player cancel is deliberately
+ * NOT one of this function's callers — cancelAction calls
+ * releaseVehicleReservation directly instead, which returns committed cargo
+ * to the ground unconditionally (see that function's own doc comment).
  */
 export function releaseActionToOpenPool(
   state: GameState,
@@ -370,7 +390,9 @@ export function releaseActionToOpenPool(
   action.status = 'queued';
   action.holderId = null;
 
-  releaseVehicleReservation(state, action.id);
+  if (!isCommittedToOwnCargo(state, action)) {
+    releaseVehicleReservation(state, action.id);
+  }
 
   const ghost = state.ghostPreviews.find(g => g.id === action.id);
   if (ghost) {

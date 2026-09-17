@@ -2,31 +2,29 @@
 //
 // BoulderBreaking.ts (breaking) and HaulingTask.ts (hauling) are both
 // position-gated vehicle tasks that target a fragment: request looks up and
-// validates the vehicle, tick drives it toward the fragment's approach cell
-// one movement tick at a time, and search picks the nearest reachable
-// candidate fragment. The first four exports below are those steps, shared
-// so BoulderBreaking.ts and HaulingTask.ts only carry what differs between
-// them: eligibility rules, phase names, and what happens on arrival.
+// validates the vehicle, search picks the nearest reachable candidate
+// fragment, and claimAndDispatchFragmentAction runs the claim/reserve/
+// dispatch tail once the caller's own eligibility checks pass. These four
+// exports are those steps, shared so BoulderBreaking.ts and HaulingTask.ts
+// only carry what differs between them: eligibility rules and what happens
+// on arrival (now ArrivalEffects.ts, #1091).
 //
-// startVehicleGatedFragmentWork (#552) is a different kind of sharing: not a
-// step reused by BoulderBreaking.ts/HaulingTask.ts themselves, but the entry
-// point ArrivalGate.ts and VehicleReservation.ts both call to kick a
-// haul_debris/fragment_debris PendingAction's request* function once its
-// vehicle is ready — one fresh-boarding, one same-vehicle-continuity. It
-// lives here rather than in either of those two engine/ modules because it
-// needs to import both request* functions, and importing economy/ from
-// engine/ is the one-way direction the architecture already requires.
+// The per-tick driving step and the vehicle-gated request/abort entry points
+// this file used to also share (driveTowardFragment,
+// startVehicleGatedFragmentWork, abortVehicleGatedFragmentWork,
+// isMidLoadedHaul) moved to itinerary planning and arrival effects (#1091) —
+// PlanItinerary.ts's planFragmentTaskItinerary now plans the drive legs
+// ArrivalGate.ts/VehicleReservation.ts used to kick off here.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
-import type { Employee } from '../entities/Employee.js';
+import type { ActionType, GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
-import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { driveVehicleTowardTarget } from '../engine/Locomotion.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { requestHaulFragment, abortHaulReturningCargo } from './HaulingTask.js';
-import { requestBreakBoulder, abortBreak } from './BoulderBreaking.js';
+import { claimPendingAction } from '../engine/TaskDispatch.js';
+import { reserveVehicle } from '../engine/VehicleReservation.js';
+import { moveTo } from '../engine/MoveTo.js';
+import { t } from '../i18n/I18n.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -60,20 +58,6 @@ export function findRequestVehicleOfRole(
   if (!found.success) return found;
   if (found.vehicle.type !== expectedRole) return { success: false, error: wrongRoleError };
   return found;
-}
-
-/**
- * Point `vehicle` at `fragment`'s approach cell and advance its movement by
- * one tick. Returns true once the vehicle has arrived (x/z match target) —
- * the caller then performs its own arrival effect (load onto vehicle vs.
- * split it in place) instead of this helper knowing which.
- */
-export function driveTowardFragment(state: GameState, vehicle: Vehicle, fragment: FragmentData): boolean {
-  const approach = fragmentApproachCell(fragment, state, vehicle.id);
-  vehicle.task = 'moving';
-  vehicle.targetX = approach.x;
-  vehicle.targetZ = approach.z;
-  return driveVehicleTowardTarget(state, vehicle, approach.x, approach.z).arrived;
 }
 
 /**
@@ -117,93 +101,37 @@ export function findNearestReachableFragment(
 }
 
 /**
- * Start a haul_debris/fragment_debris action's actual haul/break work for
- * `vehicle` once its driver is in place (#552) — shared by ArrivalGate.ts's
- * resolveBoarding (fresh boarding) and VehicleReservation.ts's
- * promoteVehicleGatedAction (continuity: employee already driving this exact
- * vehicle). Both sites independently extracted payload.fragmentId and
- * dispatched to requestHaulFragment/requestBreakBoulder via the same
- * type-ternary; this is that shared step.
- *
- * Returns `null` for any action type other than haul_debris/fragment_debris —
- * the caller falls back to its own generic single-target drive in that case.
- * Returns the request's own `success` flag for a fragment-gated action;
- * `false` means the caller should release the vehicle back (each call site
- * uses its own release-call variant — keeping the driver seated is common to
- * both, but the exact API differs, so that stays with the caller).
+ * The claim/reserve/dispatch tail shared by requestHaulFragment
+ * (HaulingTask.ts) and requestBreakBoulder (BoulderBreaking.ts): finds the
+ * fragment's existing self-dispatched queued action of `actionType`, claims
+ * it on behalf of `vehicle`'s driver, reserves the vehicle for it, and calls
+ * moveTo to plan and start the actual itinerary — mechanically identical
+ * between the two callers, which keep only their own eligibility checks
+ * (payload-null for haul, oversized-direction for break) before calling
+ * this (#1091).
  */
-export function startVehicleGatedFragmentWork(
+export function claimAndDispatchFragmentAction(
   state: GameState,
   vehicle: Vehicle,
-  action: PendingAction,
-): boolean | null {
-  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return null;
+  actionType: ActionType,
+  fragmentId: number,
+  noActionQueuedKey: string,
+  claimFailedKey: string,
+): { success: true } | { success: false; error: string } {
+  const action = state.pendingActions.find(a =>
+    a.type === actionType && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
+  if (!action) return { success: false, error: t(noActionQueuedKey) };
 
-  const fragmentId = action.payload['fragmentId'] as number;
-  const started = action.type === 'haul_debris'
-    ? requestHaulFragment(state, vehicle.id, fragmentId)
-    : requestBreakBoulder(state, vehicle.id, fragmentId);
-  return started.success;
-}
+  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  if (!employee) return { success: false, error: 'Vehicle has no driver' };
 
-/**
- * Shared abort-on-forced-release counterpart to startVehicleGatedFragmentWork.
- * Cleanly unwinds whatever vehicle-gated fragment work (hauling or breaking)
- * is in flight on this vehicle, so a reservation can be safely released:
- *  - if haulingPhase is set: returns any picked-up cargo to the ground first
- *    (via returnFragmentToGround), then aborts the haul (abortHaul).
- *  - if breakPhase is set: aborts the break (abortBreak) — no cargo return
- *    needed, breaking never moves a fragment off-ground until it splits.
- *  - if neither is set: no-op.
- * Callers (reservation release, cancellation, driver death) do not need to
- * know which kind of work was in flight, or any of the phase constants.
- */
-export function abortVehicleGatedFragmentWork(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.haulingPhase !== null) {
-    // Drop any cargo wherever the vehicle currently sits, not back at the
-    // fragment's original pre-pickup position (#974 follow-up — see
-    // returnFragmentToGround's own doc comment for the livelock this avoids
-    // when a fatigue policy interrupts faster than one haul leg can
-    // complete), then clear the haul state (HaulingTask.ts's
-    // abortHaulReturningCargo — shared with tickHaulingProgress's own
-    // missing-depot-building abort branch).
-    abortHaulReturningCargo(state, vehicle);
-    return;
-  }
+  const claimed = claimPendingAction(state, action.id, employee.id);
+  if (!claimed) return { success: false, error: t(claimFailedKey) };
+  reserveVehicle(vehicle, claimed.id);
+  employee.activeActionId = claimed.id;
 
-  if (vehicle.breakPhase !== null) {
-    abortBreak(vehicle);
-  }
-}
+  const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
 
-/**
- * True when `employee` is the boarded driver of a vehicle already carrying
- * cargo toward a depot (haulingPhase === 'to_depot') — the one vehicle-gated
- * sub-phase where an interruption costs far more than a generic mid-drive
- * pause. abortVehicleGatedFragmentWork's returnFragmentToGround now drops
- * cargo wherever the vehicle currently sits rather than teleporting it back
- * to its original pre-pickup position (#974 follow-up), but resuming still
- * means a fresh pickup-and-redrive cycle from that drop point — unlike a
- * 'to_fragment' (not yet loaded) interruption, which only repeats the
- * initial approach.
- *
- * Exists so ForceShiftRest.ts's policy-aware mid-execution guard
- * (isMidVehicleGatedWork, VehicleReservation.ts — scoped to
- * `taskTicksRemaining !== null`, a field haul_debris/fragment_debris never
- * sets since both are phase-driven rather than employee-timer-driven) can
- * also protect this one costly sub-phase, without reopening the broader
- * "don't protect mid-drive-to-target" decision that guard's own doc comment
- * already settled for every other vehicle-gated task. Without this, a
- * fatigue policy that force-rests faster than one haul leg can complete
- * (e.g. `set_policy mode:continuous`'s WORK_DURATION_TICKS=6 cadence)
- * interrupts the SAME loaded haul repeatedly — each cycle makes some real
- * forward progress now (unlike before this fix, which reset to zero every
- * time), but repeated interruption can still miss a contract's own delivery
- * deadline (direct-traced via tutorial-interactive.json's/
- * tutorial-steps-visual.json's contract-deliver step).
- */
-export function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
-  return state.vehicles.vehicles.some(
-    v => v.driverId === employee.id && v.haulingPhase === 'to_depot',
-  );
+  return { success: true };
 }

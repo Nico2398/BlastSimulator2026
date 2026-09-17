@@ -98,7 +98,7 @@ import type { RampDef } from '../mining/Ramp.js';
 // side). A pre-v19 save only has `driverId` — occupantIds defaults to
 // `[driverId]` (or `[]` when unset) and locomotion is derived from whichever
 // vehicle's driverId names the employee. See SaveLoad.ts's migrateV18ToV19.
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 export interface GameConfig {
   seed: number;

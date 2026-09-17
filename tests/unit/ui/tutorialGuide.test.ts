@@ -452,18 +452,22 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
   });
 
-  it('haul-debris: also waits while a vehicle has a live haulingPhase, with no pending action at all', () => {
+  // #1091: hasOutstandingVehicleWork replaces the deleted haulingPhase/
+  // breakPhase fields with reservedForActionId !== null on a debris_hauler/
+  // rock_fragmenter — there is no separate phase field left on `Vehicle` to
+  // check directly (tutorialGuide.ts's own doc comment on that function).
+  it('haul-debris: also waits while a debris_hauler vehicle is reserved for a haul, with no pending action at all', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, haulingPhase: 'to_fragment', breakPhase: null } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', reservedForActionId: 1 } as never];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
 
-    s.vehicles.vehicles = [{ id: 1, haulingPhase: null, breakPhase: null } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', reservedForActionId: null } as never];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(false);
   });
 
-  it('haul-debris: also waits while a vehicle has a live breakPhase', () => {
+  it('haul-debris: also waits while a rock_fragmenter vehicle is reserved for a break', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, haulingPhase: null, breakPhase: 'to_boulder' } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'rock_fragmenter', reservedForActionId: 1 } as never];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
   });
 
@@ -1073,33 +1077,36 @@ describe('decideClock', () => {
   // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (exported and
   // reused by isHaulDispatched in tutorialStepHelpers.ts, exercised here
   // through decideClock) is the fix.
-  describe('vehicle-gated hauling/breaking work (#552)', () => {
-    it('keeps running past budget while a vehicle has a live haulingPhase, even though every employee is fully idle', () => {
+  // #1091: hasOutstandingVehicleWork/workSignature key off
+  // reservedForActionId/payload now — there is no separate haulingPhase/
+  // breakPhase field left on `Vehicle` (tutorialGuide.ts's own doc comment).
+  describe('vehicle-gated hauling/breaking work (#552, #1091)', () => {
+    it('keeps running past budget while a debris_hauler vehicle is reserved for a haul, even though every employee is fully idle', () => {
       const s = state();
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
       ];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
     });
 
-    it('keeps running past budget while a vehicle has a live breakPhase, even though every employee is fully idle', () => {
+    it('keeps running past budget while a rock_fragmenter vehicle is reserved for a break, even though every employee is fully idle', () => {
       const s = state();
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, haulingPhase: null, breakPhase: 'to_boulder', x: 3, z: 4 } as never,
+        { id: 1, type: 'rock_fragmenter', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
       ];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
     });
 
-    it('holds once budget is spent when no vehicle has a live phase and no employee has work outstanding (control)', () => {
+    it('holds once budget is spent when no vehicle is reserved and no employee has work outstanding (control)', () => {
       const s = state();
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, haulingPhase: null, breakPhase: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', reservedForActionId: null, payload: null, x: 3, z: 4 } as never,
       ];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
     });
@@ -1113,7 +1120,7 @@ describe('decideClock', () => {
         s.employees.employees = [];
         // A fresh position every tick — the haul is provably still moving.
         s.vehicles.vehicles = [
-          { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: tick, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: tick, z: 0 } as never,
         ];
         const decision = decideClock(s, 0, budget, true, progress);
         if (tick > budget + WORK_GRACE_TICKS) {
@@ -1123,12 +1130,12 @@ describe('decideClock', () => {
       }
     });
 
-    it('workSignature differs between two states where only the vehicle\'s x/z/haulingPhase differ', () => {
+    it('workSignature differs between two states where only the vehicle\'s x/z/payload differ', () => {
       const s1 = state();
       s1.tickCount = DEFAULT_TICK_BUDGET + 5;
       s1.employees.employees = [];
       s1.vehicles.vehicles = [
-        { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
       ];
       const d1 = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true);
 
@@ -1136,7 +1143,7 @@ describe('decideClock', () => {
       s2.tickCount = DEFAULT_TICK_BUDGET + 5;
       s2.employees.employees = [];
       s2.vehicles.vehicles = [
-        { id: 1, haulingPhase: 'to_depot', breakPhase: null, x: 9, z: 1 } as never,
+        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: { fragmentId: 9, massKg: 500 }, x: 9, z: 1 } as never,
       ];
       const d2 = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true);
 
@@ -1158,7 +1165,7 @@ describe('decideClock', () => {
         // simulating a hauler that stalls mid-drive (e.g. blocked path).
         const x = tick <= freezeAt ? tick : freezeAt;
         s.vehicles.vehicles = [
-          { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x, z: 0 } as never,
         ];
         const decision = decideClock(s, 0, budget, true, progress);
         last = decision;

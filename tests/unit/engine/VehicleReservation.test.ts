@@ -32,7 +32,9 @@ import {
   reconcileVehicleReservations,
   isMidVehicleGatedWork,
   completeVehicleGatedAction,
+  hasBlockedQueuedActionForVehicleRole,
 } from '../../../src/core/engine/VehicleReservation.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 // reconcileVehicleReservations no longer performs the interruption itself
@@ -50,7 +52,8 @@ import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js'
 import { cancelAction } from '../../../src/core/engine/TaskCancellation.js';
 import { forceShiftRestIfNeeded } from '../../../src/core/engine/ForceShiftRest.js';
 import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
-import { driveVehicleTowardTarget } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import { WORK_DURATION_TICKS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
@@ -211,53 +214,17 @@ describe('findFreeVehicleForRole', () => {
     expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
   });
 
-  // #974 follow-up: findFreeVehicleForRole must exclude a vehicle already
-  // mid vehicle-gated fragment work (haulingPhase/breakPhase set) even though
-  // it looks "free" by the pre-existing checks (no reservedForActionId, no
-  // driver) — otherwise a same-tick self-dispatch claim can "free-ride" onto
-  // a vehicle a manual `vehicle haul`/`vehicle break` console command drove
-  // out-of-band, tearing down its unrelated in-flight work on release. See
-  // this function's own doc comment for the full trace
-  // (blast-oversized-boulders.integration.test.ts).
-  it('excludes an otherwise-free vehicle whose haulingPhase is set (#974)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.haulingPhase = 'to_fragment';
-
-    expect(findFreeVehicleForRole(state, 'debris_hauler', employee)).toBeNull();
-  });
-
-  it('excludes an otherwise-free vehicle whose breakPhase is set (#974)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_fragmenter, 1);
-
-    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
-    vehicle.breakPhase = 'to_boulder';
-
-    expect(findFreeVehicleForRole(state, 'rock_fragmenter', employee)).toBeNull();
-  });
-
-  it('returns the vehicle when haulingPhase and breakPhase are both null (exclusion is specific, not overly broad) (#974)', () => {
-    const state = createGame({ seed: SEED });
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
-
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.haulingPhase = null;
-    vehicle.breakPhase = null;
-
-    const picked = findFreeVehicleForRole(state, 'debris_hauler', employee);
-
-    expect(picked).not.toBeNull();
-    expect(picked!.id).toBe(vehicle.id);
-  });
+  // #974's original exclusion (a dedicated haulingPhase/breakPhase check) no
+  // longer applies (#1091): a vehicle mid vehicle-gated fragment work now
+  // carries a non-null reservedForActionId for its whole itinerary, with no
+  // separate phase field left to check (see findFreeVehicleForRole's own doc
+  // comment). That case is already covered above by "returns null when the
+  // only matching vehicle is already reserved for another action" — nothing
+  // else distinguishes "mid-haul"/"mid-break" from any other reservation any
+  // more, so the three dedicated haulingPhase/breakPhase-set/both-null cases
+  // this block used to carry are redundant with that coverage and were
+  // removed rather than rewritten against fields that no longer exist on
+  // `Vehicle`.
 });
 
 describe('reserveVehicle', () => {
@@ -319,8 +286,11 @@ describe('releaseVehicleReservation (#1090: claim-only — never dismounts)', ()
 // ── issue #922 / #1090: traced through the real call chains a player
 // actually triggers (cancellation, forced shift rest, a hard fatigue
 // collapse), not just releaseVehicleReservation called directly. Drives the
-// vehicle several cells with the real tickVehicle stepper first, so "the
-// vehicle has moved since boarding" is genuine.
+// vehicle several cells with the real tickLocomotion stepper (#1091 —
+// replaces the deleted driveVehicleTowardTarget: install a plain 'reposition'
+// itinerary via moveTo, already-mounted continuity keeps it a drive leg with
+// no boarding walk, and tick the itinerary mover the same way the real game
+// loop would) first, so "the vehicle has moved since boarding" is genuine.
 //
 // #1090 changes what these three chains actually do: releaseVehicleReservation
 // is now claim-only, so cancelAction and tickCollapse leave the driver
@@ -363,7 +333,8 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
 
     // Real driving — several cells, no NavGrid (state.navGrid is null on a
     // freshly-created game), so tickVehicleDirectLine advances one cell/tick.
-    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
+    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0); // sanity: it actually moved
 
     const vehicleXAtCancel = vehicle.x;
@@ -404,7 +375,8 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     employee.x = 0;
     employee.z = 0;
 
-    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
+    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0);
 
     const vehicleXAtRest = vehicle.x;
@@ -450,7 +422,8 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     employee.x = 0;
     employee.z = 0;
 
-    for (let i = 0; i < 5; i++) driveVehicleTowardTarget(state, vehicle, vehicle.targetX, vehicle.targetZ);
+    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0);
 
     const vehicleXAtCollapse = vehicle.x;
@@ -765,24 +738,20 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 100;
-    vehicle.haulingFragmentId = 1;
-    vehicle.haulingPhase = 'to_depot';
-    vehicle.haulingDepotBuildingId = 999;
-    vehicle.payloadKg = 850;
+    vehicle.payload = { fragmentId: 1, massKg: 850 };
     vehicle.task = 'transport';
     vehicle.state = 'working';
 
     releaseVehicleReservation(state, 100);
 
     // The #974 bug this regression pins: without aborting the haul first,
-    // unassignDriver refuses while haulingPhase !== null and driverId stays
-    // stuck forever. #1090: the driver is never unassigned by a plain
-    // release any more anyway — only the fragment-work abort's own cleanup
-    // (haul state, cargo) matters here now.
+    // unassignDriver refuses while payload !== null (#1091: replaces the old
+    // haulingPhase guard) and driverId stays stuck forever. #1090: the driver
+    // is never unassigned by a plain release any more anyway — only the
+    // fragment-work abort's own cleanup (haul state, cargo) matters here now.
     expect(vehicle.driverId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.haulingFragmentId).toBeNull();
+    expect(vehicle.payload).toBeNull();
     expect(vehicle.task).toBe('idle');
     expect(vehicle.state).toBe('idle');
 
@@ -805,9 +774,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 101;
-    vehicle.haulingFragmentId = 1;
-    vehicle.haulingPhase = 'to_depot';
-    vehicle.payloadKg = 850;
+    vehicle.payload = { fragmentId: 1, massKg: 850 };
 
     releaseVehicleReservation(state, 101);
 
@@ -832,17 +799,19 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = 102;
-    vehicle.breakFragmentId = 2;
-    vehicle.breakPhase = 'to_boulder';
     vehicle.task = 'moving';
     vehicle.state = 'moving';
 
     releaseVehicleReservation(state, 102);
 
+    // Breaking never sets `payload` (it splits the boulder in place) — the
+    // only observable state to clear here is the reservation and the display
+    // task/state, same as the "neither phase set" case below (#1091: no
+    // dedicated breakPhase/breakFragmentId left to distinguish "mid-break"
+    // from any other reservation).
     expect(vehicle.driverId).toBe(employee.id);
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.breakPhase).toBeNull();
-    expect(vehicle.breakFragmentId).toBeNull();
+    expect(vehicle.payload).toBeNull();
     expect(vehicle.task).toBe('idle');
     expect(vehicle.state).toBe('idle');
   });
@@ -871,3 +840,60 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 // #1090: releaseVehicleReservationKeepDriver is deleted — releaseVehicleReservation
 // itself is now claim-only (see the describe blocks above), so a dedicated
 // driver-retaining variant is redundant and gone along with it.
+
+describe('hasBlockedQueuedActionForVehicleRole (#1091: untargeted haul_debris exclusion)', () => {
+  it('an untargeted queued haul_debris action does not count as blocked while no active freight_warehouse exists — the #1091 exclusion, since nobody could complete it either way', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: null,
+    }));
+    // No freight_warehouse placed at all — hasActiveFreightWarehouse is false.
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(false);
+  });
+
+  it('the same untargeted queued haul_debris action counts as blocked once an active freight_warehouse exists — genuine demand somebody else could now claim', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: null,
+    }));
+    const placed = placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 64, 64);
+    if (!placed.success) throw new Error(`Setup: placeBuilding failed — ${placed.error}`);
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(true);
+  });
+
+  it('a queued haul_debris action targeted at a DIFFERENT employee still counts as blocked regardless of warehouse existence — the original #1090 hostage case the exclusion does not touch', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: other.id,
+    }));
+    // No freight_warehouse — would exclude an untargeted action, but this one
+    // is targeted at `other`, so the exclusion's own `a.targetEmployeeId !== null`
+    // branch already keeps it counted.
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(true);
+  });
+
+  it('a non-haul_debris queued action of the same role counts as blocked with no warehouse involved — the exclusion is scoped to haul_debris only', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter',
+      status: 'queued', targetEmployeeId: null,
+    }));
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'rock_fragmenter', employee.id)).toBe(true);
+  });
+});

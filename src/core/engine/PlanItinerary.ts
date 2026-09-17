@@ -15,6 +15,15 @@ import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
+import { fragmentApproachCell } from '../economy/FragmentApproach.js';
+import { isOversized } from '../mining/BlastCalc.js';
+// Economy -> engine -> economy: findHaulDepotApproach (HaulingTask.ts) needs
+// no vehicle/employee-claim machinery of its own, only a NavGrid lookup, so
+// importing it here closes a cycle no differently than the existing
+// MoveTo.ts -> PlanItinerary.ts -> VehicleReservation.ts one documented above
+// — every edge is a function called from inside another function's body,
+// never evaluated at module-load time.
+import { findHaulDepotApproach } from '../economy/HaulingTask.js';
 
 export type PlanFidelity = 'estimate' | 'exact';
 
@@ -172,6 +181,133 @@ export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
 }
 
 /**
+ * Resolves which vehicle a vehicle-gated goal drives: an explicit `via` hint
+ * names it outright (must still have a free seat); absent that, reuse the
+ * reservation already made for `reservedActionId`, if any, otherwise the
+ * cheapest free vehicle of `role`. Shared by planItinerary's own generic
+ * vehicle-gated branch and planFragmentTaskItinerary below — both resolve a
+ * goal's vehicle identically, differing only in what they build the
+ * itinerary out of once they have it (#1091).
+ */
+function resolveVehicleForGoal(
+  state: GameState,
+  employee: Employee,
+  role: VehicleRole,
+  via: number | undefined,
+  reservedActionId: number | null,
+): Vehicle | null {
+  if (via !== undefined) {
+    const vehicle = state.vehicles.vehicles.find(v => v.id === via);
+    return vehicle && hasFreeSeatFor(vehicle, employee) ? vehicle : null;
+  }
+
+  const reserved = reservedActionId !== null
+    ? state.vehicles.vehicles.find(v => v.reservedForActionId === reservedActionId)
+    : undefined;
+  return reserved ?? findFreeVehicleForRole(state, role, employee) ?? null;
+}
+
+/**
+ * A zero-length alight leg for an employee currently mounted in a DIFFERENT
+ * vehicle than the one they're about to board — null when not mounted at
+ * all (nothing to alight from first). #1103: without this, a foot leg
+ * walking to board a new vehicle would move employee.x/z on its own while
+ * the old vehicle, whose x/z is written only from ITS OWN occupant's advance
+ * (Locomotion.ts), never moves, instantly splitting the two positions apart
+ * (I2). Applying the 'alight' step the very same tick it becomes current
+ * (Locomotion.advanceItinerary's own continuity-leg handling) avoids idling a
+ * tick for a movement that would never fire. Shared, via buildMountLegs
+ * below, by planItinerary's own generic vehicle-gated branch and
+ * planFragmentTaskItinerary (#1091).
+ */
+function buildAlightLegIfMountedElsewhere(employee: Employee): Leg | null {
+  if (!isMounted(employee.locomotion)) return null;
+  return {
+    mode: 'foot',
+    vehicleId: null,
+    destX: employee.x,
+    destZ: employee.z,
+    arrival: 'exact',
+    onArrive: { kind: 'alight' },
+    estTicks: 0,
+  };
+}
+
+/**
+ * The mount sequence every vehicle-gated itinerary needs before it can drive
+ * anywhere: already mounted in `vehicle` keeps continuity (no legs, drive
+ * from the employee's own position); otherwise alight-if-mounted-elsewhere
+ * then board `vehicle`, driving from its position instead once boarded.
+ * Shared by planItinerary's own generic vehicle-gated branch and
+ * planFragmentTaskItinerary below — both need this exact prefix before
+ * diverging on what they drive to (#1091). Returns null when no route to
+ * board `vehicle` exists (buildBoardLeg failed), same "stays queued, retries
+ * next tick" contract as every other null return in this file.
+ */
+function buildMountLegs(
+  state: GameState,
+  employee: Employee,
+  vehicle: Vehicle,
+  fidelity: PlanFidelity,
+): { legs: Leg[]; driveFromX: number; driveFromZ: number } | null {
+  if (isMounted(employee.locomotion) && mountedVehicleId(employee.locomotion) === vehicle.id) {
+    return { legs: [], driveFromX: employee.x, driveFromZ: employee.z };
+  }
+
+  const legs: Leg[] = [];
+  const alightLeg = buildAlightLegIfMountedElsewhere(employee);
+  if (alightLeg) legs.push(alightLeg);
+
+  const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
+  if (boardLeg === null) return null;
+  legs.push(boardLeg);
+
+  const driveFromX = vehicle.x;
+  const driveFromZ = vehicle.z;
+  return { legs, driveFromX, driveFromZ };
+}
+
+/**
+ * A drive leg from (`fromX`, `fromZ`) to (`toX`, `toZ`), timed at
+ * `def.speed`, ending in `onArrive` — the shape four sites in this file
+ * build: the resumed-cargo depot leg, the fresh drive-to-fragment leg, the
+ * depot leg for a fresh haul (all three ending in an `{ kind: 'effect' }`
+ * step), and the generic vehicle-gated branch's own plain drive leg (ending
+ * in `{ kind: 'none' }`) (#1091). `avoidVehicles` is always `false`: mirrors
+ * Locomotion.ts's own advanceLeg (the executor) — a drive leg ignores
+ * NavCell.vehicleOccupied entirely at the static-pathfinding level (a
+ * vehicle must be able to drive onto another vehicle's or a fragment's cell
+ * to interact with it) and instead routes around a live vehicle-vs-vehicle
+ * occupancy check at each step, not baked into this route-cost estimate.
+ * Returns null when no route exists, same "stays queued, retries next tick"
+ * contract as every other null return in this file.
+ */
+function buildDriveLeg(
+  state: GameState,
+  fidelity: PlanFidelity,
+  vehicle: Vehicle,
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  onArrive: Leg['onArrive'],
+  def: ReturnType<typeof getVehicleDefByTier>,
+): Leg | null {
+  const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false);
+  if (dist === null) return null;
+
+  return {
+    mode: 'drive',
+    vehicleId: vehicle.id,
+    destX: toX,
+    destZ: toZ,
+    arrival: 'exact',
+    onArrive,
+    estTicks: cellsToTravelTicks(dist, def.speed),
+  };
+}
+
+/**
  * A single foot leg straight from `employee`'s own position to
  * (`targetX`, `targetZ`), at walking speed, plus `workTicks` of work once
  * there. Shared by planItinerary's own no-vehicle-role branch and its
@@ -206,6 +342,89 @@ function buildFootOnlyItinerary(
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
 }
 
+/**
+ * Plans a haul_debris/fragment_debris work goal's itinerary: the fragment-
+ * targeting drive leg(s) — to the fragment, and for a haul, on to the depot —
+ * each ending in an ArrivalEffects.ts effect (`haul_load`, `haul_unload`,
+ * `boulder_split`) rather than the generic single-target-then-work shape
+ * `planItinerary`'s own fallback below builds for every other action type.
+ * Split out because these two action types are the only ones needing more
+ * than one drive leg to reach their work (#1091 — see HaulingTask.ts's and
+ * BoulderBreaking.ts's own reduced surface, which used to drive this
+ * themselves via tickHaulingProgress/tickBreakProgress phase machines on
+ * `Vehicle`).
+ */
+function planFragmentTaskItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  action: PendingAction,
+  opts?: { via?: number },
+): Itinerary | null {
+  const role = action.requiredVehicleRole;
+  if (role === null) return null; // defensive — both action types always carry a role
+
+  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id);
+  if (!vehicle) return null;
+
+  const fragmentId = action.payload['fragmentId'];
+  if (typeof fragmentId !== 'number') return null;
+
+  const mount = buildMountLegs(state, employee, vehicle, fidelity);
+  if (mount === null) return null;
+  const { legs, driveFromX, driveFromZ } = mount;
+
+  const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
+
+  // Resume-after-interruption (#1091): the reserved vehicle already carries
+  // this exact fragment as payload — its haul_load leg already ran before an
+  // earlier policy-driven interruption/pause left the reservation (and the
+  // cargo) intact rather than releasing it (isCommittedToOwnCargo,
+  // VehicleReservation.ts). Only the depot leg is left to plan.
+  if (action.type === 'haul_debris' && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId) {
+    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
+    if (depotApproach === null) return null;
+
+    const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def);
+    if (depotLeg === null) return null;
+    legs.push(depotLeg);
+
+    return { legs, goal, workTicks: 0, estTotalTicks: legs.reduce((sum, leg) => sum + leg.estTicks, 0) };
+  }
+
+  // A fresh haul, or a break — both start with a drive to the fragment
+  // itself. Re-validated here (not just at claim time): the fragment must
+  // still be on_ground, and (haul only) not have become oversized, or
+  // (break only) still be oversized, by the time this itinerary is actually
+  // planned/replanned.
+  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'on_ground');
+  if (!tracked) return null;
+  if (action.type === 'fragment_debris' && !isOversized(tracked.fragment.volume)) return null;
+  if (action.type === 'haul_debris' && isOversized(tracked.fragment.volume)) return null;
+
+  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
+  const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def);
+  if (toFragmentLeg === null) return null;
+  legs.push(toFragmentLeg);
+
+  if (action.type === 'fragment_debris') {
+    return { legs, goal, workTicks: 0, estTotalTicks: legs.reduce((sum, leg) => sum + leg.estTicks, 0) };
+  }
+
+  // haul_debris: one more leg on to the depot — no active one means this
+  // goal stays unresolvable, same "stays queued, retries next tick" contract
+  // as every other null return in this file.
+  const depotApproach = findHaulDepotApproach(state, approach.x, approach.z);
+  if (depotApproach === null) return null;
+
+  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def);
+  if (toDepotLeg === null) return null;
+  legs.push(toDepotLeg);
+
+  return { legs, goal, workTicks: 0, estTotalTicks: legs.reduce((sum, leg) => sum + leg.estTicks, 0) };
+}
+
 export function planItinerary(
   state: GameState,
   employee: Employee,
@@ -220,6 +439,17 @@ export function planItinerary(
   // doc comment (#1090).
   opts?: { via?: number; action?: PendingAction },
 ): Itinerary | null {
+  // haul_debris/fragment_debris (#1091): these two action types need more
+  // than the generic single-drive-leg-then-work shape the rest of this
+  // function builds, so they're diverted to their own planner up front —
+  // see planFragmentTaskItinerary's own doc comment.
+  if (goal.kind === 'work') {
+    const action = opts?.action ?? state.pendingActions.find(a => a.id === goal.actionId);
+    if (action && (action.type === 'haul_debris' || action.type === 'fragment_debris')) {
+      return planFragmentTaskItinerary(state, employee, goal, fidelity, action, opts);
+    }
+  }
+
   const resolved = resolveGoal(state, employee, goal, opts?.action);
   if (resolved === null) return null;
 
@@ -250,82 +480,24 @@ export function planItinerary(
   // that, reuse the reservation already made for this action, if any,
   // otherwise the cheapest free vehicle of the required role — same lookup
   // resolveVehicleGatedWalkTarget (ActionSelection.ts, deleted along with
-  // this whole function) used.
-  let vehicle: Vehicle | undefined;
-  if (via !== undefined) {
-    vehicle = state.vehicles.vehicles.find(v => v.id === via);
-    if (!vehicle || !hasFreeSeatFor(vehicle, employee)) return null;
-  } else {
-    const reserved = resolved.actionId !== null
-      ? state.vehicles.vehicles.find(v => v.reservedForActionId === resolved.actionId)
-      : undefined;
-    vehicle = reserved ?? findFreeVehicleForRole(state, role!, employee) ?? undefined;
-    // #1090: unlike the deleted resolveVehicleGatedWalkTarget's own
-    // "defensive" fallback to a plain on-foot walk when no vehicle is
-    // reserved or free, planItinerary reports this goal genuinely
-    // unresolvable — a vehicle-gated action has no valid on-foot substitute,
-    // so a route that doesn't actually exist in the real dispatch (no
-    // vehicle to drive) must not be costed as though it does. Matches
-    // findVehicleForClaim's own real dispatch-time refusal in this state.
-    if (!vehicle) return null;
-  }
+  // this whole function) used. #1090: unlike a "defensive" fallback to a
+  // plain on-foot walk when no vehicle is reserved or free, planItinerary
+  // reports this goal genuinely unresolvable — a vehicle-gated action has no
+  // valid on-foot substitute, so a route that doesn't actually exist in the
+  // real dispatch (no vehicle to drive) must not be costed as though it
+  // does. Matches findVehicleForClaim's own real dispatch-time refusal in
+  // this state.
+  const vehicle = resolveVehicleForGoal(state, employee, role!, via, resolved.actionId);
+  if (!vehicle) return null;
 
-  const alreadyMounted = isMounted(employee.locomotion) && mountedVehicleId(employee.locomotion) === vehicle.id;
-
-  const legs: Leg[] = [];
-  let driveFromX = employee.x;
-  let driveFromZ = employee.z;
-
-  if (!alreadyMounted) {
-    // #1103: an employee currently mounted in a DIFFERENT vehicle (e.g. an
-    // idle rock_digger driver picked up for a debris_hauler haul) must alight
-    // from it before walking to board this one — otherwise the foot leg
-    // below moves employee.x/z on its own while the old vehicle, whose x/z is
-    // written only from ITS OWN occupant's advance (Locomotion.ts), never
-    // moves, instantly splitting the two positions apart (I2). A zero-length
-    // leg at the employee's own current position applies its 'alight' step
-    // the very same tick it becomes current (Locomotion.advanceItinerary's
-    // own continuity-leg handling) rather than idling a tick for a movement
-    // that would never fire.
-    if (isMounted(employee.locomotion)) {
-      legs.push({
-        mode: 'foot',
-        vehicleId: null,
-        destX: employee.x,
-        destZ: employee.z,
-        arrival: 'exact',
-        onArrive: { kind: 'alight' },
-        estTicks: 0,
-      });
-    }
-
-    const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
-    if (boardLeg === null) return null;
-    legs.push(boardLeg);
-
-    driveFromX = vehicle.x;
-    driveFromZ = vehicle.z;
-  }
+  const mount = buildMountLegs(state, employee, vehicle, fidelity);
+  if (mount === null) return null;
+  const { legs, driveFromX, driveFromZ } = mount;
 
   const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
-  // Drive leg: avoidVehicles: false, mirroring Locomotion.ts's own
-  // advanceLeg (the executor) — a drive leg ignores NavCell.vehicleOccupied
-  // entirely at the static-pathfinding level (a vehicle must be able to
-  // drive onto another vehicle's or a fragment's cell to interact with it)
-  // and instead routes around a live vehicle-vs-vehicle occupancy check at
-  // each step, not baked into this route-cost estimate.
-  const driveDist = estimateLegDistance(state, fidelity, vehicle.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, false);
-  if (driveDist === null) return null;
-
-  legs.push({
-    mode: 'drive',
-    vehicleId: vehicle.id,
-    destX: resolved.targetX,
-    destZ: resolved.targetZ,
-    arrival: 'exact',
-    onArrive: { kind: 'none' },
-    estTicks: cellsToTravelTicks(driveDist, def.speed),
-  });
+  const driveLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, { kind: 'none' }, def);
+  if (driveLeg === null) return null;
+  legs.push(driveLeg);
 
   const estTotalTicks = legs.reduce((sum, leg) => sum + leg.estTicks, 0) + resolved.workTicks;
   return { legs, goal, workTicks: resolved.workTicks, estTotalTicks };

@@ -204,14 +204,15 @@ describe('alight', () => {
     }
   });
 
-  it('fails, with no state change, when the vehicle is mid-haul (haulingPhase set)', () => {
+  it('fails, with no state change, when the vehicle is mid-haul (payload set)', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
     vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.haulingPhase = 'to_depot';
+    // #1091: payload replaces haulingPhase as the mid-haul guard unassignDriver checks.
+    vehicle.payload = { fragmentId: 1, massKg: 500 };
 
     const result = alight(state, vehicle.id);
 
