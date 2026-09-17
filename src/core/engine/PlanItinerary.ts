@@ -28,7 +28,7 @@ import { findHaulDepotApproach } from '../economy/HaulingTask.js';
 export type PlanFidelity = 'estimate' | 'exact';
 
 /** Goal resolved to a travel target, the vehicle role (if any) it's gated behind, and its work ticks. */
-interface ResolvedGoal {
+export interface ResolvedGoal {
   targetX: number;
   targetZ: number;
   requiredVehicleRole: VehicleRole | null;
@@ -281,6 +281,11 @@ function buildMountLegs(
  * occupancy check at each step, not baked into this route-cost estimate.
  * Returns null when no route exists, same "stays queued, retries next tick"
  * contract as every other null return in this file.
+ *
+ * `arrival` (phase 7, #1093): 'exact' for every existing call site (a drive
+ * leg that ends the itinerary or hands off to a work/haul effect at the
+ * precise target); 'adjacent' for a transport-ride leg that alights near the
+ * target rather than on it, leaving a short foot leg to finish the trip.
  */
 function buildDriveLeg(
   state: GameState,
@@ -292,6 +297,7 @@ function buildDriveLeg(
   toZ: number,
   onArrive: Leg['onArrive'],
   def: ReturnType<typeof getVehicleDefByTier>,
+  arrival: 'exact' | 'adjacent',
 ): Leg | null {
   const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false);
   if (dist === null) return null;
@@ -301,7 +307,7 @@ function buildDriveLeg(
     vehicleId: vehicle.id,
     destX: toX,
     destZ: toZ,
-    arrival: 'exact',
+    arrival,
     onArrive,
     estTicks: cellsToTravelTicks(dist, def.speed),
   };
@@ -386,7 +392,7 @@ function planFragmentTaskItinerary(
     const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
     if (depotApproach === null) return null;
 
-    const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def);
+    const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact');
     if (depotLeg === null) return null;
     legs.push(depotLeg);
 
@@ -404,7 +410,7 @@ function planFragmentTaskItinerary(
   if (action.type === 'haul_debris' && isOversized(tracked.fragment.volume)) return null;
 
   const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
-  const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def);
+  const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def, 'exact');
   if (toFragmentLeg === null) return null;
   legs.push(toFragmentLeg);
 
@@ -418,11 +424,70 @@ function planFragmentTaskItinerary(
   const depotApproach = findHaulDepotApproach(state, approach.x, approach.z);
   if (depotApproach === null) return null;
 
-  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def);
+  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact');
   if (toDepotLeg === null) return null;
   legs.push(toDepotLeg);
 
   return { legs, goal, workTicks: 0, estTotalTicks: legs.reduce((sum, leg) => sum + leg.estTicks, 0) };
+}
+
+/**
+ * Builds a transport-ride itinerary for a non-vehicle-gated 'work' goal
+ * (phase 7, #1093): mount legs onto `vehicle` (see `buildMountLegs`), then a
+ * drive leg to (`resolved.targetX`, `resolved.targetZ`) with
+ * `arrival: 'adjacent'` and `onArrive: { kind: 'alight',
+ * releaseVehicleForActionId: resolved.actionId! }` (the ride is a borrowed
+ * vehicle for this one trip, not a reservation the action itself needs, so
+ * alighting must free it), then a short foot leg covering the
+ * `TRANSPORT_ALIGHT_FINISH_WALK_CELLS`-cell remainder into the exact target.
+ * Returns null when any leg's route doesn't exist, same "stays queued,
+ * retries next tick" contract as every other null return in this file.
+ */
+export function buildTransportRideItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  resolved: ResolvedGoal,
+  vehicle: Vehicle,
+): Itinerary | null {
+  // TODO: implement (#1093 phase 7)
+  void state;
+  void employee;
+  void goal;
+  void fidelity;
+  void resolved;
+  void vehicle;
+  return null;
+}
+
+/**
+ * Finds the cheapest ride itinerary across every vehicle role for a
+ * non-vehicle-gated 'work' goal (phase 7, #1093): iterates
+ * `getAllVehicleRoles()`, uses `findFreeVehicleForRole` to find a free
+ * vehicle per role, builds a ride candidate per free role via
+ * `buildTransportRideItinerary`, and returns the cheapest one — by
+ * `estTotalTicks` — only when it is strictly cheaper than `footCost` (the
+ * cost of the plain on-foot itinerary already available for this goal).
+ * Returns null when no ride is cheaper than walking, or no vehicle role has
+ * a free vehicle at all.
+ */
+export function findCheapestTransportItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  resolved: ResolvedGoal,
+  footCost: number,
+): Itinerary | null {
+  // TODO: implement (#1093 phase 7)
+  void state;
+  void employee;
+  void goal;
+  void fidelity;
+  void resolved;
+  void footCost;
+  return null;
 }
 
 export function planItinerary(
@@ -469,9 +534,11 @@ export function planItinerary(
 
   if (role === null && via === undefined) {
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED) {
-      /* reserved for gameplay-vehicle-fleet phase 7 (fast transport): compare
-       * this foot leg's cost against boarding+driving and return whichever is
-       * cheaper. Not built in phase 3a. */
+      // TODO(#1093 phase 7): findCheapestTransportItinerary plugs in here,
+      // scoped to goal.kind === 'work' && resolved.actionId !== null — it
+      // compares the foot itinerary this branch returns against riding a
+      // borrowed vehicle and returns whichever is cheaper. Not wired in
+      // yet; behavior here is unchanged.
     }
 
     return buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
@@ -496,7 +563,7 @@ export function planItinerary(
   const { legs, driveFromX, driveFromZ } = mount;
 
   const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
-  const driveLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, { kind: 'none' }, def);
+  const driveLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, { kind: 'none' }, def, 'exact');
   if (driveLeg === null) return null;
   legs.push(driveLeg);
 

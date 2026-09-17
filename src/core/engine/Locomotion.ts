@@ -28,7 +28,7 @@ import { isDestinationOccupied, updateVehicleCellOccupancy, tickVehicleTaskState
 import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
-import { dismountVehicleDriver } from './VehicleReservation.js';
+import { dismountVehicleDriver, releaseVehicleReservation } from './VehicleReservation.js';
 
 /** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
 function readCommitted(emp: Employee): RouteCommitment {
@@ -658,6 +658,13 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   }
 
   // step.kind === 'alight'
+  // TODO(#1093 phase 7): when step.releaseVehicleForActionId !== undefined
+  // and it matches drivenVehicle?.reservedForActionId, call
+  // releaseVehicleReservation(state, step.releaseVehicleForActionId) so a
+  // borrowed transport-ride vehicle is freed back to the pool the instant
+  // its rider alights, instead of staying reserved for an action it was
+  // never claimed against. Not implemented yet.
+  void releaseVehicleReservation;
   const vehicleId = isMounted(emp.locomotion) ? mountedVehicleId(emp.locomotion) : null;
   if (vehicleId === null) return true; // already on foot — nothing to undo
   return alight(state, vehicleId, emitter).success;

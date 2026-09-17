@@ -13,7 +13,7 @@ export type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
 export type ArrivalStep =
   | { kind: 'none' }
   | { kind: 'board'; vehicleId: number }
-  | { kind: 'alight' }
+  | { kind: 'alight'; releaseVehicleForActionId?: number }
   | { kind: 'effect'; effectId: ArrivalEffectId };
 
 /** One foot or drive segment of an itinerary. */

@@ -558,7 +558,15 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // #1090: every other on-foot action walks via moveTo — the only entry
   // point that starts movement — rather than setting destinationX/Z
   // directly, whenever moveTo can actually resolve a route.
+  // TODO(#1093 phase 7): change to moveTo(state, employee.id, { actionId:
+  // action.id }) so planItinerary can compare walking against riding a
+  // borrowed vehicle for this goal (findCheapestTransportItinerary,
+  // PlanItinerary.ts) instead of always walking the full distance.
   const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ });
+  // TODO(#1093 phase 7): once the above plans a itinerary that may include a
+  // mode: 'drive' leg (a transport ride), a drive leg's vehicle needs
+  // reserveVehicle(state, ...) called so it isn't claimed out from under the
+  // employee mid-ride. Not implemented yet.
   if (!moveResult.success) {
     // #1090 follow-up: moveTo's upfront exact-fidelity reachability check
     // (planItinerary) refuses to install an itinerary for a target that's
