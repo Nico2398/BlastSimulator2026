@@ -200,6 +200,11 @@ export interface PendingAction {
    * or SAVE_VERSION bump applies. Always read with `!= null` (loose), not `!==`.
    */
   blockedReason?: BlockedOrderReason | null;
+  /**
+   * Tick after which this action becomes claimable again, stamped when a
+   * vehicle abandons it as stuck. Null/absent = no backoff active.
+   */
+  stuckBackoffUntilTick?: number | null;
 }
 
 /**

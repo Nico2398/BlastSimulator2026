@@ -691,6 +691,12 @@ export const STUCK_MORALE_PENALTY = 2;
  */
 export const MOVE_STUCK_ABANDON_TICKS = 30;
 
+/**
+ * Ticks before a stuck-abandoned action becomes claimable again. 2x
+ * MOVE_STUCK_ABANDON_TICKS — see issue #1130 Decisions taken.
+ */
+export const ACTION_STUCK_BACKOFF_TICKS = 60;
+
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 

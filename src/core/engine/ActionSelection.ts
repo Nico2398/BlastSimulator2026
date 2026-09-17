@@ -323,6 +323,15 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 }
 
 /**
+ * True when `action`'s stuck-abandon backoff (if any) has expired, or it never had one.
+ * See PendingAction.stuckBackoffUntilTick.
+ */
+export function isActionPastStuckBackoff(_state: GameState, _action: PendingAction): boolean {
+  // TODO: implemented by @implementer
+  return true;
+}
+
+/**
  * The three-clause "is this queued action open to `employee`" check used by
  * `findStarvedActionForEmployee` below: still `queued`, untargeted or
  * targeted at `employee`, and `employee` holds `requiredSkill` when one is

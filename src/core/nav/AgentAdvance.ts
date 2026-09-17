@@ -43,6 +43,12 @@ export interface AdvanceAlongPathInput {
   committed?: RouteCommitment;
   /** Whether the fresh replan this tick avoids vehicle-occupied cells — used by the route-commitment guard to re-resolve a waypoint on the same terms the fresh path was found under. */
   avoidVehicles?: boolean;
+  /**
+   * Mover's own position 2 ticks back, threaded like `committed`. Null when
+   * fewer than 2 ticks of history exist yet.
+   */
+  moveHistoryX?: number | null;
+  moveHistoryZ?: number | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -61,6 +67,13 @@ interface AdvanceAlongPathOutcome {
   isPathComplete: boolean;
   /** Updated route-commitment, to be written back onto the entity (#1129). */
   committed: RouteCommitment;
+  /**
+   * This tick's pre-move position, becomes moveHistoryX/Z two ticks from now.
+   * Shift-register invariant: at start of tick n, moveHistoryX/Z == P(n-2),
+   * input.x/z == P(n-1).
+   */
+  moveHistoryX: number | null;
+  moveHistoryZ: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +166,9 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // untouched — nothing moved this tick, so there is nothing to roll
       // forward or decay.
       committed: input.committed ?? NULL_ROUTE_COMMITMENT,
+      // TODO: implement — shift-register wiring lands with the oscillation fix.
+      moveHistoryX: null,
+      moveHistoryZ: null,
     };
   }
 
@@ -310,6 +326,9 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     becameStuck: false,
     isPathComplete,
     committed,
+    // TODO: implement — shift-register wiring lands with the oscillation fix.
+    moveHistoryX: null,
+    moveHistoryZ: null,
   };
 }
 

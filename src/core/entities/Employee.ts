@@ -168,6 +168,15 @@ export interface Employee {
   committedFromX?: number | null;
   committedFromZ?: number | null;
   /**
+   * Own position 2 ticks back — cross-references AgentAdvance.ts's
+   * shift-register invariant (moveHistoryX/Z == P(n-2), x/z == P(n-1) at the
+   * start of tick n), which the stuck-detection oscillation fix (#1130)
+   * threads through here field-for-field. Null when fewer than 2 ticks of
+   * history exist yet.
+   */
+  moveHistoryX?: number | null;
+  moveHistoryZ?: number | null;
+  /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside
    * destinationX/destinationZ by the claim step; consumed by
@@ -294,6 +303,8 @@ export function hireEmployee(
     committedRemainingCost: null,
     committedFromX: null,
     committedFromZ: null,
+    moveHistoryX: null,
+    moveHistoryZ: null,
     pendingRestDuration: null,
     pendingRestNeedKey: null,
     pendingTaskDuration: null,
