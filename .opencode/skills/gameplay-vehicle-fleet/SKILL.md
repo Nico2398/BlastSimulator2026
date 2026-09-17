@@ -159,9 +159,11 @@ Two behaviours follow and are never special-cased:
 - **Continuity.** An employee already mounted in a qualifying vehicle plans a zero-length first leg,
   which the planner drops. Their cost for the next same-role action is strictly lower than any
   on-foot candidate's, so they keep the vehicle by ranking. Nothing dismounts on completion.
-- **Transport.** For an on-foot action the planner may compare walking against
-  `[foot -> vehicle, board, drive, alight, foot -> target]` and pick the cheaper. Gated by
-  `VEHICLE_TRANSPORT_PLANNING_ENABLED` in `balance.ts` until the fast-transport feature ships.
+- **Transport.** For a `'work'` goal with a real `actionId` the planner compares walking against
+  `[foot -> vehicle, board, drive, alight, foot -> target]` across every vehicle role and picks the
+  cheaper — never for `'reposition'` or `'rest'` goals, which stay foot-only. `place_building` and
+  `level_ground` goals are excluded: their target cell becomes NavGrid-blocked once construction
+  completes, which would strand a vehicle left standing on it.
 
 ## Board, Alight, and the 3D Model
 
@@ -238,7 +240,7 @@ today. A migration issue updates its own row as it lands.
 | 4 | Cost model delegates to the planner; continuity machinery removed | landed |
 | 5 | Haul and break become leg effects | landed |
 | 6 | `driverId`/`pendingEvacuationDestination` stripped, tier-correct upkeep/fuel, `reposition` ability | landed |
-| 7 | Fast transport un-gated | planned |
+| 7 | Fast transport un-gated | landed |
 
 Phase 0a's own measured baseline (`tutorial-boxcut-full.json`, interaction mode and command mode
 both converge on the same figures): the box-cut finishes in 108 ticks (command mode) / 20 ticks for
