@@ -243,9 +243,21 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
 
     // hopAdvance.isPathComplete here means only "reached hopTarget" (a
     // single-waypoint list is all advanceAgent was given) — true "reached
-    // the leg's own destination" only when that hop's target IS it.
+    // the leg's own destination" only when that hop's target IS it, OR when
+    // it's the fresh path's own last waypoint and there is no more path left
+    // to walk. The second arm matters when `destinationX/Z` sits outside the
+    // NavGrid (findPath's own silent clamp — Pathfinding.ts's `clampToGrid`):
+    // the route's last waypoint then falls short of the exact destination
+    // coordinates forever, so an exact-match-only test would leave the agent
+    // parked one cell short with a route to nowhere further to walk, never
+    // arriving — matching the pre-#1129 single-call advanceAgent, whose
+    // completion test was index-based (walked past the last given waypoint)
+    // and so never depended on hitting the exact destination value either.
     const reachedHop = hopAdvance.isPathComplete;
-    const legComplete = reachedHop && hopTarget.x === input.destinationX && hopTarget.z === input.destinationZ;
+    const lastWaypoint = input.path.waypoints[input.path.waypoints.length - 1];
+    const exhaustedFreshPath = !!lastWaypoint && hopTarget.x === lastWaypoint.x && hopTarget.z === lastWaypoint.z;
+    const legComplete = reachedHop
+      && (hopTarget.x === input.destinationX && hopTarget.z === input.destinationZ || exhaustedFreshPath);
 
     if (legComplete) {
       committed = NULL_ROUTE_COMMITMENT;
@@ -391,8 +403,23 @@ function resolveTargetWaypoint(
     // one case only — walk straight at the leg's own destination for this
     // one hop instead, so next tick's replan, from a shifted position, gets
     // an unambiguous comparison to resolve the tie with.
+    // A retrace is inherently a two-point signature — the fresh target must
+    // point back at some *other* place the commitment came from. A hop that
+    // moved zero distance (the agent already sitting exactly on both the
+    // committed waypoint and the fresh path's own target — the ordinary
+    // shape once the agent is parked at a route's dead end, e.g. the last
+    // in-range cell before an out-of-grid destination) records fromX/fromZ
+    // equal to waypointX/waypointZ itself. Left unguarded, that self-
+    // referential "from" trivially matches a fresh target that is, every
+    // tick, that same stationary cell — misfiring the retrace guard forever
+    // and routing the agent in an unclamped straight line at the raw
+    // destination instead of holding position, confirmed live via
+    // needs-drain-visual's employee dispatch (150,150) on a 64x64 NavGrid:
+    // pre-fix it walked straight off the grid for 65 extra ticks instead of
+    // parking at the clamped edge cell.
     const isRetrace = committed.fromX != null && committed.fromZ != null
-      && freshTarget.x === committed.fromX && freshTarget.z === committed.fromZ;
+      && freshTarget.x === committed.fromX && freshTarget.z === committed.fromZ
+      && (committed.fromX !== committed.waypointX || committed.fromZ !== committed.waypointZ);
     if (isRetrace) {
       return {
         target: { x: destinationX, z: destinationZ },
