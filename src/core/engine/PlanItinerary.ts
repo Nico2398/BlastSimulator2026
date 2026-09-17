@@ -9,11 +9,11 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, getAllVehicleRoles, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -451,14 +451,31 @@ export function buildTransportRideItinerary(
   resolved: ResolvedGoal,
   vehicle: Vehicle,
 ): Itinerary | null {
-  // TODO: implement (#1093 phase 7)
-  void state;
-  void employee;
-  void goal;
-  void fidelity;
-  void resolved;
-  void vehicle;
-  return null;
+  const mount = buildMountLegs(state, employee, vehicle, fidelity);
+  if (mount === null) return null;
+  const { legs, driveFromX, driveFromZ } = mount;
+
+  const def = getVehicleDefByTier(vehicle.type, vehicle.tier);
+  const driveLeg = buildDriveLeg(
+    state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
+    { kind: 'alight', releaseVehicleForActionId: resolved.actionId! }, def, 'adjacent',
+  );
+  if (driveLeg === null) return null;
+  legs.push(driveLeg);
+
+  const footLeg: Leg = {
+    mode: 'foot',
+    vehicleId: null,
+    destX: resolved.targetX,
+    destZ: resolved.targetZ,
+    arrival: 'exact',
+    onArrive: { kind: 'none' },
+    estTicks: cellsToTravelTicks(TRANSPORT_ALIGHT_FINISH_WALK_CELLS, AGENT_WALK_SPEED),
+  };
+  legs.push(footLeg);
+
+  const estTotalTicks = legs.reduce((sum, leg) => sum + leg.estTicks, 0) + resolved.workTicks;
+  return { legs, goal, workTicks: resolved.workTicks, estTotalTicks };
 }
 
 /**
@@ -480,14 +497,18 @@ export function findCheapestTransportItinerary(
   resolved: ResolvedGoal,
   footCost: number,
 ): Itinerary | null {
-  // TODO: implement (#1093 phase 7)
-  void state;
-  void employee;
-  void goal;
-  void fidelity;
-  void resolved;
-  void footCost;
-  return null;
+  let best: Itinerary | null = null;
+
+  for (const role of getAllVehicleRoles()) {
+    const vehicle = findFreeVehicleForRole(state, role, employee);
+    if (!vehicle) continue;
+
+    const candidate = buildTransportRideItinerary(state, employee, goal, fidelity, resolved, vehicle);
+    if (candidate === null) continue;
+    if (best === null || candidate.estTotalTicks < best.estTotalTicks) best = candidate;
+  }
+
+  return best !== null && best.estTotalTicks < footCost ? best : null;
 }
 
 export function planItinerary(
@@ -533,15 +554,14 @@ export function planItinerary(
   );
 
   if (role === null && via === undefined) {
-    if (VEHICLE_TRANSPORT_PLANNING_ENABLED) {
-      // TODO(#1093 phase 7): findCheapestTransportItinerary plugs in here,
-      // scoped to goal.kind === 'work' && resolved.actionId !== null — it
-      // compares the foot itinerary this branch returns against riding a
-      // borrowed vehicle and returns whichever is cheaper. Not wired in
-      // yet; behavior here is unchanged.
+    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
+
+    if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null && footItinerary !== null) {
+      const transportItinerary = findCheapestTransportItinerary(state, employee, goal, fidelity, resolved, footItinerary.estTotalTicks);
+      if (transportItinerary !== null) return transportItinerary;
     }
 
-    return buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
+    return footItinerary;
   }
 
   // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent

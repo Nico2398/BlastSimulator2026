@@ -557,16 +557,24 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
 
   // #1090: every other on-foot action walks via moveTo — the only entry
   // point that starts movement — rather than setting destinationX/Z
-  // directly, whenever moveTo can actually resolve a route.
-  // TODO(#1093 phase 7): change to moveTo(state, employee.id, { actionId:
-  // action.id }) so planItinerary can compare walking against riding a
-  // borrowed vehicle for this goal (findCheapestTransportItinerary,
-  // PlanItinerary.ts) instead of always walking the full distance.
-  const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ });
-  // TODO(#1093 phase 7): once the above plans a itinerary that may include a
-  // mode: 'drive' leg (a transport ride), a drive leg's vehicle needs
-  // reserveVehicle(state, ...) called so it isn't claimed out from under the
-  // employee mid-ride. Not implemented yet.
+  // directly, whenever moveTo can actually resolve a route. Goal shape is
+  // { actionId } (not { x, z }) so planItinerary/resolveGoal recognize a
+  // 'work' goal with a real actionId — required for
+  // findCheapestTransportItinerary's walk-vs-ride comparison to trigger, and
+  // for a transport ride's alight step to have a valid actionId to key its
+  // own release on (#1093 phase 7).
+  const moveResult = moveTo(state, employee.id, { actionId: action.id });
+  // A transport-ride itinerary (#1093 phase 7) may include a mode: 'drive'
+  // leg for a borrowed vehicle this action never claimed through
+  // promoteVehicleGatedAction — reserve it here so it isn't claimed out from
+  // under the employee mid-ride.
+  if (moveResult.success) {
+    const driveLeg = employee.itinerary?.legs.find(leg => leg.mode === 'drive');
+    if (driveLeg?.vehicleId !== null && driveLeg?.vehicleId !== undefined) {
+      const rideVehicle = state.vehicles.vehicles.find(v => v.id === driveLeg.vehicleId);
+      if (rideVehicle) reserveVehicle(rideVehicle, action.id);
+    }
+  }
   if (!moveResult.success) {
     // #1090 follow-up: moveTo's upfront exact-fidelity reachability check
     // (planItinerary) refuses to install an itinerary for a target that's
