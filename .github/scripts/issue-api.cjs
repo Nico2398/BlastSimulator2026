@@ -146,6 +146,7 @@ function createIssueApi(
   const issues = new Map();
   const dependencies = new Map();
   const deliverables = new Map();
+  const assignmentComments = new Map();
 
   /**
    * Runs one read, asking again when the failure is a transient one.
@@ -454,6 +455,60 @@ function createIssueApi(
       return items.some(
         (event) => event.event === 'labeled' && event.label?.name === 'in-progress'
       );
+    },
+
+    /**
+     * Every comment on this issue, unfiltered — `run-liveness.cjs` reasons
+     * about which of them, if any, is genuinely this issue's own assignment
+     * comment. See issue #1136.
+     *
+     * Despite the name, this does **not** filter for the assignment phrase or
+     * for authorship — it is the generic accessor, mirroring `deliverableFor`
+     * and `declaredBlockedBy` above: a plain read here, the domain-specific
+     * rule (the `ASSIGNMENT_COMMENT_PATTERN` match, and which author counts as
+     * the pipeline's own) in the caller. This repository is public, and
+     * anyone can post a comment containing the exact assignment phrase for
+     * some other issue's real assignment — `user` is returned precisely so a
+     * caller can tell a genuine pipeline comment from one that merely quotes
+     * or spoofs the phrase, rather than trusting phrase-match alone.
+     *
+     * @param {number} number
+     * @returns {Promise<{comments: {body: string, created_at: string, user: {login: string, type: string}|null}[], unknown: boolean}>}
+     */
+    async assignmentCommentsFor(number) {
+      if (assignmentComments.has(number)) return assignmentComments.get(number);
+
+      let result;
+      try {
+        const { items, complete } = await readAllPages((page) =>
+          read(`#${number}: comments`, () =>
+            github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: number,
+              per_page: PER_PAGE,
+              page,
+            })
+          )
+        );
+        if (!complete) {
+          log(`#${number}: comments exceed ${MAX_PAGES * PER_PAGE} — read as incomplete.`);
+        }
+        result = {
+          comments: items.map((comment) => ({
+            body: comment.body || '',
+            created_at: comment.created_at,
+            user: comment.user ? { login: comment.user.login, type: comment.user.type } : null,
+          })),
+          unknown: !complete,
+        };
+      } catch (error) {
+        log(`#${number}: comments could not be read (${error.status ?? error.message}).`);
+        result = { comments: [], unknown: true };
+      }
+
+      assignmentComments.set(number, result);
+      return result;
     },
 
     /**

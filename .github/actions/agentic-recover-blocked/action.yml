@@ -23,6 +23,14 @@ description: >
   watchdog would, so `handle-failure.yml`'s existing `blocked` reaction
   chains the queue past it immediately instead of after a stall threshold.
 
+  The genuinely-lost decision itself is delegated to `run-liveness.cjs`
+  rather than decided inline here. It used to treat one empty
+  status-filtered `listWorkflowRuns` read as proof a run was gone — that read
+  is eventually consistent, and a run created seconds earlier can simply not
+  show up yet. That falsely declared a live run lost, labelled its issue
+  `blocked` with an inferred cause that was never actually verified, and
+  cascaded into parking the whole pipeline queue. See issue #1136.
+
 inputs:
   token:
     description: >
@@ -34,6 +42,13 @@ inputs:
     description: "This run's own issue number, excluded from the sweep. Empty is fine."
     required: false
     default: ""
+  grace_window_minutes:
+    description: >
+      Minutes a run is given to become visible in `listWorkflowRuns` before
+      its absence counts as evidence of loss. Empty defers to
+      `run-liveness.cjs`'s own default.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -42,6 +57,7 @@ runs:
       uses: actions/github-script@v7
       env:
         SELF_ISSUE: ${{ inputs.self_issue }}
+        GRACE_WINDOW_MINUTES: ${{ inputs.grace_window_minutes }}
       with:
         github-token: ${{ inputs.token }}
         script: |
@@ -53,39 +69,60 @@ runs:
           // Required from the workspace, not vendored into this YAML: the same
           // rules and the same deliverable predicate every other entry point
           // reaches through them, so this cannot silently disagree with what
-          // `agentic-assign` or `agentic-watchdog` would decide.
+          // `agentic-assign` or `agentic-watchdog` would decide. The liveness
+          // decision itself is `run-liveness.cjs`'s — see issue #1136.
           const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
           const { createIssueApi } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-api.cjs`);
+          const runLiveness = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/run-liveness.cjs`);
           const api = createIssueApi(github, { owner, repo, log: core.info });
 
-          // If anything is genuinely queued or already running behind this
-          // job, the slot is correctly spoken for — the normal case on every
-          // successful hand-off, including the usual one where the next
-          // session is simply waiting its turn. Only silence behind this run,
-          // with an issue still `in-progress` and nothing to show for it, is
-          // suspicious.
+          // Whichever account `inputs.token` resolves to — the same PAT
+          // `agentic-assign` writes assignment comments with, since both this
+          // action and that one are always invoked with
+          // `PAT_TOKEN_COPILOT_AUTOMATION`. `decideRunLiveness` trusts an
+          // assignment comment's phrase match only when it also comes from
+          // this login, so a comment anyone else posts containing the same
+          // phrase cannot read as evidence the run is still alive. See
+          // issue #1136's security finding. A failed read leaves this `null`,
+          // which the same fail-closed check turns into "no trusted comment
+          // found" rather than a crash.
+          let trustedAuthorLogin = null;
+          try {
+            const { data: self } = await github.rest.users.getAuthenticated();
+            trustedAuthorLogin = self.login;
+          } catch (error) {
+            core.warning(
+              `Could not resolve this run's own identity (${error.status ?? error.message}) — assignment comments will not be trusted as evidence this sweep.`
+            );
+          }
+
+          // Every recent run across both runner workflows, unfiltered by
+          // status — `run-liveness.cjs` reasons about status itself, and a
+          // status filter is exactly the eventually-consistent read that
+          // caused #1136: an empty status-filtered listing for a run seconds
+          // old is not proof it is gone.
           //
           // #614: a run concurrency-blocked behind this one's own slot can be
-          // reported by the Actions API as `pending`, not `queued` — this step
-          // ran with #614's real run sitting in exactly that state, found
-          // nothing under the narrower two-status check, and blocked a run
-          // that went on to open its PR 19 minutes later. `agentic-ci-failure.yml`
-          // already covered the full set for the same reason; mirrored here.
-          const LIVE = ['queued', 'in_progress', 'waiting', 'requested', 'pending'];
+          // reported by the Actions API as `pending`, not `queued` or
+          // `in_progress` — `LIVE_RUN_STATUSES` in `run-liveness.cjs` covers
+          // the full set for the same reason.
+          const workflowRuns = [];
+          let workflowRunsUnknown = false;
           for (const workflow_id of RUNNERS) {
-            for (const status of LIVE) {
+            try {
               const { data } = await github.rest.actions.listWorkflowRuns({
-                owner, repo, workflow_id, status, per_page: 10,
+                owner, repo, workflow_id, per_page: 20,
               });
-              const others = data.workflow_runs.filter((run) => run.id !== context.runId);
-              if (others.length > 0) {
-                core.info(
-                  `${workflow_id}: ${others.length} ${status} run(s) besides this one — the slot is spoken for.`
-                );
-                return;
+              for (const run of data.workflow_runs) {
+                workflowRuns.push({ id: run.id, status: run.status, created_at: run.created_at });
               }
+            } catch (error) {
+              core.warning(`${workflow_id}: runs could not be read (${error.status ?? error.message}).`);
+              workflowRunsUnknown = true;
             }
           }
+
+          const graceWindowMinutes = runLiveness.resolveGraceWindowMinutes(process.env.GRACE_WINDOW_MINUTES);
 
           const busy = await api.listIssuesByLabel(rules.IN_PROGRESS);
           let recovered = 0;
@@ -105,13 +142,40 @@ runs:
               continue;
             }
 
-            core.warning(`#${issue.number}: in-progress, no PR, nothing queued behind this run — recovering now.`);
+            const assignmentComments = await api.assignmentCommentsFor(issue.number);
+
+            const verdict = runLiveness.decideRunLiveness({
+              issueNumber: issue.number,
+              assignmentComments: assignmentComments.comments,
+              assignmentCommentsUnknown: assignmentComments.unknown,
+              workflowRuns,
+              workflowRunsUnknown,
+              now: Date.now(),
+              graceWindowMinutes,
+              excludeRunId: context.runId,
+              trustedAuthorLogin,
+            });
+
+            if (verdict.verdict !== 'lost') {
+              (verdict.verdict === 'live' ? core.info : core.warning)(verdict.reason);
+              continue;
+            }
+
+            core.warning(verdict.reason);
+            const runLine = verdict.evidence.mostRecentRun
+              ? `The most recently observed run is #${verdict.evidence.mostRecentRun.id}, status \`${verdict.evidence.mostRecentRun.status}\`, created ${verdict.evidence.mostRecentRun.createdAt} (~${verdict.evidence.mostRecentRun.ageMinutes}m ago).`
+              : 'No workflow run was found for this issue at all.';
+            const assignmentLine = verdict.evidence.assignmentComment
+              ? `Its assignment comment is ~${verdict.evidence.assignmentComment.ageMinutes}m old, beyond the ${verdict.evidence.graceWindowMinutes}m grace window this check allows for the run list to catch up.`
+              : '';
+
             await github.rest.issues.createComment({
               owner, repo, issue_number: issue.number,
               body: [
                 '🕳️ **This run was lost — caught at hand-off, not by the hourly sweep.**',
                 '',
-                `Issue #${issue.number} was assigned while this session held the single-flight \`agentic-runner\` slot. Its own triggered run never started a job — almost certainly cancelled while queued, by another event landing in the same window and taking the one pending-run slot GitHub Actions holds per concurrency group.`,
+                `Issue #${issue.number} was assigned while this session held the single-flight \`agentic-runner\` slot. ${assignmentLine}`,
+                runLine,
                 '',
                 'Marking it `blocked` so `handle-failure.yml` chains the queue past it right away, rather than leaving every later assignment deferred behind it until the next stall sweep.',
               ].join('\n'),

@@ -211,6 +211,7 @@ Everywhere the loop asks "does this issue have its PR" — the single-flight def
 | `AGENTIC_BLOCKED_CHAIN_LIMIT` | positive integer, default `3`; anything else falls back to the default rather than disabling the brake | How many runs may end `blocked` since the last merged pipeline PR before the chain from a failure parks the queue |
 | `AGENTIC_CI_FIX_ENABLED` | anything but `false`, default on | Whether a red CI on a pipeline PR is handed back to the agent. Off, a red CI reports to nobody again — the state PR #581 was left in |
 | `AGENTIC_CI_FIX_ATTEMPT_LIMIT` | positive integer, default `3`; anything else falls back to the default rather than disabling the brake | How many times the same pull request may be handed back for a red CI before it is parked as a draft with its issue `blocked` |
+| `AGENTIC_RUN_LIVENESS_GRACE_MINUTES` | minutes, default `5`; anything else falls back to the default | How long `run-liveness.cjs` gives a just-assigned run to become visible in `listWorkflowRuns` before its absence counts as evidence the run is lost, rather than merely not-yet-visible |
 
 Switching agents is a one-value change: set `AGENTIC_AGENT` to `@claude` and every subsequent assignment comment mentions `@claude`, waking `claude-runner.yml` instead of `opencode-runner.yml`. Both runners stay enabled either way, so a human can still summon the other runtime by commenting its mention by hand. An unrecognised value fails the assignment step loudly rather than silently picking a default.
 

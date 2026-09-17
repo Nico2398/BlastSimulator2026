@@ -436,6 +436,7 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           self_issue: ${{ steps.context.outputs.issue }}
+          grace_window_minutes: ${{ vars.AGENTIC_RUN_LIVENESS_GRACE_MINUTES }}
 
       # No chaining step here, deliberately. A run whose deliverable was an
       # answer or an executed command closes its own issue and stops there: a
