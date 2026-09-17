@@ -15,7 +15,7 @@ import {
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
-import { abortVehicleGatedFragmentWork } from '../../src/core/economy/FragmentTaskLifecycle.js';
+import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
 import {
   createFinanceState,
   addIncome,
@@ -813,7 +813,13 @@ describe('Economy', () => {
     // for which fragment happens to be claimed first.
     const probeVehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const probeDriver = ctx.state!.employees.employees.find(e => e.id === driverId)!;
-    abortVehicleGatedFragmentWork(ctx.state!, probeVehicle);
+    // #1091: abortVehicleGatedFragmentWork is deleted — releaseVehicleReservation
+    // (VehicleReservation.ts) is the real abort path now: it returns any
+    // in-flight cargo to the ground and clears the reservation/display
+    // task-state in one call (findAndAbortReservedVehicle's own doc comment).
+    if (probeVehicle.reservedForActionId !== null) {
+      releaseVehicleReservation(ctx.state!, probeVehicle.reservedForActionId);
+    }
     probeVehicle.reservedForActionId = null;
     probeVehicle.task = 'idle';
     probeVehicle.state = 'idle';

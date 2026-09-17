@@ -25,7 +25,6 @@ import {
   estimateActionCost,
   resolveActionCost,
   selectBestActionForEmployee,
-  computeActionWorkTicks,
 } from '../../../src/core/engine/ActionSelection.js';
 import { octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -36,6 +35,7 @@ import { hireEmployee, assignSkill, type Employee } from '../../../src/core/enti
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ORE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 
 // #1090: haul_debris is requiredVehicleRole: 'debris_hauler' — planItinerary
 // now reports a vehicle-gated goal genuinely unresolvable (Infinity/null)
@@ -69,9 +69,23 @@ function makeFlatGrid(width: number, height: number): NavGrid {
   return new NavGrid(width, height, cells);
 }
 
+/**
+ * #1091: a haul_debris candidate's itinerary always ends with a drive-to-
+ * depot leg (PlanItinerary.ts's planFragmentTaskItinerary) — with no active
+ * freight_warehouse anywhere, findHaulDepotApproach fails and the whole
+ * itinerary is unresolvable (null), so every fixture below needs one. Placed
+ * at a fixed, arbitrary point (30,30) — the ore bonus (16 ticks) dwarfs every
+ * short intra-cluster distance these tests use, clamping estimateActionCost's
+ * ore-bearing candidates to 0 regardless of exactly where the depot sits
+ * (verified empirically), so its placement doesn't need to preserve any
+ * particular symmetry for the ranking assertions to hold.
+ */
 function makeState(width = 60, height = 60): GameState {
   const state = createGame({ seed: 42 });
   state.navGrid = makeFlatGrid(width, height);
+  const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 30, 30, width, height);
+  if (!warehouse.success) throw new Error(`Setup: placeBuilding failed — ${warehouse.error}`);
+  warehouse.building!.active = true;
   return state;
 }
 
@@ -212,23 +226,31 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('resolveActionCost — ore priority bonus never affects the real resolved duration (#671)', () => {
-  it("an ore-bearing haul_debris candidate's resolved totalTicks equals real travel+work ticks, with no bonus subtracted", () => {
+  it("an ore-bearing haul_debris candidate's resolved totalTicks matches an otherwise-identical plain candidate's, with no bonus subtracted", () => {
     const state = makeState();
     const emp = makeHaulerEmployee(state, 0, 0);
 
-    addBlastFragments(state.logistics, [makeFragment(1, 10, 0, { gloomium: 0.2 })]);
-    const ore = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
+    // Two fragments at the exact same position — one ore-bearing, one not,
+    // otherwise identical (same mass/volume, so computeActionWorkTicks's own
+    // inputs match too) — isolates the ore bonus as the ONLY variable between
+    // their two resolveActionCost calls. #1091: comparing against the real
+    // plain candidate's own resolved cost (rather than a hand-rolled
+    // travel-distance recomputation) stays correct regardless of exactly how
+    // many legs planFragmentTaskItinerary's route happens to carry (today: a
+    // drive to the fragment, then on to the depot).
+    addBlastFragments(state.logistics, [
+      makeFragment(1, 10, 0, {}),
+      makeFragment(2, 10, 0, { gloomium: 0.2 }),
+    ]);
+    const plain = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
+    const ore = makeHaulAction({ id: 2, targetX: 10, targetZ: 0, payload: { fragmentId: 2 } });
 
-    const resolved = resolveActionCost(state, emp, ore);
-    expect(resolved).not.toBeNull();
+    const resolvedPlain = resolveActionCost(state, emp, plain);
+    const resolvedOre = resolveActionCost(state, emp, ore);
+    expect(resolvedPlain).not.toBeNull();
+    expect(resolvedOre).not.toBeNull();
 
-    // #1090: the vehicle sits at the employee's own starting cell (board leg
-    // zero-length) — the whole route is one drive leg at the vehicle's own
-    // (tiered) speed, not AGENT_WALK_SPEED.
-    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / DEBRIS_HAULER_SPEED;
-    const expectedWorkTicks = computeActionWorkTicks(state, emp, ore);
-
-    expect(resolved!.totalTicks).toBeCloseTo(expectedTravelTicks + expectedWorkTicks, 10);
+    expect(resolvedOre!.totalTicks).toBeCloseTo(resolvedPlain!.totalTicks, 10);
   });
 
   it("selectBestActionForEmployee's chosen ore-bearing action reports a totalTicks matching the plain (bonus-free) real cost", () => {
@@ -237,20 +259,24 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
 
     // Same equal-octile-distance setup as the ranking test above — the ore
     // candidate wins selection, but its reported totalTicks must still be
-    // its own real (undiscounted) cost, not the ranking-only estimate.
+    // its own real (undiscounted) cost. A third, plain "control" fragment at
+    // the ore candidate's own position gives an independent real cost to
+    // compare against, the same way the test above does.
     addBlastFragments(state.logistics, [
       makeFragment(1, 10, 0, {}),
       makeFragment(2, 0, 10, { gloomium: 0.2 }),
+      makeFragment(3, 0, 10, {}),
     ]);
     const plain = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
     const ore = makeHaulAction({ id: 2, targetX: 0, targetZ: 10, payload: { fragmentId: 2 } });
+    const oreControl = makeHaulAction({ id: 3, targetX: 0, targetZ: 10, payload: { fragmentId: 3 } });
 
     const result = selectBestActionForEmployee(state, emp, [plain, ore]);
     expect(result).not.toBeNull();
     expect(result!.action.id).toBe(ore.id);
 
-    const expectedTravelTicks = octileHeuristic(emp.x, emp.z, ore.targetX, ore.targetZ) / DEBRIS_HAULER_SPEED;
-    const expectedWorkTicks = computeActionWorkTicks(state, emp, ore);
-    expect(result!.totalTicks).toBeCloseTo(expectedTravelTicks + expectedWorkTicks, 10);
+    const resolvedControl = resolveActionCost(state, emp, oreControl);
+    expect(resolvedControl).not.toBeNull();
+    expect(result!.totalTicks).toBeCloseTo(resolvedControl!.totalTicks, 10);
   });
 });

@@ -26,11 +26,11 @@ import {
 import type { Employee } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 // #1089 (mount/itinerary rebuild phase 3b): tickVehicle/EntityMovementTick's
-// position-writing movers are replaced by Locomotion.ts's tickLocomotion (the
-// itinerary walker) and driveVehicleTowardTarget (ad hoc phase-driving, no
-// itinerary) — both stubs at this (red) phase, so every test exercising them
-// below is expected to fail for that reason.
-import { tickLocomotion, driveVehicleTowardTarget } from '../../src/core/engine/Locomotion.js';
+// position-writing movers are replaced by Locomotion.ts's tickLocomotion, the
+// sole itinerary walker (#1091: the old ad hoc, itinerary-independent
+// driveVehicleTowardTarget primitive is deleted — every drive now goes
+// through a planned itinerary leg).
+import { tickLocomotion } from '../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../src/core/engine/MoveTo.js';
 import type { Leg } from '../../src/core/engine/Itinerary.js';
 import { Random } from '../../src/core/math/Random.js';
@@ -276,9 +276,9 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── driveVehicleTowardTarget advances movement (#1089, replaces tickVehicle) ──
+  // ── A boarded vehicle advances via the itinerary/tickLocomotion path (#1089/#1091, replaces tickVehicle and the deleted driveVehicleTowardTarget) ──
 
-  it('driveVehicleTowardTarget advances a boarded vehicle toward its target at the vehicle\'s own tiered speed', () => {
+  it('a boarded vehicle advances toward a moveTo target at the vehicle\'s own tiered speed, driven by tickLocomotion', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
     const origX = v.x;
@@ -289,12 +289,11 @@ describe('Vehicle fleet', () => {
     // diagonal detour instead of the straight line this test means to check.
     const targetX = origX + 4;
     const targetZ = v.z;
-    // #1089: driveVehicleTowardTarget requires an occupant aboard to advance
-    // at all — a vehicle with nobody in it never moves, everywhere in the
-    // game. Give it a real, licensed, co-located driver (rather than a
-    // dangling fake employee id — #1084's assertWorldInvariants flags that as
-    // I1_dangling_driver_reference) to exercise the driven-movement path this
-    // test means to check.
+    // #1089: a vehicle only ever moves through its occupant's own advance —
+    // nobody aboard, nothing moves, everywhere in the game. Give it a real,
+    // licensed, co-located driver (rather than a dangling fake employee id —
+    // #1084's assertWorldInvariants flags that as I1_dangling_driver_reference)
+    // to exercise the driven-movement path this test means to check.
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     const assignResult = board(ctx.state!, v.id, eid);
@@ -303,29 +302,38 @@ describe('Vehicle fleet', () => {
     const driver = ctx.state!.employees.employees.find(e => e.id === eid)!;
     driver.locomotion = { kind: 'mounted', vehicleId: v.id };
 
-    // makeCtx() runs new_game, which builds a NavGrid — driveVehicleTowardTarget
-    // routes via Pathfinding.findPath and advances at debris_hauler's own
+    // makeCtx() runs new_game, which builds a NavGrid — the resulting drive
+    // leg routes via Pathfinding.findPath and advances at debris_hauler's own
     // speed (3 cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1
     // cell/tick (#407).
     const debrisHaulerSpeed = 3;
 
-    const result = driveVehicleTowardTarget(ctx.state!, v, targetX, targetZ);
+    // #1091: moveTo's own already-mounted continuity (PlanItinerary.ts) plans
+    // straight to a drive leg with no explicit `via` and no boarding walk —
+    // tickLocomotion is the one call that actually advances it.
+    const moveResult = moveTo(ctx.state!, eid, { x: targetX, z: targetZ });
+    expect(moveResult.success).toBe(true);
+    tickLocomotion(ctx.state!);
 
-    expect(result.arrived).toBe(false);
     expect(v.x).toBe(origX + debrisHaulerSpeed);
+    // Not yet arrived — one tick at speed 3 covers 3 of the 4 cells needed.
+    expect(v.x).not.toBe(targetX);
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  it('driveVehicleTowardTarget does nothing for a vehicle with no occupant', () => {
+  it('tickLocomotion does nothing for a vehicle with no occupant', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
     v.occupantIds = [];
     const origX = v.x;
     const origZ = v.z;
 
-    const result = driveVehicleTowardTarget(ctx.state!, v, origX + 4, origZ);
+    // No employee mounted in it at all — tickLocomotion only ever advances a
+    // vehicle through its occupant's own itinerary leg, so a driverless,
+    // unboarded vehicle has nothing driving it and never moves, regardless of
+    // any stray targetX/targetZ.
+    tickLocomotion(ctx.state!);
 
-    expect(result.arrived).toBe(false);
     expect(v.x).toBe(origX);
     expect(v.z).toBe(origZ);
     expectNoWorldInvariantViolations(ctx.state!);

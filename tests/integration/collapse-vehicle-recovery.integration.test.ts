@@ -23,6 +23,7 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
+import { syncHaulDispatch } from '../../src/core/economy/HaulDispatch.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { tickUntil } from './helpers.js';
 
@@ -202,6 +203,12 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
 
     addBlastFragments(state.logistics, [makeFragment(9001, 4, 28)], state.navGrid);
+    // requestHaulFragment (behind `vehicle haul`) claims an already-self-
+    // dispatched haul_debris action (#1091 — HaulDispatch.ts's
+    // syncHaulDispatch) rather than creating one itself; a real tick would
+    // seed it via TickPipeline.ts, but calling it directly here avoids
+    // consuming one of the "a couple of ticks in" drive ticks asserted below.
+    syncHaulDispatch(state);
     expect(run(`vehicle haul ${vehicleId} fragment:9001`)).toMatchObject({ success: true });
 
     // A couple of ticks in: still driving, not yet arrived/loaded.
@@ -242,6 +249,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
 
     addBlastFragments(state.logistics, [makeFragment(9002, 5, 6)], state.navGrid);
+    syncHaulDispatch(state);
     expect(run(`vehicle haul ${vehicleId} fragment:9002`)).toMatchObject({ success: true });
 
     tickUntil(run, () => vehicle.payload !== null, 30);
@@ -253,11 +261,14 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     tickUntil(run, () => driver.collapsing, 50);
     expect(driver.collapsing).toBe(true);
 
-    // Alighted cleanly: released the vehicle, but the loaded cargo travels
-    // with the vehicle, not the driver — payload still names the same
-    // fragment, and (#1091: no more returnFragmentToGround) it never
-    // reappears on the ground.
-    expect(vehicle.driverId).toBeNull();
+    // #1091: alightIfMounted's own alight call is refused here —
+    // unassignDriver (Vehicle.ts) refuses to unassign a driver while
+    // `payload !== null`, specifically so a loaded haul is never orphaned
+    // mid-flight with nobody driving it (NeedRestoration.ts's own doc comment
+    // on tickCollapse: "alight's own guards ... may refuse; that's fine").
+    // The driver stays mounted despite collapsing, and the cargo travels with
+    // the vehicle exactly as it was — payload still names the same fragment.
+    expect(vehicle.driverId).toBe(driver.id);
     expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002)).toHaveLength(1);

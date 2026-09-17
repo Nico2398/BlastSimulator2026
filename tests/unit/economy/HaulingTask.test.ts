@@ -28,6 +28,7 @@ import { requestBreakBoulder } from '../../../src/core/economy/BoulderBreaking.j
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import type { Itinerary, ArrivalStep } from '../../../src/core/engine/Itinerary.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 
 const SEED = 42;
 const GRID = 64;
@@ -284,8 +285,13 @@ describe('requestHaulFragment — happy path', () => {
     const warehouse = placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state, 0, 0);
     const fragment = makeFragment(1, 5, 7);
-    addBlastFragments(state.logistics, [fragment], state.navGrid);
     const actionsBefore = state.pendingActions.length;
+    addBlastFragments(state.logistics, [fragment], state.navGrid);
+    // requestHaulFragment claims an already-self-dispatched haul_debris
+    // action (#1091 — see HaulDispatch.ts's syncHaulDispatch) rather than
+    // creating one itself; in real gameplay TickPipeline.ts runs this every
+    // tick well before a player could issue a manual haul request.
+    syncHaulDispatch(state);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
 
@@ -301,6 +307,8 @@ describe('requestHaulFragment — happy path', () => {
     expect(action).toBeDefined();
     expect(action!.type).toBe('haul_debris');
     expect(action!.payload['fragmentId']).toBe(1);
+    // Exactly one new action overall — syncHaulDispatch created it, and
+    // requestHaulFragment only claims it rather than creating a duplicate.
     expect(state.pendingActions.length).toBe(actionsBefore + 1);
 
     // Installs a driving itinerary on the driver ending in the two hauling
@@ -336,6 +344,7 @@ describe('requestHaulFragment — happy path', () => {
     const near = placeWarehouse(state, 6, 6); // near
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)], state.navGrid);
+    syncHaulDispatch(state);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
     expect(result.success).toBe(true);
@@ -481,6 +490,7 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
     const atThreshold = makeFragment(1, 5, 5);
     atThreshold.volume = OVERSIZED_FRAGMENT_THRESHOLD;
     addBlastFragments(state.logistics, [atThreshold], state.navGrid);
+    syncHaulDispatch(state);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
 
@@ -535,6 +545,7 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     const haulFragment = makeFragment(1, 6, 9);
     haulFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD; // at threshold: haulable
     addBlastFragments(haulState.logistics, [haulFragment], haulState.navGrid);
+    syncHaulDispatch(haulState);
     requestHaulFragment(haulState, haulVehicle.id, 1);
     const haulDriver = haulState.employees.employees.find(e => e.id === haulVehicle.driverId)!;
     const haulLoadLeg = legsWithEffect(haulDriver.itinerary!, 'haul_load')[0]!;
@@ -551,6 +562,7 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     const breakFragment = makeFragment(1, 6, 9);
     breakFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD + 0.5; // oversized: breakable
     addBlastFragments(breakState.logistics, [breakFragment], breakState.navGrid);
+    syncHaulDispatch(breakState);
     requestBreakBoulder(breakState, breakVehicle.id, 1);
     const breakSplitLeg = legsWithEffect(employee.itinerary!, 'boulder_split')[0]!;
 

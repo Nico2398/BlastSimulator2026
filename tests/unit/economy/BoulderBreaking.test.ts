@@ -24,6 +24,7 @@ import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import type { Itinerary, ArrivalStep } from '../../../src/core/engine/Itinerary.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 
 const SEED = 42;
 
@@ -198,8 +199,13 @@ describe('requestBreakBoulder — happy path', () => {
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenFragmenter(state, 0, 0);
     const fragment = makeFragment(1, 5, 7, 1.0);
-    addBlastFragments(state.logistics, [fragment], state.navGrid);
     const actionsBefore = state.pendingActions.length;
+    addBlastFragments(state.logistics, [fragment], state.navGrid);
+    // requestBreakBoulder claims an already-self-dispatched fragment_debris
+    // action (#1091 — see HaulDispatch.ts's syncHaulDispatch) rather than
+    // creating one itself; in real gameplay TickPipeline.ts runs this every
+    // tick well before a player could issue a manual break request.
+    syncHaulDispatch(state);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
 
@@ -215,6 +221,8 @@ describe('requestBreakBoulder — happy path', () => {
     expect(action).toBeDefined();
     expect(action!.type).toBe('fragment_debris');
     expect(action!.payload['fragmentId']).toBe(1);
+    // Exactly one new action overall — syncHaulDispatch created it, and
+    // requestBreakBoulder only claims it rather than creating a duplicate.
     expect(state.pendingActions.length).toBe(actionsBefore + 1);
 
     // Installs a driving itinerary on the driver ending in the boulder_split
