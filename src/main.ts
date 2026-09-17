@@ -980,15 +980,16 @@ selectionBar.setActionHandler((action, entity) => {
     }
     case 'move_here': {
       // Vehicle counterpart of Dispatch Here: drive to whatever tile the
-      // player is currently pointing at. Note the parser's coordinate form
-      // here is `to:x,z` (one comma-joined argument), not the `x:… z:…` pair
-      // `employee dispatch` takes — see src/console/commands/vehicle.ts.
+      // player is currently pointing at. `vehicle reposition` takes its
+      // coordinates positionally (#1092) — `<id> <x> <z>`, not the `to:x,z`
+      // form the deleted `vehicle move` took; it also finds an idle licensed
+      // driver on its own when the vehicle is empty.
       const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
         uiManager.notify({ severity: 'warn', title: t('shell.selection.move_here'), body: t('shell.selection.no_move_target') });
         break;
       }
-      reportIfFailed(t('shell.selection.move_here'), window.__gameConsole(`vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}`));
+      reportIfFailed(t('shell.selection.move_here'), window.__gameConsole(`vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}`));
       break;
     }
     case 'follow':

@@ -13,8 +13,6 @@ import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { completePendingAction } from './TaskLifecycleCore.js';
 import type { Employee } from '../entities/Employee.js';
 import type { VehicleState } from '../entities/Vehicle.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
-import { alight } from './Mount.js';
 
 /**
  * PendingAction.payload key evacuateZone stamps on any action it interrupts
@@ -197,11 +195,11 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
  * the way, because it was never 'queued' at the moment evacuateZone ran to
  * stamp one. Confirmed live via tutorial-interactive.json: a dig_ramp_segment
  * action claimed into an employee's taskQueue (its vehicle reserved —
- * VehicleReservation.ts's reservedForActionId — but not yet boarded, driverId
- * still null) survived evacuation, then sent that employee straight back into
+ * VehicleReservation.ts's reservedForActionId — but not yet boarded, its
+ * driver seat still empty) survived evacuation, then sent that employee straight back into
  * the zone the instant they arrived at their own safe cell — the vehicle
  * itself meanwhile stuck at its pre-evacuation position the whole time
- * (reservedForActionId !== null with driverId === null satisfies neither
+ * (reservedForActionId !== null with an empty driver seat satisfies neither
  * tick.ts step 8f's plain-movement gate nor ArrivalGate.ts's vehicle-gated
  * one), so `dangerZoneClear` (which — unlike this hold mechanism's own
  * isZoneClearOfEmployees — also checks vehicles) could not have read true
@@ -240,53 +238,35 @@ export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, z
 
 /**
  * True when `employee` is currently driving a vehicle clear of an evacuating
- * zone (boarded a driverless vehicle rather than evacuating on foot, #1042)
- * rather than walking their own route.
+ * zone (or walking over to board one for that drive) rather than evacuating
+ * on foot.
  *
- * Keyed on `vehicle.pendingEvacuationDestination !== null` — the marker
- * clearZone stages on exactly (and only) a vehicle being driven clear of an
- * evacuation, cleared the moment it arrives (releaseArrivedEvacuationDrivers
- * below) — rather than on `employee.activeActionId === null` combined with
- * `driverId === employee.id` alone. That pair is NOT unique to an evacuation
- * drive: a driver boarded directly (the console `vehicle driver` command,
- * routed through `requestBoardVehicle`/`board()`) or one left mounted between
- * two vehicle-gated tasks by
- * vehicle-continuity (VehicleContinuity.ts's own dismount-then-reassign
- * ordering can still leave a one-tick gap) both carry activeActionId===null
- * while genuinely idle-but-boarded, not evacuating — treating that as an
- * evacuation drive permanently soft-locks them out of tickEmployees, the
- * exact regression collapse-vehicle-recovery.integration.test.ts caught
- * (driverId assigned manually before any action ever claims the employee).
+ * Read off the itinerary (#1092) instead of the deleted
+ * `pendingEvacuationDestination` marker, and scoped to exactly what that
+ * marker marked: a `reposition` goal whose final leg ends by putting the
+ * driver back on foot. `clearZone` (Zone.ts) is the only thing that plans
+ * that shape — `alightOnArrival` is applied to an evacuation order and to
+ * nothing else — so an ordinary player-ordered reposition, which leaves its
+ * driver in the cab, and the board-only itinerary the console `vehicle
+ * driver` command installs (also a `reposition` goal, by the vehicle's own
+ * position) both stay correctly outside it. Widening this to every
+ * `reposition` goal would shield both of those from need-driven rest as
+ * well, which is neither this guard's job nor its previous behaviour.
+ *
+ * Keyed on the itinerary rather than on `activeActionId === null` combined
+ * with "drives a vehicle": that pair is NOT unique to an evacuation drive —
+ * a driver boarded directly, or one left mounted between two vehicle-gated
+ * tasks, both carry activeActionId === null while genuinely idle-but-boarded,
+ * and treating that as an evacuation drive permanently soft-locks them out of
+ * tickEmployees (the regression collapse-vehicle-recovery.integration.test.ts
+ * caught). An itinerary, unlike a mount, always ends: the moment the drive
+ * arrives, Locomotion clears it and this reads false again.
+ *
+ * `vehicles` is vestigial now that the marker it used to scan for is gone;
+ * kept so every call site stays put for one more phase.
  */
-export function isMidEvacuationDrive(vehicles: VehicleState, employee: Employee): boolean {
-  return vehicles.vehicles.some(v => v.driverId === employee.id && v.pendingEvacuationDestination !== null);
-}
-
-/**
- * Releases the driver of any vehicle that has arrived at its
- * pendingEvacuationDestination — the employee dismounts and evacuates the
- * rest of the way on foot, mirroring an ordinary on-foot evacuee (#1042).
- */
-export function releaseArrivedEvacuationDrivers(state: GameState, emitter?: EventEmitter): void {
-  for (const vehicle of state.vehicles.vehicles) {
-    if (vehicle.pendingEvacuationDestination === null) continue;
-    if (vehicle.driverId === null) continue;
-    // Now doing real work (a vehicle-gated action claimed the vehicle after
-    // boarding) — must not be dismounted mid-task.
-    if (vehicle.reservedForActionId !== null) continue;
-
-    // #1089: compare against the evacuation destination itself, not
-    // vehicle.targetX/Z — those are now written only by Locomotion's
-    // writeVehiclePosition, mid-drive, and stay at the vehicle's own
-    // pre-board spawn position for the whole tick the board and the
-    // evacuation-drive itinerary are first installed (no movement has run
-    // yet to overwrite them). Comparing against the stale default there
-    // read as "already arrived" the instant the driver boarded, dismounting
-    // them before the drive ever started.
-    const dest = vehicle.pendingEvacuationDestination;
-    if (vehicle.x !== dest.x || vehicle.z !== dest.z) continue;
-
-    alight(state, vehicle.id, emitter);
-    vehicle.pendingEvacuationDestination = null;
-  }
+export function isMidEvacuationDrive(_vehicles: VehicleState, employee: Employee): boolean {
+  const itinerary = employee.itinerary;
+  if (itinerary === null || itinerary.goal.kind !== 'reposition') return false;
+  return itinerary.legs[itinerary.legs.length - 1]?.onArrive.kind === 'alight';
 }

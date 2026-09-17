@@ -8,7 +8,6 @@
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
@@ -49,14 +48,14 @@ export interface ArrivalGateResult {
  * seedTaskTimerFields call below so a `dig_ramp_segment` action's duration
  * can be computed off the live voxel count (#924).
  */
-export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
-  // Dismount any evacuation driver whose vehicle has reached its
-  // pendingEvacuationDestination this tick (#1042) — before the employee/
-  // vehicle loops below, so a just-arrived driver is free to be picked up by
-  // ordinary dispatch/rest routing the same tick, exactly like an ordinary
-  // on-foot evacuee arriving at their own safe cell.
-  releaseArrivedEvacuationDrivers(state, emitter);
-
+// `_emitter`: nothing in this gate emits any more (#1092 moved the last one,
+// the evacuation-driver dismount, into the itinerary's own alight step) —
+// kept on the signature so the tick pipeline's call site stays unchanged.
+export function tickArrivalGate(state: GameState, _emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
+  // #1092: an evacuation driver is dismounted by their own itinerary's final
+  // `alight` arrival step (Zone.ts's clearZone, via MoveTo's alightOnArrival)
+  // the tick the drive lands, so there is no separate arrived-driver sweep
+  // here any more.
   const result: ArrivalGateResult = {
     restStarted: [],
     taskStarted: [],

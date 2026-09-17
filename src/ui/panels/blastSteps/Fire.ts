@@ -23,6 +23,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
+import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
@@ -128,7 +129,7 @@ export class FireStep {
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: v.driverId === null });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: vehicleDriverId(v) === null });
     }
     return result;
   }
@@ -140,7 +141,7 @@ export class FireStep {
       if (e.alive && isInZone(e.x, e.z, zone)) keys.push(`e${e.id}`);
     }
     for (const v of state.vehicles.vehicles) {
-      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${v.driverId === null ? 'nodriver' : 'driver'}`);
+      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${vehicleDriverId(v) === null ? 'nodriver' : 'driver'}`);
     }
     return keys;
   }

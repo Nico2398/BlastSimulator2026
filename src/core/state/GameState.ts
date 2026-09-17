@@ -98,7 +98,14 @@ import type { RampDef } from '../mining/Ramp.js';
 // side). A pre-v19 save only has `driverId` — occupantIds defaults to
 // `[driverId]` (or `[]` when unset) and locomotion is derived from whichever
 // vehicle's driverId names the employee. See SaveLoad.ts's migrateV18ToV19.
-export const SAVE_VERSION = 20;
+// v19 -> v20: Vehicle.payload replaces the haul/break phase fields (#1091).
+// See SaveLoad.ts's migrateV19ToV20.
+// v20 -> v21: Vehicle lost `driverId` (a mirror of `occupantIds[0]` since
+// v19) and `pendingEvacuationDestination` (#1092 — an evacuation drive is
+// the driving employee's own itinerary `reposition` goal now, not a marker
+// on the vehicle). Both are stripped off a loaded save with nothing carried
+// forward. See SaveLoad.ts's migrateV20ToV21.
+export const SAVE_VERSION = 21;
 
 export interface GameConfig {
   seed: number;

@@ -23,6 +23,7 @@ import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../econom
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { moveTo } from './MoveTo.js';
 
 export interface TickEmployeesResult {
@@ -302,7 +303,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * debris_hauler) mid-chain on one vehicle role, unable to ever reserve ahead
  * a genuinely drivable action of the other role — direct-traced via
  * economy-full-loop.json: with the exact-role restriction in place, both of
- * its two drivers ended up parked (driverId null) deep inside the very debris
+ * its two drivers ended up parked (nobody aboard) deep inside the very debris
  * field their own work had just produced, each permanently unable to path to
  * the other's now-abundant backlog, so storedMassKg stopped increasing for
  * good rather than merely later. Left `false` for step 2 (idle employee),
@@ -454,7 +455,7 @@ export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, e
     if (!action || action.requiredVehicleRole === null) continue;
 
     const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-    if (!vehicle || vehicle.driverId !== null) continue;
+    if (!vehicle || vehicleDriverId(vehicle) !== null) continue;
 
     employee.taskQueue = employee.taskQueue.filter(id => id !== action.id);
     releaseActionToOpenPool(state, action);

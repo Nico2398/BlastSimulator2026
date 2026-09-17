@@ -11,7 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { getVehicleDefByTier } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
@@ -471,8 +471,9 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
   const freeCell = findNearestFreeCellForVehicle(state, blocker);
   if (!freeCell) return false;
 
-  if (blocker.driverId !== null) {
-    moveTo(state, blocker.driverId, { x: freeCell.x, z: freeCell.z });
+  const blockerDriverId = vehicleDriverId(blocker);
+  if (blockerDriverId !== null) {
+    moveTo(state, blockerDriverId, { x: freeCell.x, z: freeCell.z });
   } else {
     relocateDriverlessVehicle(state, blocker, freeCell.x, freeCell.z);
   }
@@ -650,18 +651,9 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
     const alreadyThere = isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id;
     if (!alreadyThere) {
       const boarded = board(state, vehicle.id, emp.id, emitter);
-      if (!boarded.success) {
-        // #1042: a stale evacuation marker on this vehicle must not confuse
-        // whoever drives it next — the driver who actually took it either
-        // isn't evacuating at all, or staged their own marker via clearZone
-        // already. Mirrors the old ArrivalGate.resolveBoarding's identical
-        // cleanup on every cancelled-boarding path.
-        vehicle.pendingEvacuationDestination = null;
-        return false;
-      }
+      if (!boarded.success) return false;
     }
 
-    handlePostBoardIntent(state, emp, vehicle);
     return true;
   }
 
@@ -671,27 +663,3 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   return alight(state, vehicleId, emitter).success;
 }
 
-/**
- * Whatever was staged on `vehicle` before this exact board resolved — an
- * evacuation drive clear (#1042) — starts now, the moment the driver is
- * actually seated. Absorbed from the old ArrivalGate.resolveBoarding, which
- * lived right next to its own `board()` call for the same reason boarding
- * itself moved here (#1089): both are "what a board resolves into", not two
- * separate concerns.
- *
- * A vehicle-gated action's own haul/break work no longer hands off here
- * (#1091): boarding is just another leg of an itinerary that already
- * contains every subsequent drive leg and its arrival effect
- * (PlanItinerary.ts's planFragmentTaskItinerary), so there is nothing left to
- * start once the board leg itself resolves.
- */
-function handlePostBoardIntent(state: GameState, emp: Employee, vehicle: Vehicle): void {
-  if (vehicle.pendingEvacuationDestination !== null) {
-    // Boarded to drive a vehicle clear of an evacuating zone (#1042) rather
-    // than for a vehicle-gated action — no reservation to hand off to.
-    // moveTo's own implicit continuity (via the employee's just-established
-    // mount) plans straight to a drive leg, no redundant foot/board leg.
-    const dest = vehicle.pendingEvacuationDestination;
-    moveTo(state, emp.id, { x: dest.x, z: dest.z });
-  }
-}

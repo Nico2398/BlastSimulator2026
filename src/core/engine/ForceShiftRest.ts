@@ -18,6 +18,7 @@ import { isMidVehicleGatedWork, hasQueuedActionForVehicleRole } from './VehicleR
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
 /**
@@ -210,7 +211,7 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  * finish the drive uninterrupted.
  */
 function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
-  return state.vehicles.vehicles.some(v => v.driverId === employee.id && v.payload !== null);
+  return state.vehicles.vehicles.some(v => vehicleDriverId(v) === employee.id && v.payload !== null);
 }
 
 function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {

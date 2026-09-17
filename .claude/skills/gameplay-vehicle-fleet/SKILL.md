@@ -237,7 +237,7 @@ today. A migration issue updates its own row as it lands.
 | 3b | `tickLocomotion` + `moveTo` become the only movers; vehicles stop pathfinding | planned |
 | 4 | Cost model delegates to the planner; continuity machinery removed | landed |
 | 5 | Haul and break become leg effects | landed |
-| 6 | Dead vehicle fields stripped, tier-correct stat reads, `reposition` goal | planned |
+| 6 | `driverId`/`pendingEvacuationDestination` stripped, tier-correct upkeep/fuel, `reposition` ability | landed |
 | 7 | Fast transport un-gated | planned |
 
 Phase 0a's own measured baseline (`tutorial-boxcut-full.json`, interaction mode and command mode
@@ -248,5 +248,18 @@ bounded by `atMost: { vehicleBoardingCount: 4 }`. Both ceilings are measured-bas
 phases are expected to lower, not design targets. 3 boardings is far above the 2 boardings the
 mount/itinerary model targets; closing that gap is what phase 1a+ exists to do.
 
-Phase 2 keeps `driverId` as a read-only mirror of `occupantIds` so the readers that phases 3 to 5
-rewrite or delete are not migrated twice. Phase 6 removes the mirror and the readers left.
+Phase 2 kept `driverId` as a read-only mirror of `occupantIds` so the readers phases 3 to 5 rewrite
+or delete were not migrated twice. Phase 6 removed it: the driver is `occupantIds[0]`, read through
+`vehicleDriverId(vehicle)` (Vehicle.ts), and `pendingEvacuationDestination` is gone with it — an
+evacuation drive is now the driving employee's own `reposition` itinerary, ending in an `alight`
+step, with nothing stored on the vehicle. Phase 6 also fixed upkeep and fuel to bill at the
+vehicle's own tier, and gave `reposition` a player-facing path: the `vehicle reposition <id> <x> <z>`
+console command (which auto-selects the nearest idle licensed driver when the vehicle is empty, and
+refuses a vehicle reserved for a task) and the Fleet panel's per-card Reposition button, which arms
+the in-scene tile picker and dispatches it. The display-only `vehicle assign`/`vehicle move`
+subcommands are gone.
+
+Still stored on `Vehicle`, still planned for removal in a later phase: `task`, `state`, `targetX`,
+`targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`, `reservedForActionId`.
+`computeVehicleStatus(vehicle, occupant)` already derives working/moving from the occupant when one
+is passed, which is the seam those removals go through.

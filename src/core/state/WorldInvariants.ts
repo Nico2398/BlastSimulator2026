@@ -9,6 +9,7 @@
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { resolveReservationHolder, isPendingReserveAhead } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
@@ -143,7 +144,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       violations.push({ kind: 'I5_reservation_without_valid_holder', vehicleId: v.id, actionId: v.reservedForActionId });
       continue;
     }
-    const holderId = action.holderId ?? v.driverId;
+    const holderId = action.holderId ?? vehicleDriverId(v);
     if (holderId == null) {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',
@@ -182,7 +183,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
     // with an unreleased reservation. The exclusion stays as a regression
     // guard: if I5 ever flags one, this exact gap reopened — pin coverage in
     // vehicles.integration.test.ts's #922 interrupt/resume case.
-    const valid = v.driverId === holderId
+    const valid = vehicleDriverId(v) === holderId
       || holder.pendingDriverVehicleId === v.id
       // isPendingReserveAhead (VehicleReservation.ts) is this exact "busy
       // elsewhere, reserved ahead in taskQueue" shape — shared with

@@ -369,19 +369,27 @@ function migrateV19ToV20(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
- * v20 -> v21 (#1092, skeleton): reserved for the phase-6 dead-field strip
- * (`driverId`/`pendingEvacuationDestination` mirrors removed from `Vehicle`)
- * once the implementer migrates the ~20 call sites that still read them.
- * Pass-through stub so the migration chain type-checks before that lands —
- * not yet wired into `deserialize`'s version-gated chain below, and
- * `SAVE_VERSION` is not bumped yet.
+ * v20 -> v21 (#1092): the phase-6 dead-field strip — `driverId` and
+ * `pendingEvacuationDestination` are gone from `Vehicle`. Nothing is carried
+ * forward from either: `occupantIds` has held the mount truth since v19 (and
+ * `driverId` was only ever a mirror of `occupantIds[0]` after it), and a
+ * mid-evacuation drive now lives in the driving employee's own itinerary —
+ * whose `reposition` goal a v20 save already serialized — rather than in a
+ * per-vehicle destination marker. A resumed save either still carries that
+ * itinerary and finishes the drive, or carries none and leaves the vehicle
+ * parked where it stood, which is exactly what the marker would have
+ * produced. Mutates `obj` in place, matching every other migration block in
+ * `deserialize` below.
  */
-// Exported (unlike the version-gated migrations above) only because nothing
-// calls it yet — TS's noUnusedLocals would otherwise flag it dead until the
-// implementer wires it into deserialize's chain, at which point this reverts
-// to an unexported function like migrateV19ToV20.
-export function migrateV20ToV21(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement (#1092).
+function migrateV20ToV21(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesContainer = obj['vehicles'] as Record<string, unknown> | undefined;
+  const vehiclesList = vehiclesContainer?.['vehicles'] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(vehiclesList)) return obj;
+
+  for (const v of vehiclesList) {
+    delete v['driverId'];
+    delete v['pendingEvacuationDestination'];
+  }
   return obj;
 }
 
@@ -606,6 +614,11 @@ export function deserialize(json: string): GameState {
   // v19 -> v20: Vehicle.payload replaces the haul/break phase fields (#1091).
   if ((obj['version'] as number) < 20) {
     migrateV19ToV20(obj);
+  }
+
+  // v20 -> v21: Vehicle.driverId / .pendingEvacuationDestination stripped (#1092).
+  if ((obj['version'] as number) < 21) {
+    migrateV20ToV21(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

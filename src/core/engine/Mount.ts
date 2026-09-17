@@ -5,7 +5,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
-import { canAssignDriver, unassignDriver } from '../entities/Vehicle.js';
+import { canAssignDriver, unassignDriver, vehicleDriverId } from '../entities/Vehicle.js';
 import { isMounted } from '../entities/EmployeeLocomotion.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
@@ -29,8 +29,8 @@ function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): 
  * (Chebyshev distance) of the vehicle, licensed and otherwise eligible per
  * `canAssignDriver`, and the vehicle must have a free seat
  * (`VEHICLE_SEAT_COUNT`). On success, snaps the employee onto the vehicle's
- * position and marks them mounted — the vehicle's `driverId` mirror is
- * maintained only from here and from `alight`.
+ * position and marks them mounted — this module is the only writer of
+ * `occupantIds`, whose first entry IS the driver (#1092).
  */
 export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
@@ -51,7 +51,6 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   }
 
   vehicle.occupantIds.push(employeeId);
-  vehicle.driverId = vehicle.occupantIds[0] ?? null;
   employee.x = vehicle.x;
   employee.z = vehicle.z;
   employee.locomotion = { kind: 'mounted', vehicleId };
@@ -61,7 +60,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   // board; this is now the one place a board ever succeeds. Scoped to the
   // seat that actually becomes the driver (occupantIds[0]) rather than every
   // successful board, so a future multi-seat passenger doesn't inflate it.
-  if (vehicle.driverId === employeeId) {
+  if (vehicleDriverId(vehicle) === employeeId) {
     state.vehicles.driverBoardingCount++;
   }
 

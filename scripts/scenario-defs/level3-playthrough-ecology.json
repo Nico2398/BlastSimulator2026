@@ -1186,7 +1186,7 @@
       }
     },
     {
-      "command": "vehicle move 1 to:35,35",
+      "command": "vehicle reposition 1 35 35",
       "interaction": [
         {
           "type": "clickSelector",

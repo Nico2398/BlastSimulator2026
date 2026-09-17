@@ -86,6 +86,28 @@ export function moveTo(
 }
 
 /**
+ * Turns the itinerary `employee` is currently on into one that ends with
+ * them stepping off the vehicle: the final leg's arrival step becomes
+ * `alight`. Used by an evacuation drive (Zone.ts's `clearZone`), where the
+ * driver is expected to be back on foot the moment the vehicle is clear —
+ * an ordinary player-ordered reposition leaves them in the cab instead, so
+ * this is a property of the order, not of the `reposition` goal itself
+ * (#1092 — replaces the `pendingEvacuationDestination` marker and the
+ * separate arrival sweep that used to dismount off it).
+ *
+ * No-op when the employee has no itinerary, or when its last leg already
+ * carries an arrival step of its own (a board, or a haul/break effect) —
+ * that step is what the journey exists for and is never overwritten.
+ */
+export function alightOnArrival(employee: Employee | undefined): void {
+  const legs = employee?.itinerary?.legs;
+  if (legs === undefined || legs.length === 0) return;
+  const last = legs[legs.length - 1]!;
+  if (last.onArrive.kind !== 'none') return;
+  last.onArrive = { kind: 'alight' };
+}
+
+/**
  * Keeps `employee.pendingDriverVehicleId` — the read-only mirror
  * ForceShiftRest.ts/TaskCancellation.ts/tutorialGuide.ts/FleetPanel.ts read to
  * mean "currently walking to board a vehicle" — in agreement with the

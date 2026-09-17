@@ -2,18 +2,19 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import type { GameState } from '../../core/state/GameState.js';
 import {
   purchaseVehicle,
-  assignVehicle,
   destroyVehicle,
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
   canAssignDriver,
+  vehicleDriverId,
   type VehicleRole,
-  type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { findAvailableDriverForReposition } from '../../core/entities/VehicleDriverAssignment.js';
 import { alight } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { moveTo } from '../../core/engine/MoveTo.js';
@@ -60,7 +61,8 @@ export function vehicleCommand(
       }
       const lines = ['Fleet:'];
       for (const v of state.vehicles.vehicles) {
-        const driverInfo = v.driverId !== null ? `driver:#${v.driverId}` : 'driver:none';
+        const driverId = vehicleDriverId(v);
+        const driverInfo = driverId !== null ? `driver:#${driverId}` : 'driver:none';
         lines.push(`  [${v.id}] ${v.type} at (${v.x},${v.z}) task: ${v.task} HP: ${v.hp} ${driverInfo}`);
       }
       return { success: true, output: lines.join('\n') };
@@ -125,86 +127,6 @@ export function vehicleCommand(
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: t('vehicle.buy_success', { type, id: vehicle.id, cost }) };
-    }
-    // TODO(#1092): `assign task:moving` and `move` both exist only to install
-    // a reposition itinerary on a vehicle's driver — the target end-state is
-    // `reposition` below as the one entry point for "drive this vehicle
-    // somewhere with no work attached," with these two subcommands removed
-    // once callers (tutorial stages, scenario defs) migrate to it.
-    case 'assign': {
-      const id = parseInt(args[1] ?? '', 10);
-      const task = (named['task'] ?? 'idle') as VehicleTask;
-      const toCoords = (named['to'] ?? '').split(',').map(Number);
-      if (isNaN(id)) return { success: false, output: t('vehicle.assign_usage') };
-      const target = state.vehicles.vehicles.find(v => v.id === id);
-      if (!target) {
-        return { success: false, output: t('vehicle.not_found', { id }) };
-      }
-      // Same rationale as `move` (#947): canTickVehicle never advances a
-      // driverless vehicle, so staging task='moving' here would silently
-      // no-op instead of walking. Refuse instead of accepting it quietly.
-      if (task === 'moving' && target.driverId === null) {
-        return { success: false, output: t('vehicle.move_no_driver', { id }) };
-      }
-      const targetX = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[0] : undefined;
-      const targetZ = toCoords.length >= 2 && !toCoords.some(isNaN) ? toCoords[1] : undefined;
-      // #1089: an employee is the only mobile agent — vehicle.task/targetX/Z
-      // are written only for display now (Locomotion.ts's writeVehiclePosition),
-      // and nothing reads them to drive movement any more. A `task:moving`
-      // assign with real coordinates must install an itinerary on the
-      // driver via moveTo the same way `move` below does, or the vehicle
-      // (already confirmed driven, above) silently never moves — exactly
-      // the #1089 fixer-pass regression `move` itself already hit. A task
-      // other than 'moving', or 'moving' with no `to:` coords, stays a
-      // plain display-field assignment — nothing to drive toward.
-      if (task === 'moving' && targetX !== undefined && targetZ !== undefined) {
-        const result = moveTo(state, target.driverId!, { x: targetX, z: targetZ });
-        if (!result.success) {
-          return { success: false, output: result.error };
-        }
-        return { success: true, output: t('vehicle.assign_success', { id, task }) };
-      }
-      // `target` above already confirmed a vehicle with `id` exists, and
-      // nothing mutates `state.vehicles` between that lookup and here, so
-      // assignVehicle cannot fail its own not-found check — its boolean
-      // return is not re-checked (same reasoning as `move`'s fix, #947).
-      assignVehicle(state.vehicles, id, task, targetX, targetZ);
-      return { success: true, output: t('vehicle.assign_success', { id, task }) };
-    }
-    // TODO(#1092): superseded by `reposition` below — see the `assign` case's
-    // own TODO for the target end-state.
-    case 'move': {
-      const id = parseInt(args[1] ?? '', 10);
-      const toCoords = (named['to'] ?? '').split(',').map(Number);
-      if (isNaN(id) || toCoords.length < 2 || toCoords.some(isNaN)) {
-        return { success: false, output: t('vehicle.move_usage') };
-      }
-      const target = state.vehicles.vehicles.find(v => v.id === id);
-      if (!target) {
-        return { success: false, output: t('vehicle.not_found', { id }) };
-      }
-      // canTickVehicle (EntityMovementTick.ts, #947) never advances a
-      // driverless vehicle — staging task='moving' here would silently
-      // no-op instead of walking, which is worse than today's (wrong, but
-      // visible) unmanned drive. Refuse instead.
-      if (target.driverId === null) {
-        return { success: false, output: t('vehicle.move_no_driver', { id }) };
-      }
-      // #1089: drive the vehicle's own driver there via moveTo — the only
-      // entry point that installs an itinerary Locomotion actually walks.
-      // moveVehicle (Vehicle.ts) only ever wrote vehicle.task/targetX/Z,
-      // which Locomotion now writes for display only (writeVehiclePosition)
-      // and never reads to move anything — calling it here left the
-      // vehicle sitting at its spawn point forever despite reporting
-      // "moving" (confirmed live: level1-playthrough-win.json's own
-      // corridor-clearing `vehicle move` steps never actually relocated the
-      // blocking vehicles, silently defeating the scenario's own documented
-      // deadlock workaround).
-      const result = moveTo(state, target.driverId, { x: toCoords[0]!, z: toCoords[1]! });
-      if (!result.success) {
-        return { success: false, output: result.error };
-      }
-      return { success: true, output: t('vehicle.move_success', { id, x: toCoords[0]!, z: toCoords[1]! }) };
     }
     case 'driver': {
       const vehicleId = parseInt(args[1] ?? '', 10);
@@ -284,7 +206,7 @@ export function vehicleCommand(
       return { success: true, output: t('vehicle.break_success', { id: vehicleId, fragmentId }) };
     }
     case 'reposition': {
-      return repositionVehicleCommand(ctx, args);
+      return repositionVehicleCommand(state, args);
     }
     default:
       return { success: false, output: t('vehicle.usage') };
@@ -294,14 +216,41 @@ export function vehicleCommand(
 // ── reposition subcommand (#1092) ──
 
 /**
- * `vehicle reposition <id> <x> <z>` — the target end-state for driving a
- * vehicle somewhere with no work attached (Itinerary's `reposition` Goal,
- * already planned by `planItinerary`), replacing `assign task:moving` and
- * `move` above once callers migrate — see those cases' own TODOs.
+ * `vehicle reposition <id> <x> <z>` — drive a vehicle somewhere with no work
+ * attached (Itinerary's `reposition` Goal, planned by `planItinerary`). The
+ * one entry point for that, replacing the display-only `assign task:moving`
+ * and `move` subcommands this file used to carry (#1092).
+ *
+ * The driver is whoever is already aboard; with the vehicle empty, the
+ * nearest idle licensed employee is picked and walks over to board it
+ * (`findAvailableDriverForReposition`). Refused outright while the vehicle is
+ * reserved for a task — repositioning it would strand that work mid-flight.
  */
-function repositionVehicleCommand(_ctx: GameContext, _args: string[]): CommandResult {
-  // TODO: implement (#1092) — parse <id> <x> <z>, find an available driver
-  // via findAvailableDriverForReposition (VehicleDriverAssignment.ts), then
-  // moveTo(state, driver.id, { x, z }, { via: id }) same as `move` above.
-  throw new Error('not implemented');
+function repositionVehicleCommand(state: GameState, args: string[]): CommandResult {
+  const id = parseInt(args[1] ?? '', 10);
+  const x = Number(args[2]);
+  const z = Number(args[3]);
+  if (isNaN(id) || !Number.isFinite(x) || !Number.isFinite(z) || args[2] === undefined || args[3] === undefined) {
+    return { success: false, output: t('vehicle.reposition_usage') };
+  }
+
+  const vehicle = state.vehicles.vehicles.find(v => v.id === id);
+  if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
+
+  if (vehicle.reservedForActionId !== null) {
+    return { success: false, output: t('vehicle.reposition_reserved', { id }) };
+  }
+
+  const driverId = vehicleDriverId(vehicle)
+    ?? findAvailableDriverForReposition(vehicle, state.vehicles, state.employees)?.id
+    ?? null;
+  if (driverId === null) {
+    return { success: false, output: t('vehicle.reposition_no_driver', { id }) };
+  }
+
+  const result = moveTo(state, driverId, { x, z }, { via: vehicle.id });
+  if (!result.success) {
+    return { success: false, output: result.error };
+  }
+  return { success: true, output: t('vehicle.reposition_success', { id, x, z }) };
 }

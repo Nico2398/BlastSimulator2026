@@ -167,12 +167,6 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // covers every `vehicle driver <vehicleId> <employeeId>` command in the
   // suite.
   'vehicle driver',
-  // vehicle-task-states-visual.json: `vehicle assign <id> task:<task>`
-  // writes the VehicleTask enum directly, skipping the drive/load/unload
-  // sequence ArrivalGate drives — a test-only state poke alongside
-  // `employee assign_skill` (gap G5); every player-meaningful task has its
-  // own real control instead (Haul, Break, MOVE HERE).
-  'vehicle assign 1 task:transport',
   // needs-cycle.json: "hauler" is not a real hire role (Usage:
   // employee hire role:(driller|blaster|driver|surveyor|manager)) — there
   // is no hire button for a role that doesn't exist, a genuine no-op in

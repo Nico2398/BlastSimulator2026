@@ -14,6 +14,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
@@ -251,7 +252,7 @@ export function canReleaseStrandedVehicleGatedAction(
 ): boolean {
   if (action.requiredVehicleRole === null) return false;
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-  if (!vehicle || vehicle.driverId !== null) return false;
+  if (!vehicle || vehicleDriverId(vehicle) !== null) return false;
   if (resolveActionCost(state, employee, action) !== null) return false;
 
   const role = action.requiredVehicleRole;

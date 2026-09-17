@@ -12,6 +12,7 @@ import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { syncPendingDriverVehicleId } from './MoveTo.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 
@@ -502,7 +503,7 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
   // catch this, the reservation this loop just released is already gone,
   // so its vehicle-driven-by-reservedForActionId lookup would never find it
   // again — a dead employee left mounted would violate I1/I2 forever.
-  const drivenVehicle = state.vehicles.vehicles.find(v => v.driverId === employeeId);
+  const drivenVehicle = state.vehicles.vehicles.find(v => vehicleDriverId(v) === employeeId);
   if (drivenVehicle) dismountVehicleDriver(state, drivenVehicle);
 
   // A snapshot, not the live array: a 'rest' action below is removed via

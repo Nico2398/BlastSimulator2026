@@ -4,7 +4,7 @@
 
 import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
 
-export { ROLE_LICENCE_REQUIRED, canAssignDriver, getExcavatorLoadingRate } from './VehicleDriverAssignment.js';
+export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
 
 // ── Vehicle roles ──
 
@@ -97,11 +97,6 @@ const VEHICLE_DEFS: Record<VehicleRole, Record<VehicleTier, VehicleDef>> = {
   rock_fragmenter:    makeTiers('rock_fragmenter',     VEHICLE_BASE_STATS.rock_fragmenter),
 };
 
-/** Returns the tier-1 def for backward compatibility. */
-export function getVehicleDef(role: VehicleRole): VehicleDef {
-  return VEHICLE_DEFS[role][1];
-}
-
 /** Returns the def for the given role and tier. */
 export function getVehicleDefByTier(role: VehicleRole, tier: VehicleTier): VehicleDef {
   return VEHICLE_DEFS[role][tier];
@@ -125,8 +120,6 @@ export interface Vehicle {
   /** Target coordinates for movement/task. */
   targetX: number;
   targetZ: number;
-  /** ID of the employee currently driving this vehicle (null = unassigned). */
-  driverId: number | null;
   /** High-level operational state. */
   state: VehicleOperationalState;
   /**
@@ -152,17 +145,10 @@ export interface Vehicle {
   /**
    * PendingAction id this vehicle is exclusively reserved for — set at claim
    * time by GameLoop for a vehicle-gated action, VehicleReservation.ts owns
-   * every transition. Distinct from driverId: reserved-but-not-yet-boarded
-   * is the walk-to-vehicle phase.
+   * every transition. Distinct from the driver seat: reserved-but-not-yet-
+   * boarded is the walk-to-vehicle phase.
    */
   reservedForActionId: number | null;
-  /**
-   * Safe destination a qualified employee is driving this vehicle toward
-   * during an evacuation, or null when not mid-evacuation-drive. Set when a
-   * driverless vehicle is boarded and driven clear rather than left stranded
-   * (#1042); cleared once the vehicle arrives.
-   */
-  pendingEvacuationDestination: { x: number; z: number } | null;
   /**
    * IDs of employees currently mounted in this vehicle (driver included).
    * Must agree with each occupant's `Locomotion` in both directions — see
@@ -179,6 +165,18 @@ export interface VehicleState {
   nextId: number;
   /** Fleet-wide count of driver-boarding events. */
   driverBoardingCount: number;
+}
+
+/**
+ * The employee driving `vehicle` right now, or null when nobody is aboard.
+ * The driver is the first occupant (`occupantIds[0]`) — the one whose
+ * itinerary moves the vehicle (`gameplay-vehicle-fleet`). The single
+ * accessor every reader goes through, so "who drives this" stays one
+ * question the fleet module answers rather than a field shape each caller
+ * re-derives (#1092 — replaces the `driverId` mirror deleted with phase 6).
+ */
+export function vehicleDriverId(vehicle: Vehicle): number | null {
+  return vehicle.occupantIds[0] ?? null;
 }
 
 export function createVehicleState(): VehicleState {
@@ -205,14 +203,12 @@ export function purchaseVehicle(
     task: 'idle',
     targetX: x,
     targetZ: z,
-    driverId: null,
     state: 'idle',
     payload: null,
     waitingTicks: 0,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
     reservedForActionId: null,
-    pendingEvacuationDestination: null,
     occupantIds: [],
   };
   state.vehicles.push(vehicle);
@@ -257,11 +253,17 @@ export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier:
   return Math.round(def.purchaseCost * VEHICLE_SCRAP_RESIDUAL_FRACTION * hpFraction);
 }
 
-/** Calculate total maintenance + fuel costs for all vehicles per tick. */
+/**
+ * Calculate total maintenance + fuel costs for all vehicles per tick. Billed
+ * off the vehicle's OWN tier (#1092): a tier-3 rig costs
+ * `VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick` times a tier-1's
+ * upkeep, and the same for fuel — upkeep that ignored `tier` made the elite
+ * tiers strictly better than their price implied.
+ */
 export function getVehicleCostsPerTick(state: VehicleState): number {
   let total = 0;
   for (const v of state.vehicles) {
-    const def = getVehicleDef(v.type);
+    const def = getVehicleDefByTier(v.type, v.tier);
     total += def.maintenanceCostPerTick;
     if (v.task !== 'idle') {
       total += def.fuelCostPerTick;
@@ -282,6 +284,10 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
  * interruption, which this guard was never meant to cover. Only a vehicle
  * that has actually picked something up (`payload` set) risks being
  * orphaned with cargo nobody is driving.
+ *
+ * Guard-only since #1092: there is no `driverId` field left to clear — the
+ * driver seat is `occupantIds[0]`, and `Mount.alight` (the one writer of
+ * `occupantIds`) is what actually empties it once this guard passes.
  */
 export function unassignDriver(
   vehicleState: VehicleState,
@@ -289,10 +295,8 @@ export function unassignDriver(
 ): { success: boolean; error?: string } {
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
-  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul' };
 
-  vehicle.driverId = null;
   return { success: true };
 }
 

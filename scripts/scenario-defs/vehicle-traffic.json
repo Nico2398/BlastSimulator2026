@@ -271,7 +271,7 @@
       "description": "All four drivers spawn on the same tile as their haulers (#512), so 10 ticks is enough for every one of them to walk over and board -- confirmed live: `vehicle list` afterward shows driver:#1..#4 on all four."
     },
     {
-      "command": "vehicle move 2 to:21,20",
+      "command": "vehicle reposition 2 21 20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -305,7 +305,7 @@
       "description": "Fixed by issue #512: all four haulers spawn on ONE tile (vehicle buy stagger gets undone by NavGrid.findNearestReachableCell snapping every one of them to the same reachable cell), so scene-raycast clickEntity could only ever pick hauler #1 -- clickEntity for #2/#3/#4 always raycast onto #1 instead. FleetPanel rows are clickable now, so hauler #2 gets selected by clicking its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"2\"]`), routed through ScenePicking.select(), then MOVE HERE drives the same `vehicle move` command as the hauler #1 step above."
     },
     {
-      "command": "vehicle move 3 to:20,21",
+      "command": "vehicle reposition 3 20 21",
       "interaction": [
         {
           "type": "clickSelector",
@@ -339,7 +339,7 @@
       "description": "Fixed by issue #512, same fix as hauler #2 above: hauler #3 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"3\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
-      "command": "vehicle move 4 to:19,20",
+      "command": "vehicle reposition 4 19 20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -383,7 +383,7 @@
       "role": "setup"
     },
     {
-      "command": "vehicle move 2 to:20,20",
+      "command": "vehicle reposition 2 20 20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -417,7 +417,7 @@
       "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #2 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
-      "command": "vehicle move 3 to:20,20",
+      "command": "vehicle reposition 3 20 20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -451,7 +451,7 @@
       "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #3 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
-      "command": "vehicle move 4 to:20,20",
+      "command": "vehicle reposition 4 20 20",
       "interaction": [
         {
           "type": "clickSelector",

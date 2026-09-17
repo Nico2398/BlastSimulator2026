@@ -7,7 +7,7 @@ import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
+import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../core/entities/Vehicle.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
@@ -50,8 +50,9 @@ export function describeStatus(status: VehicleStatus): string {
   return status.ticks !== null ? t('ui.fleet.status_with_ticks', { status: base, n: status.ticks }) : base;
 }
 
-export function makeStatusChip(v: Vehicle): HTMLElement {
-  const status = computeVehicleStatus(v);
+/** `occupant`, when the caller has resolved it, makes working/moving read off the driver's own activity rather than the vehicle's display fields (#1092). */
+export function makeStatusChip(v: Vehicle, occupant?: Employee): HTMLElement {
+  const status = occupant ? computeVehicleStatus(v, occupant) : computeVehicleStatus(v);
   return chip(describeStatus(status), STATUS_TONE[status.kind]);
 }
 
@@ -67,7 +68,10 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   if (v.type !== 'debris_hauler') return null;
   const capacity = getVehicleDefByTier(v.type, v.tier).capacity;
   const massKg = v.payload?.massKg ?? 0;
-  const pct = capacity > 0 ? Math.round((massKg / capacity) * 100) : 0;
+  // Clamped (#1092): an over-capacity load (a fragment heavier than the
+  // tier's own capacity, which loading does not refuse) would otherwise draw
+  // a gauge past its own track.
+  const pct = capacity > 0 ? Math.min(100, Math.round((massKg / capacity) * 100)) : 0;
   const row = gauge(t('ui.fleet.load'), pct, 'var(--bsx-info)', { labelWidth: 30 });
   const value = row.querySelector('.bsx-gauge-value');
   if (value) value.textContent = t('ui.fleet.load_kg', { kg: Math.round(massKg), cap: Math.round(capacity) });
@@ -91,14 +95,15 @@ function makeDriveIconRow(label: string, color: string): HTMLElement {
  * anymore.
  */
 export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
-  const driver = state.employees.employees.find(e => e.id === v.driverId);
-  return makeDriveIconRow(driver?.name ?? `#${v.driverId}`, 'var(--bsx-text-secondary)');
+  const driverId = vehicleDriverId(v);
+  const driver = state.employees.employees.find(e => e.id === driverId);
+  return makeDriveIconRow(driver?.name ?? `#${driverId}`, 'var(--bsx-text-secondary)');
 }
 
 /**
  * A driver already walking to board this vehicle, not yet arrived —
- * `v.driverId` stays null the whole walk (ArrivalGate.ts only sets it on
- * arrival), so without this the card would fall through to `makeNoDriverRow`
+ * a vehicle's driver seat stays empty the whole walk (nobody is aboard until
+ * the board arrival step), so without this the card would fall through to `makeNoDriverRow`
  * and, pre-#715, silently re-offer the same employee as if nobody had
  * claimed the vehicle yet. No unassign control: cancelling an in-progress
  * walk has no console command today, only display.
