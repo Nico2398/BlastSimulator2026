@@ -40,10 +40,9 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payloadKg: 0,
+    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
-    breakFragmentId: null, breakPhase: null, reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null, pendingEvacuationDestination: null,
     occupantIds: [],
     ...overrides,
   };

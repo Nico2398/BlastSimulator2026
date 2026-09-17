@@ -1186,11 +1186,12 @@ describe('Vehicle fleet', () => {
       expect(moveResult.success).toBe(true);
 
       // The exact overlap shape the old, three-mover code allowed: a
-      // hauling-style phase flag AND a vehicle-gated reservation, both set on
-      // the SAME vehicle the employee is now driving via their itinerary.
-      // Under the pre-#1089 design, either flag alone routed this vehicle
-      // through a second, independent drive call in the same tick.
-      vehicle.haulingPhase = 'to_depot';
+      // hauling-style mid-haul flag (now `payload` set, #1091) AND a
+      // vehicle-gated reservation, both set on the SAME vehicle the
+      // employee is now driving via their itinerary. Under the pre-#1089
+      // design, either flag alone routed this vehicle through a second,
+      // independent drive call in the same tick.
+      vehicle.payload = { fragmentId: 1, massKg: 100 };
       vehicle.reservedForActionId = 999999;
 
       const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
