@@ -146,6 +146,7 @@ function createIssueApi(
   const issues = new Map();
   const dependencies = new Map();
   const deliverables = new Map();
+  const assignmentComments = new Map();
 
   /**
    * Runs one read, asking again when the failure is a transient one.
@@ -465,7 +466,38 @@ function createIssueApi(
      * @returns {Promise<{comments: {body: string, created_at: string}[], unknown: boolean}>}
      */
     async assignmentCommentsFor(number) {
-      throw new Error('not implemented');
+      if (assignmentComments.has(number)) return assignmentComments.get(number);
+
+      let result;
+      try {
+        const { items, complete } = await readAllPages((page) =>
+          read(`#${number}: comments`, () =>
+            github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: number,
+              per_page: PER_PAGE,
+              page,
+            })
+          )
+        );
+        if (!complete) {
+          log(`#${number}: comments exceed ${MAX_PAGES * PER_PAGE} — read as incomplete.`);
+        }
+        result = {
+          comments: items.map((comment) => ({
+            body: comment.body || '',
+            created_at: comment.created_at,
+          })),
+          unknown: !complete,
+        };
+      } catch (error) {
+        log(`#${number}: comments could not be read (${error.status ?? error.message}).`);
+        result = { comments: [], unknown: true };
+      }
+
+      assignmentComments.set(number, result);
+      return result;
     },
 
     /**
