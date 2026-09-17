@@ -159,7 +159,13 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
+      "description": "#1090-followup root-cause fix: leading `setStepper` on the amount field added -- stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), but amount had no equivalent stepper adjustment, so the real Charge All click was silently charging at the panel's own DEFAULT_AMOUNT_KG=5 the whole time (same documented gotcha Charge.ts's own comment on `data-field=\"amount\"` names, and the exact fix blast-undercharge.json's own analogous step already applies). #1090's dispatch-timing change didn't create this divergence -- `compare-scenario-traces.ts` shows it was always there (chargesByHole amountKg 5 vs the declared 2) -- but it meant this file's blast in interaction mode was never actually the deliberately undercharged 2kg/5m-spacing shot the file's own description claims, just a heavier, better-fragmented one whose different RNG trajectory needed enough extra ticks to build both freight_warehouses that the file's cash cushion (last sized for a different divergence, #556) ran out into bankruptcy first. Charging at the intended 2kg fixes the actual blast outcome to match command mode's own trace.",
       "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 2
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
