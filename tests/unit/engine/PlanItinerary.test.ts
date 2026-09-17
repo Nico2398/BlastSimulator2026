@@ -399,7 +399,17 @@ describe('transport planning (phase 7, #1093)', () => {
     const driveLeg = itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg, `expected a drive leg riding the free hauler; got legs: ${JSON.stringify(itinerary!.legs)}`).toBeDefined();
     expect(driveLeg!.vehicleId).toBe(vehicle.id);
-    expect(driveLeg!.arrival).toBe('adjacent');
+    // Fixed post-#1093 landing (buildings.integration.test.ts's #1000
+    // starved-backlog regression): the drive leg now targets a real,
+    // computed alight WAYPOINT with `arrival: 'exact'`, not the goal's own
+    // target under a loose `arrival: 'adjacent'` tolerance. 'adjacent'
+    // accepts distance <= 1 — including 0 — so a single fast tick could (and
+    // did) overshoot straight onto the target cell itself; for a
+    // `place_building` goal that cell becomes permanently NavGrid-blocked
+    // the instant construction completes, stranding a vehicle parked there
+    // for good (see PlanItinerary.ts's `resolveRideAlightPoint`/
+    // `targetBecomesBlocked` doc comments).
+    expect(driveLeg!.arrival).toBe('exact');
     expect(driveLeg!.onArrive).toEqual({ kind: 'alight', releaseVehicleForActionId: action.id });
 
     // Trailing foot leg finishes the last stretch into the exact target.
