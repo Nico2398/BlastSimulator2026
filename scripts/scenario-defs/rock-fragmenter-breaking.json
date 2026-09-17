@@ -687,10 +687,7 @@
           "buildingCount": 2,
           "orderedBuildingCount": 0
         },
-        "increased": [
-          "storedMassKg"
-        ],
-        "note": "#953: the file's 'storedMassKg must have grown' proof moved here from the tick-40 step below. This wait runs until both warehouses stand — up to 400 ticks — and it is the window in which the first delivery lands in BOTH modes. The later step only held the proof while command mode happened to still have a haul outstanding when it opened; interaction mode, which ticks on its own while polling, has always delivered everything before then, and the climb gate's dispatch timing moved command mode the same way."
+        "note": "#953 moved the file's 'storedMassKg must have grown' proof here since command mode still had a haul outstanding when this wait opened; #1091-followup: the itinerary rebuild's new dispatch-cost ordering (#1090) delays which employee grabs the starved building task, so buildingCount now reaches 2 well before the first delivery lands (sandbox-confirmed: storedMassKg is still 0 right after this wait resolves). The proof moved back to the tick-40 step below, where it actually happens now."
       }
     },
     {
@@ -746,7 +743,10 @@
         "decreased": [
           "cash"
         ],
-        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs — increased is the cross-mode-robust proof. The haul claim moved up to the tick-30 block above (#556): with the warehouses built rather than placed, hauling starts as soon as the sites land and interaction mode — which runs its own extra polling ticks — has already delivered everything the blast produced before this block opens. What is true in both modes is that stored mass climbs in the block where hauling begins; this one keeps the cash drain it was always about."
+        "increased": [
+          "storedMassKg"
+        ],
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. #1091-followup: the 'increased' proof moved back here from the wait_until step above — the itinerary rebuild's dispatch-cost reordering (#1090) now has buildingCount reach 2 well before the first haul lands (sandbox-confirmed storedMassKg still 0 there), and this tick-40 step is where the delivery is sandbox-confirmed to land (0 -> 3871.875 kg in one traced run). Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs — increased is the cross-mode-robust proof."
       }
     },
     {

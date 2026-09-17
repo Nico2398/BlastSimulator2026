@@ -1004,6 +1004,36 @@
       "commandOutcome": "either"
     },
     {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "description": "#1091-followup: new third tick/event-resolve pair -- #1090's dispatch-cost reordering delays which employee grabs the debris_hauler's own haul, so storedMassKg is still 0 by the end of this file's original 20-tick pre-deliver pad (2x tick 10); direct-traced (command mode) that it now lands at storedMassKg 550 only after 33 ticks past the accept step above, not the ~10 that used to be enough. A single wider `tick 30` was tried first and rejected: a pending event partway through halts a bare `tick N` command early (confirmed live: only 25 of 30 ticks landed before an event interrupted it), the same interruption class this file's own smaller tick-10/resolve pairs already exist to avoid. A plain third `tick 10` pair (30 ticks total across all three) was tried next and still landed 3 ticks short (140 -> 170, no interruption that run) -- widened to `tick 20` here (40 ticks total across all three) for a real margin over the measured 33-tick landing. `changedBy` dropped for `increased` on this one step: a genuine random event can still interrupt this wider block partway (sandbox-confirmed: 15 of 20 ticks landed on one run before a pending event halted it), and the delivery below only needs the block's ticks to have actually advanced, not landed on one exact count.",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "contract deliver type:rubble_disposal amount:260",
       "interaction": [
         {
@@ -1152,9 +1182,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "nuisance": 54.39999999999998
+          "nuisance": 50
         },
-        "note": "#1090-followup (sandbox-measured): the event drawn at this due-tick changed from `union_book_club` (nuisance unchanged) to `union_food_trucks` (nuisance +5, decaying toward baseline by the time this step reads it) -- VehicleContinuity.ts's deletion shifts the earlier hole-count/charge-timing cascade (see the tick-60 and charge steps above) enough to move which real tick each due-window falls on, the same class of draw-order shift #947's own note on this exact step already documents for an earlier cause."
+        "note": "#1091-followup (sandbox-measured): back to 50 (unchanged) -- the new tick-20/event-resolve pair inserted above (see the pre-deliver tick step's own #1091-followup note) shifts every due-tick from here on by the same amount, and this checkpoint's own event draw is `union_book_club` again on this run (nuisance unchanged), not #1090-followup's `union_food_trucks` (nuisance +5). Same class of draw-order shift #947's and #1090-followup's own notes on this exact step already document for their own, different upstream causes."
       },
       "commandOutcome": "either"
     },
@@ -1169,7 +1199,7 @@
       "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 195,
+          "tickCount": 215,
           "deathCount": 3,
           "employeeCount": 6,
           "bankrupt": false,
@@ -1180,7 +1210,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0
         },
-        "note": "Closing tickCount re-measured 175 -> 185 (#1008): the freight_warehouse build step above moved from (5,5) to (20,24) -- the nearest flat 4x4 site once the new footprint-flatness check rejected (5,5) -- and (20,24) sits much farther from the crew's working area near the blast/drill site. Traced tick-by-tick against the per-step state dumps (`npx tsx scripts/scenario-test.ts --mode command --scenario level1-playthrough-win --screenshots`): every checkpoint through tick 103 (the blast) is unchanged from before #1008; the `wait_until field:buildingCount equals:1` step right after the warehouse order is the first to diverge, now taking 31 ticks (103 -> 134) for the crew to walk to and build the farther site, versus the shorter walk to (5,5) before. That +10ish tick delta on the build carries through the fixed `tick 10` blocks that follow (each still advances by the full 10, or is truncated early by the same union_strike_aftermath event landing at the same real tick, tick 175, as before -- the block is just entered 10 ticks later), so the file's own scripted tail ends up one `tick 10` block's worth (10 ticks) later at the close: 175 -> 185. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note). #959 fixer pass: vehicleCount 3 -> 4 again -- drill_rig #1 now survives that same blast (see the blast step's own #959 note); the fleet stays at 4 for the rest of the file. #1090-followup: tickCount re-measured 185 -> 195 -- the tick-60 checkpoint above now lands one more hole (VehicleContinuity.ts's deletion), which shifts the `union_food_trucks` event (see the step above) onto a due-tick one `tick 10` block later than `union_book_club` used to land, pushing the file's own scripted tail one more full block out. Everything else this step pins is unchanged."
+        "note": "Closing tickCount re-measured 175 -> 185 (#1008): the freight_warehouse build step above moved from (5,5) to (20,24) -- the nearest flat 4x4 site once the new footprint-flatness check rejected (5,5) -- and (20,24) sits much farther from the crew's working area near the blast/drill site. Traced tick-by-tick against the per-step state dumps (`npx tsx scripts/scenario-test.ts --mode command --scenario level1-playthrough-win --screenshots`): every checkpoint through tick 103 (the blast) is unchanged from before #1008; the `wait_until field:buildingCount equals:1` step right after the warehouse order is the first to diverge, now taking 31 ticks (103 -> 134) for the crew to walk to and build the farther site, versus the shorter walk to (5,5) before. That +10ish tick delta on the build carries through the fixed `tick 10` blocks that follow (each still advances by the full 10, or is truncated early by the same union_strike_aftermath event landing at the same real tick, tick 175, as before -- the block is just entered 10 ticks later), so the file's own scripted tail ends up one `tick 10` block's worth (10 ticks) later at the close: 175 -> 185. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note). #959 fixer pass: vehicleCount 3 -> 4 again -- drill_rig #1 now survives that same blast (see the blast step's own #959 note); the fleet stays at 4 for the rest of the file. #1090-followup: tickCount re-measured 185 -> 195 -- the tick-60 checkpoint above now lands one more hole (VehicleContinuity.ts's deletion), which shifts the `union_food_trucks` event (see the step above) onto a due-tick one `tick 10` block later than `union_book_club` used to land, pushing the file's own scripted tail one more full block out. #1091-followup: tickCount re-measured 195 -> 215 -- the pre-deliver tick step gained a third tick-20 pad (see that step's own #1091-followup note, needed because #1090's dispatch-cost reordering delays the debris_hauler's own first haul), and that pad's own real ticks (15 landed before an event interrupted it, sandbox-confirmed) carry straight through to this closing checkpoint. Everything else this step pins is unchanged."
       },
       "role": "setup"
     }
