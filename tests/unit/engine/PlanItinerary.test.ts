@@ -371,19 +371,14 @@ describe('planItinerary', () => {
 
 // ── transport planning (phase 7, #1093) ─────────────────────────────────────
 // A non-vehicle-gated 'work' goal (requiredVehicleRole: null — general_work,
-// survey, etc.) currently always plans a plain foot-only itinerary. Phase 7
-// wires findCheapestTransportItinerary into planItinerary's own
-// `role === null && via === undefined` branch (see that branch's own
-// TODO(#1093 phase 7) comment in PlanItinerary.ts), so a distant such goal
-// should instead compare walking against riding a free, licensed vehicle for
-// most of the trip and pick whichever is cheaper — never for a vehicle whose
-// speed can't beat AGENT_WALK_SPEED (rock_digger, speed 1), and never for
+// survey, etc.) plans a plain foot-only itinerary by default. Phase 7 wires
+// findCheapestTransportItinerary into planItinerary's own
+// `role === null && via === undefined` branch, so a distant such goal instead
+// compares walking against riding a free, licensed vehicle for most of the
+// trip and picks whichever is cheaper — never for a vehicle whose speed can't
+// beat AGENT_WALK_SPEED (rock_digger, speed 1), and never for
 // 'reposition'/'rest' goals, which carry no actionId for
-// findCheapestTransportItinerary to scope its comparison to. Both
-// findCheapestTransportItinerary and buildTransportRideItinerary are current
-// stubs that unconditionally return null (PlanItinerary.ts), so every
-// assertion below that a ride itinerary exists is expected to fail at RED
-// phase — not from an import/type error, from a real, named assertion.
+// findCheapestTransportItinerary to scope its comparison to.
 describe('transport planning (phase 7, #1093)', () => {
   it('distant work goal with a free tier-1 debris hauler nearby: itinerary rides the hauler most of the way, alights near the target, finishes on foot, and beats walking outright', () => {
     const state = makeState();
@@ -510,6 +505,34 @@ describe('transport planning (phase 7, #1093)', () => {
 
     const goal: Goal = { kind: 'rest', buildingId: building!.id };
     const itinerary = planItinerary(state, employee, goal, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it("'place_building' work goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby that would otherwise ride cheaper (targetBecomesBlocked exclusion)", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, type: 'place_building', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+
+    expect(itinerary).not.toBeNull();
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.mode).toBe('foot');
+  });
+
+  it("'level_ground' work goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby that would otherwise ride cheaper (targetBecomesBlocked exclusion)", () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, type: 'level_ground', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
 
     expect(itinerary).not.toBeNull();
     expect(itinerary!.legs).toHaveLength(1);

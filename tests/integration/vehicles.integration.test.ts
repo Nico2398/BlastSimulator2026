@@ -1994,20 +1994,16 @@ describe('dig_ramp_segment — starvation override on the timer-driven completio
 // ── #1093: fast transport un-gated (mount/itinerary rebuild phase 7) ──────
 //
 // A plain on-foot 'work' goal (requiredVehicleRole: null — general_work,
-// survey, etc.) is currently always walked. Phase 7 wires
+// survey, etc.) is walked by default. Phase 7 wires
 // findCheapestTransportItinerary into planItinerary's own
-// `role === null && via === undefined` branch (TODO(#1093 phase 7),
-// PlanItinerary.ts) so a distant such goal compares walking against riding a
-// free, licensed vehicle for most of the trip, alighting near the target and
-// finishing on foot, and takes whichever is cheaper. Drives the REAL
-// production tick pipeline (tickCommand, same as this file's own #986/#1130
-// describe blocks above) through an identical setup with and without a free
-// vehicle available, and compares how many ticks each takes to arrive —
-// RED phase: with findCheapestTransportItinerary and
-// buildTransportRideItinerary both still stubs returning null, the two runs
-// take the identical foot-only route, so the "fewer ticks" and
-// "boarded at least once" assertions below are both expected to fail, not
-// error.
+// `role === null && via === undefined` branch so a distant such goal compares
+// walking against riding a free, licensed vehicle for most of the trip,
+// alighting near the target and finishing on foot, and takes whichever is
+// cheaper. Drives the REAL production tick pipeline (tickCommand, same as
+// this file's own #986/#1130 describe blocks above) through an identical
+// setup with and without a free vehicle available, and compares how many
+// ticks each takes to arrive: with a free vehicle available, the ride beats
+// the walk outright and the driver boards at least once.
 
 describe('fast transport (#1093)', () => {
   function solidVoxel() {

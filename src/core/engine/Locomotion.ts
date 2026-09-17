@@ -622,6 +622,16 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
       drivenVehicle.state = 'idle';
       drivenVehicle.waitingTicks = 0;
       if (drivenVehicle.reservedForActionId !== null) {
+        // A transport ride's alight leg (#1093) passes through this branch on
+        // purpose: its borrowed vehicle is reserved for the goal's action, so
+        // it briefly takes on the vehicle-role arrival task here (e.g.
+        // 'drilling') even though this is only the ride's intermediate alight
+        // point, not the action's real target. That's immediately overwritten
+        // — the `step.kind === 'alight'` handling below calls
+        // releaseVehicleReservation in this same synchronous step, which
+        // resets task/state back to idle before any tick observes the
+        // mismatch. Anyone reordering this function or adding an early return
+        // between here and that release must keep that ordering intact.
         drivenVehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[drivenVehicle.type];
         tickVehicleTaskState(drivenVehicle);
       }

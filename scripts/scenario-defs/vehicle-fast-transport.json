@@ -1,6 +1,6 @@
 {
   "name": "vehicle-fast-transport",
-  "description": "Issue #1093 (mount/itinerary rebuild phase 7): a distant on-foot general_work order (requiredVehicleRole: null) is dispatched to a driller who also holds the driving.truck licence, with one free tier-1 debris hauler ($25,000, speed 3) parked near the driller's own spawn point. Once VEHICLE_TRANSPORT_PLANNING_ENABLED's planner comparison is wired through planItinerary (findCheapestTransportItinerary, currently a stub returning null per PlanItinerary.ts's own TODO(#1093 phase 7)), the driller should board the hauler, ride most of the ~15-cell trip at speed 3 rather than walking the whole way at AGENT_WALK_SPEED (2), alight within TRANSPORT_ALIGHT_FINISH_WALK_CELLS of the target, and finish on foot -- driverBoardingCount (vehicleBoardingCount in the state dump) should read at least 1 by the time the order resolves, and the hauler releases cleanly (no reservation, no occupant) once it does. Structurally valid now, and the wait_until step's own goal is expected to fail at RED phase (no wiring yet, so nobody boards and the order resolves on foot) -- this file's job is to be exercised once the implementer lands, not to pass today.",
+  "description": "Issue #1093 (mount/itinerary rebuild phase 7): a distant on-foot general_work order (requiredVehicleRole: null) is dispatched to a driller who also holds the driving.truck licence, with one free tier-1 debris hauler ($25,000, speed 3) parked near the driller's own spawn point. VEHICLE_TRANSPORT_PLANNING_ENABLED's planner comparison, wired through planItinerary (findCheapestTransportItinerary), has the driller board the hauler, ride most of the ~15-cell trip at speed 3 rather than walking the whole way at AGENT_WALK_SPEED (2), alight within TRANSPORT_ALIGHT_FINISH_WALK_CELLS of the target, and finish on foot -- driverBoardingCount (vehicleBoardingCount in the state dump) reads at least 1 by the time the order resolves, and the hauler releases cleanly (no reservation, no occupant) once it does.",
   "steps": [
     {
       "command": "new_game seed:42 mine_type:desert size:32 cash:100000",
@@ -120,7 +120,7 @@
     },
     {
       "command": "wait_until field:pendingActionCount equals:0 max_ticks:400",
-      "description": "Advances time until the dispatched order resolves (pendingActionCount drops back to 0, TaskLifecycleCore.ts's own splice-on-completion), rather than a hand-measured tick pad -- see dev-scenario-authoring's wait-on-a-condition rule. RED phase: with findCheapestTransportItinerary still a stub returning null (PlanItinerary.ts's own TODO(#1093 phase 7)), the driller walks the whole distance on foot and vehicleBoardingCount never moves off its starting 0, so this step's own increased goal is expected to fail until the implementer wires the comparison into planItinerary.",
+      "description": "Advances time until the dispatched order resolves (pendingActionCount drops back to 0, TaskLifecycleCore.ts's own splice-on-completion), rather than a hand-measured tick pad -- see dev-scenario-authoring's wait-on-a-condition rule. With findCheapestTransportItinerary wired into planItinerary, the driller rides the hauler for most of the trip and vehicleBoardingCount moves off its starting 0 by the time this step's own goal is checked.",
       "timeout": 125,
       "interaction": [
         {

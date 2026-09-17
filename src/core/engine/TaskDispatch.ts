@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Task Dispatch engine
 // Routes pending actions to qualified employees.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import { isFootprintAction, type GameState, type PendingAction } from '../state/GameState.js';
 
 export type { PendingAction };
 
@@ -69,7 +69,7 @@ export function dispatchPendingAction(
   // (#556, widened by #1009) so the renderer can draw the full site/area
   // outline instead of a single point — every other action type's ghost is
   // unaffected, footprint stays undefined.
-  const footprint = action.type === 'place_building' || action.type === 'level_ground'
+  const footprint = isFootprintAction(action.type)
     ? (action.payload['footprint'] as ReadonlyArray<readonly [number, number]> | undefined)
     : undefined;
   state.ghostPreviews.push({
