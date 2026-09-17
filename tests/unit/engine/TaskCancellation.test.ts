@@ -7,16 +7,17 @@
 // releaseDeadEmployeeActions (#557 review) and cancelAction's fix to not
 // clear a different active action's holder fields (#939).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { releaseDeadEmployeeActions, cancelAction, walkingDistanceEstimate } from '../../../src/core/engine/TaskCancellation.js';
+import { releaseDeadEmployeeActions, cancelAction, interruptActiveAction } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
 
 const SEED = 42;
 const DEAD_ID = 7;
@@ -288,29 +289,155 @@ describe('cancelAction — must not clear a DIFFERENT active action\'s holder fi
   });
 });
 
-// ── walkingDistanceEstimate must not trust findPath's silent out-of-bounds
-// clamp (#1113, mirrors #1109's fix to resolveActionCost/ActionSelection.ts)
-// ─────────────────────────────────────────────────────────────────────────
-describe('walkingDistanceEstimate — out-of-bounds target (#1113)', () => {
-  it('returns Infinity for a target outside state.navGrid\'s bounds, rather than a distance computed against findPath\'s silently clamped-to-grid endpoint', () => {
-    // 30x30 grid. A target far past the grid's edge clamps under plain
-    // findPath onto the grid's last cell and still reports found:true —
-    // walkingDistanceEstimate must not let that masquerade as a real,
-    // reachable distance.
+// ── hasCloserIdleCandidate must call the REAL distance oracle
+// (PlanItinerary.ts's estimateLegDistance) with the real per-call
+// avoidVehicles/agentId, not TaskCancellation.ts's own hand-rolled
+// walkingDistanceEstimate helper hardcoding avoidVehicles:true / agentId:-1
+// (#1128). walkingDistanceEstimate itself is being deleted by the
+// implementation that follows this test-writing pass, so every test below
+// drives hasCloserIdleCandidate only through interruptActiveAction — the one
+// exported entry point that reaches it (hasCloserIdleCandidate itself stays
+// private) — exactly like the #556/#867/#954 pin/release regression suites in
+// TaskDispatch.test.ts already do.
+//
+// Shared setup shape for every test below: a 'general_work' action already
+// mid-walk-only-pinned to `pinned` (targetEmployeeId === pinned.id,
+// payload.walkOnlyPinnedBy === pinned.id, pinned.taskTicksRemaining === null,
+// pinned.pendingTaskDuration !== null) — the exact state that routes a REPEAT
+// interruptActiveAction call into the `hasCloserIdleCandidate` branch
+// (TaskCancellation.ts's own doc comment on interruptActiveAction explains
+// why: first interruption pins, a second one either releases or re-pins based
+// on hasCloserIdleCandidate's verdict).
+describe('hasCloserIdleCandidate\'s real distance-oracle semantics, via interruptActiveAction\'s repeat walk-only-pin release (#1128)', () => {
+  /** Hire one real employee at (x, z) into state.employees and return them. */
+  function hireAt(state: ReturnType<typeof createGame>, seed: number, x: number, z: number) {
+    const rng = new Random(seed);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, x, z);
+    return employee;
+  }
+
+  it('computes avoidVehicles from the target\'s REAL vehicle occupancy, not a hardcoded true — releases the pin to a genuinely closer idle candidate once the occupied target becomes reachable', () => {
+    // The action's own target cell is itself sitting under a vehicle (e.g. a
+    // drill_rig parked exactly where a hole needs charging) — mirrors
+    // PlanItinerary.ts's own buildFootOnlyItinerary convention:
+    // avoidVehicles = !isDestinationOccupied(target), so a leg whose OWN
+    // destination is occupied must flip to false to ever reach it at all.
+    //
+    // Under the current hardcoded avoidVehicles:true, BOTH the pinned
+    // employee's own distance and every idle candidate's distance to this
+    // target resolve to Infinity (findExactPath refuses an impassable goal
+    // cell) — `Infinity < Infinity` is false, so hasCloserIdleCandidate
+    // (wrongly) reports no closer candidate and the pin never releases. With
+    // avoidVehicles correctly derived as false here, the target becomes a
+    // real, reachable cell again: `closer` (one cell away) gets a small
+    // finite distance strictly less than `pinned`'s (clear across the grid),
+    // so the pin DOES release.
     const state = createGame({ seed: SEED });
-    state.navGrid = makeFlatGrid(30, 30);
-    const fromX = 0, fromZ = 0;
-    const toX = 500, toZ = 500; // genuinely outside the 30x30 grid
+    state.employees = createEmployeeState();
+    const pinned = hireAt(state, SEED, 0, 0);
+    const closer = hireAt(state, SEED + 1, 9, 10);
 
-    const plainPath = findPath(state.navGrid, {
-      agentId: -1,
-      fromX, fromZ, toX, toZ,
-      avoidVehicles: true,
+    const grid = makeFlatGrid(20, 20);
+    grid.cells[10]![10]!.vehicleOccupied = true; // the action's own target cell
+    state.navGrid = grid;
+
+    const action = makeAction({
+      id: 500, targetX: 10, targetZ: 10,
+      status: 'assigned', holderId: pinned.id, targetEmployeeId: pinned.id,
+      payload: { walkOnlyPinnedBy: pinned.id },
     });
-    expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+    state.pendingActions.push(action);
 
-    const distance = walkingDistanceEstimate(state, fromX, fromZ, toX, toZ);
+    pinned.activeActionId = action.id;
+    pinned.pendingTaskDuration = 10; // mid-walk-only phase (taskTicksRemaining stays null)
 
-    expect(distance).toBe(Infinity);
+    interruptActiveAction(state, pinned, action.id);
+
+    const stored = state.pendingActions.find(a => a.id === action.id)!;
+    expect(stored.targetEmployeeId).toBeNull();
+    expect(closer.id).not.toBe(pinned.id); // sanity: two distinct candidates were actually compared
+  });
+
+  it('threads each candidate\'s own real employee id as the agentId passed to the distance oracle, never a hardcoded -1', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const pinned = hireAt(state, SEED, 0, 0);
+    const closer = hireAt(state, SEED + 1, 1, 1);
+    state.navGrid = makeFlatGrid(20, 20);
+
+    const action = makeAction({
+      id: 501, targetX: 10, targetZ: 10,
+      status: 'assigned', holderId: pinned.id, targetEmployeeId: pinned.id,
+      payload: { walkOnlyPinnedBy: pinned.id },
+    });
+    state.pendingActions.push(action);
+
+    pinned.activeActionId = action.id;
+    pinned.pendingTaskDuration = 10;
+
+    const spy = vi.spyOn(PlanItineraryModule, 'estimateLegDistance');
+
+    interruptActiveAction(state, pinned, action.id);
+
+    // The old hand-rolled walkingDistanceEstimate never calls into
+    // PlanItinerary.ts at all — this spy sees zero calls today, which is the
+    // expected red-phase failure below.
+    expect(spy.mock.calls.length).toBeGreaterThan(0);
+
+    const agentIdsUsed = spy.mock.calls.map(call => call[2]);
+    expect(agentIdsUsed).not.toContain(-1);
+    expect(agentIdsUsed).toContain(pinned.id);
+    expect(agentIdsUsed).toContain(closer.id);
+
+    spy.mockRestore();
+  });
+
+  // ── #1113 regression, re-expressed against the new call path ────────────
+  // (mirrors #1109's fix to resolveActionCost/ActionSelection.ts). The
+  // deleted walkingDistanceEstimate used to trust findPath's silent
+  // out-of-bounds clamp; estimateLegDistance (PlanItinerary.ts) never does,
+  // since it always calls findExactPath. This proves that protection still
+  // holds once hasCloserIdleCandidate calls the real oracle instead.
+  it('an out-of-bounds action target resolves to null/Infinity through the real oracle, never a distance computed against findPath\'s silently clamped endpoint (#1113)', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const pinned = hireAt(state, SEED, 0, 0);
+    hireAt(state, SEED + 1, 1, 1); // nominally "closer" by straight-line to the shared out-of-bounds target
+    state.navGrid = makeFlatGrid(30, 30);
+
+    const outOfBoundsX = 500, outOfBoundsZ = 500;
+    const plainPath = findPath(state.navGrid, {
+      agentId: -1, fromX: 0, fromZ: 0, toX: outOfBoundsX, toZ: outOfBoundsZ, avoidVehicles: true,
+    });
+    expect(plainPath.found).toBe(true); // findPath itself still clamps silently — the trap this regression guards against
+
+    const action = makeAction({
+      id: 502, targetX: outOfBoundsX, targetZ: outOfBoundsZ,
+      status: 'assigned', holderId: pinned.id, targetEmployeeId: pinned.id,
+      payload: { walkOnlyPinnedBy: pinned.id },
+    });
+    state.pendingActions.push(action);
+
+    pinned.activeActionId = action.id;
+    pinned.pendingTaskDuration = 10;
+
+    const spy = vi.spyOn(PlanItineraryModule, 'estimateLegDistance');
+
+    interruptActiveAction(state, pinned, action.id);
+
+    // Fails today for the same reason as the agentId test above: the real
+    // oracle is never called at all by the current hand-rolled fallback.
+    expect(spy.mock.calls.length).toBeGreaterThan(0);
+    for (const result of spy.mock.results) {
+      expect(result.value).toBeNull(); // never a distance against a clamped endpoint
+    }
+
+    // Both pinned and the candidate resolve to the same unreachable Infinity
+    // for this shared out-of-bounds target, so the pin is never released to
+    // an out-of-bounds phantom "closer" candidate.
+    const stored = state.pendingActions.find(a => a.id === action.id)!;
+    expect(stored.targetEmployeeId).toBe(pinned.id);
+
+    spy.mockRestore();
   });
 });
