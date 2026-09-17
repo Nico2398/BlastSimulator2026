@@ -54,6 +54,20 @@ function writeCommitted(emp: Employee, committed: RouteCommitment): void {
   emp.committedFromZ = committed.fromZ ?? null;
 }
 
+/** Reads `emp`'s carried move-history shift-register (#1130) into the shape `advanceAlongPath` takes. */
+function readMoveHistory(emp: Employee): { moveHistoryX: number | null; moveHistoryZ: number | null } {
+  return {
+    moveHistoryX: emp.moveHistoryX ?? null,
+    moveHistoryZ: emp.moveHistoryZ ?? null,
+  };
+}
+
+/** Writes an `advanceAlongPath` outcome's move-history fields (#1130) back onto `emp` for next tick. */
+function writeMoveHistory(emp: Employee, moveHistoryX: number | null, moveHistoryZ: number | null): void {
+  emp.moveHistoryX = moveHistoryX;
+  emp.moveHistoryZ = moveHistoryZ;
+}
+
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
 interface LocomotionResult {
   moved: number[];
@@ -153,13 +167,15 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid, avoidVehicles,
     committed: readCommitted(emp),
+    ...readMoveHistory(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
   writeCommitted(emp, outcome.committed);
+  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
 
-  if (!outcome.pathFound) {
+  if (!outcome.pathFound || outcome.isStuck) {
     if (emp.isMoveStuck) {
       if (outcome.becameStuck) {
         result.stuck.push(emp.id);
@@ -174,7 +190,7 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
         emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
       }
     }
-    return;
+    if (!outcome.pathFound) return;
   }
 
   emp.x = outcome.x;
@@ -308,17 +324,33 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid, avoidVehicles,
     committed: readCommitted(emp),
+    ...readMoveHistory(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
   writeCommitted(emp, outcome.committed);
+  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
   if (isDrive) {
     vehicle!.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle!.isMoveStuck = outcome.isStuck;
   }
 
-  if (!outcome.pathFound) {
+  // Position/waitingTicks only advance on a genuinely found path — a period-2
+  // oscillation (outcome.isStuck true, pathFound still true) really did walk
+  // this tick, just back to where it stood 2 ticks ago, so this still counts
+  // as the entity's real position; only the abandon check below additionally
+  // fires on it.
+  if (outcome.pathFound) {
+    emp.vehicleWaitingTicks = 0;
+    if (isDrive) vehicle!.waitingTicks = 0;
+
+    emp.x = outcome.x;
+    emp.z = outcome.z;
+    if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
+  }
+
+  if (!outcome.pathFound || outcome.isStuck) {
     if (outcome.becameStuck) emitter?.emit('agent:stuck', { employeeId: emp.id });
     emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
 
@@ -362,13 +394,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     return 'blocked';
   }
 
-  emp.vehicleWaitingTicks = 0;
-  if (isDrive) vehicle!.waitingTicks = 0;
-
-  emp.x = outcome.x;
-  emp.z = outcome.z;
-  if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
-
   return 'moved';
 }
 
@@ -399,14 +424,21 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
       consecutiveFailures: 0, isStuck: false,
       path: reroute,
       // A reroute is trusted immediately — never compared against a stale
-      // main-route commitment from before the occupancy block.
+      // main-route commitment from before the occupancy block, and never
+      // against pre-reroute move history either (the same reasoning as
+      // `committed` above): a rerouted hop is a different route from a
+      // different resolved target, so a coincidental match against where the
+      // agent stood 2 ticks before the reroute is not an oscillation.
       committed: NULL_ROUTE_COMMITMENT,
+      moveHistoryX: null,
+      moveHistoryZ: null,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
     emp.isMoveStuck = false;
     emp.vehicleWaitingTicks = 0;
     writeCommitted(emp, outcome.committed);
+    writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
     vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle.isMoveStuck = false;
     vehicle.waitingTicks = 0;
