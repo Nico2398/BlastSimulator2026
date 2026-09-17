@@ -32,7 +32,9 @@ import {
   reconcileVehicleReservations,
   isMidVehicleGatedWork,
   completeVehicleGatedAction,
+  hasBlockedQueuedActionForVehicleRole,
 } from '../../../src/core/engine/VehicleReservation.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 // reconcileVehicleReservations no longer performs the interruption itself
@@ -838,3 +840,60 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 // #1090: releaseVehicleReservationKeepDriver is deleted — releaseVehicleReservation
 // itself is now claim-only (see the describe blocks above), so a dedicated
 // driver-retaining variant is redundant and gone along with it.
+
+describe('hasBlockedQueuedActionForVehicleRole (#1091: untargeted haul_debris exclusion)', () => {
+  it('an untargeted queued haul_debris action does not count as blocked while no active freight_warehouse exists — the #1091 exclusion, since nobody could complete it either way', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: null,
+    }));
+    // No freight_warehouse placed at all — hasActiveFreightWarehouse is false.
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(false);
+  });
+
+  it('the same untargeted queued haul_debris action counts as blocked once an active freight_warehouse exists — genuine demand somebody else could now claim', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: null,
+    }));
+    const placed = placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 64, 64);
+    if (!placed.success) throw new Error(`Setup: placeBuilding failed — ${placed.error}`);
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(true);
+  });
+
+  it('a queued haul_debris action targeted at a DIFFERENT employee still counts as blocked regardless of warehouse existence — the original #1090 hostage case the exclusion does not touch', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { employee: other } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'haul_debris', requiredVehicleRole: 'debris_hauler',
+      status: 'queued', targetEmployeeId: other.id,
+    }));
+    // No freight_warehouse — would exclude an untargeted action, but this one
+    // is targeted at `other`, so the exclusion's own `a.targetEmployeeId !== null`
+    // branch already keeps it counted.
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'debris_hauler', employee.id)).toBe(true);
+  });
+
+  it('a non-haul_debris queued action of the same role counts as blocked with no warehouse involved — the exclusion is scoped to haul_debris only', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    state.pendingActions.push(makeAction(state, {
+      id: 1, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter',
+      status: 'queued', targetEmployeeId: null,
+    }));
+
+    expect(hasBlockedQueuedActionForVehicleRole(state, 'rock_fragmenter', employee.id)).toBe(true);
+  });
+});

@@ -6,12 +6,15 @@
 // the estimator and the executor can share this shape without coupling to
 // GameState's internal fields.
 
+/** Registered arrival effect ids an itinerary leg's `onArrive` may name. */
+export type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
+
 /** What happens the instant a leg's destination is reached. */
 export type ArrivalStep =
   | { kind: 'none' }
   | { kind: 'board'; vehicleId: number }
   | { kind: 'alight' }
-  | { kind: 'effect'; effectId: string };
+  | { kind: 'effect'; effectId: ArrivalEffectId };
 
 /** One foot or drive segment of an itinerary. */
 export interface Leg {

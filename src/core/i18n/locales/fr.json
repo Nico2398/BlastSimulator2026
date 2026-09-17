@@ -3504,5 +3504,9 @@
   "move_to.vehicle_not_found": "Véhicule introuvable",
   "move_to.vehicle_unavailable": "Véhicule indisponible",
   "move_to.no_route_to_vehicle": "Aucun itinéraire vers le véhicule",
-  "move_to.no_route_available": "Aucun itinéraire disponible"
+  "move_to.no_route_available": "Aucun itinéraire disponible",
+  "haul.no_action_queued": "Aucune action de transport en attente pour ce fragment",
+  "haul.claim_failed": "Échec de la prise en charge de l'action de transport",
+  "break.no_action_queued": "Aucune action de fragmentation en attente pour ce fragment",
+  "break.claim_failed": "Échec de la prise en charge de l'action de fragmentation"
 }

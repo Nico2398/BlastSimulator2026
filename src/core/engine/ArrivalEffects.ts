@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Arrival effects (#1091)
 //
-// Dispatch table for an itinerary leg's `{ kind: 'effect'; effectId: string }`
+// Dispatch table for an itinerary leg's `{ kind: 'effect'; effectId: ArrivalEffectId }`
 // ArrivalStep (Itinerary.ts) — fired by Locomotion.ts at the instant a leg's
 // destination is reached, the same arrival-gated timing every other
 // position-dependent action already uses (see the `vehicles` rule). Replaces
@@ -17,9 +17,10 @@
 // other point in the tick where "this action is done" would otherwise be
 // noticed.
 //
-// Effect ids are a closed catalog (ArrivalEffectId) rather than a raw string
-// so the next one is a union member and a catalog entry, not a new branch
-// somewhere else — see the "Extension without edit" principle.
+// Effect ids are a closed catalog (ArrivalEffectId, exported from Itinerary.ts,
+// which owns the ArrivalStep union) rather than a raw string so the next one
+// is a union member and a catalog entry, not a new branch somewhere else —
+// see the "Extension without edit" principle.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
@@ -30,9 +31,7 @@ import { pickupFragment, deliverToDepot } from '../economy/Logistics.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
-
-/** Registered arrival effect ids an itinerary leg's `onArrive` may name. */
-type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
+import type { ArrivalEffectId } from './Itinerary.js';
 
 type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: EventEmitter) => boolean;
 

@@ -284,6 +284,38 @@ describe('runTick — TickReport reflects what happened', () => {
   });
 });
 
+describe('runTick — fatal world invariant abort (#1091: FATAL_VIOLATION_KINDS)', () => {
+  beforeEach(() => {
+    clearEvents();
+  });
+
+  it('throws when a desynced I8 payload/in_transit pairing is present and checkInvariants is true', () => {
+    const state = createGame({ seed: SEED });
+    const emitter = new EventEmitter();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    // Payload names a fragment id that logistics never tracked 'in_transit' —
+    // exactly the I8 desync (checkI8PayloadNotInTransit, WorldInvariants.ts).
+    vehicle.payload = { fragmentId: 999, massKg: 1000 };
+
+    expect(() => runOneTick(state, emitter, true)).toThrow(/Fatal world invariant violation/);
+  });
+
+  it('does not throw for a non-fatal violation kind (I1) even with checkInvariants true, and the tick completes normally', () => {
+    const state = createGame({ seed: SEED });
+    const emitter = new EventEmitter();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    // occupantIds names an employee id nobody holds — I1 mismatch
+    // (checkI1OccupantLocomotionMismatch, WorldInvariants.ts), not in
+    // FATAL_VIOLATION_KINDS, so runTick must collect it and keep going.
+    vehicle.occupantIds = [999];
+
+    let report: TickReport | undefined;
+    expect(() => { report = runOneTick(state, emitter, true); }).not.toThrow();
+    expect(report!.worldInvariantViolations.some(v => v.kind === 'I1_occupant_locomotion_mismatch')).toBe(true);
+    expect(report!.tick).toBe(1);
+  });
+});
+
 describe('runTick — cross-check against the console tick command (no behaviour change, #1086)', () => {
   beforeEach(() => {
     clearEvents();

@@ -17,6 +17,7 @@ import { findNearestReachableFragment, findRequestVehicleOfRole } from './Fragme
 import { claimPendingAction } from '../engine/TaskDispatch.js';
 import { reserveVehicle } from '../engine/VehicleReservation.js';
 import { moveTo } from '../engine/MoveTo.js';
+import { t } from '../i18n/I18n.js';
 
 /**
  * True when `vehicle` is a rock_fragmenter with a driver assigned and no
@@ -61,13 +62,13 @@ export function requestBreakBoulder(
 
   const action = state.pendingActions.find(a =>
     a.type === 'fragment_debris' && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
-  if (!action) return { success: false, error: 'No break action queued for this fragment' };
+  if (!action) return { success: false, error: t('break.no_action_queued') };
 
   const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
   if (!employee) return { success: false, error: 'Vehicle has no driver' };
 
   const claimed = claimPendingAction(state, action.id, employee.id);
-  if (!claimed) return { success: false, error: 'Failed to claim break action' };
+  if (!claimed) return { success: false, error: t('break.claim_failed') };
   reserveVehicle(vehicle, claimed.id);
   employee.activeActionId = claimed.id;
 
