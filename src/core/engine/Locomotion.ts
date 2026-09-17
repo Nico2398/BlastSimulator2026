@@ -14,7 +14,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
-import { advanceAlongPath } from '../nav/AgentAdvance.js';
+import { advanceAlongPath, NULL_ROUTE_COMMITMENT } from '../nav/AgentAdvance.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
@@ -126,6 +126,8 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     destinationX: destX, destinationZ: destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid,
+    // TODO(#1129): placeholder — implementer wires this to emp.committed*.
+    committed: NULL_ROUTE_COMMITMENT,
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -278,7 +280,9 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     x: emp.x, z: emp.z, walkSpeed: speed,
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
+    // TODO(#1129): placeholder — implementer wires this to emp.committed*.
+    committed: NULL_ROUTE_COMMITMENT,
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -368,6 +372,8 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
       destinationX: leg.destX, destinationZ: leg.destZ,
       consecutiveFailures: 0, isStuck: false,
       path: reroute,
+      // TODO(#1129): placeholder — implementer wires this to emp.committed*.
+      committed: NULL_ROUTE_COMMITMENT,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;

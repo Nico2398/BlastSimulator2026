@@ -12,6 +12,8 @@ import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 export interface AgentPath {
   found: boolean;
   waypoints: Array<{ x: number; z: number }>;
+  /** Total A* cost of this route, when the source computed one (findPath/findExactPath do; the legacy direct-line synth does not). */
+  totalCost?: number;
 }
 
 export interface AdvanceAlongPathInput {
@@ -30,6 +32,10 @@ export interface AdvanceAlongPathInput {
    * pass null and get the plain "skip the agent's own cell" behaviour.
    */
   navGrid?: NavGrid | null;
+  /** The in-flight waypoint/cost baseline carried across ticks (#1129) — see `RouteCommitment`. */
+  committed: RouteCommitment;
+  /** Whether the fresh replan this tick avoids vehicle-occupied cells — used by the route-commitment guard to re-resolve a waypoint on the same terms the fresh path was found under. */
+  avoidVehicles?: boolean;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -46,7 +52,42 @@ interface AdvanceAlongPathOutcome {
   becameStuck: boolean;
   /** True when the agent reached the final waypoint this tick. */
   isPathComplete: boolean;
+  /** Updated route-commitment, to be written back onto the entity (#1129). */
+  committed: RouteCommitment;
 }
+
+// ---------------------------------------------------------------------------
+// Route commitment (#1129)
+// ---------------------------------------------------------------------------
+
+/**
+ * The in-flight waypoint an agent has already committed to walking toward,
+ * plus the cost baseline it was chosen under, carried across ticks. A fresh
+ * replan every tick (`findExactPath`) can hand back a differently-shaped but
+ * equal-cost route from a start point that shifted by a sub-cell fraction —
+ * without this guard the agent abandons an in-flight hop and walks back to
+ * where it started, oscillating forever (#1129). Null fields mean "no
+ * commitment yet" — see `NULL_ROUTE_COMMITMENT`.
+ */
+export interface RouteCommitment {
+  waypointX: number | null;
+  waypointZ: number | null;
+  destX: number | null;
+  destZ: number | null;
+  remainingCost: number | null;
+}
+
+/** The empty commitment — no in-flight waypoint yet. Default for a fresh journey/leg. */
+export const NULL_ROUTE_COMMITMENT: RouteCommitment = {
+  waypointX: null, waypointZ: null, destX: null, destZ: null, remainingCost: null,
+};
+
+// Tie tolerance for preferring the committed in-flight waypoint over a fresh
+// replan's target (#1129), mirroring RAMP_TIE_EPSILON's precedent in
+// Pathfinding.ts: two routes within this cost band are treated as equal, so
+// the already-committed waypoint wins instead of flapping between them.
+// Placeholder value — tuned by the implementer.
+const ROUTE_COMMIT_TIE_EPSILON = 1.0;
 
 /**
  * Shared per-tick movement skeleton for any entity walking a NavGrid path:
@@ -84,6 +125,10 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       isStuck: next.isStuck,
       becameStuck: next.isStuck && !wasStuck,
       isPathComplete: false,
+      // TODO(#1129): a failed replan should not silently drop a live
+      // commitment. Placeholder pass-through until implementer wires the
+      // resolution logic in via resolveTargetWaypoint.
+      committed: input.committed,
     };
   }
 
@@ -123,7 +168,41 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     isStuck: reset.isStuck,
     becameStuck: false,
     isPathComplete: advance.isPathComplete,
+    // TODO(#1129): placeholder pass-through — implementer wires this up to
+    // resolveTargetWaypoint's returned commitment.
+    committed: input.committed,
   };
+}
+
+/**
+ * Resolves this tick's actual walk target from the fresh replan's target
+ * against any in-flight commitment (#1129): keeps the agent committed to an
+ * already-in-progress waypoint unless the fresh route is clearly better by
+ * more than `ROUTE_COMMIT_TIE_EPSILON`, breaking the oscillation described on
+ * `RouteCommitment`. Returns the resolved walk target plus the commitment to
+ * write back onto the entity for next tick.
+ *
+ * TODO(#1129): stub only — implementer fills in the guard logic. Exported
+ * (rather than kept module-private, per plan) only so it type-checks as an
+ * unused declaration under `noUnusedLocals` before `advanceAlongPath` calls
+ * it — the implementer phase wires the call in and can drop the export if
+ * the guard logic ends up module-private again.
+ */
+export function resolveTargetWaypoint(
+  x: number,
+  z: number,
+  freshTarget: { x: number; z: number },
+  freshCost: number | undefined,
+  destinationX: number,
+  destinationZ: number,
+  committed: RouteCommitment,
+  navGrid: NavGrid | null,
+  avoidVehicles: boolean,
+): { target: { x: number; z: number }; committed: RouteCommitment } {
+  // Placeholder references so strict noUnusedParameters stays green until
+  // the implementer fills in the guard logic (#1129).
+  void [x, z, freshTarget, freshCost, destinationX, destinationZ, committed, navGrid, avoidVehicles, ROUTE_COMMIT_TIE_EPSILON];
+  throw new Error('not implemented');
 }
 
 /**
