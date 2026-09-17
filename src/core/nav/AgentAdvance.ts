@@ -6,6 +6,7 @@
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
+import { isImpassable } from './Pathfinding.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
@@ -32,8 +33,14 @@ export interface AdvanceAlongPathInput {
    * pass null and get the plain "skip the agent's own cell" behaviour.
    */
   navGrid?: NavGrid | null;
-  /** The in-flight waypoint/cost baseline carried across ticks (#1129) — see `RouteCommitment`. */
-  committed: RouteCommitment;
+  /**
+   * The in-flight waypoint/cost baseline carried across ticks (#1129) — see
+   * `RouteCommitment`. Optional so callers/fixtures predating the guard (no
+   * commitment to carry yet) keep compiling unchanged; defaults to
+   * `NULL_ROUTE_COMMITMENT`, which always adopts the fresh replan's own
+   * target — identical to pre-#1129 behaviour.
+   */
+  committed?: RouteCommitment;
   /** Whether the fresh replan this tick avoids vehicle-occupied cells — used by the route-commitment guard to re-resolve a waypoint on the same terms the fresh path was found under. */
   avoidVehicles?: boolean;
 }
@@ -85,8 +92,12 @@ export const NULL_ROUTE_COMMITMENT: RouteCommitment = {
 // Tie tolerance for preferring the committed in-flight waypoint over a fresh
 // replan's target (#1129), mirroring RAMP_TIE_EPSILON's precedent in
 // Pathfinding.ts: two routes within this cost band are treated as equal, so
-// the already-committed waypoint wins instead of flapping between them.
-// Placeholder value — tuned by the implementer.
+// the already-committed waypoint wins instead of flapping between them. 1.0
+// (one full move-cost unit — MIN_WALKABLE_COST in Pathfinding.ts) covers the
+// issue's own repro (route B's cost = route A's cost minus about one tick's
+// walk distance) while still yielding to a fresh route that is genuinely a
+// cell or more shorter — a real reroute, not just a differently-shaped
+// equal-cost alternative from a start point that drifted a sub-cell fraction.
 const ROUTE_COMMIT_TIE_EPSILON = 1.0;
 
 /**
@@ -125,14 +136,33 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       isStuck: next.isStuck,
       becameStuck: next.isStuck && !wasStuck,
       isPathComplete: false,
-      // TODO(#1129): a failed replan should not silently drop a live
-      // commitment. Placeholder pass-through until implementer wires the
-      // resolution logic in via resolveTargetWaypoint.
-      committed: input.committed,
+      // A failed replan leaves whatever commitment was already in flight
+      // untouched — nothing moved this tick, so there is nothing to roll
+      // forward or decay.
+      committed: input.committed ?? NULL_ROUTE_COMMITMENT,
     };
   }
 
   const reset = resetStuckState(stuckInput);
+
+  // One tick's movement budget is spent hop by hop rather than in one
+  // advanceAgent call over the whole fresh path (#1129): each hop re-resolves
+  // its own target against the in-flight commitment — protecting against the
+  // oscillation `RouteCommitment` documents — and, once that hop is fully
+  // walked with budget still left over, loops to resolve the next one. A
+  // single guarded call spanning the whole tick would otherwise either adopt
+  // the fresh path uncritically (losing the guard on a multi-hop tick) or cap
+  // movement at one hop regardless of leftover budget (stalling a fast agent
+  // for ticks at a time whenever the guard's very first hop happens to be
+  // short — confirmed live via #1088's itinerary/simulation equivalence
+  // suite, which measured a drill_rig taking 3+ ticks longer than planned
+  // before this loop existed).
+  let x = input.x;
+  let z = input.z;
+  let remaining = Number.isFinite(input.walkSpeed) ? Math.max(0, input.walkSpeed) : 0;
+  let committed = input.committed ?? NULL_ROUTE_COMMITMENT;
+  let isPathComplete = false;
+
   // Both of findPath's sources (the A* reconstruction and the direct-line
   // fallback) emit waypoints[0] as the agent's own (floor-rounded) starting
   // cell — every path is a fresh from-here-to-there route recomputed each
@@ -147,30 +177,101 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   // that never reaches the destination (found via a #458 T6.1 regression:
   // resized levels carry more natural terrain relief, putting agents near a
   // ramp far more often than the old, flatter levels did).
-  const startIndex = firstUnwalkedWaypoint(input.x, input.z, input.path.waypoints, input.navGrid ?? null);
-  const advance = advanceAgent({
-    x: input.x,
-    z: input.z,
-    waypoints: input.path.waypoints,
-    waypointIndex: startIndex,
-    walkSpeed: input.walkSpeed,
-    destinationX: input.destinationX,
-    destinationZ: input.destinationZ,
-    consecutiveFailures: reset.consecutiveFailures,
-    isStuck: reset.isStuck,
-  });
+  //
+  // Computed once, from the tick-START position — not re-derived per hop.
+  // `firstUnwalkedWaypoint` is a geometry heuristic with no memory of its own
+  // (unlike `advanceAgent`'s plain incrementing waypointIndex), so re-running
+  // it from an interior hop's post-move position can hand back the very same
+  // index the agent just departed, stalling the loop in place instead of
+  // progressing through the fresh path's later waypoints.
+  let pathIndex = firstUnwalkedWaypoint(input.x, input.z, input.path.waypoints, input.navGrid ?? null);
+
+  // Bounded by one iteration per waypoint the fresh path holds (+1 for the
+  // synthetic single-hop case) — cannot loop unboundedly since each iteration
+  // either exhausts `remaining` or fully consumes one hop's distance.
+  const maxHops = input.path.waypoints.length + 1;
+  for (let hop = 0; hop < maxHops && remaining > 0 && !isPathComplete; hop++) {
+    const freshTarget = input.path.waypoints[pathIndex] ?? input.path.waypoints[input.path.waypoints.length - 1]!;
+
+    const resolved = resolveTargetWaypoint(
+      x, z,
+      freshTarget, input.path.totalCost,
+      input.destinationX, input.destinationZ,
+      committed,
+      input.navGrid ?? null,
+      input.avoidVehicles ?? false,
+    );
+
+    // Only a hop that actually consumes the fresh path's own next waypoint
+    // advances the cursor into it — a "kept" hop toward the carried
+    // commitment instead leaves `pathIndex` pointing at the same fresh
+    // waypoint so a later hop (once the agent reaches the commitment and the
+    // guard adopts fresh again) still compares against it correctly.
+    const adoptedFresh = resolved.target.x === freshTarget.x && resolved.target.z === freshTarget.z;
+
+    const hopTarget = resolved.target;
+    const beforeX = x;
+    const beforeZ = z;
+    const hopAdvance = advanceAgent({
+      x, z,
+      waypoints: [hopTarget],
+      waypointIndex: 0,
+      walkSpeed: remaining,
+      destinationX: input.destinationX,
+      destinationZ: input.destinationZ,
+      consecutiveFailures: 0,
+      isStuck: false,
+    });
+
+    x = hopAdvance.x;
+    z = hopAdvance.z;
+    const walked = Math.hypot(x - beforeX, z - beforeZ);
+    remaining = Math.max(0, remaining - walked);
+
+    // hopAdvance.isPathComplete here means only "reached hopTarget" (a
+    // single-waypoint list is all advanceAgent was given) — true "reached
+    // the leg's own destination" only when that hop's target IS it.
+    const reachedHop = hopAdvance.isPathComplete;
+    const legComplete = reachedHop && hopTarget.x === input.destinationX && hopTarget.z === input.destinationZ;
+
+    if (legComplete) {
+      committed = NULL_ROUTE_COMMITMENT;
+      isPathComplete = true;
+      break;
+    }
+
+    // Decay the cost baseline this commitment was chosen/kept under by the
+    // distance actually walked this hop, never below 0 — a route that is
+    // honestly still improving, just not by more than the tie epsilon, must
+    // keep losing ground against a genuinely shorter fresh route a few hops
+    // later rather than being protected forever at its original cost.
+    const baseline = adoptedFresh ? (input.path.totalCost ?? null) : resolved.committed.remainingCost;
+    const remainingCost = baseline === null ? null : Math.max(0, baseline - walked);
+
+    committed = {
+      waypointX: hopTarget.x,
+      waypointZ: hopTarget.z,
+      destX: input.destinationX,
+      destZ: input.destinationZ,
+      remainingCost,
+    };
+
+    // Budget ran out mid-hop (partial move) — nothing left to spend on a
+    // further hop this tick.
+    if (!reachedHop) break;
+
+    if (adoptedFresh) pathIndex = Math.min(pathIndex + 1, input.path.waypoints.length - 1);
+  }
 
   return {
     pathFound: true,
-    x: advance.x,
-    z: advance.z,
+    x,
+    z,
     consecutiveFailures: reset.consecutiveFailures,
     isStuck: reset.isStuck,
     becameStuck: false,
-    isPathComplete: advance.isPathComplete,
-    // TODO(#1129): placeholder pass-through — implementer wires this up to
-    // resolveTargetWaypoint's returned commitment.
-    committed: input.committed,
+    isPathComplete,
+    committed,
   };
 }
 
@@ -181,14 +282,8 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
  * more than `ROUTE_COMMIT_TIE_EPSILON`, breaking the oscillation described on
  * `RouteCommitment`. Returns the resolved walk target plus the commitment to
  * write back onto the entity for next tick.
- *
- * TODO(#1129): stub only — implementer fills in the guard logic. Exported
- * (rather than kept module-private, per plan) only so it type-checks as an
- * unused declaration under `noUnusedLocals` before `advanceAlongPath` calls
- * it — the implementer phase wires the call in and can drop the export if
- * the guard logic ends up module-private again.
  */
-export function resolveTargetWaypoint(
+function resolveTargetWaypoint(
   x: number,
   z: number,
   freshTarget: { x: number; z: number },
@@ -199,10 +294,66 @@ export function resolveTargetWaypoint(
   navGrid: NavGrid | null,
   avoidVehicles: boolean,
 ): { target: { x: number; z: number }; committed: RouteCommitment } {
-  // Placeholder references so strict noUnusedParameters stays green until
-  // the implementer fills in the guard logic (#1129).
-  void [x, z, freshTarget, freshCost, destinationX, destinationZ, committed, navGrid, avoidVehicles, ROUTE_COMMIT_TIE_EPSILON];
-  throw new Error('not implemented');
+  const adoptFresh = (): { target: { x: number; z: number }; committed: RouteCommitment } => ({
+    target: freshTarget,
+    committed: {
+      waypointX: freshTarget.x,
+      waypointZ: freshTarget.z,
+      destX: destinationX,
+      destZ: destinationZ,
+      remainingCost: freshCost ?? null,
+    },
+  });
+
+  // No active commitment yet, or a previous tick adopted one with no cost
+  // baseline to protect (no-navgrid mode) — nothing to compare against.
+  if (committed.waypointX === null || committed.waypointZ === null || committed.remainingCost === null) {
+    return adoptFresh();
+  }
+
+  // Stale commitment from a previous leg — the destination moved out from
+  // under it.
+  if (committed.destX !== destinationX || committed.destZ !== destinationZ) {
+    return adoptFresh();
+  }
+
+  // Arrived at (or, since advanceAgent only ever snaps exactly onto a single
+  // committed waypoint, never overshoots) the committed waypoint — same
+  // exact-cell arrival test this file's own leg/destination checks already
+  // use (Locomotion.ts's isLegArrived, advanceLegacyFootWalk's x===destX).
+  if (x === committed.waypointX && z === committed.waypointZ) {
+    return adoptFresh();
+  }
+
+  // The committed waypoint is no longer a real step from here — a genuine
+  // obstacle (blast, new building, vehicle) must be reacted to immediately,
+  // never held stale by this guard. Reuses this file's own climb check and
+  // Pathfinding's own impassability check rather than inventing new ones.
+  if (navGrid) {
+    const targetCell = navGrid.cellAt(navGrid.clampX(Math.floor(committed.waypointX)), navGrid.clampZ(Math.floor(committed.waypointZ)));
+    const standingCell = navGrid.cellAt(navGrid.clampX(Math.floor(x)), navGrid.clampZ(Math.floor(z)));
+    const blocked = !targetCell || isImpassable(targetCell, avoidVehicles, false);
+    const climbLegal = !!standingCell && !!targetCell
+      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, NAV_MAX_CLIMB_HEIGHT);
+    if (blocked || !climbLegal) return adoptFresh();
+  }
+
+  // No navgrid cost to compare against — nothing to protect the commitment
+  // against oscillation with.
+  if (freshCost === undefined) return adoptFresh();
+
+  // Fresh route is a real reroute, not just a differently-shaped alternative
+  // of about the same cost.
+  if (freshCost < committed.remainingCost - ROUTE_COMMIT_TIE_EPSILON) {
+    return adoptFresh();
+  }
+
+  // Otherwise: hold the line. The caller decays remainingCost by this tick's
+  // own walk distance once it knows how far the agent actually moved.
+  return {
+    target: { x: committed.waypointX, z: committed.waypointZ },
+    committed,
+  };
 }
 
 /**

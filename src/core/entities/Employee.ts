@@ -153,11 +153,11 @@ export interface Employee {
    * walk back to where it started. Null when no commitment is in flight.
    * Mirrors AgentAdvance.ts's RouteCommitment shape field-for-field.
    */
-  committedWaypointX: number | null;
-  committedWaypointZ: number | null;
-  committedDestX: number | null;
-  committedDestZ: number | null;
-  committedRemainingCost: number | null;
+  committedWaypointX?: number | null;
+  committedWaypointZ?: number | null;
+  committedDestX?: number | null;
+  committedDestZ?: number | null;
+  committedRemainingCost?: number | null;
   /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside

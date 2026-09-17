@@ -14,7 +14,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
-import { advanceAlongPath, NULL_ROUTE_COMMITMENT } from '../nav/AgentAdvance.js';
+import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
@@ -29,6 +29,26 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
 import { dismountVehicleDriver } from './VehicleReservation.js';
+
+/** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
+function readCommitted(emp: Employee): RouteCommitment {
+  return {
+    waypointX: emp.committedWaypointX ?? null,
+    waypointZ: emp.committedWaypointZ ?? null,
+    destX: emp.committedDestX ?? null,
+    destZ: emp.committedDestZ ?? null,
+    remainingCost: emp.committedRemainingCost ?? null,
+  };
+}
+
+/** Writes an `advanceAlongPath` outcome's route-commitment (#1129) back onto `emp` for next tick. */
+function writeCommitted(emp: Employee, committed: RouteCommitment): void {
+  emp.committedWaypointX = committed.waypointX;
+  emp.committedWaypointZ = committed.waypointZ;
+  emp.committedDestX = committed.destX;
+  emp.committedDestZ = committed.destZ;
+  emp.committedRemainingCost = committed.remainingCost;
+}
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
 interface LocomotionResult {
@@ -126,12 +146,12 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     destinationX: destX, destinationZ: destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid,
-    // TODO(#1129): placeholder — implementer wires this to emp.committed*.
-    committed: NULL_ROUTE_COMMITMENT,
+    committed: readCommitted(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
 
   if (!outcome.pathFound) {
     if (emp.isMoveStuck) {
@@ -281,12 +301,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid, avoidVehicles,
-    // TODO(#1129): placeholder — implementer wires this to emp.committed*.
-    committed: NULL_ROUTE_COMMITMENT,
+    committed: readCommitted(emp),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
   emp.isMoveStuck = outcome.isStuck;
+  writeCommitted(emp, outcome.committed);
   if (isDrive) {
     vehicle!.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle!.isMoveStuck = outcome.isStuck;
@@ -372,13 +392,15 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
       destinationX: leg.destX, destinationZ: leg.destZ,
       consecutiveFailures: 0, isStuck: false,
       path: reroute,
-      // TODO(#1129): placeholder — implementer wires this to emp.committed*.
+      // A reroute is trusted immediately — never compared against a stale
+      // main-route commitment from before the occupancy block.
       committed: NULL_ROUTE_COMMITMENT,
     });
 
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
     emp.isMoveStuck = false;
     emp.vehicleWaitingTicks = 0;
+    writeCommitted(emp, outcome.committed);
     vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
     vehicle.isMoveStuck = false;
     vehicle.waitingTicks = 0;
