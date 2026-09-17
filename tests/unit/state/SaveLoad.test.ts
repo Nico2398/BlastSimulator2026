@@ -20,50 +20,14 @@ afterAll(() => {
   }
 });
 
-// ── v2→v3 migration for Vehicle.waitingTicks ────────────────────────────────
-// waitingTicks was added to the Vehicle interface at save version 3. A
-// pre-v3 save's vehicles predate the field entirely — it must default to 0,
-// matching purchaseVehicle's own default.
-//
-// GAP found during the #768 test-writer pass: the existing suite had no
-// dedicated coverage of this migration block (planner's plan listed it, but
-// no describe block exercised it). Added here as the minimum
-// characterization test to pin down current (pre-refactor) behavior.
-
-describe('deserialize — v2→v3 migration for Vehicle.waitingTicks', () => {
-  it('a pre-v3 vehicle with no waitingTicks field loads with waitingTicks: 0', () => {
-    const state = createGame({ seed: 42 });
-    purchaseVehicle(state.vehicles, 'debris_hauler');
-
-    const json = serialize(state);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    parsed['version'] = 2;
-    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
-    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
-    expect(vehicleList).toHaveLength(1);
-    delete vehicleList[0]!['waitingTicks'];
-
-    const restored = deserialize(JSON.stringify(parsed));
-
-    expect(restored.vehicles.vehicles).toHaveLength(1);
-    expect(restored.vehicles.vehicles[0]!.waitingTicks).toBe(0);
-  });
-
-  it('a pre-v3 save with a non-zero waitingTicks is left untouched by the migration (regression)', () => {
-    const state = createGame({ seed: 42 });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.waitingTicks = 4;
-
-    const json = serialize(state);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    parsed['version'] = 2;
-
-    const restored = deserialize(JSON.stringify(parsed));
-
-    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.waitingTicks).toBe(4);
-  });
-});
+// ── v2→v3 migration for Vehicle.waitingTicks (#1138 — dead, field removed) ──
+// waitingTicks was added at save version 3, then deleted from Vehicle
+// entirely by #1138's migrateV21ToV22 — a save reaching v22 has it stripped
+// regardless of what this block used to pin, and the field no longer exists
+// on the live Vehicle type to construct a fixture against. Removed; see the
+// "deserialize — v21→v22 migration (#1138)" block below for its replacement
+// coverage of the same field's removal, now at the version it actually
+// disappears at.
 
 describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () => {
   it('deserializes v4 save without collectedOre to v5 with empty collectedOre', () => {
@@ -575,40 +539,13 @@ describe('deserialize — v8→v9 migration for Employee.taskQueue (#549)', () =
 // migration block. Added here as the minimum characterization test to pin
 // down current (pre-refactor) behavior.
 
-describe('deserialize — v9→v10 migration for Vehicle.reservedForActionId (#550)', () => {
-  it('a v9 fixture with a vehicle missing reservedForActionId loads with reservedForActionId: null', () => {
-    const state = createGame({ seed: 42 });
-    purchaseVehicle(state.vehicles, 'debris_hauler');
-
-    const json = serialize(state);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    parsed['version'] = 9;
-    const vehiclesRaw = parsed['vehicles'] as Record<string, unknown>;
-    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>>;
-    expect(vehicleList).toHaveLength(1);
-    delete vehicleList[0]!['reservedForActionId'];
-
-    const restored = deserialize(JSON.stringify(parsed));
-
-    expect(restored.vehicles.vehicles).toHaveLength(1);
-    expect(restored.vehicles.vehicles[0]!.reservedForActionId).toBeNull();
-  });
-
-  it('a pre-v10 save with reservedForActionId already set is left untouched by the migration (regression)', () => {
-    const state = createGame({ seed: 42 });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.reservedForActionId = 42;
-
-    const json = serialize(state);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    parsed['version'] = 9;
-
-    const restored = deserialize(JSON.stringify(parsed));
-
-    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.reservedForActionId).toBe(42);
-  });
-});
+// ── v9→v10 migration for Vehicle.reservedForActionId (#1138 — dead, field removed) ──
+// reservedForActionId was added at save version 10, then removed from
+// Vehicle entirely by #1138 — folded into VehicleState.reservations by
+// migrateV21ToV22 instead. Both original tests here asserted the value on
+// `Vehicle.reservedForActionId`, which no longer exists on the type; see the
+// "deserialize — v21→v22 migration (#1138)" block below for the
+// reservation's new home.
 
 // ── v10→v11 migration for GameState.plannedDrillHoles (#553) ───────────────
 // SAVE_VERSION bumped 10→11 when GameState gained a `plannedDrillHoles:
@@ -1200,7 +1137,7 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
   it('SAVE_VERSION is 21', () => {
-    expect(SAVE_VERSION).toBe(21);
+    expect(SAVE_VERSION).toBe(22);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1263,7 +1200,7 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
   it('SAVE_VERSION is 21', () => {
-    expect(SAVE_VERSION).toBe(21);
+    expect(SAVE_VERSION).toBe(22);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1344,7 +1281,7 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
   it('SAVE_VERSION is 21', () => {
-    expect(SAVE_VERSION).toBe(21);
+    expect(SAVE_VERSION).toBe(22);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1437,7 +1374,7 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
   it('SAVE_VERSION is 21', () => {
-    expect(SAVE_VERSION).toBe(21);
+    expect(SAVE_VERSION).toBe(22);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1510,5 +1447,137 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
     expect('driverId' in restoredVehicle).toBe(false);
     expect('pendingEvacuationDestination' in restoredVehicle).toBe(false);
     expect(restoredVehicle.occupantIds).toEqual([]);
+  });
+});
+
+// ── v21→v22 migration for Vehicle dead-field removal (#1138) ──────────────
+// task, state, targetX, targetZ, waitingTicks, moveConsecutiveFailures,
+// isMoveStuck and reservedForActionId drop off Vehicle entirely at v22 — the
+// first seven were always derived display/movement state and carry nothing
+// forward; reservedForActionId, when set, folds into the fleet-wide
+// `VehicleState.reservations` array instead of being dropped, so a save
+// taken mid vehicle-gated action doesn't forget which vehicle it claimed.
+
+describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
+  it('SAVE_VERSION is 22', () => {
+    expect(SAVE_VERSION).toBe(22);
+  });
+
+  it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 21;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    const rawVehicle = vehiclesList[0]!;
+    // A v21 save still carries every one of the eight dead fields.
+    rawVehicle['task'] = 'transport';
+    rawVehicle['state'] = 'moving';
+    rawVehicle['targetX'] = 9;
+    rawVehicle['targetZ'] = 9;
+    rawVehicle['waitingTicks'] = 3;
+    rawVehicle['moveConsecutiveFailures'] = 1;
+    rawVehicle['isMoveStuck'] = false;
+    rawVehicle['reservedForActionId'] = 77;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    for (const deadField of [
+      'task', 'state', 'targetX', 'targetZ', 'waitingTicks',
+      'moveConsecutiveFailures', 'isMoveStuck', 'reservedForActionId',
+    ]) {
+      expect(deadField in restoredVehicle).toBe(false);
+    }
+    expect(restored.vehicles.reservations).toEqual([{ vehicleId: vehicle.id, actionId: 77 }]);
+  });
+
+  it('a v21 vehicle with reservedForActionId already null migrates to an empty reservations array, with no spurious entries', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    purchaseVehicle(state.vehicles, 'rock_digger', 6, 6);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 21;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    for (const rawVehicle of vehiclesList) {
+      rawVehicle['reservedForActionId'] = null;
+    }
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.reservations).toEqual([]);
+  });
+
+  it('a v21 vehicle whose reservedForActionId names an action absent from the same save still migrates into reservations (cleanup happens on first tick, not at migration)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 21;
+    // No pendingActions entry with id 999 exists anywhere in this save.
+    parsed['pendingActions'] = [];
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    vehiclesList[0]!['reservedForActionId'] = 999;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    // Migration itself does no reconciliation — reconcileVehicleReservations
+    // (VehicleReservation.ts) is what sweeps a dangling reservation on the
+    // first tick after load, not migrateV21ToV22.
+    expect(restored.vehicles.reservations).toEqual([{ vehicleId: vehicle.id, actionId: 999 }]);
+  });
+
+  it('a v21 fleet with multiple reserved vehicles migrates one reservations entry per vehicle, correctly paired', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle: v1 } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    const { vehicle: v2 } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 1, 1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 2, 2); // unreserved — no entry expected
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 21;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    const rawV1 = vehiclesList.find(v => v['id'] === v1.id)!;
+    const rawV2 = vehiclesList.find(v => v['id'] === v2.id)!;
+    rawV1['reservedForActionId'] = 10;
+    rawV2['reservedForActionId'] = 20;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.reservations).toHaveLength(2);
+    expect(restored.vehicles.reservations).toContainEqual({ vehicleId: v1.id, actionId: 10 });
+    expect(restored.vehicles.reservations).toContainEqual({ vehicleId: v2.id, actionId: 20 });
+  });
+
+  it('a save whose vehicles already carry none of the eight dead fields migrates to an empty reservations array without erroring (no fields to fold in)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 21;
+    // Every dead field is ALREADY absent here (current serialize output,
+    // once the implementer removes them from Vehicle) — migration must be a
+    // no-op producing an empty reservations array, not an error, on a save
+    // that never had reservedForActionId to fold in.
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.vehicles.reservations).toEqual([]);
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect('reservedForActionId' in restoredVehicle).toBe(false);
   });
 });

@@ -7,86 +7,27 @@
 // isCellOccupiedByOtherVehicle, syncDriverPosition, and tickEmployeeMovement
 // are all deleted from this file by the implementer phase — their coverage
 // moved to tests/unit/engine/Locomotion.test.ts. What's left here is a pure
-// display mapping (tickVehicleTaskState) and a pure occupancy query
-// (isDestinationOccupied), neither of which writes a position.
+// occupancy query (isDestinationOccupied) and the occupancy-cache write
+// (updateVehicleCellOccupancy), neither of which owns a position.
+//
+// #1138: tickVehicleTaskState (the VehicleTask -> VehicleOperationalState
+// display mapping) is deleted along with Vehicle.task/.state themselves —
+// vehicle display state is fully derived now (VehicleStatus.computeVehicleStatus,
+// see that file's own test suite). updateVehicleCellOccupancy gained an
+// explicit `isStationaryNow` parameter in the same change (it used to read
+// `vehicle.state !== 'moving'` itself) — covered fresh below since it had no
+// dedicated unit coverage before this file's own tickVehicleTaskState block
+// crowded it out.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { tickVehicleTaskState, isDestinationOccupied } from '../../../src/core/engine/EntityMovementTick.js';
+import { isDestinationOccupied, updateVehicleCellOccupancy } from '../../../src/core/engine/EntityMovementTick.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 const VEHICLE_TICK_SEED = 42;
-
-// ── tickVehicleTaskState (issue #411) ────────────────────────────────────────
-// VehicleOperationalState.working was never assigned anywhere prior to this —
-// vehicle-task-states-visual's working-state screenshot was unreachable.
-// tickVehicleTaskState is the pure per-vehicle transform; tick-loop wiring is
-// covered separately in tests/integration/vehicles.integration.test.ts.
-
-describe('tickVehicleTaskState (#411)', () => {
-  const WORK_TASKS = ['transport', 'loading', 'drilling', 'clearing'] as const;
-
-  it.each(WORK_TASKS)('sets state to working when task is %s', (task) => {
-    const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    vehicle.task = task;
-    vehicle.state = 'idle';
-
-    tickVehicleTaskState(vehicle);
-
-    expect(vehicle.state).toBe('working');
-  });
-
-  it('returns state to idle when task returns to idle', () => {
-    const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
-    vehicle.task = 'loading';
-    vehicle.state = 'working';
-
-    vehicle.task = 'idle';
-    tickVehicleTaskState(vehicle);
-
-    expect(vehicle.state).toBe('idle');
-  });
-
-  it('is idempotent — calling repeatedly with the same work task keeps state working', () => {
-    const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.task = 'drilling';
-    vehicle.state = 'idle';
-
-    tickVehicleTaskState(vehicle);
-    tickVehicleTaskState(vehicle);
-    tickVehicleTaskState(vehicle);
-
-    expect(vehicle.state).toBe('working');
-  });
-
-  it('does not touch state when task is moving — tickLocomotion owns moving/waiting transitions', () => {
-    const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'building_destroyer', 0, 0);
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-
-    tickVehicleTaskState(vehicle);
-
-    expect(vehicle.state).toBe('moving');
-  });
-
-  it('does not touch a waiting state when task is moving', () => {
-    const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
-    vehicle.task = 'moving';
-    vehicle.state = 'waiting';
-
-    tickVehicleTaskState(vehicle);
-
-    expect(vehicle.state).toBe('waiting');
-  });
-});
 
 // ── isDestinationOccupied (#954 follow-up fix) ──────────────────────────────
 // Exported so ActionSelection.ts's resolveActionCost can apply the exact same
@@ -133,5 +74,71 @@ describe('isDestinationOccupied (#954 follow-up fix)', () => {
 
     const withGrid = buildFlatNavGridState();
     expect(isDestinationOccupied(withGrid, 999, 999)).toBe(false);
+  });
+});
+
+// ── updateVehicleCellOccupancy (#954, isStationaryNow param added #1138) ───
+
+describe('updateVehicleCellOccupancy', () => {
+  function buildFlatNavGridState(): GameState {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      for (let z = 0; z < 5; z++) {
+        vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  it('marks the new cell occupied when isStationaryNow is true', () => {
+    const state = buildFlatNavGridState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+
+    updateVehicleCellOccupancy(state, vehicle, true, true, 2, 2);
+
+    expect(state.navGrid!.cellAt(2, 2)!.vehicleOccupied).toBe(true);
+  });
+
+  it('clears the previous cell when the vehicle stops being stationary (wasStationary && !isStationaryNow)', () => {
+    const state = buildFlatNavGridState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    state.navGrid!.cellAt(2, 2)!.vehicleOccupied = true;
+    vehicle.x = 3; vehicle.z = 2;
+
+    updateVehicleCellOccupancy(state, vehicle, true, false, 2, 2);
+
+    expect(state.navGrid!.cellAt(2, 2)!.vehicleOccupied).toBe(false);
+  });
+
+  it('clears the previous cell when the vehicle moved to a new cell, regardless of the stationary flags', () => {
+    const state = buildFlatNavGridState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    state.navGrid!.cellAt(2, 2)!.vehicleOccupied = true;
+    vehicle.x = 3; vehicle.z = 2;
+
+    updateVehicleCellOccupancy(state, vehicle, false, false, 2, 2);
+
+    expect(state.navGrid!.cellAt(2, 2)!.vehicleOccupied).toBe(false);
+  });
+
+  it('leaves the previous cell alone when the vehicle stayed put and was already moving (wasStationary=false, isStationaryNow=false, no cell change)', () => {
+    const state = buildFlatNavGridState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    state.navGrid!.cellAt(2, 2)!.vehicleOccupied = true;
+
+    updateVehicleCellOccupancy(state, vehicle, false, false, 2, 2);
+
+    // Not cleared: no cell change and no was-stationary-to-moving transition.
+    expect(state.navGrid!.cellAt(2, 2)!.vehicleOccupied).toBe(true);
+  });
+
+  it('is a no-op that does not throw when state.navGrid is null', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    expect(state.navGrid).toBeNull();
+
+    expect(() => updateVehicleCellOccupancy(state, vehicle, true, true, 2, 2)).not.toThrow();
   });
 });

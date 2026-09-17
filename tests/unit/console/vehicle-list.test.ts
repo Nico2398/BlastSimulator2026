@@ -135,4 +135,26 @@ describe('vehicle list — driver display', () => {
     expect(vehicleLine).toBeDefined();
     expect(vehicleLine).toContain(`driver:#${employeeId}`);
   });
+
+  // ── #1138: task: -> status: (derived via computeVehicleStatus) ──────────
+
+  it('list output has a status: column, not a task: column', () => {
+    const ctx = makeCtx();
+    addTruckVehicle(ctx);
+
+    const result = vehicleCommand(ctx, ['list'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('status:');
+    expect(result.output).not.toContain('task:');
+  });
+
+  it('an idle, undriven vehicle reports status: idle', () => {
+    const ctx = makeCtx();
+    addTruckVehicle(ctx);
+
+    const result = vehicleCommand(ctx, ['list'], {});
+
+    expect(result.output).toContain('status: idle');
+  });
 });

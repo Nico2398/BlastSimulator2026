@@ -9,7 +9,7 @@ import {
   type ZoneBounds,
   type SafeDestinationFinder,
 } from '../../../src/core/entities/Zone.js';
-import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { createVehicleState, purchaseVehicle, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
@@ -101,12 +101,15 @@ describe('Zone clearing and evacuation', () => {
     expect(employee.destinationX).toBeGreaterThan(zone.x2);
     expect(employee.destinationZ).not.toBeNull();
 
-    // #1089: vehicle.task/targetX are written by tickLocomotion's own
-    // drive-leg advance, not synchronously at plan time — one real tick is
-    // what actually starts the drive.
+    // #1089/#1138: the drive leg (and the vehicle's derived "moving" status)
+    // are written by tickLocomotion's own drive-leg advance, not
+    // synchronously at plan time — one real tick is what actually starts the
+    // drive. Vehicle itself carries no task/targetX any more (#1138) — both
+    // are read off the driving employee's own itinerary.
     tickLocomotion(state);
-    expect(vehicle.task).toBe('moving');
-    expect(vehicle.targetX).toBeGreaterThan(zone.x2);
+    const drivingEmployee = resolveVehicleDriver(vehicle, employees.employees);
+    expect(drivingEmployee?.itinerary).not.toBeNull();
+    expect(drivingEmployee?.itinerary?.legs[0]?.destX).toBeGreaterThan(zone.x2);
 
     expect(result.orderedVehicleIds).toContain(vehicle.id);
     expect(result.orderedEmployeeIds).toContain(employee.id);
@@ -181,7 +184,7 @@ describe('Zone clearing and evacuation', () => {
 
     expect(vehicle.x).toBe(beforeX);
     expect(vehicle.z).toBe(beforeZ);
-    expect(vehicle.task).not.toBe('moving');
+    expect(resolveVehicleDriver(vehicle, employees.employees)).toBeUndefined();
     expect(result.strandedVehicleIds).toContain(vehicle.id);
     expect(result.orderedVehicleIds).not.toContain(vehicle.id);
   });
@@ -193,7 +196,6 @@ describe('Zone clearing and evacuation', () => {
     // no driver aboard (occupantIds defaults to []) — must strand even though findSafeDestination succeeds
     const beforeX = vehicle.x;
     const beforeZ = vehicle.z;
-    const beforeTask = vehicle.task;
 
     // findSafeDestination here (unlike noSafeDestination) DOES find somewhere
     // safe — the driverless check must short-circuit before the destination
@@ -203,10 +205,10 @@ describe('Zone clearing and evacuation', () => {
 
     expect(result.strandedVehicleIds).toContain(vehicle.id);
     expect(result.orderedVehicleIds).not.toContain(vehicle.id);
-    // moveVehicle never effectively applied — position and task genuinely unchanged.
+    // moveVehicle never effectively applied — position genuinely unchanged.
     expect(vehicle.x).toBe(beforeX);
     expect(vehicle.z).toBe(beforeZ);
-    expect(vehicle.task).toBe(beforeTask);
+    expect(resolveVehicleDriver(vehicle, employees.employees)).toBeUndefined();
   });
 
   it('a mixed zone orders the driver-equipped vehicle out while stranding the driverless one, in the same clearZone call (#947)', () => {
@@ -224,12 +226,13 @@ describe('Zone clearing and evacuation', () => {
 
     expect(result.orderedVehicleIds).toContain(driven.id);
     expect(result.orderedVehicleIds).not.toContain(driverless.id);
-    expect(driven.task).toBe('moving');
-    expect(driven.targetX).toBeGreaterThan(zone.x2);
+    const drivenDriver = resolveVehicleDriver(driven, employees.employees);
+    expect(drivenDriver?.itinerary).not.toBeNull();
+    expect(drivenDriver?.itinerary?.legs[0]?.destX).toBeGreaterThan(zone.x2);
 
     expect(result.strandedVehicleIds).toContain(driverless.id);
     expect(result.strandedVehicleIds).not.toContain(driven.id);
-    expect(driverless.task).not.toBe('moving');
+    expect(resolveVehicleDriver(driverless, employees.employees)).toBeUndefined();
   });
 
   // ── #1042: a driverless vehicle with a qualified, reachable employee is

@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { TaskProgressBar } from '../../../src/renderer/TaskProgressBar.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../../../src/core/entities/Vehicle.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
@@ -49,7 +49,11 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 
 /** Unused directly (sync's vehicles arg is only consulted by computeEmployeeActivity
  * for the 'driving' state, irrelevant here), kept for signature parity with sync(). */
-const NO_VEHICLES: Vehicle[] = [];
+// #1138: sync() takes a VehicleState now, not a raw Vehicle[].
+function makeVehicleState(vehicles: Vehicle[] = []): VehicleState {
+  return { vehicles, nextId: vehicles.length + 1, driverBoardingCount: 0, reservations: [] };
+}
+const NO_VEHICLES: VehicleState = makeVehicleState();
 
 /** No construction sites in play — most pre-#1012 tests don't exercise them. */
 const NO_PENDING_ACTIONS: PendingAction[] = [];

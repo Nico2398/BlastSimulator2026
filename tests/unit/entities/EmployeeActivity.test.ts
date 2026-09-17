@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeEmployeeActivity, findDrivenVehicle } from '../../../src/core/entities/EmployeeActivity.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../../../src/core/entities/Vehicle.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -39,29 +39,32 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
-    id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, state: 'idle', payload: null,
-    waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null,
+    id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+    payload: null,
     occupantIds: [],
     ...overrides,
   };
 }
 
+/** #1138: computeEmployeeActivity takes a VehicleState now, not a raw array. */
+function makeVehicleState(vehicles: Vehicle[] = []): VehicleState {
+  return { vehicles, nextId: vehicles.length + 1, driverBoardingCount: 0, reservations: [] };
+}
+
 describe('computeEmployeeActivity', () => {
   it('reports idle when nothing is set', () => {
-    const activity = computeEmployeeActivity(makeEmployee(), []);
+    const activity = computeEmployeeActivity(makeEmployee(), makeVehicleState());
     expect(activity).toEqual({ kind: 'idle', ticksRemaining: null, totalTicks: null, actionType: null, vehicleId: null });
   });
 
   it('reports collapsed, taking priority over everything else', () => {
     const emp = makeEmployee({ collapsing: true, taskTicksRemaining: 5, activeTaskTotalTicks: 20 });
-    expect(computeEmployeeActivity(emp, []).kind).toBe('collapsed');
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('collapsed');
   });
 
   it('reports resting with ticksRemaining, no total (rest has none tracked)', () => {
     const emp = makeEmployee({ restTicksRemaining: 7 });
-    const activity = computeEmployeeActivity(emp, []);
+    const activity = computeEmployeeActivity(emp, makeVehicleState());
     expect(activity.kind).toBe('resting');
     expect(activity.ticksRemaining).toBe(7);
     expect(activity.totalTicks).toBeNull();
@@ -71,7 +74,7 @@ describe('computeEmployeeActivity', () => {
     const emp = makeEmployee({
       taskTicksRemaining: 8, activeTaskTotalTicks: 20, pendingActionType: 'survey',
     });
-    const activity = computeEmployeeActivity(emp, []);
+    const activity = computeEmployeeActivity(emp, makeVehicleState());
     expect(activity.kind).toBe('working');
     expect(activity.ticksRemaining).toBe(8);
     expect(activity.totalTicks).toBe(20);
@@ -80,40 +83,60 @@ describe('computeEmployeeActivity', () => {
 
   it('reports working with totalTicks null when activeTaskTotalTicks was never set (old save)', () => {
     const emp = makeEmployee({ taskTicksRemaining: 8 });
-    expect(computeEmployeeActivity(emp, []).totalTicks ?? null).toBeNull();
+    expect(computeEmployeeActivity(emp, makeVehicleState()).totalTicks ?? null).toBeNull();
   });
 
   it('reports driving when a vehicle lists them as driver, before falling through to walking/idle', () => {
     const emp = makeEmployee({ id: 6, destinationX: null });
-    const vehicles = [makeVehicle({ id: 9, occupantIds: [6] })];
-    const activity = computeEmployeeActivity(emp, vehicles);
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, occupantIds: [6] })]);
+    const activity = computeEmployeeActivity(emp, vehicleState);
     expect(activity.kind).toBe('driving');
     expect(activity.vehicleId).toBe(9);
   });
 
   it('working takes priority over driving (e.g. a driver dispatched to foot work mid-tick)', () => {
     const emp = makeEmployee({ id: 6, taskTicksRemaining: 3 });
-    const vehicles = [makeVehicle({ id: 9, occupantIds: [6] })];
-    expect(computeEmployeeActivity(emp, vehicles).kind).toBe('working');
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, occupantIds: [6] })]);
+    expect(computeEmployeeActivity(emp, vehicleState).kind).toBe('working');
   });
 
   it('reports walking with the pending action type when destinationX is set', () => {
     const emp = makeEmployee({ destinationX: 12, destinationZ: 4, pendingActionType: 'drill_hole' });
-    const activity = computeEmployeeActivity(emp, []);
+    const activity = computeEmployeeActivity(emp, makeVehicleState());
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('drill_hole');
   });
 
   it('reports walking when only destinationZ is set', () => {
     const emp = makeEmployee({ destinationX: null, destinationZ: 4 });
-    expect(computeEmployeeActivity(emp, []).kind).toBe('walking');
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('walking');
   });
 
   it('reports walking with a null actionType when walking to rest or to board a vehicle', () => {
     const emp = makeEmployee({ destinationX: 5, destinationZ: 5, pendingDriverVehicleId: 2 });
-    const activity = computeEmployeeActivity(emp, []);
+    const activity = computeEmployeeActivity(emp, makeVehicleState());
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBeNull();
+  });
+
+  // ── #1138: the driving_to_task/driving split now reads the reservation off
+  // VehicleState.reservations (previously the vehicle's own
+  // reservedForActionId field) — this pins that the lookup survived the move.
+  it('a driven vehicle with an active reservation reports driving_to_task, not plain driving', () => {
+    const emp = makeEmployee({ id: 6, destinationX: null });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, occupantIds: [6] })]);
+    vehicleState.reservations.push({ vehicleId: 9, actionId: 3 });
+    const activity = computeEmployeeActivity(emp, vehicleState);
+    expect(activity.kind).toBe('driving_to_task');
+    expect(activity.vehicleId).toBe(9);
+  });
+
+  it('a driven vehicle with no reservation reports plain driving', () => {
+    const emp = makeEmployee({ id: 6, destinationX: null });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, occupantIds: [6] })]);
+    const activity = computeEmployeeActivity(emp, vehicleState);
+    expect(activity.kind).toBe('driving');
+    expect(activity.vehicleId).toBe(9);
   });
 });
 

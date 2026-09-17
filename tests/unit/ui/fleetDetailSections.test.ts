@@ -4,7 +4,7 @@
 // panel and only ever hits one leg of each of makeHpGauge's/makeLoadGauge's/
 // makeDriverRow's ternaries — this file targets the legs it misses.
 import { describe, it, expect } from 'vitest';
-import { makeHpGauge, makeLoadGauge, makeDriverRow } from '../../../src/ui/fleetDetailSections.js';
+import { makeHpGauge, makeLoadGauge, makeDriverRow, makeStatusChip } from '../../../src/ui/fleetDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
@@ -12,10 +12,8 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
-    id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, state: 'idle', payload: null,
-    waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null,
+    id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
+    payload: null,
     occupantIds: [],
     ...overrides,
   };
@@ -123,5 +121,32 @@ describe('fleetDetailSections — makeDriverRow', () => {
     const row = makeDriverRow(makeVehicle({ occupantIds: [99] }), state);
     expect(row.textContent).toContain('#99');
     expect(row.textContent).not.toContain('Dorian Kask');
+  });
+});
+
+// ── makeStatusChip (#1138: vehicleState threads through to the reservation
+// lookup computeVehicleStatus's hauling branch needs) ──────────────────────
+
+describe('fleetDetailSections — makeStatusChip', () => {
+  it('reports idle with no occupant and no reservation', () => {
+    const state = makeState([makeVehicle()], []);
+    const chip = makeStatusChip(makeVehicle(), state.vehicles);
+    expect(chip.textContent).toContain('Idle');
+  });
+
+  it('reports broken for hp <= 0, regardless of vehicleState/occupant', () => {
+    const state = makeState([], []);
+    const chip = makeStatusChip(makeVehicle({ hp: 0 }), state.vehicles);
+    expect(chip.textContent).toContain('Broken');
+  });
+
+  it('reports hauling for a debris_hauler with an active reservation, via vehicleState', () => {
+    const vehicle = makeVehicle({ id: 3, type: 'debris_hauler' });
+    const state = makeState([vehicle], [makeEmployee({ id: 6 })]);
+    vehicle.occupantIds = [6];
+    state.vehicles.reservations.push({ vehicleId: vehicle.id, actionId: 1 });
+    const occupant = state.employees.employees.find(e => e.id === 6);
+    const chip = makeStatusChip(vehicle, state.vehicles, occupant);
+    expect(chip.textContent).toContain('Hauling');
   });
 });

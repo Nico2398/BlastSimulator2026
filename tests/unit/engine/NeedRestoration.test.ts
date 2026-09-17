@@ -13,7 +13,8 @@ import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
@@ -203,7 +204,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     tickNeedRestoration(state);
 
-    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(employee, state.vehicles);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('rest');
   });
@@ -758,7 +759,7 @@ describe('tickCollapse (7.6)', () => {
     tickCollapse(state);
 
     expect(employee.pendingActionType).toBe('rest');
-    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(employee, state.vehicles);
     expect(activity.kind).toBe('collapsed');
   });
 
@@ -822,7 +823,7 @@ describe('tickCollapse (7.6)', () => {
     employee.taskTicksRemaining = 3; // boarded, mid-execution
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = gatedAction.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
 
     placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -838,7 +839,7 @@ describe('tickCollapse (7.6)', () => {
     expect(employee.activeActionId).not.toBe(gatedAction.id);
 
     // The vehicle reservation and its driver are released too.
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBeNull();
 
     const restAction = state.pendingActions.find(
@@ -880,7 +881,7 @@ describe('tickCollapse (7.6)', () => {
       };
       state.pendingActions.push(gatedAction);
       employee.taskQueue = [gatedAction.id];
-      vehicle.reservedForActionId = gatedAction.id;
+      reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
       // vehicle.driverId stays null — reserved but never boarded, exactly the
       // reclaim-while-resting shape claimActionsTargetedAtEmployee produces.
 
@@ -889,7 +890,7 @@ describe('tickCollapse (7.6)', () => {
       // The already-collapsing employee is not reported as newly collapsed.
       expect(result.collapsed).toHaveLength(0);
 
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
       expect(gatedAction.status).toBe('queued');
       expect(gatedAction.holderId).toBeNull();
       expect(employee.taskQueue).not.toContain(gatedAction.id);
@@ -914,7 +915,7 @@ describe('tickCollapse (7.6)', () => {
       // Predates the collapse trigger — already sitting in taskQueue before
       // fatigue crossed the threshold this same tick.
       employee.taskQueue = [gatedAction.id];
-      vehicle.reservedForActionId = gatedAction.id;
+      reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
 
       placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -923,7 +924,7 @@ describe('tickCollapse (7.6)', () => {
       expect(result.collapsed).toEqual([employee.id]);
       expect(employee.collapsing).toBe(true);
 
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
       expect(gatedAction.status).toBe('queued');
       expect(gatedAction.holderId).toBeNull();
       expect(employee.taskQueue).not.toContain(gatedAction.id);
@@ -951,7 +952,7 @@ describe('tickCollapse (7.6)', () => {
       employee.taskTicksRemaining = 3; // boarded, mid-execution
       vehicle.occupantIds = [employee.id];
       employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-      vehicle.reservedForActionId = activeAction.id;
+      reserveVehicle(state.vehicles, vehicle.id, activeAction.id);
 
       placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
 
@@ -965,7 +966,7 @@ describe('tickCollapse (7.6)', () => {
       expect(released.status).toBe('queued');
       expect(released.holderId).toBeNull();
       expect(employee.activeActionId).not.toBe(activeAction.id);
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
       expect(vehicleDriverId(vehicle)).toBeNull();
     });
 

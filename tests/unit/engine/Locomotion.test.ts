@@ -18,7 +18,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
@@ -139,12 +139,10 @@ describe('tickLocomotion', () => {
     expect(employee.z).toBe(0);
   });
 
-  it('never changes an unoccupied vehicle\'s x/z across 10 ticks, regardless of any stray targetX/targetZ', () => {
+  it('never changes an unoccupied vehicle\'s x/z across 10 ticks', () => {
     const state = buildFlatNavGridState(20, 5);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     vehicle.occupantIds = [];
-    vehicle.targetX = 19;
-    vehicle.targetZ = 4;
 
     for (let i = 0; i < 10; i++) {
       tickLocomotion(state);
@@ -217,9 +215,8 @@ describe('tickLocomotion', () => {
     // Idle, driverless, unreserved blocker sitting exactly on the drive
     // leg's own destination cell.
     const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 1);
-    expect(blocker.task).toBe('idle');
     expect(vehicleDriverId(blocker)).toBeNull();
-    expect(blocker.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, blocker.id)).toBeNull();
 
     for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 5; i++) {
       tickLocomotion(state);

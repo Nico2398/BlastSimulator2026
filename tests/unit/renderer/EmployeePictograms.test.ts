@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { EmployeePictograms, pictogramKindFor, type PictogramKind } from '../../../src/renderer/EmployeePictograms.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity, EmployeeActivityKind } from '../../../src/core/entities/EmployeeActivity.js';
 import type { ActionType } from '../../../src/core/state/GameState.js';
 
@@ -50,10 +50,14 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-/** Unused directly by any test here (sync's vehicles arg only feeds
+/** Unused directly by any test here (sync's vehicleState arg only feeds
  * computeEmployeeActivity's 'driving' classification), kept for signature
- * parity with sync() — mirrors TaskProgressBar.test.ts's own NO_VEHICLES. */
-const NO_VEHICLES: Vehicle[] = [];
+ * parity with sync() — mirrors TaskProgressBar.test.ts's own NO_VEHICLES.
+ * #1138: sync() takes a VehicleState now, not a raw Vehicle[]. */
+function makeVehicleState(vehicles: Vehicle[] = []): VehicleState {
+  return { vehicles, nextId: vehicles.length + 1, driverBoardingCount: 0, reservations: [] };
+}
+const NO_VEHICLES: VehicleState = makeVehicleState();
 
 function makeCamera(): THREE.PerspectiveCamera {
   return new THREE.PerspectiveCamera(55, 16 / 9, 0.5, 4000);
@@ -347,14 +351,12 @@ describe('EmployeePictograms', () => {
     scene.add(anchor);
     const emp = makeEmployee({ id: 1 });
     const vehicle: Vehicle = {
-      id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-      targetX: 0, targetZ: 0, state: 'idle', payload: null,
-      waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-      reservedForActionId: null,
+      id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+      payload: null,
       occupantIds: [1],
     };
 
-    pictograms.sync([emp], [vehicle], id => (id === 1 ? anchor : null));
+    pictograms.sync([emp], makeVehicleState([vehicle]), id => (id === 1 ? anchor : null));
 
     expect(pictograms.count).toBe(1);
     pictograms.dispose();

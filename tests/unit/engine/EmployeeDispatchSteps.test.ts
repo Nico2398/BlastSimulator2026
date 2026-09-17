@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import {
   claimActionsTargetedAtEmployee,
   fillIdleEmployeeFromQueueOrPool,
@@ -472,7 +472,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       });
       state.pendingActions.push(action);
       holder.taskQueue = [50];
-      vehicle.reservedForActionId = action.id;
+      reserveVehicle(state.vehicles, vehicle.id, action.id);
       // vehicle.driverId stays null — never actually boarded.
 
       const result1 = makeResult();
@@ -482,7 +482,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       expect(holder.activeActionId).toBeNull();
       expect(action.status).toBe('queued');
       expect(action.holderId).toBeNull();
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
 
       const result2 = makeResult();
       fillIdleEmployeeFromQueueOrPool(state, other, result2);
@@ -490,7 +490,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       expect(other.activeActionId).toBe(50);
       expect(action.status).toBe('assigned');
       expect(action.holderId).toBe(other.id);
-      expect(vehicle.reservedForActionId).toBe(50);
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(50);
     });
 
     it('never releases a reservation whose vehicle already has a driver — real boarding progress is never discarded', () => {
@@ -511,7 +511,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       });
       state.pendingActions.push(action);
       holder.taskQueue = [51];
-      vehicle.reservedForActionId = action.id;
+      reserveVehicle(state.vehicles, vehicle.id, action.id);
 
       const result = makeResult();
       fillIdleEmployeeFromQueueOrPool(state, holder, result);
@@ -521,7 +521,7 @@ describe('fillIdleEmployeeFromQueueOrPool', () => {
       expect(holder.taskQueue).toContain(51);
       expect(action.status).toBe('assigned');
       expect(action.holderId).toBe(holder.id);
-      expect(vehicle.reservedForActionId).toBe(51);
+      expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(51);
       expect(other.activeActionId).toBeNull();
     });
   });
@@ -597,7 +597,7 @@ describe('claimOnePoolCandidate', () => {
     expect(selection).not.toBeNull();
     expect(selection!.action.id).toBe(1);
     const vehicle = state.vehicles.vehicles[0]!;
-    expect(vehicle.reservedForActionId).toBe(1);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(1);
     expect(action.status).toBe('assigned');
     expect(action.holderId).toBe(employee.id);
   });
@@ -937,7 +937,7 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     });
     state.pendingActions.push(action);
     employee.taskQueue = [1];
-    vehicle.reservedForActionId = 1;
+    reserveVehicle(state.vehicles, vehicle.id, 1);
     // vehicle.driverId stays null — reserved but never boarded.
 
     releaseUnboardedTaskQueueVehicleReservations(state, employee);
@@ -945,7 +945,7 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     expect(employee.taskQueue).not.toContain(1);
     expect(action.status).toBe('queued');
     expect(action.holderId).toBeNull();
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
   it('leaves an on-foot (requiredVehicleRole: null) taskQueue entry untouched', () => {
@@ -990,14 +990,14 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     });
     state.pendingActions.push(action);
     employee.taskQueue = [3];
-    vehicle.reservedForActionId = 3;
+    reserveVehicle(state.vehicles, vehicle.id, 3);
 
     releaseUnboardedTaskQueueVehicleReservations(state, employee);
 
     expect(employee.taskQueue).toContain(3);
     expect(action.status).toBe('assigned');
     expect(action.holderId).toBe(employee.id);
-    expect(vehicle.reservedForActionId).toBe(3);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(3);
     expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
   });
 
@@ -1023,18 +1023,18 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     });
     state.pendingActions.push(gated1, gated2, onFoot);
     employee.taskQueue = [10, 11, 12];
-    v1.reservedForActionId = 10;
-    v2.reservedForActionId = 11;
+    reserveVehicle(state.vehicles, v1.id, 10);
+    reserveVehicle(state.vehicles, v2.id, 11);
 
     releaseUnboardedTaskQueueVehicleReservations(state, employee);
 
     expect(employee.taskQueue).toEqual([12]);
     expect(gated1.status).toBe('queued');
     expect(gated1.holderId).toBeNull();
-    expect(v1.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, v1.id)).toBeNull();
     expect(gated2.status).toBe('queued');
     expect(gated2.holderId).toBeNull();
-    expect(v2.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, v2.id)).toBeNull();
     expect(onFoot.status).toBe('assigned');
     expect(onFoot.holderId).toBe(employee.id);
   });
@@ -1109,7 +1109,7 @@ describe('promoteActionToActive', () => {
     const action = makeAction({
       id: 2, requiredVehicleRole: 'drill_rig', requiredSkill: 'blasting', targetX: 10, targetZ: 10,
     });
-    reserveVehicle(vehicle, action.id);
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
 
     promoteActionToActive(state, employee, action);
 
@@ -1198,7 +1198,7 @@ describe('promoteActionToActive', () => {
 
     promoteActionToActive(state, employee, action);
 
-    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(employee, state.vehicles);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('rest');
   });

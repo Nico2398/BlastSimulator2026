@@ -22,7 +22,7 @@ import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
 import type { PendingAction, PlannedRamp, RampSegmentTracker } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../../src/core/mining/ChargePlan.js';
@@ -833,7 +833,7 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
 
     const claimers = [empA, empB].filter(e => e.activeActionId === action.id);
     expect(claimers).toHaveLength(1);
-    expect(vehicle.reservedForActionId).toBe(action.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(action.id);
   });
 
   it('promotes a claimed vehicle-gated action onto pendingDriverVehicleId (walk-to-vehicle), not pendingTaskDuration/taskTicksRemaining directly', () => {
@@ -954,7 +954,7 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
 
     expect(employee.taskQueue).not.toContain(action.id);
     expect(state.pendingActions.find(a => a.id === action.id)!.status).toBe('queued');
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
   // Mirror case: an ordinary employee (not resting, not collapsing) is

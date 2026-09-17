@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCellType, type NavCell, isVehicleCurrentlyDriving } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -23,6 +23,8 @@ import { buildRamp } from '../../../src/core/mining/Ramp.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createVehicleState, purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -1691,5 +1693,85 @@ describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicl
         expect(nav.cellAt(x, z)!.vehicleOccupied).toBe(false);
       }
     }
+  });
+});
+
+// ── isVehicleCurrentlyDriving / buildNavGrid's employees param (#1138) ─────
+// buildNavGrid used to skip marking a vehicle's cell occupied by reading
+// `vehicle.state === 'moving'` directly — deleted along with every other
+// Vehicle-native display field. isVehicleCurrentlyDriving is the derived
+// replacement: a vehicle is "moving" when its driver (occupantIds[0],
+// resolved against the `employees` list buildNavGrid now takes) has a
+// non-null itinerary.
+
+describe('isVehicleCurrentlyDriving (#1138)', () => {
+  function makeDrivingEmployee(vehicleId: number, id = 1): Employee {
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(id), 0, 0);
+    employee.id = id;
+    employee.itinerary = {
+      legs: [{ mode: 'drive', vehicleId, destX: 5, destZ: 5, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+      goal: { kind: 'reposition', x: 5, z: 5 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    };
+    return employee;
+  }
+
+  it('is false for a driverless vehicle', () => {
+    const fleet = createVehicleState();
+    const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 0, 0);
+    expect(isVehicleCurrentlyDriving(vehicle, [])).toBe(false);
+  });
+
+  it('is false for a vehicle whose occupant has no itinerary (boarded but idle)', () => {
+    const fleet = createVehicleState();
+    const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 0, 0);
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(1), 0, 0);
+    vehicle.occupantIds = [employee.id];
+    employee.itinerary = null;
+    expect(isVehicleCurrentlyDriving(vehicle, [employee])).toBe(false);
+  });
+
+  it('is true for a vehicle whose occupant has a non-null itinerary', () => {
+    const fleet = createVehicleState();
+    const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 0, 0);
+    const driver = makeDrivingEmployee(vehicle.id);
+    vehicle.occupantIds = [driver.id];
+    expect(isVehicleCurrentlyDriving(vehicle, [driver])).toBe(true);
+  });
+});
+
+describe('NavGrid.buildNavGrid — a currently-driving vehicle does not mark its cell occupied (#1138)', () => {
+  it('skips vehicleOccupied for a vehicle whose driver has a running itinerary, passed via the employees param', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const fleet = createVehicleState();
+    const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 7, 7);
+    const { employee: driver } = hireEmployee(createEmployeeState(), 'driller', new Random(1), 7, 7);
+    driver.id = 1;
+    vehicle.occupantIds = [driver.id];
+    driver.itinerary = {
+      legs: [{ mode: 'drive', vehicleId: vehicle.id, destX: 9, destZ: 9, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+      goal: { kind: 'reposition', x: 9, z: 9 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    };
+
+    const nav = NavGrid.buildNavGrid(grid, [], [], [], [vehicle], [driver]);
+
+    expect(nav.cellAt(7, 7)!.vehicleOccupied).toBe(false);
+  });
+
+  it('still marks the cell occupied for the SAME vehicle once its driver has no itinerary (parked)', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const fleet = createVehicleState();
+    const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 7, 7);
+    const { employee: driver } = hireEmployee(createEmployeeState(), 'driller', new Random(1), 7, 7);
+    driver.id = 1;
+    vehicle.occupantIds = [driver.id];
+    driver.itinerary = null;
+
+    const nav = NavGrid.buildNavGrid(grid, [], [], [], [vehicle], [driver]);
+
+    expect(nav.cellAt(7, 7)!.vehicleOccupied).toBe(true);
   });
 });

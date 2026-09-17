@@ -20,6 +20,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { FragmentState } from '../../../src/core/economy/Logistics.js';
@@ -264,7 +265,7 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     const v = addVehicle(state, { occupantIds: [emp.id], x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'in_progress' });
-    v.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, v.id, action.id);
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
@@ -275,7 +276,7 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     const v = addVehicle(state, { x: 0, z: 0 });
     emp.pendingDriverVehicleId = v.id;
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
-    v.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, v.id, action.id);
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
@@ -286,14 +287,15 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     const v = addVehicle(state, { occupantIds: [emp.id], x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: null, status: 'in_progress' });
-    v.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, v.id, action.id);
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
   it('violation when reservedForActionId names a PendingAction that no longer exists', () => {
     const state = makeState();
-    const v = addVehicle(state, { reservedForActionId: 12345 });
+    const v = addVehicle(state, {});
+    reserveVehicle(state.vehicles, v.id, 12345);
 
     const violations = assertWorldInvariants(state);
 
@@ -307,7 +309,7 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     const emp = addEmployee(state, { x: 9, z: 9, pendingDriverVehicleId: null });
     const v = addVehicle(state, { x: 0, z: 0 });
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
-    v.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, v.id, action.id);
 
     const violations = assertWorldInvariants(state);
 

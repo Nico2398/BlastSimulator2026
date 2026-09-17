@@ -13,7 +13,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { releaseDeadEmployeeActions, cancelAction, interruptActiveAction } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -122,11 +122,11 @@ describe('releaseDeadEmployeeActions (#557 review)', () => {
     const held = makeAction({ id: 6, status: 'assigned', holderId: DEAD_ID, requiredVehicleRole: 'drill_rig' });
     state.pendingActions.push(held);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    reserveVehicle(vehicle, 6);
+    reserveVehicle(state.vehicles, vehicle.id, 6);
 
     releaseDeadEmployeeActions(state, DEAD_ID);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
   it('leaves an action held by a DIFFERENT employee entirely untouched (boundary)', () => {

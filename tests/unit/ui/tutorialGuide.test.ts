@@ -452,22 +452,25 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
   });
 
-  // #1091: hasOutstandingVehicleWork replaces the deleted haulingPhase/
-  // breakPhase fields with reservedForActionId !== null on a debris_hauler/
-  // rock_fragmenter — there is no separate phase field left on `Vehicle` to
-  // check directly (tutorialGuide.ts's own doc comment on that function).
+  // #1091/#1138: hasOutstandingVehicleWork replaces the deleted haulingPhase/
+  // breakPhase fields with getVehicleReservation(vehicleState, v.id) !== null
+  // on a debris_hauler/rock_fragmenter — the reservation lives in
+  // VehicleState.reservations now, not on the Vehicle object itself
+  // (tutorialGuide.ts's own doc comment on that function).
   it('haul-debris: also waits while a debris_hauler vehicle is reserved for a haul, with no pending action at all', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', reservedForActionId: 1 } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', payload: null, occupantIds: [] } as never];
+    s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
 
-    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', reservedForActionId: null } as never];
+    s.vehicles.reservations = [];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(false);
   });
 
   it('haul-debris: also waits while a rock_fragmenter vehicle is reserved for a break', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, type: 'rock_fragmenter', reservedForActionId: 1 } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'rock_fragmenter', payload: null, occupantIds: [] } as never];
+    s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
   });
 
@@ -558,7 +561,8 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
       { id: 2, buildingId: 2, type: 'driving_center', tier: 1, x: 0, z: 0, actionId: 2, cost: 100 } as never,
       { id: 3, buildingId: 3, type: 'freight_warehouse', tier: 1, x: 0, z: 0, actionId: 3, cost: 100 } as never,
     ];
-    s.vehicles.vehicles = [{ id: 1, haulingPhase: 'to_fragment', breakPhase: 'to_boulder' } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', payload: null, occupantIds: [] } as never];
+    s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     s.contracts.active = [
       {
         id: 1, type: 'ore_sale', materialId: 'dirtite', description: '', quantityKg: 100,
@@ -1077,17 +1081,19 @@ describe('decideClock', () => {
   // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (exported and
   // reused by isHaulDispatched in tutorialStepHelpers.ts, exercised here
   // through decideClock) is the fix.
-  // #1091: hasOutstandingVehicleWork/workSignature key off
-  // reservedForActionId/payload now — there is no separate haulingPhase/
-  // breakPhase field left on `Vehicle` (tutorialGuide.ts's own doc comment).
+  // #1091/#1138: hasOutstandingVehicleWork/workSignature key off
+  // getVehicleReservation(vehicleState, v.id)/payload now — the reservation
+  // lives in VehicleState.reservations, not on the Vehicle object itself
+  // (tutorialGuide.ts's own doc comment).
   describe('vehicle-gated hauling/breaking work (#552, #1091)', () => {
     it('keeps running past budget while a debris_hauler vehicle is reserved for a haul, even though every employee is fully idle', () => {
       const s = state();
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
       ];
+      s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
     });
 
@@ -1096,8 +1102,9 @@ describe('decideClock', () => {
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'rock_fragmenter', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'rock_fragmenter', payload: null, occupantIds: [], x: 3, z: 4 } as never,
       ];
+      s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
     });
 
@@ -1106,7 +1113,7 @@ describe('decideClock', () => {
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', reservedForActionId: null, payload: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
       ];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
     });
@@ -1120,8 +1127,9 @@ describe('decideClock', () => {
         s.employees.employees = [];
         // A fresh position every tick — the haul is provably still moving.
         s.vehicles.vehicles = [
-          { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: tick, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: tick, z: 0 } as never,
         ];
+        s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
         const decision = decideClock(s, 0, budget, true, progress);
         if (tick > budget + WORK_GRACE_TICKS) {
           expect(decision.hold).toBe(false);
@@ -1135,16 +1143,18 @@ describe('decideClock', () => {
       s1.tickCount = DEFAULT_TICK_BUDGET + 5;
       s1.employees.employees = [];
       s1.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
       ];
+      s1.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       const d1 = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true);
 
       const s2 = state();
       s2.tickCount = DEFAULT_TICK_BUDGET + 5;
       s2.employees.employees = [];
       s2.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: { fragmentId: 9, massKg: 500 }, x: 9, z: 1 } as never,
+        { id: 1, type: 'debris_hauler', payload: { fragmentId: 9, massKg: 500 }, occupantIds: [], x: 9, z: 1 } as never,
       ];
+      s2.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       const d2 = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true);
 
       expect(d1.progressSignature).not.toBeNull();
@@ -1165,8 +1175,9 @@ describe('decideClock', () => {
         // simulating a hauler that stalls mid-drive (e.g. blocked path).
         const x = tick <= freezeAt ? tick : freezeAt;
         s.vehicles.vehicles = [
-          { id: 1, type: 'debris_hauler', reservedForActionId: 1, payload: null, x, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x, z: 0 } as never,
         ];
+        s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
         const decision = decideClock(s, 0, budget, true, progress);
         last = decision;
         if (tick < freezeAt + WORK_GRACE_TICKS) {
