@@ -17,9 +17,10 @@ import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleDefByTier, type Vehic
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { computeActionWorkTicks } from '../../../src/core/engine/ActionSelection.js';
-import { planItinerary } from '../../../src/core/engine/PlanItinerary.js';
+import { planItinerary, estimateLegDistance } from '../../../src/core/engine/PlanItinerary.js';
 import type { Goal } from '../../../src/core/engine/Itinerary.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
+import { octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 
 const SEED = 42;
 
@@ -366,5 +367,65 @@ describe('planItinerary', () => {
     planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
 
     expect(state).toEqual(before);
+  });
+});
+
+// ── estimateLegDistance (#1128 — exported for TaskCancellation.ts's
+// hasCloserIdleCandidate to reuse as its real distance oracle instead of a
+// hand-rolled duplicate) ─────────────────────────────────────────────────
+describe('estimateLegDistance', () => {
+  it('exact fidelity, open grid: returns the real A* path cost for the given request, matching findPath\'s own totalCost', () => {
+    const state = makeState(20, 20);
+    const dist = estimateLegDistance(state, 'exact', 1, 0, 0, 10, 0, false);
+    const path = findPath(state.navGrid!, { agentId: 1, fromX: 0, fromZ: 0, toX: 10, toZ: 0, avoidVehicles: false });
+    expect(path.found).toBe(true);
+    expect(dist).toBeCloseTo(path.totalCost);
+  });
+
+  it('estimate fidelity: returns the plain octile heuristic regardless of any NavGrid obstacle', () => {
+    const state = makeState(20, 20);
+    blockColumnRange(state.navGrid!, 5, 0, 19); // full wall an exact search would have to detour around
+    const dist = estimateLegDistance(state, 'estimate', 1, 0, 0, 10, 0, false);
+    expect(dist).toBe(octileHeuristic(0, 0, 10, 0));
+  });
+
+  it('exact fidelity with state.navGrid === null falls back to the octile heuristic (boundary — no grid built yet)', () => {
+    const state = createGame({ seed: SEED });
+    expect(state.navGrid).toBeNull();
+    const dist = estimateLegDistance(state, 'exact', 1, 0, 0, 10, 0, false);
+    expect(dist).toBe(octileHeuristic(0, 0, 10, 0));
+  });
+
+  it('exact fidelity: a target outside the NavGrid\'s bounds returns null rather than a distance against findPath\'s silently clamped endpoint (#1109)', () => {
+    const state = makeState(30, 30);
+    const plainPath = findPath(state.navGrid!, { agentId: 1, fromX: 0, fromZ: 0, toX: 500, toZ: 500, avoidVehicles: false });
+    expect(plainPath.found).toBe(true); // findPath itself still clamps silently
+
+    const dist = estimateLegDistance(state, 'exact', 1, 0, 0, 500, 500, false);
+    expect(dist).toBeNull();
+  });
+
+  it('exact fidelity: a geometrically unreachable target (boxed in on all 8 neighbours) returns null (rejection)', () => {
+    const state = makeState(20, 20);
+    const targetX = 10, targetZ = 10;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dz === 0) continue;
+        state.navGrid!.cells[targetZ + dz]![targetX + dx] = makeCell('blocked');
+      }
+    }
+    const dist = estimateLegDistance(state, 'exact', 1, 0, 0, targetX, targetZ, false);
+    expect(dist).toBeNull();
+  });
+
+  it('avoidVehicles true treats an occupied target as impassable (null); false lets a route reach the exact same cell', () => {
+    const state = makeState(20, 20);
+    state.navGrid!.cells[0]![10]!.vehicleOccupied = true;
+
+    const blocked = estimateLegDistance(state, 'exact', 1, 0, 0, 10, 0, true);
+    const allowed = estimateLegDistance(state, 'exact', 1, 0, 0, 10, 0, false);
+
+    expect(blocked).toBeNull();
+    expect(allowed).not.toBeNull();
   });
 });
