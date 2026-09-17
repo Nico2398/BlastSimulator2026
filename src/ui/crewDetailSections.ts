@@ -83,7 +83,7 @@ export function makeHiredLocationStrip(e: Employee, state: GameState): HTMLEleme
     ? t('ui.crew.day_label', { day: Math.floor(e.hiredAtTick / 24) + 1 })
     : t('ui.crew.hired_unknown');
 
-  const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
+  const activity = computeEmployeeActivity(e, state.vehicles);
   let location: string;
   if (activity.kind === 'driving' || activity.kind === 'driving_to_task') {
     location = t('ui.crew.location_aboard', { vehicle: `#${activity.vehicleId}` });
@@ -126,7 +126,7 @@ export function makeNeedsSection(e: Employee): HTMLElement {
 // ── CURRENT TASK ──
 
 export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLElement {
-  const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
+  const activity = computeEmployeeActivity(e, state.vehicles);
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.current_task')));
 

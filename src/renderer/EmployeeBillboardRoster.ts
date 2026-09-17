@@ -11,7 +11,7 @@
 
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
-import type { Vehicle } from '../core/entities/Vehicle.js';
+import type { VehicleState } from '../core/entities/Vehicle.js';
 import { computeEmployeeActivity, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 
 /**
@@ -76,12 +76,12 @@ export class EmployeeBillboardRoster<T> {
  */
 export function forEachEmployeeActivity(
   employees: readonly Employee[],
-  vehicles: readonly Vehicle[],
+  vehicleState: VehicleState,
   liveIds: Set<number>,
   fn: (employee: Employee, activity: EmployeeActivity) => void,
 ): void {
   for (const employee of employees) {
     liveIds.add(employee.id);
-    fn(employee, computeEmployeeActivity(employee, vehicles));
+    fn(employee, computeEmployeeActivity(employee, vehicleState));
   }
 }

@@ -158,7 +158,7 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   deps.vehicles = new VehicleMesh(scene);
   for (const v of state.vehicles.vehicles) {
     const surfaceY = deps.getTerrainSurfaceY(v.x, v.z);
-    deps.vehicles.addVehicle(v, surfaceY);
+    deps.vehicles.addVehicle(v, state.vehicles, state.employees.employees, surfaceY);
   }
 
   // Characters (placed at terrain surface height, not y=0)

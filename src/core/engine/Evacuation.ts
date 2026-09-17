@@ -10,7 +10,7 @@ import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
@@ -226,8 +226,9 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
 
   for (const vehicle of state.vehicles.vehicles) {
     if (!isInZone(vehicle.x, vehicle.z, zone)) continue;
-    if (vehicleDriverId(vehicle) === null && vehicle.reservedForActionId !== null) {
-      releaseVehicleReservation(state, vehicle.reservedForActionId);
+    const reservedForActionId = getVehicleReservation(state.vehicles, vehicle.id);
+    if (vehicleDriverId(vehicle) === null && reservedForActionId !== null) {
+      releaseVehicleReservation(state, reservedForActionId);
     }
   }
 

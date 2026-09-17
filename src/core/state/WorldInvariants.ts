@@ -9,7 +9,7 @@
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { resolveReservationHolder, isPendingReserveAhead } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
@@ -138,10 +138,11 @@ function checkI4VehicleMovedWithoutOccupant(
 function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const v of state.vehicles.vehicles) {
-    if (v.reservedForActionId === null) continue;
-    const action = state.pendingActions.find(a => a.id === v.reservedForActionId);
+    const reservedForActionId = getVehicleReservation(state.vehicles, v.id);
+    if (reservedForActionId === null) continue;
+    const action = state.pendingActions.find(a => a.id === reservedForActionId);
     if (!action) {
-      violations.push({ kind: 'I5_reservation_without_valid_holder', vehicleId: v.id, actionId: v.reservedForActionId });
+      violations.push({ kind: 'I5_reservation_without_valid_holder', vehicleId: v.id, actionId: reservedForActionId });
       continue;
     }
     const holderId = action.holderId ?? vehicleDriverId(v);
@@ -149,7 +150,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',
         vehicleId: v.id,
-        actionId: v.reservedForActionId,
+        actionId: reservedForActionId,
       });
       continue;
     }
@@ -158,7 +159,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',
         vehicleId: v.id,
-        actionId: v.reservedForActionId,
+        actionId: reservedForActionId,
         employeeId: holderId,
       });
       continue;
@@ -193,7 +194,7 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
       violations.push({
         kind: 'I5_reservation_without_valid_holder',
         vehicleId: v.id,
-        actionId: v.reservedForActionId,
+        actionId: reservedForActionId,
         employeeId: holderId,
       });
     }

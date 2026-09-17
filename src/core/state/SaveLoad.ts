@@ -370,6 +370,42 @@ function migrateV20ToV21(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v21 -> v22 (#1138): `task`, `state`, `targetX`, `targetZ`, `waitingTicks`,
+ * `moveConsecutiveFailures`, `isMoveStuck` and `reservedForActionId` are gone
+ * from `Vehicle` — the first seven were always derived display/movement
+ * state (VehicleStatus.computeVehicleStatus, the driving Employee's own
+ * fields) and carry nothing forward. `reservedForActionId`, when set, folds
+ * into `vehiclesContainer.reservations` (`VehicleState.reservations`,
+ * mirroring `migrateV20ToV21`'s own shape/registration) instead of being
+ * dropped — a save taken mid vehicle-gated action must not forget which
+ * vehicle it claimed. Mutates `obj` in place, matching every other migration
+ * block in `deserialize` below.
+ */
+function migrateV21ToV22(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesContainer = obj['vehicles'] as Record<string, unknown> | undefined;
+  const vehiclesList = vehiclesContainer?.['vehicles'] as Array<Record<string, unknown>> | undefined;
+  if (!vehiclesContainer || !Array.isArray(vehiclesList)) return obj;
+
+  const reservations: Array<{ vehicleId: unknown; actionId: unknown }> = [];
+  for (const v of vehiclesList) {
+    const actionId = v['reservedForActionId'];
+    if (typeof actionId === 'number') {
+      reservations.push({ vehicleId: v['id'], actionId });
+    }
+    delete v['task'];
+    delete v['state'];
+    delete v['targetX'];
+    delete v['targetZ'];
+    delete v['waitingTicks'];
+    delete v['moveConsecutiveFailures'];
+    delete v['isMoveStuck'];
+    delete v['reservedForActionId'];
+  }
+  vehiclesContainer['reservations'] = reservations;
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -595,6 +631,12 @@ export function deserialize(json: string): GameState {
   // v20 -> v21: Vehicle.driverId / .pendingEvacuationDestination stripped (#1092).
   if ((obj['version'] as number) < 21) {
     migrateV20ToV21(obj);
+  }
+
+  // v21 -> v22: Vehicle's eight dead fields stripped, reservedForActionId
+  // folded into VehicleState.reservations (#1138).
+  if ((obj['version'] as number) < 22) {
+    migrateV21ToV22(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

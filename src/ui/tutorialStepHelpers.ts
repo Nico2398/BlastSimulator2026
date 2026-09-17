@@ -258,7 +258,7 @@ export function hasPlannedBuildingOfType(state: GameState, buildingType: string)
 export function isHaulDispatched(state: GameState): boolean {
   if (hasPendingActionOfType(state, 'haul_debris')) return true;
   if (hasPendingActionOfType(state, 'fragment_debris')) return true;
-  return (state.vehicles?.vehicles ?? []).some(hasOutstandingVehicleWork);
+  return (state.vehicles?.vehicles ?? []).some((v) => hasOutstandingVehicleWork(v, state.vehicles));
 }
 
 /**

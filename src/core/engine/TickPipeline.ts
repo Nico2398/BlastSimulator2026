@@ -17,7 +17,6 @@ import type { TaskProgressLevelUp } from './TaskProgress.js';
 import type { TrainingCompletion } from '../entities/EmployeeTraining.js';
 import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
-import { tickVehicleTaskState } from './EntityMovementTick.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { ExpenseCategory } from '../economy/Finance.js';
@@ -270,22 +269,14 @@ export function runTick(
   const stuckEmployees = movementResult.stuck;
   const abandonedActions = movementResult.abandoned;
 
-  // 8f-1. Vehicle task/work display state (#411) — every vehicle, every
-  // tick, independent of whether it drove this tick: a vehicle assigned a
-  // work task directly (console `vehicle assign`, or any other caller that
-  // sets vehicle.task without going through an itinerary's drive-leg
-  // arrival) still needs VehicleOperationalState to reflect it. Locomotion's
-  // own applyArrivalStep already calls this for a vehicle whose drive leg
-  // just arrived; re-running it here for every vehicle is idempotent (pure
-  // function of vehicle.task) and is what covers every other caller.
-  for (const vehicle of state.vehicles.vehicles) {
-    tickVehicleTaskState(vehicle);
-  }
+  // 8f-1. Vehicle task/work display state (#411) is fully derived now
+  // (VehicleStatus.computeVehicleStatus, #1138) — no per-tick vehicle sweep
+  // left to run here.
 
   // 8f-2. Traffic jam detection — runs immediately after locomotion, once
   // per tick, so console/scenario "tick" steps can fire TrafficJamEvent too
   // (#411).
-  fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
+  fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.employees.employees, state.events, state.tickCount);
 
   // 8h. Arrival gate — must run after locomotion above: promotes rest/task
   // intents queued this tick or a prior one into their active timers/effects

@@ -11,8 +11,8 @@
 // haul one.
 
 import type { GameState } from '../state/GameState.js';
-import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 
@@ -21,8 +21,9 @@ import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatc
  * break task already in progress — the shared eligibility gate for
  * findReachableOversizedFragment and the UI's Break button.
  */
-export function isBreakEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
-  return !!vehicle && vehicle.type === 'rock_fragmenter' && vehicleDriverId(vehicle) !== null && vehicle.reservedForActionId === null;
+export function isBreakEligibleVehicle(vehicle: Vehicle | undefined, vehicleState: VehicleState): vehicle is Vehicle {
+  return !!vehicle && vehicle.type === 'rock_fragmenter' && vehicleDriverId(vehicle) !== null
+    && getVehicleReservation(vehicleState, vehicle.id) === null;
 }
 
 /**
@@ -47,7 +48,7 @@ export function requestBreakBoulder(
   if (!found.success) return found;
   const vehicle = found.vehicle;
   if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
-  if (vehicle.reservedForActionId !== null) {
+  if (getVehicleReservation(state.vehicles, vehicle.id) !== null) {
     return { success: false, error: 'Vehicle is already breaking a fragment' };
   }
 
@@ -68,7 +69,7 @@ export function requestBreakBoulder(
  */
 export function findReachableOversizedFragment(state: GameState, vehicleId: number): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!isBreakEligibleVehicle(vehicle)) return null;
+  if (!isBreakEligibleVehicle(vehicle, state.vehicles)) return null;
 
   return findNearestReachableFragment(
     state,

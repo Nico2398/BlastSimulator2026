@@ -23,7 +23,7 @@ import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../econom
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { moveTo } from './MoveTo.js';
 
 export interface TickEmployeesResult {
@@ -77,7 +77,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
 
     const claimed = claimPendingAction(state, action.id, employee.id);
     if (!claimed) continue;
-    if (vehicleCheck.vehicle) reserveVehicle(vehicleCheck.vehicle, claimed.id);
+    if (vehicleCheck.vehicle) reserveVehicle(state.vehicles, vehicleCheck.vehicle.id, claimed.id);
     result.claimed.push(action.id);
 
     if (employee.activeActionId === null) {
@@ -373,7 +373,7 @@ export function claimOnePoolCandidate(
 
   const claimed = claimPendingAction(state, selection.action.id, employee.id);
   if (!claimed) return null;
-  if (vehicleCheck.vehicle) reserveVehicle(vehicleCheck.vehicle, claimed.id);
+  if (vehicleCheck.vehicle) reserveVehicle(state.vehicles, vehicleCheck.vehicle.id, claimed.id);
 
   return selection;
 }
@@ -454,7 +454,7 @@ export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, e
     const action = state.pendingActions.find(a => a.id === actionId);
     if (!action || action.requiredVehicleRole === null) continue;
 
-    const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+    const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
     if (!vehicle || vehicleDriverId(vehicle) !== null) continue;
 
     employee.taskQueue = employee.taskQueue.filter(id => id !== action.id);
@@ -572,7 +572,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     const driveLeg = employee.itinerary?.legs.find(leg => leg.mode === 'drive');
     if (driveLeg?.vehicleId !== null && driveLeg?.vehicleId !== undefined) {
       const rideVehicle = state.vehicles.vehicles.find(v => v.id === driveLeg.vehicleId);
-      if (rideVehicle) reserveVehicle(rideVehicle, action.id);
+      if (rideVehicle) reserveVehicle(state.vehicles, rideVehicle.id, action.id);
     }
   }
   if (!moveResult.success) {

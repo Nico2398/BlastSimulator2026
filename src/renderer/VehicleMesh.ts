@@ -10,7 +10,10 @@
 // tween each frame (#520 — see MovementInterpolation.ts).
 
 import * as THREE from 'three';
-import type { Vehicle, VehicleOperationalState } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../core/entities/Vehicle.js';
+import { resolveVehicleDriver } from '../core/entities/Vehicle.js';
+import type { Employee } from '../core/entities/Employee.js';
+import { computeVehicleStatus, type VehicleStatusKind } from '../core/entities/VehicleStatus.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
 import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
@@ -64,12 +67,13 @@ export class VehicleMesh {
   }
 
   /** Add a vehicle mesh to the scene at its position, optionally on a terrain surface. */
-  addVehicle(vehicle: Vehicle, surfaceY: number = 0): void {
+  addVehicle(vehicle: Vehicle, vehicleState: VehicleState, employees: readonly Employee[], surfaceY: number = 0): void {
     const group = new THREE.Group();
     const entry = this.attachModel(group, vehicle);
-    applyStateIndicator(group, vehicle.state, stateIndicatorHeight(entry.instance));
+    const status = computeVehicleStatus(vehicle, vehicleState, resolveVehicleDriver(vehicle, employees));
+    applyStateIndicator(group, status.kind, stateIndicatorHeight(entry.instance));
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
-    const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
+    const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool, employees);
     group.position.set(renderX, surfaceY, renderZ);
     tagPickable(group, 'vehicle', vehicle.id);
     this.scene.add(group);
@@ -84,37 +88,45 @@ export class VehicleMesh {
    *   eased (x, z) the tween produces so a vehicle's Y follows the slope
    *   under its wheels every frame instead of the last synced cell (#1038).
    */
-  update(vehicles: Vehicle[], dt: number, heightAt?: (x: number, z: number) => number): void {
+  update(
+    vehicles: Vehicle[],
+    vehicleState: VehicleState,
+    employees: readonly Employee[],
+    dt: number,
+    heightAt?: (x: number, z: number) => number,
+  ): void {
     for (const v of vehicles) {
       const entry = this.vehicles.get(v.id);
       if (!entry) continue;
       // Update stored reference
       entry.vehicle = v;
-      // Ease toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
-      const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
+      // Ease toward target (+ queue offset for fused waiting vehicles, #411 round 2)
+      const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles, employees);
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
       const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
-      this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt);
-      applyStateIndicator(entry.group, v.state);
+      const status = computeVehicleStatus(v, vehicleState, resolveVehicleDriver(v, employees));
+      this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt, status.kind);
+      applyStateIndicator(entry.group, status.kind);
     }
   }
 
   /**
-   * Render-only offset for a 'waiting' vehicle sharing its target cell with
-   * others (#411 round 2) — thin delegate to VehicleWaitingQueue.ts, kept as
-   * an instance method so callers/tests don't need a second import.
+   * Render-only offset for a vehicle waiting on occupancy and sharing its
+   * target cell with others (#411 round 2) — thin delegate to
+   * VehicleWaitingQueue.ts, kept as an instance method so callers/tests
+   * don't need a second import.
    */
-  waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
-    return waitingQueueOffset(vehicle, pool);
+  waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[], employees: readonly Employee[]): readonly [number, number] {
+    return waitingQueueOffset(vehicle, pool, employees);
   }
 
   /**
    * Render position for a vehicle, folding in the waiting-queue slot offset
    * (#411 round 4) — thin delegate to VehicleWaitingQueue.ts.
    */
-  waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
-    return waitingRenderPosition(vehicle, pool);
+  waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[], employees: readonly Employee[]): readonly [number, number] {
+    return waitingRenderPosition(vehicle, pool, employees);
   }
 
   /** Snap a vehicle directly to its world position (no tween — use after teleport or initial placement). */
@@ -156,7 +168,7 @@ export class VehicleMesh {
   }
 
   /** Swap any stand-in box for the real model once its asset has loaded. */
-  refreshModels(): void {
+  refreshModels(vehicleState: VehicleState, employees: readonly Employee[]): void {
     for (const entry of this.vehicles.values()) {
       if (!entry.instance.isFallback || !this.library.has(vehicleModelId(entry.vehicle.type, entry.vehicle.tier))) continue;
       entry.group.remove(entry.instance.root);
@@ -165,7 +177,8 @@ export class VehicleMesh {
       entry.instance = fresh.instance;
       entry.wheels = fresh.wheels;
       entry.flywheel = fresh.flywheel;
-      applyStateIndicator(entry.group, entry.vehicle.state, stateIndicatorHeight(entry.instance));
+      const status = computeVehicleStatus(entry.vehicle, vehicleState, resolveVehicleDriver(entry.vehicle, employees));
+      applyStateIndicator(entry.group, status.kind, stateIndicatorHeight(entry.instance));
     }
   }
 
@@ -203,7 +216,7 @@ export class VehicleMesh {
   }
 
   /** Turn toward the direction of travel, spin wheels by distance, run the flywheel while working. */
-  private animateMotion(entry: VehicleEntry, dx: number, dz: number, dt: number): void {
+  private animateMotion(entry: VehicleEntry, dx: number, dz: number, dt: number, statusKind: VehicleStatusKind): void {
     if (dt <= 0) return;
     const dist = Math.hypot(dx, dz);
     if (dist / dt > MOVE_SPEED_MIN) {
@@ -211,7 +224,7 @@ export class VehicleMesh {
       // Axles run along the model's Z; rolling forward turns them negative.
       for (const wheel of entry.wheels) wheel.node.rotation.z -= dist / wheel.radius;
     }
-    if (entry.flywheel && entry.vehicle.state === 'working') entry.flywheel.rotation.z += FLYWHEEL_RATE * dt;
+    if (entry.flywheel && statusKind === 'working') entry.flywheel.rotation.z += FLYWHEEL_RATE * dt;
   }
 }
 
@@ -233,13 +246,15 @@ function stateIndicatorHeight(instance: ModelInstance): number {
 
 // ---------- State indicator ----------
 
-/** Marker color per VehicleOperationalState. */
-export const STATE_COLOR_MAP: Record<VehicleOperationalState, number> = {
+/** Marker color per VehicleStatusKind (#1138 — replaces the deleted VehicleOperationalState). */
+export const STATE_COLOR_MAP: Record<VehicleStatusKind, number> = {
   idle: 0x999999,     // grey — not working
   moving: 0x3399ff,   // blue — en route
   working: 0x33cc33,  // green — actively working
   waiting: 0xffcc00,  // amber — blocked/waiting
   broken: 0xff3333,   // red — broken down
+  stuck: 0xff6600,    // orange — stuck, needs attention
+  hauling: 0x33cc33,  // green — actively hauling/breaking
 };
 
 const STATE_INDICATOR_RADIUS = 0.25;
@@ -260,7 +275,7 @@ function findStateIndicator(group: THREE.Group): THREE.Mesh | undefined {
  * group.userData.isStateIndicator) rather than adding a duplicate; `y`
  * repositions it when given.
  */
-export function applyStateIndicator(group: THREE.Group, state: VehicleOperationalState, y?: number): void {
+export function applyStateIndicator(group: THREE.Group, state: VehicleStatusKind, y?: number): void {
   const color = STATE_COLOR_MAP[state];
   let marker = findStateIndicator(group);
 

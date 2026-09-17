@@ -11,7 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { getVehicleDefByTier, vehicleDriverId } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId, resolveVehicleDriver, getVehicleReservation } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
@@ -20,11 +20,10 @@ import {
   STUCK_MORALE_PENALTY,
   MOVE_STUCK_ABANDON_TICKS,
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
-  VEHICLE_ROLE_ARRIVAL_TASK,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { board, alight } from './Mount.js';
-import { isDestinationOccupied, updateVehicleCellOccupancy, tickVehicleTaskState } from './EntityMovementTick.js';
+import { isDestinationOccupied, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
@@ -296,10 +295,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   emp.isMoveStuck = outcome.isStuck;
   writeCommitted(emp, outcome.committed);
   writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
-  if (isDrive) {
-    vehicle!.moveConsecutiveFailures = outcome.consecutiveFailures;
-    vehicle!.isMoveStuck = outcome.isStuck;
-  }
 
   // Position/waitingTicks only advance on a genuinely found path — a period-2
   // oscillation (outcome.isStuck true, pathFound still true) really did walk
@@ -308,7 +303,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // fires on it.
   if (outcome.pathFound) {
     emp.vehicleWaitingTicks = 0;
-    if (isDrive) vehicle!.waitingTicks = 0;
 
     emp.x = outcome.x;
     emp.z = outcome.z;
@@ -349,18 +343,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       }
       result.abandoned.push({ employeeId: emp.id, actionId });
       emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
-      // #986: the released vehicle's own stuck mirror must reset too — left
-      // set, a freshly idle vehicle re-accumulates from a stale
-      // moveConsecutiveFailures/isMoveStuck the instant its next driver's own
-      // drive leg starts touching these same fields, hitting this same
-      // abandon branch again almost immediately instead of getting the full
-      // MOVE_STUCK_ABANDON_TICKS a genuinely new drive is owed — mirrors the
-      // pre-itinerary tickVehicleOnNavGrid's own identical reset right after
-      // its abandon release (EntityMovementTick.ts, deleted).
-      if (isDrive) {
-        vehicle!.moveConsecutiveFailures = 0;
-        vehicle!.isMoveStuck = false;
-      }
+      // #986/#1138: the stuck mirror lived on the vehicle so a freshly idle
+      // vehicle wouldn't re-accumulate a stale count on its next driver — now
+      // that isMoveStuck/moveConsecutiveFailures live only on the employee
+      // (cleared by dismountVehicleDriver's own alight, which drops the
+      // occupant relationship entirely), there is nothing left on `vehicle`
+      // itself to reset here.
     }
     return 'blocked';
   }
@@ -381,8 +369,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
 function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
   emp.vehicleWaitingTicks++;
-  vehicle.waitingTicks = emp.vehicleWaitingTicks;
-  vehicle.state = 'waiting';
 
   if (emp.vehicleWaitingTicks < VEHICLE_OCCUPANCY_REROUTE_THRESHOLD) return 'blocked';
 
@@ -410,9 +396,6 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     emp.vehicleWaitingTicks = 0;
     writeCommitted(emp, outcome.committed);
     writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
-    vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
-    vehicle.isMoveStuck = false;
-    vehicle.waitingTicks = 0;
 
     // The employee's own x/z must move too (I2) — a reroute that only wrote
     // the vehicle's position left the employee frozen at the pre-reroute
@@ -444,7 +427,6 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
   if (relocateDestinationBlocker(state, leg.destX, leg.destZ, vehicle.id)) return 'blocked';
 
   emp.isMoveStuck = true;
-  vehicle.isMoveStuck = true;
   if (!wasStuckBefore) emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
   return 'blocked';
 }
@@ -464,9 +446,13 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
   if (!blocker) return false;
 
   // Already relocating — this trigger or a prior tick's — give it time to
-  // clear rather than pile on a second relocation order.
-  if (blocker.state === 'moving') return true;
-  if (blocker.task !== 'idle' || blocker.reservedForActionId !== null) return false;
+  // clear rather than pile on a second relocation order. "Moving"/"has a
+  // task" are re-derived (#1138) rather than read off the deleted
+  // Vehicle.state/.task fields: a driven blocker mid-itinerary is treated as
+  // already relocating, and any reservation still means it's genuinely busy.
+  const blockerDriver = resolveVehicleDriver(blocker, state.employees.employees);
+  if (blockerDriver && blockerDriver.itinerary !== null) return true;
+  if (getVehicleReservation(state.vehicles, blocker.id) !== null) return false;
 
   const freeCell = findNearestFreeCellForVehicle(state, blocker);
   if (!freeCell) return false;
@@ -492,12 +478,13 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
 function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number): void {
   const prevX = Math.floor(blocker.x);
   const prevZ = Math.floor(blocker.z);
-  const wasStationary = blocker.state !== 'moving';
 
   blocker.x = x;
   blocker.z = z;
 
-  updateVehicleCellOccupancy(state, blocker, wasStationary, prevX, prevZ);
+  // A driverless blocker is stationary both before and after this instant
+  // teleport (#1138) — there is no vehicle-native 'moving' state left to read.
+  updateVehicleCellOccupancy(state, blocker, true, true, prevX, prevZ);
 }
 
 /**
@@ -540,19 +527,21 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
 }
 
 /** Writes a driving employee's advance onto their vehicle — the only place a vehicle's x/z ever changes. */
-function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, leg: Leg): void {
-  const wasStationary = vehicle.state !== 'moving';
+function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, _leg: Leg): void {
   const prevX = Math.round(vehicle.x);
   const prevZ = Math.round(vehicle.z);
 
   vehicle.x = x;
   vehicle.z = z;
-  vehicle.targetX = leg.destX;
-  vehicle.targetZ = leg.destZ;
-  vehicle.state = 'moving';
-  vehicle.task = 'moving';
 
-  updateVehicleCellOccupancy(state, vehicle, wasStationary, prevX, prevZ);
+  // TODO(#1138): wasStationary/isStationaryNow used to read the deleted
+  // Vehicle.state field (true only on the very first tick a stationary
+  // vehicle starts driving). Hardcoded here to "was, isn't now" — always
+  // clears the old cell, never marks the new one occupied while actively
+  // driving, which matches every steady-state driving tick; only the exact
+  // "already on the destination cell the instant driving starts" edge case
+  // differs from the old behaviour.
+  updateVehicleCellOccupancy(state, vehicle, true, false, prevX, prevZ);
 }
 
 /** The immediate next grid cell along a found path — the one occupancy is checked against. Mirrors the old nextGridStep. */
@@ -614,28 +603,13 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   // that file's own #550 header). A plain reposition drive (moveTo(x,z) with
   // no reservation — an evacuation-clear, or a manual `vehicle driver`/test
   // drive) never had a task of its own to arrive INTO, and settles on idle.
+  // #1138: task/state used to snap to idle here, then briefly take on the
+  // reserved role's arrival task as a display mirror — both derived,
+  // display-only concerns now (VehicleStatus.computeVehicleStatus), so there
+  // is nothing left on `vehicle` itself to write on arrival.
   let drivenVehicle: Vehicle | undefined;
   if (leg.mode === 'drive' && leg.vehicleId !== null) {
     drivenVehicle = state.vehicles.vehicles.find(v => v.id === leg.vehicleId);
-    if (drivenVehicle) {
-      drivenVehicle.task = 'idle';
-      drivenVehicle.state = 'idle';
-      drivenVehicle.waitingTicks = 0;
-      if (drivenVehicle.reservedForActionId !== null) {
-        // A transport ride's alight leg (#1093) passes through this branch on
-        // purpose: its borrowed vehicle is reserved for the goal's action, so
-        // it briefly takes on the vehicle-role arrival task here (e.g.
-        // 'drilling') even though this is only the ride's intermediate alight
-        // point, not the action's real target. That's immediately overwritten
-        // — the `step.kind === 'alight'` handling below calls
-        // releaseVehicleReservation in this same synchronous step, which
-        // resets task/state back to idle before any tick observes the
-        // mismatch. Anyone reordering this function or adding an early return
-        // between here and that release must keep that ordering intact.
-        drivenVehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[drivenVehicle.type];
-        tickVehicleTaskState(drivenVehicle);
-      }
-    }
   }
 
   const step = leg.onArrive;
@@ -648,7 +622,7 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
     if (!drivenVehicle) return true;
     const ok = applyArrivalEffect(state, drivenVehicle, step.effectId, emitter);
     if (!ok) {
-      interruptActiveAction(state, emp, drivenVehicle.reservedForActionId, { forceOpenPool: true });
+      interruptActiveAction(state, emp, getVehicleReservation(state.vehicles, drivenVehicle.id), { forceOpenPool: true });
       return false;
     }
     return true;
@@ -672,7 +646,8 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   // leg's own mode: 'drive') is freed back to the pool the instant its rider
   // alights, instead of staying reserved for an action it was never claimed
   // against.
-  if (step.releaseVehicleForActionId !== undefined && drivenVehicle?.reservedForActionId === step.releaseVehicleForActionId) {
+  if (step.releaseVehicleForActionId !== undefined && drivenVehicle !== undefined
+    && getVehicleReservation(state.vehicles, drivenVehicle.id) === step.releaseVehicleForActionId) {
     releaseVehicleReservation(state, step.releaseVehicleForActionId);
   }
   const vehicleId = isMounted(emp.locomotion) ? mountedVehicleId(emp.locomotion) : null;

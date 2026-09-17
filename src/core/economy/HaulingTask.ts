@@ -11,8 +11,8 @@
 // of their own.
 
 import type { GameState } from '../state/GameState.js';
-import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
@@ -30,8 +30,9 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
  * hauling vs. wrong vehicle type), and collapsing that into one boolean
  * would lose those distinct error messages.
  */
-export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
-  return !!vehicle && vehicle.type === 'debris_hauler' && vehicleDriverId(vehicle) !== null && vehicle.reservedForActionId === null;
+export function isHaulEligibleVehicle(vehicle: Vehicle | undefined, vehicleState: VehicleState): vehicle is Vehicle {
+  return !!vehicle && vehicle.type === 'debris_hauler' && vehicleDriverId(vehicle) !== null
+    && getVehicleReservation(vehicleState, vehicle.id) === null;
 }
 
 /**
@@ -56,7 +57,7 @@ export function requestHaulFragment(
   if (!found.success) return found;
   const vehicle = found.vehicle;
   if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
-  if (vehicle.reservedForActionId !== null || vehicle.payload !== null) {
+  if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
     return { success: false, error: 'Vehicle is already hauling' };
   }
 
@@ -80,7 +81,7 @@ export function requestHaulFragment(
  */
 export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!isHaulEligibleVehicle(vehicle)) return null;
+  if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
   const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
 

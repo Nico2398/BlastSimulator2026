@@ -127,7 +127,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   if (deps.taskProgress && deps.characters) {
     deps.taskProgress.sync(
       state.employees.employees,
-      state.vehicles.vehicles,
+      state.vehicles,
       state.pendingActions,
       id => deps.characters!.getGroup(id),
       id => deps.ghosts?.getGroup(id) ?? null,
@@ -138,7 +138,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   if (deps.pictograms && deps.characters) {
     deps.pictograms.sync(
       state.employees.employees,
-      state.vehicles.vehicles,
+      state.vehicles,
       id => deps.characters!.getGroup(id),
     );
   }

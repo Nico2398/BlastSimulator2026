@@ -349,7 +349,9 @@ export class GameRenderer {
     if (modelLibrary.revision !== this.lastModelRevision) {
       this.lastModelRevision = modelLibrary.revision;
       this.buildings?.refreshModels();
-      this.vehicles?.refreshModels();
+      if (this.vehicles && this.lastState) {
+        this.vehicles.refreshModels(this.lastState.vehicles, this.lastState.employees.employees);
+      }
       this.characters?.refreshModels();
       // Trees, rocks and houses are static instanced batches, rebuilt whole
       // once every prop they lacked is in — one rebuild, never per model.
@@ -364,7 +366,10 @@ export class GameRenderer {
     this.pictograms?.update(dt);
 
     if (this.vehicles && this.lastState) {
-      this.vehicles.update(this.lastState.vehicles.vehicles, dt, (x, z) => this.getTerrainSurfaceY(x, z));
+      this.vehicles.update(
+        this.lastState.vehicles.vehicles, this.lastState.vehicles, this.lastState.employees.employees,
+        dt, (x, z) => this.getTerrainSurfaceY(x, z),
+      );
     }
 
     if (this.ghosts) {

@@ -120,7 +120,7 @@ export class CrewPanel extends PanelBase {
       .filter(e => e.alive)
       .map(e => {
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
-        const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
+        const activity = computeEmployeeActivity(e, state.vehicles);
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
           + `:${e.trainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
@@ -262,7 +262,7 @@ export class CrewPanel extends PanelBase {
   }
 
   private makeStatusTags(e: Employee, state: GameState): HTMLElement {
-    const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(e, state.vehicles);
     const wrap = el('div', { attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
     const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
     if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });

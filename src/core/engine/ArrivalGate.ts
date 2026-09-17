@@ -7,6 +7,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
@@ -120,7 +121,7 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGate
       const action = state.pendingActions.find(a => a.id === emp.activeActionId);
       if (action && action.requiredVehicleRole !== null
         && action.type !== 'haul_debris' && action.type !== 'fragment_debris') {
-        const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+        const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
         if (vehicle && isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id) {
           seedTaskTimerFields(state, emp, action, grid);
           emp.taskTicksRemaining = emp.pendingTaskDuration!;

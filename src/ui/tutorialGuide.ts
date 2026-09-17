@@ -8,7 +8,8 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
-import type { Vehicle } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleState } from '../core/entities/Vehicle.js';
+import { getVehicleReservation } from '../core/entities/Vehicle.js';
 import type { TutorialStage } from './tutorialStages.js';
 
 /** Marks the body while the tutorial holds the rails. */
@@ -302,8 +303,8 @@ function hasActiveTraining(state: GameState): boolean {
  * WORK_GRACE_TICKS window would time out mid-trip and hold the clock on a
  * haul that is still visibly making progress.
  */
-export function hasOutstandingVehicleWork(v: Vehicle): boolean {
-  return (v.type === 'debris_hauler' || v.type === 'rock_fragmenter') && v.reservedForActionId !== null;
+export function hasOutstandingVehicleWork(v: Vehicle, vehicleState: VehicleState): boolean {
+  return (v.type === 'debris_hauler' || v.type === 'rock_fragmenter') && getVehicleReservation(vehicleState, v.id) !== null;
 }
 
 /**
@@ -336,11 +337,11 @@ function workSignature(state: GameState): string {
   // otherwise-static employee signature above still register as "still
   // working" instead of reading stuck the instant WORK_GRACE_TICKS elapses.
   const vehicleWorking = (state.vehicles?.vehicles ?? [])
-    .filter(hasOutstandingVehicleWork)
+    .filter((v) => hasOutstandingVehicleWork(v, state.vehicles))
     .slice()
     .sort((a, b) => a.id - b.id)
     .map((v) => [
-      v.id, v.x, v.z, v.reservedForActionId, v.payload?.fragmentId ?? null,
+      v.id, v.x, v.z, getVehicleReservation(state.vehicles, v.id), v.payload?.fragmentId ?? null,
     ].join(','))
     .join(';');
 
@@ -362,7 +363,7 @@ function workSignature(state: GameState): string {
 function isWorkInProgress(state: GameState): boolean {
   if ((state.pendingActions?.length ?? 0) > 0) return true;
   if (state.employees.employees.some(hasOutstandingWork)) return true;
-  return (state.vehicles?.vehicles ?? []).some(hasOutstandingVehicleWork);
+  return (state.vehicles?.vehicles ?? []).some((v) => hasOutstandingVehicleWork(v, state.vehicles));
 }
 
 /**

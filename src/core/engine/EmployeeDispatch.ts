@@ -19,6 +19,7 @@ import { isLicensedForRole, hasBlockedQueuedActionForVehicleRole } from './Vehic
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alightIfMounted } from './Mount.js';
+import { getVehicleReservation } from '../entities/Vehicle.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -226,7 +227,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
         // another employee's; either way, alighting here would desync the
         // reservation from a driver assertWorldInvariants' I5 check expects
         // to still resolve.
-        if (vehicle && vehicle.reservedForActionId === null && hasBlockedQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
+        if (vehicle && getVehicleReservation(state.vehicles, vehicle.id) === null && hasBlockedQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
           alightIfMounted(state, employee);
         }
       }

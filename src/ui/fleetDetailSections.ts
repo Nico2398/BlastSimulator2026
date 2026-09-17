@@ -6,7 +6,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
-import type { Vehicle, VehicleTier } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
 import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../core/entities/Vehicle.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
@@ -50,9 +50,15 @@ export function describeStatus(status: VehicleStatus): string {
   return status.ticks !== null ? t('ui.fleet.status_with_ticks', { status: base, n: status.ticks }) : base;
 }
 
-/** `occupant`, when the caller has resolved it, makes working/moving read off the driver's own activity rather than the vehicle's display fields (#1092). */
-export function makeStatusChip(v: Vehicle, occupant?: Employee): HTMLElement {
-  const status = occupant ? computeVehicleStatus(v, occupant) : computeVehicleStatus(v);
+/**
+ * `occupant`, when the caller has resolved it, makes working/moving read off
+ * the driver's own activity rather than the vehicle's display fields
+ * (#1092). `vehicleState` threads through to computeVehicleStatus's own
+ * reservation lookup (#1138 — the hauling branch's getVehicleReservation
+ * call).
+ */
+export function makeStatusChip(v: Vehicle, vehicleState: VehicleState, occupant?: Employee): HTMLElement {
+  const status = computeVehicleStatus(v, vehicleState, occupant);
   return chip(describeStatus(status), STATUS_TONE[status.kind]);
 }
 

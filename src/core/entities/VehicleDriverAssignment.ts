@@ -6,7 +6,7 @@
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
-import { vehicleDriverId } from './Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import { isMounted } from './EmployeeLocomotion.js';
 import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 
@@ -51,7 +51,8 @@ export function canAssignDriver(
   // different employee, or a manual `vehicle driver` re-target) is blocked.
   // The reserving employee's own boarding succeeds because GameLoop sets
   // employee.activeActionId to the reserving action before requesting it.
-  if (vehicle.reservedForActionId !== null && vehicle.reservedForActionId !== employee.activeActionId) {
+  const reservedForActionId = getVehicleReservation(vehicleState, vehicle.id);
+  if (reservedForActionId !== null && reservedForActionId !== employee.activeActionId) {
     return { success: false, error: 'Vehicle is reserved for another task' };
   }
 

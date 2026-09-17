@@ -7,6 +7,8 @@ import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { resolveVehicleDriver } from '../entities/Vehicle.js';
+import type { Employee } from '../entities/Employee.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
@@ -86,6 +88,18 @@ export interface NavCell {
  */
 export function isCellOccupied(cell: NavCell | undefined): boolean {
   return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
+}
+
+/**
+ * True when `vehicle` is actively being driven right now — replaces the old
+ * `vehicle.state === 'moving'` read (#1138): a vehicle carries no state of
+ * its own any more, so "moving" is derived from its driver's own itinerary
+ * (a non-null itinerary means the driver, and therefore the vehicle they're
+ * mounted in, is still travelling — `gameplay-vehicle-fleet`).
+ */
+export function isVehicleCurrentlyDriving(vehicle: Vehicle, employees: readonly Employee[]): boolean {
+  const driver = resolveVehicleDriver(vehicle, employees);
+  return driver !== undefined && driver.itinerary !== null;
 }
 
 export class NavGrid {
@@ -224,6 +238,7 @@ export class NavGrid {
     drillHoles: DrillHole[],
     groundFragments: FragmentData[] = [],
     vehicles: Vehicle[] = [],
+    employees: Employee[] = [],
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
@@ -256,7 +271,7 @@ export class NavGrid {
       navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
     }
     for (const vehicle of vehicles) {
-      if (vehicle.state === 'moving') continue;
+      if (isVehicleCurrentlyDriving(vehicle, employees)) continue;
       const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
       if (cell) cell.vehicleOccupied = true;
     }

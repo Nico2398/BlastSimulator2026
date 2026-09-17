@@ -128,7 +128,7 @@ export function claimAndDispatchFragmentAction(
 
   const claimed = claimPendingAction(state, action.id, employee.id);
   if (!claimed) return { success: false, error: t(claimFailedKey) };
-  reserveVehicle(vehicle, claimed.id);
+  reserveVehicle(state.vehicles, vehicle.id, claimed.id);
   employee.activeActionId = claimed.id;
 
   const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });

@@ -12,6 +12,9 @@ import type { GameState } from '../../core/state/GameState.js';
 import { findSurveyForColumn, isSurveyStale } from '../../core/mining/SurveyCalc.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
+import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
+import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
+import { describeStatus } from '../fleetDetailSections.js';
 
 const ROLE_ICON: Record<string, IconName> = {
   driller: 'blast', blaster: 'explosive', driver: 'vehicle', surveyor: 'survey', manager: 'crew',
@@ -107,7 +110,8 @@ export class HoverTag {
       case 'vehicle': {
         const v = state.vehicles.vehicles.find(x => x.id === entity.id);
         if (!v) return null;
-        return this.row(VEHICLE_ICON[v.type] ?? 'vehicle', t(`vehicle_type.${v.type}`), `${t(`vehicle_state.${v.state}`)} · HP ${Math.round(v.hp)}`);
+        const status = computeVehicleStatus(v, state.vehicles, resolveVehicleDriver(v, state.employees.employees));
+        return this.row(VEHICLE_ICON[v.type] ?? 'vehicle', t(`vehicle_type.${v.type}`), `${describeStatus(status)} · HP ${Math.round(v.hp)}`);
       }
       case 'employee': {
         const e = state.employees.employees.find(x => x.id === entity.id);
