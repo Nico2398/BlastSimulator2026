@@ -255,7 +255,11 @@ describe('decideRunLiveness — case 4: fails closed toward undetermined, never 
     const result = decideRunLiveness(
       baseInput({
         assignmentComments: [assignmentComment(ASSIGNMENT_BODY, 'not-a-real-timestamp')],
-        workflowRuns: [{ id: 817, status: 'requested', created_at: 'also-not-a-timestamp' }],
+        // Non-live status deliberately (matches the `cancelled`/`completed`
+        // fixtures above) — this test isolates the unparseable-timestamp
+        // path, not the live-status short-circuit, which case 3 already
+        // covers.
+        workflowRuns: [{ id: 817, status: 'completed', created_at: 'also-not-a-timestamp' }],
         graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
       })
     );

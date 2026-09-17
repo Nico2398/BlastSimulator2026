@@ -91,6 +91,21 @@ function decideRunLiveness(input) {
       : DEFAULT_GRACE_WINDOW_MINUTES;
   const graceWindowMs = effectiveGraceWindowMinutes * 60 * 1000;
 
+  // Step 0: a status GitHub is actively reporting is never second-guessed by
+  // anything below — not assignment-comment existence, not age, not the
+  // grace window. See #614. This must run before every other check: a
+  // queued run's own status is authoritative even with no assignment
+  // comment at all.
+  const candidateRuns = workflowRuns.filter((run) => run.id !== excludeRunId);
+  const liveRun = candidateRuns.find((run) => LIVE_RUN_STATUSES.includes(run.status));
+  if (liveRun) {
+    return {
+      verdict: 'live',
+      reason: `#${issueNumber}: run #${liveRun.id} is ${liveRun.status} — a reported live status is never second-guessed.`,
+      evidence: { run: liveRun },
+    };
+  }
+
   // Step 1: no age can be established at all without the comments.
   if (assignmentCommentsUnknown) {
     return undetermined(issueNumber, 'assignment comments could not be read — cannot establish assignment age.', {
@@ -112,19 +127,6 @@ function decideRunLiveness(input) {
     return undetermined(issueNumber, 'workflow runs could not be read — cannot rule out a live run.', {
       workflowRunsUnknown: true,
     });
-  }
-
-  const candidateRuns = workflowRuns.filter((run) => run.id !== excludeRunId);
-
-  // Step 4: a status GitHub is actively reporting is never second-guessed,
-  // regardless of age. See #614.
-  const liveRun = candidateRuns.find((run) => LIVE_RUN_STATUSES.includes(run.status));
-  if (liveRun) {
-    return {
-      verdict: 'live',
-      reason: `#${issueNumber}: run #${liveRun.id} is ${liveRun.status} — a reported live status is never second-guessed.`,
-      evidence: { run: liveRun },
-    };
   }
 
   // The most recent assignment comment by parseable timestamp — only the
