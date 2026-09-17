@@ -23,7 +23,7 @@ import {
   SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
-import { placementRefusalReason, type PlacementKit } from '../scene/PlacementKit.js';
+import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -309,41 +309,26 @@ export class SurveyPanel extends PanelBase {
   private pickTargetAndRun(): void {
     const kit = this.placementKit;
     if (!kit) return;
-    const { controller, overlay, strip } = kit;
-    if (controller.isArmed) { controller.cancel(); return; }
 
     const radius = SURVEY_COVERAGE_RADIUS[this.selectedMethod];
-    const refresh = (): void => {
-      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
-      const sel = controller.selection;
-      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, tone: 'survey', ...(radius > 0 ? { radius } : {}) } : null);
-      strip.show({
-        icon: 'survey',
-        title: t('ui.survey.pick_target'),
-        subtitle: t(`survey.${this.selectedMethod}`),
-        fields: [],
-        result: sel ? `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
-        instruction: t('ui.survey.pick_instruction'),
-      });
-    };
 
-    controller.setConfirmHandler((sel) => {
-      const cmd = this.gameConsole?.(`survey ${this.selectedMethod} x:${sel.x1} z:${sel.z1}`);
-      this.setTransientStatus(cmd?.success ? t('ui.survey.queued') : (cmd?.output ?? ''));
-      overlay.flashConfirm();
-    });
-    controller.setChangeHandler(refresh);
-    // Show the pit aimed at the middle so the player is never staring at a blank scene.
-    controller.arm({
-      shape: 'point',
+    armPointPick(kit, {
+      icon: 'survey',
+      title: t('ui.survey.pick_target'),
+      subtitle: t(`survey.${this.selectedMethod}`),
+      instruction: t('ui.survey.pick_instruction'),
+      result: (sel) => `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}`,
+      marker: { tone: 'survey', ...(radius > 0 ? { radius } : {}) },
+      // Show the pit aimed at the middle so the player is never staring at a blank scene.
       initialSelection: {
         x: Math.floor(this.worldOriginX + this.worldSizeX / 2),
         z: Math.floor(this.worldOriginZ + this.worldSizeZ / 2),
       },
+      onConfirm: (sel) => {
+        const cmd = this.gameConsole?.(`survey ${this.selectedMethod} x:${sel.x1} z:${sel.z1}`);
+        this.setTransientStatus(cmd?.success ? t('ui.survey.queued') : (cmd?.output ?? ''));
+      },
     });
-    refresh();
   }
 
   // ── Results ──────────────────────────────────────────────────────────────

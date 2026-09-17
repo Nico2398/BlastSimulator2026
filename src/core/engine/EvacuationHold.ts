@@ -12,7 +12,6 @@ import { isInZone, isZoneClearOfEmployees, isZoneStillBlastThreatened } from '..
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { completePendingAction } from './TaskLifecycleCore.js';
 import type { Employee } from '../entities/Employee.js';
-import type { VehicleState } from '../entities/Vehicle.js';
 
 /**
  * PendingAction.payload key evacuateZone stamps on any action it interrupts
@@ -261,11 +260,8 @@ export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, z
  * tickEmployees (the regression collapse-vehicle-recovery.integration.test.ts
  * caught). An itinerary, unlike a mount, always ends: the moment the drive
  * arrives, Locomotion clears it and this reads false again.
- *
- * `vehicles` is vestigial now that the marker it used to scan for is gone;
- * kept so every call site stays put for one more phase.
  */
-export function isMidEvacuationDrive(_vehicles: VehicleState, employee: Employee): boolean {
+export function isMidEvacuationDrive(employee: Employee): boolean {
   const itinerary = employee.itinerary;
   if (itinerary === null || itinerary.goal.kind !== 'reposition') return false;
   return itinerary.legs[itinerary.legs.length - 1]?.onArrive.kind === 'alight';

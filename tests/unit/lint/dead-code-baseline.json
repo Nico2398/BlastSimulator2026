@@ -173,7 +173,6 @@
     "src/renderer/SelectionOverlay.ts:OVERLAY_COLORS",
     "src/renderer/SelectionOverlay.ts:OverlayCellsUpdate",
     "src/renderer/SelectionOverlay.ts:OverlayLineUpdate",
-    "src/renderer/SelectionOverlay.ts:OverlayPointUpdate",
     "src/renderer/SelectionOverlay.ts:OverlayRegion",
     "src/renderer/SelectionOverlay.ts:OverlayShape",
     "src/renderer/SelectionOverlay.ts:OverlayUpdate",

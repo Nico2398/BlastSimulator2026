@@ -43,7 +43,7 @@ const EMPLOYEE_DEFAULTS = {
  */
 function resolveDriverBoarding(ctx: MiningContext): void {
   tickLocomotion(ctx.state!, ctx.emitter);
-  tickArrivalGate(ctx.state!, ctx.emitter);
+  tickArrivalGate(ctx.state!);
 }
 
 // ── Test context factory ──

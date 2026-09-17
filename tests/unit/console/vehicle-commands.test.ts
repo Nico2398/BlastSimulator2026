@@ -521,17 +521,15 @@ describe('vehicle reposition — auto-selects a driver when the vehicle has none
   });
 });
 
-// ── vehicle assign / vehicle move — removed once callers migrate to reposition (#1092) ──
+// ── vehicle assign / vehicle move — deleted in favour of reposition (#1092) ──
 //
-// Both subcommands exist today only to install a reposition itinerary on a
-// vehicle's driver (see vehicle.ts's own TODO(#1092) comments on each case) —
-// `reposition` above is their replacement. This pins the END STATE: once
-// removed, each falls through to the same unrecognized-subcommand usage
-// error every other unknown subcommand produces. Fails today (both still
-// exist and return their own success/failure), passes once removed.
+// Both subcommands used to install a reposition itinerary on a vehicle's
+// driver; `vehicle reposition` above replaced them and their cases are gone
+// from vehicle.ts. These pin that removal: each now falls through to the same
+// unrecognized-subcommand usage error every other unknown subcommand produces.
 
 describe('vehicle assign / vehicle move — no longer recognized subcommands (#1092)', () => {
-  it('"vehicle assign" falls through to the generic usage error once removed', () => {
+  it('"vehicle assign" falls through to the generic usage error', () => {
     const ctx = makeCtx();
     const vehicleId = addTruckVehicle(ctx);
 
@@ -541,7 +539,7 @@ describe('vehicle assign / vehicle move — no longer recognized subcommands (#1
     expect(result.output).toBe(t('vehicle.usage'));
   });
 
-  it('"vehicle move" falls through to the generic usage error once removed', () => {
+  it('"vehicle move" falls through to the generic usage error', () => {
     const ctx = makeCtx();
     const vehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);

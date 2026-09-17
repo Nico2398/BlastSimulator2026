@@ -237,7 +237,7 @@ export function canReleaseStrandedOnFootAction(
  * now judged by the same real reachability check every other claim/release
  * decision in this module already uses instead of that function's own
  * weaker "nobody has boarded yet" heuristic — an employee who simply hasn't
- * started walking yet also has `vehicle.driverId === null`, so pairing that
+ * started walking yet also leaves `vehicleDriverId(vehicle) === null`, so pairing that
  * with a genuine `resolveActionCost` failure is what distinguishes actually
  * stranded from merely not-yet-started.
  *

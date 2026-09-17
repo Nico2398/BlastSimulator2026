@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { FleetPanel } from '../../../../src/ui/panels/FleetPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
@@ -9,6 +9,10 @@ import type { Employee } from '../../../../src/core/entities/Employee.js';
 import { NavGrid } from '../../../../src/core/nav/NavGrid.js';
 import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
+import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
+import type {
+  PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler,
+} from '../../../../src/ui/scene/PlacementController.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -430,6 +434,173 @@ function makeManyVehicles(count: number): ReturnType<typeof makeVehicle>[] {
   // to this test's own concern.
   return Array.from({ length: count }, (_, i) => makeVehicle({ id: i + 1, x: i, z: 0, targetX: i, targetZ: 0 }));
 }
+
+// ── Reposition (#1092) ──────────────────────────────────────────────────────
+//
+// The button's two disabled branches mirror what `vehicle reposition` itself
+// refuses (a vehicle reserved for a task, a role nobody on the roster is
+// licensed for), so the player is told why up front instead of clicking into a
+// refusal. When it is enabled, clicking arms the shared point picker and the
+// confirmed tile becomes the console command — the whole player-facing path to
+// the itinerary's `reposition` goal.
+
+/** Lightweight stand-in for PlacementController/SelectionOverlay/ParamStrip — mirrors Drill.test.ts's own mock kit, plus arm()'s initialSelection, which the Reposition flow relies on. */
+function makeMockKit() {
+  let armed = false;
+  let phase: 'idle' | 'armed' | 'selected' = 'idle';
+  let selection: PlacementSelection | null = null;
+  let confirmHandler: PlacementConfirmHandler | null = null;
+  let changeHandler: PlacementChangeHandler | null = null;
+
+  const controller = {
+    get isArmed() { return armed; },
+    get currentPhase() { return phase; },
+    get selection() { return selection; },
+    get activeRegion() { return null; },
+    get canConfirm() { return selection !== null; },
+    setConfirmHandler: (cb: PlacementConfirmHandler) => { confirmHandler = cb; },
+    setCancelHandler: vi.fn(),
+    setChangeHandler: (cb: PlacementChangeHandler) => { changeHandler = cb; },
+    arm: (config: PlacementArmConfig) => {
+      armed = true;
+      phase = config.initialSelection ? 'selected' : 'armed';
+      selection = config.initialSelection
+        ? { x1: config.initialSelection.x, z1: config.initialSelection.z, x2: config.initialSelection.x, z2: config.initialSelection.z }
+        : null;
+    },
+    cancel: () => { armed = false; phase = 'idle'; selection = null; changeHandler?.(); },
+    simulateSelect(sel: PlacementSelection) { selection = sel; phase = 'selected'; changeHandler?.(); },
+    simulateConfirm() { if (selection) confirmHandler?.(selection); },
+  };
+  const overlay = { update: vi.fn(), clear: vi.fn(), flashConfirm: vi.fn() };
+  const strip = { show: vi.fn(), hide: vi.fn(), setConfirmHandler: vi.fn(), setCancelHandler: vi.fn() };
+
+  return { kit: { controller, overlay, strip } as unknown as PlacementKit, controller, overlay, strip };
+}
+
+/** A truck driver holding the licence every debris_hauler needs. */
+function makeLicensedTruckDriver(overrides: Partial<Employee> = {}): Employee {
+  return makeEmployee({
+    id: 6, name: 'Dorian Kask',
+    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
+    ...overrides,
+  });
+}
+
+function repositionBtn(panel: FleetPanel): HTMLButtonElement {
+  return panel.root.querySelector('.bs-fleet-reposition-btn') as HTMLButtonElement;
+}
+
+describe('FleetPanel — Reposition button (#1092)', () => {
+  it('is disabled and explains why when the vehicle is reserved for a task', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler', reservedForActionId: 11 })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    const btn = repositionBtn(panel);
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toBe(t('ui.fleet.reposition_busy'));
+  });
+
+  it('is disabled and explains why when nobody living holds the role licence', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'drill_rig' })],
+      [makeEmployee({ id: 6 })], // no qualifications at all
+    ));
+
+    const btn = repositionBtn(panel);
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toBe(t('ui.fleet.no_licensed', { licence: t('skill.driving.drill_rig') }));
+  });
+
+  it('counts only a LIVING licensed employee — a dead licence holder still leaves the button refused', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
+      [makeLicensedTruckDriver({ alive: false })],
+    ));
+
+    expect(repositionBtn(panel).disabled).toBe(true);
+  });
+
+  it('is enabled when the vehicle is free and someone is licensed', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    const btn = repositionBtn(panel);
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).toBe(t('ui.fleet.reposition_hint'));
+  });
+
+  it('clicking arms the placement kit, pre-selected on the vehicle\'s own tile', () => {
+    const { panel } = makePanel();
+    const { kit, controller, strip } = makeMockKit();
+    panel.setPlacementKit(kit);
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler', x: 7.4, z: 11.6 })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    repositionBtn(panel).click();
+
+    expect(controller.isArmed).toBe(true);
+    expect(controller.selection).toEqual({ x1: 7, z1: 12, x2: 7, z2: 12 });
+    expect(strip.show).toHaveBeenCalled();
+  });
+
+  it('dispatches the real reposition command for the confirmed tile', () => {
+    const { panel } = makePanel();
+    const { kit, controller, overlay } = makeMockKit();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.setPlacementKit(kit);
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler', x: 5, z: 5 })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    repositionBtn(panel).click();
+    controller.simulateSelect({ x1: 18, z1: 4, x2: 18, z2: 4 });
+    controller.simulateConfirm();
+
+    expect(calls).toEqual(['vehicle reposition 2 18 4']);
+    expect(overlay.flashConfirm).toHaveBeenCalled();
+  });
+
+  it('clicking a second time cancels instead of re-arming (the button is a toggle)', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeMockKit();
+    panel.setPlacementKit(kit);
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    repositionBtn(panel).click();
+    repositionBtn(panel).click();
+
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('does nothing and does not throw when no placement kit has been wired', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    expect(() => repositionBtn(panel).click()).not.toThrow();
+    expect(calls).toEqual([]);
+  });
+});
 
 describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
   it('nests all 12 vehicle cards inside a single bounded wrapper, not flattened directly into bodyEl', () => {

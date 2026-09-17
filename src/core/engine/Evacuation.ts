@@ -75,8 +75,8 @@ export function isMidEvacuationWalk(employee: Employee): boolean {
  * NeedTaskInsertion.ts each repeated at their own call sites into the one
  * call those sites now make.
  */
-export function isMidEvacuation(state: GameState, employee: Employee): boolean {
-  return isMidEvacuationWalk(employee) || isMidEvacuationDrive(state.vehicles, employee);
+export function isMidEvacuation(employee: Employee): boolean {
+  return isMidEvacuationWalk(employee) || isMidEvacuationDrive(employee);
 }
 
 /**

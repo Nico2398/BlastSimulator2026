@@ -6,7 +6,6 @@
 // loop, after entity movement has been advanced.
 
 import type { GameState } from '../state/GameState.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
@@ -48,10 +47,7 @@ export interface ArrivalGateResult {
  * seedTaskTimerFields call below so a `dig_ramp_segment` action's duration
  * can be computed off the live voxel count (#924).
  */
-// `_emitter`: nothing in this gate emits any more (#1092 moved the last one,
-// the evacuation-driver dismount, into the itinerary's own alight step) —
-// kept on the signature so the tick pipeline's call site stays unchanged.
-export function tickArrivalGate(state: GameState, _emitter?: EventEmitter, grid?: VoxelGrid): ArrivalGateResult {
+export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGateResult {
   // #1092: an evacuation driver is dismounted by their own itinerary's final
   // `alight` arrival step (Zone.ts's clearZone, via MoveTo's alightOnArrival)
   // the tick the drive lands, so there is no separate arrived-driver sweep

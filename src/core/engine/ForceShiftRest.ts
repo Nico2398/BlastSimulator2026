@@ -360,7 +360,7 @@ export function forceShiftRestIfNeededByPolicy(
   // free to reassign and overwrite the evacuation destination with a walk
   // back toward a living_quarters, possibly right back inside the danger
   // zone they were just ordered out of.
-  if (isMidEvacuation(state, emp)) return;
+  if (isMidEvacuation(emp)) return;
   // #1090 follow-up: idle but mounted, with a same-role follow-up already
   // queued and unclaimed — about to be picked up by the ordinary cost-ranked
   // pool dispatch at near-zero cost. See hasClaimableSameRoleFollowUp's own

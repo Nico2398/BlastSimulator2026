@@ -246,7 +246,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     // leg puts the driver back on foot, which only clearZone ever plans.
     employee.itinerary = makeRepositionItinerary(vehicle.id, { kind: 'alight' });
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(true);
+    expect(isMidEvacuationDrive(employee)).toBe(true);
   });
 
   it('true while still walking over to board the vehicle — the rescue is one itinerary, board leg included', () => {
@@ -264,7 +264,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
       estTotalTicks: 14,
     };
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(true);
+    expect(isMidEvacuationDrive(employee)).toBe(true);
   });
 
   it('false for an ordinary player-ordered reposition — the driver stays in the cab, so the last leg alights nobody (boundary)', () => {
@@ -275,7 +275,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     vehicle.occupantIds = [employee.id];
     employee.itinerary = makeRepositionItinerary(vehicle.id, { kind: 'none' });
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false for a work itinerary that happens to end in an alight — only a reposition goal counts (rejection)', () => {
@@ -287,7 +287,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     const itinerary = makeRepositionItinerary(vehicle.id, { kind: 'alight' });
     employee.itinerary = { ...itinerary, goal: { kind: 'work', actionId: 7 } };
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false once the drive lands and Locomotion clears the itinerary, even with the driver still aboard', () => {
@@ -298,7 +298,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     vehicle.occupantIds = [employee.id];
     employee.itinerary = null;
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false for an employee not driving anything', () => {
@@ -308,7 +308,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     employee.activeActionId = null;
     purchaseVehicle(state.vehicles, 'debris_hauler'); // driverless
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false for an ordinary vehicle-gated driver — activeActionId still non-null while driving (distinguishes a task drive from an evacuation drive)', () => {
@@ -319,7 +319,7 @@ describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.occupantIds = [employee.id];
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 });
 

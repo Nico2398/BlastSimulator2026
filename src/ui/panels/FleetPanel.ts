@@ -32,7 +32,7 @@ import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDri
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
-import { placementRefusalReason } from '../scene/PlacementKit.js';
+import { armPointPick } from '../scene/PlacementKit.js';
 
 
 export class FleetPanel extends PanelBase {
@@ -44,7 +44,7 @@ export class FleetPanel extends PanelBase {
   private lastSignature = '';
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
-  /** Shared in-scene placement tool (#1092), for the "Reposition" click flow — armed by each card's Reposition button, same pattern as `SurveyPanel.pickTargetAndRun`. */
+  /** Shared in-scene placement tool (#1092), for the "Reposition" click flow — armed by each card's Reposition button through `armPointPick`, same as `SurveyPanel.pickTargetAndRun`. */
   private placementKit: PlacementKit | null = null;
 
   constructor(container: HTMLElement) {
@@ -74,8 +74,8 @@ export class FleetPanel extends PanelBase {
 
   /**
    * Arms the shared placement tool to pick a parking spot for `vehicleId`,
-   * the "Reposition" click flow's entry point — same pattern as
-   * `SurveyPanel.pickTargetAndRun`: arm on click, dispatch
+   * the "Reposition" click flow's entry point — the same `armPointPick` flow
+   * `SurveyPanel.pickTargetAndRun` uses: arm on click, dispatch
    * `vehicle reposition <id> <x> <z>` via `this.gameConsole` on confirm.
    * Pre-selects the vehicle's own tile so Confirm is reachable immediately
    * and the player can see which vehicle the strip is talking about.
@@ -83,38 +83,18 @@ export class FleetPanel extends PanelBase {
   requestReposition(vehicleId: number): void {
     const kit = this.placementKit;
     if (!kit) return;
-    const { controller, overlay, strip } = kit;
-    if (controller.isArmed) { controller.cancel(); return; }
 
     const vehicle = this.lastState?.vehicles.vehicles.find(v => v.id === vehicleId);
-    const subtitle = vehicle ? vehicleDisplayName(vehicle.type, vehicle.tier) : `#${vehicleId}`;
 
-    const refresh = (): void => {
-      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
-      const sel = controller.selection;
-      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1 } : null);
-      strip.show({
-        icon: 'vehicle',
-        title: t('ui.fleet.reposition_pick_target'),
-        subtitle,
-        fields: [],
-        result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
-        instruction: t('ui.fleet.reposition_pick_instruction'),
-      });
-    };
-
-    controller.setConfirmHandler((sel) => {
-      this.gameConsole?.(`vehicle reposition ${vehicleId} ${sel.x1} ${sel.z1}`);
-      overlay.flashConfirm();
-    });
-    controller.setChangeHandler(refresh);
-    controller.arm({
-      shape: 'point',
+    armPointPick(kit, {
+      icon: 'vehicle',
+      title: t('ui.fleet.reposition_pick_target'),
+      subtitle: vehicle ? vehicleDisplayName(vehicle.type, vehicle.tier) : `#${vehicleId}`,
+      instruction: t('ui.fleet.reposition_pick_instruction'),
+      result: (sel) => `(${sel.x1}, ${sel.z1})`,
       ...(vehicle ? { initialSelection: { x: Math.round(vehicle.x), z: Math.round(vehicle.z) } } : {}),
+      onConfirm: (sel) => { this.gameConsole?.(`vehicle reposition ${vehicleId} ${sel.x1} ${sel.z1}`); },
     });
-    refresh();
   }
 
 
