@@ -369,6 +369,23 @@ function migrateV19ToV20(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v20 -> v21 (#1092, skeleton): reserved for the phase-6 dead-field strip
+ * (`driverId`/`pendingEvacuationDestination` mirrors removed from `Vehicle`)
+ * once the implementer migrates the ~20 call sites that still read them.
+ * Pass-through stub so the migration chain type-checks before that lands —
+ * not yet wired into `deserialize`'s version-gated chain below, and
+ * `SAVE_VERSION` is not bumped yet.
+ */
+// Exported (unlike the version-gated migrations above) only because nothing
+// calls it yet — TS's noUnusedLocals would otherwise flag it dead until the
+// implementer wires it into deserialize's chain, at which point this reverts
+// to an unexported function like migrateV19ToV20.
+export function migrateV20ToV21(obj: Record<string, unknown>): Record<string, unknown> {
+  // TODO: implement (#1092).
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */

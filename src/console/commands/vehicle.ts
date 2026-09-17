@@ -126,6 +126,11 @@ export function vehicleCommand(
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: t('vehicle.buy_success', { type, id: vehicle.id, cost }) };
     }
+    // TODO(#1092): `assign task:moving` and `move` both exist only to install
+    // a reposition itinerary on a vehicle's driver — the target end-state is
+    // `reposition` below as the one entry point for "drive this vehicle
+    // somewhere with no work attached," with these two subcommands removed
+    // once callers (tutorial stages, scenario defs) migrate to it.
     case 'assign': {
       const id = parseInt(args[1] ?? '', 10);
       const task = (named['task'] ?? 'idle') as VehicleTask;
@@ -166,6 +171,8 @@ export function vehicleCommand(
       assignVehicle(state.vehicles, id, task, targetX, targetZ);
       return { success: true, output: t('vehicle.assign_success', { id, task }) };
     }
+    // TODO(#1092): superseded by `reposition` below — see the `assign` case's
+    // own TODO for the target end-state.
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);
       const toCoords = (named['to'] ?? '').split(',').map(Number);
@@ -276,7 +283,25 @@ export function vehicleCommand(
       }
       return { success: true, output: t('vehicle.break_success', { id: vehicleId, fragmentId }) };
     }
+    case 'reposition': {
+      return repositionVehicleCommand(ctx, args);
+    }
     default:
       return { success: false, output: t('vehicle.usage') };
   }
+}
+
+// ── reposition subcommand (#1092) ──
+
+/**
+ * `vehicle reposition <id> <x> <z>` — the target end-state for driving a
+ * vehicle somewhere with no work attached (Itinerary's `reposition` Goal,
+ * already planned by `planItinerary`), replacing `assign task:moving` and
+ * `move` above once callers migrate — see those cases' own TODOs.
+ */
+function repositionVehicleCommand(_ctx: GameContext, _args: string[]): CommandResult {
+  // TODO: implement (#1092) — parse <id> <x> <z>, find an available driver
+  // via findAvailableDriverForReposition (VehicleDriverAssignment.ts), then
+  // moveTo(state, driver.id, { x, z }, { via: id }) same as `move` above.
+  throw new Error('not implemented');
 }

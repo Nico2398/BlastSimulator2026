@@ -6,6 +6,7 @@
 // kind + raw data, never player-facing text — mirrors EmployeeActivity.ts.
 
 import type { Vehicle, VehicleTask } from './Vehicle.js';
+import type { Employee } from './Employee.js';
 
 export type VehicleStatusKind = 'broken' | 'stuck' | 'waiting' | 'hauling' | 'working' | 'moving' | 'idle';
 
@@ -34,8 +35,13 @@ const IDLE: VehicleStatus = { kind: 'idle', ticks: null, haulingPhase: null, tas
  * distinguishes the two sub-phases now that there is no separate
  * `haulingPhase` field on `Vehicle`: not yet loaded (still driving to the
  * fragment) vs. already loaded (driving to the depot).
+ *
+ * `occupant`, optional (#1092): the vehicle's driver, when the caller has it
+ * in hand, for a future reposition-aware status line (e.g. distinguishing a
+ * reposition drive from ordinary `moving`). Unused until the implementer
+ * wires it in — every existing call site keeps working unchanged.
  */
-export function computeVehicleStatus(v: Vehicle): VehicleStatus {
+export function computeVehicleStatus(v: Vehicle, _occupant?: Employee): VehicleStatus {
   if (v.state === 'broken') return { ...IDLE, kind: 'broken' };
   if (v.isMoveStuck) return { ...IDLE, kind: 'stuck', ticks: v.waitingTicks };
   if (v.state === 'waiting') return { ...IDLE, kind: 'waiting', ticks: v.waitingTicks };

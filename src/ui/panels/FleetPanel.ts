@@ -28,6 +28,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { PlacementKit } from '../scene/PlacementKit.js';
 
 
 export class FleetPanel extends PanelBase {
@@ -39,6 +40,8 @@ export class FleetPanel extends PanelBase {
   private lastSignature = '';
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
+  /** Shared in-scene placement tool (#1092), for the "Reposition" click flow — armed by a per-card button the implementer adds, same pattern as `SurveyPanel.pickTargetAndRun`. */
+  private placementKit: PlacementKit | null = null;
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-vehicle-panel'));
@@ -62,6 +65,21 @@ export class FleetPanel extends PanelBase {
 
   /** Register a callback fired when a vehicle's Fleet panel row is clicked to select it. */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void { this.onSelectVehicleCb = cb; }
+
+  setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
+
+  /**
+   * Arms the shared placement tool to pick a parking spot for `vehicleId`,
+   * the "Reposition" click flow's entry point — same pattern as
+   * `SurveyPanel.pickTargetAndRun`: arm on click, dispatch
+   * `vehicle reposition <id> <x> <z>` via `this.gameConsole` on confirm.
+   * Stub only: the implementer wires the per-card button, arm/refresh/cancel,
+   * and the confirm dispatch; also adds the card's "Reposition" button itself.
+   */
+  requestReposition(_vehicleId: number): void {
+    if (!this.placementKit) return;
+    // TODO: implement (#1092).
+  }
 
 
   update(state: GameState): void {

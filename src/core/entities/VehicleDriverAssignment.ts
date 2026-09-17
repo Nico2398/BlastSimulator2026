@@ -125,3 +125,23 @@ function distanceSq(employee: Employee, vehicle: Vehicle): number {
   const dz = employee.z - vehicle.z;
   return dx * dx + dz * dz;
 }
+
+// ── Reposition driver assignment (#1092) ──
+
+/**
+ * Picks a licensed, available employee to drive `vehicle` to a player-chosen
+ * parking spot (the `reposition` Goal — see `gameplay-vehicle-fleet` phase
+ * 6), or null when none qualifies. Unlike `findBestEvacuationDriver`, a
+ * reposition is player-initiated rather than urgency-ranked against a
+ * caller-supplied candidate pool, so this takes no `candidateEmployeeIds` or
+ * `canReach` — the implementer decides the source pool and reachability
+ * check when this is wired up.
+ */
+export function findAvailableDriverForReposition(
+  _vehicle: Vehicle,
+  _vehicleState: VehicleState,
+  _employeeState: EmployeeState,
+): Employee | null {
+  // TODO: implement (#1092).
+  return null;
+}
