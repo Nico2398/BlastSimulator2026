@@ -776,8 +776,15 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
   ): void {
     // Only once already down to the post-sell-ore minimal crew (driver +
     // hauler) — before that, stagnation just means the blast hasn't
-    // happened yet, not that the job is done.
-    if (state.employees.employees.length !== 1 || state.vehicles.vehicles.length !== 1) return;
+    // happened yet, not that the job is done. Generalized (#1130) from a
+    // strict "exactly one employee total" to tolerate a permanently
+    // unionized non-driver straggler the sell-ore layoff loop below could
+    // never fire in the first place: exactly one driver, every OTHER
+    // employee still on the roster unionized (nobody the layoff loop could
+    // have gotten rid of), and exactly one vehicle.
+    const drivers = state.employees.employees.filter((e) => e.role === 'driver');
+    const nonDrivers = state.employees.employees.filter((e) => e.role !== 'driver');
+    if (drivers.length !== 1 || !nonDrivers.every((e) => e.unionized) || state.vehicles.vehicles.length !== 1) return;
 
     const completedCount = state.contracts.completedHistory.filter((c) => c.completed).length;
     if (state.logistics.storedMassKg !== stagnation.lastStoredMassKg || completedCount !== stagnation.lastCompletedCount) {
@@ -972,7 +979,23 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
         // the profit line, exactly as `sellCompletableContracts` already
         // does for selling (#959).
         for (const emp of [...state.employees.employees]) {
-          if (emp.role !== 'driver') run(`employee fire ${emp.id}`);
+          if (emp.role !== 'driver') {
+            const fireResult = run(`employee fire ${emp.id}`);
+            // A unionized employee's refusal is expected (fireEmployee,
+            // Employee.ts) — they simply stay employed, and
+            // windDownOnceExhausted's own crew-size check (#1130) already
+            // tolerates a unionized non-driver straggler surviving this
+            // loop. Any OTHER refusal reason is a real regression — fail
+            // loudly here rather than silently draining cash on an
+            // unfireable-for-an-unknown-reason employee for the rest of the
+            // run (#1130's own regression: the loop used to swallow every
+            // refusal reason unconditionally).
+            if (!fireResult.success && !emp.unionized) {
+              throw new Error(
+                `Setup: employee fire ${emp.id} failed for a reason other than unionization -- ${fireResult.output}`,
+              );
+            }
+          }
         }
 
         // Same logic for the fleet: the drill_rig and rock_digger already

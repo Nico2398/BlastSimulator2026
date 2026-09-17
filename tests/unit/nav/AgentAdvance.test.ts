@@ -432,6 +432,167 @@ describe('advanceAlongPath — stationary-at-dead-end does not misfire the retra
   });
 });
 
+// ── #1130: period-2 oscillation trips isStuck even though pathFound stays true ──
+//
+// findPath can hand back two equal-cost route shapes that alternate tick over
+// tick near a terrain ridge — a genuine A/B/A/B position cycle. The old
+// stuck-counter reset fired on every `found: true` tick regardless of whether
+// the mover's position actually changed, so this cycle never tripped
+// isStuck. moveHistoryX/Z is a 2-tick shift register (input == the mover's
+// own position 2 ticks back; output == this tick's own pre-move position) —
+// when the tick's final position exactly matches moveHistoryX/Z AND the leg
+// did not complete this tick, that's the oscillation's signature and must run
+// through the same failure-accumulation path `!path.found` already uses,
+// without ever reporting `pathFound: false`.
+
+describe('advanceAlongPath — period-2 oscillation trips isStuck (#1130)', () => {
+  /** A single-hop path whose only waypoint is `target` — walkSpeed covers it in one tick, landing exactly on it. */
+  function hopTo(target: { x: number; z: number }): { found: true; waypoints: Array<{ x: number; z: number }> } {
+    return { found: true, waypoints: [target] };
+  }
+
+  it('crosses STUCK_THRESHOLD via a synthetic A/B/A/B cycle even though every tick reports pathFound: true, and becameStuck fires exactly once on the transition', () => {
+    const A = { x: 0, z: 0 };
+    const B = { x: 1, z: 0 };
+
+    let x = A.x, z = A.z;
+    let consecutiveFailures = 0;
+    let isStuck = false;
+    let moveHistoryX: number | null = null;
+    let moveHistoryZ: number | null = null;
+    const becameStuckTicks: boolean[] = [];
+    const pathFoundTicks: boolean[] = [];
+
+    // Alternate the "fresh path" target every tick between B and A — with
+    // walkSpeed exactly covering one hop, the mover's own position follows
+    // the identical A/B/A/B cycle.
+    for (let tick = 0; tick < STUCK_THRESHOLD + 3; tick++) {
+      const target = tick % 2 === 0 ? B : A;
+      const result = advanceAlongPath(baseInput({
+        x, z,
+        walkSpeed: 1, // exactly one full hop between A and B per tick
+        destinationX: 10, destinationZ: 10, // far away — the leg never legitimately completes
+        consecutiveFailures, isStuck,
+        path: hopTo(target),
+        committed: NULL_ROUTE_COMMITMENT,
+        moveHistoryX, moveHistoryZ,
+      }));
+
+      pathFoundTicks.push(result.pathFound);
+      becameStuckTicks.push(result.becameStuck);
+      x = result.x;
+      z = result.z;
+      consecutiveFailures = result.consecutiveFailures;
+      isStuck = result.isStuck;
+      moveHistoryX = result.moveHistoryX;
+      moveHistoryZ = result.moveHistoryZ;
+    }
+
+    // Every tick genuinely found and walked a route — this is not the
+    // `!path.found` mechanism.
+    expect(pathFoundTicks.every(Boolean)).toBe(true);
+    expect(isStuck).toBe(true);
+    expect(becameStuckTicks.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('does not trip isStuck when a 3+-tick path legitimately revisits a cell it passed through earlier (not a strict period-2 alternation)', () => {
+    // A → B → C → A → B → C ... — a period-3 cycle. No tick's own position
+    // ever matches its OWN 2-ticks-back position under this cycle (A's
+    // 2-back is C, B's 2-back is A, C's 2-back is B) — never a match, so the
+    // oscillation signature never fires despite the mover genuinely
+    // revisiting cells.
+    const A = { x: 0, z: 0 };
+    const B = { x: 1, z: 0 };
+    const C = { x: 2, z: 0 };
+    const cycle = [B, C, A, B, C, A, B, C, A, B];
+
+    let x = A.x, z = A.z;
+    let consecutiveFailures = 0;
+    let isStuck = false;
+    let moveHistoryX: number | null = null;
+    let moveHistoryZ: number | null = null;
+
+    for (const target of cycle) {
+      const result = advanceAlongPath(baseInput({
+        x, z,
+        walkSpeed: 1,
+        destinationX: 10, destinationZ: 10,
+        consecutiveFailures, isStuck,
+        path: hopTo(target),
+        committed: NULL_ROUTE_COMMITMENT,
+        moveHistoryX, moveHistoryZ,
+      }));
+
+      x = result.x;
+      z = result.z;
+      consecutiveFailures = result.consecutiveFailures;
+      isStuck = result.isStuck;
+      moveHistoryX = result.moveHistoryX;
+      moveHistoryZ = result.moveHistoryZ;
+
+      expect(isStuck).toBe(false);
+    }
+  });
+
+  it('the first two ticks of any journey (moveHistoryX/Z still null) never false-positive, and reset normally on a found path', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 0, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 0,
+      consecutiveFailures: STUCK_THRESHOLD - 1,
+      isStuck: false,
+      path: { found: true, waypoints: [{ x: AGENT_WALK_SPEED, z: 0 }] },
+      committed: NULL_ROUTE_COMMITMENT,
+      moveHistoryX: null,
+      moveHistoryZ: null,
+    }));
+
+    expect(result.pathFound).toBe(true);
+    expect(result.isStuck).toBe(false);
+    expect(result.becameStuck).toBe(false);
+    expect(result.consecutiveFailures).toBe(0);
+  });
+
+  it('leg completing this tick always resets the stuck counter, even on what would otherwise look like an oscillating tick', () => {
+    // Position exactly matches moveHistoryX/Z (the oscillation signature),
+    // but the leg completes this very tick — isPathComplete must win.
+    const result = advanceAlongPath(baseInput({
+      x: 9, z: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 0,
+      consecutiveFailures: STUCK_THRESHOLD,
+      isStuck: false,
+      path: { found: true, waypoints: [{ x: 10, z: 0 }] },
+      committed: NULL_ROUTE_COMMITMENT,
+      // Pre-fix-shaped history: the mover's position 2 ticks back happens to
+      // equal where this tick's hop actually lands — irrelevant, since the
+      // leg completes.
+      moveHistoryX: 10,
+      moveHistoryZ: 0,
+    }));
+
+    expect(result.isPathComplete).toBe(true);
+    expect(result.isStuck).toBe(false);
+    expect(result.consecutiveFailures).toBe(0);
+  });
+
+  it('shift-register invariant: this tick\'s output moveHistoryX/Z equals this tick\'s own pre-move input x/z', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 3, z: 4,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: 10, destinationZ: 4,
+      path: { found: true, waypoints: [{ x: 5, z: 4 }] },
+      committed: NULL_ROUTE_COMMITMENT,
+      moveHistoryX: 1,
+      moveHistoryZ: 4,
+    }));
+
+    expect(result.moveHistoryX).toBe(3);
+    expect(result.moveHistoryZ).toBe(4);
+  });
+
+});
+
 describe('advanceAlongPath — off-grid destination still completes the leg (#1129 bug 2)', () => {
   it('reports the leg complete on reaching the fresh path\'s own last waypoint even though it never equals the raw destination', () => {
     // destinationX/Z (100,0) sits far outside anything the NavGrid could

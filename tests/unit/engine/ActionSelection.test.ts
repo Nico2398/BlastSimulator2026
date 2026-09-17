@@ -23,6 +23,7 @@ import {
   canReleaseStrandedOnFootAction,
   findStarvedActionForEmployee,
   cellsToTravelTicks,
+  isActionPastStuckBackoff,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -31,7 +32,7 @@ import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLiving
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
@@ -1250,6 +1251,109 @@ describe('findStarvedActionForEmployee (#1000, #1060)', () => {
     const result = findStarvedActionForEmployee(state, emp);
 
     expect(result).toBeNull();
+  });
+
+  // ── stuck-abandon backoff filter (#1130) ─────────────────────────────────
+  //
+  // A vehicle that just abandoned this action as stuck stamps
+  // stuckBackoffUntilTick — findStarvedActionForEmployee must never hand the
+  // identical action straight back out during that window, even though it is
+  // otherwise starved, unclaimed, and on-foot-eligible.
+
+  it('does not report an action still inside its stuckBackoffUntilTick window as starved, even though every other starvation condition holds', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({
+      id: 1, targetX: 3, targetZ: 0, queuedAtTick: 0,
+      stuckBackoffUntilTick: ACTION_STARVATION_TICK_THRESHOLD + 5,
+    });
+    state.pendingActions.push(action);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD;
+
+    const result = findStarvedActionForEmployee(state, emp);
+
+    expect(result).toBeNull();
+  });
+
+  it('reports the same action as starved again once its stuckBackoffUntilTick has passed', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const action = makeAction({
+      id: 1, targetX: 3, targetZ: 0, queuedAtTick: 0,
+      stuckBackoffUntilTick: ACTION_STARVATION_TICK_THRESHOLD,
+    });
+    state.pendingActions.push(action);
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD;
+
+    const result = findStarvedActionForEmployee(state, emp);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(action.id);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// isActionPastStuckBackoff (#1130)
+//
+// PendingAction.stuckBackoffUntilTick is stamped by interruptActiveAction
+// when a vehicle abandons an action as stuck (options.forceOpenPool), so the
+// exact same action isn't reclaimed by the next dispatch pass an instant
+// later. isActionPastStuckBackoff is the single predicate every claim-
+// eligibility filter (EmployeeDispatchSteps.ts's claimActionsTargetedAtEmployee/
+// claimOnePoolCandidate, and findStarvedActionForEmployee above) ANDs itself
+// against.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('isActionPastStuckBackoff (#1130)', () => {
+  it('returns true when stuckBackoffUntilTick is undefined — never had a backoff (happy path)', () => {
+    const state = makeState();
+    const action = makeAction({ id: 1 });
+    expect(action.stuckBackoffUntilTick).toBeUndefined();
+
+    expect(isActionPastStuckBackoff(state, action)).toBe(true);
+  });
+
+  it('returns true when stuckBackoffUntilTick is null — never had a backoff', () => {
+    const state = makeState();
+    const action = makeAction({ id: 1, stuckBackoffUntilTick: null });
+
+    expect(isActionPastStuckBackoff(state, action)).toBe(true);
+  });
+
+  it('returns false while state.tickCount is still short of stuckBackoffUntilTick (boundary: one tick short)', () => {
+    const state = makeState();
+    state.tickCount = 100;
+    const action = makeAction({ id: 1, stuckBackoffUntilTick: 101 });
+
+    expect(isActionPastStuckBackoff(state, action)).toBe(false);
+  });
+
+  it('returns true once state.tickCount reaches stuckBackoffUntilTick exactly (boundary)', () => {
+    const state = makeState();
+    state.tickCount = 101;
+    const action = makeAction({ id: 1, stuckBackoffUntilTick: 101 });
+
+    expect(isActionPastStuckBackoff(state, action)).toBe(true);
+  });
+
+  it('returns true well past stuckBackoffUntilTick', () => {
+    const state = makeState();
+    state.tickCount = 500;
+    const action = makeAction({ id: 1, stuckBackoffUntilTick: 101 });
+
+    expect(isActionPastStuckBackoff(state, action)).toBe(true);
+  });
+
+  it('reflects ACTION_STUCK_BACKOFF_TICKS-scaled windows realistically: still backed off just under the configured window, past it just after', () => {
+    const state = makeState();
+    const stampedAtTick = 1000;
+    const action = makeAction({ id: 1, stuckBackoffUntilTick: stampedAtTick + ACTION_STUCK_BACKOFF_TICKS });
+
+    state.tickCount = stampedAtTick + ACTION_STUCK_BACKOFF_TICKS - 1;
+    expect(isActionPastStuckBackoff(state, action)).toBe(false);
+
+    state.tickCount = stampedAtTick + ACTION_STUCK_BACKOFF_TICKS;
+    expect(isActionPastStuckBackoff(state, action)).toBe(true);
   });
 });
 
