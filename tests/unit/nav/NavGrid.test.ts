@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, type NavCellType, type NavCell, isVehicleCurrentlyDriving } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -22,7 +22,7 @@ import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
 import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import { createVehicleState, purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { createVehicleState, purchaseVehicle, isVehicleCurrentlyDriving, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 

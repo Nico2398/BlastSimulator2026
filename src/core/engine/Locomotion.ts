@@ -11,7 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { getVehicleDefByTier, vehicleDriverId, resolveVehicleDriver, getVehicleReservation } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
@@ -306,7 +306,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
 
     emp.x = outcome.x;
     emp.z = outcome.z;
-    if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, leg);
+    if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z);
 
     // Position genuinely advanced this tick — record it regardless of
     // whether the isStuck-abandon branch below also fires (an oscillating
@@ -407,7 +407,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     // this exact way).
     emp.x = outcome.x;
     emp.z = outcome.z;
-    writeVehiclePosition(state, vehicle, outcome.x, outcome.z, leg);
+    writeVehiclePosition(state, vehicle, outcome.x, outcome.z);
     result.moved.push(emp.id);
     result.moved.push(vehicle.id);
     return 'moved';
@@ -450,8 +450,7 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
   // task" are re-derived (#1138) rather than read off the deleted
   // Vehicle.state/.task fields: a driven blocker mid-itinerary is treated as
   // already relocating, and any reservation still means it's genuinely busy.
-  const blockerDriver = resolveVehicleDriver(blocker, state.employees.employees);
-  if (blockerDriver && blockerDriver.itinerary !== null) return true;
+  if (isVehicleCurrentlyDriving(blocker, state.employees.employees)) return true;
   if (getVehicleReservation(state.vehicles, blocker.id) !== null) return false;
 
   const freeCell = findNearestFreeCellForVehicle(state, blocker);
@@ -527,7 +526,7 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
 }
 
 /** Writes a driving employee's advance onto their vehicle — the only place a vehicle's x/z ever changes. */
-function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, _leg: Leg): void {
+function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number): void {
   const prevX = Math.round(vehicle.x);
   const prevZ = Math.round(vehicle.z);
 

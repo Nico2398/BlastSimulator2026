@@ -205,6 +205,18 @@ export function resolveVehicleDriver(vehicle: Vehicle, employees: readonly Emplo
   return employees.find(e => e.id === driverId);
 }
 
+/**
+ * True when `vehicle` is actively being driven right now — replaces the old
+ * `vehicle.state === 'moving'` read (#1138): a vehicle carries no state of
+ * its own any more, so "moving" is derived from its driver's own itinerary
+ * (a non-null itinerary means the driver, and therefore the vehicle they're
+ * mounted in, is still travelling — `gameplay-vehicle-fleet`).
+ */
+export function isVehicleCurrentlyDriving(vehicle: Vehicle, employees: readonly Employee[]): boolean {
+  const driver = resolveVehicleDriver(vehicle, employees);
+  return driver !== undefined && driver.itinerary !== null;
+}
+
 export function createVehicleState(): VehicleState {
   return { vehicles: [], nextId: 1, driverBoardingCount: 0, reservations: [] };
 }

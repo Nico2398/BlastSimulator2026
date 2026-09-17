@@ -82,7 +82,7 @@ when mounted. Nothing else reads or writes an entity's speed.
 
 A vehicle stores identity, position, condition, cargo, and who is inside it. It stores no
 destination, no task, no phase, no movement tracker. `VehicleOperationalState` and `VehicleTask`
-are **derived** for display by `computeVehicleStatus(vehicle, occupant)`, never stored.
+are **derived** for display by `computeVehicleStatus(v, vehicleState, occupant)`, never stored.
 
 Seats: `occupantIds` is an array capped by `VEHICLE_SEAT_COUNT` (every role 1 for now). The
 **driver** is `occupantIds[0]` — the occupant whose itinerary moves the vehicle. Passengers are an
@@ -240,6 +240,7 @@ today. A migration issue updates its own row as it lands.
 | 4 | Cost model delegates to the planner; continuity machinery removed | landed |
 | 5 | Haul and break become leg effects | landed |
 | 6 | `driverId`/`pendingEvacuationDestination` stripped, tier-correct upkeep/fuel, `reposition` ability | landed |
+| 6b | Last stored fields removed (`task`, `state`, `targetX`, `targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`, `reservedForActionId`); reservation moves to `VehicleState.reservations`; `computeVehicleStatus` takes `vehicleState`; fuel bills off reservation state | landed |
 | 7 | Fast transport un-gated | landed |
 
 Phase 0a's own measured baseline (`tutorial-boxcut-full.json`, interaction mode and command mode
@@ -261,7 +262,10 @@ refuses a vehicle reserved for a task) and the Fleet panel's per-card Reposition
 the in-scene tile picker and dispatches it. The display-only `vehicle assign`/`vehicle move`
 subcommands are gone.
 
-Still stored on `Vehicle`, still planned for removal in a later phase: `task`, `state`, `targetX`,
-`targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`, `reservedForActionId`.
-`computeVehicleStatus(vehicle, occupant)` already derives working/moving from the occupant when one
-is passed, which is the seam those removals go through.
+Phase 6b removed the last eight fields stored on `Vehicle` for a reason other than "who is inside
+it": `task`, `state`, `targetX`, `targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`,
+`reservedForActionId`. The reservation a vehicle-gated action holds now lives in
+`VehicleState.reservations` (`{ vehicleId, actionId }` entries), read and written through
+`getVehicleReservation`, `findVehicleReservedForAction`, and `removeVehicleReservation`
+(`Vehicle.ts`) rather than a field on the vehicle itself. Fuel bills off whether a vehicle holds a
+reservation, not off the now-gone `task` field.
