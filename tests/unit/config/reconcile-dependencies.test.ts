@@ -17,7 +17,7 @@ import { join } from 'path';
 const require = createRequire(import.meta.url);
 const ROOT = join(import.meta.dirname, '../../..');
 
-const { missingRelationships, reconcileDependencies } = require(
+const { missingRelationships, reconcileDependencies, declaredDependencies } = require(
   join(ROOT, '.github/scripts/reconcile-dependencies.cjs')
 );
 
@@ -133,5 +133,71 @@ describe('reconcileDependencies', () => {
 
     expect(result.created).toEqual([]);
     expect(result.failed).toEqual([{ number: 1118, reason: '403' }]);
+  });
+
+  // #1090 itself: the label and the body edit that declares a dependency are
+  // two separate API calls that can land in either order. A job that only ever
+  // read the body once, before the edit landed, would find nothing declared and
+  // never get a second chance — no event fires for a later body edit alone.
+  // This proves the reconciler itself does the right thing on a second call
+  // once the body has caught up; `handle-failure.yml` firing that second call
+  // at all is pinned separately in `autonomy-loop.test.ts`.
+  it('creates the relationship once the body gains the section, on a later call', async () => {
+    let body = '## Context\n\nNothing declared yet.\n';
+    const api = fakeApi({
+      getIssue: async (n: number) => ({ number: n, id: 5_000_000 + n, body }),
+      declaredBlockedBy: async () => ({ numbers: [], available: true, unknown: false }),
+    });
+
+    const first = await reconcileDependencies(api, 1090);
+    expect(first.created).toEqual([]);
+    expect(api.calls).toEqual([]);
+
+    body = '## Blocked by\n\n- #1125\n';
+    const second = await reconcileDependencies(api, 1090);
+
+    expect(second.created).toEqual([1125]);
+    expect(api.calls).toEqual([{ number: 1090, blockerId: 5_001_125 }]);
+  });
+
+  // "Nothing declared" and "declared but already recorded" are the same
+  // `missing.length === 0` branch today, and read as the identical log line —
+  // which is exactly what made the #1090 race a silent no-op instead of a
+  // visible retry-me signal. The two must be distinguishable in the log.
+  it('logs "no dependency declared" distinctly from "already a relationship"', async () => {
+    const logsA: string[] = [];
+    await reconcileDependencies(
+      fakeApi({
+        getIssue: async (n: number) => ({ number: n, id: 5_000_000 + n, body: '## Context\n\nNothing here.\n' }),
+        declaredBlockedBy: async () => ({ numbers: [], available: true, unknown: false }),
+      }),
+      1090,
+      { log: (m: string) => logsA.push(m) }
+    );
+    expect(logsA.some((m) => m.includes('no dependency declared'))).toBe(true);
+
+    const logsB: string[] = [];
+    await reconcileDependencies(
+      fakeApi({ declaredBlockedBy: async () => ({ numbers: [1089, 1118], available: true, unknown: false }) }),
+      1090,
+      { log: (m: string) => logsB.push(m) }
+    );
+    expect(logsB.some((m) => m.includes('already a relationship'))).toBe(true);
+    expect(logsB.some((m) => m.includes('no dependency declared'))).toBe(false);
+  });
+});
+
+describe('declaredDependencies', () => {
+  it("returns the section's numbers minus self-reference", () => {
+    const body = '## Blocked by\n\n- #1089\n- #1118\n- #1090\n'; // #1090 is self
+    expect(declaredDependencies(1090, body)).toEqual([1089, 1118]);
+  });
+
+  it('is empty when the section is absent', () => {
+    expect(declaredDependencies(1090, '## Context\n\nNothing here.\n')).toEqual([]);
+  });
+
+  it('is empty for a missing body', () => {
+    expect(declaredDependencies(1090, undefined)).toEqual([]);
   });
 });

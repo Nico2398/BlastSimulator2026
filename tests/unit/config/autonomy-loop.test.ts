@@ -162,7 +162,7 @@ describe('chaining past a run that ended blocked', () => {
   const failure = workflow('handle-failure.yml');
 
   it('assigns the next issue when a run ends blocked', () => {
-    expect(failure).toMatch(/issues:\s*\n\s*types:\s*\[labeled\]/);
+    expect(failure).toMatch(/issues:\s*\n\s*types:\s*\[labeled, edited\]/);
     expect(failure).toContain("github.event.label.name == 'blocked'");
     expect(failure).toContain(ASSIGN_ACTION);
   });
@@ -183,8 +183,35 @@ describe('chaining past a run that ended blocked', () => {
   it('records every declared dependency as a relationship on either halt label', () => {
     expect(failure).toContain('reconcile-dependencies:');
     expect(failure).toContain('reconcile-dependencies.cjs');
-    expect(failure).toMatch(
-      /reconcile-dependencies:\s*\n\s*if: github\.event\.label\.name == 'blocked' \|\| github\.event\.label\.name == 'paused'/
+    expect(failure).toContain("github.event.label.name == 'blocked'");
+    expect(failure).toContain("github.event.label.name == 'paused'");
+  });
+
+  // The label and the body edit that declares a dependency are two separate API
+  // calls that can land in either order. A job gated on the `labeled` webhook
+  // alone can run before the body edit lands, read the section as empty, and
+  // never run again — no event fires for the later edit. The job must also
+  // react to the issue being edited while already carrying the halt label.
+  it('also reconciles on an edit to an issue already carrying the halt label', () => {
+    const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
+    const jobIf = job.slice(0, job.indexOf('runs-on:'));
+
+    expect(jobIf).toContain("github.event.action == 'labeled'");
+    expect(jobIf).toContain("github.event.action == 'edited'");
+    expect(jobIf).toContain('github.event.changes.body');
+    expect(jobIf).toContain("contains(github.event.issue.labels.*.name, 'blocked')");
+    expect(jobIf).toContain("contains(github.event.issue.labels.*.name, 'paused')");
+  });
+
+  // The old single-condition shape gated the job on the label event alone,
+  // which is exactly the race this job exists to close. Its replacement must
+  // not still be a single `github.event.label.name == ...` condition.
+  it('does not gate reconcile-dependencies on the label event alone any more', () => {
+    const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
+    const jobIf = job.slice(0, job.indexOf('runs-on:'));
+
+    expect(jobIf).not.toMatch(
+      /^\s*if: github\.event\.label\.name == 'blocked' \|\| github\.event\.label\.name == 'paused'\s*$/m
     );
   });
 
