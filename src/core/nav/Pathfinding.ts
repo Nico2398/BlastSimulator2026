@@ -99,7 +99,8 @@ const ASTAR_HEURISTIC_WEIGHT = 1.3;
  * * ASTAR_TIE_BREAK_EPSILON` — or the tie-break would start reordering
  * genuinely different-cost routes instead of merely stabilizing identical-
  * cost ones. At 1e-7 and a generous 500×500 grid upper bound, that product is
- * 0.025 — four orders of magnitude under MIN_WALKABLE_COST.
+ * 0.025 — a 40× margin under MIN_WALKABLE_COST (1.0 / 0.025), roughly 1.6
+ * orders of magnitude.
  */
 const ASTAR_TIE_BREAK_EPSILON = 1e-7;
 

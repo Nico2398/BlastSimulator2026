@@ -38,6 +38,8 @@ function readCommitted(emp: Employee): RouteCommitment {
     destX: emp.committedDestX ?? null,
     destZ: emp.committedDestZ ?? null,
     remainingCost: emp.committedRemainingCost ?? null,
+    fromX: emp.committedFromX ?? null,
+    fromZ: emp.committedFromZ ?? null,
   };
 }
 
@@ -48,6 +50,8 @@ function writeCommitted(emp: Employee, committed: RouteCommitment): void {
   emp.committedDestX = committed.destX;
   emp.committedDestZ = committed.destZ;
   emp.committedRemainingCost = committed.remainingCost;
+  emp.committedFromX = committed.fromX ?? null;
+  emp.committedFromZ = committed.fromZ ?? null;
 }
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
@@ -134,10 +138,12 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     return;
   }
 
+  const avoidVehicles = !isDestinationOccupied(state, destX, destZ);
+
   const path = state.navGrid
     ? findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ,
-        avoidVehicles: !isDestinationOccupied(state, destX, destZ),
+        avoidVehicles,
       })
     : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: destX, z: destZ }] };
 
@@ -145,7 +151,7 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
     x: emp.x, z: emp.z, walkSpeed: AGENT_WALK_SPEED,
     destinationX: destX, destinationZ: destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid,
+    path, navGrid: state.navGrid, avoidVehicles,
     committed: readCommitted(emp),
   });
 

@@ -159,6 +159,15 @@ export interface Employee {
   committedDestZ?: number | null;
   committedRemainingCost?: number | null;
   /**
+   * Position the current committed hop started from (#1129) — mirrors
+   * `RouteCommitment.fromX`/`fromZ`. Round-tripped by
+   * Locomotion.ts's readCommitted/writeCommitted so the retrace guard in
+   * `resolveTargetWaypoint` actually sees a `from` position on a real tick,
+   * not just inside a fixture that threads a `RouteCommitment` directly.
+   */
+  committedFromX?: number | null;
+  committedFromZ?: number | null;
+  /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside
    * destinationX/destinationZ by the claim step; consumed by
@@ -283,6 +292,8 @@ export function hireEmployee(
     committedDestX: null,
     committedDestZ: null,
     committedRemainingCost: null,
+    committedFromX: null,
+    committedFromZ: null,
     pendingRestDuration: null,
     pendingRestNeedKey: null,
     pendingTaskDuration: null,
