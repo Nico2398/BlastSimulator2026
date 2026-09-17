@@ -23,10 +23,25 @@ export function moveTo(
   employeeId: number,
   target: { vehicleId: number },
 ): MoveResult;
+/**
+ * Walk (and, for a vehicle-gated action, drive) the itinerary a PendingAction
+ * needs — the 'work' goal, rather than a plain 'reposition' (#1091). Routes
+ * through planItinerary exactly like the (x, z) overload above, but for a
+ * haul_debris/fragment_debris action this is what actually reaches
+ * PlanItinerary.ts's planFragmentTaskItinerary (its fragment/depot legs and
+ * load/unload/split effects) instead of the generic single-drive-leg shape a
+ * 'reposition' goal to the action's own targetX/targetZ would produce.
+ */
 export function moveTo(
   state: GameState,
   employeeId: number,
-  target: { x: number; z: number } | { vehicleId: number },
+  target: { actionId: number },
+  opts?: { via?: number },
+): MoveResult;
+export function moveTo(
+  state: GameState,
+  employeeId: number,
+  target: { x: number; z: number } | { vehicleId: number } | { actionId: number },
   opts?: { via?: number },
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
@@ -46,6 +61,18 @@ export function moveTo(
       workTicks: 0,
       estTotalTicks: leg.estTicks,
     };
+    syncPendingDriverVehicleId(employee);
+    return { success: true };
+  }
+
+  if ('actionId' in target) {
+    const action = state.pendingActions.find(a => a.id === target.actionId);
+    if (!action) return { success: false, error: t('move_to.no_route_available') };
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), action });
+    if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
+
+    employee.itinerary = itinerary;
     syncPendingDriverVehicleId(employee);
     return { success: true };
   }

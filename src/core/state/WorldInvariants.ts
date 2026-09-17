@@ -227,21 +227,35 @@ function checkI7DriveLegWithoutMount(state: GameState): Violation[] {
   return violations;
 }
 
+/**
+ * I8: a vehicle carrying `payload` must have its named fragment tracked
+ * `in_transit` in logistics — the two are meant to move together (#1091,
+ * `vehicle.payload` replaces the old payloadKg/haulingFragmentId pair). A
+ * mismatch here means the fragment and cargo bookkeeping have desynced.
+ */
 function checkI8PayloadNotInTransit(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const v of state.vehicles.vehicles) {
-    if (v.payloadKg <= 0) continue;
-    if (v.haulingFragmentId === null) {
-      violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id });
-      continue;
-    }
-    const tracked = findInTransitFragment(state.logistics, v.haulingFragmentId);
+    if (v.payload === null) continue;
+    const tracked = findInTransitFragment(state.logistics, v.payload.fragmentId);
     if (!tracked) {
-      violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: v.haulingFragmentId });
+      violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: v.payload.fragmentId });
     }
   }
   return violations;
 }
+
+/**
+ * Violation kinds severe enough to abort the tick outright rather than
+ * merely being collected and reported (#1091). Today, only I8: a desynced
+ * payload/logistics pairing corrupts every later tick that computes against
+ * it, so TickPipeline.ts's dev/test-only invariant check throws the instant
+ * it finds one instead of letting the game keep running on bad state. Every
+ * other violation kind keeps the existing collect-and-continue behavior.
+ */
+export const FATAL_VIOLATION_KINDS: ReadonlySet<ViolationKind> = new Set<ViolationKind>([
+  'I8_payload_not_in_transit',
+]);
 
 /**
  * I9: an executing task's employee should not still be travelling —

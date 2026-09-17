@@ -287,7 +287,11 @@ function hasActiveTraining(state: GameState): boolean {
 }
 
 /**
- * True if this vehicle has a live haul or break phase in progress (#552).
+ * True if this vehicle is mid-itinerary on a haul_debris/fragment_debris
+ * action (#552, #1091) — debris_hauler and rock_fragmenter are the only two
+ * roles ever claimed for those two action types, so a reservation on either
+ * role is exactly that in-progress phase; there is no separate
+ * haulingPhase/breakPhase field left on `Vehicle` to check directly.
  *
  * The employee driving it carries no per-tick signal of its own once
  * boarded — hasOutstandingWork(e) only ever reads activeActionId (which
@@ -299,7 +303,7 @@ function hasActiveTraining(state: GameState): boolean {
  * haul that is still visibly making progress.
  */
 export function hasOutstandingVehicleWork(v: Vehicle): boolean {
-  return v.haulingPhase !== null || v.breakPhase !== null;
+  return (v.type === 'debris_hauler' || v.type === 'rock_fragmenter') && v.reservedForActionId !== null;
 }
 
 /**
@@ -326,17 +330,17 @@ function workSignature(state: GameState): string {
     ].join(','))
     .join(';');
 
-  // A hauling/breaking vehicle's own id/x/z/phase/target-fragment fields
-  // (#552) — changes every tick the vehicle moves and at every phase
-  // transition, which is what lets a hauling driver's otherwise-static
-  // employee signature above still register as "still working" instead of
-  // reading stuck the instant WORK_GRACE_TICKS elapses.
+  // A hauling/breaking vehicle's own id/x/z/reservation/payload fields
+  // (#552, #1091) — changes every tick the vehicle moves and at every phase
+  // transition (load/unload/split), which is what lets a hauling driver's
+  // otherwise-static employee signature above still register as "still
+  // working" instead of reading stuck the instant WORK_GRACE_TICKS elapses.
   const vehicleWorking = (state.vehicles?.vehicles ?? [])
     .filter(hasOutstandingVehicleWork)
     .slice()
     .sort((a, b) => a.id - b.id)
     .map((v) => [
-      v.id, v.x, v.z, v.haulingPhase, v.haulingFragmentId, v.breakPhase, v.breakFragmentId,
+      v.id, v.x, v.z, v.reservedForActionId, v.payload?.fragmentId ?? null,
     ].join(','))
     .join(';');
 

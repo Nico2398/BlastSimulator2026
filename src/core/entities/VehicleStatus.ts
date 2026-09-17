@@ -27,12 +27,21 @@ const IDLE: VehicleStatus = { kind: 'idle', ticks: null, haulingPhase: null, tas
  * player needs the call-to-action, not the routine label it would otherwise
  * carry. `broken` (destroyed by a projectile, mid-repair) pre-empts all of
  * them: a broken vehicle isn't stuck in traffic, it isn't moving anywhere.
+ *
+ * A debris_hauler reserved for an action (#1091 — the only action type this
+ * role is ever claimed for is haul_debris) is "hauling" for its whole
+ * itinerary, whichever leg it's currently on — `payload` is what
+ * distinguishes the two sub-phases now that there is no separate
+ * `haulingPhase` field on `Vehicle`: not yet loaded (still driving to the
+ * fragment) vs. already loaded (driving to the depot).
  */
 export function computeVehicleStatus(v: Vehicle): VehicleStatus {
   if (v.state === 'broken') return { ...IDLE, kind: 'broken' };
   if (v.isMoveStuck) return { ...IDLE, kind: 'stuck', ticks: v.waitingTicks };
   if (v.state === 'waiting') return { ...IDLE, kind: 'waiting', ticks: v.waitingTicks };
-  if (v.haulingPhase !== null) return { ...IDLE, kind: 'hauling', haulingPhase: v.haulingPhase };
+  if (v.type === 'debris_hauler' && v.reservedForActionId !== null) {
+    return { ...IDLE, kind: 'hauling', haulingPhase: v.payload !== null ? 'to_depot' : 'to_fragment' };
+  }
   if (v.state === 'working') return { ...IDLE, kind: 'working', task: v.task };
   if (v.state === 'moving') return { ...IDLE, kind: 'moving' };
   return IDLE;

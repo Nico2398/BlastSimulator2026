@@ -236,7 +236,7 @@ today. A migration issue updates its own row as it lands.
 | 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | landed |
 | 3b | `tickLocomotion` + `moveTo` become the only movers; vehicles stop pathfinding | planned |
 | 4 | Cost model delegates to the planner; continuity machinery removed | landed |
-| 5 | Haul and break become leg effects | planned |
+| 5 | Haul and break become leg effects | landed |
 | 6 | Dead vehicle fields stripped, tier-correct stat reads, `reposition` goal | planned |
 | 7 | Fast transport un-gated | planned |
 

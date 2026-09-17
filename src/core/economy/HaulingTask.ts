@@ -13,7 +13,12 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole } from './FragmentTaskLifecycle.js';
+import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
+import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
+import { claimPendingAction } from '../engine/TaskDispatch.js';
+import { reserveVehicle } from '../engine/VehicleReservation.js';
+import { moveTo } from '../engine/MoveTo.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -33,20 +38,54 @@ export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is 
 
 /**
  * Request that a debris_hauler vehicle haul a fragment to the nearest active
- * depot/warehouse building. Itinerary-driven (#1091): the actual drive/load/
- * deliver sequence is planned by PlanItinerary.ts's planFragmentTaskItinerary
- * and executed leg by leg via ArrivalEffects.ts, rather than this function
- * setting phase fields directly — it validates eligibility and reports the
- * same Result<T> shape the console command and existing tests depend on.
+ * depot/warehouse building. Itinerary-driven (#1091): rather than setting
+ * phase fields directly, this claims the fragment's existing (self-dispatched
+ * — see HaulDispatch.ts's syncHaulDispatch) haul_debris PendingAction on
+ * behalf of the vehicle's driver, reserves the vehicle for it, and calls
+ * moveTo, which plans the actual drive/load/deliver itinerary via
+ * PlanItinerary.ts's planFragmentTaskItinerary and executes it leg by leg via
+ * ArrivalEffects.ts. The one entry point both the manual `vehicle haul`
+ * console command and this file's own eligibility gate above rely on; self-
+ * dispatch reaches the same itinerary through the ordinary employee-claim
+ * pipeline (EmployeeDispatchSteps.ts) instead, never through this function.
  */
 export function requestHaulFragment(
   state: GameState,
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  void state; void vehicleId; void fragmentId;
-  // TODO: implement
-  throw new Error('not implemented');
+  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
+  if (!found.success) return found;
+  const vehicle = found.vehicle;
+  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicle.reservedForActionId !== null || vehicle.payload !== null) {
+    return { success: false, error: 'Vehicle is already hauling' };
+  }
+
+  const tracked = state.logistics.fragments.find(
+    f => f.fragment.id === fragmentId && f.state === 'on_ground',
+  );
+  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  if (isOversized(tracked.fragment.volume)) {
+    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first' };
+  }
+
+  const action = state.pendingActions.find(a =>
+    a.type === 'haul_debris' && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
+  if (!action) return { success: false, error: 'No haul action queued for this fragment' };
+
+  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  if (!employee) return { success: false, error: 'Vehicle has no driver' };
+
+  const claimed = claimPendingAction(state, action.id, employee.id);
+  if (!claimed) return { success: false, error: 'Failed to claim haul action' };
+  reserveVehicle(vehicle, claimed.id);
+  employee.activeActionId = claimed.id;
+
+  const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
+
+  return { success: true };
 }
 
 /**
@@ -86,7 +125,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
  * exists.
  */
 export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number): { x: number; z: number } | null {
-  void state; void fromX; void fromZ;
-  // TODO: implement
-  throw new Error('not implemented');
+  const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', fromX, fromZ);
+  if (!depot) return null;
+  return findBuildingApproachCell(state.navGrid, depot, getBuildingDef(depot.type, depot.tier), fromX, fromZ);
 }

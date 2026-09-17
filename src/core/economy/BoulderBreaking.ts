@@ -13,7 +13,10 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole } from './FragmentTaskLifecycle.js';
+import { claimPendingAction } from '../engine/TaskDispatch.js';
+import { reserveVehicle } from '../engine/VehicleReservation.js';
+import { moveTo } from '../engine/MoveTo.js';
 
 /**
  * True when `vehicle` is a rock_fragmenter with a driver assigned and no
@@ -26,20 +29,52 @@ export function isBreakEligibleVehicle(vehicle: Vehicle | undefined): vehicle is
 
 /**
  * Request that a rock_fragmenter vehicle break an oversized fragment in
- * place. Itinerary-driven (#1091): the actual drive/split sequence is
- * planned by PlanItinerary.ts's planFragmentTaskItinerary and executed via
- * ArrivalEffects.ts's boulder_split, rather than this function setting phase
- * fields directly — it validates eligibility and reports the same Result<T>
- * shape the console command and existing tests depend on.
+ * place. Itinerary-driven (#1091): mirrors HaulingTask.ts's own
+ * requestHaulFragment — claims the fragment's existing (self-dispatched)
+ * fragment_debris PendingAction on behalf of the vehicle's driver, reserves
+ * the vehicle for it, and calls moveTo, which plans the actual
+ * drive-then-split itinerary via PlanItinerary.ts's planFragmentTaskItinerary
+ * and executes it via ArrivalEffects.ts's boulder_split. The one entry point
+ * both the manual `vehicle break` console command and this file's own
+ * eligibility gate above rely on; self-dispatch reaches the same itinerary
+ * through the ordinary employee-claim pipeline (EmployeeDispatchSteps.ts)
+ * instead, never through this function.
  */
 export function requestBreakBoulder(
   state: GameState,
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  void state; void vehicleId; void fragmentId;
-  // TODO: implement
-  throw new Error('not implemented');
+  const found = findRequestVehicleOfRole(state, vehicleId, 'rock_fragmenter', 'Vehicle is not a rock fragmenter');
+  if (!found.success) return found;
+  const vehicle = found.vehicle;
+  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicle.reservedForActionId !== null) {
+    return { success: false, error: 'Vehicle is already breaking a fragment' };
+  }
+
+  const tracked = state.logistics.fragments.find(
+    f => f.fragment.id === fragmentId && f.state === 'on_ground',
+  );
+  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  if (!isOversized(tracked.fragment.volume)) return { success: false, error: 'Fragment is not oversized' };
+
+  const action = state.pendingActions.find(a =>
+    a.type === 'fragment_debris' && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
+  if (!action) return { success: false, error: 'No break action queued for this fragment' };
+
+  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  if (!employee) return { success: false, error: 'Vehicle has no driver' };
+
+  const claimed = claimPendingAction(state, action.id, employee.id);
+  if (!claimed) return { success: false, error: 'Failed to claim break action' };
+  reserveVehicle(vehicle, claimed.id);
+  employee.activeActionId = claimed.id;
+
+  const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
+
+  return { success: true };
 }
 
 /**

@@ -9,8 +9,6 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { releaseArrivedEvacuationDrivers } from './EvacuationHold.js';
-import { tickHaulingProgress } from '../economy/HaulingTask.js';
-import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
@@ -35,10 +33,13 @@ export interface ArrivalGateResult {
    */
   boardingCancelled: Array<{ employeeId: number; reason: 'vehicle_gone' | 'vehicle_taken' | 'vehicle_moved' | string }>;
   /**
-   * Vehicle-gated actions (haul_debris/fragment_debris and any future
-   * vehicle-gated action) whose work completed on this tick via the vehicle
-   * drive loop below, for GameLoop's completion pass to finish off with
-   * completeVehicleGatedAction (VehicleReservation.ts, #552, #1090).
+   * Always empty (#1091). A haul_debris/fragment_debris action now completes
+   * the instant its own final itinerary effect (haul_unload/boulder_split)
+   * succeeds — inside ArrivalEffects.ts, which calls completeVehicleGatedAction
+   * (VehicleReservation.ts) itself, well before this function's own
+   * per-employee "arrived" check below ever sees this employee again. Kept
+   * on the shape (like driversBoarded/boardingCancelled above) so
+   * TickPipeline.ts's existing completion-pass loop stays untouched.
    */
   completedVehicleActions: Array<{ actionId: number; employeeId: number }>;
 }
@@ -119,10 +120,13 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
       // comment, #1089) — compute and start it here instead, the instant
       // the employee (and, by I2, their vehicle) actually reaches the
       // target, mirroring the pre-itinerary vehicle-drive loop's identical
-      // deferral. haul_debris/fragment_debris are excluded — their own
-      // phase machinery (HaulingTask.ts/BoulderBreaking.ts) drives
-      // completion instead, so seeding a work timer for them here would
-      // race it. Also requires the employee to still be genuinely mounted
+      // deferral. haul_debris/fragment_debris are excluded — a haul/break
+      // itinerary's own final effect (ArrivalEffects.ts's haul_unload/
+      // boulder_split) already completes the action and clears
+      // activeActionId the very same tick it fires, before this employee's
+      // itinerary ever empties out to reach "arrived" here at all; this
+      // exclusion is a defensive backstop should that invariant ever slip,
+      // not the thing that makes it true. Also requires the employee to still be genuinely mounted
       // in the vehicle reserved for this action — "arrived" (itinerary ===
       // null) also covers a drive leg that just ABORTED (its vehicle
       // destroyed/reassigned underneath it, Locomotion.advanceLeg), which
@@ -153,63 +157,13 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
     }
   }
 
-  for (const vehicle of state.vehicles.vehicles) {
-    if (vehicle.haulingPhase === null) continue;
-
-    const prevPhase = vehicle.haulingPhase;
-    const prevFragmentId = vehicle.haulingFragmentId;
-
-    tickHaulingProgress(state, vehicle);
-
-    if (prevPhase === 'to_fragment' && vehicle.haulingPhase === 'to_depot' && prevFragmentId !== null) {
-      emitter?.emit('vehicle:haul_loaded', { vehicleId: vehicle.id, fragmentId: prevFragmentId });
-    } else if (prevPhase === 'to_depot' && vehicle.haulingPhase === null && prevFragmentId !== null) {
-      const tracked = state.logistics.fragments.find(f => f.fragment.id === prevFragmentId);
-      if (tracked?.state === 'stored') {
-        emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId: prevFragmentId });
-        // #552: a full deliver cycle just completed for a vehicle-gated
-        // haul_debris action (reservedForActionId survives a successful
-        // haul — see abortHaul's doc comment) — report it so GameLoop's
-        // completion pass (completeVehicleGatedAction, #1090) can clear
-        // the PendingAction/ghost and let the employee continue.
-        if (vehicle.reservedForActionId !== null && vehicle.driverId !== null) {
-          result.completedVehicleActions.push({ actionId: vehicle.reservedForActionId, employeeId: vehicle.driverId });
-        }
-      }
-    }
-  }
-
-  for (const vehicle of state.vehicles.vehicles) {
-    if (vehicle.breakPhase === null) continue;
-
-    // tickBreakProgress only returns the original fragment's id on the tick
-    // it actually splits the boulder — mirror the haul loop above by
-    // detecting that (rather than threading an emitter into the tick
-    // function itself) and deriving the produced piece ids from what
-    // appeared in logistics.fragments during this call.
-    const beforeIds = new Set(state.logistics.fragments.map(f => f.fragment.id));
-    const vehicleId = vehicle.id;
-    // Captured before tickBreakProgress runs: a successful split leaves
-    // reservedForActionId/driverId alone (see tickBreakProgress's own
-    // doc comment), but reading them up front is what lets this loop report
-    // the completion below regardless of that detail.
-    const reservedActionId = vehicle.reservedForActionId;
-    const driverId = vehicle.driverId;
-    const splitFragmentId = tickBreakProgress(state, vehicle);
-    if (splitFragmentId !== null) {
-      const pieceIds = state.logistics.fragments
-        .filter(f => !beforeIds.has(f.fragment.id))
-        .map(f => f.fragment.id);
-      emitter?.emit('vehicle:boulder_broken', { vehicleId, fragmentId: splitFragmentId, pieceIds });
-      // #552: a fragment_debris action's work completed in this same tick
-      // (breaking is atomic, unlike hauling's two-leg trip) — report it so
-      // GameLoop's completion pass can clear the PendingAction/ghost and let
-      // the employee continue.
-      if (reservedActionId !== null && driverId !== null) {
-        result.completedVehicleActions.push({ actionId: reservedActionId, employeeId: driverId });
-      }
-    }
-  }
+  // The old per-vehicle haul/break phase-machine loops lived here (#1091):
+  // ArrivalEffects.ts's haul_load/haul_unload/boulder_split now fire from
+  // inside Locomotion.ts's own itinerary walk, at the instant each drive leg
+  // that carries one actually arrives — including the 'vehicle:haul_loaded'/
+  // 'vehicle:haul_delivered'/'vehicle:boulder_broken' events those loops used
+  // to emit here, now emitted by the effect handlers themselves
+  // (ArrivalEffects.ts).
 
   // reconcileVehicleReservations only reports which active actions need
   // interrupting (their reserved vehicle vanished underneath them) rather

@@ -334,6 +334,41 @@ function migrateV18ToV19(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v19 -> v20: Vehicle.payload replaces payloadKg/haulingFragmentId/
+ * haulingPhase/haulingDepotBuildingId/breakFragmentId/breakPhase (#1091 —
+ * itinerary-driven hauling/breaking). A vehicle whose old `haulingPhase` was
+ * `'to_depot'` (already loaded, cargo aboard) gets `payload` derived from its
+ * old `haulingFragmentId`/`payloadKg`; every other case (still driving to the
+ * fragment, mid-break, or never hauling at all) gets `payload: null` —
+ * matching the itinerary model's own "not yet loaded" state, which carries no
+ * vehicle-side signal of its own. The old fields are left on the raw object
+ * untouched (never stripped), matching this file's existing minimal-touch
+ * migration style — the new Vehicle interface simply no longer declares them.
+ * Mutates `obj` in place, matching every other migration block in
+ * `deserialize` below.
+ */
+function migrateV19ToV20(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesContainer = obj['vehicles'] as Record<string, unknown> | undefined;
+  const vehiclesList = vehiclesContainer?.['vehicles'] as Array<Record<string, unknown>> | undefined;
+
+  if (Array.isArray(vehiclesList)) {
+    for (const v of vehiclesList) {
+      if (v['payload'] !== undefined) continue;
+
+      if (v['haulingPhase'] === 'to_depot') {
+        const fragmentId = v['haulingFragmentId'];
+        const massKg = typeof v['payloadKg'] === 'number' ? v['payloadKg'] : 0;
+        v['payload'] = typeof fragmentId === 'number' ? { fragmentId, massKg } : null;
+      } else {
+        v['payload'] = null;
+      }
+    }
+  }
+
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -549,6 +584,11 @@ export function deserialize(json: string): GameState {
   // v18 -> v19: Vehicle.occupantIds / Employee.locomotion (#1087).
   if ((obj['version'] as number) < 19) {
     migrateV18ToV19(obj);
+  }
+
+  // v19 -> v20: Vehicle.payload replaces the haul/break phase fields (#1091).
+  if ((obj['version'] as number) < 20) {
+    migrateV19ToV20(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

@@ -49,7 +49,7 @@ import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManag
 import { CONTRACT_REFRESH_INTERVAL } from '../config/balance.js';
 import { isExposed, processSmuggling } from '../events/MafiaActions.js';
 import { resolveContractPriceMultiplier } from '../campaign/Level.js';
-import { assertWorldInvariants } from '../state/WorldInvariants.js';
+import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 
@@ -307,13 +307,22 @@ export function runTick(
   // shutdown, arrest, worker revolt).
   const gameOver = checkGameOverConditions(state, emitter);
 
-  // 9b. World invariant check (#1084) — dev/test builds only, warn-only.
-  // Reports internal-consistency violations (dangling driver refs,
-  // position mismatches, etc.) that should never occur if the
-  // mount/itinerary/task machinery upstream is correct; never throws.
+  // 9b. World invariant check (#1084) — dev/test builds only. Reports
+  // internal-consistency violations (dangling driver refs, position
+  // mismatches, etc.) that should never occur if the mount/itinerary/task
+  // machinery upstream is correct; collect-and-continue for every kind
+  // except FATAL_VIOLATION_KINDS (#1091), which throws immediately instead —
+  // a desynced payload/logistics pairing (I8) corrupts every later tick that
+  // computes against it, so continuing to run on it hides the defect rather
+  // than surfacing it where it happened.
   const worldInvariantViolations = options.checkInvariants
     ? assertWorldInvariants(state, vehiclePositionsAtTickStart)
     : [];
+
+  const fatalViolation = worldInvariantViolations.find(v => FATAL_VIOLATION_KINDS.has(v.kind));
+  if (fatalViolation) {
+    throw new Error(`Fatal world invariant violation: ${JSON.stringify(fatalViolation)}`);
+  }
 
   // 10. Pending event — auto-pause and report to player
   let firedEvent: FiredEventReport | null = null;

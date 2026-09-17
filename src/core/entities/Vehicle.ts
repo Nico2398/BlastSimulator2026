@@ -275,10 +275,13 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
  * elsewhere. Refuses while the vehicle is carrying a loaded haul so it
  * doesn't get orphaned mid-flight with cargo aboard and nobody driving it.
  *
- * TODO(#1091): this only catches the loaded-and-driving-to-depot half of the
- * old `haulingPhase !== null` guard — the to-fragment (not yet loaded) leg
- * has no equivalent signal on `Vehicle` once itinerary-driven hauling lands.
- * Revisit once ArrivalEffects.ts's haul_load/haul_unload wiring is in.
+ * `payload !== null` is the only guard needed (#1091): the itinerary model's
+ * "not yet loaded" leg (driving toward the fragment, cargo not aboard yet)
+ * carries nothing worth protecting — losing that driver mid-drive is exactly
+ * as recoverable as any other vehicle-gated action's ordinary mid-drive
+ * interruption, which this guard was never meant to cover. Only a vehicle
+ * that has actually picked something up (`payload` set) risks being
+ * orphaned with cargo nobody is driving.
  */
 export function unassignDriver(
   vehicleState: VehicleState,

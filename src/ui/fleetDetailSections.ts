@@ -62,14 +62,15 @@ export function makeHpGauge(v: Vehicle): HTMLElement {
   return gauge(t('ui.fleet.hp'), pct, color, { labelWidth: 30 });
 }
 
-/** Only debris_hauler ever carries a payload — every other role's payloadKg sits at 0 forever, so the gauge is omitted rather than shown always-empty. */
+/** Only debris_hauler ever carries a payload — every other role's massKg sits at 0 forever, so the gauge is omitted rather than shown always-empty. */
 export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   if (v.type !== 'debris_hauler') return null;
   const capacity = getVehicleDefByTier(v.type, v.tier).capacity;
-  const pct = capacity > 0 ? Math.round((v.payloadKg / capacity) * 100) : 0;
+  const massKg = v.payload?.massKg ?? 0;
+  const pct = capacity > 0 ? Math.round((massKg / capacity) * 100) : 0;
   const row = gauge(t('ui.fleet.load'), pct, 'var(--bsx-info)', { labelWidth: 30 });
   const value = row.querySelector('.bsx-gauge-value');
-  if (value) value.textContent = t('ui.fleet.load_kg', { kg: Math.round(v.payloadKg), cap: Math.round(capacity) });
+  if (value) value.textContent = t('ui.fleet.load_kg', { kg: Math.round(massKg), cap: Math.round(capacity) });
   return row;
 }
 
