@@ -784,7 +784,7 @@ describe('getVehicleDefByTier — tier 3 purchaseCost = tier 1 purchaseCost × 4
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TASK 2.5 — Vehicle interface fields: driverId, state, payloadKg, targetX/Z
+// TASK 2.5 — Vehicle interface fields: driverId, state, payload, targetX/Z
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ── Vehicle interface fields ──────────────────────────────────────────────────
@@ -824,29 +824,29 @@ describe('Vehicle interface fields', () => {
     }
   });
 
-  it('newly purchased vehicle has payloadKg initialised to 0', () => {
-    // payloadKg: number — 0 means the vehicle is carrying nothing when first purchased.
-    // Fails (Red) until Vehicle interface adds payloadKg and purchaseVehicle() sets it to 0.
+  it('newly purchased vehicle has payload initialised to null', () => {
+    // payload: { fragmentId; massKg } | null — null means the vehicle is carrying
+    // nothing when first purchased (#1091: replaces the old payloadKg number).
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    expect(vehicle.payloadKg).toBe(0);
+    expect(vehicle.payload).toBeNull();
   });
 
-  it('payloadKg is 0 for every vehicle role immediately after purchase', () => {
+  it('payload is null for every vehicle role immediately after purchase', () => {
     // Exhaustively checks every role so no role-specific initialisation path is missed.
     const vs = createVehicleState();
     for (const role of ALL_ROLES) {
       const { vehicle } = purchaseVehicle(vs, role);
-      expect(vehicle.payloadKg).toBe(0);
+      expect(vehicle.payload).toBeNull();
     }
   });
 
-  it('newly purchased vehicle has payloadKg that is a non-negative finite number', () => {
-    // Guards against -0, NaN, Infinity being used as the zero payload sentinel.
+  it('purchaseVehicle never sets payload to a truthy sentinel (e.g. an empty object)', () => {
+    // Guards against a stray `{}` or zero-mass placeholder standing in for "empty" —
+    // the contract is strictly `null`, never a payload object with sentinel fields.
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
-    expect(vehicle.payloadKg).toBeGreaterThanOrEqual(0);
-    expect(Number.isFinite(vehicle.payloadKg)).toBe(true);
+    expect(vehicle.payload).toBe(null);
   });
 
   it('targetX equals the x coordinate passed to purchaseVehicle (confirmatory)', () => {
@@ -1569,11 +1569,15 @@ describe('unassignDriver — error: vehicle has no driver', () => {
 });
 
 describe('unassignDriver — error: vehicle is mid-haul', () => {
-  it('refuses to unassign and preserves driverId while hauling to a fragment', () => {
+  // #1091: unassignDriver's mid-haul guard reads `vehicle.payload !== null`
+  // now that haulingPhase/haulingFragmentId are gone — payload is only set
+  // once haul_load's arrival effect fires, so this guard only ever catches
+  // the loaded, driving-to-depot leg.
+  it('refuses to unassign and preserves driverId once a fragment is loaded (driving to the depot)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    vehicle.haulingPhase = 'to_fragment';
+    vehicle.payload = { fragmentId: 1, massKg: 500 };
 
     const result = unassignDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(false);
@@ -1581,15 +1585,19 @@ describe('unassignDriver — error: vehicle is mid-haul', () => {
     expect(vehicle.driverId).toBe(empId);
   });
 
-  it('refuses to unassign while hauling to the depot', () => {
+  // TODO(#1091): the to-fragment leg (before load_haul fires) has no signal
+  // on Vehicle any more — unassignDriver can't distinguish "driving toward a
+  // fragment" from "idle", so it allows the unassign. See Vehicle.ts's own
+  // TODO(#1091) comment on unassignDriver.
+  it('allows unassign before the fragment is loaded — driving-to-fragment leg has no payload signal yet', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    vehicle.haulingPhase = 'to_depot';
+    expect(vehicle.payload).toBeNull();
 
     const result = unassignDriver(state.vehicles, vehicleId);
-    expect(result.success).toBe(false);
-    expect(vehicle.driverId).toBe(empId);
+    expect(result.success).toBe(true);
+    expect(vehicle.driverId).toBeNull();
   });
 });
 

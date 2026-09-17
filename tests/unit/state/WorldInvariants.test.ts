@@ -410,46 +410,58 @@ describe('assertWorldInvariants — I7_drive_leg_without_mount (#1089)', () => {
 });
 
 // ── I8: payload not in transit ──────────────────────────────────────────────
+//
+// #1091: `Vehicle.payload` replaces the old `payloadKg`/`haulingFragmentId`
+// pair with one `{ fragmentId; massKg } | null` field — mass and fragment
+// identity travel together, so there is no longer a "payloadKg set but
+// haulingFragmentId null" state to represent. I8 now reads: `payload !==
+// null` implies that fragment's logistics state is `in_transit`.
 
 describe('assertWorldInvariants — I8_payload_not_in_transit', () => {
-  it('no violation when payloadKg is 0 and haulingFragmentId is null', () => {
+  it('no violation when payload is null', () => {
     const state = makeState();
-    addVehicle(state, { payloadKg: 0, haulingFragmentId: null });
+    addVehicle(state, { payload: null });
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('no violation when payloadKg is 0 but haulingFragmentId is set — the drive-to-fragment phase before pickup', () => {
-    const state = makeState();
-    addFragment(state, 1, 'on_ground');
-    addVehicle(state, { payloadKg: 0, haulingFragmentId: 1 });
-
-    expect(assertWorldInvariants(state)).toEqual([]);
-  });
-
-  it('no violation when payloadKg > 0, haulingFragmentId is set, and the fragment is in_transit', () => {
+  it('no violation when payload names a fragment that is in_transit', () => {
     const state = makeState();
     addFragment(state, 1, 'in_transit');
-    addVehicle(state, { payloadKg: 500, haulingFragmentId: 1 });
+    addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('violation when payloadKg > 0 but haulingFragmentId is null', () => {
+  it('violation when payload names a fragment id that does not exist in logistics at all', () => {
     const state = makeState();
-    const v = addVehicle(state, { payloadKg: 500, haulingFragmentId: null });
+    const v = addVehicle(state, { payload: { fragmentId: 999, massKg: 500 } });
 
     const violations = assertWorldInvariants(state);
 
     expect(violations).toHaveLength(1);
     expect(violations[0]!.kind).toBe('I8_payload_not_in_transit');
     expect(violations[0]!.vehicleId).toBe(v.id);
+    expect(violations[0]!.fragmentId).toBe(999);
   });
 
-  it('violation when payloadKg > 0, haulingFragmentId is set, but the fragment is not in_transit', () => {
+  it('violation when payload names a fragment that is on_ground, not in_transit', () => {
     const state = makeState();
     addFragment(state, 1, 'on_ground');
-    const v = addVehicle(state, { payloadKg: 500, haulingFragmentId: 1 });
+    const v = addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
+
+    const violations = assertWorldInvariants(state);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.kind).toBe('I8_payload_not_in_transit');
+    expect(violations[0]!.vehicleId).toBe(v.id);
+    expect(violations[0]!.fragmentId).toBe(1);
+  });
+
+  it('violation when payload names a fragment that is already stored', () => {
+    const state = makeState();
+    addFragment(state, 1, 'stored');
+    const v = addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
 
     const violations = assertWorldInvariants(state);
 

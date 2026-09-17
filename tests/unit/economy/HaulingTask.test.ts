@@ -1,23 +1,33 @@
-// BlastSimulator2026 — Tests for HaulingTask (issue #437)
+// BlastSimulator2026 — Tests for HaulingTask (issue #437, itinerary-driven #1091)
 //
-// requestHaulFragment dispatches a debris_hauler toward a ground fragment
-// without loading it immediately; tickHaulingProgress advances the vehicle
-// through to_fragment -> pickup -> to_depot -> deliver -> idle, only acting
-// on arrival (never mid-transit).
+// requestHaulFragment validates eligibility and installs the itinerary
+// machinery (a PendingAction claimed/reserved for the vehicle, and an
+// itinerary on the driver whose legs drive to the fragment then the depot,
+// each ending in an ArrivalEffects.ts effect) rather than starting a
+// per-tick phase machine — ArrivalEffects.test.ts covers what happens once
+// each leg actually arrives. findHaulDepotApproach resolves the itinerary's
+// depot leg target at plan time, replacing the old per-tick
+// resolveDepotApproach re-target.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import { requestHaulFragment, tickHaulingProgress, findReachableGroundFragment } from '../../../src/core/economy/HaulingTask.js';
+import {
+  requestHaulFragment,
+  findReachableGroundFragment,
+  findHaulDepotApproach,
+  isHaulEligibleVehicle,
+} from '../../../src/core/economy/HaulingTask.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { requestBreakBoulder } from '../../../src/core/economy/BoulderBreaking.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
+import type { Itinerary, ArrivalStep } from '../../../src/core/engine/Itinerary.js';
 
 const SEED = 42;
 const GRID = 64;
@@ -46,30 +56,18 @@ function makeIdleHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   return purchaseVehicle(state.vehicles, 'debris_hauler', x, z).vehicle;
 }
 
-/** A debris_hauler with a licensed driver already boarded (driverId set). */
+/** A debris_hauler with a licensed driver already boarded (driverId set, occupied, mounted). */
 function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   const vehicle = makeIdleHauler(state, x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.truck', 1);
-  // #1089: driveVehicleTowardTarget (Locomotion.ts) reads the driver off
-  // vehicle.occupantIds[0], not the driverId mirror alone.
+  // #1089/#1091: planItinerary/driving reads the driver off
+  // vehicle.occupantIds[0]/employee.locomotion, not the driverId mirror alone.
   vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
-}
-
-/**
- * Moves a driven vehicle AND its mounted driver together (I2) —
- * driveVehicleTowardTarget (Locomotion.ts) reads arrival off the DRIVER's
- * own position, not the vehicle's.
- */
-function moveVehicleAndDriver(state: ReturnType<typeof createGame>, vehicle: Vehicle, x: number, z: number): void {
-  vehicle.x = x;
-  vehicle.z = z;
-  const driver = state.employees.employees.find(e => e.id === vehicle.occupantIds[0]);
-  if (driver) { driver.x = x; driver.z = z; }
 }
 
 function placeWarehouse(state: ReturnType<typeof createGame>, x: number, z: number) {
@@ -102,6 +100,77 @@ function makeFlatNavGrid(size: number): NavGrid {
   );
 }
 
+/** Every leg across `itinerary` whose arrival step is the named effect. */
+function legsWithEffect(itinerary: Itinerary, effectId: string) {
+  return itinerary.legs.filter(leg => (leg.onArrive as ArrivalStep).kind === 'effect' && (leg.onArrive as { effectId: string }).effectId === effectId);
+}
+
+// ── isHaulEligibleVehicle ────────────────────────────────────────────────────
+
+describe('isHaulEligibleVehicle', () => {
+  it('true for a debris_hauler with a driver and no reserved action', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeDrivenHauler(state);
+    expect(isHaulEligibleVehicle(vehicle)).toBe(true);
+  });
+
+  it('false for a non-debris_hauler vehicle', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for a debris_hauler with no driver assigned', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeIdleHauler(state);
+    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for a debris_hauler already reserved for another action', () => {
+    const state = createGame({ seed: SEED });
+    const vehicle = makeDrivenHauler(state);
+    vehicle.reservedForActionId = 42;
+    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+  });
+
+  it('false for undefined', () => {
+    expect(isHaulEligibleVehicle(undefined)).toBe(false);
+  });
+});
+
+// ── findHaulDepotApproach ────────────────────────────────────────────────────
+
+describe('findHaulDepotApproach', () => {
+  it('returns the nearest active freight_warehouse\'s approach cell when several exist', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
+    placeWarehouse(state, 40, 40); // far
+    const near = placeWarehouse(state, 6, 6); // near
+
+    const approach = findHaulDepotApproach(state, 0, 0);
+
+    expect(approach).not.toBeNull();
+    // Must sit adjacent to the NEAR warehouse, not the far one.
+    expect(Math.abs(approach!.x - near.x) + Math.abs(approach!.z - near.z)).toBeLessThan(10);
+  });
+
+  it('returns null when no active freight_warehouse exists', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
+
+    expect(findHaulDepotApproach(state, 0, 0)).toBeNull();
+  });
+
+  it('falls back to the warehouse\'s raw coordinates when no NavGrid is built yet', () => {
+    const state = createGame({ seed: SEED });
+    const warehouse = placeWarehouse(state, 10, 10);
+
+    const approach = findHaulDepotApproach(state, 0, 0);
+
+    expect(approach).toEqual({ x: warehouse.x, z: warehouse.z });
+  });
+});
+
 // ── requestHaulFragment — precondition failures ─────────────────────────────
 
 describe('requestHaulFragment — precondition failures', () => {
@@ -133,12 +202,24 @@ describe('requestHaulFragment — precondition failures', () => {
     expect(result.error).toBeDefined();
   });
 
-  it('rejects a vehicle that is already hauling', () => {
+  it('rejects a vehicle already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state);
-    vehicle.haulingFragmentId = 999;
-    vehicle.haulingPhase = 'to_fragment';
+    vehicle.reservedForActionId = 42;
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+
+    const result = requestHaulFragment(state, vehicle.id, 1);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('rejects a vehicle currently carrying a payload (mid-haul)', () => {
+    const state = createGame({ seed: SEED });
+    placeWarehouse(state, 10, 10);
+    const vehicle = makeDrivenHauler(state);
+    vehicle.payload = { fragmentId: 999, massKg: 500 };
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
@@ -194,115 +275,74 @@ describe('requestHaulFragment — precondition failures', () => {
   });
 });
 
-// ── requestHaulFragment — happy path defers movement/loading ───────────────
+// ── requestHaulFragment — happy path installs the itinerary machinery ──────
 
 describe('requestHaulFragment — happy path', () => {
-  it('sets the vehicle destination toward the fragment and marks the haul pending', () => {
+  it('claims the vehicle for a haul_debris action and installs an itinerary driving to the fragment then the depot', () => {
     const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
     const warehouse = placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 7)]);
+    const fragment = makeFragment(1, 5, 7);
+    addBlastFragments(state.logistics, [fragment], state.navGrid);
+    const actionsBefore = state.pendingActions.length;
 
     const result = requestHaulFragment(state, vehicle.id, 1);
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(vehicle.targetX).toBe(5);
-    expect(vehicle.targetZ).toBe(7);
-    expect(vehicle.haulingFragmentId).toBe(1);
-    expect(vehicle.haulingPhase).toBe('to_fragment');
-    expect(vehicle.haulingDepotBuildingId).toBe(warehouse.id);
-    // The core contract under test: no synchronous pickup.
+    // The core contract under test: no synchronous pickup — loading only
+    // happens once the itinerary's own drive leg actually arrives.
     expect(state.logistics.fragments[0]!.state).toBe('on_ground');
+
+    // Claims the vehicle so no other request/dispatch can double-book it.
+    expect(vehicle.reservedForActionId).not.toBeNull();
+    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('haul_debris');
+    expect(action!.payload['fragmentId']).toBe(1);
+    expect(state.pendingActions.length).toBe(actionsBefore + 1);
+
+    // Installs a driving itinerary on the driver ending in the two hauling
+    // arrival effects, per gameplay-vehicle-fleet's own
+    // "[drive -> fragment, effect 'load'] [drive -> depot, effect 'unload']"
+    // shape.
+    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    expect(driver.itinerary).not.toBeNull();
+    const itinerary = driver.itinerary!;
+
+    const loadLegs = legsWithEffect(itinerary, 'haul_load');
+    const unloadLegs = legsWithEffect(itinerary, 'haul_unload');
+    expect(loadLegs).toHaveLength(1);
+    expect(unloadLegs).toHaveLength(1);
+
+    const fragmentApproach = fragmentApproachCell(fragment, state, vehicle.id);
+    expect(loadLegs[0]!.destX).toBe(fragmentApproach.x);
+    expect(loadLegs[0]!.destZ).toBe(fragmentApproach.z);
+
+    const depotApproach = findHaulDepotApproach(state, fragmentApproach.x, fragmentApproach.z)!;
+    expect(unloadLegs[0]!.destX).toBe(depotApproach.x);
+    expect(unloadLegs[0]!.destZ).toBe(depotApproach.z);
+
+    // The load leg is planned before the unload leg.
+    expect(itinerary.legs.indexOf(loadLegs[0]!)).toBeLessThan(itinerary.legs.indexOf(unloadLegs[0]!));
+    void warehouse;
   });
 
   it('routes to the nearest active freight_warehouse when several exist', () => {
     const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
     placeWarehouse(state, 40, 40); // far
     const near = placeWarehouse(state, 6, 6); // near
     const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)], state.navGrid);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
-
     expect(result.success).toBe(true);
-    expect(vehicle.haulingDepotBuildingId).toBe(near.id);
-  });
-});
 
-// ── tickHaulingProgress — no-op while travelling ────────────────────────────
-
-describe('tickHaulingProgress — travelling', () => {
-  it('does nothing while the vehicle has not yet arrived at the fragment', () => {
-    const state = createGame({ seed: SEED });
-    placeWarehouse(state, 10, 10);
-    const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
-    requestHaulFragment(state, vehicle.id, 1);
-
-    // Still en route: task is 'moving' and position has not reached the fragment.
-    vehicle.task = 'moving';
-    moveVehicleAndDriver(state, vehicle, 1, 1);
-
-    tickHaulingProgress(state, vehicle);
-
-    expect(state.logistics.fragments[0]!.state).toBe('on_ground');
-    expect(vehicle.haulingPhase).toBe('to_fragment');
-  });
-});
-
-// ── tickHaulingProgress — arrival at the fragment ───────────────────────────
-
-describe('tickHaulingProgress — arrival at fragment', () => {
-  it('loads the fragment on arrival and re-targets the vehicle toward the depot', () => {
-    const state = createGame({ seed: SEED });
-    const warehouse = placeWarehouse(state, 10, 10);
-    const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
-    requestHaulFragment(state, vehicle.id, 1);
-
-    // Arrived: task idle, position matches the fragment.
-    vehicle.task = 'idle';
-    moveVehicleAndDriver(state, vehicle, 5, 5);
-
-    tickHaulingProgress(state, vehicle);
-
-    expect(state.logistics.fragments[0]!.state).toBe('in_transit');
-    expect(vehicle.haulingPhase).toBe('to_depot');
-    expect(vehicle.targetX).toBe(warehouse.x);
-    expect(vehicle.targetZ).toBe(warehouse.z);
-  });
-});
-
-// ── tickHaulingProgress — arrival at the depot ──────────────────────────────
-
-describe('tickHaulingProgress — arrival at depot', () => {
-  it('delivers the fragment on arrival, increases stored mass, and clears hauling fields', () => {
-    const state = createGame({ seed: SEED });
-    const warehouse = placeWarehouse(state, 10, 10);
-    const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1200)]);
-    requestHaulFragment(state, vehicle.id, 1);
-
-    // First leg: arrive at fragment, load it.
-    vehicle.task = 'idle';
-    moveVehicleAndDriver(state, vehicle, 5, 5);
-    tickHaulingProgress(state, vehicle);
-    expect(state.logistics.fragments[0]!.state).toBe('in_transit');
-
-    const storedBefore = state.logistics.storedMassKg;
-
-    // Second leg: arrive at the depot.
-    vehicle.task = 'idle';
-    moveVehicleAndDriver(state, vehicle, warehouse.x, warehouse.z);
-    tickHaulingProgress(state, vehicle);
-
-    expect(state.logistics.fragments[0]!.state).toBe('stored');
-    expect(state.logistics.storedMassKg).toBe(storedBefore + 1200);
-    expect(vehicle.haulingFragmentId).toBeNull();
-    expect(vehicle.haulingPhase).toBeNull();
-    expect(vehicle.haulingDepotBuildingId).toBeNull();
-    expect(vehicle.task).toBe('idle');
+    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    const unloadLeg = legsWithEffect(driver.itinerary!, 'haul_unload')[0]!;
+    expect(Math.abs(unloadLeg.destX - near.x) + Math.abs(unloadLeg.destZ - near.z)).toBeLessThan(10);
   });
 });
 
@@ -311,7 +351,7 @@ describe('tickHaulingProgress — arrival at depot', () => {
 // Picks the nearest 'on_ground' fragment that is actually path-connected to
 // the vehicle's position (via NavGrid.computeReachableSet) rather than plain
 // nearest-distance — after a full-clear blast most fragments land in 'void'
-// NavGrid cells no vehicle can reach.
+// NavGrid cells no vehicle can reach. Unchanged by #1091.
 
 describe('findReachableGroundFragment — precondition failures', () => {
   it('returns null when there are zero on-ground fragments', () => {
@@ -435,17 +475,18 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
 
   it('accepts a fragment exactly at the oversized threshold (isOversized must be strictly >, not >=)', () => {
     const state = createGame({ seed: SEED });
-    const warehouse = placeWarehouse(state, 10, 10);
+    state.navGrid = makeFlatNavGrid(GRID);
+    placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state, 0, 0);
     const atThreshold = makeFragment(1, 5, 5);
     atThreshold.volume = OVERSIZED_FRAGMENT_THRESHOLD;
-    addBlastFragments(state.logistics, [atThreshold]);
+    addBlastFragments(state.logistics, [atThreshold], state.navGrid);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(vehicle.haulingDepotBuildingId).toBe(warehouse.id);
+    expect(vehicle.reservedForActionId).not.toBeNull();
   });
 });
 
@@ -477,66 +518,46 @@ describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
   });
 });
 
-// ── fragmentApproachCell — shared approach resolution (#484) ───────────────
+// ── fragmentApproachCell — shared between hauling and breaking (#484) ──────
 //
 // Hauling and breaking dispatch different vehicle roles at the same fragment
 // position, but both must resolve to the identical NavGrid approach cell —
 // otherwise a hauler and a fragmenter sent to the same boulder would park in
-// different places.
-
-// ── tickHaulingProgress — NavGrid fragment-occupancy clearing (#954) ───────
-//
-// Pickup at the fragment ('to_fragment' -> 'to_depot' transition) clears the
-// fragment's own cell occupant count via NavGrid.removeFragmentOccupant —
-// only ever indirectly covered before, through Logistics.addBlastFragments's
-// own wiring in the full-loop integration test.
-
-describe('tickHaulingProgress — NavGrid fragment-occupancy clearing (#954)', () => {
-  it('clears the fragment cell\'s occupancy count on pickup', () => {
-    const state = createGame({ seed: SEED });
-    state.navGrid = makeFlatNavGrid(20);
-    placeWarehouse(state, 10, 10);
-    const vehicle = makeDrivenHauler(state, 0, 0);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)], state.navGrid);
-    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
-    requestHaulFragment(state, vehicle.id, 1);
-
-    // Arrived: task idle, position matches the fragment.
-    vehicle.task = 'idle';
-    moveVehicleAndDriver(state, vehicle, 5, 5);
-
-    tickHaulingProgress(state, vehicle);
-
-    expect(state.logistics.fragments[0]!.state).toBe('in_transit');
-    expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(0);
-  });
-});
+// different places. #1091: that shared target now shows up as the
+// itinerary's own first drive leg destination rather than vehicle.targetX/Z.
 
 describe('fragmentApproachCell — shared between hauling and breaking (#484)', () => {
-  it('haul and break resolve the same approach cell for equivalent fragments at the same position', () => {
+  it('haul and break plan their first drive leg onto the same approach cell for equivalent fragments at the same position', () => {
     const haulState = createGame({ seed: SEED });
+    haulState.navGrid = makeFlatNavGrid(GRID);
     placeWarehouse(haulState, 10, 10);
     const haulVehicle = makeDrivenHauler(haulState, 0, 0);
     const haulFragment = makeFragment(1, 6, 9);
     haulFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD; // at threshold: haulable
-    addBlastFragments(haulState.logistics, [haulFragment]);
+    addBlastFragments(haulState.logistics, [haulFragment], haulState.navGrid);
     requestHaulFragment(haulState, haulVehicle.id, 1);
+    const haulDriver = haulState.employees.employees.find(e => e.id === haulVehicle.driverId)!;
+    const haulLoadLeg = legsWithEffect(haulDriver.itinerary!, 'haul_load')[0]!;
 
     const breakState = createGame({ seed: SEED });
+    breakState.navGrid = makeFlatNavGrid(GRID);
     const rng = new Random(SEED);
     const { vehicle: breakVehicle } = purchaseVehicle(breakState.vehicles, 'rock_fragmenter', 0, 0);
     const { employee } = hireEmployee(breakState.employees, 'driver', rng);
     assignSkill(breakState.employees, employee.id, 'driving.excavator', 1);
     breakVehicle.driverId = employee.id;
+    breakVehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: breakVehicle.id };
     const breakFragment = makeFragment(1, 6, 9);
     breakFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD + 0.5; // oversized: breakable
-    addBlastFragments(breakState.logistics, [breakFragment]);
+    addBlastFragments(breakState.logistics, [breakFragment], breakState.navGrid);
     requestBreakBoulder(breakState, breakVehicle.id, 1);
+    const breakSplitLeg = legsWithEffect(employee.itinerary!, 'boulder_split')[0]!;
 
     const expected = fragmentApproachCell(haulFragment);
-    expect(haulVehicle.targetX).toBe(expected.x);
-    expect(haulVehicle.targetZ).toBe(expected.z);
-    expect(breakVehicle.targetX).toBe(expected.x);
-    expect(breakVehicle.targetZ).toBe(expected.z);
+    expect(haulLoadLeg.destX).toBe(expected.x);
+    expect(haulLoadLeg.destZ).toBe(expected.z);
+    expect(breakSplitLeg.destX).toBe(expected.x);
+    expect(breakSplitLeg.destZ).toBe(expected.z);
   });
 });
