@@ -18,11 +18,13 @@ import {
 // Re-exported so EmployeeDispatch.ts/EmployeeDispatchSteps.ts keep importing
 // evacuation-hold bookkeeping from this one file — the split into
 // EvacuationHold.ts (#557 follow-up file-size split) is an internal
-// organization detail, not a change to who imports what. See
-// EvacuationHold.ts for EVACUATION_HOLD_KEY's own doc comment and both
-// functions'.
+// organization detail, not a change to who imports what. EVACUATION_HOLD_KEY
+// itself is not re-exported here (#1090: its last external importer via this
+// module was an unused test import, removed as dead) — import it directly
+// from EvacuationHold.ts if a caller needs the raw key again. See
+// EvacuationHold.ts for its own doc comment and both functions'.
 export {
-  EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds,
+  isEvacuationHoldActive, clearResolvedEvacuationHolds,
 } from './EvacuationHold.js';
 
 /**

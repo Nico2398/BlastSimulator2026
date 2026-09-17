@@ -13,8 +13,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { TaskProgressResult } from './TaskProgress.js';
 import type { TaskCompletionReport } from './TickPipeline.js';
 import { Random } from '../math/Random.js';
-import { completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
-import { completePendingAction } from './TaskDispatch.js';
+import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
@@ -112,22 +111,17 @@ export function applyTaskCompletion(
     }
 
     // Any completed non-rest action — skill-required (survey, etc.) or
-    // not (a null-skill general_work dispatch) — routes through
-    // tickTaskProgress and carries an actionId here; completePendingAction
-    // removes the completing action's record and ghost, once the work has
-    // actually finished, not at claim time (#547).
+    // not (a null-skill general_work dispatch), vehicle-gated or on-foot —
+    // routes through tickTaskProgress and carries an actionId here.
+    // completeVehicleGatedAction (VehicleReservation.ts, #1090) owns both
+    // releasing any vehicle reservation (a safe no-op when this action
+    // never reserved one) and removing the completed action's record/ghost
+    // (completePendingAction) — one call handles every action type, not just
+    // vehicle-gated ones, since resolveActionCost/planItinerary already own
+    // picking any same-role follow-up and no continuity fast path is needed
+    // here any more.
     if (progress.actionId !== undefined) {
-      // #1085: route through the same shared completion function the
-      // phase-driven (haul_debris/fragment_debris) path already used, so the
-      // starvation override, the vehicle-continuity promotion and the
-      // reservation release happen once, in one place, regardless of which
-      // kind of work just finished. Returns false for a non-vehicle-gated
-      // action (or an already-removed one) — completePendingAction below is
-      // the same fallback that already ran for those.
-      const handled = completeVehicleGatedActionIfApplicable(state, emp, progress.actionId);
-      if (!handled) {
-        completePendingAction(state, progress.actionId);
-      }
+      completeVehicleGatedAction(state, emp, progress.actionId);
     }
 
     // A completed 'survey' task resolves here — after the surveyor has

@@ -3,26 +3,27 @@
 // The three-step-per-employee claim sequence EmployeeDispatch.ts's
 // tickEmployees runs for each employee every tick: claim actions targeted at
 // them, fill from their own queue or the open pool, or reserve one pool
-// action ahead while busy — plus the shared promoteActionToActive that both
-// this module and VehicleContinuity.ts use to hand a claimed action to an
-// employee. Split out of GameLoop.ts as part of #759's file-size split;
-// re-exported there so GameLoop.ts stays the single public surface for
-// tick-orchestration callers.
+// action ahead while busy — plus promoteActionToActive, which hands a
+// claimed action to an employee. Split out of GameLoop.ts as part of #759's
+// file-size split; re-exported there so GameLoop.ts stays the single public
+// surface for tick-orchestration callers.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction, type SelectedAction,
+  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
+  canReleaseStrandedVehicleGatedAction, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, canReassignStrandedReservation, isLicensedForRole } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
+import { moveTo } from './MoveTo.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -192,15 +193,14 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // #954 follow-up (economy-full-loop regression): a vehicle-gated entry
       // among those same unreachable candidates may be reserved to a vehicle
       // nobody has boarded yet, with a different, already-idle, already-
-      // licensed employee standing by who could use it right now —
-      // canReassignStrandedReservation's own doc comment (VehicleReservation.ts)
-      // has the full trace. Handing it back to the open pool here, rather
-      // than leaving it locked to this employee until its own retry
-      // eventually succeeds (which resolveActionCost's #954 occupancy
-      // check can now correctly refuse forever), lets that other employee
-      // claim it the very next time they're offered the pool below.
+      // licensed employee standing by who could use it right now.
+      // canReleaseStrandedVehicleGatedAction (ActionSelection.ts) restores
+      // this — the deleted canReassignStrandedReservation's own release half
+      // (VehicleReservation.ts, dismount-on-release mechanism removed by
+      // #1090), now judged by the same real resolveActionCost reachability
+      // check every other claim/release decision in this file already uses.
       for (const candidate of candidates) {
-        if (canReassignStrandedReservation(state, candidate)) {
+        if (canReleaseStrandedVehicleGatedAction(state, employee, candidate)) {
           employee.taskQueue = employee.taskQueue.filter(id => id !== candidate.id);
           releaseActionToOpenPool(state, candidate);
         } else if (canReleaseStrandedOnFootAction(state, employee, candidate)) {
@@ -225,10 +225,12 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
   // field of hundreds of nearer haul/fragment actions re-picks one of those
   // every tick indefinitely, so an ordered building on the far side of the
   // pit stays unbuilt even while somebody is free to walk to it right now.
-  // VehicleContinuity.ts's own starvation gate does not cover this: it fires
-  // only when a driver *completes* a vehicle-gated action, and an employee
-  // who never completes one — churning on a claim that keeps failing, or
-  // idle between rests — never passes through it at all. Direct-traced via
+  // The now-deleted VehicleContinuity.ts's own starvation gate never covered
+  // this: it fired only when a driver *completes* a vehicle-gated action, and
+  // an employee who never completes one — churning on a claim that keeps
+  // failing, or idle between rests — never passed through it at all.
+  // findStarvedActionForEmployee (promoteStarved, above) covers every idle
+  // employee regardless of what they were last doing. Direct-traced via
   // rock-fragmenter-breaking.json in interaction mode: both `place_building`
   // orders sat 'queued' and fully claimable (reachable, no required skill,
   // no vehicle needed) for 3,000 ticks while the one idle driver re-selected
@@ -276,13 +278,13 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * reserveOnePoolActionAhead's own doc comment): when true, a
  * `requiredVehicleRole === null` candidate is never considered. Without it, a
  * busy driver could reserve-ahead an on-foot action (e.g. a `place_building`
- * order) into taskQueue, where it can never be redeemed by the same-tick
- * continuity fast path (VehicleContinuity.ts's tryContinueVehicleGatedAction
- * only promotes a taskQueue entry whose role matches the just-finished
- * action) and, being no longer 'queued', is invisible to
- * findStarvedActionForEmployee too — so it sits claimed but un-promotable for
- * as long as the driver keeps finding more same-role vehicle work to chain
- * onto, defeating the whole point of the starvation override.
+ * order) into taskQueue, where it sits un-promotable until the driver goes
+ * genuinely idle (only fillIdleEmployeeFromQueueOrPool's step 2 promotes a
+ * taskQueue entry, role-agnostic, once activeActionId is null) and, being no
+ * longer 'queued', is invisible to findStarvedActionForEmployee too — so it
+ * sits claimed but un-promotable for as long as the driver keeps finding more
+ * same-role vehicle work to chain onto ahead of ever going idle, defeating
+ * the whole point of the starvation override.
  *
  * A *different* vehicle-gated candidate (any non-null role) is deliberately
  * NOT excluded here, even when it doesn't match the employee's current
@@ -312,9 +314,10 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * speculative lookahead reservation): without it, a busy employee whose own
  * active action is on-foot (so the #1000 on-foot exclusion above doesn't
  * apply) can immediately re-reserve-ahead a vehicle action that
- * releaseUnboardedTaskQueueVehicleReservations (VehicleContinuity.ts's
- * starvation override) JUST released back to the pool for exactly this
- * reason — an idle, already-licensed employee standing by should get it
+ * releaseUnboardedTaskQueueVehicleReservations (called from a starvation
+ * override elsewhere — NeedRestoration.ts's tickCollapse) JUST released
+ * back to the pool for exactly this reason — an idle, already-licensed
+ * employee standing by should get it
  * this same tick, not have it re-locked to the very employee whose own
  * detour caused the release, defeating the release's whole point. Left
  * `false` for step 2 (idle employee, fillIdleEmployeeFromQueueOrPool) —
@@ -458,7 +461,6 @@ export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, e
  * sends them walking toward the target, and seeds either
  * pendingRestDuration/pendingRestNeedKey (rest) or pendingTaskDuration/
  * activeTaskSkill/pendingActionType/pendingActionPayload (everything else).
- * Also used by VehicleContinuity.ts's tryContinueVehicleGatedAction.
  */
 export function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction): void {
   employee.activeActionId = action.id;
@@ -504,8 +506,33 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // PlanItinerary.ts's own vehicle-gated branch.
   alightIfMounted(state, employee);
 
-  employee.destinationX = action.targetX;
-  employee.destinationZ = action.targetZ;
+  // #1090: every other on-foot action walks via moveTo — the only entry
+  // point that starts movement — rather than setting destinationX/Z
+  // directly, whenever moveTo can actually resolve a route.
+  const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ });
+  if (!moveResult.success) {
+    // #1090 follow-up: moveTo's upfront exact-fidelity reachability check
+    // (planItinerary) refuses to install an itinerary for a target that's
+    // unreachable right now, unlike the legacy per-tick stepper it replaced
+    // here, which always started the walk and let every tick's own findPath
+    // attempt retry — incrementing moveConsecutiveFailures until isMoveStuck
+    // flips and MOVE_STUCK_ABANDON_TICKS eventually abandons it
+    // (Locomotion.ts's advanceLegacyFootWalk). Left as a silent no-op, an
+    // employee whose claim target is unreachable right now — but not
+    // provably unreachable forever — locks up permanently: activeActionId
+    // stays set (so the ordinary idle claim/promote steps never revisit
+    // them), while itinerary and destinationX/Z both stay null, which
+    // ArrivalGate reads as "arrived" without the employee ever having moved,
+    // and Locomotion's stuck-tracking never even starts (confirmed live via
+    // console-api.test.ts's own "counts an employee as stuck ... boxed in by
+    // buildings" case — a dispatch outside a sealed pocket froze silently
+    // instead of ever flipping isMoveStuck). Falling back to the legacy
+    // destinationX/Z walk here restores that same resilience for exactly
+    // this one case, without touching the itinerary path any target
+    // reachable at claim time still takes.
+    employee.destinationX = action.targetX;
+    employee.destinationZ = action.targetZ;
+  }
 
   // Non-rest actions queue their task duration here — a skill-required
   // action's claimed employee is guaranteed (by the qualification filters

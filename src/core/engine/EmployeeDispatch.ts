@@ -15,8 +15,10 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
-import { isLicensedForRole } from './VehicleReservation.js';
+import { isLicensedForRole, hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { alightIfMounted } from './Mount.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -190,6 +192,44 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);
+      // #1090 follow-up: still idle after this tick's own dispatch attempt
+      // found nothing for them, but mounted — with no dismount-on-completion
+      // any more, a driver whose own work ran out (no same-role follow-up
+      // queued anywhere) would otherwise sit mounted forever, permanently
+      // hostage to nobody, while a DIFFERENT employee's own separately
+      // targeted action for that exact role can never claim the vehicle
+      // (findFreeVehicleForRole only ever considers driverId === null, or
+      // the requesting employee's own current vehicle). Alighting here —
+      // only once this tick's own claim attempt has already had first
+      // refusal, and only when hasBlockedQueuedActionForVehicleRole confirms
+      // some OTHER employee's queued (or untargeted) action for this exact
+      // role is genuinely starved — frees the vehicle for that other
+      // employee's own claim, the very next tick, without reintroducing a
+      // same-role continuity special case for the common case where a
+      // follow-up this same employee could claim exists instead (they would
+      // already hold it, via fillIdleEmployeeFromQueueOrPool just above).
+      // `hasQueuedActionForVehicleRole` (the employeeId-scoped sibling
+      // predicate) cannot stand in here: it reads identically false for the
+      // real hostage bug this exists to fix AND for a vehicle boarded by a
+      // bare `vehicle driver`/`vehicle move` console command with no
+      // PendingAction behind it at all — evicting the latter's driver within
+      // one dispatch tick of boarding (confirmed live: nav-move-costs-visual,
+      // vehicle-traffic, vehicle-task-states-visual and every other scenario
+      // driving a vehicle by hand).
+      if (employee.activeActionId === null && isMounted(employee.locomotion)) {
+        const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
+        // reservedForActionId !== null already means this exact vehicle is
+        // spoken for — either this same employee's own reserved-ahead
+        // taskQueue entry (reserveOnePoolActionAhead, #611 — 'assigned', not
+        // 'queued', so hasBlockedQueuedActionForVehicleRole's own query would
+        // miss it and wrongly alight the one employee still holding it) or
+        // another employee's; either way, alighting here would desync the
+        // reservation from a driver assertWorldInvariants' I5 check expects
+        // to still resolve.
+        if (vehicle && vehicle.reservedForActionId === null && hasBlockedQueuedActionForVehicleRole(state, vehicle.type, employee.id)) {
+          alightIfMounted(state, employee);
+        }
+      }
     } else {
       reserveOnePoolActionAhead(state, employee, result);
     }
@@ -206,11 +246,36 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
 /**
  * Work-state classification for NEED_DRAIN_RATES purposes (#680, extended to
- * 'traveling' by #928). See EmployeeWorkState for the four states.
+ * 'traveling' by #928, and again for a vehicle-gated mid-drive by #1090's own
+ * livelock follow-up). See EmployeeWorkState for the four states.
+ *
+ * pendingTaskDuration/pendingRestDuration cover the on-foot outbound-walk and
+ * return-to-rest cases (#928) — but a vehicle-gated action's own duration is
+ * deliberately never staged into pendingTaskDuration until the vehicle
+ * physically arrives (ArrivalGate.ts's own doc comment, #1089), so those two
+ * fields alone stay null for the whole approach drive to a claimed
+ * dig_ramp_segment/drill_hole/etc, and the old fallback below read that
+ * (activeActionId already set, nothing else claimed yet) as 'working' — full
+ * fatigue drain for a leg where no work is actually happening yet, exactly
+ * the bug #928 fixed for the on-foot case. `itinerary` (or, for the rare
+ * fallback to a direct-write walk, destinationX/Z — see beginRestTravel's own
+ * doc comment, RestActionHelpers.ts) is non-null for exactly this same "still
+ * travelling, not yet arrived" window regardless of mover
+ * (ArrivalGate.tickArrivalGate's own `arrived` check reads the identical
+ * three fields), so it closes the gap the same way pendingTaskDuration does
+ * for the on-foot case. Confirmed live via needs.integration.test.ts's #945
+ * box-cut suite and the tutorial-boxcut-full scenario: a mounted forced-rest
+ * round trip billed its drive at the 'working' rate (2/tick, further
+ * multiplied by low morale) instead of 'traveling' (1/tick), so a round trip
+ * that fit the fatigue budget at the correct rate blew straight through it —
+ * a permanent livelock, not a distance problem needing a cap.
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
   if (emp.restTicksRemaining !== null) return 'resting';
-  if (emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null) return 'traveling';
+  if (
+    emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null
+    || emp.itinerary !== null || emp.destinationX !== null || emp.destinationZ !== null
+  ) return 'traveling';
   if (emp.activeActionId !== null) return 'working';
   return 'idle';
 }

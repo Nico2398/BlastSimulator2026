@@ -9,9 +9,10 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation, releaseVehicleReservationKeepDriver, isMidVehicleGatedWork } from './VehicleReservation.js';
+import { releaseVehicleReservation, isMidVehicleGatedWork, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
+import { syncPendingDriverVehicleId } from './MoveTo.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -251,7 +252,7 @@ export function interruptActiveAction(
   state: GameState,
   employee: Employee,
   actionId: number | null,
-  options?: { keepVehicleDriver?: boolean; forceOpenPool?: boolean },
+  options?: { forceOpenPool?: boolean },
 ): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
@@ -281,10 +282,11 @@ export function interruptActiveAction(
           // position, drove 3 ticks, and was pulled off again before ever
           // reaching the segment). isMidVehicleGatedWork (VehicleReservation.ts)
           // covers both the drive and mid-execution phases; the
-          // taskTicksRemaining === null guard above already narrows this to
-          // the drive phase specifically — mid-execution is separately
-          // protected upstream (ForceShiftRest.ts's own isMidVehicleGatedWork
-          // guard) and never reaches here with taskTicksRemaining === null.
+          // taskTicksRemaining === null guard above already narrows this
+          // branch to the drive phase specifically — mid-execution always
+          // sets taskTicksRemaining (seedTaskTimerFields), so it takes the
+          // taskTicksRemaining-preserving branch above instead and never
+          // reaches here.
           || (action.requiredVehicleRole !== null && isMidVehicleGatedWork(state, employee))
         )
       ) {
@@ -357,11 +359,7 @@ export function interruptActiveAction(
         }
       }
 
-      // options.keepVehicleDriver (#552) skips the dismount for the one
-      // caller (ArrivalGate.ts's resolveBoarding) interrupting an action
-      // whose driver had *just* boarded this same tick for it — every other
-      // caller keeps the full dismount-and-idle release.
-      releaseActionToOpenPool(state, action, options);
+      releaseActionToOpenPool(state, action);
     }
   }
 
@@ -381,23 +379,15 @@ export function interruptActiveAction(
  * evacuated employee claimed but never started walking to, with no
  * per-employee walk state of its own to unwind.
  *
- * options.keepVehicleDriver (#552): see interruptActiveAction's own call
- * site above — releaseDeadEmployeeActions never passes this, a dead
- * employee has no boarding-continuity case to protect.
  */
 export function releaseActionToOpenPool(
   state: GameState,
   action: PendingAction,
-  options?: { keepVehicleDriver?: boolean },
 ): void {
   action.status = 'queued';
   action.holderId = null;
 
-  if (options?.keepVehicleDriver) {
-    releaseVehicleReservationKeepDriver(state, action.id);
-  } else {
-    releaseVehicleReservation(state, action.id);
-  }
+  releaseVehicleReservation(state, action.id);
 
   const ghost = state.ghostPreviews.find(g => g.id === action.id);
   if (ghost) {
@@ -442,7 +432,14 @@ function clearHolderWalkFields(emp: Employee): void {
   emp.moveConsecutiveFailures = 0;
   emp.isMoveStuck = false;
   emp.pendingTaskDuration = null;
-  emp.pendingDriverVehicleId = null;
+  // #1090: clear any in-flight itinerary too — an interruption/cancellation
+  // must never leave a moveTo-installed itinerary still attached once the
+  // employee is idle-but-claimable again (WorldInvariants.ts's I9 check).
+  // syncPendingDriverVehicleId (MoveTo.ts) re-derives pendingDriverVehicleId
+  // from the (now null) itinerary rather than hand-setting it, reusing the
+  // same syncing helper every itinerary mutation already goes through.
+  emp.itinerary = null;
+  syncPendingDriverVehicleId(emp);
 }
 
 /**
@@ -493,6 +490,16 @@ function actionOrderCost(action: PendingAction): number {
  * work this was is still worth finishing.
  */
 export function releaseDeadEmployeeActions(state: GameState, employeeId: number): void {
+  // #1090: dismount any vehicle the dead employee still drives, directly —
+  // releaseActionToOpenPool's own releaseVehicleReservation call below is
+  // claim-only now (never dismounts), and by the time
+  // reconcileVehicleReservations' own dead-holder sweep would otherwise
+  // catch this, the reservation this loop just released is already gone,
+  // so its vehicle-driven-by-reservedForActionId lookup would never find it
+  // again — a dead employee left mounted would violate I1/I2 forever.
+  const drivenVehicle = state.vehicles.vehicles.find(v => v.driverId === employeeId);
+  if (drivenVehicle) dismountVehicleDriver(state, drivenVehicle);
+
   // A snapshot, not the live array: a 'rest' action below is removed via
   // completePendingAction, which splices state.pendingActions — iterating
   // the live array while splicing it skips whatever shifted into the

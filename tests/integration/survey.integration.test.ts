@@ -267,9 +267,11 @@ describe('Survey system', () => {
     const afterOneTick = tickCommand(ctx, ['1'], {});
     expect(afterOneTick.success).toBe(true);
     // Not resolved yet — the surveyor has only just started walking there.
+    // #1090: an on-foot claim walks via moveTo's itinerary now, not the
+    // legacy destinationX/Z fields (EmployeeDispatchSteps.ts's
+    // promoteActionToActive).
     expect(ctx.state!.surveyResults).toHaveLength(0);
-    expect(emp.destinationX).not.toBeNull();
-    expect(emp.destinationZ).not.toBeNull();
+    expect(emp.itinerary).not.toBeNull();
     expect(emp.x === 2 && emp.z === 2).toBe(false);
 
     // Enough ticks for the walk (Euclidean distance / AGENT_WALK_SPEED) plus

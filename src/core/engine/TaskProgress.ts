@@ -106,7 +106,24 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
       const totalTicks = emp.activeTaskTotalTicks ?? 0;
       const ticksElapsed = totalTicks - emp.taskTicksRemaining;
       const carvedCount = tracker.carvedCount ?? 0;
-      const target = computeRampSegmentCarveTarget(tracker.cells.length, ticksElapsed, totalTicks);
+      // #1090 follow-up: totalTicks is re-derived from the REMAINING
+      // (not-yet-carved) voxel count every time this segment is re-armed
+      // after an interruption (ArrivalGate.ts's activeTaskTotalTicks <-
+      // ActionSelection.ts's computeActionWorkTicks, grid-filtered) — now
+      // reachable for a boarded, mid-execution vehicle-gated action too,
+      // since #1090 deletes the guard that used to keep one uninterrupted
+      // from arrival to completion. computeRampSegmentCarveTarget's own
+      // ease curve must operate on the SAME basis as totalTicks — the cells
+      // still to carve THIS attempt, offset by carvedCount — rather than the
+      // segment's full original cell count: scaling the curve to the full
+      // count while totalTicks reflects only the remainder made the curve's
+      // target lag behind carvedCount for the whole attempt, silently
+      // discarding every re-armed attempt's ticks with zero further carving
+      // (confirmed live via needs.integration.test.ts's own #945 box-cut
+      // ramp suite — a segment resumed after a forced-rest interruption
+      // never carved another cell, no matter how many times it was retried).
+      const remainingCells = tracker.cells.length - carvedCount;
+      const target = carvedCount + computeRampSegmentCarveTarget(remainingCells, ticksElapsed, totalTicks);
 
       if (target > carvedCount) {
         const sliceResult = carveRampSegmentSlice(grid, tracker.cells, carvedCount, target, emitter);

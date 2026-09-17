@@ -59,11 +59,12 @@ export { tickGeneralRestCompletion, type GeneralRestCompletionResult } from './R
 // ShiftCycle.ts (#759's file-size split) — re-exported here.
 export { processShiftCycle, type ShiftCycleResult } from './ShiftCycle.js';
 
-// Vehicle-continuity inline promotion (#550/#552) lives in
-// VehicleContinuity.ts (#759's file-size split) — re-exported here.
-// tryContinueVehicleGatedAction stays internal to VehicleContinuity.ts (#1085):
-// completeVehicleGatedActionIfApplicable is the sole entry point callers use.
-export { completeVehicleGatedActionIfApplicable } from './VehicleContinuity.js';
+// Vehicle-gated action completion (#1090) lives in VehicleReservation.ts —
+// VehicleContinuity.ts's own continuity fast path was deleted along with the
+// dismount-on-release mechanism; completeVehicleGatedAction is the sole entry
+// point callers use, re-exported here for the same reason as the rest of
+// this module.
+export { completeVehicleGatedAction } from './VehicleReservation.js';
 
 // Task progress ticking and completion lives in TaskProgress.ts (#759's
 // file-size split) — re-exported here.

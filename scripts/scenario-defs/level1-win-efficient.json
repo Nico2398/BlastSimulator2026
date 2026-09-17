@@ -1390,7 +1390,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged.",
       "interaction": [
         {
           "type": "command",
@@ -1404,9 +1404,9 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 0,
+          "wellBeing": 30.50249999999994,
           "safety": 50,
-          "ecology": 56.11999999999996,
+          "ecology": 49.17,
           "nuisance": 47.925
         },
         "changedBy": {
@@ -1430,9 +1430,9 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 0,
+          "wellBeing": 30.50249999999994,
           "safety": 50,
-          "ecology": 56.11999999999996,
+          "ecology": 49.17,
           "nuisance": 47.925
         },
         "changedBy": {
@@ -2498,7 +2498,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#554 Finding (real trajectory, supersedes the pre-#554 tickCount-491 calibration): worker_revolt no longer fires here at all -- it already fired much earlier, during pattern 1's own `wait_until field:orderedChargeCount` step (charging is now real, queued work, ~69 ticks), well before pattern 1's blast even happens. wellBeing crashes to 0 mid-pattern-1-drilling (well before any death) and stays there uninterrupted long enough for the REVOLT_TICKS=120 streak to complete during that charge wait, so `levelEnded`/`levelEndReason` are already `true`/`worker_revolt` from that point on -- this step doesn't newly trigger anything, it just keeps observing an already-ended level. What #554 actually changes here is `tickCount`: the queued charge action's own real elapsed time shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks relative to the pre-#554 file (charging used to be instant), so this checkpoint reads 551, not 491, purely from that uniform shift -- not from any change in when the revolt itself fires. Real consequence unchanged from the pre-#554 file: pattern 2 still lands all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended. `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to this checkpoint, same real-time-accrual class as line ~1072's own note.",
+      "description": "#554 Finding (real trajectory, supersedes the pre-#554 tickCount-491 calibration): worker_revolt no longer fires here at all -- it already fired much earlier, during pattern 1's own `wait_until field:orderedChargeCount` step (charging is now real, queued work, ~69 ticks), well before pattern 1's blast even happens. wellBeing crashes to 0 mid-pattern-1-drilling (well before any death) and stays there uninterrupted long enough for the REVOLT_TICKS=120 streak to complete during that charge wait, so `levelEnded`/`levelEndReason` are already `true`/`worker_revolt` from that point on -- this step doesn't newly trigger anything, it just keeps observing an already-ended level. What #554 actually changes here is `tickCount`: the queued charge action's own real elapsed time shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks relative to the pre-#554 file (charging used to be instant), so this checkpoint reads 551, not 491, purely from that uniform shift -- not from any change in when the revolt itself fires. Real consequence unchanged from the pre-#554 file: pattern 2 still lands all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended. `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to this checkpoint, same real-time-accrual class as line ~1072's own note. #1090-followup (sandbox-measured): `levelEnded`/`levelEndReason` dropped from this step's own expect -- VehicleContinuity.ts's deletion slows pattern 1's crew fatigue drain (no forced dismount/rewalk between same-role holes), so wellBeing no longer crashes to 0 until partway through pattern 2's drilling instead of during pattern 1's charge wait, and the REVOLT_TICKS=120 streak hasn't yet completed by this checkpoint's tickCount (still 431, unchanged) -- `levelEnded` reads `false` here now. The revolt still fires for real, just later (see the `wait_until field:ecology` step below, which now also pays off a real fatigue-driven wellBeing debt as well as ecology's).",
       "interaction": [
         {
           "type": "command",
@@ -2512,8 +2512,8 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt"
+          "levelEnded": false,
+          "levelEndReason": null
         },
         "decreased": [
           "cash"
@@ -2522,7 +2522,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2025975` pre-emptively, same real-time-accrual class documented at line ~1072. `levelEnded`/`levelEndReason` stay exact -- deterministic from tick count and wellBeing, not wall-clock-sensitive. `holeCount`/`orderedHoleCount` also dropped -- same landing-boundary note as the tick step just above.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2025975` pre-emptively, same real-time-accrual class documented at line ~1072. `holeCount`/`orderedHoleCount` also dropped -- same landing-boundary note as the tick step just above. #1090-followup (sandbox-measured): `levelEnded`/`levelEndReason` dropped here too, same reason as the tick step above -- the level has not ended yet at this checkpoint.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2535,8 +2535,8 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt"
+          "levelEnded": false,
+          "levelEndReason": null
         }
       },
       "commandOutcome": "either"

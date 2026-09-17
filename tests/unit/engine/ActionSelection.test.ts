@@ -22,13 +22,14 @@ import {
   resolveRestNeedKey,
   canReleaseStrandedOnFootAction,
   findStarvedActionForEmployee,
+  cellsToTravelTicks,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
@@ -303,7 +304,14 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
     expect(result).toBeNull();
   });
 
-  it('resolves against the reserved vehicle\'s position, not the action\'s own target: reachable when the path to the vehicle is clear even though the path to the target is blocked', () => {
+  it('resolves against the reserved vehicle\'s position, not the action\'s own target: still null when the walk to the vehicle is clear but the drive from it to the target is blocked (#1090: whole-route reachability, not walk-to-vehicle-only)', () => {
+    // #1090: resolveActionCost now delegates to planItinerary, whose
+    // estTotalTicks sums the WHOLE route (walk-to-vehicle, then drive to the
+    // target), replacing the deleted resolveVehicleGatedWalkTarget's
+    // walk-only reachability judgment. A wall isolating the target from the
+    // vehicle blocks the drive leg exactly as it would block a direct walk,
+    // so this must resolve to null now — the pre-#1090 walk-only check would
+    // have wrongly reported "reachable" here.
     const state = makeState(30, 30);
     const emp = makeEmployee(state, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
@@ -311,36 +319,197 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
       id: 1,
       requiredVehicleRole: 'debris_hauler',
       targetX: 25,
-      targetZ: 25, // isolated from the employee by the wall below
+      targetZ: 25, // isolated from the employee AND the vehicle by the wall below
     });
     vehicle.reservedForActionId = action.id;
-    blockColumn(state.navGrid!, 10); // isolates the action's own target (x=25) from the employee (x=0), but the vehicle (x=0) is on the employee's own side
+    blockColumn(state.navGrid!, 10); // isolates the action's own target (x=25) from both the employee and the vehicle (x=0)
 
     const result = resolveActionCost(state, emp, action);
 
-    expect(result).not.toBeNull();
-    expect(result!.totalTicks).toBeGreaterThan(0);
+    expect(result).toBeNull();
   });
 
-  it('falls back to the action\'s own target when the employee already holds the reserved vehicle\'s driverId (continuity case)', () => {
+  it('plans a zero-length first leg when the employee already holds the reserved vehicle\'s driverId and locomotion (continuity case) — reachable even though a fresh walk-to-vehicle route is walled off, since no walk is needed', () => {
     const state = makeState(30, 30);
-    const emp = makeEmployee(state, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 20, 0);
+    const emp = makeEmployee(state, vehicle.x, vehicle.z); // I2: mounted employee sits at their vehicle's position
     const action = makeAction({
       id: 1,
       requiredVehicleRole: 'debris_hauler',
-      targetX: 3,
-      targetZ: 3,
+      targetX: 25,
+      targetZ: 3, // same side of the wall as the vehicle (x=20) — only the drive leg matters
     });
     vehicle.reservedForActionId = action.id;
-    vehicle.driverId = emp.id; // already boarded — no further foot-walk needed
-    blockColumn(state.navGrid!, 10); // would block the walk to the vehicle, but that walk is moot now
+    vehicle.driverId = emp.id;
+    vehicle.occupantIds = [emp.id];
+    emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id }; // I1: mount truth is Locomotion, not driverId alone
+    blockColumn(state.navGrid!, 10); // would block a fresh walk to the vehicle, but continuity plans no such leg
 
     const result = resolveActionCost(state, emp, action);
 
-    // Reachable: the real walk target is the action's own (reachable) target,
-    // not the (unreachable-behind-the-wall) vehicle.
+    // Reachable: continuity (planItinerary dropping the zero-length first
+    // leg) means the only leg left is the drive from the vehicle's own
+    // position (20,0) to the action's target (25,3), never crossing the
+    // wall.
     expect(result).not.toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// estimateActionCost / resolveActionCost — cost delegates to planItinerary
+// (#1090, vehicle-fleet migration phase 4)
+//
+// resolveVehicleGatedWalkTarget's own walk-only calculation (above) is
+// replaced: both functions now sum whatever planItinerary itself returns for
+// the employee's whole route — walk-to-vehicle at walking speed PLUS
+// drive-to-target at the vehicle's own (tiered) speed for a vehicle-gated
+// action, not just the walk leg. Continuity (a mounted employee's cost
+// beating an on-foot candidate's) becomes an emergent property of that same
+// cost ranking — planning a zero-length first leg for an already-mounted
+// employee — rather than a bolted-on mechanism (VehicleContinuity.ts,
+// deleted).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegates to planItinerary (#1090)', () => {
+  it("includes the drive leg's own ticks (vehicle speed), not just the walk-to-vehicle leg", () => {
+    const state = makeState(60, 60);
+    const emp = makeEmployee(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 0);
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 10, targetZ: 40 });
+    vehicle.reservedForActionId = action.id;
+    state.pendingActions.push(action);
+
+    const workTicks = computeActionWorkTicks(state, emp, action);
+    // The formula resolveVehicleGatedWalkTarget's old walk-only calculation
+    // used: travel ticks to the vehicle alone, ignoring the drive leg
+    // entirely — this is the baseline a correct fix must exceed.
+    const walkOnlyTravelTicks = cellsToTravelTicks(
+      PathfindingModule.octileHeuristic(emp.x, emp.z, vehicle.x, vehicle.z),
+      AGENT_WALK_SPEED,
+    );
+    const walkOnlyTotal = walkOnlyTravelTicks + workTicks;
+
+    const estimated = estimateActionCost(state, emp, action);
+    const resolved = resolveActionCost(state, emp, action);
+
+    expect(resolved).not.toBeNull();
+    // Strictly greater than a walk-only calculation — the drive leg's own
+    // ticks (at the vehicle's own speed, not walking speed) are missing from
+    // the old formula and must now be included.
+    expect(estimated).toBeGreaterThan(walkOnlyTotal);
+    expect(resolved!.totalTicks).toBeGreaterThan(walkOnlyTotal);
+
+    // Roughly matches walk_ticks + drive_ticks + work_ticks, within the
+    // planner's own formula (planItinerary sums exactly these three parts —
+    // see PlanItinerary.ts's own estTotalTicks computation).
+    const def = getVehicleDefByTier('debris_hauler', 1);
+    const driveTicks = cellsToTravelTicks(
+      PathfindingModule.octileHeuristic(vehicle.x, vehicle.z, action.targetX, action.targetZ),
+      def.speed,
+    );
+    const expectedTotal = walkOnlyTravelTicks + driveTicks + workTicks;
+    expect(resolved!.totalTicks).toBeCloseTo(expectedTotal, 5);
+  });
+
+  it("a mounted employee's cost for a same-role vehicle-gated action is strictly lower than an equally-placed on-foot employee's cost (continuity-by-ranking, not by special-cased mechanism)", () => {
+    const state = makeState(60, 60);
+    // The mounted employee's own vehicle sits exactly at their position (mount
+    // invariant) — a single-seat vehicle already occupied by `mounted`, so the
+    // on-foot employee (starting at the SAME position, per the scenario) must
+    // instead reach a second, separate, free vehicle of the same role sitting
+    // farther away, then drive a longer remaining distance from there to the
+    // target — a genuine extra cost, not an artifact of how the two are
+    // placed relative to each other.
+    const { vehicle: mountedVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 5, 15); // a second, separate, free vehicle
+    const mounted = makeEmployee(state, 5, 5);
+    assignSkill(state.employees, mounted.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    mountedVehicle.driverId = mounted.id;
+    mountedVehicle.occupantIds = [mounted.id];
+    mounted.locomotion = { kind: 'mounted', vehicleId: mountedVehicle.id };
+
+    const onFoot = makeEmployee(state, 5, 5);
+    assignSkill(state.employees, onFoot.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+
+    // Straight line along z, on the opposite side from otherFreeVehicle, so
+    // driving from otherFreeVehicle's position costs strictly MORE than
+    // driving from mountedVehicle's position — the on-foot employee's route
+    // is worse on both legs, not just the walk.
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: -35 });
+    state.pendingActions.push(action);
+
+    const mountedCost = estimateActionCost(state, mounted, action);
+    const onFootCost = estimateActionCost(state, onFoot, action);
+
+    expect(mountedCost).toBeLessThan(onFootCost);
+  });
+
+  it('returns Infinity (never throws, never NaN) when no free vehicle of the required role exists anywhere', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    assignSkill(state.employees, emp.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 20, targetZ: 20 });
+    state.pendingActions.push(action);
+    // No vehicle purchased at all — nothing for findFreeVehicleForRole to find.
+
+    let cost = -1;
+    expect(() => { cost = estimateActionCost(state, emp, action); }).not.toThrow();
+
+    expect(cost).toBe(Infinity);
+    expect(Number.isNaN(cost)).toBe(false);
+  });
+
+  it('resolveActionCost returns null (not throwing) when planItinerary cannot reach the target — preserves "stays queued, retried next tick"', () => {
+    const state = makeState(30, 30);
+    blockColumn(state.navGrid!, 15); // isolates the target side from the employee+vehicle side
+    const emp = makeEmployee(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 25, targetZ: 0 });
+    vehicle.reservedForActionId = action.id;
+    state.pendingActions.push(action);
+
+    let result: { totalTicks: number } | null = null;
+    expect(() => { result = resolveActionCost(state, emp, action); }).not.toThrow();
+
+    expect(result).toBeNull();
+  });
+
+  // Regression guard for the #954 occupancy livelock, now at the
+  // planItinerary delegation boundary (#1090) — the VEHICLE-occupancy case,
+  // mirrored against "returns null when an employee is boxed in by fragment
+  // occupancy..." above. #1090's own implementation threads a single
+  // `avoidVehicles` flag straight through to `findExactPath`
+  // (`estimateLegDistance`'s own doc comment), and that flag's underlying
+  // cell check (`isCellOccupied`, NavGrid.ts) treats vehicle- and
+  // fragment-occupancy as one combined obstacle everywhere `avoidVehicles` is
+  // consulted — deliberately, since a drive leg's own `avoidVehicles: false`
+  // must be free to route onto a FRAGMENT's cell too (driving up to haul or
+  // break it), not just a vehicle's. Splitting the two into independently
+  // controllable obstacles would have to thread a second flag through every
+  // `PathfindingRequest` call site rather than a change scoped to this
+  // planner, and `isDestinationOccupied`'s own doc comment holds the
+  // invariant a narrower fix must not break: resolveActionCost and an
+  // employee's own real foot travel (Locomotion.ts) "must agree" on
+  // reachability — an employee genuinely boxed in by parked vehicles on
+  // every neighbour cell is exactly as stuck in real movement (which applies
+  // this same combined avoidVehicles check) as this cost estimate correctly
+  // reports here. EntityMovementTick.ts's own stuck-abandon mechanism (#938)
+  // is what recovers an employee from a genuine livelock like this one, not
+  // a cost estimate that quietly disagrees with what the simulation would
+  // actually do.
+  it('returns null for an employee boxed in by VEHICLE occupancy on every neighbour cell, same as real foot travel would be stuck (#954, #1090)', () => {
+    const state = makeState(10, 10);
+    const emp = makeEmployee(state, 5, 5);
+    const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [dx, dz] of offsets) {
+      state.navGrid!.cells[5 + dz!]![5 + dx!]!.vehicleOccupied = true;
+    }
+    const action = makeAction({ id: 1, targetX: 8, targetZ: 8 }); // unoccupied destination
+    state.pendingActions.push(action);
+
+    const result = resolveActionCost(state, emp, action);
+
+    expect(result).toBeNull();
   });
 });
 

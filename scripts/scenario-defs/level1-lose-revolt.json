@@ -354,8 +354,8 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "holeCount": 6,
-          "orderedHoleCount": 19
+          "holeCount": 5,
+          "orderedHoleCount": 20
         },
         "increased": [
           "wellBeing"
@@ -426,10 +426,7 @@
         "decreased": [
           "cash"
         ],
-        "increased": [
-          "wellBeing"
-        ],
-        "note": "#553-followup (issue #586 CI): relaxed cash (equals:422770 -> decreased) and wellBeing (equals:99.95 -> increased) -- a real CI run read cash 423226, the same real-time-accrual class documented at the tick-40/tick-80 checkpoints above. wellBeing reaches its own natural ceiling around here (99.95, not the clamp's 100), same mechanism as this file's pre-#553 trajectory -- it will not stay there (see tick 290 below). tickCount stays exact; it is not host-timing-sensitive."
+        "note": "#553-followup (issue #586 CI): relaxed cash (equals:422770 -> decreased) and wellBeing (equals:99.95 -> increased) -- a real CI run read cash 423226, the same real-time-accrual class documented at the tick-40/tick-80 checkpoints above. wellBeing reaches its own natural ceiling around here (99.95, not the clamp's 100), same mechanism as this file's pre-#553 trajectory -- it will not stay there (see tick 290 below). tickCount stays exact; it is not host-timing-sensitive. #1090-followup: wellBeing's `increased` assertion dropped entirely here -- the vehicle-continuity deletion's slightly slower redispatch (one extra idle tick before a freed driller is redispatched) shifts wellBeing onto its ceiling exactly at this checkpoint (sandbox-measured: 99.97 -> 99.97, flat), where before it read as still climbing; the ceiling itself and the later fall (tick 290 below) are unaffected."
       }
     },
     {

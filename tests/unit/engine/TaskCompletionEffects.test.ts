@@ -42,15 +42,17 @@ describe('applyTaskCompletion — level_ground (#1009)', () => {
   });
 });
 
-describe('applyTaskCompletion — dig_ramp_segment ordering (#945)', () => {
+describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #1090)', () => {
   /**
    * A rock_digger driver mid-vehicle-chain, having just finished segment 0
    * of a 2-segment ramp, with segment 1 already queued open in the pool.
    * isRampSegmentClaimable (ActionSelection.ts) gates segment 1 on segment
-   * 0's own tracker.done — so this fixture only lets the assertion below
-   * distinguish "tracker.done set before the continuity lookup" from
-   * "set after": the reversed order would leave segment 1 unclaimable and
-   * dismount the driver instead of continuing them onto it.
+   * 0's own tracker.done — so tracker.done being set here (before
+   * completeVehicleGatedAction releases the claim) is what makes segment 1
+   * claimable by ordinary dispatch the very next tick, whoever ranks
+   * cheapest for it (#1090: no continuity promotion happens inside
+   * applyTaskCompletion any more — completeVehicleGatedAction only releases
+   * the reservation and clears the driver's active-task fields).
    */
   function makeFixture() {
     const state = createGame({ seed: SEED });
@@ -105,8 +107,8 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945)', () => {
     return { state, grid, employee, vehicle, segment0Action, segment1Action, ramp };
   }
 
-  it('marks the finished segment done before the vehicle-continuity lookup, so the driver continues onto the next segment', () => {
-    const { state, grid, employee, segment0Action, segment1Action, ramp } = makeFixture();
+  it('marks the finished segment done, releases the claim, and leaves the next segment queued for ordinary dispatch to pick up', () => {
+    const { state, grid, employee, vehicle, segment0Action, segment1Action, ramp } = makeFixture();
 
     const progress = baseProgress({
       actionType: 'dig_ramp_segment',
@@ -121,10 +123,19 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945)', () => {
       rampId: 1, segmentIndex: 0, voxelsCleared: 1, rampFullyDone: false,
     });
 
-    // Continuity found segment 1 claimable (its predecessor is now done) and
-    // promoted the driver onto it instead of dismounting.
-    expect(employee.activeActionId).toBe(segment1Action.id);
-    expect(state.pendingActions.find(a => a.id === segment1Action.id)!.status).toBe('assigned');
+    // #1090: no continuity promotion — completeVehicleGatedAction only
+    // releases the claim (vehicle reservation + driver's own active-task
+    // fields) and completes segment 0's PendingAction. Segment 1 is now
+    // claimable (isRampSegmentClaimable, ActionSelection.ts) but stays
+    // 'queued' until the next tick's ordinary dispatch ranks a driver onto
+    // it — this employee, still mounted in `vehicle`, is expected to win
+    // that ranking by cost (planItinerary's zero-length first leg), but
+    // applyTaskCompletion itself does not drive that.
+    expect(employee.activeActionId).toBeNull();
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBe(employee.id); // still mounted — release is claim-only
+    expect(state.pendingActions.find(a => a.id === segment1Action.id)!.status).toBe('queued');
+    expect(state.pendingActions.find(a => a.id === segment1Action.id)!.holderId).toBeNull();
     expect(state.pendingActions.find(a => a.id === segment0Action.id)).toBeUndefined();
   });
 });

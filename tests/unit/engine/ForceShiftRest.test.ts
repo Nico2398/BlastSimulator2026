@@ -514,15 +514,21 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).not.toBeNull();
   });
 
-  // NEW (#945, fixer follow-up): mirrors forceShiftRestIfNeeded's own
-  // taskTicksRemaining guard, but scoped to vehicle-gated work
-  // (isMidVehicleGatedWork, VehicleReservation.ts) rather than a blanket
-  // taskTicksRemaining check — a policy-forced rest must not preempt a
-  // driver already boarded and mid-execution of a vehicle-gated action
-  // (e.g. mid dig_ramp_segment), even with fatigue deep below any threshold
-  // and the shift boundary long since passed. Only a genuine collapse
-  // (tickCollapse, NeedRestoration.ts) is still allowed to interrupt
-  // mid-task — that path is untouched by #945.
+  // #945, RESTORED as a #1090 follow-up: #1090 briefly deleted this
+  // dedicated vehicle-gated mid-execution guard on the reasoning that
+  // nothing dismounts on completion any more, so an interrupted
+  // vehicle-gated task costs no walk-back-and-reboard. That reasoning holds
+  // for the mechanism's original cost, but mount continuity through rest
+  // (#1118) introduces a different cost the guard also happened to prevent:
+  // every interruption re-approaches with the SAME vehicle over the SAME
+  // (possibly long) round trip to the rest building, and an interrupted
+  // mid-execution task re-arms with a fresh, equally short budget every
+  // time — for a site whose living_quarters is far enough that the round
+  // trip alone re-crosses the policy's threshold, no segment ever finishes.
+  // Confirmed live via needs.integration.test.ts's own #945 box-cut suite
+  // and the tutorial-boxcut-full scenario, both livelocking forever once
+  // this guard was gone. See forceShiftRestIfNeededByPolicy's own inline
+  // comment and isMidVehicleGatedWork's own doc comment (VehicleReservation.ts).
   it('#945: no-op when boarded and mid-execution of a vehicle-gated action (taskTicksRemaining set), even with fatigue deep below threshold', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

@@ -462,12 +462,12 @@
           "command": "tick 60"
         }
       ],
-      "description": "#553: sandbox-measured (re-verified, #959 fixer pass: 5, not the pre-#959 4, land in this window -- an unrelated upstream vehicle-continuity fix picks the driller's next hole more efficiently). The lone driller lands only 5 of the pattern's 16 holes in this window -- not the full drain the pattern set out to order. Landing all 16 (tutorial-playthrough.json's own solo-driller measurement: ~400 ticks for the same size pattern) would keep this file's cash below the $5,000 bankruptcy threshold for well over the 100-tick grace period (Bankruptcy.ts) -- see the file description's bankruptcy finding. This file blasts with the 5 that land instead of waiting for the rest, the only way any of drilling/blasting/hauling/contract-fulfillment survives to be exercised at all. The rest never land: the pad stops here on purpose, not because 60 was too small a guess.",
+      "description": "#553: sandbox-measured (re-verified, #959 fixer pass: 5, not the pre-#959 4, land in this window -- an unrelated upstream vehicle-continuity fix picks the driller's next hole more efficiently). #1090-followup (sandbox-measured, re-verified: 6, not 5, land in this window -- VehicleContinuity.ts's deletion means the driller no longer dismounts the drill_rig between same-role holes, so consecutive drill_hole itineraries save a walk-off/walk-back pair each time, and one more hole (H7, boustrophedon-adjacent to H8) lands inside the same tick budget). The lone driller lands 6 of the pattern's 16 holes in this window -- not the full drain the pattern set out to order. Landing all 16 (tutorial-playthrough.json's own solo-driller measurement: ~400 ticks for the same size pattern) would keep this file's cash below the $5,000 bankruptcy threshold for well over the 100-tick grace period (Bankruptcy.ts) -- see the file description's bankruptcy finding. This file blasts with the 6 that land instead of waiting for the rest, the only way any of drilling/blasting/hauling/contract-fulfillment survives to be exercised at all. The rest never land: the pad stops here on purpose, not because 60 was too small a guess.",
       "role": "setup",
       "expect": {
         "equals": {
-          "orderedHoleCount": 11,
-          "holeCount": 5
+          "orderedHoleCount": 10,
+          "holeCount": 6
         }
       }
     },
@@ -497,25 +497,6 @@
     },
     {
       "command": "drill_plan remove hole:H6",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "drill_plan remove hole:H7",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -682,10 +663,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 5
+          "holeCount": 6
         }
       },
-      "description": "Last of the 12 cancellations -- drill plan now holds exactly the 4 already-landed holes and nothing more, matching this file's original, deliberately-truncated pattern. #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern."
+      "description": "Last of the cancellations -- drill plan now holds exactly the already-landed holes and nothing more, matching this file's original, deliberately-truncated pattern. #959 (merge): five holes used to be blasted here, not four, because only the still-ORDERED holes are cancelled above. #1090-followup (sandbox-measured, re-verified: 6, not 5): VehicleContinuity.ts's deletion means the driller no longer dismounts the drill_rig between same-role holes, so one more hole (H7) lands inside the tick-60 window above and the H7 cancellation step was removed from this file entirely (it is now drilled, not ordered). Re-measured end to end (`--report-drift`, command mode): moves nothing downstream but the charge/sequence counts."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -751,7 +732,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 5,
+          "chargedCount": 6,
           "orderedChargeCount": 0
         }
       }
@@ -782,7 +763,7 @@
       "description": "This value already matches the Sequence panel's own 25ms default (Sequence.ts DEFAULT_DELAY_STEP_MS) -- 0 stepper clicks needed, asserted rather than assumed (Finding #75). #959 (merge): five holes are blasted here now, not four, because only the eleven still-ORDERED holes are cancelled above -- the twelfth removal, which used to tear out a drilled hole as well, is gone. It had become the one place the two modes could not agree: Drill.ts renders every ordered row ahead of every drilled one, so the click always takes the drilled hole leading the list (H1) while the console removed whichever the step named (H8, drilled since the vehicle-continuity fix lands a fifth hole inside the same window) -- two different four-hole patterns, with different casualties to show for it (CI: `deathCount should be 3 but is 2`). Cancelling only what is still ordered is the same beat with no divergence left in it, and re-measured end to end (`--report-drift`, command mode) it moves nothing downstream but the charge/sequence counts: deathCount, vehicleCount, tickCount, the scores and every cash figure in this file reproduce unchanged on the five-hole pattern.",
       "expect": {
         "equals": {
-          "sequencedCount": 5
+          "sequencedCount": 6
         }
       }
     },
@@ -1171,8 +1152,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "nuisance": 50
-        }
+          "nuisance": 54.39999999999998
+        },
+        "note": "#1090-followup (sandbox-measured): the event drawn at this due-tick changed from `union_book_club` (nuisance unchanged) to `union_food_trucks` (nuisance +5, decaying toward baseline by the time this step reads it) -- VehicleContinuity.ts's deletion shifts the earlier hole-count/charge-timing cascade (see the tick-60 and charge steps above) enough to move which real tick each due-window falls on, the same class of draw-order shift #947's own note on this exact step already documents for an earlier cause."
       },
       "commandOutcome": "either"
     },
@@ -1187,7 +1169,7 @@
       "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 185,
+          "tickCount": 195,
           "deathCount": 3,
           "employeeCount": 6,
           "bankrupt": false,
@@ -1198,7 +1180,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0
         },
-        "note": "Closing tickCount re-measured 175 -> 185 (#1008): the freight_warehouse build step above moved from (5,5) to (20,24) -- the nearest flat 4x4 site once the new footprint-flatness check rejected (5,5) -- and (20,24) sits much farther from the crew's working area near the blast/drill site. Traced tick-by-tick against the per-step state dumps (`npx tsx scripts/scenario-test.ts --mode command --scenario level1-playthrough-win --screenshots`): every checkpoint through tick 103 (the blast) is unchanged from before #1008; the `wait_until field:buildingCount equals:1` step right after the warehouse order is the first to diverge, now taking 31 ticks (103 -> 134) for the crew to walk to and build the farther site, versus the shorter walk to (5,5) before. That +10ish tick delta on the build carries through the fixed `tick 10` blocks that follow (each still advances by the full 10, or is truncated early by the same union_strike_aftermath event landing at the same real tick, tick 175, as before -- the block is just entered 10 ticks later), so the file's own scripted tail ends up one `tick 10` block's worth (10 ticks) later at the close: 175 -> 185. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note). #959 fixer pass: vehicleCount 3 -> 4 again -- drill_rig #1 now survives that same blast (see the blast step's own #959 note); the fleet stays at 4 for the rest of the file."
+        "note": "Closing tickCount re-measured 175 -> 185 (#1008): the freight_warehouse build step above moved from (5,5) to (20,24) -- the nearest flat 4x4 site once the new footprint-flatness check rejected (5,5) -- and (20,24) sits much farther from the crew's working area near the blast/drill site. Traced tick-by-tick against the per-step state dumps (`npx tsx scripts/scenario-test.ts --mode command --scenario level1-playthrough-win --screenshots`): every checkpoint through tick 103 (the blast) is unchanged from before #1008; the `wait_until field:buildingCount equals:1` step right after the warehouse order is the first to diverge, now taking 31 ticks (103 -> 134) for the crew to walk to and build the farther site, versus the shorter walk to (5,5) before. That +10ish tick delta on the build carries through the fixed `tick 10` blocks that follow (each still advances by the full 10, or is truncated early by the same union_strike_aftermath event landing at the same real tick, tick 175, as before -- the block is just entered 10 ticks later), so the file's own scripted tail ends up one `tick 10` block's worth (10 ticks) later at the close: 175 -> 185. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged. #928: vehicleCount 4 -> 3 -- drill_rig #1 is destroyed in the blast step above under the single-gauge fatigue model (see that step's own note). #959 fixer pass: vehicleCount 3 -> 4 again -- drill_rig #1 now survives that same blast (see the blast step's own #959 note); the fleet stays at 4 for the rest of the file. #1090-followup: tickCount re-measured 185 -> 195 -- the tick-60 checkpoint above now lands one more hole (VehicleContinuity.ts's deletion), which shifts the `union_food_trucks` event (see the step above) onto a due-tick one `tick 10` block later than `union_book_club` used to land, pushing the file's own scripted tail one more full block out. Everything else this step pins is unchanged."
       },
       "role": "setup"
     }

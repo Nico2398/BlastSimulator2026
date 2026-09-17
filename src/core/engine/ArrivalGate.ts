@@ -38,7 +38,7 @@ export interface ArrivalGateResult {
    * Vehicle-gated actions (haul_debris/fragment_debris and any future
    * vehicle-gated action) whose work completed on this tick via the vehicle
    * drive loop below, for GameLoop's completion pass to finish off with
-   * completeVehicleGatedActionIfApplicable (#552).
+   * completeVehicleGatedAction (VehicleReservation.ts, #552, #1090).
    */
   completedVehicleActions: Array<{ actionId: number; employeeId: number }>;
 }
@@ -170,7 +170,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
         // #552: a full deliver cycle just completed for a vehicle-gated
         // haul_debris action (reservedForActionId survives a successful
         // haul — see abortHaul's doc comment) — report it so GameLoop's
-        // completion pass (completeVehicleGatedActionIfApplicable) can clear
+        // completion pass (completeVehicleGatedAction, #1090) can clear
         // the PendingAction/ghost and let the employee continue.
         if (vehicle.reservedForActionId !== null && vehicle.driverId !== null) {
           result.completedVehicleActions.push({ actionId: vehicle.reservedForActionId, employeeId: vehicle.driverId });
