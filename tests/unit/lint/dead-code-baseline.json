@@ -68,6 +68,7 @@
     "src/core/engine/GameLoop.ts:TaskProgressLevelUp",
     "src/core/engine/GameLoop.ts:TickEmployeesResult",
     "src/core/engine/GameLoop.ts:VALID_SPEEDS",
+    "src/core/engine/GameLoop.ts:completeVehicleGatedAction",
     "src/core/engine/GameLoop.ts:deductRestCost",
     "src/core/engine/GameLoop.ts:estimateActionCost",
     "src/core/engine/GameLoop.ts:resolveActionCost",

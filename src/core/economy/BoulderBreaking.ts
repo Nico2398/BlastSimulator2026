@@ -13,11 +13,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment, findRequestVehicleOfRole } from './FragmentTaskLifecycle.js';
-import { claimPendingAction } from '../engine/TaskDispatch.js';
-import { reserveVehicle } from '../engine/VehicleReservation.js';
-import { moveTo } from '../engine/MoveTo.js';
-import { t } from '../i18n/I18n.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a rock_fragmenter with a driver assigned and no
@@ -60,22 +56,7 @@ export function requestBreakBoulder(
   if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
   if (!isOversized(tracked.fragment.volume)) return { success: false, error: 'Fragment is not oversized' };
 
-  const action = state.pendingActions.find(a =>
-    a.type === 'fragment_debris' && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
-  if (!action) return { success: false, error: t('break.no_action_queued') };
-
-  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
-  if (!employee) return { success: false, error: 'Vehicle has no driver' };
-
-  const claimed = claimPendingAction(state, action.id, employee.id);
-  if (!claimed) return { success: false, error: t('break.claim_failed') };
-  reserveVehicle(vehicle, claimed.id);
-  employee.activeActionId = claimed.id;
-
-  const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });
-  if (!moveResult.success) return { success: false, error: moveResult.error };
-
-  return { success: true };
+  return claimAndDispatchFragmentAction(state, vehicle, 'fragment_debris', fragmentId, 'break.no_action_queued', 'break.claim_failed');
 }
 
 /**

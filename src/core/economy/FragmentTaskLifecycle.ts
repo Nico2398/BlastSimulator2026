@@ -2,10 +2,12 @@
 //
 // BoulderBreaking.ts (breaking) and HaulingTask.ts (hauling) are both
 // position-gated vehicle tasks that target a fragment: request looks up and
-// validates the vehicle, and search picks the nearest reachable candidate
-// fragment. These three exports are those steps, shared so BoulderBreaking.ts
-// and HaulingTask.ts only carry what differs between them: eligibility
-// rules and what happens on arrival (now ArrivalEffects.ts, #1091).
+// validates the vehicle, search picks the nearest reachable candidate
+// fragment, and claimAndDispatchFragmentAction runs the claim/reserve/
+// dispatch tail once the caller's own eligibility checks pass. These four
+// exports are those steps, shared so BoulderBreaking.ts and HaulingTask.ts
+// only carry what differs between them: eligibility rules and what happens
+// on arrival (now ArrivalEffects.ts, #1091).
 //
 // The per-tick driving step and the vehicle-gated request/abort entry points
 // this file used to also share (driveTowardFragment,
@@ -14,11 +16,15 @@
 // PlanItinerary.ts's planFragmentTaskItinerary now plans the drive legs
 // ArrivalGate.ts/VehicleReservation.ts used to kick off here.
 
-import type { GameState } from '../state/GameState.js';
+import type { ActionType, GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { claimPendingAction } from '../engine/TaskDispatch.js';
+import { reserveVehicle } from '../engine/VehicleReservation.js';
+import { moveTo } from '../engine/MoveTo.js';
+import { t } from '../i18n/I18n.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -92,4 +98,40 @@ export function findNearestReachableFragment(
   }
 
   return bestId;
+}
+
+/**
+ * The claim/reserve/dispatch tail shared by requestHaulFragment
+ * (HaulingTask.ts) and requestBreakBoulder (BoulderBreaking.ts): finds the
+ * fragment's existing self-dispatched queued action of `actionType`, claims
+ * it on behalf of `vehicle`'s driver, reserves the vehicle for it, and calls
+ * moveTo to plan and start the actual itinerary — mechanically identical
+ * between the two callers, which keep only their own eligibility checks
+ * (payload-null for haul, oversized-direction for break) before calling
+ * this (#1091).
+ */
+export function claimAndDispatchFragmentAction(
+  state: GameState,
+  vehicle: Vehicle,
+  actionType: ActionType,
+  fragmentId: number,
+  noActionQueuedKey: string,
+  claimFailedKey: string,
+): { success: true } | { success: false; error: string } {
+  const action = state.pendingActions.find(a =>
+    a.type === actionType && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
+  if (!action) return { success: false, error: t(noActionQueuedKey) };
+
+  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  if (!employee) return { success: false, error: 'Vehicle has no driver' };
+
+  const claimed = claimPendingAction(state, action.id, employee.id);
+  if (!claimed) return { success: false, error: t(claimFailedKey) };
+  reserveVehicle(vehicle, claimed.id);
+  employee.activeActionId = claimed.id;
+
+  const moveResult = moveTo(state, employee.id, { actionId: claimed.id }, { via: vehicle.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
+
+  return { success: true };
 }

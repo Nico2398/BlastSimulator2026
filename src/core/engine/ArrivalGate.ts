@@ -32,16 +32,6 @@ export interface ArrivalGateResult {
    * reason. Always empty for the same reason as `driversBoarded` above.
    */
   boardingCancelled: Array<{ employeeId: number; reason: 'vehicle_gone' | 'vehicle_taken' | 'vehicle_moved' | string }>;
-  /**
-   * Always empty (#1091). A haul_debris/fragment_debris action now completes
-   * the instant its own final itinerary effect (haul_unload/boulder_split)
-   * succeeds — inside ArrivalEffects.ts, which calls completeVehicleGatedAction
-   * (VehicleReservation.ts) itself, well before this function's own
-   * per-employee "arrived" check below ever sees this employee again. Kept
-   * on the shape (like driversBoarded/boardingCancelled above) so
-   * TickPipeline.ts's existing completion-pass loop stays untouched.
-   */
-  completedVehicleActions: Array<{ actionId: number; employeeId: number }>;
 }
 
 /**
@@ -72,7 +62,6 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter, grid?:
     taskStarted: [],
     driversBoarded: [],
     boardingCancelled: [],
-    completedVehicleActions: [],
   };
 
   for (const emp of state.employees.employees) {

@@ -27,7 +27,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
-import { pickupFragment, deliverToDepot } from '../economy/Logistics.js';
+import { pickupFragment, deliverToDepot, type TrackedFragment } from '../economy/Logistics.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
@@ -39,6 +39,30 @@ type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: Event
 function findReservedAction(state: GameState, vehicle: Vehicle): PendingAction | undefined {
   if (vehicle.reservedForActionId === null) return undefined;
   return state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+}
+
+/**
+ * The find-reserved-action -> extract-fragmentId -> find-on-ground-fragment
+ * prefix shared by applyHaulLoad and applyBoulderSplit — both look up the
+ * fragment named by the vehicle's reserved action before diverging on their
+ * own oversized-polarity check (haul refuses oversized, break requires it).
+ * Returns null on any lookup failure: no reserved action, a malformed
+ * payload, or the fragment no longer tracked 'on_ground'.
+ */
+function resolveReservedGroundFragment(
+  state: GameState,
+  vehicle: Vehicle,
+): { fragmentId: number; tracked: TrackedFragment } | null {
+  const action = findReservedAction(state, vehicle);
+  if (!action) return null;
+
+  const fragmentId = action.payload['fragmentId'];
+  if (typeof fragmentId !== 'number') return null;
+
+  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'on_ground');
+  if (!tracked) return null;
+
+  return { fragmentId, tracked };
 }
 
 /**
@@ -66,14 +90,9 @@ function completeFragmentGatedAction(state: GameState, vehicle: Vehicle): void {
  * a haul's own final leg (haul_unload) does that.
  */
 export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
-  const action = findReservedAction(state, vehicle);
-  if (!action) return false;
-
-  const fragmentId = action.payload['fragmentId'];
-  if (typeof fragmentId !== 'number') return false;
-
-  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'on_ground');
-  if (!tracked || isOversized(tracked.fragment.volume)) return false;
+  const resolved = resolveReservedGroundFragment(state, vehicle);
+  if (!resolved || isOversized(resolved.tracked.fragment.volume)) return false;
+  const { fragmentId, tracked } = resolved;
 
   const loaded = pickupFragment(state.logistics, fragmentId, String(vehicle.id));
   if (!loaded) return false;
@@ -149,14 +168,9 @@ function highestFragmentId(state: GameState): number {
  * nothing is ever loaded onto the vehicle.
  */
 export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
-  const action = findReservedAction(state, vehicle);
-  if (!action) return false;
-
-  const fragmentId = action.payload['fragmentId'];
-  if (typeof fragmentId !== 'number') return false;
-
-  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'on_ground');
-  if (!tracked || !isOversized(tracked.fragment.volume)) return false;
+  const resolved = resolveReservedGroundFragment(state, vehicle);
+  if (!resolved || !isOversized(resolved.tracked.fragment.volume)) return false;
+  const { tracked } = resolved;
 
   const boulder: Boulder = {
     id: tracked.fragment.id,
