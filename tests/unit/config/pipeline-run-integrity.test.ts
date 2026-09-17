@@ -290,6 +290,30 @@ describe('a run that settles nothing is retried', () => {
   });
 });
 
+// #1136: the recovery step declared a run "almost certainly cancelled while
+// queued" off one empty status-filtered `listWorkflowRuns` read — eventually
+// consistent, and it read empty for run #817 six seconds after it started,
+// falsely blocking #1130 and cascading into parking the whole queue. The fix
+// routes the verdict through `run-liveness.cjs` instead of deciding inline,
+// same shape as the `assignability.cjs` assertion this file's sibling
+// (`autonomy-loop.test.ts`) already carries for this same action.
+describe('recovery step routes its liveness verdict through the shared module', () => {
+  const recoverAction = action('agentic-recover-blocked');
+
+  it('requires run-liveness.cjs rather than deciding inline', () => {
+    expect(recoverAction).toContain('.github/scripts/run-liveness.cjs');
+    expect(recoverAction).toContain('decideRunLiveness');
+  });
+
+  it('drops the old inline "almost certainly cancelled while queued" verdict', () => {
+    expect(recoverAction).not.toContain('almost certainly cancelled while queued');
+  });
+
+  it('drops the old inline LIVE-status loop now that the module owns the check', () => {
+    expect(recoverAction).not.toContain("['queued', 'in_progress', 'waiting', 'requested', 'pending']");
+  });
+});
+
 describe('an unfinished run releases the assignment chain', () => {
   const rescue = action('agentic-rescue');
 
