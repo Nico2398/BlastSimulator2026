@@ -351,8 +351,11 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.fleet.reposition_hint, ui.fleet.reposition_busy,
     // ui.fleet.reposition_pick_target, ui.fleet.reposition_pick_instruction —
     // both locales.
+    // Baseline is now 3509 (down from 3514): #1138 refactor removes the 5
+    // orphaned vehicle_state.* keys (idle/moving/working/waiting/broken) —
+    // their last call sites migrated to describeStatus() — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3514);
+    expect(Object.keys(en).length).toBe(3509);
   });
 });
 

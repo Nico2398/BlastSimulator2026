@@ -2,6 +2,8 @@
 // Detects conditions that trigger events outside the normal timer system.
 
 import type { Vehicle } from '../entities/Vehicle.js';
+import { resolveVehicleDriver } from '../entities/Vehicle.js';
+import type { Employee } from '../entities/Employee.js';
 import type { EventSystemState, FiredEvent } from './EventSystem.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import {
@@ -22,22 +24,20 @@ export { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS };
  */
 export function detectTrafficJam(
   vehicles: Vehicle[],
+  employees: readonly Employee[],
   state: EventSystemState,
   tickCount: number,
 ): FiredEvent | null {
   if (state.pendingEvent) return null;
   if (state.eventFreqMultiplier === 0) return null;
 
-  // Count qualifying vehicles (state=waiting, waitingTicks at threshold) per target cell.
-  const waitingByTarget = new Map<string, number>();
-  for (const v of vehicles) {
-    if (v.state === 'waiting' && v.waitingTicks >= TRAFFIC_JAM_MIN_TICKS) {
-      const key = `${v.targetX},${v.targetZ}`;
-      waitingByTarget.set(key, (waitingByTarget.get(key) ?? 0) + 1);
-    }
-  }
+  // Count qualifying vehicles (driver waiting on occupancy, at threshold) per
+  // target cell — re-derived (#1138) from the driving employee's own
+  // vehicleWaitingTicks and current drive leg's destination, now that
+  // neither lives on Vehicle itself any more.
+  const waitingByTarget = buildWaitingByTarget(vehicles, employees);
 
-  for (const count of waitingByTarget.values()) {
+  for (const { count } of waitingByTarget.values()) {
     if (count >= TRAFFIC_JAM_MIN_VEHICLES) {
       const event: FiredEvent = { eventId: 'traffic_jam', firedAtTick: tickCount };
       state.pendingEvent = event;
@@ -56,6 +56,30 @@ export interface TrafficAdvisory {
 }
 
 /**
+ * Shared clustering pass for detectTrafficJam and computeTrafficAdvisory
+ * (#1138): a vehicle counts as "waiting on this cell" when its driving
+ * employee's own `vehicleWaitingTicks` is at threshold and their current
+ * itinerary leg is a drive leg — that leg's `destX`/`destZ` is the cell they
+ * are queued on, replacing the deleted `Vehicle.state`/`.waitingTicks`/
+ * `.targetX`/`.targetZ` fields.
+ */
+function buildWaitingByTarget(vehicles: readonly Vehicle[], employees: readonly Employee[]): Map<string, TrafficAdvisory> {
+  const waitingByTarget = new Map<string, TrafficAdvisory>();
+  for (const v of vehicles) {
+    const driver = resolveVehicleDriver(v, employees);
+    if (!driver || driver.vehicleWaitingTicks < TRAFFIC_JAM_MIN_TICKS) continue;
+    const leg = driver.itinerary?.legs[0];
+    if (!leg || leg.mode !== 'drive') continue;
+
+    const key = `${leg.destX},${leg.destZ}`;
+    const entry = waitingByTarget.get(key);
+    if (entry) entry.count++;
+    else waitingByTarget.set(key, { targetX: leg.destX, targetZ: leg.destZ, count: 1 });
+  }
+  return waitingByTarget;
+}
+
+/**
  * Read-only view of the same waiting-vehicle clustering detectTrafficJam uses
  * to decide whether to fire the traffic_jam event — for the Fleet panel's
  * advisory banner, which must not have detectTrafficJam's side effects
@@ -64,16 +88,8 @@ export interface TrafficAdvisory {
  * event is currently blocked or paused. Uses the same MIN_VEHICLES/MIN_TICKS
  * thresholds so the banner and the event agree on what counts as a jam.
  */
-export function computeTrafficAdvisory(vehicles: readonly Vehicle[]): TrafficAdvisory[] {
-  const waitingByTarget = new Map<string, TrafficAdvisory>();
-  for (const v of vehicles) {
-    if (v.state === 'waiting' && v.waitingTicks >= TRAFFIC_JAM_MIN_TICKS) {
-      const key = `${v.targetX},${v.targetZ}`;
-      const entry = waitingByTarget.get(key);
-      if (entry) entry.count++;
-      else waitingByTarget.set(key, { targetX: v.targetX, targetZ: v.targetZ, count: 1 });
-    }
-  }
+export function computeTrafficAdvisory(vehicles: readonly Vehicle[], employees: readonly Employee[]): TrafficAdvisory[] {
+  const waitingByTarget = buildWaitingByTarget(vehicles, employees);
   return [...waitingByTarget.values()].filter(e => e.count >= TRAFFIC_JAM_MIN_VEHICLES);
 }
 

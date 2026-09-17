@@ -23,8 +23,8 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleState } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
@@ -153,7 +153,7 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
   const action = state.pendingActions.find(a => a.id === employee.activeActionId);
   if (!action || action.requiredVehicleRole === null) return false;
   return state.vehicles.vehicles.some(
-    v => v.reservedForActionId === action.id && vehicleDriverId(v) === employee.id,
+    v => getVehicleReservation(state.vehicles, v.id) === action.id && vehicleDriverId(v) === employee.id,
   );
 }
 
@@ -188,8 +188,8 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
 
   const qualifying = state.vehicles.vehicles.filter(v =>
     v.type === role &&
-    v.state !== 'broken' &&
-    v.reservedForActionId === null &&
+    v.hp > 0 &&
+    getVehicleReservation(state.vehicles, v.id) === null &&
     (vehicleDriverId(v) === null || vehicleDriverId(v) === employee.id),
   );
   if (qualifying.length === 0) return null;
@@ -208,9 +208,21 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   });
 }
 
-/** Marks `vehicle` reserved for `actionId`. Caller must have already confirmed the vehicle came from findFreeVehicleForRole this same tick. */
-export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
-  vehicle.reservedForActionId = actionId;
+/**
+ * Marks `vehicleId` reserved for `actionId` in `vehicleState.reservations`
+ * (#1138 — replaces the old `vehicle.reservedForActionId = actionId` direct
+ * write). Caller must have already confirmed the vehicle came from
+ * findFreeVehicleForRole this same tick. Replaces any existing entry for
+ * `vehicleId` rather than appending a second one.
+ */
+export function reserveVehicle(vehicleState: VehicleState, vehicleId: number, actionId: number): void {
+  clearVehicleReservation(vehicleState, vehicleId);
+  vehicleState.reservations.push({ vehicleId, actionId });
+}
+
+/** Removes any reservation entry for `vehicleId` from `vehicleState.reservations`. No-op if none exists. Delegates to `removeVehicleReservation` (Vehicle.ts) — the one code path that splices `reservations`, also used by `destroyVehicle` (#1138). */
+function clearVehicleReservation(vehicleState: VehicleState, vehicleId: number): void {
+  removeVehicleReservation(vehicleState, vehicleId);
 }
 
 /**
@@ -227,7 +239,7 @@ export function isCommittedToOwnCargo(state: GameState, action: PendingAction): 
   if (action.type !== 'haul_debris') return false;
   const fragmentId = action.payload['fragmentId'];
   if (typeof fragmentId !== 'number') return false;
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
   return !!vehicle && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId;
 }
 
@@ -252,7 +264,7 @@ export function findVehicleForClaim(
 ): { ok: true; vehicle: Vehicle | null } | { ok: false } {
   if (action.requiredVehicleRole === null) return { ok: true, vehicle: null };
 
-  const alreadyReserved = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  const alreadyReserved = findVehicleReservedForAction(state.vehicles, action.id);
   if (alreadyReserved) return { ok: true, vehicle: alreadyReserved };
 
   const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
@@ -289,7 +301,7 @@ export function findVehicleForClaim(
  * here.
  */
 export function promoteVehicleGatedAction(state: GameState, employee: Employee, action: PendingAction): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+  const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
   // Reservation vanished between claim and promotion (shouldn't happen within
   // a single tick, but reconcileVehicleReservations is the backstop if it
   // ever does) — leave the employee idle-but-claimed; next tick's reconcile
@@ -343,14 +355,14 @@ function returnVehicleCargoToGround(state: GameState, vehicle: Vehicle): void {
  * display fields reset.
  */
 function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  const vehicle = findVehicleReservedForAction(state.vehicles, actionId);
   if (!vehicle) return null;
 
   returnVehicleCargoToGround(state, vehicle);
-  vehicle.reservedForActionId = null;
-  vehicle.task = 'idle';
-  vehicle.state = 'idle';
-  vehicle.waitingTicks = 0;
+  clearVehicleReservation(state.vehicles, vehicle.id);
+  // task/state/waitingTicks used to be reset to idle here (#1090) — now
+  // derived display-only via computeVehicleStatus (VehicleStatus.ts), so
+  // there is nothing left on Vehicle itself to reset.
   return vehicle;
 }
 
@@ -407,10 +419,8 @@ export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitte
   alight(state, vehicle.id, emitter);
   const cellX = Math.round(vehicle.x);
   const cellZ = Math.round(vehicle.z);
-  vehicle.task = 'idle';
-  vehicle.state = 'idle';
-  vehicle.waitingTicks = 0;
-  updateVehicleCellOccupancy(state, vehicle, false, cellX, cellZ);
+  // task/state/waitingTicks reset dropped (#1138) — derived display-only now.
+  updateVehicleCellOccupancy(state, vehicle, false, true, cellX, cellZ);
 }
 
 /**
@@ -471,7 +481,7 @@ export function completeVehicleGatedAction(state: GameState, employee: Employee,
  * the employee stays mounted.
  */
 export function releaseVehicleOnCompletion(state: GameState, employee: Employee, completedActionId: number): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === completedActionId);
+  const vehicle = findVehicleReservedForAction(state.vehicles, completedActionId);
   if (!vehicle) return;
   // Defensive: only the driver whose action just completed may trigger the
   // release — a mismatch here means the reservation/driver bookkeeping has
@@ -563,8 +573,8 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
   // that same guard, restored here since nothing else sweeps every reserved,
   // driven vehicle unconditionally each tick any more.
   for (const vehicle of state.vehicles.vehicles) {
-    if (vehicle.reservedForActionId === null) continue;
-    const actionId = vehicle.reservedForActionId;
+    const actionId = getVehicleReservation(state.vehicles, vehicle.id);
+    if (actionId === null) continue;
     const action = state.pendingActions.find(a => a.id === actionId);
 
     if (!action) {
@@ -625,7 +635,7 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
     const holder = state.employees.employees.find(e => e.id === action.holderId);
     if (!holder || holder.taskTicksRemaining !== null) continue;
 
-    const vehicleStillExists = state.vehicles.vehicles.some(v => v.reservedForActionId === action.id);
+    const vehicleStillExists = findVehicleReservedForAction(state.vehicles, action.id) !== null;
     if (vehicleStillExists) continue;
 
     interruptions.push({ employee: holder, actionId: action.id });

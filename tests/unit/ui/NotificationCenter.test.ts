@@ -5,6 +5,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -137,14 +139,17 @@ describe('NotificationCenter (redesign P1)', () => {
     });
 
     it('derives a fleet pip counting stuck vehicles', () => {
+      // #1138: isMoveStuck lives on the driving Employee now, not the
+      // vehicle — a stuck vehicle is one whose occupant (occupantIds[0])
+      // reads isMoveStuck: true.
       const center = new NotificationCenter();
       const state = makeState();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
+      employee.isMoveStuck = true;
       state.vehicles.vehicles.push({
-        id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-        targetX: 0, targetZ: 0, state: 'idle', payloadKg: 0,
-        waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: true,
-        haulingFragmentId: null, haulingPhase: null, haulDepotId: null,
-      } as never);
+        id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+        payload: null, occupantIds: [employee.id],
+      });
       const pips = center.update(state);
       expect(pips.find(p => p.kind === 'fleet')?.label).toBe('1');
     });

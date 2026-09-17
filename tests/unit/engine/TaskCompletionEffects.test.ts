@@ -13,7 +13,8 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import type { TaskProgressResult } from '../../../src/core/engine/TaskProgress.js';
 
 const SEED = 42;
@@ -90,7 +91,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
     };
     state.pendingActions.push(segment0Action, segment1Action);
 
-    vehicle.reservedForActionId = segment0Action.id;
+    reserveVehicle(state.vehicles, vehicle.id, segment0Action.id);
     employee.activeActionId = segment0Action.id;
 
     const ramp: PlannedRamp = {
@@ -132,7 +133,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
     // that ranking by cost (planItinerary's zero-length first leg), but
     // applyTaskCompletion itself does not drive that.
     expect(employee.activeActionId).toBeNull();
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBe(employee.id); // still mounted — release is claim-only
     expect(state.pendingActions.find(a => a.id === segment1Action.id)!.status).toBe('queued');
     expect(state.pendingActions.find(a => a.id === segment1Action.id)!.holderId).toBeNull();

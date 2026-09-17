@@ -16,10 +16,8 @@ import type {
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
-    id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, state: 'idle', payload: null,
-    waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null,
+    id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
+    payload: null,
     occupantIds: [],
     ...overrides,
   };
@@ -113,7 +111,7 @@ describe('FleetPanel', () => {
   it('shows no Break button for a rock_fragmenter with a reachable oversized fragment (breakEligibility.ts retired, #618)', () => {
     const { panel } = makePanel();
     const state = makeState(
-      [makeVehicle({ id: 5, type: 'rock_fragmenter', x: 0, z: 0, targetX: 0, targetZ: 0, occupantIds: [1] })],
+      [makeVehicle({ id: 5, type: 'rock_fragmenter', x: 0, z: 0, occupantIds: [1] })],
       [makeEmployee({ id: 1 })],
     );
     state.navGrid = makeFlatNavGrid(20);
@@ -132,10 +130,21 @@ describe('FleetPanel', () => {
 
   it('shows a real traffic banner when enough vehicles are jammed at one target', () => {
     const { panel } = makePanel();
-    const jammed = [1, 2, 3].map(id => makeVehicle({
-      id, state: 'waiting', waitingTicks: 15, targetX: 8, targetZ: 8,
+    // #1138: "waiting" is derived from the driving employee's own
+    // vehicleWaitingTicks and current drive leg now — build a (vehicle,
+    // employee) pair per jammed vehicle instead of poking Vehicle.state.
+    const jammed = [1, 2, 3].map(id => makeVehicle({ id, occupantIds: [100 + id] }));
+    const drivers = [1, 2, 3].map(id => makeEmployee({
+      id: 100 + id,
+      vehicleWaitingTicks: 15,
+      itinerary: {
+        legs: [{ mode: 'drive', vehicleId: id, destX: 8, destZ: 8, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+        goal: { kind: 'reposition', x: 8, z: 8 },
+        workTicks: 0,
+        estTotalTicks: 5,
+      },
     }));
-    panel.update(makeState(jammed));
+    panel.update(makeState(jammed, drivers));
     const banner = panel.root.querySelector('.bs-fleet-traffic');
     expect(banner).not.toBeNull();
     expect(banner!.textContent).toContain('3 vehicles');
@@ -143,7 +152,9 @@ describe('FleetPanel', () => {
 
   it('status chip reports a real stuck duration', () => {
     const { panel } = makePanel();
-    panel.update(makeState([makeVehicle({ isMoveStuck: true, waitingTicks: 14 })]));
+    const vehicle = makeVehicle({ occupantIds: [6] });
+    const driver = makeEmployee({ id: 6, isMoveStuck: true, moveConsecutiveFailures: 14 });
+    panel.update(makeState([vehicle], [driver]));
     expect(panel.root.querySelector('.bs-fleet-status')!.textContent).toBe('Stuck · 14h');
   });
 
@@ -429,10 +440,10 @@ function childrenBeforeSection(bodyEl: HTMLElement, label: string): HTMLElement[
 }
 
 function makeManyVehicles(count: number): ReturnType<typeof makeVehicle>[] {
-  // Distinct (x,z) per vehicle and no waitingTicks — avoids tripping the
+  // Distinct (x,z) per vehicle and no occupant — avoids tripping the
   // traffic-jam banner, which would add an extra pre-DEALERSHIP child unrelated
   // to this test's own concern.
-  return Array.from({ length: count }, (_, i) => makeVehicle({ id: i + 1, x: i, z: 0, targetX: i, targetZ: 0 }));
+  return Array.from({ length: count }, (_, i) => makeVehicle({ id: i + 1, x: i, z: 0 }));
 }
 
 // ── Reposition (#1092) ──────────────────────────────────────────────────────
@@ -494,10 +505,12 @@ function repositionBtn(panel: FleetPanel): HTMLButtonElement {
 describe('FleetPanel — Reposition button (#1092)', () => {
   it('is disabled and explains why when the vehicle is reserved for a task', () => {
     const { panel } = makePanel();
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler', reservedForActionId: 11 })],
+    const state = makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
       [makeLicensedTruckDriver()],
-    ));
+    );
+    state.vehicles.reservations.push({ vehicleId: 2, actionId: 11 });
+    panel.update(state);
 
     const btn = repositionBtn(panel);
     expect(btn.disabled).toBe(true);

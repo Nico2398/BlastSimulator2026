@@ -6,6 +6,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -478,7 +479,7 @@ describe('vehicle reposition — refuses while the vehicle is mid vehicle-gated 
     vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
     tickCommand(ctx, ['1'], {});
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, 7);
 
     const result = vehicleCommand(ctx, ['reposition', String(vehicleId), '3', '3'], {});
 

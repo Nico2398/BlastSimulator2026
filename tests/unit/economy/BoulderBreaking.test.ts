@@ -20,6 +20,8 @@ import {
   isBreakEligibleVehicle,
   findReachableOversizedFragment,
 } from '../../../src/core/economy/BoulderBreaking.js';
+import { getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -78,30 +80,31 @@ describe('isBreakEligibleVehicle', () => {
   it('true for a rock_fragmenter with a driver and no reserved action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
-    expect(isBreakEligibleVehicle(vehicle)).toBe(true);
+    expect(isBreakEligibleVehicle(vehicle, state.vehicles)).toBe(true);
   });
 
   it('false for a non-rock_fragmenter vehicle', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
-    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+    expect(isBreakEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for a rock_fragmenter with no driver assigned', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeIdleFragmenter(state);
-    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+    expect(isBreakEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for a rock_fragmenter already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
-    vehicle.reservedForActionId = 42;
-    expect(isBreakEligibleVehicle(vehicle)).toBe(false);
+    reserveVehicle(state.vehicles, vehicle.id, 42);
+    expect(isBreakEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for undefined', () => {
-    expect(isBreakEligibleVehicle(undefined)).toBe(false);
+    const state = createGame({ seed: SEED });
+    expect(isBreakEligibleVehicle(undefined, state.vehicles)).toBe(false);
   });
 });
 
@@ -147,7 +150,7 @@ describe('requestBreakBoulder — precondition failures', () => {
   it('rejects a rock_fragmenter already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
-    vehicle.reservedForActionId = 42;
+    reserveVehicle(state.vehicles, vehicle.id, 42);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
@@ -215,8 +218,8 @@ describe('requestBreakBoulder — happy path', () => {
     expect(state.logistics.fragments[0]!.fragment.id).toBe(1);
 
     // Claims the vehicle so no other request/dispatch can double-book it.
-    expect(vehicle.reservedForActionId).not.toBeNull();
-    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).not.toBeNull();
+    const action = state.pendingActions.find(a => a.id === getVehicleReservation(state.vehicles, vehicle.id));
     expect(action).toBeDefined();
     expect(action!.type).toBe('fragment_debris');
     expect(action!.payload['fragmentId']).toBe(1);

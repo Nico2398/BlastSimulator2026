@@ -22,6 +22,7 @@ import {
 } from '../../src/console/commands/mining.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
+import { getVehicleReservation } from '../../src/core/entities/Vehicle.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 /**
@@ -264,14 +265,12 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     // (VehicleReservation.ts) is the real abort path now: it returns any
     // in-flight cargo to the ground and clears the reservation/display
     // task-state in one call (findAndAbortReservedVehicle's own doc comment).
-    if (haulerVehicle.reservedForActionId !== null) {
-      releaseVehicleReservation(ctx.state!, haulerVehicle.reservedForActionId);
+    const haulerReservation = getVehicleReservation(ctx.state!.vehicles, haulerVehicle.id);
+    if (haulerReservation !== null) {
+      releaseVehicleReservation(ctx.state!, haulerReservation);
     }
-    haulerVehicle.reservedForActionId = null;
-    haulerVehicle.task = 'idle';
-    haulerVehicle.state = 'idle';
-    haulerVehicle.isMoveStuck = false;
-    haulerVehicle.moveConsecutiveFailures = 0;
+    haulerDriver.isMoveStuck = false;
+    haulerDriver.moveConsecutiveFailures = 0;
     haulerDriver.activeActionId = null;
     haulerDriver.taskQueue = [];
     haulerDriver.itinerary = null;

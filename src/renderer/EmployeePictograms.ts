@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
-import type { Vehicle } from '../core/entities/Vehicle.js';
+import type { VehicleState } from '../core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { BAR_Y_OFFSET } from './TaskProgressBar.js';
 import { faceCamera } from './Billboard.js';
@@ -256,12 +256,12 @@ export class EmployeePictograms {
    */
   sync(
     employees: readonly Employee[],
-    vehicles: readonly Vehicle[],
+    vehicleState: VehicleState,
     getAnchor: (id: number) => THREE.Group | null,
   ): void {
     const liveIds = new Set<number>();
 
-    forEachEmployeeActivity(employees, vehicles, liveIds, (employee, activity) => {
+    forEachEmployeeActivity(employees, vehicleState, liveIds, (employee, activity) => {
       const kind = pictogramKindFor(activity);
       const anchor = kind !== null ? getAnchor(employee.id) : null;
 

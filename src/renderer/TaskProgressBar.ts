@@ -11,7 +11,7 @@
 
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
-import type { Vehicle } from '../core/entities/Vehicle.js';
+import type { VehicleState } from '../core/entities/Vehicle.js';
 import type { PendingAction } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
@@ -104,7 +104,7 @@ export class TaskProgressBar {
    */
   sync(
     employees: readonly Employee[],
-    vehicles: readonly Vehicle[],
+    vehicleState: VehicleState,
     pendingActions: readonly PendingAction[],
     getWorkerAnchor: (id: number) => THREE.Group | null,
     getSiteAnchor: (actionId: number) => THREE.Object3D | null,
@@ -112,7 +112,7 @@ export class TaskProgressBar {
     const liveIds = new Set<number>();
     const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
 
-    forEachEmployeeActivity(employees, vehicles, liveIds, (employee, activity) => {
+    forEachEmployeeActivity(employees, vehicleState, liveIds, (employee, activity) => {
       const anchor = getWorkerAnchor(employee.id);
       const fraction = activity.kind === 'working' && activity.actionType !== 'place_building'
         ? taskProgressFraction(activity)
@@ -155,7 +155,7 @@ export class TaskProgressBar {
       const holder = action.holderId !== null
         ? employeeById.get(action.holderId) ?? null
         : null;
-      const activity = holder ? computeEmployeeActivity(holder, vehicles) : null;
+      const activity = holder ? computeEmployeeActivity(holder, vehicleState) : null;
       const fraction = activity && activity.kind === 'working' && activity.actionType === 'place_building'
         ? taskProgressFraction(activity)
         : null;

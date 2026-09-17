@@ -7,6 +7,8 @@ import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { isVehicleCurrentlyDriving } from '../entities/Vehicle.js';
+import type { Employee } from '../entities/Employee.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
@@ -224,6 +226,7 @@ export class NavGrid {
     drillHoles: DrillHole[],
     groundFragments: FragmentData[] = [],
     vehicles: Vehicle[] = [],
+    employees: Employee[] = [],
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
@@ -256,7 +259,7 @@ export class NavGrid {
       navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
     }
     for (const vehicle of vehicles) {
-      if (vehicle.state === 'moving') continue;
+      if (isVehicleCurrentlyDriving(vehicle, employees)) continue;
       const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
       if (cell) cell.vehicleOccupied = true;
     }

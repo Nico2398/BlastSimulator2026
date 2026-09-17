@@ -428,7 +428,7 @@ describe('Campaign', () => {
       const remaining = [...vehicles];
       for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
         const idx = remaining.findIndex(v =>
-          v.type === slot.role && v.tier === slot.tier && vehicleDriverId(v) === null && v.state === 'idle',
+          v.type === slot.role && v.tier === slot.tier && vehicleDriverId(v) === null,
         );
         expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
         remaining.splice(idx, 1);

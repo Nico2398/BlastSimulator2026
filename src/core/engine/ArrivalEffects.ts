@@ -24,7 +24,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
@@ -38,8 +38,9 @@ type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: Event
 
 /** The PendingAction `vehicle` is currently reserved for, or undefined when it isn't reserved at all (shouldn't happen for a vehicle mid arrival-effect leg, but the caller (`applyArrivalEffect`) treats an unresolved action as a plain failure rather than throwing). */
 function findReservedAction(state: GameState, vehicle: Vehicle): PendingAction | undefined {
-  if (vehicle.reservedForActionId === null) return undefined;
-  return state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+  const reservedForActionId = getVehicleReservation(state.vehicles, vehicle.id);
+  if (reservedForActionId === null) return undefined;
+  return state.pendingActions.find(a => a.id === reservedForActionId);
 }
 
 /**
@@ -77,10 +78,11 @@ function resolveReservedGroundFragment(
  */
 function completeFragmentGatedAction(state: GameState, vehicle: Vehicle): void {
   const driverId = vehicleDriverId(vehicle);
-  if (vehicle.reservedForActionId === null || driverId === null) return;
+  const reservedForActionId = getVehicleReservation(state.vehicles, vehicle.id);
+  if (reservedForActionId === null || driverId === null) return;
   const employee = state.employees.employees.find(e => e.id === driverId);
   if (!employee) return;
-  completeVehicleGatedAction(state, employee, vehicle.reservedForActionId);
+  completeVehicleGatedAction(state, employee, reservedForActionId);
 }
 
 /**

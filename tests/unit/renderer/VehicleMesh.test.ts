@@ -2,21 +2,67 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import type { Vehicle, VehicleTier, VehicleOperationalState } from '../../../src/core/entities/Vehicle.js';
+import type { Vehicle, VehicleTier, VehicleState } from '../../../src/core/entities/Vehicle.js';
+import type { Employee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, createEmployeeState } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator, BODY_TINT } from '../../../src/renderer/VehicleMesh.js';
+import type { VehicleStatusKind } from '../../../src/core/entities/VehicleStatus.js';
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 
-function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
-  return { id, type, x, z, hp: 100, task: 'idle', state: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
+function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier, hp = 100): Vehicle {
+  return { id, type, tier, x, z, hp, payload: null, occupantIds: [] };
+}
+
+/** #1138: addVehicle/update/refreshModels take a VehicleState now, not a raw Vehicle[]. */
+function makeVehicleState(vehicles: Vehicle[] = []): VehicleState {
+  return { vehicles, nextId: vehicles.length + 1, driverBoardingCount: 0, reservations: [] };
+}
+
+let _nextEmployeeId = 1;
+
+/**
+ * A driving-employee fixture, mounted into `vehicle` (occupantIds[0]) — the
+ * status/waiting-queue derivation this whole file now needs since Vehicle
+ * itself carries no display state (#1138). ids are forced unique across
+ * every fixture in this file, since each hireEmployee call starts a fresh
+ * throwaway EmployeeState (ids always begin at 1).
+ */
+function makeOccupant(vehicle: Vehicle, overrides: Partial<Employee> = {}): Employee {
+  const id = _nextEmployeeId++;
+  const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(id), vehicle.x, vehicle.z);
+  employee.id = id;
+  Object.assign(employee, overrides);
+  vehicle.occupantIds = [employee.id];
+  return employee;
+}
+
+/** An occupant whose driving employee is waiting on occupancy toward (destX, destZ). */
+function makeWaitingOccupant(vehicle: Vehicle, destX: number, destZ: number, waitingTicks = 5): Employee {
+  return makeOccupant(vehicle, {
+    vehicleWaitingTicks: waitingTicks,
+    itinerary: {
+      legs: [{ mode: 'drive', vehicleId: vehicle.id, destX, destZ, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+      goal: { kind: 'reposition', x: destX, z: destZ },
+      workTicks: 0,
+      estTotalTicks: 5,
+    },
+  });
+}
+
+/** An occupant whose driving employee is mid-task (computeVehicleStatus's 'working' branch). */
+function makeWorkingOccupant(vehicle: Vehicle): Employee {
+  return makeOccupant(vehicle, { taskTicksRemaining: 5, itinerary: null });
 }
 
 describe('VehicleMesh', () => {
   it('addVehicle adds group to scene', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
+    const v = makeVehicle(1, 'debris_hauler');
+    vm.addVehicle(v, makeVehicleState([v]), []);
     expect(scene.children.length).toBe(1);
     expect(vm.count).toBe(1);
     vm.dispose();
@@ -26,7 +72,9 @@ describe('VehicleMesh', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
-    types.forEach((t, i) => vm.addVehicle(makeVehicle(i, t, i * 5, 0)));
+    const vehicles = types.map((t, i) => makeVehicle(i, t, i * 5, 0));
+    const vs = makeVehicleState(vehicles);
+    vehicles.forEach(v => vm.addVehicle(v, vs, []));
     expect(vm.count).toBe(5);
     vm.dispose();
   });
@@ -36,7 +84,8 @@ describe('VehicleMesh', () => {
     const vm = new VehicleMesh(scene);
     const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
     for (const type of types) {
-      vm.addVehicle(makeVehicle(0, type));
+      const v = makeVehicle(0, type);
+      vm.addVehicle(v, makeVehicleState([v]), []);
       const group = scene.children[0] as THREE.Group;
       expect(group.children.length).toBeGreaterThan(1); // multi-part shapes
       vm.clearAll();
@@ -48,7 +97,7 @@ describe('VehicleMesh', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
 
     // Move vehicle target far away
     v.x = 100;
@@ -56,9 +105,10 @@ describe('VehicleMesh', () => {
 
     // After a few updates, position should move toward target
     // (dt now required — VehicleMesh.update() must become duration-aware, #520)
-    vm.update([v], 0.1);
-    vm.update([v], 0.1);
-    vm.update([v], 0.1);
+    const vs = makeVehicleState([v]);
+    vm.update([v], vs, [], 0.1);
+    vm.update([v], vs, [], 0.1);
+    vm.update([v], vs, [], 0.1);
     const group = scene.children[0] as THREE.Group;
     expect(group.position.x).toBeGreaterThan(0);
     expect(group.position.z).toBeGreaterThan(0);
@@ -68,7 +118,8 @@ describe('VehicleMesh', () => {
   it('snapPosition moves vehicle immediately', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'building_destroyer', 0, 0));
+    const v = makeVehicle(1, 'building_destroyer', 0, 0);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     vm.snapPosition(1, 50, 0, 75);
     const group = scene.children[0] as THREE.Group;
     expect(group.position.x).toBeCloseTo(50);
@@ -79,8 +130,11 @@ describe('VehicleMesh', () => {
   it('removeVehicle removes specific mesh', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
-    vm.addVehicle(makeVehicle(2, 'rock_digger'));
+    const v1 = makeVehicle(1, 'debris_hauler');
+    const v2 = makeVehicle(2, 'rock_digger');
+    const vs = makeVehicleState([v1, v2]);
+    vm.addVehicle(v1, vs, []);
+    vm.addVehicle(v2, vs, []);
     vm.removeVehicle(1);
     expect(scene.children.length).toBe(1);
     expect(vm.count).toBe(1);
@@ -90,8 +144,11 @@ describe('VehicleMesh', () => {
   it('clearAll removes all vehicles', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
-    vm.addVehicle(makeVehicle(2, 'drill_rig'));
+    const v1 = makeVehicle(1, 'debris_hauler');
+    const v2 = makeVehicle(2, 'drill_rig');
+    const vs = makeVehicleState([v1, v2]);
+    vm.addVehicle(v1, vs, []);
+    vm.addVehicle(v2, vs, []);
     vm.clearAll();
     expect(scene.children.length).toBe(0);
     vm.dispose();
@@ -103,19 +160,18 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const group = scene.children[0] as THREE.Group;
 
     v.x = 10;
     v.z = 10;
-    v.targetX = 10;
-    v.targetZ = 10;
+    const vs = makeVehicleState([v]);
 
     const dt = 0.05;
     const steps = Math.ceil(MOVE_TWEEN_DURATION_S / dt) + 5;
     let sawIntermediate = false;
     for (let i = 0; i < steps; i++) {
-      vm.update([v], dt);
+      vm.update([v], vs, [], dt);
       if (
         group.position.x > 0 && group.position.x < 10 &&
         group.position.z > 0 && group.position.z < 10
@@ -134,14 +190,12 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const group = scene.children[0] as THREE.Group;
 
     v.x = 10;
     v.z = 10;
-    v.targetX = 10;
-    v.targetZ = 10;
-    vm.update([v], 0.05); // glide partway
+    vm.update([v], makeVehicleState([v]), [], 0.05); // glide partway
 
     const beforeX = group.position.x;
     const beforeZ = group.position.z;
@@ -149,9 +203,7 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
     // Retarget completely before convergence.
     v.x = -20;
     v.z = 40;
-    v.targetX = -20;
-    v.targetZ = 40;
-    vm.update([v], 0.05);
+    vm.update([v], makeVehicleState([v]), [], 0.05);
 
     const jump = Math.hypot(group.position.x - beforeX, group.position.z - beforeZ);
     // Linear interpolation (#948): no smoothstep taper near a fresh
@@ -167,15 +219,13 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const group = scene.children[0] as THREE.Group;
 
     // Magnitude far exceeding any single-tick move (teleport across the map).
     v.x = 500;
     v.z = -500;
-    v.targetX = 500;
-    v.targetZ = -500;
-    vm.update([v], 0.016);
+    vm.update([v], makeVehicleState([v]), [], 0.016);
 
     expect(group.position.x).toBeCloseTo(500);
     expect(group.position.z).toBeCloseTo(-500);
@@ -185,7 +235,8 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
   it('setSurfaceY updates only the y component, leaving x/z untouched', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler', 4, 9));
+    const v = makeVehicle(1, 'debris_hauler', 4, 9);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const group = scene.children[0] as THREE.Group;
     const xBefore = group.position.x;
     const zBefore = group.position.z;
@@ -205,20 +256,18 @@ describe('VehicleMesh — movement interpolation (#520)', () => {
 // visibly steps/sinks/floats when crossing a slope. Mirrors the CharacterMesh
 // coverage — vehicles must behave the same as employees.
 describe('VehicleMesh — heightAt follows the eased render position on slopes (#1038)', () => {
-  it('update(vehicles, dt, heightAt) resamples y to heightAt at the eased render position, not a stale synced value', () => {
+  it('update(vehicles, vehicleState, employees, dt, heightAt) resamples y to heightAt at the eased render position, not a stale synced value', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v, 0);
+    vm.addVehicle(v, makeVehicleState([v]), [], 0);
     const group = scene.children[0] as THREE.Group;
 
     v.x = 10;
     v.z = 0;
-    v.targetX = 10;
-    v.targetZ = 0;
     const heightAt = (x: number, _z: number) => x * 2;
 
-    vm.update([v], 0.05, heightAt);
+    vm.update([v], makeVehicleState([v]), [], 0.05, heightAt);
 
     // Mid-glide: eased x must sit strictly between 0 and 10, or this test
     // cannot distinguish "sampled at eased x" from "sampled at target x".
@@ -232,11 +281,11 @@ describe('VehicleMesh — heightAt follows the eased render position on slopes (
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 5, 5);
-    vm.addVehicle(v, 0);
+    vm.addVehicle(v, makeVehicleState([v]), [], 0);
     const group = scene.children[0] as THREE.Group;
 
     // Converge the tween fully — a stationary vehicle, no target change.
-    for (let i = 0; i < 30; i++) vm.update([v], 0.05);
+    for (let i = 0; i < 30; i++) vm.update([v], makeVehicleState([v]), [], 0.05);
     expect(group.position.x).toBeCloseTo(5);
     expect(group.position.z).toBeCloseTo(5);
 
@@ -244,11 +293,11 @@ describe('VehicleMesh — heightAt follows the eased render position on slopes (
     // calls — heightAt now returns a different value at the same (x, z).
     let terrainY = 3;
     const heightAt = () => terrainY;
-    vm.update([v], 0.05, heightAt);
+    vm.update([v], makeVehicleState([v]), [], 0.05, heightAt);
     expect(group.position.y).toBe(3);
 
     terrainY = 9;
-    vm.update([v], 0.05, heightAt);
+    vm.update([v], makeVehicleState([v]), [], 0.05, heightAt);
     expect(group.position.y).toBe(9);
     vm.dispose();
   });
@@ -257,9 +306,9 @@ describe('VehicleMesh — heightAt follows the eased render position on slopes (
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const v = makeVehicle(1, 'debris_hauler', 0, 0);
-    vm.addVehicle(v, 5); // surfaceY = 5
+    vm.addVehicle(v, makeVehicleState([v]), [], 5); // surfaceY = 5
 
-    vm.update([v], 0.05); // no 3rd arg
+    vm.update([v], makeVehicleState([v]), [], 0.05); // no heightAt arg
     const group = scene.children[0] as THREE.Group;
     expect(group.position.y).toBe(5);
     vm.dispose();
@@ -277,9 +326,13 @@ describe('VehicleMesh — tier picks the model asset', () => {
     const library = await loadedModelLibrary(['vehicle_debris_hauler_t2']);
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene, library);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, 1));
-    vm.addVehicle(makeVehicle(2, 'debris_hauler', 4, 0, 2));
-    vm.addVehicle(makeVehicle(3, 'debris_hauler', 8, 0, 3));
+    const vehicles = [
+      makeVehicle(1, 'debris_hauler', 0, 0, 1),
+      makeVehicle(2, 'debris_hauler', 4, 0, 2),
+      makeVehicle(3, 'debris_hauler', 8, 0, 3),
+    ];
+    const vs = makeVehicleState(vehicles);
+    vehicles.forEach(v => vm.addVehicle(v, vs, []));
     expect(vm.getInstance(1)!.isFallback).toBe(true);
     expect(vm.getInstance(2)!.isFallback).toBe(false);
     expect(vm.getInstance(3)!.isFallback).toBe(true);
@@ -290,8 +343,9 @@ describe('VehicleMesh — tier picks the model asset', () => {
   it('keeps the model\'s own paint colour at every tier', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, 1));
-    vm.addVehicle(makeVehicle(2, 'debris_hauler', 4, 0, 3));
+    const vehicles = [makeVehicle(1, 'debris_hauler', 0, 0, 1), makeVehicle(2, 'debris_hauler', 4, 0, 3)];
+    const vs = makeVehicleState(vehicles);
+    vehicles.forEach(v => vm.addVehicle(v, vs, []));
     const c1 = vm.getInstance(1)!.tints.get(BODY_TINT)!.color;
     const c3 = vm.getInstance(2)!.tints.get(BODY_TINT)!.color;
     expect(c1.getHex()).toBe(c3.getHex());
@@ -304,20 +358,28 @@ describe('VehicleMesh — tier picks the model asset', () => {
 // rendered identically to idle since only position lerped — no color/marker
 // distinguished them. STATE_COLOR_MAP and applyStateIndicator close that gap,
 // following the same material-manipulation pattern as applyTierVariation.
+//
+// #1138: VehicleOperationalState (a Vehicle-native field) is deleted —
+// STATE_COLOR_MAP is now keyed by VehicleStatusKind (VehicleStatus.ts), the
+// fully-derived replacement, with two new kinds (stuck, hauling) that never
+// existed as a Vehicle.state value.
 
-describe('STATE_COLOR_MAP (#411)', () => {
-  const ALL_STATES: VehicleOperationalState[] = ['idle', 'moving', 'working', 'waiting', 'broken'];
+describe('STATE_COLOR_MAP (#411, #1138)', () => {
+  const ALL_KINDS: VehicleStatusKind[] = ['idle', 'moving', 'working', 'waiting', 'broken', 'stuck', 'hauling'];
 
-  it('has a numeric color entry for every VehicleOperationalState', () => {
-    for (const state of ALL_STATES) {
-      expect(STATE_COLOR_MAP[state], `missing color for state "${state}"`).toBeTypeOf('number');
+  it('has a numeric color entry for every VehicleStatusKind', () => {
+    for (const kind of ALL_KINDS) {
+      expect(STATE_COLOR_MAP[kind], `missing color for kind "${kind}"`).toBeTypeOf('number');
     }
   });
 
-  it('assigns a distinct color to each of the 5 states', () => {
-    const colors = ALL_STATES.map(s => STATE_COLOR_MAP[s]);
+  it('assigns a color to each of the 7 kinds, with working and hauling deliberately sharing the "actively doing something" green', () => {
+    const colors = ALL_KINDS.map(k => STATE_COLOR_MAP[k]);
+    // working/hauling intentionally share a color (both read as "green,
+    // actively productive") — every other pair is still distinct.
     const unique = new Set(colors);
-    expect(unique.size).toBe(ALL_STATES.length);
+    expect(unique.size).toBe(ALL_KINDS.length - 1);
+    expect(STATE_COLOR_MAP.working).toBe(STATE_COLOR_MAP.hauling);
   });
 });
 
@@ -354,6 +416,15 @@ describe('applyStateIndicator (#411)', () => {
     expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['waiting']);
   });
 
+  it("marker material color matches STATE_COLOR_MAP['stuck']", () => {
+    const group = new THREE.Group();
+    applyStateIndicator(group, 'stuck');
+
+    const marker = getIndicatorMeshes(group)[0]!;
+    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
+    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['stuck']);
+  });
+
   it('updates the existing marker in place on repeated calls rather than stacking duplicates', () => {
     const group = new THREE.Group();
     applyStateIndicator(group, 'idle');
@@ -379,38 +450,42 @@ describe('applyStateIndicator (#411)', () => {
 
 // ── Issue #411: waitingQueueOffset / waitingRenderPosition ─────────────────
 // Rewritten across 3 bug-fix rounds (idle-occupant slot collision, offset
-// anchored to the shared target rather than each vehicle's own raw x/z).
-// These tests lock in the fixed behavior of both rounds.
+// anchored to the shared target rather than each vehicle's own raw x/z), and
+// again for #1138: "waiting" is no longer a Vehicle-native state — it is
+// re-derived from the driving employee's own vehicleWaitingTicks and current
+// drive leg. The "an idle vehicle already sitting at the target claims slot
+// 0" carve-out (round 3) is dropped entirely along with Vehicle.state — see
+// VehicleWaitingQueue.ts's own #1138 doc comment — so that dedicated test is
+// removed rather than rewritten against a mechanism that no longer exists.
 
-describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
-  it('an idle vehicle occupying the exact target cell reserves slot 0 and renders at its own unoffset position', () => {
+describe('waitingQueueOffset / waitingRenderPosition (#411, #1138)', () => {
+  it('a vehicle with no waiting occupant renders at its own unoffset position', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
 
-    const idleAtTarget = makeVehicle(1, 'debris_hauler', 10, 10, 1);
-    idleAtTarget.state = 'idle';
-    idleAtTarget.targetX = 10;
-    idleAtTarget.targetZ = 10;
+    const idle = makeVehicle(1, 'debris_hauler', 10, 10, 1);
+    const pool = [idle];
 
-    const waiting = makeVehicle(2, 'debris_hauler', 5, 5, 1);
-    waiting.state = 'waiting';
-    waiting.targetX = 10;
-    waiting.targetZ = 10;
-
-    const pool = [idleAtTarget, waiting];
-
-    // Idle occupant is never offset regardless of slot bookkeeping.
-    expect(vm.waitingQueueOffset(idleAtTarget, pool)).toEqual([0, 0]);
-    expect(vm.waitingRenderPosition(idleAtTarget, pool)).toEqual([10, 10]);
-
-    // Idle occupant claims slot 0 first (ascending id), so the waiting
-    // vehicle must NOT also get the [0, 0] offset — it would render on top.
-    expect(vm.waitingQueueOffset(waiting, pool)).toEqual(WAITING_QUEUE_SLOT_OFFSETS[1]);
+    expect(vm.waitingQueueOffset(idle, pool, [])).toEqual([0, 0]);
+    expect(vm.waitingRenderPosition(idle, pool, [])).toEqual([10, 10]);
 
     vm.dispose();
   });
 
-  it('waiting vehicles anchor to the shared target, not their own raw x/z (round 4 regression)', () => {
+  it('a single waiting vehicle gets no offset (needs >=2 sharing a target to matter)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    const waiting = makeVehicle(1, 'debris_hauler', 5, 5, 1);
+    const driver = makeWaitingOccupant(waiting, 10, 10);
+    const pool = [waiting];
+
+    expect(vm.waitingQueueOffset(waiting, pool, [driver])).toEqual([0, 0]);
+
+    vm.dispose();
+  });
+
+  it('waiting vehicles anchor to the shared drive target, not their own raw x/z (round 4 regression)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
 
@@ -418,22 +493,18 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
     // positions — the bug this guards against added the offset to each
     // vehicle's own x/z, scattering them instead of anchoring to the target.
     const v1 = makeVehicle(1, 'debris_hauler', 1, 1, 1);
-    v1.state = 'waiting';
-    v1.targetX = 20;
-    v1.targetZ = 20;
-
+    const d1 = makeWaitingOccupant(v1, 20, 20);
     const v2 = makeVehicle(2, 'debris_hauler', 40, 45, 1);
-    v2.state = 'waiting';
-    v2.targetX = 20;
-    v2.targetZ = 20;
+    const d2 = makeWaitingOccupant(v2, 20, 20);
 
     const pool = [v1, v2];
+    const employees = [d1, d2];
 
     const [o1x, o1z] = WAITING_QUEUE_SLOT_OFFSETS[0]!;
     const [o2x, o2z] = WAITING_QUEUE_SLOT_OFFSETS[1]!;
 
-    expect(vm.waitingRenderPosition(v1, pool)).toEqual([20 + o1x, 20 + o1z]);
-    expect(vm.waitingRenderPosition(v2, pool)).toEqual([20 + o2x, 20 + o2z]);
+    expect(vm.waitingRenderPosition(v1, pool, employees)).toEqual([20 + o1x, 20 + o1z]);
+    expect(vm.waitingRenderPosition(v2, pool, employees)).toEqual([20 + o2x, 20 + o2z]);
 
     vm.dispose();
   });
@@ -442,19 +513,14 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
 
-    const vehicles = [1, 2, 3, 4].map(id => {
-      const v = makeVehicle(id, 'debris_hauler', id, id, 1);
-      v.state = 'waiting';
-      v.targetX = 50;
-      v.targetZ = 50;
-      return v;
-    });
+    const vehicles = [1, 2, 3, 4].map(id => makeVehicle(id, 'debris_hauler', id, id, 1));
+    const employees = vehicles.map(v => makeWaitingOccupant(v, 50, 50));
 
-    const positions = vehicles.map(v => vm.waitingRenderPosition(v, vehicles));
+    const positions = vehicles.map(v => vm.waitingRenderPosition(v, vehicles, employees));
 
-    // sharingTarget is ascending-id order with no idle occupant, so vehicle
-    // at array index i gets WAITING_QUEUE_SLOT_OFFSETS[i] — derive the
-    // expected minimum spacing from the real constant, not a hardcoded value.
+    // sharingTarget is ascending-id order, so vehicle at array index i gets
+    // WAITING_QUEUE_SLOT_OFFSETS[i] — derive the expected minimum spacing
+    // from the real constant, not a hardcoded value.
     const usedOffsets = [0, 1, 2, 3].map(i => WAITING_QUEUE_SLOT_OFFSETS[i]!);
     const pairwiseOffsetDistances = usedOffsets.flatMap((a, i) =>
       usedOffsets.slice(i + 1).map(b => Math.hypot(a[0] - b[0], a[1] - b[1])),
@@ -482,19 +548,38 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
     // `sharingTarget.indexOf(id) % WAITING_QUEUE_SLOT_OFFSETS.length`, so the
     // (length + 1)th vehicle (index === length) wraps back to slot 0.
     const count = WAITING_QUEUE_SLOT_OFFSETS.length + 1;
-    const vehicles = Array.from({ length: count }, (_, i) => {
-      const v = makeVehicle(i + 1, 'debris_hauler', i, i, 1);
-      v.state = 'waiting';
-      v.targetX = 5;
-      v.targetZ = 5;
-      return v;
-    });
+    const vehicles = Array.from({ length: count }, (_, i) => makeVehicle(i + 1, 'debris_hauler', i, i, 1));
+    const employees = vehicles.map(v => makeWaitingOccupant(v, 5, 5));
 
-    const firstOffset = vm.waitingQueueOffset(vehicles[0]!, vehicles);
-    const wrappedOffset = vm.waitingQueueOffset(vehicles[vehicles.length - 1]!, vehicles);
+    const firstOffset = vm.waitingQueueOffset(vehicles[0]!, vehicles, employees);
+    const wrappedOffset = vm.waitingQueueOffset(vehicles[vehicles.length - 1]!, vehicles, employees);
 
     expect(wrappedOffset).toEqual(firstOffset);
     expect(wrappedOffset).toEqual(WAITING_QUEUE_SLOT_OFFSETS[0]);
+
+    vm.dispose();
+  });
+
+  it('a driverless vehicle sharing the exact cell of waiting vehicles never counts toward their shared-target slotting', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    const driverless = makeVehicle(1, 'drill_rig', 20, 20, 1); // no occupant at all
+    const v1 = makeVehicle(2, 'debris_hauler', 1, 1, 1);
+    const d1 = makeWaitingOccupant(v1, 20, 20);
+    const v2 = makeVehicle(3, 'debris_hauler', 40, 45, 1);
+    const d2 = makeWaitingOccupant(v2, 20, 20);
+
+    const pool = [driverless, v1, v2];
+    const employees = [d1, d2];
+
+    // driverless never resolves a drive target — [0, 0], no slot claimed.
+    expect(vm.waitingQueueOffset(driverless, pool, employees)).toEqual([0, 0]);
+    // Only v1/v2 share a target — same 2-way split as the "no idle occupant" case.
+    const [o1x, o1z] = WAITING_QUEUE_SLOT_OFFSETS[0]!;
+    const [o2x, o2z] = WAITING_QUEUE_SLOT_OFFSETS[1]!;
+    expect(vm.waitingRenderPosition(v1, pool, employees)).toEqual([20 + o1x, 20 + o1z]);
+    expect(vm.waitingRenderPosition(v2, pool, employees)).toEqual([20 + o2x, 20 + o2z]);
 
     vm.dispose();
   });
@@ -503,8 +588,11 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
     it('pickables() returns one tagged object per vehicle', () => {
       const scene = new THREE.Scene();
       const vm = new VehicleMesh(scene);
-      vm.addVehicle(makeVehicle(1, 'debris_hauler'));
-      vm.addVehicle(makeVehicle(2, 'rock_digger', 5, 5));
+      const v1 = makeVehicle(1, 'debris_hauler');
+      const v2 = makeVehicle(2, 'rock_digger', 5, 5);
+      const vs = makeVehicleState([v1, v2]);
+      vm.addVehicle(v1, vs, []);
+      vm.addVehicle(v2, vs, []);
       const pickables = vm.pickables();
       expect(pickables).toHaveLength(2);
       expect(pickables.map(o => o.userData['entityId']).sort()).toEqual([1, 2]);
@@ -515,7 +603,8 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
     it('getPosition() returns the vehicle group world position', () => {
       const scene = new THREE.Scene();
       const vm = new VehicleMesh(scene);
-      vm.addVehicle(makeVehicle(1, 'debris_hauler', 12, 7));
+      const v = makeVehicle(1, 'debris_hauler', 12, 7);
+      vm.addVehicle(v, makeVehicleState([v]), []);
       const pos = vm.getPosition(1);
       expect(pos?.x).toBeCloseTo(12);
       expect(pos?.z).toBeCloseTo(7);
@@ -539,20 +628,20 @@ describe('VehicleMesh — model animation (real assets)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene, library);
     const v = makeVehicle(1, 'debris_hauler', 0, 0, 2);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const inst = vm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
     const wheel = inst.node('WheelFL')!;
     const group = scene.children[0] as THREE.Group;
 
     // Drive toward -Z: a +X-facing model must yaw to +π/2 and its wheels must roll.
-    v.x = 0; v.z = -6; v.targetX = 0; v.targetZ = -6;
-    for (let i = 0; i < 30; i++) vm.update([v], 0.05);
+    v.x = 0; v.z = -6;
+    for (let i = 0; i < 30; i++) vm.update([v], makeVehicleState([v]), [], 0.05);
     expect(group.rotation.y).toBeCloseTo(Math.PI / 2, 1);
     expect(wheel.rotation.z).toBeLessThan(-1);
     // Parked: no further spin.
     const spun = wheel.rotation.z;
-    vm.update([v], 0.05);
+    vm.update([v], makeVehicleState([v]), [], 0.05);
     expect(wheel.rotation.z).toBe(spun);
     vm.dispose();
   });
@@ -562,12 +651,15 @@ describe('VehicleMesh — model animation (real assets)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene, library);
     const v = makeVehicle(1, 'rock_fragmenter', 0, 0, 2);
-    vm.addVehicle(v);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     const flywheel = vm.getInstance(1)!.node('Flywheel')!;
-    vm.update([v], 0.1);
+    vm.update([v], makeVehicleState([v]), [], 0.1);
     expect(flywheel.rotation.z).toBeCloseTo(0);
-    (v as { state: VehicleOperationalState }).state = 'working';
-    vm.update([v], 0.1);
+
+    // #1138: "working" is derived from the occupant's own task timer now —
+    // no more Vehicle.state to poke directly.
+    const worker = makeWorkingOccupant(v);
+    vm.update([v], makeVehicleState([v]), [worker], 0.1);
     expect(flywheel.rotation.z).toBeGreaterThan(0);
     vm.dispose();
   });
@@ -576,13 +668,14 @@ describe('VehicleMesh — model animation (real assets)', () => {
     const library = await loadedModelLibrary([]);
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene, library);
-    vm.addVehicle(makeVehicle(1, 'drill_rig', 0, 0, 2));
+    const v = makeVehicle(1, 'drill_rig', 0, 0, 2);
+    vm.addVehicle(v, makeVehicleState([v]), []);
     expect(vm.getInstance(1)!.isFallback).toBe(true);
-    vm.refreshModels(); // asset still missing — no change
+    vm.refreshModels(makeVehicleState([v]), []); // asset still missing — no change
     expect(vm.getInstance(1)!.isFallback).toBe(true);
     const loaded = await loadedModelLibrary(['vehicle_drill_rig_t2']);
     library.register('vehicle_drill_rig_t2', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('vehicle_drill_rig_t2')!);
-    vm.refreshModels();
+    vm.refreshModels(makeVehicleState([v]), []);
     const inst = vm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
     expect(inst.node('Mast')).not.toBeNull();

@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
@@ -97,7 +98,7 @@ function reserveFragmentAction(
     queuedAtTick: 0,
   };
   state.pendingActions.push(action);
-  vehicle.reservedForActionId = action.id;
+  reserveVehicle(state.vehicles, vehicle.id, action.id);
   return action;
 }
 
@@ -169,7 +170,7 @@ describe('applyHaulLoad', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = makeDrivenHauler(state, 5, 5);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
-    vehicle.reservedForActionId = null;
+    // No reservation exists at all — the default, unreserved state.
 
     const result = applyHaulLoad(state, vehicle);
 
@@ -280,7 +281,7 @@ describe('applyBoulderSplit', () => {
     const { vehicle } = makeDrivenFragmenter(state, 5, 5);
     const oversized = makeFragment(1, 5, 5, OVERSIZED_FRAGMENT_THRESHOLD + 1);
     addBlastFragments(state.logistics, [oversized]);
-    vehicle.reservedForActionId = null;
+    // No reservation exists at all — the default, unreserved state.
 
     const result = applyBoulderSplit(state, vehicle);
 

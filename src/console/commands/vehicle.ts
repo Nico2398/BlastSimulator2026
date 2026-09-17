@@ -11,10 +11,13 @@ import {
   computeScrapResidualValue,
   canAssignDriver,
   vehicleDriverId,
+  getVehicleReservation,
+  resolveVehicleDriver,
   type VehicleRole,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { findAvailableDriverForReposition } from '../../core/entities/VehicleDriverAssignment.js';
+import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { alight } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { moveTo } from '../../core/engine/MoveTo.js';
@@ -63,7 +66,9 @@ export function vehicleCommand(
       for (const v of state.vehicles.vehicles) {
         const driverId = vehicleDriverId(v);
         const driverInfo = driverId !== null ? `driver:#${driverId}` : 'driver:none';
-        lines.push(`  [${v.id}] ${v.type} at (${v.x},${v.z}) task: ${v.task} HP: ${v.hp} ${driverInfo}`);
+        const driver = resolveVehicleDriver(v, state.employees.employees);
+        const status = computeVehicleStatus(v, state.vehicles, driver).kind;
+        lines.push(`  [${v.id}] ${v.type} at (${v.x},${v.z}) status: ${status} HP: ${v.hp} ${driverInfo}`);
       }
       return { success: true, output: lines.join('\n') };
     }
@@ -237,7 +242,7 @@ function repositionVehicleCommand(state: GameState, args: string[]): CommandResu
   const vehicle = state.vehicles.vehicles.find(v => v.id === id);
   if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
 
-  if (vehicle.reservedForActionId !== null) {
+  if (getVehicleReservation(state.vehicles, vehicle.id) !== null) {
     return { success: false, output: t('vehicle.reposition_reserved', { id }) };
   }
 

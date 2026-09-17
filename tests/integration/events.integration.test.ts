@@ -33,6 +33,8 @@ import {
   SCORE_DECAY_RATE,
 } from '../../src/core/config/balance.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee } from '../../src/core/entities/Employee.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -76,34 +78,45 @@ function makeEventCtx(overrides: Partial<{
   };
 }
 
-/** Build a minimal waiting-vehicle fixture for traffic-jam tests. */
+/**
+ * Build a minimal (vehicle, employee) pair for traffic-jam tests. #1138:
+ * detectTrafficJam clusters on the DRIVING EMPLOYEE's own
+ * vehicleWaitingTicks and current drive leg's destX/destZ now — Vehicle
+ * itself carries no state/waitingTicks/targetX/targetZ any more.
+ */
 let _nextVehicleId: number;
 function makeWaitingVehicle(
   targetX: number,
   targetZ: number,
   waitingTicks: number,
-  overrides?: Partial<Vehicle>,
-): Vehicle {
+): { vehicle: Vehicle; employee: Employee } {
   const id = _nextVehicleId++;
-  return {
-    id,
-    type: 'debris_hauler',
-    tier: 1,
-    x: targetX - 1,
-    z: targetZ,
-    hp: 100,
-    task: 'moving',
-    targetX,
-    targetZ,
-    state: 'waiting',
-    payload: null,
-    waitingTicks,
-    moveConsecutiveFailures: 0,
-    isMoveStuck: false,
-    reservedForActionId: null,
-    occupantIds: [],
-    ...overrides,
+  const employees = createEmployeeState();
+  const { employee } = hireEmployee(employees, 'driller', new Random(id), targetX - 1, targetZ);
+  employee.id = id;
+  employee.vehicleWaitingTicks = waitingTicks;
+  employee.itinerary = {
+    legs: [{ mode: 'drive', vehicleId: id, destX: targetX, destZ: targetZ, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+    goal: { kind: 'reposition', x: targetX, z: targetZ },
+    workTicks: 0,
+    estTotalTicks: 5,
   };
+  const vehicle: Vehicle = {
+    id, type: 'debris_hauler', tier: 1, x: targetX - 1, z: targetZ, hp: 100,
+    payload: null,
+    occupantIds: [employee.id],
+  };
+  return { vehicle, employee };
+}
+
+/** Splits an array of (vehicle, employee) pairs into two parallel arrays. */
+function split(pairs: Array<{ vehicle: Vehicle; employee: Employee }>): { vehicles: Vehicle[]; employees: Employee[] } {
+  return { vehicles: pairs.map(p => p.vehicle), employees: pairs.map(p => p.employee) };
+}
+
+/** A driverless vehicle — never a driving employee to read waiting-state off. */
+function makeDriverlessVehicle(x: number, z: number): Vehicle {
+  return { id: _nextVehicleId++, type: 'debris_hauler', tier: 1, x, z, hp: 100, payload: null, occupantIds: [] };
 }
 
 // ── Event system ─────────────────────────────────────────────────────────────
@@ -291,59 +304,59 @@ describe('Event system', () => {
 
   it('detectTrafficJam returns null with empty vehicle list', () => {
     const eventState = createEventSystemState();
-    const result = detectTrafficJam([], eventState, 100);
+    const result = detectTrafficJam([], [], eventState, 100);
     expect(result).toBeNull();
   });
 
   it('detectTrafficJam returns null with only 1 vehicle', () => {
     const eventState = createEventSystemState();
-    const vehicles = [makeWaitingVehicle(5, 5, 15)];
-    const result = detectTrafficJam(vehicles, eventState, 100);
+    const { vehicles, employees } = split([makeWaitingVehicle(5, 5, 15)]);
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
     expect(result).toBeNull();
   });
 
   it('detectTrafficJam returns null with 2 vehicles (below threshold of 3)', () => {
     const eventState = createEventSystemState();
-    const vehicles = [
+    const { vehicles, employees } = split([
       makeWaitingVehicle(5, 5, 12),
       makeWaitingVehicle(5, 5, 15),
-    ];
-    const result = detectTrafficJam(vehicles, eventState, 100);
+    ]);
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
     expect(result).toBeNull();
   });
 
   it('detectTrafficJam ignores vehicles below waiting-ticks threshold', () => {
     const eventState = createEventSystemState();
     // 3 vehicles on same target but each has waited only 5 ticks (< 10)
-    const vehicles = [
+    const { vehicles, employees } = split([
       makeWaitingVehicle(3, 3, 5),
       makeWaitingVehicle(3, 3, 5),
       makeWaitingVehicle(3, 3, 5),
-    ];
-    const result = detectTrafficJam(vehicles, eventState, 100);
+    ]);
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
     expect(result).toBeNull();
   });
 
-  it('detectTrafficJam ignores non-waiting vehicles even if on shared target', () => {
+  it('detectTrafficJam ignores a driverless vehicle even if it sits on a shared target', () => {
     const eventState = createEventSystemState();
-    const vehicles = [
+    const { vehicles, employees } = split([
       makeWaitingVehicle(8, 8, 10),
       makeWaitingVehicle(8, 8, 10),
-      { ...makeWaitingVehicle(8, 8, 10), state: 'moving' as const },
-    ];
-    // Only 2 are in 'waiting' state → below threshold of 3
-    const result = detectTrafficJam(vehicles, eventState, 100);
+    ]);
+    vehicles.push(makeDriverlessVehicle(8, 8));
+    // Only 2 have a waiting driver → below threshold of 3
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
     expect(result).toBeNull();
   });
 
   it('detectTrafficJam fires when 3+ vehicles wait on same target long enough', () => {
     const eventState = createEventSystemState();
-    const vehicles = [
+    const { vehicles, employees } = split([
       makeWaitingVehicle(7, 2, 10),
       makeWaitingVehicle(7, 2, 12),
       makeWaitingVehicle(7, 2, 15),
-    ];
-    const result = detectTrafficJam(vehicles, eventState, 42);
+    ]);
+    const result = detectTrafficJam(vehicles, employees, eventState, 42);
 
     expect(result).not.toBeNull();
     expect(result!.eventId).toBe('traffic_jam');
@@ -357,12 +370,12 @@ describe('Event system', () => {
     const eventState = createEventSystemState();
     eventState.pendingEvent = { eventId: 'existing_event', firedAtTick: 90 };
 
-    const vehicles = [
+    const { vehicles, employees } = split([
       makeWaitingVehicle(2, 2, 10),
       makeWaitingVehicle(2, 2, 10),
       makeWaitingVehicle(2, 2, 10),
-    ];
-    const result = detectTrafficJam(vehicles, eventState, 100);
+    ]);
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
 
     expect(result).toBeNull();
     // The pre-existing pending event must not be overwritten

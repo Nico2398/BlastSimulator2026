@@ -30,6 +30,7 @@ import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee, type EmployeeRole } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
@@ -240,7 +241,7 @@ describe('vehicle.ts — reposition refuses a vehicle reserved for a task', () =
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
     mountTestDriver(ctx, vehicle);
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, 7);
     const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(reservedEn(vehicle.id));
@@ -250,7 +251,7 @@ describe('vehicle.ts — reposition refuses a vehicle reserved for a task', () =
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
     mountTestDriver(ctx, vehicle);
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, 7);
     setLocale('fr');
     const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);

@@ -8,8 +8,8 @@ import { buildCommand, employeeCommand } from '../../src/console/commands/entiti
 import { buildRampCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
-import { createVehicleState, purchaseVehicle, destroyVehicle, getVehicleDefByTier, getAllVehicleRoles, ROLE_LICENCE_REQUIRED, vehicleDriverId, assignVehicle } from '../../src/core/entities/Vehicle.js';
-import type { VehicleTask } from '../../src/core/entities/Vehicle.js';
+import { createVehicleState, purchaseVehicle, destroyVehicle, getVehicleDefByTier, getAllVehicleRoles, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation, resolveVehicleDriver } from '../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
 import { board, alight } from '../../src/core/engine/Mount.js';
 import {
   hireEmployee,
@@ -220,8 +220,8 @@ describe('Vehicle fleet', () => {
     // snapped to a reachable, same-bench-level cell (#458 T6.1/D13) — see
     // the driverId test above for why this isn't pinned to the exact tile.
     const v = ctx.state!.vehicles.vehicles[0]!;
-    expect(Math.abs(v.targetX - 16)).toBeLessThanOrEqual(1);
-    expect(Math.abs(v.targetZ - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.x - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.z - 16)).toBeLessThanOrEqual(1);
     // #1092: `vehicle reposition` is the one command that drives a vehicle
     // somewhere with no work attached. It would pick an idle licensed driver
     // itself, but this test's own point is that a DRIVEN vehicle's
@@ -239,35 +239,29 @@ describe('Vehicle fleet', () => {
     const result = vehicleCommand(ctx, ['reposition', '1', '30', '30'], {});
     expect(result.success).toBe(true);
 
-    // #1089: vehicle.task/targetX/Z are written for display only now
-    // (Locomotion.ts's writeVehiclePosition) — `reposition` installs an itinerary
-    // on the driver via moveTo, and the vehicle only reads back as "moving"
-    // with the new target once Locomotion actually advances that itinerary
-    // a tick, not the instant the command itself returns.
+    // #1089/#1138: the drive leg is read off the driving employee's own
+    // itinerary now (Vehicle carries no task/targetX/Z of its own) —
+    // `reposition` installs an itinerary on the driver via moveTo, and the
+    // itinerary only reflects the new target once Locomotion actually
+    // advances it a tick, not the instant the command itself returns.
     tickCommand(ctx, ['1'], {});
-    expect(v.task).toBe('moving');
-    expect(v.targetX).toBe(30);
-    expect(v.targetZ).toBe(30);
+    const drivingEmp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+    expect(drivingEmp.itinerary).not.toBeNull();
+    expect(drivingEmp.itinerary!.legs[0]!.destX).toBe(30);
+    expect(drivingEmp.itinerary!.legs[0]!.destZ).toBe(30);
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── Task assignment ──
-
-  // #1092 removed the `vehicle assign` console subcommand — a display-only
-  // field mutation with no player-facing meaning. `assignVehicle` is the core
-  // API that still stages the display fields, and it is what the tick loop's
-  // task → operational-state derivation reads, so these drive it directly.
-  it('assign task to vehicle', () => {
-    vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    const v = ctx.state!.vehicles.vehicles[0]!;
-    expect(v.task).toBe('idle');
-
-    const assigned = assignVehicle(ctx.state!.vehicles, 1, 'transport');
-
-    expect(assigned).toBe(true);
-    expect(v.task).toBe('transport');
-    expectNoWorldInvariantViolations(ctx.state!);
-  });
+  // ── Task assignment (#1138 — assignVehicle deleted along with Vehicle.task) ──
+  // #1092 already removed the `vehicle assign` console subcommand — a
+  // display-only field mutation with no player-facing meaning.
+  // `assignVehicle`, the core API that used to stage those display fields,
+  // is deleted outright by #1138 along with Vehicle.task/targetX/targetZ
+  // themselves — vehicle display state is fully derived now
+  // (VehicleStatus.computeVehicleStatus). Nothing left here to assign or
+  // assert against directly; see the "vehicle work-task → working
+  // operational state" describe block below for its replacement coverage
+  // via computeVehicleStatus.
 
   // ── A boarded vehicle advances via the itinerary/tickLocomotion path (#1089/#1091, replaces tickVehicle and the deleted driveVehicleTowardTarget) ──
 
@@ -362,7 +356,6 @@ describe('Vehicle fleet', () => {
     expect(vehicle.type).toBe('debris_hauler');
     expect(vehicle.x).toBe(10);
     expect(vehicle.z).toBe(20);
-    expect(vehicle.task).toBe('idle');
     expect(vehicleDriverId(vehicle)).toBeNull();
     expect(cost).toBeGreaterThan(0);
     expect(vs.vehicles).toHaveLength(1);
@@ -457,21 +450,6 @@ describe('Vehicle fleet', () => {
     const result = vehicleCommand(emptyCtx, ['list'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
-  });
-
-  // ── assign task with target coordinates ──
-
-  it('assign task with target coords updates both task and target', () => {
-    vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    const v = ctx.state!.vehicles.vehicles[0]!;
-
-    const assigned = assignVehicle(ctx.state!.vehicles, 1, 'transport', 25, 12);
-
-    expect(assigned).toBe(true);
-    expect(v.task).toBe('transport');
-    expect(v.targetX).toBe(25);
-    expect(v.targetZ).toBe(12);
-    expectNoWorldInvariantViolations(ctx.state!);
   });
 
   // ── getVehicleDefByTier returns tier-1 stats ──
@@ -592,47 +570,47 @@ describe('Vehicle fleet', () => {
 
   // ── vehicle work-task → working operational state, via the real tick loop (#411) ──
 
-  describe('vehicle work-task → working operational state (#411)', () => {
-    it('vehicle.state becomes working after a tick once task is set to a work task', () => {
+  describe('vehicle work-task → working status via computeVehicleStatus (#411, #1138)', () => {
+    // assignVehicle/Vehicle.task/Vehicle.state are all deleted (#1138) — a
+    // vehicle's "working" status is now fully derived from its occupant's own
+    // taskTicksRemaining (VehicleStatus.computeVehicleStatus), read through
+    // the real `vehicle list` console command instead of the display fields
+    // that used to carry it.
+    it('vehicle status reports working once a boarded occupant has a running task timer, and idle with none', () => {
       vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
       const v = ctx.state!.vehicles.vehicles[0]!;
-      expect(v.state).toBe('idle');
+      const eid = hireOne(ctx, 'driver');
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+      v.occupantIds = [eid];
+      emp.locomotion = { kind: 'mounted', vehicleId: v.id };
 
-      assignVehicle(ctx.state!.vehicles, 1, 'transport');
-      expect(v.state).toBe('idle'); // the assignment alone does not flip state — only the tick loop does
+      expect(vehicleCommand(ctx, ['list'], {}).output).toContain('status: idle');
 
-      tickCommand(ctx, ['1'], {});
+      emp.taskTicksRemaining = 5;
+      expect(vehicleCommand(ctx, ['list'], {}).output).toContain('status: working');
 
-      expect(v.state).toBe('working');
+      emp.taskTicksRemaining = null;
+      expect(vehicleCommand(ctx, ['list'], {}).output).toContain('status: idle');
       expectNoWorldInvariantViolations(ctx.state!);
     });
 
-    it('vehicle.state returns to idle after a tick once task returns to idle', () => {
-      vehicleCommand(ctx, ['buy', 'rock_digger'], {});
-      const v = ctx.state!.vehicles.vehicles[0]!;
+    it('every vehicle role reports working while its occupant has a running task timer', () => {
+      const roles = getAllVehicleRoles();
+      for (const role of roles) {
+        vehicleCommand(ctx, ['buy', role], {});
+        const v = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!;
+        const rng = new Random(200 + roles.indexOf(role));
+        const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
+        assignSkill(ctx.state!.employees, employee.id, ROLE_LICENCE_REQUIRED[role], 1);
+        v.occupantIds = [employee.id];
+        employee.locomotion = { kind: 'mounted', vehicleId: v.id };
+        employee.taskTicksRemaining = 5;
 
-      assignVehicle(ctx.state!.vehicles, 1, 'loading');
-      tickCommand(ctx, ['1'], {});
-      expect(v.state).toBe('working');
-
-      assignVehicle(ctx.state!.vehicles, 1, 'idle');
-      tickCommand(ctx, ['1'], {});
-
-      expect(v.state).toBe('idle');
-      expectNoWorldInvariantViolations(ctx.state!);
-    });
-
-    it('each work task (transport, loading, drilling, clearing) drives state to working via the tick loop', () => {
-      const workTasks: VehicleTask[] = ['transport', 'loading', 'drilling', 'clearing'];
-      for (const task of workTasks) {
-        vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-        const id = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!.id;
-        assignVehicle(ctx.state!.vehicles, id, task);
-
-        tickCommand(ctx, ['1'], {});
-
-        const v = ctx.state!.vehicles.vehicles.find(veh => veh.id === id)!;
-        expect(v.state, `task=${task} should drive state to working`).toBe('working');
+        const list = vehicleCommand(ctx, ['list'], {});
+        const line = list.output!.split('\n').find(l => l.includes(`[${v.id}]`));
+        expect(line, `role=${role} should have a vehicle-list line`).toBeDefined();
+        expect(line, `role=${role} should report status: working`).toContain('status: working');
       }
       expectNoWorldInvariantViolations(ctx.state!);
     });
@@ -651,10 +629,6 @@ describe('Vehicle fleet', () => {
       const anchor = ctx.state!.vehicles.vehicles[0]!;
       anchor.x = 20;
       anchor.z = 20;
-      anchor.targetX = 20;
-      anchor.targetZ = 20;
-      anchor.task = 'idle';
-      anchor.state = 'idle';
       // #1087 follow-up: an idle, unreserved blocker sitting on the
       // contended cell is no longer a permanent obstacle —
       // handleVehicleOccupancyBlock (VehicleOccupancyReroute.ts) now
@@ -693,7 +667,7 @@ describe('Vehicle fleet', () => {
         queuedAtTick: 0,
       };
       ctx.state!.pendingActions.push(anchorAction);
-      anchor.reservedForActionId = anchorAction.id;
+      reserveVehicle(ctx.state!.vehicles, anchor.id, anchorAction.id);
 
       // TRAFFIC_JAM_MIN_VEHICLES vehicles, each one grid step from the
       // anchor's cell (their shared target), already at
@@ -711,11 +685,6 @@ describe('Vehicle fleet', () => {
         const [dx, dz] = neighborOffsets[i]!;
         v.x = 20 + dx;
         v.z = 20 + dz;
-        v.targetX = 20;
-        v.targetZ = 20;
-        v.task = 'moving';
-        v.state = 'waiting';
-        v.waitingTicks = TRAFFIC_JAM_MIN_TICKS - 1;
         // #947: canTickVehicle now requires a driver aboard to advance on
         // tick at all -- a driverless vehicle's waitingTicks would never
         // reach the threshold this tick, since it never ticks in the first
@@ -797,7 +766,7 @@ describe('Vehicle fleet', () => {
       // vehicle they just finished working, ready for the planner's own cost
       // ranking to pick the same vehicle again for a same-role follow-up
       // (continuity is now emergent, not a bolted-on mechanism).
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
       expect(vehicleDriverId(vehicle)).toBe(eid);
       expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
       expectNoWorldInvariantViolations(ctx.state!);
@@ -862,13 +831,13 @@ describe('Vehicle fleet', () => {
       ctx.state!.pendingActions[0]!.status = 'assigned';
       ctx.state!.pendingActions[0]!.holderId = eid;
       emp.activeActionId = actionId;
-      vehicle.reservedForActionId = actionId;
+      reserveVehicle(ctx.state!.vehicles, vehicle.id, actionId);
       emp.pendingDriverVehicleId = vehicle.id;
 
       const cancel = employeeCommand(ctx, ['cancel', String(actionId)], {});
       expect(cancel.success).toBe(true);
 
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
       expect(emp.pendingDriverVehicleId).toBeNull();
       expectNoWorldInvariantViolations(ctx.state!);
     });
@@ -889,13 +858,13 @@ describe('Vehicle fleet', () => {
       emp.activeActionId = actionId;
       vehicle.occupantIds = [eid];
       emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-      vehicle.reservedForActionId = actionId;
+      reserveVehicle(ctx.state!.vehicles, vehicle.id, actionId);
       emp.taskTicksRemaining = null;
 
       killEmployee(ctx.state!.employees, eid);
       tickCommand(ctx, ['1'], {});
 
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
       expect(vehicleDriverId(vehicle)).toBeNull();
       expectNoWorldInvariantViolations(ctx.state!);
     });
@@ -914,7 +883,7 @@ describe('Vehicle fleet', () => {
       ctx.state!.pendingActions[0]!.holderId = eid1;
       emp1.activeActionId = actionId;
       vehicle1.occupantIds = [eid1];
-      vehicle1.reservedForActionId = actionId;
+      reserveVehicle(ctx.state!.vehicles, vehicle1.id, actionId);
       emp1.taskTicksRemaining = null;
 
       destroyVehicle(ctx.state!.vehicles, vehicle1.id);
@@ -965,7 +934,7 @@ describe('Vehicle fleet', () => {
       emp.activeActionId = actionId;
       vehicle.occupantIds = [eid];
       emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-      vehicle.reservedForActionId = actionId;
+      reserveVehicle(ctx.state!.vehicles, vehicle.id, actionId);
       emp.taskTicksRemaining = null;
       vehicle.x = 8; vehicle.z = 8; emp.x = 8; emp.z = 8;
 
@@ -978,7 +947,7 @@ describe('Vehicle fleet', () => {
       interruptActiveAction(ctx.state!, emp, actionId);
 
       // The claim itself releases...
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
       // ...but a plain (non-rest) interruption leaves mount state completely
       // untouched — no dismount as a side effect of releasing the claim.
       expect(vehicleDriverId(vehicle)).toBe(eid);
@@ -1029,7 +998,7 @@ describe('Vehicle fleet', () => {
       emp.activeActionId = actionId;
       vehicle.occupantIds = [eid];
       emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-      vehicle.reservedForActionId = actionId;
+      reserveVehicle(ctx.state!.vehicles, vehicle.id, actionId);
       emp.taskTicksRemaining = null;
 
       emp.ticksWorked = WORK_DURATION_TICKS;
@@ -1063,7 +1032,7 @@ describe('Vehicle fleet', () => {
       // and no completion-triggered alight either.
       expect(boarded).toBe(true);
       expect(sawAlightAfterBoarding).toBe(false);
-      expect(vehicle.reservedForActionId).toBeNull();
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
       expect(vehicleDriverId(vehicle)).toBe(eid);
       expectNoWorldInvariantViolations(ctx.state!);
     });
@@ -1179,7 +1148,7 @@ describe('Vehicle fleet', () => {
       // design, either flag alone routed this vehicle through a second,
       // independent drive call in the same tick.
       vehicle.payload = { fragmentId: 1, massKg: 100 };
-      vehicle.reservedForActionId = 999999;
+      reserveVehicle(ctx.state!.vehicles, vehicle.id, 999999);
 
       const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
       const beforeX = vehicle.x;
@@ -1397,7 +1366,9 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
     for (let i = 0; i < 100; i++) {
       expect(runCommand(engine, 'tick 1').success).toBe(true);
       const rig = engine.ctx.state!.vehicles.vehicles.find(v => v.id === 1)!;
-      if (rig.state === 'waiting' && rig.waitingTicks >= VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 1 && !rig.isMoveStuck) {
+      // #1138: "waiting"/isMoveStuck are read off the driving employee now.
+      const rigDriver = resolveVehicleDriver(rig, engine.ctx.state!.employees.employees);
+      if (rigDriver && rigDriver.vehicleWaitingTicks >= VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 1 && !rigDriver.isMoveStuck) {
         sawUnescalatedOverThreshold = true;
       }
     }
@@ -1519,16 +1490,14 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     state.pendingActions.push(action);
     vehicle.occupantIds = [driver.id];
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 10;
-    vehicle.targetZ = 21; // crater floor — unreachable, no ramp dug
+    const targetX = 10;
+    const targetZ = 21; // crater floor — unreachable, no ramp dug
     // A real vehicle-gated claim always sets this at claim time
     // (findFreeVehicleForRole/promoteVehicleGatedAction) — releaseVehicleReservation
     // (called from within interruptActiveAction) looks the vehicle up by this
     // field, not by driverId, so leaving it unset would silently no-op the
     // vehicle-side dismount on sustained-stuck release.
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, action.id);
     driver.activeActionId = action.id;
     // #1089: only an employee moves — tickLocomotion only ever advances an
     // employee's own itinerary, so a driver mounted via the raw field pokes
@@ -1538,7 +1507,7 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // to plan a route to a target it can already tell is unreachable — this
     // test means to prove the executor's own sustained-stuck-abandon
     // escalation, discovered over time, not the planner's upfront refusal.
-    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
+    installDriveItinerary(driver, vehicle.id, targetX, targetZ);
 
     let releasedAtTick = -1;
     for (let i = 1; i <= MOVE_STUCK_ABANDON_TICKS + 5; i++) {
@@ -1552,10 +1521,11 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     expect(releasedAtTick).toBeGreaterThan(0);
     expect(releasedAtTick).toBeLessThanOrEqual(MOVE_STUCK_ABANDON_TICKS);
 
-    expect(vehicle.task).toBe('idle');
-    expect(vehicle.state).toBe('idle');
-    expect(vehicle.moveConsecutiveFailures).toBe(0);
-    expect(vehicle.isMoveStuck).toBe(false);
+    // #1138: the stuck mirror lives on the driving Employee now, not the
+    // vehicle — dismounting via alight (Locomotion.ts's abandon path) is what
+    // clears it, and the released driver's own fields reflect that reset.
+    expect(driver.moveConsecutiveFailures).toBe(0);
+    expect(driver.isMoveStuck).toBe(false);
 
     const releasedAction = state.pendingActions.find(a => a.id === 9001)!;
     expect(releasedAction.status).toBe('queued');
@@ -1581,10 +1551,6 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     state.pendingActions.push(action2);
     vehicle.occupantIds = [driver.id];
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 15;
-    vehicle.targetZ = 5;
     // A real vehicle-gated claim always sets this at claim time (mirrors the
     // first drive's own identical setup line above) — omitting it made
     // reconcileVehicleReservations' own "reserved vehicle no longer exists"
@@ -1594,24 +1560,23 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
     // didn't yet touch the itinerary), but #1090 and #1110's
     // clearHolderWalkFields fix together make it clear employee.itinerary
     // too, which would abort this hand-installed drive.
-    vehicle.reservedForActionId = action2.id;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, action2.id);
     driver.activeActionId = action2.id;
     // #1089: same reasoning as the first drive above — a real itinerary is
     // what tickLocomotion actually walks.
-    installDriveItinerary(driver, vehicle.id, vehicle.targetX, vehicle.targetZ);
+    installDriveItinerary(driver, vehicle.id, 15, 5);
 
     let arrived = false;
     for (let i = 0; i < 60; i++) {
       tickCommand(ctx, ['1'], {});
-      const currentTask = vehicle.task as VehicleTask;
-      if (vehicle.x === 15 && vehicle.z === 5 && currentTask === 'idle') {
+      if (vehicle.x === 15 && vehicle.z === 5 && driver.itinerary === null) {
         arrived = true;
         break;
       }
     }
 
     expect(arrived).toBe(true);
-    expect(vehicle.isMoveStuck).toBe(false);
+    expect(driver.isMoveStuck).toBe(false);
     expectNoWorldInvariantViolations(state);
   });
 });
@@ -1675,7 +1640,7 @@ describe('vehicle-gated stuck-abandon dispatch backoff (#1130)', () => {
     const action = makeHaulAction({ id: 7001, holderId: driver.id, status: 'assigned' });
     state.pendingActions.push(action);
     vehicle.occupantIds = [driver.id];
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, action.id);
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     driver.activeActionId = action.id;
 
@@ -1685,8 +1650,6 @@ describe('vehicle-gated stuck-abandon dispatch backoff (#1130)', () => {
     // Mirrors that same call site's own dismount, so the vehicle is genuinely
     // idle and eligible for redispatch rather than still mounted mid-drive.
     alight(state, vehicle.id);
-    vehicle.task = 'idle';
-    vehicle.state = 'idle';
 
     expect(action.status).toBe('queued');
     expect(action.holderId).toBeNull();
@@ -1736,14 +1699,12 @@ describe('vehicle-gated stuck-abandon dispatch backoff (#1130)', () => {
     const backedOff = makeHaulAction({ id: 7002, holderId: driver.id, status: 'assigned', targetX: 2, targetZ: 5 });
     state.pendingActions.push(backedOff);
     vehicle.occupantIds = [driver.id];
-    vehicle.reservedForActionId = backedOff.id;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, backedOff.id);
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     driver.activeActionId = backedOff.id;
 
     interruptActiveAction(state, driver, backedOff.id, { forceOpenPool: true });
     alight(state, vehicle.id);
-    vehicle.task = 'idle';
-    vehicle.state = 'idle';
     expect(backedOff.stuckBackoffUntilTick).not.toBeNull();
 
     // A second, unrelated, farther-and-so-costlier action — different
@@ -1985,7 +1946,7 @@ describe('dig_ramp_segment — starvation override on the timer-driven completio
     // already produces for the same starvation event: the vehicle is fully
     // released, not left reserved-but-idle on the abandoned ramp segment.
     expect(vehicleDriverId(vehicle)).toBeNull();
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
 
     expectNoWorldInvariantViolations(ctx.state!);
   });
@@ -2118,7 +2079,7 @@ describe('fast transport (#1093)', () => {
     }
 
     expect(vehicleDriverId(hauler)).toBeNull();
-    expect(hauler.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(ctx.state!.vehicles, hauler.id)).toBeNull();
     expect(hauler.occupantIds).toHaveLength(0);
     expectNoWorldInvariantViolations(state);
   });

@@ -105,7 +105,14 @@ import type { RampDef } from '../mining/Ramp.js';
 // the driving employee's own itinerary `reposition` goal now, not a marker
 // on the vehicle). Both are stripped off a loaded save with nothing carried
 // forward. See SaveLoad.ts's migrateV20ToV21.
-export const SAVE_VERSION = 21;
+// v21 -> v22: Vehicle lost `task`, `state`, `targetX`, `targetZ`,
+// `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck` and
+// `reservedForActionId` (#1138 — every one of them is either derived
+// display state (VehicleStatus.computeVehicleStatus) or moved onto the
+// driving Employee/VehicleState.reservations). `reservedForActionId` folds
+// into `vehiclesContainer.reservations`; the rest carry nothing forward.
+// See SaveLoad.ts's migrateV21ToV22.
+export const SAVE_VERSION = 22;
 
 export interface GameConfig {
   seed: number;
@@ -579,7 +586,9 @@ export function buildGameNavGrid(
   const groundFragments = state.logistics.fragments
     .filter(f => f.state === 'on_ground')
     .map(f => f.fragment);
-  state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles, groundFragments, state.vehicles.vehicles);
+  state.navGrid = NavGrid.buildNavGrid(
+    voxelGrid, buildings, drillHoles, groundFragments, state.vehicles.vehicles, state.employees.employees,
+  );
 }
 
 /**

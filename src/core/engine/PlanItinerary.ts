@@ -13,7 +13,7 @@ import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUN
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, getAllVehicleRoles, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -202,8 +202,8 @@ function resolveVehicleForGoal(
   }
 
   const reserved = reservedActionId !== null
-    ? state.vehicles.vehicles.find(v => v.reservedForActionId === reservedActionId)
-    : undefined;
+    ? findVehicleReservedForAction(state.vehicles, reservedActionId)
+    : null;
   return reserved ?? findFreeVehicleForRole(state, role, employee) ?? null;
 }
 

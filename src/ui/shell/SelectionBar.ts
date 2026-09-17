@@ -10,6 +10,9 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
+import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
+import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
+import { describeStatus } from '../fleetDetailSections.js';
 
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
@@ -155,7 +158,8 @@ export class SelectionBar {
       case 'vehicle': {
         const v = state.vehicles.vehicles.find(x => x.id === entity.id);
         if (!v) return null;
-        return { title: t(`vehicle_type.${v.type}`), sub: `#${v.id} · ${t(`vehicle_state.${v.state}`)}` };
+        const status = computeVehicleStatus(v, state.vehicles, resolveVehicleDriver(v, state.employees.employees));
+        return { title: t(`vehicle_type.${v.type}`), sub: `#${v.id} · ${describeStatus(status)}` };
       }
       case 'employee': {
         const e = state.employees.employees.find(x => x.id === entity.id);

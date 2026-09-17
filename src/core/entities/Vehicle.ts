@@ -3,6 +3,7 @@
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
 import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
+import type { Employee } from './Employee.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
 
@@ -19,11 +20,6 @@ export type VehicleRole =
 
 /** Equipment tier: 1 = base, 2 = upgraded, 3 = elite. */
 export type VehicleTier = 1 | 2 | 3;
-
-// ── VehicleOperationalState ──
-
-/** High-level operational state for a vehicle instance. */
-export type VehicleOperationalState = 'idle' | 'moving' | 'working' | 'waiting' | 'broken';
 
 // ── VehicleTask ──
 
@@ -116,12 +112,6 @@ export interface Vehicle {
   x: number;
   z: number;
   hp: number;
-  task: VehicleTask;
-  /** Target coordinates for movement/task. */
-  targetX: number;
-  targetZ: number;
-  /** High-level operational state. */
-  state: VehicleOperationalState;
   /**
    * The single cargo item this vehicle currently carries — a fragment loaded
    * by a `haul_load` arrival effect, cleared by `haul_unload`. Null when
@@ -130,25 +120,6 @@ export interface Vehicle {
    * rather than two fields that could disagree.
    */
   payload: { fragmentId: number; massKg: number } | null;
-  /** Number of consecutive ticks the vehicle has spent in the waiting state. */
-  waitingTicks: number;
-  /** Consecutive ticks tickVehicle failed to find a NavGrid path to targetX/Z. */
-  moveConsecutiveFailures: number;
-  /**
-   * True once moveConsecutiveFailures reaches STUCK_THRESHOLD, OR once an
-   * occupancy-block reroute attempt fails after
-   * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks of waiting on another vehicle
-   * (both in src/core/config/balance.ts; see handleVehicleOccupancyBlock in
-   * VehicleOccupancyReroute.ts, #591) — idle until the path clears either way.
-   */
-  isMoveStuck: boolean;
-  /**
-   * PendingAction id this vehicle is exclusively reserved for — set at claim
-   * time by GameLoop for a vehicle-gated action, VehicleReservation.ts owns
-   * every transition. Distinct from the driver seat: reserved-but-not-yet-
-   * boarded is the walk-to-vehicle phase.
-   */
-  reservedForActionId: number | null;
   /**
    * IDs of employees currently mounted in this vehicle (driver included).
    * Must agree with each occupant's `Locomotion` in both directions — see
@@ -165,6 +136,13 @@ export interface VehicleState {
   nextId: number;
   /** Fleet-wide count of driver-boarding events. */
   driverBoardingCount: number;
+  /**
+   * The exclusive claim a PendingAction holds on a vehicle (#1138) — replaces
+   * the old per-vehicle `reservedForActionId` field. At most one entry per
+   * `vehicleId` and at most one per `actionId`; `reserveVehicle`/
+   * `clearVehicleReservation` (VehicleReservation.ts) own every transition.
+   */
+  reservations: Array<{ vehicleId: number; actionId: number }>;
 }
 
 /**
@@ -179,8 +157,68 @@ export function vehicleDriverId(vehicle: Vehicle): number | null {
   return vehicle.occupantIds[0] ?? null;
 }
 
+/**
+ * The PendingAction id `vehicleId` is currently reserved for, or null when
+ * unreserved — the single lookup every reader of the old
+ * `Vehicle.reservedForActionId` field goes through now that the reservation
+ * lives in `VehicleState.reservations` instead of on the vehicle itself
+ * (#1138). Lives here rather than in VehicleReservation.ts to avoid an import
+ * cycle with VehicleDriverAssignment.ts (see that file's own canAssignDriver).
+ */
+export function getVehicleReservation(state: VehicleState, vehicleId: number): number | null {
+  return state.reservations.find(r => r.vehicleId === vehicleId)?.actionId ?? null;
+}
+
+/**
+ * The vehicle currently reserved for `actionId`, or null when nothing is
+ * reserved for it — the reverse lookup of `getVehicleReservation`, replacing
+ * every `state.vehicles.vehicles.find(v => v.reservedForActionId === actionId)`
+ * call site (#1138).
+ */
+export function findVehicleReservedForAction(state: VehicleState, actionId: number): Vehicle | null {
+  const entry = state.reservations.find(r => r.actionId === actionId);
+  if (!entry) return null;
+  return state.vehicles.find(v => v.id === entry.vehicleId) ?? null;
+}
+
+/**
+ * Removes any reservation entry for `vehicleId` from `state.reservations`.
+ * No-op if none exists. The one code path that splices `reservations` (#1138)
+ * — `destroyVehicle` below calls it directly (entities may not import
+ * VehicleReservation.ts, which already imports this file), and
+ * VehicleReservation.ts's own `clearVehicleReservation` calls it too rather
+ * than duplicating the splice, so a reservation is never removed two ways.
+ */
+export function removeVehicleReservation(state: VehicleState, vehicleId: number): void {
+  const idx = state.reservations.findIndex(r => r.vehicleId === vehicleId);
+  if (idx >= 0) state.reservations.splice(idx, 1);
+}
+
+/**
+ * The employee currently driving `vehicle`, resolved from `employees` by
+ * `vehicleDriverId` — the shared lookup callers that only have an employee
+ * list (not a full `GameState`) use instead of re-deriving it (#1138).
+ */
+export function resolveVehicleDriver(vehicle: Vehicle, employees: readonly Employee[]): Employee | undefined {
+  const driverId = vehicleDriverId(vehicle);
+  if (driverId === null) return undefined;
+  return employees.find(e => e.id === driverId);
+}
+
+/**
+ * True when `vehicle` is actively being driven right now — replaces the old
+ * `vehicle.state === 'moving'` read (#1138): a vehicle carries no state of
+ * its own any more, so "moving" is derived from its driver's own itinerary
+ * (a non-null itinerary means the driver, and therefore the vehicle they're
+ * mounted in, is still travelling — `gameplay-vehicle-fleet`).
+ */
+export function isVehicleCurrentlyDriving(vehicle: Vehicle, employees: readonly Employee[]): boolean {
+  const driver = resolveVehicleDriver(vehicle, employees);
+  return driver !== undefined && driver.itinerary !== null;
+}
+
 export function createVehicleState(): VehicleState {
-  return { vehicles: [], nextId: 1, driverBoardingCount: 0 };
+  return { vehicles: [], nextId: 1, driverBoardingCount: 0, reservations: [] };
 }
 
 // ── Operations ──
@@ -200,44 +238,19 @@ export function purchaseVehicle(
     tier,
     x, z,
     hp: def.maxHp,
-    task: 'idle',
-    targetX: x,
-    targetZ: z,
-    state: 'idle',
     payload: null,
-    waitingTicks: 0,
-    moveConsecutiveFailures: 0,
-    isMoveStuck: false,
-    reservedForActionId: null,
     occupantIds: [],
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };
 }
 
-/** Assign a vehicle to a task. */
-export function assignVehicle(
-  state: VehicleState,
-  vehicleId: number,
-  task: VehicleTask,
-  targetX?: number,
-  targetZ?: number,
-): boolean {
-  const vehicle = state.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return false;
-
-  vehicle.task = task;
-  if (targetX !== undefined) vehicle.targetX = targetX;
-  if (targetZ !== undefined) vehicle.targetZ = targetZ;
-  if (task === 'moving') vehicle.waitingTicks = 0;
-  return true;
-}
-
-/** Destroy a vehicle (e.g., hit by a projectile). */
+/** Destroy a vehicle (e.g., hit by a projectile). Also removes its reservation entry, if any (#1138) — a destroyed vehicle must never leave a stale `reservations` entry naming an id no longer in `state.vehicles`. */
 export function destroyVehicle(state: VehicleState, vehicleId: number): boolean {
   const idx = state.vehicles.findIndex(v => v.id === vehicleId);
   if (idx < 0) return false;
   state.vehicles.splice(idx, 1);
+  removeVehicleReservation(state, vehicleId);
   return true;
 }
 
@@ -265,7 +278,12 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
   for (const v of state.vehicles) {
     const def = getVehicleDefByTier(v.type, v.tier);
     total += def.maintenanceCostPerTick;
-    if (v.task !== 'idle') {
+    // Fuel bills only while the vehicle holds an active reservation for a
+    // gated action (#1138) — reservation state, not raw occupancy, is the
+    // source of truth for "is this vehicle actively working" everywhere else
+    // on this branch. A vehicle someone merely rides (no reservation) burns
+    // no fuel; a reserved-but-not-yet-boarded vehicle already does.
+    if (getVehicleReservation(state, v.id) !== null) {
       total += def.fuelCostPerTick;
     }
   }

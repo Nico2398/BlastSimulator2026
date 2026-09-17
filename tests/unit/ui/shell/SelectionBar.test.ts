@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
-import { purchaseVehicle } from '../../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, resolveVehicleDriver } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
@@ -308,15 +308,16 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     const result = runner.run(command);
     expect(result.success, result.output).toBe(true);
 
-    // #1089: vehicle.task/targetX/Z are written for display only now
-    // (Locomotion.ts's writeVehiclePosition) — `reposition` installs an itinerary
-    // on the driver via moveTo, and the vehicle only reads back as "moving"
-    // with the new target once Locomotion actually advances that itinerary
-    // a tick, not the instant the command itself returns.
+    // #1089/#1138: the drive leg is read off the driving employee's own
+    // itinerary now (Vehicle carries no task/targetX/Z of its own) —
+    // `reposition` installs an itinerary on the driver via moveTo, and the
+    // itinerary only reflects the new target once Locomotion actually
+    // advances it a tick, not the instant the command itself returns.
     runner.run('tick 1');
     const moved = ctx.state!.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(moved.task).toBe('moving');
-    expect(moved.targetX).toBe(12);
-    expect(moved.targetZ).toBe(7);
+    const driver = resolveVehicleDriver(moved, ctx.state!.employees.employees);
+    expect(driver?.itinerary).not.toBeNull();
+    expect(driver?.itinerary?.legs[0]?.destX).toBe(12);
+    expect(driver?.itinerary?.legs[0]?.destZ).toBe(7);
   });
 });

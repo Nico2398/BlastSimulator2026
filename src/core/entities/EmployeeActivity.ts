@@ -5,8 +5,8 @@
 // data, never player-facing text.
 
 import type { Employee } from './Employee.js';
-import type { Vehicle } from './Vehicle.js';
-import { vehicleDriverId } from './Vehicle.js';
+import type { Vehicle, VehicleState } from './Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
 export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'idle';
@@ -32,7 +32,7 @@ const IDLE: EmployeeActivity = { kind: 'idle', ticksRemaining: null, totalTicks:
  * read off the fleet rather than the employee (nothing on Employee itself
  * marks "driving" — only the vehicle's own driver seat does).
  */
-export function computeEmployeeActivity(employee: Employee, vehicles: readonly Vehicle[]): EmployeeActivity {
+export function computeEmployeeActivity(employee: Employee, vehicleState: VehicleState): EmployeeActivity {
   if (employee.collapsing) return { ...IDLE, kind: 'collapsed' };
 
   if (employee.restTicksRemaining !== null) {
@@ -49,11 +49,8 @@ export function computeEmployeeActivity(employee: Employee, vehicles: readonly V
     };
   }
 
-  const drivenVehicle = findDrivenVehicle(employee.id, vehicles);
-  // `?? null`: a fixture/old-save Vehicle predating reservedForActionId
-  // (#550) carries it as undefined, not null — treated the same as
-  // "unreserved" rather than misreported as vehicle-gated.
-  if (drivenVehicle && (drivenVehicle.reservedForActionId ?? null) !== null) {
+  const drivenVehicle = findDrivenVehicle(employee.id, vehicleState.vehicles);
+  if (drivenVehicle && getVehicleReservation(vehicleState, drivenVehicle.id) !== null) {
     // taskTicksRemaining !== null is caught by the 'working' branch above,
     // which takes priority — this only ever fires while still en route
     // (walking/boarding done, vehicle driving, work not yet started).

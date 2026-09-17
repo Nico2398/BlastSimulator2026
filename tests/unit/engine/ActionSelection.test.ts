@@ -31,6 +31,7 @@ import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/N
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
@@ -297,7 +298,7 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
       targetX: 3,
       targetZ: 3, // reachable on the employee's own side of the wall
     });
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     blockColumn(state.navGrid!, 10); // isolates the vehicle (x=20) from the employee (x=0)
 
     const result = resolveActionCost(state, emp, action);
@@ -322,7 +323,7 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
       targetX: 25,
       targetZ: 25, // isolated from the employee AND the vehicle by the wall below
     });
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     blockColumn(state.navGrid!, 10); // isolates the action's own target (x=25) from both the employee and the vehicle (x=0)
 
     const result = resolveActionCost(state, emp, action);
@@ -340,7 +341,7 @@ describe('resolveActionCost — vehicle-gated action (requiredVehicleRole set)',
       targetX: 25,
       targetZ: 3, // same side of the wall as the vehicle (x=20) — only the drive leg matters
     });
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     vehicle.occupantIds = [emp.id];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id }; // I1: mount truth is Locomotion, not driverId alone
     blockColumn(state.navGrid!, 10); // would block a fresh walk to the vehicle, but continuity plans no such leg
@@ -376,7 +377,7 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
     const emp = makeEmployee(state, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 0);
     const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 10, targetZ: 40 });
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     state.pendingActions.push(action);
 
     const workTicks = computeActionWorkTicks(state, emp, action);
@@ -464,7 +465,7 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
     const emp = makeEmployee(state, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
     const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: 25, targetZ: 0 });
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     state.pendingActions.push(action);
 
     let result: { totalTicks: number } | null = null;

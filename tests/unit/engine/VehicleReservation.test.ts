@@ -22,7 +22,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import {
   isLicensedForRole,
   findFreeVehicleForRole,
@@ -103,7 +103,7 @@ describe('findFreeVehicleForRole', () => {
 
     const { vehicle: wrongRole } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const { vehicle: broken } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 1);
-    broken.state = 'broken';
+    broken.hp = 0;
     const { vehicle: free } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 2);
 
     const picked = findFreeVehicleForRole(state, 'drill_rig', employee);
@@ -199,7 +199,7 @@ describe('findFreeVehicleForRole', () => {
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.reservedForActionId = 999;
+    reserveVehicle(state.vehicles, vehicle.id, 999);
 
     expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
   });
@@ -228,56 +228,52 @@ describe('findFreeVehicleForRole', () => {
 });
 
 describe('reserveVehicle', () => {
-  it('sets reservedForActionId on the vehicle', () => {
+  it('sets the reservation in VehicleState.reservations, keyed by vehicleId (#1138 — replaces the old Vehicle.reservedForActionId write)', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
 
-    reserveVehicle(vehicle, 42);
+    reserveVehicle(state.vehicles, vehicle.id, 42);
 
-    expect(vehicle.reservedForActionId).toBe(42);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(42);
   });
 
-  it('overwrites a previous reservation on the same vehicle object (boundary: re-reservation)', () => {
+  it('overwrites a previous reservation for the same vehicleId rather than appending a second entry (boundary: re-reservation)', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
 
-    reserveVehicle(vehicle, 99);
+    reserveVehicle(state.vehicles, vehicle.id, 99);
 
-    expect(vehicle.reservedForActionId).toBe(99);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(99);
+    expect(state.vehicles.reservations.filter(r => r.vehicleId === vehicle.id)).toHaveLength(1);
   });
 });
 
 describe('releaseVehicleReservation (#1090: claim-only — never dismounts)', () => {
-  it('clears reservedForActionId and resets task/state to idle, but leaves a boarded driver mounted', () => {
+  it('clears the reservation, but leaves a boarded driver mounted', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.reservedForActionId = 5;
+    reserveVehicle(state.vehicles, vehicle.id, 5);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'drilling';
-    vehicle.state = 'working';
 
     releaseVehicleReservation(state, 5);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     // #1090: releasing the claim is no longer a dismount — the driver stays
     // exactly where they were, still mounted.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
-    expect(vehicle.task).toBe('idle');
-    expect(vehicle.state).toBe('idle');
   });
 
   it('is a no-op when no vehicle is reserved for the given actionId', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.reservedForActionId = null;
 
     expect(() => releaseVehicleReservation(state, 123)).not.toThrow();
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBeNull();
   });
 });
@@ -317,21 +313,17 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 30;
-    vehicle.targetZ = 0;
 
     const action = makeVehicleGatedHeldAction(30, employee.id);
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.x = 0;
     employee.z = 0;
 
     // Real driving — several cells, no NavGrid (state.navGrid is null on a
     // freshly-created game), so tickVehicleDirectLine advances one cell/tick.
-    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    moveTo(state, employee.id, { x: 30, z: 0 });
     for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0); // sanity: it actually moved
 
@@ -341,7 +333,7 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     const result = cancelAction(state, action.id);
 
     expect(result.success).toBe(true);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     // #1090: cancelling the action no longer dismounts the driver as a side
     // effect — they stay exactly where the vehicle was, still mounted.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
@@ -360,19 +352,15 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 30;
-    vehicle.targetZ = 0;
 
     const action = makeVehicleGatedHeldAction(31, employee.id);
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.x = 0;
     employee.z = 0;
 
-    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    moveTo(state, employee.id, { x: 30, z: 0 });
     for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0);
 
@@ -406,19 +394,15 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
-    vehicle.targetX = 30;
-    vehicle.targetZ = 0;
 
     const action = makeVehicleGatedHeldAction(32, employee.id);
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.x = 0;
     employee.z = 0;
 
-    moveTo(state, employee.id, { x: vehicle.targetX, z: vehicle.targetZ });
+    moveTo(state, employee.id, { x: 30, z: 0 });
     for (let i = 0; i < 5; i++) tickLocomotion(state);
     expect(vehicle.x).toBeGreaterThan(0);
 
@@ -439,7 +423,7 @@ describe("releaseVehicleReservation's real call chains (#922, #1090)", () => {
     // their vehicle's (I2).
     expect(vehicleDriverId(vehicle)).toBeNull();
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
-    expect(vehicle.reservedForActionId).not.toBe(action.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).not.toBe(action.id);
     // No navGrid in this fixture — findAlightCell (Mount.ts) falls back to
     // the vehicle's own cell.
     expect(employee.x).toBe(vehicleXAtCollapse);
@@ -456,11 +440,11 @@ describe('releaseVehicleOnCompletion', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
 
     releaseVehicleOnCompletion(state, employee, 7);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
   });
@@ -471,12 +455,12 @@ describe('releaseVehicleOnCompletion', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
-    vehicle.reservedForActionId = 8; // follow-up action, not the one that just completed
+    reserveVehicle(state.vehicles, vehicle.id, 8); // follow-up action, not the one that just completed
 
     releaseVehicleOnCompletion(state, employee, 7);
 
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(vehicle.reservedForActionId).toBe(8);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(8);
   });
 });
 
@@ -486,14 +470,14 @@ describe('reconcileVehicleReservations', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.reservedForActionId = 99;
+    reserveVehicle(state.vehicles, vehicle.id, 99);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     // No PendingAction with id 99 exists — orphaned reservation.
 
     reconcileVehicleReservations(state);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
   });
 
@@ -505,14 +489,14 @@ describe('reconcileVehicleReservations', () => {
     const action = makeAction(state, { id: 10, holderId: employee.id, status: 'assigned' });
     state.pendingActions.push(action);
     employee.activeActionId = 10;
-    vehicle.reservedForActionId = 10;
+    reserveVehicle(state.vehicles, vehicle.id, 10);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     killEmployee(state.employees, employee.id);
     reconcileVehicleReservations(state);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
   it("interrupts (status back to 'queued') an employee whose reserved vehicle no longer exists, while still travelling (taskTicksRemaining null)", () => {
@@ -523,7 +507,7 @@ describe('reconcileVehicleReservations', () => {
     const action = makeAction(state, { id: 20, holderId: employee.id, status: 'assigned', targetX: 10, targetZ: 10 });
     state.pendingActions.push(action);
     employee.activeActionId = 20;
-    vehicle.reservedForActionId = 20;
+    reserveVehicle(state.vehicles, vehicle.id, 20);
     vehicle.occupantIds = [employee.id];
     employee.taskTicksRemaining = null;
 
@@ -555,7 +539,7 @@ describe('reconcileVehicleReservations', () => {
     const action = makeAction(state, { id: 21, holderId: employee.id, status: 'in_progress', targetX: 10, targetZ: 10 });
     state.pendingActions.push(action);
     employee.activeActionId = 21;
-    vehicle.reservedForActionId = 21;
+    reserveVehicle(state.vehicles, vehicle.id, 21);
     vehicle.occupantIds = [employee.id];
     employee.taskTicksRemaining = 5; // already working — vehicle physically arrived
 
@@ -586,7 +570,7 @@ describe('isMidVehicleGatedWork', () => {
     const action = makeAction(state, { id: 1, holderId: employee.id, status: 'in_progress' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     vehicle.occupantIds = [employee.id];
 
     expect(isMidVehicleGatedWork(state, employee)).toBe(true);
@@ -630,7 +614,7 @@ describe('isMidVehicleGatedWork', () => {
     const action = makeAction(state, { id: 3, holderId: employee.id, status: 'in_progress' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     vehicle.occupantIds = [otherDriver.id]; // reservation exists, but this employee never boarded it
 
     expect(isMidVehicleGatedWork(state, employee)).toBe(false);
@@ -652,14 +636,14 @@ describe('completeVehicleGatedAction (#1090)', () => {
     const action = makeAction(state, { id: 1, holderId: employee.id, status: 'in_progress' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     completeVehicleGatedAction(state, employee, action.id);
 
     expect(state.pendingActions.find(a => a.id === action.id)).toBeUndefined();
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     // Nothing dismounts on completion (#1090) — continuity for a same-role
     // follow-up is now entirely the planner's own emergent ranking.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
@@ -728,10 +712,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = 100;
+    reserveVehicle(state.vehicles, vehicle.id, 100);
     vehicle.payload = { fragmentId: 1, massKg: 850 };
-    vehicle.task = 'transport';
-    vehicle.state = 'working';
 
     releaseVehicleReservation(state, 100);
 
@@ -741,10 +723,8 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     // is never unassigned by a plain release any more anyway — only the
     // fragment-work abort's own cleanup (haul state, cargo) matters here now.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.payload).toBeNull();
-    expect(vehicle.task).toBe('idle');
-    expect(vehicle.state).toBe('idle');
 
     // The cargo already picked up is not permanently lost — back on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
@@ -763,7 +743,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = 101;
+    reserveVehicle(state.vehicles, vehicle.id, 101);
     vehicle.payload = { fragmentId: 1, massKg: 850 };
 
     releaseVehicleReservation(state, 101);
@@ -787,22 +767,18 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = 102;
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
+    reserveVehicle(state.vehicles, vehicle.id, 102);
 
     releaseVehicleReservation(state, 102);
 
     // Breaking never sets `payload` (it splits the boulder in place) — the
-    // only observable state to clear here is the reservation and the display
-    // task/state, same as the "neither phase set" case below (#1091: no
-    // dedicated breakPhase/breakFragmentId left to distinguish "mid-break"
-    // from any other reservation).
+    // only observable state to clear here is the reservation itself, same
+    // as the "neither phase set" case below (#1091: no dedicated
+    // breakPhase/breakFragmentId left to distinguish "mid-break" from any
+    // other reservation).
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.payload).toBeNull();
-    expect(vehicle.task).toBe('idle');
-    expect(vehicle.state).toBe('idle');
   });
 
   it('a vehicle with neither phase set: same claim-only release as the plain case (#1090)', () => {
@@ -812,16 +788,12 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.reservedForActionId = 103;
-    vehicle.task = 'drilling';
-    vehicle.state = 'working';
+    reserveVehicle(state.vehicles, vehicle.id, 103);
 
     releaseVehicleReservation(state, 103);
 
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.task).toBe('idle');
-    expect(vehicle.state).toBe('idle');
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 });
 

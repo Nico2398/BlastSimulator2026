@@ -14,6 +14,7 @@ import type { GameState, PendingAction, BlockedOrderReason } from '../../core/st
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
+import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -142,7 +143,9 @@ export class NotificationCenter {
     if (collapsedCount > 0) {
       pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsedCount), tone: 'critical', tip: `${collapsedCount} employee(s) collapsed` });
     }
-    const stuckCount = state.vehicles.vehicles.filter(v => v.isMoveStuck).length;
+    const stuckCount = state.vehicles.vehicles.filter(
+      v => resolveVehicleDriver(v, state.employees.employees)?.isMoveStuck === true,
+    ).length;
     if (stuckCount > 0) {
       pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: `${stuckCount} vehicle(s) stuck` });
     }

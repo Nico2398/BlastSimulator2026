@@ -73,7 +73,7 @@ export function syncEntitySets(
   if (vehicles) {
     for (const v of state.vehicles.vehicles) {
       if (!renderedVehicleIds.has(v.id)) {
-        vehicles.addVehicle(v);
+        vehicles.addVehicle(v, state.vehicles, state.employees.employees);
         renderedVehicleIds.add(v.id);
       }
     }

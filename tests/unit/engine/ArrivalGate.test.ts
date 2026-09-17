@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 // #1089: boarding itself, and a vehicle-gated action's own drive, now resolve
@@ -27,7 +27,7 @@ import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 // through moveTo (real itinerary) + tickLocomotion (the real mover) instead.
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
-import { reconcileVehicleReservations } from '../../../src/core/engine/VehicleReservation.js';
+import { reconcileVehicleReservations, reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 // reconcileVehicleReservations no longer performs the interruption itself
 // (import-cycle fix, #550) — it only reports which actions need it. Unit
 // tests are allowed to import interruptActiveAction directly to perform the
@@ -306,7 +306,7 @@ describe('tickArrivalGate — evacuation-drive boarding (#1042, one itinerary si
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
 
     employee.x = 5;
     employee.z = 5;
@@ -320,8 +320,11 @@ describe('tickArrivalGate — evacuation-drive boarding (#1042, one itinerary si
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     tickLocomotion(state);
 
-    expect(vehicle.targetX).toBe(40);
-    expect(vehicle.targetZ).toBe(40);
+    // #1138: vehicle carries no targetX/targetZ of its own — the drive
+    // target is read off the driving employee's current itinerary leg.
+    const driver = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(driver?.itinerary?.legs[0]?.destX).toBe(40);
+    expect(driver?.itinerary?.legs[0]?.destZ).toBe(40);
   });
 
   it('abandons the rescue itinerary when the boarding is cancelled because another driver took the vehicle first', () => {
@@ -474,7 +477,7 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     const action = makeVehicleGatedAction({ id: 1, holderId: employee.id, targetX: 20, targetZ: 20 });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
 
     employee.x = 5;
     employee.z = 5;
@@ -490,8 +493,10 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     // The vehicle, not the employee, drives the rest of the way to the
     // action's own target — this is what #550 adds on top of plain boarding.
-    expect(vehicle.targetX).toBe(20);
-    expect(vehicle.targetZ).toBe(20);
+    // #1138: read off the driver's own itinerary leg, not a vehicle-native
+    // targetX/targetZ (deleted).
+    expect(employee.itinerary?.legs[0]?.destX).toBe(20);
+    expect(employee.itinerary?.legs[0]?.destZ).toBe(20);
     expect(employee.destinationX).toBeNull();
     expect(employee.destinationZ).toBeNull();
   });
@@ -506,7 +511,7 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     const action = makeVehicleGatedAction({ id: 2, holderId: employee.id, targetX: 20, targetZ: 20, status: 'assigned' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.x = 10;
     employee.z = 10;
 
@@ -546,8 +551,6 @@ describe('tickArrivalGate — stale-claim guard on vehicle arrival (#928)', () =
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
     vehicle.occupantIds = [employee.id];
-    vehicle.targetX = 20;
-    vehicle.targetZ = 20;
     // The vehicle has already arrived at the action's target this tick.
     vehicle.x = 20;
     vehicle.z = 20;
@@ -556,7 +559,7 @@ describe('tickArrivalGate — stale-claim guard on vehicle arrival (#928)', () =
       id: 3, holderId: employee.id, targetX: 20, targetZ: 20, status: 'in_progress',
     });
     state.pendingActions.push(action);
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
 
     // The holder has since moved on — e.g. sent to rest — so activeActionId
     // no longer names this action, even though the vehicle (driven on its
@@ -597,7 +600,7 @@ describe("tickArrivalGate — a driver's x/z tracks the vehicle continuously acr
     const action = makeVehicleGatedAction({ id: 5, holderId: employee.id, targetX: 20, targetZ: 0, status: 'assigned' });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.x = 0;
     employee.z = 0;
 
@@ -633,20 +636,18 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.targetX = 20;
-    vehicle.targetZ = 20;
 
     const action = makeVehicleGatedAction({ id: 3, holderId: employee.id, targetX: 20, targetZ: 20 });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.taskTicksRemaining = null;
 
     killEmployee(state.employees, employee.id);
 
     reconcileVehicleReservations(state);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicleDriverId(vehicle)).toBeNull();
   });
 
@@ -657,13 +658,11 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
     vehicle.occupantIds = [employee.id];
-    vehicle.targetX = 20;
-    vehicle.targetZ = 20;
 
     const action = makeVehicleGatedAction({ id: 4, holderId: employee.id, targetX: 20, targetZ: 20 });
     state.pendingActions.push(action);
     employee.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     employee.taskTicksRemaining = null; // still travelling, not yet working
 
     // Vehicle destroyed underneath the employee — e.g. a blast projection.

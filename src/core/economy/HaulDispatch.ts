@@ -7,6 +7,7 @@
 // reachable only through the manual Fleet-panel button.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 import type { TrackedFragment } from './Logistics.js';
@@ -160,7 +161,7 @@ export function isHaulOrFragmentActionClaimable(
 
   if (tracked.state === 'in_transit') {
     return state.vehicles.vehicles.some(
-      v => v.reservedForActionId === action.id && v.payload?.fragmentId === tracked.fragment.id,
+      v => getVehicleReservation(state.vehicles, v.id) === action.id && v.payload?.fragmentId === tracked.fragment.id,
     );
   }
 

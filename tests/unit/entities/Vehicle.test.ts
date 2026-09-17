@@ -2,16 +2,17 @@ import { describe, it, expect } from 'vitest';
 import {
   type VehicleRole,
   type VehicleTier,
-  type VehicleOperationalState,
   createVehicleState,
   purchaseVehicle,
-  assignVehicle,
   destroyVehicle,
   getVehicleCostsPerTick,
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
   canReleaseDriver,
+  getVehicleReservation,
+  findVehicleReservedForAction,
+  resolveVehicleDriver,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   findBestEvacuationDriver,
@@ -19,6 +20,7 @@ import {
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
 import { VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { board, alight } from '../../../src/core/engine/Mount.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -105,7 +107,6 @@ describe('purchaseVehicle', () => {
     expect(cost).toBe(getVehicleDefByTier('debris_hauler', 1).purchaseCost);
     expect(state.vehicles).toHaveLength(1);
     expect(vehicle.type).toBe('debris_hauler' satisfies VehicleRole);
-    expect(vehicle.task).toBe('idle');
   });
 
   it('purchasing a rock_digger adds it with correct role', () => {
@@ -128,11 +129,10 @@ describe('purchaseVehicle', () => {
     expect(vehicle.type).toBe('rock_fragmenter' satisfies VehicleRole);
   });
 
-  it('purchased vehicle starts idle at the given coordinates', () => {
+  it('purchased vehicle starts at the given coordinates', () => {
     const state = createVehicleState();
     const { vehicle } = purchaseVehicle(state, 'debris_hauler', 5, 9);
 
-    expect(vehicle.task).toBe('idle');
     expect(vehicle.x).toBe(5);
     expect(vehicle.z).toBe(9);
   });
@@ -154,47 +154,26 @@ describe('purchaseVehicle', () => {
   });
 });
 
-// ── Assign ────────────────────────────────────────────────────────────────────
-
-describe('assignVehicle', () => {
-  it('assigning a debris_hauler to transport updates task and target coordinates', () => {
-    const state = createVehicleState();
-    purchaseVehicle(state, 'debris_hauler');
-    const id = state.vehicles[0]!.id;
-
-    assignVehicle(state, id, 'transport', 10, 20);
-
-    expect(state.vehicles[0]!.task).toBe('transport');
-    expect(state.vehicles[0]!.targetX).toBe(10);
-    expect(state.vehicles[0]!.targetZ).toBe(20);
-  });
-
-  it('assigning an unknown vehicle id returns false', () => {
-    const state = createVehicleState();
-    const result = assignVehicle(state, 9999, 'moving');
-    expect(result).toBe(false);
-  });
-
-  it('assigning a drill_rig to drilling changes its task to drilling', () => {
-    const state = createVehicleState();
-    purchaseVehicle(state, 'drill_rig');
-    const id = state.vehicles[0]!.id;
-
-    assignVehicle(state, id, 'drilling');
-    expect(state.vehicles[0]!.task).toBe('drilling');
-  });
-
-  it('assigning a building_destroyer to clearing changes its task', () => {
-    const state = createVehicleState();
-    purchaseVehicle(state, 'building_destroyer');
-    const id = state.vehicles[0]!.id;
-
-    assignVehicle(state, id, 'clearing');
-    expect(state.vehicles[0]!.task).toBe('clearing');
-  });
-});
+// ── assignVehicle (#1138 — deleted) ───────────────────────────────────────────
+// assignVehicle() and the VehicleTask/VehicleOperationalState display fields
+// it wrote (task, targetX, targetZ, state) are gone from Vehicle entirely —
+// see the "Vehicle interface fields (#1138)" describe block below for the
+// negative-space assertion that they no longer exist.
 
 // ── Costs per tick ────────────────────────────────────────────────────────────
+//
+// #1138: "active" (fuel-billing) used to read `v.task !== 'idle'`, written by
+// the now-deleted assignVehicle/Locomotion display fields. The skeleton's
+// placeholder reads `v.occupantIds.length > 0` instead (flagged
+// TODO(#1138) in src) — that over-bills fuel for a vehicle that merely has a
+// driver aboard but nothing assigned to do, which the old semantics never
+// billed (task stayed 'idle' until actually driven/working). `reserveVehicle`
+// writing into `VehicleState.reservations` is the one signal already
+// available on `VehicleState` alone (no `employees` needed) that reliably
+// means "this vehicle has committed, fuel-consuming work" — every
+// vehicle-gated action reserves before it ever starts driving and holds the
+// reservation for the whole itinerary (VehicleReservation.ts) — so the tests
+// below pin billing to reservation state instead of raw occupancy.
 
 describe('getVehicleCostsPerTick', () => {
   it('idle vehicles incur only maintenance cost (no fuel)', () => {
@@ -210,7 +189,16 @@ describe('getVehicleCostsPerTick', () => {
     expect(idleCost).toBe(expected);
   });
 
-  it('active vehicle adds fuel cost on top of maintenance', () => {
+  it('a vehicle with a driver aboard but no reservation bills no fuel — occupancy alone is not "active"', () => {
+    const state = createVehicleState();
+    const { vehicle } = purchaseVehicle(state, 'debris_hauler');
+    vehicle.occupantIds = [1]; // driver boarded, nothing assigned to do
+
+    const cost = getVehicleCostsPerTick(state);
+    expect(cost).toBe(getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick);
+  });
+
+  it('a reserved vehicle bills fuel on top of maintenance, even before a driver boards', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'debris_hauler');
     purchaseVehicle(state, 'rock_digger');
@@ -219,8 +207,7 @@ describe('getVehicleCostsPerTick', () => {
       getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
       getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
 
-    // Activate the debris_hauler
-    assignVehicle(state, state.vehicles[0]!.id, 'transport');
+    reserveVehicle(state, state.vehicles[0]!.id, 42);
 
     const activeCost = getVehicleCostsPerTick(state);
     expect(activeCost).toBe(baseCost + getVehicleDefByTier('debris_hauler', 1).fuelCostPerTick);
@@ -264,10 +251,10 @@ describe('getVehicleCostsPerTick', () => {
     expect(cost).not.toBe(tier1Maintenance);
   });
 
-  it('an active tier-2 vehicle bills tier-2 maintenance plus tier-2 fuel, not tier-1 rates', () => {
+  it('an active (reserved) tier-2 vehicle bills tier-2 maintenance plus tier-2 fuel, not tier-1 rates', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'debris_hauler', 0, 0, 2);
-    assignVehicle(state, state.vehicles[0]!.id, 'transport');
+    reserveVehicle(state, state.vehicles[0]!.id, 1);
 
     const cost = getVehicleCostsPerTick(state);
     const def2 = getVehicleDefByTier('debris_hauler', 2);
@@ -278,10 +265,10 @@ describe('getVehicleCostsPerTick', () => {
     expect(cost).not.toBe(def1.maintenanceCostPerTick + def1.fuelCostPerTick);
   });
 
-  it('an active tier-3 vehicle bills tier-3 maintenance plus tier-3 fuel, not tier-1 rates', () => {
+  it('an active (reserved) tier-3 vehicle bills tier-3 maintenance plus tier-3 fuel, not tier-1 rates', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'building_destroyer', 0, 0, 3);
-    assignVehicle(state, state.vehicles[0]!.id, 'clearing');
+    reserveVehicle(state, state.vehicles[0]!.id, 1);
 
     const cost = getVehicleCostsPerTick(state);
     const def3 = getVehicleDefByTier('building_destroyer', 3);
@@ -298,7 +285,7 @@ describe('getVehicleCostsPerTick', () => {
     purchaseVehicle(state, 'rock_digger', 0, 0, 2);
     purchaseVehicle(state, 'drill_rig', 0, 0, 3);
     // Activate the tier-3 drill rig so both maintenance and fuel are exercised.
-    assignVehicle(state, state.vehicles[2]!.id, 'drilling');
+    reserveVehicle(state, state.vehicles[2]!.id, 1);
 
     const cost = getVehicleCostsPerTick(state);
     const expected =
@@ -337,6 +324,50 @@ describe('destroyVehicle', () => {
     const id = state.vehicles[0]!.id;
     expect(destroyVehicle(state, id)).toBe(true);
   });
+
+  // ── #1138 regression: destroying a reserved vehicle must not orphan its
+  // reservations entry ────────────────────────────────────────────────────
+  // Pre-#1138, `reservedForActionId` lived on the Vehicle object itself —
+  // destroying the vehicle removed the field along with it, nothing left to
+  // go stale. Now that the claim lives in the separate
+  // `VehicleState.reservations` array, destroyVehicle splicing only
+  // `state.vehicles` leaves a dangling `{ vehicleId, actionId }` entry
+  // behind: findVehicleReservedForAction(actionId) then correctly reports
+  // "no vehicle" (the id lookup fails), but a LATER, legitimate
+  // `reserveVehicle(vehicleState, otherVehicleId, actionId)` for the same
+  // actionId — reserveVehicle's own `clearVehicleReservation` is keyed by
+  // vehicleId, not actionId — never removes it, leaving two reservations
+  // entries for one actionId and breaking the "at most one entry per
+  // actionId" invariant VehicleState's own doc comment promises. Reproduced
+  // end-to-end (not just this direct unit shape) in
+  // vehicles.integration.test.ts's "destroying the reserved vehicle
+  // mid-drive returns the action to queued, re-claimable by a different
+  // qualified employee/vehicle pair", which fails assertWorldInvariants'
+  // I5 check because of exactly this leftover entry.
+  it('destroying a reserved vehicle removes its reservations entry too, not just the vehicle itself', () => {
+    const state = createVehicleState();
+    const { vehicle } = purchaseVehicle(state, 'drill_rig');
+    reserveVehicle(state, vehicle.id, 42);
+    expect(getVehicleReservation(state, vehicle.id)).toBe(42);
+
+    destroyVehicle(state, vehicle.id);
+
+    expect(state.reservations.some(r => r.vehicleId === vehicle.id)).toBe(false);
+    expect(findVehicleReservedForAction(state, 42)).toBeNull();
+  });
+
+  it('a later, different vehicle legitimately reserved for the same actionId a destroyed vehicle once held ends up as the ONLY entry for that actionId', () => {
+    const state = createVehicleState();
+    const { vehicle: gone } = purchaseVehicle(state, 'drill_rig');
+    reserveVehicle(state, gone.id, 7);
+    destroyVehicle(state, gone.id);
+
+    const { vehicle: replacement } = purchaseVehicle(state, 'drill_rig');
+    reserveVehicle(state, replacement.id, 7);
+
+    expect(state.reservations.filter(r => r.actionId === 7)).toHaveLength(1);
+    expect(findVehicleReservedForAction(state, 7)?.id).toBe(replacement.id);
+  });
 });
 
 // Loading rate: getExcavatorLoadingRate was removed (#1092) — no remaining
@@ -362,34 +393,14 @@ describe('VehicleTier', () => {
   });
 });
 
-// ── VehicleOperationalState type ──────────────────────────────────────────────
-
-describe('VehicleOperationalState', () => {
-  it('"idle" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
-    const state = ('idle' satisfies VehicleOperationalState);
-    expect(state).toBe('idle');
-  });
-
-  it('"moving" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
-    const state = ('moving' satisfies VehicleOperationalState);
-    expect(state).toBe('moving');
-  });
-
-  it('"working" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
-    const state = ('working' satisfies VehicleOperationalState);
-    expect(state).toBe('working');
-  });
-
-  it('"waiting" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
-    const state = ('waiting' satisfies VehicleOperationalState);
-    expect(state).toBe('waiting');
-  });
-
-  it('"broken" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
-    const state = ('broken' satisfies VehicleOperationalState);
-    expect(state).toBe('broken');
-  });
-});
+// ── VehicleOperationalState type (#1138 — deleted, replaced by VehicleStatusKind) ──
+// VehicleOperationalState lived on Vehicle itself and could disagree with
+// reality; VehicleStatusKind (src/core/entities/VehicleStatus.ts) is the
+// derived replacement — see VehicleStatus.test.ts for its own dedicated
+// coverage. This module no longer exports an operational-state type at all
+// (a type has no runtime footprint, so the only place that can pin its
+// removal is the compiler itself: this file's own import list no longer
+// names it, and would fail to typecheck again the moment it did).
 
 // ── VehicleDef.tier ───────────────────────────────────────────────────────────
 
@@ -790,7 +801,7 @@ describe('getVehicleDefByTier — tier 3 purchaseCost = tier 1 purchaseCost × 4
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TASK 2.5 — Vehicle interface fields: occupantIds, state, payload, targetX/Z
+// TASK 2.5 — Vehicle interface fields: occupantIds, payload
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ── Vehicle interface fields ──────────────────────────────────────────────────
@@ -809,23 +820,6 @@ describe('Vehicle interface fields', () => {
     for (const role of ALL_ROLES) {
       const { vehicle } = purchaseVehicle(vs, role);
       expect(vehicle.occupantIds).toHaveLength(0);
-    }
-  });
-
-  it('newly purchased vehicle has state initialised to "idle"', () => {
-    // state: VehicleOperationalState — must be 'idle' on a fresh vehicle with no assigned work.
-    // Fails (Red) until Vehicle interface adds state and purchaseVehicle() sets it to 'idle'.
-    const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'rock_digger');
-    expect(vehicle.state).toBe('idle');
-  });
-
-  it('state is "idle" for every vehicle role immediately after purchase', () => {
-    // Exhaustively checks every role so no role-specific initialisation path is missed.
-    const vs = createVehicleState();
-    for (const role of ALL_ROLES) {
-      const { vehicle } = purchaseVehicle(vs, role);
-      expect(vehicle.state).toBe('idle');
     }
   });
 
@@ -854,96 +848,111 @@ describe('Vehicle interface fields', () => {
     expect(vehicle.payload).toBe(null);
   });
 
-  it('targetX equals the x coordinate passed to purchaseVehicle (confirmatory)', () => {
-    // targetX already exists on Vehicle; confirms it is initialised to the spawn position.
-    // This test passes today and must continue to pass after task-2.5 changes land.
+  // ── Dead-field removal (#1138) ────────────────────────────────────────────
+  // task, state, targetX, targetZ, waitingTicks, moveConsecutiveFailures,
+  // isMoveStuck and reservedForActionId are gone from Vehicle entirely — every
+  // one of them is either derived display state (VehicleStatus.computeVehicleStatus)
+  // or moved onto the driving Employee/VehicleState.reservations. A structural
+  // check (`in`) plus a JSON round-trip pins their absence at both the
+  // TypeScript and the runtime-serialisation level.
+
+  it('a freshly purchased vehicle carries none of the eight removed display/movement fields', () => {
     const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'drill_rig', 7, 3);
-    expect(vehicle.targetX).toBe(7);
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    for (const deadField of [
+      'task', 'state', 'targetX', 'targetZ', 'waitingTicks',
+      'moveConsecutiveFailures', 'isMoveStuck', 'reservedForActionId',
+    ]) {
+      expect(deadField in vehicle).toBe(false);
+    }
   });
 
-  it('targetZ equals the z coordinate passed to purchaseVehicle (confirmatory)', () => {
-    // targetZ already exists on Vehicle; confirms it is initialised to the spawn position.
-    // This test passes today and must continue to pass after task-2.5 changes land.
+  it('serialising a vehicle to JSON produces none of the eight removed keys', () => {
     const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'building_destroyer', 2, 11);
-    expect(vehicle.targetZ).toBe(11);
-  });
-
-  it('targetX and targetZ both equal the spawn coordinates when x and z differ (confirmatory)', () => {
-    // Ensures neither axis is accidentally cross-assigned (x→targetZ or z→targetX).
-    const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'rock_digger', 4, 9);
-    expect(vehicle.targetX).toBe(4);
-    expect(vehicle.targetZ).toBe(9);
+    const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
+    const keys = Object.keys(JSON.parse(JSON.stringify(vehicle)));
+    for (const deadField of [
+      'task', 'state', 'targetX', 'targetZ', 'waitingTicks',
+      'moveConsecutiveFailures', 'isMoveStuck', 'reservedForActionId',
+    ]) {
+      expect(keys).not.toContain(deadField);
+    }
   });
 });
 
-// ── Vehicle.state field ───────────────────────────────────────────────────────
+// ── Reservation accessors (#1138) ─────────────────────────────────────────────
 
-describe('Vehicle.state field', () => {
-  // Each test uses the `satisfies` operator to express a compile-time constraint:
-  // vehicle.state must be typed as VehicleOperationalState on the Vehicle interface.
-  // At runtime these also fail (Red) because purchaseVehicle() does not yet initialise
-  // vehicle.state, leaving it undefined — which does not satisfy any of the checks below.
-
-  it('Vehicle.state field holds "idle" after purchase — satisfies VehicleOperationalState', () => {
-    // Both a runtime assertion (state === 'idle') and a type-level annotation.
-    // Fails (Red) until Vehicle.state is added to the interface and set to 'idle' in purchaseVehicle().
+describe('getVehicleReservation / findVehicleReservedForAction / resolveVehicleDriver', () => {
+  it('getVehicleReservation returns null for an unreserved vehicle', () => {
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    const s = (vehicle.state satisfies VehicleOperationalState);
-    expect(s).toBe('idle' satisfies VehicleOperationalState);
+    expect(getVehicleReservation(vs, vehicle.id)).toBeNull();
   });
 
-  it('Vehicle.state field is defined immediately after purchase', () => {
-    // A field that is not initialised by purchaseVehicle() will be undefined.
-    // Fails (Red) until purchaseVehicle() sets vehicle.state to a VehicleOperationalState value.
-    const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'rock_digger');
-    expect(vehicle.state).toBeDefined();
-  });
-
-  it('"moving" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
-    // Compile-time: vehicle.state must accept 'moving' without a type error.
-    // Runtime: confirms the field exists on a freshly purchased vehicle, then verifies a
-    // 'moving' assignment round-trips correctly once the field is present on the interface.
-    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+  it('reserveVehicle + getVehicleReservation round-trip the actionId', () => {
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
-    vehicle.state = ('moving' satisfies VehicleOperationalState);
-    expect(vehicle.state satisfies VehicleOperationalState).toBe('moving');
+    reserveVehicle(vs, vehicle.id, 42);
+    expect(getVehicleReservation(vs, vehicle.id)).toBe(42);
   });
 
-  it('"working" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
-    // Same pattern as "moving": verifies the field is defined before mutating it.
-    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+  it('reserveVehicle replaces an existing reservation for the same vehicle rather than appending', () => {
     const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'drill_rig');
-    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
-    vehicle.state = ('working' satisfies VehicleOperationalState);
-    expect(vehicle.state satisfies VehicleOperationalState).toBe('working');
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    reserveVehicle(vs, vehicle.id, 1);
+    reserveVehicle(vs, vehicle.id, 2);
+    expect(getVehicleReservation(vs, vehicle.id)).toBe(2);
+    expect(vs.reservations.filter(r => r.vehicleId === vehicle.id)).toHaveLength(1);
   });
 
-  it('"waiting" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
-    // Same pattern as "moving": verifies the field is defined before mutating it.
-    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+  it('getVehicleReservation for an unknown vehicleId returns null', () => {
     const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
-    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
-    vehicle.state = ('waiting' satisfies VehicleOperationalState);
-    expect(vehicle.state satisfies VehicleOperationalState).toBe('waiting');
+    purchaseVehicle(vs, 'debris_hauler');
+    expect(getVehicleReservation(vs, 9999)).toBeNull();
   });
 
-  it('"broken" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
-    // Same pattern as "moving": verifies the field is defined before mutating it.
-    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+  it('findVehicleReservedForAction returns null when nothing is reserved for that action', () => {
     const vs = createVehicleState();
-    const { vehicle } = purchaseVehicle(vs, 'building_destroyer');
-    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
-    vehicle.state = ('broken' satisfies VehicleOperationalState);
-    expect(vehicle.state satisfies VehicleOperationalState).toBe('broken');
+    purchaseVehicle(vs, 'debris_hauler');
+    expect(findVehicleReservedForAction(vs, 1)).toBeNull();
+  });
+
+  it('findVehicleReservedForAction finds the vehicle reserved for an actionId', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    reserveVehicle(vs, vehicle.id, 7);
+    expect(findVehicleReservedForAction(vs, 7)?.id).toBe(vehicle.id);
+  });
+
+  it('findVehicleReservedForAction returns null for an actionId whose vehicle has since been destroyed', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    reserveVehicle(vs, vehicle.id, 7);
+    destroyVehicle(vs, vehicle.id);
+    expect(findVehicleReservedForAction(vs, 7)).toBeNull();
+  });
+
+  it('resolveVehicleDriver returns undefined when occupantIds is empty', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    expect(resolveVehicleDriver(vehicle, [])).toBeUndefined();
+  });
+
+  it('resolveVehicleDriver resolves the Employee matching occupantIds[0]', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    vehicle.occupantIds = [6];
+    const employees = createEmployeeState();
+    const { employee } = hireEmployee(employees, 'driller', new Random(42));
+    employee.id = 6;
+    expect(resolveVehicleDriver(vehicle, employees.employees)?.id).toBe(6);
+  });
+
+  it('resolveVehicleDriver returns undefined when occupantIds[0] names an employee not in the list', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    vehicle.occupantIds = [999];
+    expect(resolveVehicleDriver(vehicle, [])).toBeUndefined();
   });
 });
 
@@ -1458,7 +1467,7 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
     employee.activeActionId = null; // a different party — not the reservation's holder
 
     const result = board(state, vehicleId, empId);
@@ -1470,7 +1479,7 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
     employee.activeActionId = 8; // holds a DIFFERENT action than the reservation
 
     const result = board(state, vehicleId, empId);
@@ -1485,7 +1494,7 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
     employee.activeActionId = null;
 
     board(state, vehicleId, empId);
@@ -1499,7 +1508,7 @@ describe('Mount.board — success: reservation holder boards their own reserved 
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 
-    vehicle.reservedForActionId = 7;
+    reserveVehicle(state.vehicles, vehicle.id, 7);
     employee.activeActionId = 7; // the reservation's own holder
 
     const result = board(state, vehicleId, empId);
@@ -1511,7 +1520,7 @@ describe('Mount.board — success: reservation holder boards their own reserved 
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 
-    vehicle.reservedForActionId = 12;
+    reserveVehicle(state.vehicles, vehicle.id, 12);
     employee.activeActionId = 12;
 
     board(state, vehicleId, empId);

@@ -265,8 +265,6 @@ describe('GameRenderer — movement interpolation, no hard-snap on sync (#520)',
     }
     vehicle.x = 20;
     vehicle.z = 20;
-    vehicle.targetX = 20;
-    vehicle.targetZ = 20;
     renderer.syncFromContext(ctx);
 
     const pos = renderer.entityWorldPosition('vehicle', vehicle.id);

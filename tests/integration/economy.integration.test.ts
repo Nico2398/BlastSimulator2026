@@ -16,6 +16,7 @@ import {
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
 import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
+import { getVehicleReservation } from '../../src/core/entities/Vehicle.js';
 import {
   createFinanceState,
   addIncome,
@@ -817,12 +818,10 @@ describe('Economy', () => {
     // (VehicleReservation.ts) is the real abort path now: it returns any
     // in-flight cargo to the ground and clears the reservation/display
     // task-state in one call (findAndAbortReservedVehicle's own doc comment).
-    if (probeVehicle.reservedForActionId !== null) {
-      releaseVehicleReservation(ctx.state!, probeVehicle.reservedForActionId);
+    const probeReservation = getVehicleReservation(ctx.state!.vehicles, probeVehicle.id);
+    if (probeReservation !== null) {
+      releaseVehicleReservation(ctx.state!, probeReservation);
     }
-    probeVehicle.reservedForActionId = null;
-    probeVehicle.task = 'idle';
-    probeVehicle.state = 'idle';
     probeDriver.activeActionId = null;
     probeDriver.taskQueue = [];
     probeVehicle.occupantIds = [probeDriver.id];

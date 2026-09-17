@@ -23,7 +23,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
-import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
+import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
@@ -130,7 +130,7 @@ export class FleetPanel extends PanelBase {
     // reservedForActionId is part of the signature too (#1092): it decides
     // whether the card's Reposition button renders enabled or refused.
     const rows = state.vehicles.vehicles
-      .map(v => `${v.id}:${v.type}:${v.tier}:${vehicleDriverId(v) ?? '-'}:${v.reservedForActionId ?? '-'}`).join('|');
+      .map(v => `${v.id}:${v.type}:${v.tier}:${vehicleDriverId(v) ?? '-'}:${getVehicleReservation(state.vehicles, v.id) ?? '-'}`).join('|');
     // pendingDriverVehicleId, not just the driver seat: VehicleReservation's
     // automatic claim sets it immediately, but the seat itself stays empty
     // for the whole walk to the vehicle (the board arrival step fills it).
@@ -151,7 +151,7 @@ export class FleetPanel extends PanelBase {
     for (const v of state.vehicles.vehicles) {
       const row = this.bodyEl.querySelector<HTMLElement>(`[data-vehicle-id="${v.id}"]`);
       if (!row) continue;
-      row.querySelector('.bs-fleet-status')?.replaceWith(this.tag(makeStatusChip(v, this.occupantOf(v, state)), 'bs-fleet-status'));
+      row.querySelector('.bs-fleet-status')?.replaceWith(this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'));
       row.querySelector('.bs-fleet-hp')?.replaceWith(this.tag(makeHpGauge(v), 'bs-fleet-hp'));
       const load = makeLoadGauge(v);
       const existingLoad = row.querySelector('.bs-fleet-load');
@@ -171,7 +171,7 @@ export class FleetPanel extends PanelBase {
   }
 
   private makeTrafficBanner(state: GameState): HTMLElement | null {
-    const advisories = computeTrafficAdvisory(state.vehicles.vehicles);
+    const advisories = computeTrafficAdvisory(state.vehicles.vehicles, state.employees.employees);
     if (advisories.length === 0) return null;
     const worst = advisories.reduce((a, b) => (b.count > a.count ? b : a));
     const banner = el('div', { attrs: { style: 'display:flex;gap:8px;padding:9px 11px;border-radius:5px;background:rgba(255,176,46,.08);border:1px solid rgba(255,176,46,.26)' } });
@@ -261,7 +261,7 @@ export class FleetPanel extends PanelBase {
     );
     const locateBtn = el('button', { attrs: { style: 'width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer' }, children: [iconEl('locate', 12)] });
     locateBtn.addEventListener('click', () => window.__cameraFocus?.(v.x, v.z, 15));
-    head.append(iconChip, nameCol, this.tag(makeStatusChip(v, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);
+    head.append(iconChip, nameCol, this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);
 
     const rows: HTMLElement[] = [head, this.tag(makeHpGauge(v), 'bs-fleet-hp')];
     const load = makeLoadGauge(v);
@@ -333,7 +333,7 @@ export class FleetPanel extends PanelBase {
     // vehicle-reposition-before-blast.json's own click selector.
     btn.dataset['action'] = 'reposition';
 
-    const reason = v.reservedForActionId !== null
+    const reason = getVehicleReservation(state.vehicles, v.id) !== null
       ? t('ui.fleet.reposition_busy')
       : !state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type))
         ? t('ui.fleet.no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`) })

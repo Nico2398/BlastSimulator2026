@@ -24,6 +24,8 @@ import {
   isHaulEligibleVehicle,
 } from '../../../src/core/economy/HaulingTask.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { requestBreakBoulder } from '../../../src/core/economy/BoulderBreaking.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
@@ -111,30 +113,31 @@ describe('isHaulEligibleVehicle', () => {
   it('true for a debris_hauler with a driver and no reserved action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenHauler(state);
-    expect(isHaulEligibleVehicle(vehicle)).toBe(true);
+    expect(isHaulEligibleVehicle(vehicle, state.vehicles)).toBe(true);
   });
 
   it('false for a non-debris_hauler vehicle', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
-    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+    expect(isHaulEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for a debris_hauler with no driver assigned', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeIdleHauler(state);
-    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+    expect(isHaulEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for a debris_hauler already reserved for another action', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenHauler(state);
-    vehicle.reservedForActionId = 42;
-    expect(isHaulEligibleVehicle(vehicle)).toBe(false);
+    reserveVehicle(state.vehicles, vehicle.id, 42);
+    expect(isHaulEligibleVehicle(vehicle, state.vehicles)).toBe(false);
   });
 
   it('false for undefined', () => {
-    expect(isHaulEligibleVehicle(undefined)).toBe(false);
+    const state = createGame({ seed: SEED });
+    expect(isHaulEligibleVehicle(undefined, state.vehicles)).toBe(false);
   });
 });
 
@@ -206,7 +209,7 @@ describe('requestHaulFragment — precondition failures', () => {
     const state = createGame({ seed: SEED });
     placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state);
-    vehicle.reservedForActionId = 42;
+    reserveVehicle(state.vehicles, vehicle.id, 42);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
@@ -301,8 +304,8 @@ describe('requestHaulFragment — happy path', () => {
     expect(state.logistics.fragments[0]!.state).toBe('on_ground');
 
     // Claims the vehicle so no other request/dispatch can double-book it.
-    expect(vehicle.reservedForActionId).not.toBeNull();
-    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).not.toBeNull();
+    const action = state.pendingActions.find(a => a.id === getVehicleReservation(state.vehicles, vehicle.id));
     expect(action).toBeDefined();
     expect(action!.type).toBe('haul_debris');
     expect(action!.payload['fragmentId']).toBe(1);
@@ -495,7 +498,7 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(vehicle.reservedForActionId).not.toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).not.toBeNull();
   });
 });
 

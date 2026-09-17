@@ -59,10 +59,8 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
-    id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, state: 'idle', payload: null,
-    waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null,
+    id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+    payload: null,
     occupantIds: [],
     ...overrides,
   };
@@ -171,12 +169,13 @@ describe('makeHiredLocationStrip', () => {
   });
 
   it('reports the vehicle as the location while driving it', () => {
-    const state = makeState([makeVehicle({ id: 4, occupantIds: [1], state: 'moving' })]);
+    const state = makeState([makeVehicle({ id: 4, occupantIds: [1] })]);
     expect(makeHiredLocationStrip(makeEmployee({ id: 1 }), state).textContent).toContain('Aboard #4');
   });
 
   it('reports the vehicle as the location while driving to a task', () => {
-    const state = makeState([makeVehicle({ id: 4, occupantIds: [1], state: 'moving', reservedForActionId: 9 })]);
+    const state = makeState([makeVehicle({ id: 4, occupantIds: [1] })]);
+    state.vehicles.reservations.push({ vehicleId: 4, actionId: 9 });
     expect(makeHiredLocationStrip(makeEmployee({ id: 1 }), state).textContent).toContain('Aboard #4');
   });
 

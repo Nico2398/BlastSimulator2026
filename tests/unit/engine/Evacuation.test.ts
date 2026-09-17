@@ -11,7 +11,8 @@ import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
 import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleReservation, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EVACUATION_CLEARANCE_M } from '../../../src/core/config/balance.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
@@ -116,13 +117,15 @@ describe('evacuateZone', () => {
     // Routed out instead.
     expect(employee.destinationX).not.toBeNull();
     expect(isInZone(employee.destinationX!, employee.destinationZ!, zone)).toBe(false);
-    // #1089: evacuateZone only installs the itinerary — vehicle.task/targetX/
-    // targetZ are written by tickLocomotion's own drive-leg advance (the only
-    // place a vehicle's fields change), not synchronously at plan time like
-    // the old moveVehicle. One real tick is what actually starts the drive.
+    // #1089/#1138: evacuateZone only installs the itinerary — the drive
+    // leg (read off the driving employee's own itinerary now, not a
+    // vehicle-native task/targetX/targetZ) is written by tickLocomotion's
+    // own drive-leg advance, not synchronously at plan time. One real tick
+    // is what actually starts the drive.
     tickLocomotion(state);
-    expect(vehicle.task).toBe('moving');
-    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+    const evacDriver = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(evacDriver?.itinerary).not.toBeNull();
+    expect(isInZone(evacDriver!.itinerary!.legs[0]!.destX, evacDriver!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
 
     expect(result.orderedEmployeeIds).toContain(employee.id);
     expect(result.orderedVehicleIds).toContain(vehicle.id);
@@ -422,15 +425,14 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     const action = makeFragmentGatedAction({ id: 501, holderId: driver1.id, payload: { fragmentId: 1 } });
     state.pendingActions.push(action);
     driver1.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
     vehicle.payload = { fragmentId: 1, massKg: 850 };
-    vehicle.task = 'transport';
-    vehicle.state = 'working';
 
     evacuateZone(state, zone);
-    // #1089: vehicle.task/targetX/targetZ are written by tickLocomotion's own
-    // drive-leg advance, not synchronously at plan time — one real tick is
-    // what actually starts the drive (see the sibling describe block above).
+    // #1089/#1138: the drive leg is read off the driving employee's own
+    // itinerary, written by tickLocomotion's own drive-leg advance, not
+    // synchronously at plan time — one real tick is what actually starts
+    // the drive (see the sibling describe block above).
     tickLocomotion(state);
 
     // The cargo already loaded is not dropped — the fragment stays in_transit
@@ -439,12 +441,12 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
     expect(cargo.state).toBe('in_transit');
     expect(cargo.vehicleId).toBe(String(vehicle.id));
-    expect(vehicle.reservedForActionId).toBe(action.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(action.id);
     expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 850 });
 
     // Vehicle is still ordered out of the zone like any other evacuee.
-    expect(vehicle.task).toBe('moving');
-    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+    const drivenBy1 = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(isInZone(drivenBy1!.itinerary!.legs[0]!.destX, drivenBy1!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });
 
   it('a vehicle mid-haul (to_fragment, cargo not yet picked up) releases the reservation with no fragment side effects', () => {
@@ -460,16 +462,14 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     const action = makeFragmentGatedAction({ id: 502, holderId: driver2.id, payload: { fragmentId: 2 } });
     state.pendingActions.push(action);
     driver2.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
 
     evacuateZone(state, zone);
     tickLocomotion(state);
 
     // No cargo committed yet — the ordinary claim-only release runs
     // (isCommittedToOwnCargo is false), unlike the cargo-loaded case above.
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.payload).toBeNull();
 
     // Nothing was carried — the fragment is untouched, still on the ground.
@@ -477,8 +477,8 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     expect(cargo.state).toBe('on_ground');
     expect(cargo.vehicleId).toBeNull();
 
-    expect(vehicle.task).toBe('moving');
-    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+    const drivenBy2 = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(isInZone(drivenBy2!.itinerary!.legs[0]!.destX, drivenBy2!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });
 
   it('a vehicle mid-break releases the reservation the same way — breaking never carries payload to begin with (behavior-preserving)', () => {
@@ -496,18 +496,16 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     });
     state.pendingActions.push(action);
     driver3.activeActionId = action.id;
-    vehicle.reservedForActionId = action.id;
-    vehicle.task = 'moving';
-    vehicle.state = 'moving';
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
 
     evacuateZone(state, zone);
     tickLocomotion(state);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.payload).toBeNull();
 
-    expect(vehicle.task).toBe('moving');
-    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+    const drivenBy3 = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(isInZone(drivenBy3!.itinerary!.legs[0]!.destX, drivenBy3!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });
 
   it('a vehicle with no reservation at all is unaffected — no-op, no crash', () => {
@@ -518,15 +516,13 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     const { employee: driver4 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
     vehicle.occupantIds = [driver4.id];
     driver4.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.task = 'idle';
-    vehicle.state = 'idle';
 
     expect(() => evacuateZone(state, zone)).not.toThrow();
     tickLocomotion(state);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.payload).toBeNull();
-    expect(vehicle.task).toBe('moving');
-    expect(isInZone(vehicle.targetX, vehicle.targetZ, zone)).toBe(false);
+    const drivenBy4 = resolveVehicleDriver(vehicle, state.employees.employees);
+    expect(isInZone(drivenBy4!.itinerary!.legs[0]!.destX, drivenBy4!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });
 });

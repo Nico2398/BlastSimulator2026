@@ -13,7 +13,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleDefByTier, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleDefByTier, getVehicleReservation, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { computeActionWorkTicks } from '../../../src/core/engine/ActionSelection.js';
@@ -465,7 +465,7 @@ describe('transport planning (phase 7, #1093)', () => {
     const beforePlan = structuredClone(state);
     planItinerary(state, employee, goal, 'exact');
     expect(state).toEqual(beforePlan);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
 
     const resolved: ResolvedGoal = {
       targetX: action.targetX,
@@ -480,7 +480,7 @@ describe('transport planning (phase 7, #1093)', () => {
     const beforeFindCheapest = structuredClone(state);
     findCheapestTransportItinerary(state, employee, goal, 'exact', resolved, footCost);
     expect(state).toEqual(beforeFindCheapest);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
   it("'reposition' goal is unaffected by the flag: stays foot-only even with a free fast vehicle nearby", () => {

@@ -19,7 +19,8 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
@@ -116,7 +117,7 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(employee, state.vehicles);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('rest');
   });
@@ -482,7 +483,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
-    const activity = computeEmployeeActivity(employee, state.vehicles.vehicles);
+    const activity = computeEmployeeActivity(employee, state.vehicles);
     expect(activity.kind).toBe('walking');
     expect(activity.actionType).toBe('rest');
   });
@@ -547,7 +548,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const prior = pushHeldAction(state, employee.id, 1100);
     prior.requiredVehicleRole = 'rock_digger';
     vehicle.occupantIds = [employee.id];
-    vehicle.reservedForActionId = prior.id;
+    reserveVehicle(state.vehicles, vehicle.id, prior.id);
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10; // well past the shift boundary
     employee.fatigue = 1; // well below any threshold
@@ -584,7 +585,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const prior = pushHeldAction(state, employee.id, 1101);
     prior.requiredVehicleRole = 'rock_digger';
     vehicle.occupantIds = [employee.id];
-    vehicle.reservedForActionId = prior.id;
+    reserveVehicle(state.vehicles, vehicle.id, prior.id);
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
     employee.fatigue = 1;
@@ -804,12 +805,12 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     const gatedAction = pushQueuedGatedAction(state, employee.id, 1111);
     employee.taskQueue = [gatedAction.id];
-    vehicle.reservedForActionId = gatedAction.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
     // vehicle.driverId stays null — reserved but never boarded.
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(gatedAction.status).toBe('queued');
     expect(gatedAction.holderId).toBeNull();
     expect(employee.taskQueue).not.toContain(gatedAction.id);
@@ -828,11 +829,11 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     const gatedAction = pushQueuedGatedAction(state, employee.id, 1113);
     employee.taskQueue = [gatedAction.id];
-    vehicle.reservedForActionId = gatedAction.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(gatedAction.status).toBe('queued');
     expect(gatedAction.holderId).toBeNull();
     expect(employee.taskQueue).not.toContain(gatedAction.id);
@@ -855,7 +856,7 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     employee.ticksWorked = WORK_DURATION_TICKS;
     employee.taskQueue = []; // nothing queued — only the active action exists
     vehicle.occupantIds = [employee.id];
-    vehicle.reservedForActionId = activeAction.id;
+    reserveVehicle(state.vehicles, vehicle.id, activeAction.id);
 
     expect(() => forceShiftRestIfNeeded(state, employee, [], [])).not.toThrow();
 
@@ -867,7 +868,7 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     expect(released.status).toBe('queued');
     expect(released.holderId).toBeNull();
     expect(employee.activeActionId).not.toBe(activeAction.id);
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(employee.taskQueue).toEqual([]);
   });
 
@@ -884,12 +885,12 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     const gatedAction = pushQueuedGatedAction(state, employee.id, 1116);
     employee.taskQueue = [gatedAction.id];
-    vehicle.reservedForActionId = gatedAction.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction.id);
     vehicle.occupantIds = [otherEmployee.id]; // already boarded by someone else
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(vehicle.reservedForActionId).toBe(gatedAction.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(gatedAction.id);
     expect(vehicleDriverId(vehicle)).toBe(otherEmployee.id);
     expect(gatedAction.status).toBe('assigned');
     expect(gatedAction.holderId).toBe(employee.id);
@@ -909,11 +910,11 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     const gatedAction1 = pushQueuedGatedAction(state, employee.id, 1118);
     employee.taskQueue = [gatedAction1.id];
-    vehicle.reservedForActionId = gatedAction1.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction1.id);
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(employee.taskQueue).not.toContain(gatedAction1.id);
 
     // Rest completes; employee resumes work, re-claims a (new) vehicle-gated
@@ -930,12 +931,12 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
 
     const gatedAction2 = pushQueuedGatedAction(state, employee.id, 1120);
     employee.taskQueue = [gatedAction2.id];
-    vehicle.reservedForActionId = gatedAction2.id;
+    reserveVehicle(state.vehicles, vehicle.id, gatedAction2.id);
     // vehicle.driverId stays null — reserved but never boarded, again.
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(vehicle.reservedForActionId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
     expect(gatedAction2.status).toBe('queued');
     expect(gatedAction2.holderId).toBeNull();
     expect(employee.taskQueue).not.toContain(gatedAction2.id);
