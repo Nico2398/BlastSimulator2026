@@ -38,15 +38,9 @@ const { parseDependencies } = require('./assignability.cjs');
  */
 function missingRelationships(number, body, declared) {
   const already = new Set(declared.numbers);
-  const missing = new Set();
-
-  for (const dep of parseDependencies(body)) {
-    if (dep === number) continue;
-    if (already.has(dep)) continue;
-    missing.add(dep);
-  }
-
-  return [...missing].sort((a, b) => a - b);
+  return declaredDependencies(number, body)
+    .filter((dep) => !already.has(dep))
+    .sort((a, b) => a - b);
 }
 
 /**
@@ -91,6 +85,12 @@ async function reconcileDependencies(api, number, options = {}) {
     return { created: [], skipped, failed: [] };
   }
 
+  const declaredNumbers = declaredDependencies(number, issue.body);
+  if (declaredNumbers.length === 0) {
+    log(`#${number}: no dependency declared under \`## Blocked by\` — nothing to reconcile.`);
+    return { created: [], skipped: null, failed: [] };
+  }
+
   const missing = missingRelationships(number, issue.body, declared);
   if (missing.length === 0) {
     log(`#${number}: every declared dependency is already a relationship.`);
@@ -121,7 +121,21 @@ async function reconcileDependencies(api, number, options = {}) {
   return { created, skipped: null, failed };
 }
 
+/**
+ * The issue numbers a body declares under `## Blocked by`, minus self-reference.
+ * Shared by `missingRelationships` and `reconcileDependencies`'s log split,
+ * so the two never disagree on what counts as "declared".
+ *
+ * @param {number} number the issue being reconciled
+ * @param {string | null | undefined} body
+ * @returns {number[]}
+ */
+function declaredDependencies(number, body) {
+  return [...new Set(parseDependencies(body).filter((dep) => dep !== number))];
+}
+
 module.exports = {
   missingRelationships,
   reconcileDependencies,
+  declaredDependencies,
 };
