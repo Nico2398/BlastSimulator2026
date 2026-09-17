@@ -82,11 +82,24 @@ export interface RouteCommitment {
   destX: number | null;
   destZ: number | null;
   remainingCost: number | null;
+  /**
+   * The position the agent was walking from when `waypointX`/`waypointZ` was
+   * set (#1129). Used only to recognise a fresh replan's immediate target
+   * retracing the very hop that produced the current (now possibly exhausted)
+   * commitment — the oscillation's exact signature: two differently-shaped,
+   * cost-tied routes from points a tick's movement apart, one pointing back
+   * at the other's start. Optional so a fixture/caller built before this
+   * field existed keeps compiling and behaves exactly as before (no `from`
+   * position on record means the retrace check never fires).
+   */
+  fromX?: number | null;
+  fromZ?: number | null;
 }
 
 /** The empty commitment — no in-flight waypoint yet. Default for a fresh journey/leg. */
 export const NULL_ROUTE_COMMITMENT: RouteCommitment = {
   waypointX: null, waypointZ: null, destX: null, destZ: null, remainingCost: null,
+  fromX: null, fromZ: null,
 };
 
 // Tie tolerance for preferring the committed in-flight waypoint over a fresh
@@ -244,9 +257,17 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // distance actually walked this hop, never below 0 — a route that is
     // honestly still improving, just not by more than the tie epsilon, must
     // keep losing ground against a genuinely shorter fresh route a few hops
-    // later rather than being protected forever at its original cost.
+    // later rather than being protected forever at its original cost. Only a
+    // hop that fully lands on its target (`reachedHop`) corresponds to a real
+    // graph edge whose cost `walked`'s Euclidean distance actually
+    // approximates — a partial hop hasn't finished crossing that edge, and
+    // the route's total A* cost can differ arbitrarily from raw distance
+    // (cost and distance are different units in general), so decaying by a
+    // partial `walked` would subtract a distance from a cost baseline with
+    // nothing grounding the two as comparable.
     const baseline = adoptedFresh ? (input.path.totalCost ?? null) : resolved.committed.remainingCost;
-    const remainingCost = baseline === null ? null : Math.max(0, baseline - walked);
+    const decay = reachedHop ? walked : 0;
+    const remainingCost = baseline === null ? null : Math.max(0, baseline - decay);
 
     committed = {
       waypointX: hopTarget.x,
@@ -254,6 +275,11 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       destX: input.destinationX,
       destZ: input.destinationZ,
       remainingCost,
+      // Where THIS hop actually started from — not whatever `resolved.committed`
+      // itself carried, so a future tick's retrace check always compares
+      // against the true immediately-preceding position (#1129).
+      fromX: beforeX,
+      fromZ: beforeZ,
     };
 
     // Budget ran out mid-hop (partial move) — nothing left to spend on a
@@ -321,9 +347,9 @@ function resolveTargetWaypoint(
   // committed waypoint, never overshoots) the committed waypoint — same
   // exact-cell arrival test this file's own leg/destination checks already
   // use (Locomotion.ts's isLegArrived, advanceLegacyFootWalk's x===destX).
-  if (x === committed.waypointX && z === committed.waypointZ) {
-    return adoptFresh();
-  }
+  // Checked here but acted on below the obstacle/cost checks: arrival alone
+  // isn't sufficient to trust a fresh replan unconditionally (see below).
+  const arrived = x === committed.waypointX && z === committed.waypointZ;
 
   // The committed waypoint is no longer a real step from here — a genuine
   // obstacle (blast, new building, vehicle) must be reacted to immediately,
@@ -344,7 +370,41 @@ function resolveTargetWaypoint(
 
   // Fresh route is a real reroute, not just a differently-shaped alternative
   // of about the same cost.
-  if (freshCost < committed.remainingCost - ROUTE_COMMIT_TIE_EPSILON) {
+  const clearlyBetter = freshCost < committed.remainingCost - ROUTE_COMMIT_TIE_EPSILON;
+  if (clearlyBetter) {
+    return adoptFresh();
+  }
+
+  if (arrived) {
+    // The committed waypoint is fully consumed — there is no more of the old
+    // route left to protect, so "hold the line" toward it (below) would
+    // target the agent's own current position and go nowhere forever.
+    // Ordinarily that's fine: a fresh replan from the same spot the agent is
+    // legitimately walking through is *expected* to look cost-tied with the
+    // route already being followed, and trusting it (adoptFresh, below) is
+    // just normal progress along the path. Only the narrow case where fresh's
+    // own immediate target retraces the exact hop that produced this
+    // commitment is the oscillation's signature (#1129): two cost-consistent,
+    // differently-shaped routes from points a tick's movement apart, one
+    // pointing back at the other's start. Trusting fresh there would walk
+    // the agent right back where it came from, forever. Guard against that
+    // one case only — walk straight at the leg's own destination for this
+    // one hop instead, so next tick's replan, from a shifted position, gets
+    // an unambiguous comparison to resolve the tie with.
+    const isRetrace = committed.fromX != null && committed.fromZ != null
+      && freshTarget.x === committed.fromX && freshTarget.z === committed.fromZ;
+    if (isRetrace) {
+      return {
+        target: { x: destinationX, z: destinationZ },
+        committed: {
+          waypointX: destinationX,
+          waypointZ: destinationZ,
+          destX: destinationX,
+          destZ: destinationZ,
+          remainingCost: freshCost,
+        },
+      };
+    }
     return adoptFresh();
   }
 
