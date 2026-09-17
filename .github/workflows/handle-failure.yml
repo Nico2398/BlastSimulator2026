@@ -22,9 +22,16 @@ name: "Pipeline: handle a run that halted without merging"
 # builds — would otherwise march through the whole backlog in minutes.
 # `agentic-assign` counts the runs that have halted under either label since the
 # pipeline last merged anything and stops at AGENTIC_BLOCKED_CHAIN_LIMIT.
+#
+# `edited` is here for `reconcile-dependencies` alone, and only for the half of
+# a declared dependency that the label event cannot see (#1127). The two
+# queue-moving jobs below gate on `github.event.label.name`, which no `edited`
+# payload carries, so an edit still chains nothing and still starts no session:
+# the only issue events that begin a run remain the `blocked`/`paused` labels
+# and an `agent-task` issue closing.
 on:
   issues:
-    types: [labeled]
+    types: [labeled, edited]
 
 permissions:
   issues: write
@@ -178,8 +185,26 @@ jobs:
   # Its own job, not a step on `chain`: releasing the queue is the thing that
   # must not be held up by a bookkeeping write, and a reconcile that fails has
   # to go red on its own (Rule 4) without taking the chain down with it.
+  #
+  # Two triggers, because one of them cannot see what it is for (#1127). A run
+  # applies the halt label and *then* edits the body, so on the label event the
+  # `## Blocked by` section frequently does not name the dependency yet: the job
+  # read an empty section, found nothing to add and exited green, which is how
+  # #1090's relationship stayed unwritten for two hours with a green log. The
+  # edit to an issue already carrying a halt label is the other half of that
+  # write, and whichever event arrives second sees both. No duration is
+  # involved and nothing waits — each event is reacted to on arrival.
+  #
+  # Deliberately no `concurrency:` group. Two events for one pause can overlap,
+  # and that is safe by construction: the write is a set difference and
+  # `addBlockedBy` reads a 422 as success, so a duplicate writes nothing. A
+  # group would be the more dangerous choice here — GitHub holds one pending
+  # run per group and cancels further ones, which is exactly how issue #1127's
+  # own assignment run was lost.
   reconcile-dependencies:
-    if: github.event.label.name == 'blocked' || github.event.label.name == 'paused'
+    if: >-
+      (github.event.action == 'labeled' && (github.event.label.name == 'blocked' || github.event.label.name == 'paused'))
+      || (github.event.action == 'edited' && (contains(github.event.issue.labels.*.name, 'blocked') || contains(github.event.issue.labels.*.name, 'paused')))
     runs-on: ubuntu-latest
     steps:
       # The decision rules are read from the workspace, like every other
@@ -209,12 +234,21 @@ jobs:
             });
 
             const number = context.payload.issue.number;
-            const { created, skipped, failed } = await reconcileDependencies(api, number, { log: core.info });
+            const { created, unresolved, skipped, failed } = await reconcileDependencies(api, number, { log: core.info });
 
             if (created.length > 0) {
               core.info(`#${number}: recorded ${created.length} declared dependency relationship(s): ${created.map(n => `#${n}`).join(', ')}.`);
             }
             if (skipped) core.notice(`#${number}: ${skipped}.`);
+
+            // The #1127 signal, and the reason this is a notice and not an
+            // `core.info`: a paused issue with nothing under `## Blocked by`
+            // used to print the same line as one whose relationships were
+            // already complete, so the run that read the section too early was
+            // indistinguishable from a run with genuinely nothing to do. The
+            // edit that writes the section fires this job again and resolves
+            // it, so going red here would be a red job on every healthy pause.
+            if (unresolved) core.notice(`#${number}: ${unresolved}.`);
 
             // Fail loud. A dependency the queue is meant to honour that exists
             // in prose only is precisely the state this job was added to stop,

@@ -161,10 +161,31 @@ describe('assignment tokens', () => {
 describe('chaining past a run that ended blocked', () => {
   const failure = workflow('handle-failure.yml');
 
+  /** `reconcile-dependencies`' own `if:`, from the job header to its runner. */
+  const reconcileGate = () => {
+    const job = failure.slice(failure.indexOf('\n  reconcile-dependencies:'));
+    return job.slice(job.indexOf('if:'), job.indexOf('\n    runs-on:'));
+  };
+
   it('assigns the next issue when a run ends blocked', () => {
-    expect(failure).toMatch(/issues:\s*\n\s*types:\s*\[labeled\]/);
+    expect(failure).toMatch(/issues:\s*\n\s*types:\s*\[labeled, edited\]/);
     expect(failure).toContain("github.event.label.name == 'blocked'");
     expect(failure).toContain(ASSIGN_ACTION);
+  });
+
+  // `edited` is on the workflow for `reconcile-dependencies` alone (#1127).
+  // The queue-moving jobs gate on `github.event.label.name`, which no `edited`
+  // payload carries — so an edit to a paused issue reconciles its relationship
+  // and chains nothing. Without this, editing the body of any `blocked` or
+  // `paused` issue would assign a session, and the one input this project takes
+  // would silently become two.
+  it('never chains on an edit, only on a halt label', () => {
+    for (const job of ['chain:', 'notify:']) {
+      const body = failure.slice(failure.indexOf(`\n  ${job}`), failure.indexOf('\n  reconcile-dependencies:'));
+      const gate = body.slice(body.indexOf('if:'), body.indexOf('\n    runs-on:'));
+      expect(gate, `\`${job}\` must gate on the label event`).toContain('github.event.label.name');
+      expect(gate, `\`${job}\` must not react to an edit`).not.toContain("'edited'");
+    }
   });
 
   // Without the guard, a human labelling a backlog issue `blocked` — filing a
@@ -183,9 +204,35 @@ describe('chaining past a run that ended blocked', () => {
   it('records every declared dependency as a relationship on either halt label', () => {
     expect(failure).toContain('reconcile-dependencies:');
     expect(failure).toContain('reconcile-dependencies.cjs');
-    expect(failure).toMatch(
-      /reconcile-dependencies:\s*\n\s*if: github\.event\.label\.name == 'blocked' \|\| github\.event\.label\.name == 'paused'/
-    );
+
+    const gate = reconcileGate();
+    expect(gate).toContain("github.event.action == 'labeled'");
+    expect(gate).toContain("github.event.label.name == 'blocked'");
+    expect(gate).toContain("github.event.label.name == 'paused'");
+  });
+
+  // #1127: a run applies the halt label and *then* edits its `## Blocked by`
+  // section, so on the label event the section frequently does not name the
+  // dependency yet. That is the path this job was written for, and on it the
+  // job read an empty section, found nothing to add and exited green — #1090's
+  // relationship stayed unwritten for two hours behind a passing log. The edit
+  // is the other half of the same write, and whichever event lands second sees
+  // both. Remove it and the job is green-but-inert again on its own main path.
+  it('reconciles on an edit to an already-halted issue, not on the label alone', () => {
+    const gate = reconcileGate();
+    expect(gate).toContain("github.event.action == 'edited'");
+    expect(gate).toContain("contains(github.event.issue.labels.*.name, 'paused')");
+    expect(gate).toContain("contains(github.event.issue.labels.*.name, 'blocked')");
+  });
+
+  // Two events for one pause can overlap. That is safe by construction — the
+  // write is a set difference and a 422 reads as success — and a concurrency
+  // group would be the dangerous choice: GitHub holds one pending run per
+  // group and cancels further ones, which is how issue #1127's own assignment
+  // run was lost in the first place.
+  it('serialises nothing, so neither event can cancel the other', () => {
+    const job = failure.slice(failure.indexOf('\n  reconcile-dependencies:'));
+    expect(job).not.toContain('concurrency:');
   });
 
   // GITHUB_TOKEN deliberately: a relationship raises no workflow event and
@@ -203,6 +250,17 @@ describe('chaining past a run that ended blocked', () => {
   it('fails loud when a declared dependency cannot be recorded', () => {
     const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
     expect(job).toContain('core.setFailed');
+  });
+
+  // The other half of #1127. A pass that read the section too early used to log
+  // the same line as a pass with genuinely nothing to do, which is what made
+  // two hours of a missing relationship look like two hours of success. The
+  // reconciler tells the two apart as `unresolved`; this is the job surfacing
+  // it where a human reads a run, rather than inside the log body.
+  it('reports an unresolved pause as a notice rather than as nothing to do', () => {
+    const job = failure.slice(failure.indexOf('reconcile-dependencies:'));
+    expect(job).toContain('unresolved');
+    expect(job).toMatch(/core\.notice\(`#\$\{number\}: \$\{unresolved\}/);
   });
 
   // `paused` is the other terminal-without-merging outcome: the run stopped on a
