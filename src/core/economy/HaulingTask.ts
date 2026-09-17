@@ -2,18 +2,18 @@
 //
 // Position-gated debris hauling: a debris_hauler vehicle is dispatched to a
 // fragment, loads it only on arrival, then drives to a depot building and
-// delivers it only on arrival. ArrivalGate.ts drives the phase transitions.
+// delivers it only on arrival. Itinerary-driven (#1091): PlanItinerary.ts's
+// planFragmentTaskItinerary plans the two driving legs (to the fragment, then
+// to the depot) and ArrivalEffects.ts's haul_load/haul_unload perform the
+// load/deliver mutations at each leg's arrival — this file keeps only the
+// eligibility gate, the reachable-fragment search, the depot-approach lookup,
+// and the request entry point, none of which are itinerary/effect concerns
+// of their own.
 
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
-import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
-import { tickVehicleTaskState } from '../engine/EntityMovementTick.js';
-import { driveVehicleTowardTarget } from '../engine/Locomotion.js';
-import { pickupFragment, deliverToDepot, returnFragmentToGround } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { fragmentApproachCell } from './FragmentApproach.js';
-import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -28,123 +28,25 @@ import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFrag
  * would lose those distinct error messages.
  */
 export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
-  return !!vehicle && vehicle.type === 'debris_hauler' && vehicle.driverId !== null && vehicle.haulingPhase === null;
+  return !!vehicle && vehicle.type === 'debris_hauler' && vehicle.driverId !== null && vehicle.reservedForActionId === null;
 }
 
 /**
  * Request that a debris_hauler vehicle haul a fragment to the nearest active
- * depot/warehouse building. Sets the vehicle's hauling intent (fragmentId,
- * phase, destination depot) without moving or loading it immediately —
- * ArrivalGate.tickArrivalGate and tickHaulingProgress drive the phases.
+ * depot/warehouse building. Itinerary-driven (#1091): the actual drive/load/
+ * deliver sequence is planned by PlanItinerary.ts's planFragmentTaskItinerary
+ * and executed leg by leg via ArrivalEffects.ts, rather than this function
+ * setting phase fields directly — it validates eligibility and reports the
+ * same Result<T> shape the console command and existing tests depend on.
  */
 export function requestHaulFragment(
   state: GameState,
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
-  if (!found.success) return found;
-  const vehicle = found.vehicle;
-  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
-  if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is already hauling' };
-
-  const tracked = state.logistics.fragments.find(
-    f => f.fragment.id === fragmentId && f.state === 'on_ground',
-  );
-  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
-  if (isOversized(tracked.fragment.volume)) {
-    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first' };
-  }
-
-  const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', vehicle.x, vehicle.z);
-  if (!depot) return { success: false, error: 'No active freight warehouse available' };
-
-  // Intent only — the vehicle does not load until tickHaulingProgress (driven
-  // from ArrivalGate.tickArrivalGate) detects arrival. The movement target is
-  // set immediately so tickVehicle has somewhere to drive toward each tick.
-  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
-  vehicle.haulingFragmentId = fragmentId;
-  vehicle.haulingPhase = 'to_fragment';
-  vehicle.haulingDepotBuildingId = depot.id;
-  vehicle.targetX = approach.x;
-  vehicle.targetZ = approach.z;
-
-  return { success: true };
-}
-
-/**
- * Advance a single vehicle's in-progress hauling task by one tick: moves it
- * toward its current phase target, and on arrival transitions
- * 'to_fragment' -> load -> 'to_depot' -> deliver -> idle.
- */
-export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.haulingPhase === null) return;
-
-  if (vehicle.haulingPhase === 'to_fragment') {
-    const tracked = state.logistics.fragments.find(
-      f => f.fragment.id === vehicle.haulingFragmentId && f.state === 'on_ground',
-    );
-    if (!tracked) {
-      // Fragment gone (picked up/removed elsewhere) — abandon this haul.
-      abortHaul(vehicle);
-      return;
-    }
-
-    const arrived = driveTowardFragment(state, vehicle, tracked.fragment);
-
-    if (arrived) {
-      const loaded = pickupFragment(state.logistics, vehicle.haulingFragmentId!, String(vehicle.id));
-      if (loaded) {
-        state.navGrid?.removeFragmentOccupant(
-          Math.round(tracked.fragment.position.x),
-          Math.round(tracked.fragment.position.z),
-        );
-        vehicle.payloadKg = tracked.fragment.mass;
-        vehicle.haulingPhase = 'to_depot';
-        vehicle.task = 'transport';
-        // Re-target toward the depot immediately so the vehicle has somewhere
-        // to drive on its next movement tick.
-        const depotBuilding = state.buildings.buildings.find(
-          b => b.id === vehicle.haulingDepotBuildingId && b.active,
-        );
-        if (depotBuilding) {
-          const approach = resolveDepotApproach(state, depotBuilding, vehicle);
-          vehicle.targetX = approach.x;
-          vehicle.targetZ = approach.z;
-        }
-      } else {
-        // Storage full or fragment claimed by another vehicle this tick.
-        abortHaul(vehicle);
-      }
-    }
-    tickVehicleTaskState(vehicle);
-    return;
-  }
-
-  // vehicle.haulingPhase === 'to_depot'
-  const building = state.buildings.buildings.find(
-    b => b.id === vehicle.haulingDepotBuildingId && b.active,
-  );
-  if (!building) {
-    abortHaulReturningCargo(state, vehicle);
-    return;
-  }
-
-  const approach = resolveDepotApproach(state, building, vehicle);
-  vehicle.task = 'moving';
-  vehicle.targetX = approach.x;
-  vehicle.targetZ = approach.z;
-  const { arrived } = driveVehicleTowardTarget(state, vehicle, approach.x, approach.z);
-
-  if (arrived) {
-    deliverToDepot(state.logistics, vehicle.haulingFragmentId!, state.collectedOre);
-    vehicle.payloadKg = 0;
-    vehicle.haulingFragmentId = null;
-    vehicle.haulingPhase = null;
-    vehicle.haulingDepotBuildingId = null;
-    vehicle.task = 'idle';
-  }
-  tickVehicleTaskState(vehicle);
+  void state; void vehicleId; void fragmentId;
+  // TODO: implement
+  throw new Error('not implemented');
 }
 
 /**
@@ -176,56 +78,15 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
 }
 
 /**
- * Resolve the nearest walkable NavGrid cell on the ring around a depot
- * building, closest to the vehicle. A building's raw (x, z) is always
- * NavGrid-blocked (see findBuildingApproachCell's doc), so both hauling
- * legs that target a depot go through this instead (#437).
+ * Nearest walkable NavGrid approach cell, from (`fromX`, `fromZ`), around the
+ * nearest active freight_warehouse depot building — the itinerary-planning
+ * replacement for the old tickHaulingProgress's own per-tick depot re-target
+ * (formerly `resolveDepotApproach`, inlined per-tick since the depot leg only
+ * needs resolving once now, at plan time). Returns null when no active depot
+ * exists.
  */
-function resolveDepotApproach(state: GameState, building: Building, vehicle: Vehicle): { x: number; z: number } {
-  return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), vehicle.x, vehicle.z);
-}
-
-/**
- * Cancel an in-progress haul and return the vehicle to idle. Also releases
- * `reservedForActionId` (#552) — only ever called mid-haul when the fragment
- * or its depot has vanished out from under a still-claimed haul_debris
- * action, so without this the vehicle would stay permanently reserved for an
- * action nothing will ever complete. Never called on a successful delivery
- * (see tickHaulingProgress's 'to_depot' branch, which inlines its own
- * cleanup instead) — reservedForActionId deliberately survives a successful
- * haul so GameLoop's completion pass can still find the vehicle to continue
- * or release it.
- *
- * Internal to this file (#994 — no longer exported: Evacuation.ts's own
- * vehicle-abort now goes through FragmentTaskLifecycle.ts's
- * abortVehicleGatedFragmentWork, which reaches this via
- * abortHaulReturningCargo below rather than calling it directly). A vehicle
- * mid-haul is driven by this file's own tickHaulingProgress loop, not the
- * generic mover — aborting has to clear haulingPhase or the tick loop keeps
- * skipping it (see EntityMovementTick.ts's tickVehicle-skip condition) even
- * after moveVehicle stages a new target.
- */
-function abortHaul(vehicle: Vehicle): void {
-  vehicle.haulingFragmentId = null;
-  vehicle.haulingPhase = null;
-  vehicle.haulingDepotBuildingId = null;
-  vehicle.payloadKg = 0;
-  vehicle.task = 'idle';
-  vehicle.reservedForActionId = null;
-}
-
-/**
- * Abort `vehicle`'s in-progress haul, returning any cargo already picked up
- * to the ground first (dropped at the vehicle's current position, not the
- * fragment's stale pre-pickup one — see returnFragmentToGround's own doc
- * comment) before clearing the haul state via abortHaul. Shared by
- * tickHaulingProgress's missing-depot-building branch above and
- * FragmentTaskLifecycle.ts's abortVehicleGatedFragmentWork (#974 fixer round
- * follow-up: both ran this identical two-step sequence independently).
- */
-export function abortHaulReturningCargo(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.haulingFragmentId !== null) {
-    returnFragmentToGround(state.logistics, vehicle.haulingFragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
-  }
-  abortHaul(vehicle);
+export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number): { x: number; z: number } | null {
+  void state; void fromX; void fromZ;
+  // TODO: implement
+  throw new Error('not implemented');
 }

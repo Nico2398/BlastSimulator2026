@@ -206,6 +206,31 @@ function buildFootOnlyItinerary(
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
 }
 
+/**
+ * Plans a haul_debris/fragment_debris work goal's itinerary: the fragment-
+ * targeting drive leg(s) — to the fragment, and for a haul, on to the depot —
+ * each ending in an ArrivalEffects.ts effect (`haul_load`, `haul_unload`,
+ * `boulder_split`) rather than the generic single-target-then-work shape
+ * `planItinerary`'s own fallback below builds for every other action type.
+ * Split out because these two action types are the only ones needing more
+ * than one drive leg to reach their work (#1091 — see HaulingTask.ts's and
+ * BoulderBreaking.ts's own reduced surface, which used to drive this
+ * themselves via tickHaulingProgress/tickBreakProgress phase machines on
+ * `Vehicle`).
+ */
+export function planFragmentTaskItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  action: PendingAction,
+  opts?: { via?: number },
+): Itinerary | null {
+  void state; void employee; void goal; void fidelity; void action; void opts;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 export function planItinerary(
   state: GameState,
   employee: Employee,
@@ -220,6 +245,17 @@ export function planItinerary(
   // doc comment (#1090).
   opts?: { via?: number; action?: PendingAction },
 ): Itinerary | null {
+  // haul_debris/fragment_debris (#1091): these two action types need more
+  // than the generic single-drive-leg-then-work shape the rest of this
+  // function builds, so they're diverted to their own planner up front —
+  // see planFragmentTaskItinerary's own doc comment.
+  if (goal.kind === 'work') {
+    const action = opts?.action ?? state.pendingActions.find(a => a.id === goal.actionId);
+    if (action && (action.type === 'haul_debris' || action.type === 'fragment_debris')) {
+      return planFragmentTaskItinerary(state, employee, goal, fidelity, action, opts);
+    }
+  }
+
   const resolved = resolveGoal(state, employee, goal, opts?.action);
   if (resolved === null) return null;
 

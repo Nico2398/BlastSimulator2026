@@ -44,7 +44,7 @@ export interface VehicleDef {
   maintenanceCostPerTick: number;
   /** Fuel cost per tick when active ($). */
   fuelCostPerTick: number;
-  /** Capacity: kg for haulers (see `payloadKg`), m³/tick for diggers, holes/tick for drills. */
+  /** Capacity: kg for haulers (see `payload.massKg`), m³/tick for diggers, holes/tick for drills. */
   capacity: number;
   /** Movement speed (grid cells per tick). */
   speed: number;
@@ -129,8 +129,14 @@ export interface Vehicle {
   driverId: number | null;
   /** High-level operational state. */
   state: VehicleOperationalState;
-  /** Current payload in kg. */
-  payloadKg: number;
+  /**
+   * The single cargo item this vehicle currently carries — a fragment loaded
+   * by a `haul_load` arrival effect, cleared by `haul_unload`. Null when
+   * empty. Replaces the old `payloadKg` + `haulingFragmentId` pair (#1091):
+   * mass and fragment identity travel together as one loaded/unloaded unit
+   * rather than two fields that could disagree.
+   */
+  payload: { fragmentId: number; massKg: number } | null;
   /** Number of consecutive ticks the vehicle has spent in the waiting state. */
   waitingTicks: number;
   /** Consecutive ticks tickVehicle failed to find a NavGrid path to targetX/Z. */
@@ -143,19 +149,6 @@ export interface Vehicle {
    * VehicleOccupancyReroute.ts, #591) — idle until the path clears either way.
    */
   isMoveStuck: boolean;
-  /** Fragment ID this debris_hauler is currently hauling, or null when not hauling. */
-  haulingFragmentId: number | null;
-  /**
-   * Which leg of the haul the vehicle is on: driving to the fragment to load
-   * it, or driving to the depot to deliver it. Null when not hauling.
-   */
-  haulingPhase: 'to_fragment' | 'to_depot' | null;
-  /** Depot/warehouse building ID the current haul is delivering to, or null. */
-  haulingDepotBuildingId: number | null;
-  /** Fragment ID this rock_fragmenter is currently breaking, or null. */
-  breakFragmentId: number | null;
-  /** Single-leg break phase — travelling to the boulder. Null when idle. */
-  breakPhase: 'to_boulder' | null;
   /**
    * PendingAction id this vehicle is exclusively reserved for — set at claim
    * time by GameLoop for a vehicle-gated action, VehicleReservation.ts owns
@@ -214,15 +207,10 @@ export function purchaseVehicle(
     targetZ: z,
     driverId: null,
     state: 'idle',
-    payloadKg: 0,
+    payload: null,
     waitingTicks: 0,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
-    haulingFragmentId: null,
-    haulingPhase: null,
-    haulingDepotBuildingId: null,
-    breakFragmentId: null,
-    breakPhase: null,
     reservedForActionId: null,
     pendingEvacuationDestination: null,
     occupantIds: [],
@@ -284,8 +272,13 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
 
 /**
  * Unassign a vehicle's driver, freeing the employee to be reassigned
- * elsewhere. Refuses while the vehicle is mid-haul (driving to a fragment or
- * to the depot with one loaded) so a haul doesn't get orphaned mid-flight.
+ * elsewhere. Refuses while the vehicle is carrying a loaded haul so it
+ * doesn't get orphaned mid-flight with cargo aboard and nobody driving it.
+ *
+ * TODO(#1091): this only catches the loaded-and-driving-to-depot half of the
+ * old `haulingPhase !== null` guard — the to-fragment (not yet loaded) leg
+ * has no equivalent signal on `Vehicle` once itinerary-driven hauling lands.
+ * Revisit once ArrivalEffects.ts's haul_load/haul_unload wiring is in.
  */
 export function unassignDriver(
   vehicleState: VehicleState,
@@ -294,7 +287,7 @@ export function unassignDriver(
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
-  if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is mid-haul' };
+  if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul' };
 
   vehicle.driverId = null;
   return { success: true };
