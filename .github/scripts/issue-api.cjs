@@ -457,6 +457,18 @@ function createIssueApi(
     },
 
     /**
+     * The comments on this issue that assigned it to a run — the evidence
+     * `run-liveness.cjs` reasons about when deciding whether an in-flight run
+     * is genuinely lost or merely not yet visible. See issue #1136.
+     *
+     * @param {number} number
+     * @returns {Promise<{comments: {body: string, created_at: string}[], unknown: boolean}>}
+     */
+    async assignmentCommentsFor(number) {
+      throw new Error('not implemented');
+    },
+
+    /**
      * The dependencies GitHub itself records — the "Blocked by" relationships in
      * an issue's Relationships panel. Authoritative, because a relationship is a
      * declaration rather than a mention: nothing about quoting an issue in prose
