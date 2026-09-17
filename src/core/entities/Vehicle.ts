@@ -182,6 +182,19 @@ export function findVehicleReservedForAction(state: VehicleState, actionId: numb
 }
 
 /**
+ * Removes any reservation entry for `vehicleId` from `state.reservations`.
+ * No-op if none exists. The one code path that splices `reservations` (#1138)
+ * — `destroyVehicle` below calls it directly (entities may not import
+ * VehicleReservation.ts, which already imports this file), and
+ * VehicleReservation.ts's own `clearVehicleReservation` calls it too rather
+ * than duplicating the splice, so a reservation is never removed two ways.
+ */
+export function removeVehicleReservation(state: VehicleState, vehicleId: number): void {
+  const idx = state.reservations.findIndex(r => r.vehicleId === vehicleId);
+  if (idx >= 0) state.reservations.splice(idx, 1);
+}
+
+/**
  * The employee currently driving `vehicle`, resolved from `employees` by
  * `vehicleDriverId` — the shared lookup callers that only have an employee
  * list (not a full `GameState`) use instead of re-deriving it (#1138).
@@ -220,11 +233,12 @@ export function purchaseVehicle(
   return { vehicle, cost: def.purchaseCost };
 }
 
-/** Destroy a vehicle (e.g., hit by a projectile). */
+/** Destroy a vehicle (e.g., hit by a projectile). Also removes its reservation entry, if any (#1138) — a destroyed vehicle must never leave a stale `reservations` entry naming an id no longer in `state.vehicles`. */
 export function destroyVehicle(state: VehicleState, vehicleId: number): boolean {
   const idx = state.vehicles.findIndex(v => v.id === vehicleId);
   if (idx < 0) return false;
   state.vehicles.splice(idx, 1);
+  removeVehicleReservation(state, vehicleId);
   return true;
 }
 
@@ -252,11 +266,12 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
   for (const v of state.vehicles) {
     const def = getVehicleDefByTier(v.type, v.tier);
     total += def.maintenanceCostPerTick;
-    // TODO(#1138): `task` (idle vs. active) no longer lives on Vehicle — fuel
-    // billing needs a real "is this vehicle doing anything" read, likely via
-    // computeVehicleStatus/resolveVehicleDriver. Occupancy is a placeholder:
-    // an occupied-but-idle vehicle now burns fuel it previously wouldn't.
-    if (v.occupantIds.length > 0) {
+    // Fuel bills only while the vehicle holds an active reservation for a
+    // gated action (#1138) — reservation state, not raw occupancy, is the
+    // source of truth for "is this vehicle actively working" everywhere else
+    // on this branch. A vehicle someone merely rides (no reservation) burns
+    // no fuel; a reserved-but-not-yet-boarded vehicle already does.
+    if (getVehicleReservation(state, v.id) !== null) {
       total += def.fuelCostPerTick;
     }
   }

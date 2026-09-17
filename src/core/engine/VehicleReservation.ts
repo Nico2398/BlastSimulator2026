@@ -24,7 +24,7 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from '../entities/Vehicle.js';
-import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
@@ -220,10 +220,9 @@ export function reserveVehicle(vehicleState: VehicleState, vehicleId: number, ac
   vehicleState.reservations.push({ vehicleId, actionId });
 }
 
-/** Removes any reservation entry for `vehicleId` from `vehicleState.reservations`. No-op if none exists. */
+/** Removes any reservation entry for `vehicleId` from `vehicleState.reservations`. No-op if none exists. Delegates to `removeVehicleReservation` (Vehicle.ts) — the one code path that splices `reservations`, also used by `destroyVehicle` (#1138). */
 function clearVehicleReservation(vehicleState: VehicleState, vehicleId: number): void {
-  const idx = vehicleState.reservations.findIndex(r => r.vehicleId === vehicleId);
-  if (idx >= 0) vehicleState.reservations.splice(idx, 1);
+  removeVehicleReservation(vehicleState, vehicleId);
 }
 
 /**
