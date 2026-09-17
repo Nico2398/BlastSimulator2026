@@ -116,7 +116,7 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal, actionHin
  * way, since that destination's own occupancy state is what the exemption
  * keys off, not the obstacle type blocking the cells around it.
  */
-function estimateLegDistance(
+export function estimateLegDistance(
   state: GameState,
   fidelity: PlanFidelity,
   agentId: number,
