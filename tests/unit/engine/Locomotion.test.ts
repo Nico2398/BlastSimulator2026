@@ -359,7 +359,16 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
 
     spy.mockRestore();
 
-    expect(employee.isMoveStuck).toBe(true);
+    // The oscillation genuinely tripped isStuck this tick — that's what
+    // pushed this into the abandon branch at all (proven by the morale
+    // penalty and the abandon below). But abandon runs through
+    // interruptActiveAction, whose clearHolderWalkFields (TaskCancellation.ts)
+    // unconditionally resets isMoveStuck/moveConsecutiveFailures to their
+    // idle defaults on every abandon — mirrors the identical vehicle-side
+    // reset a few lines below in Locomotion.ts's own drive-leg abandon path,
+    // and vehicles.integration.test.ts's own "released, back to idle" check.
+    // A freshly-released employee is idle, not walking-stuck.
+    expect(employee.isMoveStuck).toBe(false);
     expect(employee.morale).toBe(Math.max(0, startingMorale - STUCK_MORALE_PENALTY));
     expect(result.abandoned).toEqual(expect.arrayContaining([{ employeeId: employee.id, actionId: 77 }]));
     expect(employee.activeActionId).toBeNull();
@@ -394,7 +403,12 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
 
     spy.mockRestore();
 
-    expect(driver.isMoveStuck).toBe(true);
+    // Same reset as the legacy foot-walk case above — clearHolderWalkFields
+    // (via interruptActiveAction) and Locomotion.ts's own explicit
+    // vehicle-side reset both zero isMoveStuck once the abandon actually
+    // happens; only the reservation release/dismount below is the durable
+    // observable outcome.
+    expect(driver.isMoveStuck).toBe(false);
     expect(result.abandoned).toEqual(expect.arrayContaining([{ employeeId: driver.id, actionId: 88 }]));
     expect(driver.activeActionId).toBeNull();
     // Dismounted — the vehicle's driver reservation is released along with the abandon.

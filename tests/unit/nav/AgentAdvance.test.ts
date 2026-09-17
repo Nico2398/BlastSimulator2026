@@ -446,9 +446,20 @@ describe('advanceAlongPath — stationary-at-dead-end does not misfire the retra
 // without ever reporting `pathFound: false`.
 
 describe('advanceAlongPath — period-2 oscillation trips isStuck (#1130)', () => {
-  /** A single-hop path whose only waypoint is `target` — walkSpeed covers it in one tick, landing exactly on it. */
+  /**
+   * A fresh-replan path whose next hop is `target` — walkSpeed covers it in
+   * one tick, landing exactly on it. Carries a placeholder index-0 entry (the
+   * agent's own echoed cell — `firstUnwalkedWaypoint` always skips it when a
+   * caller passes no navGrid) and a trailing waypoint well past `target`, so
+   * `target` is never the fresh path's own *last* waypoint. A real
+   * `findPath` route to a far-off destination always has more path left
+   * beyond the immediate next hop; a single-waypoint synthetic path here
+   * would instead trip `advanceAlongPath`'s `exhaustedFreshPath` leg-complete
+   * check every tick (real for the #1129 off-grid-destination case, false
+   * here) and mask the oscillation branch entirely.
+   */
   function hopTo(target: { x: number; z: number }): { found: true; waypoints: Array<{ x: number; z: number }> } {
-    return { found: true, waypoints: [target] };
+    return { found: true, waypoints: [{ x: 0, z: 0 }, target, { x: 999, z: 999 }] };
   }
 
   it('crosses STUCK_THRESHOLD via a synthetic A/B/A/B cycle even though every tick reports pathFound: true, and becameStuck fires exactly once on the transition', () => {
