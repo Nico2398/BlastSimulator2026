@@ -18,6 +18,7 @@ import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Em
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
+import { ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
 const DEAD_ID = 7;
@@ -439,5 +440,86 @@ describe('hasCloserIdleCandidate\'s real distance-oracle semantics, via interrup
     expect(stored.targetEmployeeId).toBe(pinned.id);
 
     spy.mockRestore();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// interruptActiveAction — stuck-abandon backoff stamp (#1130)
+//
+// options.forceOpenPool is the "sustained, confirmed impasse" signal
+// Locomotion.ts's abandon-after-stuck path already uses (see this file's own
+// header comment on that option). #1130 adds a second effect alongside the
+// existing unconditional release-to-pool: stamp
+// PendingAction.stuckBackoffUntilTick = state.tickCount + ACTION_STUCK_BACKOFF_TICKS
+// on the released action, so the very next dispatch pass — run by the same
+// vehicle that just abandoned it, an instant later — can't reclaim the
+// identical action. An ordinary (non-forced) interruption must never stamp
+// this: it may still resolve on its own, and backing it off would delay
+// legitimate rework for no reason.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('interruptActiveAction — stuck-abandon backoff stamp (#1130)', () => {
+  function hireAt(state: ReturnType<typeof createGame>, x: number, z: number) {
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, x, z);
+    return employee;
+  }
+
+  it('stamps stuckBackoffUntilTick = state.tickCount + ACTION_STUCK_BACKOFF_TICKS when called with forceOpenPool: true (happy path)', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    state.tickCount = 1000;
+    const emp = hireAt(state, 0, 0);
+    const action = makeAction({ id: 600, requiredSkill: null, holderId: emp.id, status: 'assigned' });
+    state.pendingActions.push(action);
+    emp.activeActionId = action.id;
+    emp.pendingTaskDuration = 10; // mid-walk phase
+
+    interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
+
+    const stored = state.pendingActions.find(a => a.id === action.id)!;
+    expect(stored.stuckBackoffUntilTick).toBe(1000 + ACTION_STUCK_BACKOFF_TICKS);
+    expect(stored.status).toBe('queued');
+  });
+
+  it('does not stamp stuckBackoffUntilTick for an ordinary interruption (forceOpenPool omitted) — only a confirmed impasse backs off', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    state.tickCount = 1000;
+    const emp = hireAt(state, 0, 0);
+    const action = makeAction({ id: 601, requiredSkill: null, holderId: emp.id, status: 'assigned' });
+    state.pendingActions.push(action);
+    emp.activeActionId = action.id;
+    emp.pendingTaskDuration = 10;
+
+    interruptActiveAction(state, emp, action.id);
+
+    const stored = state.pendingActions.find(a => a.id === action.id)!;
+    expect(stored.stuckBackoffUntilTick == null).toBe(true);
+  });
+
+  it('stamps a fresh window on a REPEAT forced interruption of the same action, based on the tick it happens at', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    state.tickCount = 1000;
+    const emp = hireAt(state, 0, 0);
+    const action = makeAction({ id: 602, requiredSkill: null, holderId: emp.id, status: 'assigned' });
+    state.pendingActions.push(action);
+    emp.activeActionId = action.id;
+    emp.pendingTaskDuration = 10;
+
+    interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
+    expect(state.pendingActions.find(a => a.id === action.id)!.stuckBackoffUntilTick).toBe(1000 + ACTION_STUCK_BACKOFF_TICKS);
+
+    // Reclaimed and re-abandoned later, at a different tick.
+    state.tickCount = 2000;
+    emp.activeActionId = action.id;
+    action.holderId = emp.id;
+    action.status = 'assigned';
+    emp.pendingTaskDuration = 10;
+
+    interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
+
+    expect(state.pendingActions.find(a => a.id === action.id)!.stuckBackoffUntilTick).toBe(2000 + ACTION_STUCK_BACKOFF_TICKS);
   });
 });

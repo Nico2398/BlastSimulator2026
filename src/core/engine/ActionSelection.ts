@@ -323,6 +323,14 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 }
 
 /**
+ * True when `action`'s stuck-abandon backoff (if any) has expired, or it never had one.
+ * See PendingAction.stuckBackoffUntilTick.
+ */
+export function isActionPastStuckBackoff(state: GameState, action: PendingAction): boolean {
+  return action.stuckBackoffUntilTick == null || state.tickCount >= action.stuckBackoffUntilTick;
+}
+
+/**
  * The three-clause "is this queued action open to `employee`" check used by
  * `findStarvedActionForEmployee` below: still `queued`, untargeted or
  * targeted at `employee`, and `employee` holds `requiredSkill` when one is
@@ -359,6 +367,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
     isQueuedActionAvailableToEmployee(employee, a) &&
     a.requiredVehicleRole === null &&
     !isEvacuationHoldActive(state, a) &&
+    isActionPastStuckBackoff(state, a) &&
     state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
 
   return selectBestActionForEmployee(state, employee, candidates);

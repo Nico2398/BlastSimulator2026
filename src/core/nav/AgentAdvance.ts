@@ -43,6 +43,12 @@ export interface AdvanceAlongPathInput {
   committed?: RouteCommitment;
   /** Whether the fresh replan this tick avoids vehicle-occupied cells — used by the route-commitment guard to re-resolve a waypoint on the same terms the fresh path was found under. */
   avoidVehicles?: boolean;
+  /**
+   * Mover's own position 2 ticks back, threaded like `committed`. Null when
+   * fewer than 2 ticks of history exist yet.
+   */
+  moveHistoryX?: number | null;
+  moveHistoryZ?: number | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -61,6 +67,13 @@ interface AdvanceAlongPathOutcome {
   isPathComplete: boolean;
   /** Updated route-commitment, to be written back onto the entity (#1129). */
   committed: RouteCommitment;
+  /**
+   * This tick's pre-move position, becomes moveHistoryX/Z two ticks from now.
+   * Shift-register invariant: at start of tick n, moveHistoryX/Z == P(n-2),
+   * input.x/z == P(n-1).
+   */
+  moveHistoryX: number | null;
+  moveHistoryZ: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,10 +166,12 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // untouched — nothing moved this tick, so there is nothing to roll
       // forward or decay.
       committed: input.committed ?? NULL_ROUTE_COMMITMENT,
+      // Shift-register: this tick's own pre-move position becomes
+      // moveHistoryX/Z two ticks from now.
+      moveHistoryX: input.x,
+      moveHistoryZ: input.z,
     };
   }
-
-  const reset = resetStuckState(stuckInput);
 
   // One tick's movement budget is spent hop by hop rather than in one
   // advanceAgent call over the whole fresh path (#1129): each hop re-resolves
@@ -301,15 +316,32 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     if (adoptedFresh) pathIndex = Math.min(pathIndex + 1, input.path.waypoints.length - 1);
   }
 
+  // A leg that completes this tick is always genuine progress, regardless of
+  // the move-history comparison below. Otherwise, an exact match against the
+  // position 2 ticks back (with 2 ticks of history actually on record) is a
+  // period-2 oscillation, not progress — route it through the same
+  // failure-accumulation path the !path.found branch above uses, so isStuck
+  // still flips true once STUCK_THRESHOLD is exceeded, while pathFound stays
+  // true (a route genuinely was found and walked this tick).
+  const wasStuck = input.isStuck;
+  const isOscillation = !isPathComplete
+    && input.moveHistoryX != null && input.moveHistoryZ != null
+    && x === input.moveHistoryX && z === input.moveHistoryZ;
+  const stuckOutcome = isOscillation ? recordStuckFailure(stuckInput) : resetStuckState(stuckInput);
+
   return {
     pathFound: true,
     x,
     z,
-    consecutiveFailures: reset.consecutiveFailures,
-    isStuck: reset.isStuck,
-    becameStuck: false,
+    consecutiveFailures: stuckOutcome.consecutiveFailures,
+    isStuck: stuckOutcome.isStuck,
+    becameStuck: isOscillation && stuckOutcome.isStuck && !wasStuck,
     isPathComplete,
     committed,
+    // Shift-register: this tick's own pre-move position becomes
+    // moveHistoryX/Z two ticks from now.
+    moveHistoryX: input.x,
+    moveHistoryZ: input.z,
   };
 }
 

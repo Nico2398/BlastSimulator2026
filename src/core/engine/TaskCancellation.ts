@@ -5,7 +5,7 @@
 // import.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import { SURVEY_COSTS } from '../config/balance.js';
+import { SURVEY_COSTS, ACTION_STUCK_BACKOFF_TICKS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
@@ -332,6 +332,14 @@ export function interruptActiveAction(
           const { walkOnlyPinnedBy: _unused, ...rest } = action.payload;
           action.payload = rest;
         }
+      }
+
+      // #1130: a forced release is a confirmed impasse, not a transient one —
+      // stamp a cooldown so dispatch (ActionSelection.ts/EmployeeDispatchSteps.ts)
+      // skips handing this same action straight back out to a stuck-move
+      // relay before whatever blocked it has had a chance to clear.
+      if (options?.forceOpenPool) {
+        action.stuckBackoffUntilTick = state.tickCount + ACTION_STUCK_BACKOFF_TICKS;
       }
 
       releaseActionToOpenPool(state, action);

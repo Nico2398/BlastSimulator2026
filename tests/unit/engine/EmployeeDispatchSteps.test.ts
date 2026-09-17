@@ -203,6 +203,52 @@ describe('claimActionsTargetedAtEmployee', () => {
     expect(result.claimed).not.toContain(40);
     expect(action.status).toBe('queued');
   });
+
+  // ── stuck-abandon backoff filter (#1130) ─────────────────────────────────
+  //
+  // An action a vehicle just abandoned as stuck carries a
+  // stuckBackoffUntilTick (stamped by interruptActiveAction's forceOpenPool
+  // path) — even a TARGETED claim must respect it, so the very next dispatch
+  // pass can't hand the identical action straight back to the employee whose
+  // own vehicle just abandoned it.
+
+  it('leaves a targeted action queued while state.tickCount is still inside its stuckBackoffUntilTick window', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    state.tickCount = 100;
+
+    const action = makeAction({
+      id: 50, targetEmployeeId: employee.id, stuckBackoffUntilTick: 200,
+    });
+    state.pendingActions.push(action);
+    const result = makeResult();
+
+    claimActionsTargetedAtEmployee(state, employee, result);
+
+    expect(result.claimed).not.toContain(50);
+    expect(action.status).toBe('queued');
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  it('claims a targeted action once state.tickCount reaches its stuckBackoffUntilTick', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    state.tickCount = 200;
+
+    const action = makeAction({
+      id: 51, targetEmployeeId: employee.id, stuckBackoffUntilTick: 200,
+    });
+    state.pendingActions.push(action);
+    const result = makeResult();
+
+    claimActionsTargetedAtEmployee(state, employee, result);
+
+    expect(result.claimed).toContain(51);
+    expect(action.status).toBe('assigned');
+    expect(employee.activeActionId).toBe(51);
+  });
 });
 
 describe('fillIdleEmployeeFromQueueOrPool', () => {
@@ -674,6 +720,57 @@ describe('claimOnePoolCandidate', () => {
 
       expect(selection).not.toBeNull();
       expect(selection!.action.id).toBe(1);
+    });
+  });
+
+  // ── stuck-abandon backoff filter (#1130) ─────────────────────────────────
+
+  describe('stuck-abandon backoff filter (#1130)', () => {
+    it('excludes a pool candidate still inside its stuckBackoffUntilTick window, even though it would otherwise win', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      state.tickCount = 100;
+
+      const action = makeAction({ id: 60, targetX: 3, targetZ: 3, stuckBackoffUntilTick: 200 });
+      state.pendingActions.push(action);
+
+      expect(claimOnePoolCandidate(state, employee)).toBeNull();
+      expect(action.status).toBe('queued');
+    });
+
+    it('claims a pool candidate once state.tickCount reaches its stuckBackoffUntilTick', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      state.tickCount = 200;
+
+      const action = makeAction({ id: 61, targetX: 3, targetZ: 3, stuckBackoffUntilTick: 200 });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(61);
+      expect(action.status).toBe('assigned');
+    });
+
+    it('a DIFFERENT, unrelated action is unaffected by another action\'s backoff and remains claimable immediately', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      state.tickCount = 100;
+
+      const backedOff = makeAction({ id: 62, targetX: 3, targetZ: 3, stuckBackoffUntilTick: 200 });
+      const unrelated = makeAction({ id: 63, targetX: 4, targetZ: 4 });
+      state.pendingActions.push(backedOff, unrelated);
+
+      const selection = claimOnePoolCandidate(state, employee);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(63);
+      expect(unrelated.status).toBe('assigned');
+      expect(backedOff.status).toBe('queued'); // still backed off, untouched
     });
   });
 });
