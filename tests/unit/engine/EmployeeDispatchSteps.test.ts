@@ -1119,8 +1119,11 @@ describe('promoteActionToActive', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
 
+    // buildingId set: a real building-backed rest target, walked to verbatim
+    // (see the no-building "rest in place" carve-out's own dedicated test
+    // below for the case where the stored target is re-derived instead).
     const action = makeAction({
-      id: 3, type: 'rest', targetX: 2, targetZ: 3, payload: { needKey: 'fatigue' },
+      id: 3, type: 'rest', targetX: 2, targetZ: 3, payload: { needKey: 'fatigue', buildingId: 1 },
     });
 
     promoteActionToActive(state, employee, action);
@@ -1131,6 +1134,45 @@ describe('promoteActionToActive', () => {
     expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
     expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.pendingTaskDuration).toBeNull();
+  });
+
+  // #1091 follow-up: a no-building "rest in place" action's targetX/targetZ
+  // is only a snapshot of wherever the employee stood when autoInsertNeedTasks
+  // (NeedTaskInsertion.ts) queued it — this action can then sit `queued` for
+  // many ticks (waiting for the employee to go idle) while a mounted employee
+  // keeps driving. By the time it's promoted here, the employee's real
+  // position has almost always drifted past that stale snapshot, if only by
+  // a sub-grid-cell fraction — and a 'reposition' itinerary's exact-arrival
+  // contract (`isLegArrived`, Locomotion.ts) can never resolve a target that
+  // differs from the reachable grid cell the employee is already standing on
+  // by less than one full cell, stranding them "traveling" (full fatigue
+  // drain) forever instead of resting. Re-deriving the target from the
+  // employee's CURRENT position for the no-building case — the only case
+  // "rest in place" is ever pointing at something other than a fixed building
+  // approach cell — fixes it: the target is always exactly where the
+  // employee already is, so arrival is immediate. Confirmed live via
+  // rock-fragmenter-breaking.json's own storedMassKg regression (#1091).
+  it('#1091: a no-building rest action walks to the employee\'s CURRENT position, not a stale stored target', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    // Simulates drift between queue time (stale target) and promotion time
+    // (current position) — the employee has since moved on from wherever
+    // the rest action's own targetX/targetZ was snapshotted.
+    employee.x = 15;
+    employee.z = 17;
+
+    const action = makeAction({
+      id: 9, type: 'rest', targetX: 15, targetZ: 17.074009447944974, payload: { needKey: 'fatigue' },
+    });
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.activeActionId).toBe(9);
+    expect(employee.destinationX).toBe(15);
+    expect(employee.destinationZ).toBe(17);
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
   });
 
   // #1013: mirrors NeedRestoration.test.ts's and ForceShiftRest.test.ts's own
@@ -1160,7 +1202,10 @@ describe('promoteActionToActive', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
 
-    const action = makeAction({ id: 4, type: 'rest', targetX: 1, targetZ: 1, payload: {} });
+    // buildingId set: a real building-backed target, walked to verbatim —
+    // see the dedicated no-building carve-out test above for the re-derived
+    // case (#1091).
+    const action = makeAction({ id: 4, type: 'rest', targetX: 1, targetZ: 1, payload: { buildingId: 1 } });
 
     promoteActionToActive(state, employee, action);
 
