@@ -280,7 +280,6 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     // them to the vehicle's own seat so requestHaulFragment's own
     // driverId-required guard passes, matching I2 (mounted position ==
     // vehicle position).
-    haulerVehicle.driverId = haulerDriver.id;
     haulerVehicle.occupantIds = [haulerDriver.id];
     haulerDriver.locomotion = { kind: 'mounted', vehicleId: haulerVehicle.id };
     haulerDriver.x = haulerVehicle.x;

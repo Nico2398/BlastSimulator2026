@@ -189,7 +189,7 @@
       "description": "60 ticks is enough for employee #3 to walk from the staffed fleet's spawn cluster over to hauler #5's own spawn point and board it -- same margin confirmed live for the same staffed:true fleet layout in nav-dynamic-updates-visual.json."
     },
     {
-      "command": "vehicle move 5 to:5,9",
+      "command": "vehicle reposition 5 5 9",
       "interaction": [
         {
           "type": "clickEntity",
@@ -220,7 +220,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on (5,9), then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle move 5 to:5,9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
+      "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on (5,9), then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle reposition 5 5 9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
       "role": "player",
       "expect": {
         "changedBy": {

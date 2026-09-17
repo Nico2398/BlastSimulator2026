@@ -8,18 +8,17 @@ import {
   assignVehicle,
   destroyVehicle,
   getVehicleCostsPerTick,
-  getExcavatorLoadingRate,
-  getVehicleDef,
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
-  unassignDriver,
+  canReleaseDriver,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
-import { board } from '../../../src/core/engine/Mount.js';
+import { VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { board, alight } from '../../../src/core/engine/Mount.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -69,29 +68,29 @@ describe('VehicleRole catalogue', () => {
 
 describe('VehicleDef definitions', () => {
   it('debris_hauler has a purchaseCost > 0', () => {
-    expect(getVehicleDef('debris_hauler').purchaseCost).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('debris_hauler', 1).purchaseCost).toBeGreaterThan(0);
   });
 
   it('rock_digger has a purchaseCost > 0', () => {
-    expect(getVehicleDef('rock_digger').purchaseCost).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_digger', 1).purchaseCost).toBeGreaterThan(0);
   });
 
   it('drill_rig has a purchaseCost > 0', () => {
-    expect(getVehicleDef('drill_rig').purchaseCost).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('drill_rig', 1).purchaseCost).toBeGreaterThan(0);
   });
 
   it('building_destroyer has a purchaseCost > 0', () => {
-    expect(getVehicleDef('building_destroyer').purchaseCost).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('building_destroyer', 1).purchaseCost).toBeGreaterThan(0);
   });
 
   it('rock_fragmenter has a purchaseCost > 0', () => {
-    expect(getVehicleDef('rock_fragmenter').purchaseCost).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_fragmenter', 1).purchaseCost).toBeGreaterThan(0);
   });
 
   it('each VehicleDef carries the matching role in its type field', () => {
     const roles: VehicleRole[] = getAllVehicleRoles();
     for (const role of roles) {
-      expect(getVehicleDef(role).type).toBe(role);
+      expect(getVehicleDefByTier(role, 1).type).toBe(role);
     }
   });
 });
@@ -103,7 +102,7 @@ describe('purchaseVehicle', () => {
     const state = createVehicleState();
     const { vehicle, cost } = purchaseVehicle(state, 'debris_hauler');
 
-    expect(cost).toBe(getVehicleDef('debris_hauler').purchaseCost);
+    expect(cost).toBe(getVehicleDefByTier('debris_hauler', 1).purchaseCost);
     expect(state.vehicles).toHaveLength(1);
     expect(vehicle.type).toBe('debris_hauler' satisfies VehicleRole);
     expect(vehicle.task).toBe('idle');
@@ -113,7 +112,7 @@ describe('purchaseVehicle', () => {
     const state = createVehicleState();
     const { vehicle, cost } = purchaseVehicle(state, 'rock_digger');
 
-    expect(cost).toBe(getVehicleDef('rock_digger').purchaseCost);
+    expect(cost).toBe(getVehicleDefByTier('rock_digger', 1).purchaseCost);
     expect(vehicle.type).toBe('rock_digger' satisfies VehicleRole);
   });
 
@@ -151,7 +150,7 @@ describe('purchaseVehicle', () => {
   it('purchased vehicle hp equals the def maxHp', () => {
     const state = createVehicleState();
     const { vehicle } = purchaseVehicle(state, 'rock_digger');
-    expect(vehicle.hp).toBe(getVehicleDef('rock_digger').maxHp);
+    expect(vehicle.hp).toBe(getVehicleDefByTier('rock_digger', 1).maxHp);
   });
 });
 
@@ -205,8 +204,8 @@ describe('getVehicleCostsPerTick', () => {
 
     const idleCost = getVehicleCostsPerTick(state);
     const expected =
-      getVehicleDef('debris_hauler').maintenanceCostPerTick +
-      getVehicleDef('rock_digger').maintenanceCostPerTick;
+      getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
+      getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
 
     expect(idleCost).toBe(expected);
   });
@@ -217,19 +216,98 @@ describe('getVehicleCostsPerTick', () => {
     purchaseVehicle(state, 'rock_digger');
 
     const baseCost =
-      getVehicleDef('debris_hauler').maintenanceCostPerTick +
-      getVehicleDef('rock_digger').maintenanceCostPerTick;
+      getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
+      getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
 
     // Activate the debris_hauler
     assignVehicle(state, state.vehicles[0]!.id, 'transport');
 
     const activeCost = getVehicleCostsPerTick(state);
-    expect(activeCost).toBe(baseCost + getVehicleDef('debris_hauler').fuelCostPerTick);
+    expect(activeCost).toBe(baseCost + getVehicleDefByTier('debris_hauler', 1).fuelCostPerTick);
   });
 
   it('empty fleet has zero cost per tick', () => {
     const state = createVehicleState();
     expect(getVehicleCostsPerTick(state)).toBe(0);
+  });
+
+  // ── Tier-correct billing (#1092) ──────────────────────────────────────────
+  // getVehicleCostsPerTick used to read the untiered getVehicleDef(v.type),
+  // always billing tier-1 rates regardless of the vehicle's own tier. A
+  // tier-2/tier-3 vehicle's maintenance and fuel must scale by the same
+  // VEHICLE_TIER_MULTIPLIERS the rest of the catalog (speed, capacity, ...)
+  // already applies via getVehicleDefByTier.
+
+  it('an idle tier-2 vehicle bills maintenance at the tier-2 multiplier, not the tier-1 rate', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'rock_digger', 0, 0, 2);
+
+    const cost = getVehicleCostsPerTick(state);
+    const tier1Maintenance = getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
+    const expected = tier1Maintenance * VEHICLE_TIER_MULTIPLIERS[2].maintenanceCostPerTick;
+
+    expect(cost).toBe(expected);
+    expect(cost).toBe(getVehicleDefByTier('rock_digger', 2).maintenanceCostPerTick);
+    expect(cost).not.toBe(tier1Maintenance);
+  });
+
+  it('an idle tier-3 vehicle bills maintenance at the tier-3 multiplier, not the tier-1 rate', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'drill_rig', 0, 0, 3);
+
+    const cost = getVehicleCostsPerTick(state);
+    const tier1Maintenance = getVehicleDefByTier('drill_rig', 1).maintenanceCostPerTick;
+    const expected = tier1Maintenance * VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick;
+
+    expect(cost).toBe(expected);
+    expect(cost).toBe(getVehicleDefByTier('drill_rig', 3).maintenanceCostPerTick);
+    expect(cost).not.toBe(tier1Maintenance);
+  });
+
+  it('an active tier-2 vehicle bills tier-2 maintenance plus tier-2 fuel, not tier-1 rates', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'debris_hauler', 0, 0, 2);
+    assignVehicle(state, state.vehicles[0]!.id, 'transport');
+
+    const cost = getVehicleCostsPerTick(state);
+    const def2 = getVehicleDefByTier('debris_hauler', 2);
+    const def1 = getVehicleDefByTier('debris_hauler', 1);
+    const expected = def2.maintenanceCostPerTick + def2.fuelCostPerTick;
+
+    expect(cost).toBe(expected);
+    expect(cost).not.toBe(def1.maintenanceCostPerTick + def1.fuelCostPerTick);
+  });
+
+  it('an active tier-3 vehicle bills tier-3 maintenance plus tier-3 fuel, not tier-1 rates', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'building_destroyer', 0, 0, 3);
+    assignVehicle(state, state.vehicles[0]!.id, 'clearing');
+
+    const cost = getVehicleCostsPerTick(state);
+    const def3 = getVehicleDefByTier('building_destroyer', 3);
+    const def1 = getVehicleDefByTier('building_destroyer', 1);
+    const expected = def3.maintenanceCostPerTick + def3.fuelCostPerTick;
+
+    expect(cost).toBe(expected);
+    expect(cost).not.toBe(def1.maintenanceCostPerTick + def1.fuelCostPerTick);
+  });
+
+  it('a mixed fleet sums each vehicle at its own tier\'s rate', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'debris_hauler', 0, 0, 1);
+    purchaseVehicle(state, 'rock_digger', 0, 0, 2);
+    purchaseVehicle(state, 'drill_rig', 0, 0, 3);
+    // Activate the tier-3 drill rig so both maintenance and fuel are exercised.
+    assignVehicle(state, state.vehicles[2]!.id, 'drilling');
+
+    const cost = getVehicleCostsPerTick(state);
+    const expected =
+      getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
+      getVehicleDefByTier('rock_digger', 2).maintenanceCostPerTick +
+      getVehicleDefByTier('drill_rig', 3).maintenanceCostPerTick +
+      getVehicleDefByTier('drill_rig', 3).fuelCostPerTick;
+
+    expect(cost).toBe(expected);
   });
 });
 
@@ -261,26 +339,9 @@ describe('destroyVehicle', () => {
   });
 });
 
-// ── Loading rate ──────────────────────────────────────────────────────────────
-
-describe('getExcavatorLoadingRate', () => {
-  it('rock_digger loading rate matches its capacity stat', () => {
-    const state = createVehicleState();
-    purchaseVehicle(state, 'rock_digger');
-    const vehicle = state.vehicles[0]!;
-
-    const rate = getExcavatorLoadingRate(vehicle);
-    expect(rate).toBe(getVehicleDef('rock_digger').capacity);
-  });
-
-  it('non-rock_digger vehicle returns a loading rate of 0', () => {
-    const state = createVehicleState();
-    purchaseVehicle(state, 'debris_hauler');
-    const vehicle = state.vehicles[0]!;
-
-    expect(getExcavatorLoadingRate(vehicle)).toBe(0);
-  });
-});
+// Loading rate: getExcavatorLoadingRate was removed (#1092) — no remaining
+// callers once the itinerary model's haul/dig effects read capacity directly
+// via getVehicleDefByTier.
 
 // ── VehicleTier type ──────────────────────────────────────────────────────────
 
@@ -334,34 +395,34 @@ describe('VehicleOperationalState', () => {
 
 describe('VehicleDef.tier', () => {
   it('debris_hauler def has a tier field that is 1, 2, or 3', () => {
-    const { tier } = getVehicleDef('debris_hauler');
+    const { tier } = getVehicleDefByTier('debris_hauler', 1);
     expect([1, 2, 3]).toContain(tier);
   });
 
   it('rock_digger def has a tier field that is 1, 2, or 3', () => {
-    const { tier } = getVehicleDef('rock_digger');
+    const { tier } = getVehicleDefByTier('rock_digger', 1);
     expect([1, 2, 3]).toContain(tier);
   });
 
   it('drill_rig def has a tier field that is 1, 2, or 3', () => {
-    const { tier } = getVehicleDef('drill_rig');
+    const { tier } = getVehicleDefByTier('drill_rig', 1);
     expect([1, 2, 3]).toContain(tier);
   });
 
   it('building_destroyer def has a tier field that is 1, 2, or 3', () => {
-    const { tier } = getVehicleDef('building_destroyer');
+    const { tier } = getVehicleDefByTier('building_destroyer', 1);
     expect([1, 2, 3]).toContain(tier);
   });
 
   it('rock_fragmenter def has a tier field that is 1, 2, or 3', () => {
-    const { tier } = getVehicleDef('rock_fragmenter');
+    const { tier } = getVehicleDefByTier('rock_fragmenter', 1);
     expect([1, 2, 3]).toContain(tier);
   });
 
   it('every role def has a tier field satisfying VehicleTier', () => {
     const roles: VehicleRole[] = getAllVehicleRoles();
     for (const role of roles) {
-      const tier: VehicleTier = getVehicleDef(role).tier;
+      const tier: VehicleTier = getVehicleDefByTier(role, 1).tier;
       expect([1, 2, 3]).toContain(tier);
     }
   });
@@ -371,34 +432,34 @@ describe('VehicleDef.tier', () => {
 
 describe('VehicleDef.nameKey', () => {
   it('debris_hauler def has a non-empty nameKey string', () => {
-    expect(getVehicleDef('debris_hauler').nameKey).toBeTypeOf('string');
-    expect(getVehicleDef('debris_hauler').nameKey.length).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('debris_hauler', 1).nameKey).toBeTypeOf('string');
+    expect(getVehicleDefByTier('debris_hauler', 1).nameKey.length).toBeGreaterThan(0);
   });
 
   it('rock_digger def has a non-empty nameKey string', () => {
-    expect(getVehicleDef('rock_digger').nameKey).toBeTypeOf('string');
-    expect(getVehicleDef('rock_digger').nameKey.length).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_digger', 1).nameKey).toBeTypeOf('string');
+    expect(getVehicleDefByTier('rock_digger', 1).nameKey.length).toBeGreaterThan(0);
   });
 
   it('drill_rig def has a non-empty nameKey string', () => {
-    expect(getVehicleDef('drill_rig').nameKey).toBeTypeOf('string');
-    expect(getVehicleDef('drill_rig').nameKey.length).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('drill_rig', 1).nameKey).toBeTypeOf('string');
+    expect(getVehicleDefByTier('drill_rig', 1).nameKey.length).toBeGreaterThan(0);
   });
 
   it('building_destroyer def has a non-empty nameKey string', () => {
-    expect(getVehicleDef('building_destroyer').nameKey).toBeTypeOf('string');
-    expect(getVehicleDef('building_destroyer').nameKey.length).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('building_destroyer', 1).nameKey).toBeTypeOf('string');
+    expect(getVehicleDefByTier('building_destroyer', 1).nameKey.length).toBeGreaterThan(0);
   });
 
   it('rock_fragmenter def has a non-empty nameKey string', () => {
-    expect(getVehicleDef('rock_fragmenter').nameKey).toBeTypeOf('string');
-    expect(getVehicleDef('rock_fragmenter').nameKey.length).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_fragmenter', 1).nameKey).toBeTypeOf('string');
+    expect(getVehicleDefByTier('rock_fragmenter', 1).nameKey.length).toBeGreaterThan(0);
   });
 
   it('every role def nameKey starts with "vehicle."', () => {
     const roles: VehicleRole[] = getAllVehicleRoles();
     for (const role of roles) {
-      expect(getVehicleDef(role).nameKey).toMatch(/^vehicle\./);
+      expect(getVehicleDefByTier(role, 1).nameKey).toMatch(/^vehicle\./);
     }
   });
 });
@@ -407,29 +468,29 @@ describe('VehicleDef.nameKey', () => {
 
 describe('VehicleDef.workRate', () => {
   it('debris_hauler def has a workRate greater than 0', () => {
-    expect(getVehicleDef('debris_hauler').workRate).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('debris_hauler', 1).workRate).toBeGreaterThan(0);
   });
 
   it('rock_digger def has a workRate greater than 0', () => {
-    expect(getVehicleDef('rock_digger').workRate).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_digger', 1).workRate).toBeGreaterThan(0);
   });
 
   it('drill_rig def has a workRate greater than 0', () => {
-    expect(getVehicleDef('drill_rig').workRate).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('drill_rig', 1).workRate).toBeGreaterThan(0);
   });
 
   it('building_destroyer def has a workRate greater than 0', () => {
-    expect(getVehicleDef('building_destroyer').workRate).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('building_destroyer', 1).workRate).toBeGreaterThan(0);
   });
 
   it('rock_fragmenter def has a workRate greater than 0', () => {
-    expect(getVehicleDef('rock_fragmenter').workRate).toBeGreaterThan(0);
+    expect(getVehicleDefByTier('rock_fragmenter', 1).workRate).toBeGreaterThan(0);
   });
 
   it('every role def has a workRate that is a finite positive number', () => {
     const roles: VehicleRole[] = getAllVehicleRoles();
     for (const role of roles) {
-      const { workRate } = getVehicleDef(role);
+      const { workRate } = getVehicleDefByTier(role, 1);
       expect(Number.isFinite(workRate)).toBe(true);
       expect(workRate).toBeGreaterThan(0);
     }
@@ -488,64 +549,9 @@ describe('getVehicleDefByTier — catalog completeness (5 roles × 3 tiers = 15 
   });
 });
 
-// ── Tier 1 backward compatibility ─────────────────────────────────────────────
-
-describe('getVehicleDefByTier — tier 1 is consistent with getVehicleDef (backward compat)', () => {
-  it('building_destroyer tier 1 stats match getVehicleDef("building_destroyer")', () => {
-    const byTier = getVehicleDefByTier('building_destroyer', 1);
-    const legacy = getVehicleDef('building_destroyer');
-    expect(byTier.speed).toBe(legacy.speed);
-    expect(byTier.capacity).toBe(legacy.capacity);
-    expect(byTier.workRate).toBe(legacy.workRate);
-    expect(byTier.maxHp).toBe(legacy.maxHp);
-    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
-    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
-  });
-
-  it('debris_hauler tier 1 stats match getVehicleDef("debris_hauler")', () => {
-    const byTier = getVehicleDefByTier('debris_hauler', 1);
-    const legacy = getVehicleDef('debris_hauler');
-    expect(byTier.speed).toBe(legacy.speed);
-    expect(byTier.capacity).toBe(legacy.capacity);
-    expect(byTier.workRate).toBe(legacy.workRate);
-    expect(byTier.maxHp).toBe(legacy.maxHp);
-    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
-    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
-  });
-
-  it('drill_rig tier 1 stats match getVehicleDef("drill_rig")', () => {
-    const byTier = getVehicleDefByTier('drill_rig', 1);
-    const legacy = getVehicleDef('drill_rig');
-    expect(byTier.speed).toBe(legacy.speed);
-    expect(byTier.capacity).toBe(legacy.capacity);
-    expect(byTier.workRate).toBe(legacy.workRate);
-    expect(byTier.maxHp).toBe(legacy.maxHp);
-    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
-    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
-  });
-
-  it('rock_digger tier 1 stats match getVehicleDef("rock_digger")', () => {
-    const byTier = getVehicleDefByTier('rock_digger', 1);
-    const legacy = getVehicleDef('rock_digger');
-    expect(byTier.speed).toBe(legacy.speed);
-    expect(byTier.capacity).toBe(legacy.capacity);
-    expect(byTier.workRate).toBe(legacy.workRate);
-    expect(byTier.maxHp).toBe(legacy.maxHp);
-    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
-    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
-  });
-
-  it('rock_fragmenter tier 1 stats match getVehicleDef("rock_fragmenter")', () => {
-    const byTier = getVehicleDefByTier('rock_fragmenter', 1);
-    const legacy = getVehicleDef('rock_fragmenter');
-    expect(byTier.speed).toBe(legacy.speed);
-    expect(byTier.capacity).toBe(legacy.capacity);
-    expect(byTier.workRate).toBe(legacy.workRate);
-    expect(byTier.maxHp).toBe(legacy.maxHp);
-    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
-    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
-  });
-});
+// Tier 1 backward compatibility: getVehicleDef (untiered) was removed
+// (#1092) — getVehicleDefByTier(role, 1) is now the only source, exercised
+// by the catalog-completeness suite above.
 
 // ── nameKey pattern: vehicle.<role>.tier<N> ───────────────────────────────────
 
@@ -784,26 +790,25 @@ describe('getVehicleDefByTier — tier 3 purchaseCost = tier 1 purchaseCost × 4
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TASK 2.5 — Vehicle interface fields: driverId, state, payload, targetX/Z
+// TASK 2.5 — Vehicle interface fields: occupantIds, state, payload, targetX/Z
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ── Vehicle interface fields ──────────────────────────────────────────────────
 
 describe('Vehicle interface fields', () => {
-  it('newly purchased vehicle has driverId initialised to null (unassigned)', () => {
-    // driverId: number | null — null means no driver is currently assigned.
-    // Fails (Red) until Vehicle interface adds driverId and purchaseVehicle() sets it to null.
+  it('newly purchased vehicle has occupantIds initialised empty (no driver aboard)', () => {
+    // occupantIds[0] is the driver; an empty array means no driver is currently assigned.
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 
-  it('driverId is null for every vehicle role immediately after purchase', () => {
+  it('occupantIds is empty for every vehicle role immediately after purchase', () => {
     // Exhaustively checks every role so no role-specific initialisation path is missed.
     const vs = createVehicleState();
     for (const role of ALL_ROLES) {
       const { vehicle } = purchaseVehicle(vs, role);
-      expect(vehicle.driverId).toBeNull();
+      expect(vehicle.occupantIds).toHaveLength(0);
     }
   });
 
@@ -997,7 +1002,7 @@ function makeDriverFixture(
 }
 
 /**
- * Same as makeDriverFixture but places the employee as `driverId` on a
+ * Same as makeDriverFixture but places the employee in `occupantIds` on a
  * *second* vehicle in the fleet, simulating an existing driver assignment
  * without calling Mount.board() itself.  The first vehicle (the target) has
  * no driver so only the "already driving" rule fires.
@@ -1011,15 +1016,16 @@ function makeAlreadyDrivingFixture(
   // Purchase a second vehicle of any role and directly assign our employee
   // as its driver — bypassing Mount.board() to set up the precondition.
   const { vehicle: otherVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-  otherVehicle.driverId = empId;
+  otherVehicle.occupantIds = [empId];
 
   return { state, vehicleId, empId };
 }
 
 /**
  * Same as makeDriverFixture but the target vehicle already has a driver
- * (driverId set to a placeholder id 999), simulating a pre-occupied vehicle.
- * The incoming employee is fully qualified so only the "vehicle taken" rule fires.
+ * (occupantIds[0] set to a placeholder id 999), simulating a pre-occupied
+ * vehicle. The incoming employee is fully qualified so only the
+ * "vehicle taken" rule fires.
  */
 function makeVehicleTakenFixture(
   vehicleRole: VehicleRole,
@@ -1030,7 +1036,7 @@ function makeVehicleTakenFixture(
   // Directly set a pre-existing driver on the vehicle.
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
   const originalDriverId = 999;
-  vehicle.driverId = originalDriverId;
+  vehicle.occupantIds = [originalDriverId];
 
   return { state, vehicleId, empId, originalDriverId };
 }
@@ -1044,11 +1050,11 @@ describe('Mount.board — happy path: debris_hauler requires driving.truck', () 
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id on success', () => {
+  it('sets vehicle.occupantIds[0] to the employee id on success', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 
   it('returns no error property on success (error is undefined)', () => {
@@ -1065,11 +1071,11 @@ describe('Mount.board — happy path: building_destroyer requires driving.truck'
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id on success', () => {
+  it('sets vehicle.occupantIds[0] to the employee id on success', () => {
     const { state, vehicleId, empId } = makeDriverFixture('building_destroyer', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 });
 
@@ -1080,11 +1086,11 @@ describe('Mount.board — happy path: rock_digger requires driving.excavator', (
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id on success', () => {
+  it('sets vehicle.occupantIds[0] to the employee id on success', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 });
 
@@ -1095,11 +1101,11 @@ describe('Mount.board — happy path: rock_fragmenter requires driving.excavator
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id on success', () => {
+  it('sets vehicle.occupantIds[0] to the employee id on success', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 });
 
@@ -1110,11 +1116,11 @@ describe('Mount.board — happy path: drill_rig requires driving.drill_rig', () 
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id on success', () => {
+  it('sets vehicle.occupantIds[0] to the employee id on success', () => {
     const { state, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.drill_rig');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 });
 
@@ -1129,7 +1135,7 @@ describe('Mount.board — happy path: higher proficiency level still qualifies',
 
     const result = board(state, vehicle.id, employee.id);
     expect(result.success).toBe(true);
-    expect(state.vehicles.vehicles.find(v => v.id === vehicle.id)!.driverId).toBe(employee.id);
+    expect(state.vehicles.vehicles.find(v => v.id === vehicle.id)!.occupantIds[0]).toBe(employee.id);
   });
 
   it('employee with proficiencyLevel 5 for driving.drill_rig can drive a drill_rig', () => {
@@ -1198,11 +1204,11 @@ describe('Mount.board — error: employee not found', () => {
     }
   });
 
-  it('vehicle.driverId stays null after an employee-not-found failure', () => {
+  it('vehicle.occupantIds stays empty after an employee-not-found failure', () => {
     const { state, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, 9999);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
@@ -1227,12 +1233,12 @@ describe('Mount.board — error: employee not alive', () => {
     }
   });
 
-  it('vehicle.driverId stays null after a dead-employee failure', () => {
+  it('vehicle.occupantIds stays empty after a dead-employee failure', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
     killEmployee(state.employees, empId);
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
@@ -1279,11 +1285,11 @@ describe('Mount.board — error: employee lacks licence (no qualifications at al
     }
   });
 
-  it('vehicle.driverId stays null after a no-licence failure', () => {
+  it('vehicle.occupantIds stays empty after a no-licence failure', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
@@ -1354,18 +1360,18 @@ describe('Mount.board — error: wrong licence (cross-role mismatch)', () => {
     }
   });
 
-  it('vehicle.driverId stays null after a wrong-licence failure', () => {
+  it('vehicle.occupantIds stays empty after a wrong-licence failure', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
 // ── Error: employee already driving another vehicle ───────────────────────────
 
 describe('Mount.board — error: employee already driving another vehicle', () => {
-  it('returns { success: false } when the employee is driverId on a different vehicle', () => {
+  it('returns { success: false } when the employee already occupies (is occupantIds[0] of) a different vehicle', () => {
     // The employee is fully qualified and the target vehicle has no driver.
     // The only failing condition is that the employee is already assigned elsewhere.
     const { state, vehicleId, empId } = makeAlreadyDrivingFixture(
@@ -1388,22 +1394,22 @@ describe('Mount.board — error: employee already driving another vehicle', () =
     }
   });
 
-  it('target vehicle.driverId remains null after an already-driving failure', () => {
-    // The target vehicle must not receive the driverId when the call fails.
+  it('target vehicle.occupantIds remains empty after an already-driving failure', () => {
+    // The target vehicle must not receive the driver when the call fails.
     const { state, vehicleId, empId } = makeAlreadyDrivingFixture(
       'drill_rig',
       'driving.drill_rig',
     );
     board(state, vehicleId, empId);
     const targetVehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(targetVehicle.driverId).toBeNull();
+    expect(targetVehicle.occupantIds).toHaveLength(0);
   });
 });
 
 // ── Error: vehicle already has a driver ──────────────────────────────────────
 
 describe('Mount.board — error: vehicle already has a driver', () => {
-  it('returns { success: false } when vehicle.driverId is already non-null', () => {
+  it('returns { success: false } when vehicle.occupantIds is already non-empty', () => {
     // The incoming employee is fully qualified and not already driving.
     // The only failing condition is that the target vehicle is already occupied.
     const { state, vehicleId, empId } = makeVehicleTakenFixture(
@@ -1426,17 +1432,17 @@ describe('Mount.board — error: vehicle already has a driver', () => {
     }
   });
 
-  it('original driverId is preserved and not overwritten after a vehicle-taken failure', () => {
-    // The pre-existing driverId (999) must survive the failed call intact.
+  it('original occupantIds[0] is preserved and not overwritten after a vehicle-taken failure', () => {
+    // The pre-existing driver (999) must survive the failed call intact.
     const { state, vehicleId, empId, originalDriverId } = makeVehicleTakenFixture(
       'drill_rig',
       'driving.drill_rig',
     );
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBe(originalDriverId);
+    expect(vehicle.occupantIds[0]).toBe(originalDriverId);
     // And must definitely not be overwritten with the incoming empId.
-    expect(vehicle.driverId).not.toBe(empId);
+    expect(vehicle.occupantIds[0]).not.toBe(empId);
   });
 });
 
@@ -1474,7 +1480,7 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     }
   });
 
-  it('vehicle.driverId stays null after a reservation-mismatch failure', () => {
+  it('vehicle.occupantIds stays empty after a reservation-mismatch failure', () => {
     const { state, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.drill_rig');
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
@@ -1483,7 +1489,7 @@ describe('Mount.board — error: vehicle reserved for a different action', () =>
     employee.activeActionId = null;
 
     board(state, vehicleId, empId);
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
@@ -1500,7 +1506,7 @@ describe('Mount.board — success: reservation holder boards their own reserved 
     expect(result.success).toBe(true);
   });
 
-  it('sets vehicle.driverId to the employee id when the reservation matches', () => {
+  it('sets vehicle.occupantIds[0] to the employee id when the reservation matches', () => {
     const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
@@ -1509,7 +1515,7 @@ describe('Mount.board — success: reservation holder boards their own reserved 
     employee.activeActionId = 12;
 
     board(state, vehicleId, empId);
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 
   it('an unreserved vehicle (reservedForActionId null) is unaffected by the guard', () => {
@@ -1521,83 +1527,87 @@ describe('Mount.board — success: reservation holder boards their own reserved 
   });
 });
 
-// ── unassignDriver — frees a vehicle's driver so it can be reassigned ─────────
+// ── canReleaseDriver — may the driver seat be emptied right now? ─────────────
+// #1092: a question, not an operation. `Mount.alight` is the one writer of
+// occupantIds (the `vehicles` rule), and it calls this first — so what these
+// cover is the answer, and `alight`'s own tests (Mount.test.ts) cover the
+// seat actually emptying on the back of it.
 
-describe('unassignDriver — happy path', () => {
-  it('clears driverId and reports success', () => {
+describe('canReleaseDriver — happy path', () => {
+  it('says yes for a driven vehicle carrying nothing, without touching occupantIds itself', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
-    const result = unassignDriver(state.vehicles, vehicleId);
+    const result = canReleaseDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(true);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds).toEqual([empId]);
   });
 
-  it('the freed employee can be assigned to a different vehicle afterward', () => {
+  it('alight, which gates on it, frees the employee to board a different vehicle afterward', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
-    unassignDriver(state.vehicles, vehicleId);
+    expect(canReleaseDriver(state.vehicles, vehicleId).success).toBe(true);
+    expect(alight(state, vehicleId).success).toBe(true);
     const { vehicle: otherVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     const result = board(state, otherVehicle.id, empId);
     expect(result.success).toBe(true);
   });
 });
 
-describe('unassignDriver — error: vehicle not found', () => {
+describe('canReleaseDriver — error: vehicle not found', () => {
   it('returns a failure result', () => {
     const vs = createVehicleState();
-    const result = unassignDriver(vs, 9999);
+    const result = canReleaseDriver(vs, 9999);
     expect(result.success).toBe(false);
   });
 
   it('error message names the reason', () => {
     const vs = createVehicleState();
-    const result = unassignDriver(vs, 9999);
+    const result = canReleaseDriver(vs, 9999);
     expect(result.error).toBe('Vehicle not found');
   });
 });
 
-describe('unassignDriver — error: vehicle has no driver', () => {
-  it('returns a failure result without touching the vehicle', () => {
+describe('canReleaseDriver — boundary: vehicle has no driver at all', () => {
+  it('says yes — an empty seat is trivially releasable, and alight owns refusing that case', () => {
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    const result = unassignDriver(vs, vehicle.id);
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Vehicle has no driver');
-    expect(vehicle.driverId).toBeNull();
+    const result = canReleaseDriver(vs, vehicle.id);
+    expect(result.success).toBe(true);
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
-describe('unassignDriver — error: vehicle is mid-haul', () => {
-  // #1091: unassignDriver's mid-haul guard reads `vehicle.payload !== null`
-  // now that haulingPhase/haulingFragmentId are gone — payload is only set
-  // once haul_load's arrival effect fires, so this guard only ever catches
-  // the loaded, driving-to-depot leg.
-  it('refuses to unassign and preserves driverId once a fragment is loaded (driving to the depot)', () => {
+describe('canReleaseDriver — error: vehicle is mid-haul', () => {
+  // #1091: the mid-haul guard reads `vehicle.payload !== null` now that
+  // haulingPhase/haulingFragmentId are gone — payload is only set once
+  // haul_load's arrival effect fires, so this guard only ever catches the
+  // loaded, driving-to-depot leg.
+  it('says no, and alight then refuses too, once a fragment is loaded (driving to the depot)', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     vehicle.payload = { fragmentId: 1, massKg: 500 };
 
-    const result = unassignDriver(state.vehicles, vehicleId);
+    const result = canReleaseDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(false);
     expect(result.error).toBe('Vehicle is mid-haul');
-    expect(vehicle.driverId).toBe(empId);
+    expect(alight(state, vehicleId).success).toBe(false);
+    expect(vehicle.occupantIds[0]).toBe(empId);
   });
 
-  // TODO(#1091): the to-fragment leg (before load_haul fires) has no signal
-  // on Vehicle any more — unassignDriver can't distinguish "driving toward a
-  // fragment" from "idle", so it allows the unassign. See Vehicle.ts's own
-  // TODO(#1091) comment on unassignDriver.
-  it('allows unassign before the fragment is loaded — driving-to-fragment leg has no payload signal yet', () => {
+  // TODO(#1091): the to-fragment leg (before haul_load fires) has no signal
+  // on Vehicle any more — this guard can't distinguish "driving toward a
+  // fragment" from "idle", so it allows the release.
+  it('says yes before the fragment is loaded — driving-to-fragment leg has no payload signal yet', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     expect(vehicle.payload).toBeNull();
 
-    const result = unassignDriver(state.vehicles, vehicleId);
-    expect(result.success).toBe(true);
-    expect(vehicle.driverId).toBeNull();
+    expect(canReleaseDriver(state.vehicles, vehicleId).success).toBe(true);
+    expect(alight(state, vehicleId).success).toBe(true);
+    expect(vehicle.occupantIds).toHaveLength(0);
   });
 });
 
@@ -1643,7 +1653,7 @@ function makeEvacuationFixture(seed: number) {
   const vs = createVehicleState();
   const es = createEmployeeState();
   const { vehicle } = purchaseVehicle(vs, 'rock_digger', 20, 20); // requires driving.excavator
-  vehicle.driverId = null;
+  // driverless — occupantIds defaults to [] on purchase
   const rng = new Random(seed);
   return { vs, es, vehicle, rng };
 }

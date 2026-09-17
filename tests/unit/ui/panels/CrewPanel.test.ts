@@ -46,9 +46,9 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
+    targetX: 0, targetZ: 0, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -112,7 +112,7 @@ describe('CrewPanel', () => {
     const { panel } = makePanel();
     const state = makeState(
       [makeEmployee({ id: 6 })],
-      [makeVehicle({ id: 1, driverId: 6 })],
+      [makeVehicle({ id: 1, occupantIds: [6] })],
     );
     panel.update(state);
     const row = panel.root.querySelector('[data-employee-id="6"]')!;

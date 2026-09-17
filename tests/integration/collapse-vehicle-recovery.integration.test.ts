@@ -26,6 +26,7 @@ import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { syncHaulDispatch } from '../../src/core/economy/HaulDispatch.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { tickUntil } from './helpers.js';
+import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 function makeFragment(id: number, x: number, z: number, mass = 900): FragmentData {
   return {
@@ -70,8 +71,8 @@ function setupStaffedHauler(warehouseAt: { x: number; z: number }): {
   )!;
 
   expect(run(`vehicle driver ${vehicle.id} ${driver.id}`)).toMatchObject({ success: true });
-  tickUntil(run, () => vehicle.driverId === driver.id, 50);
-  expect(vehicle.driverId).toBe(driver.id);
+  tickUntil(run, () => vehicleDriverId(vehicle) === driver.id, 50);
+  expect(vehicleDriverId(vehicle)).toBe(driver.id);
 
   return { run, state, vehicleId: vehicle.id, driverId: driver.id };
 }
@@ -124,7 +125,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
 
     tickUntil(run, () => driver.collapsing, 50);
     expect(driver.collapsing).toBe(true);
-    expect(vehicle.driverId).toBeNull(); // released back to idle at the moment of collapse
+    expect(vehicleDriverId(vehicle)).toBeNull(); // released back to idle at the moment of collapse
 
     // Before the fix: autoInsertNeedTasks re-trapped the driller in another
     // rest the instant this one completed, self-targeted and zero distance
@@ -154,7 +155,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
       run('tick 1');
       const action = state.pendingActions.find(a => a.id === interruptedActionId);
       if (action?.status === 'in_progress') resumedInProgress = true;
-      if (vehicle.driverId === driver.id) reboarded = true;
+      if (vehicleDriverId(vehicle) === driver.id) reboarded = true;
       if (!driver.collapsing && reboarded && (resumedInProgress || state.drillHoles.length > holesBefore)) break;
     }
 
@@ -180,7 +181,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     tickUntil(run, () => driver.collapsing, 50);
     expect(driver.collapsing).toBe(true);
     // Released back to idle at the moment of collapse (interruptActiveAction).
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
 
     tickUntil(run, () => !driver.collapsing, 400);
     expect(driver.collapsing).toBe(false);
@@ -188,8 +189,8 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
     // The employee must actually reboard — driverId comes back to this exact
     // employee, not left null while they sit idle forever, and not handed to
     // anyone else (nobody else on this roster holds driving.drill_rig).
-    tickUntil(run, () => vehicle.driverId === driver.id, 500);
-    expect(vehicle.driverId).toBe(driver.id);
+    tickUntil(run, () => vehicleDriverId(vehicle) === driver.id, 500);
+    expect(vehicleDriverId(vehicle)).toBe(driver.id);
   });
 });
 
@@ -223,7 +224,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     expect(driver.collapsing).toBe(true);
 
     // Alighted cleanly: released the vehicle, never loaded the fragment.
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(vehicle.payload).toBeNull();
     const trackedAtCollapse = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
     expect(trackedAtCollapse.state).toBe('on_ground');
@@ -262,13 +263,13 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     expect(driver.collapsing).toBe(true);
 
     // #1091: alightIfMounted's own alight call is refused here —
-    // unassignDriver (Vehicle.ts) refuses to unassign a driver while
+    // canReleaseDriver (Vehicle.ts) refuses to unassign a driver while
     // `payload !== null`, specifically so a loaded haul is never orphaned
     // mid-flight with nobody driving it (NeedRestoration.ts's own doc comment
     // on tickCollapse: "alight's own guards ... may refuse; that's fine").
     // The driver stays mounted despite collapsing, and the cargo travels with
     // the vehicle exactly as it was — payload still names the same fragment.
-    expect(vehicle.driverId).toBe(driver.id);
+    expect(vehicleDriverId(vehicle)).toBe(driver.id);
     expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002)).toHaveLength(1);

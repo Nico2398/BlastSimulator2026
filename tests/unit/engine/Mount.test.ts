@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { board, alight } from '../../../src/core/engine/Mount.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -107,7 +107,7 @@ describe('board', () => {
     expect(vehicle.occupantIds).toEqual([]);
   });
 
-  it('sets employee.locomotion, vehicle.occupantIds, and vehicle.driverId, and emits employee:mounted on success', () => {
+  it('sets employee.locomotion and vehicle.occupantIds, and emits employee:mounted on success', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
@@ -120,7 +120,7 @@ describe('board', () => {
     expect(result.success).toBe(true);
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicle.occupantIds).toContain(employee.id);
-    expect(vehicle.driverId).toBe(vehicle.occupantIds[0]);
+    expect(vehicleDriverId(vehicle)).toBe(vehicle.occupantIds[0]);
     expect(mounted).toEqual([{ employeeId: employee.id, vehicleId: vehicle.id }]);
   });
 
@@ -131,7 +131,6 @@ describe('board', () => {
     const second = hireTruckDriver(state, 5, 5);
     // Simulate `first` already having boarded, without calling board() itself.
     vehicle.occupantIds = [first.id];
-    vehicle.driverId = first.id;
     first.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     expect(vehicle.occupantIds.length).toBe(VEHICLE_SEAT_COUNT[vehicle.type]);
 
@@ -150,7 +149,6 @@ describe('board', () => {
     const second = hireExcavatorDriver(state, 3, 3);
     assignSkill(state.employees, second.id, 'driving.drill_rig', 1);
     vehicle.occupantIds = [first.id];
-    vehicle.driverId = first.id;
     first.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     const result = board(state, vehicle.id, second.id);
@@ -180,7 +178,6 @@ describe('board', () => {
     const employee = hireTruckDriver(state, 5, 5);
     // Simulate already-mounted-elsewhere without calling board() itself.
     current.occupantIds = [employee.id];
-    current.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: current.id };
 
     const result = board(state, target.id, employee.id);
@@ -209,9 +206,8 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    // #1091: payload replaces haulingPhase as the mid-haul guard unassignDriver checks.
+    // #1091: payload replaces haulingPhase as the mid-haul guard canReleaseDriver checks.
     vehicle.payload = { fragmentId: 1, massKg: 500 };
 
     const result = alight(state, vehicle.id);
@@ -226,7 +222,6 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     const emitter = new EventEmitter();
     const alighted: Array<{ employeeId: number; vehicleId: number }> = [];
@@ -237,7 +232,7 @@ describe('alight', () => {
     expect(result.success).toBe(true);
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(vehicle.occupantIds).not.toContain(employee.id);
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(alighted).toEqual([{ employeeId: employee.id, vehicleId: vehicle.id }]);
   });
 
@@ -246,7 +241,6 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Every neighbour blocked except (6, 6).
@@ -269,7 +263,6 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     state.navGrid = null;
 
@@ -285,7 +278,6 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Every one of the 8 neighbours blocked; only the vehicle's own cell is walkable.
@@ -306,7 +298,6 @@ describe('alight', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     const employee = hireTruckDriver(state, 5, 5);
     vehicle.occupantIds = [employee.id];
-    vehicle.driverId = employee.id;
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     state.navGrid = makeNavGrid(3, 3, 5, 5, () => cell('walkable', false));

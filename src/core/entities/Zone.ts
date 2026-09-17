@@ -4,7 +4,8 @@
 import type { VehicleState } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
 import type { GameState } from '../state/GameState.js';
-import { moveTo } from '../engine/MoveTo.js';
+import { vehicleDriverId } from './Vehicle.js';
+import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
 import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
@@ -94,39 +95,29 @@ export function clearZone(
   // needs to rescan the vehicle list per employee to know this.
   const inZoneDriverIds = new Set<number>();
   for (const v of vehicles.vehicles) {
-    if (v.driverId !== null && isInZone(v.x, v.z, zone)) inZoneDriverIds.add(v.driverId);
+    const driverId = vehicleDriverId(v);
+    if (driverId !== null && isInZone(v.x, v.z, zone)) inZoneDriverIds.add(driverId);
   }
 
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
 
-    if (v.driverId !== null) {
+    const driverId = vehicleDriverId(v);
+    if (driverId !== null) {
       const dest = findSafeDestination(v.x, v.z, zone);
       if (dest) {
         // Already driven — plain reposition; moveTo's own implicit
         // continuity (already mounted in `v`) plans straight to a drive
-        // leg, no boarding needed.
-        //
-        // pendingEvacuationDestination must be staged here too, not just in
-        // the driverless branch below (#1110 CI follow-up): it's the ONLY
-        // field isMidEvacuationDrive (EvacuationHold.ts) reads to recognize
-        // this driver as mid-evacuation, and every need-driven rest path
-        // (ForceShiftRest.ts's forceShiftRestIfNeededByPolicy in particular,
-        // via isMidEvacuation) skips an employee reading true there so it
-        // never overwrites an evacuation drive already under way. Leaving it
-        // null here — as this branch always had — makes an already-mounted
-        // driver's evacuation drive invisible to that guard: the very next
-        // proactive-rest trigger (trivial to hit under `set_policy
-        // mode:continuous`) discards the itinerary this moveTo just installed
-        // and sends the driver off to rest instead, stranding the vehicle
-        // exactly where it stood — reproduced live via
-        // tutorial-steps-visual.json's own interaction-mode CI run, whose
-        // `wait_until field:dangerZoneClear` never resolved because the
-        // drill_rig's continuity-mounted driver (idle, not boarding fresh)
-        // took this branch and was rest-interrupted moments later, leaving
-        // the vehicle parked inside the danger zone for the rest of the run.
-        v.pendingEvacuationDestination = { x: dest.x, z: dest.z };
-        moveTo(state, v.driverId, { x: dest.x, z: dest.z });
+        // leg, no boarding needed. The `reposition` goal this installs is
+        // itself what marks the driver mid-evacuation (#1092 —
+        // isMidEvacuationDrive, EvacuationHold.ts), so every need-driven
+        // rest path (ForceShiftRest.ts's forceShiftRestIfNeededByPolicy in
+        // particular, via isMidEvacuation) leaves the drive alone instead of
+        // discarding it and stranding the vehicle inside the zone (#1110).
+        // alightOnArrival puts the driver back on foot the moment the
+        // vehicle is clear, exactly like an ordinary on-foot evacuee.
+        const ordered = moveTo(state, driverId, { x: dest.x, z: dest.z });
+        if (ordered.success) alightOnArrival(employees.employees.find(e => e.id === driverId));
         result.orderedVehicleIds.push(v.id);
       } else {
         result.strandedVehicleIds.push(v.id);
@@ -158,12 +149,17 @@ export function clearZone(
       continue;
     }
 
-    // Stage the safe destination before starting the walk (#1042): the
-    // moment tickLocomotion's own board arrival step resolves, it reads this
-    // to kick off the drive to safety — see Locomotion.ts's
-    // handlePostBoardIntent.
-    v.pendingEvacuationDestination = { x: dest.x, z: dest.z };
-    moveTo(state, driver.id, { vehicleId: v.id });
+    // One itinerary covers the whole rescue (#1092): walk to `v`, board it,
+    // drive it clear, step off. `via` names the vehicle so the planner
+    // routes the reposition through it rather than walking the driver to
+    // safety on foot and leaving the vehicle behind — no per-vehicle
+    // destination marker, and no second `moveTo` once the board resolves.
+    const ordered = moveTo(state, driver.id, { x: dest.x, z: dest.z }, { via: v.id });
+    if (!ordered.success) {
+      result.strandedVehicleIds.push(v.id);
+      continue;
+    }
+    alightOnArrival(driver);
     boardingEmployeeIds.add(driver.id);
     result.orderedVehicleIds.push(v.id);
   }

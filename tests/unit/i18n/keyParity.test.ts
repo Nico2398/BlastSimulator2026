@@ -341,8 +341,18 @@ describe('en.json / fr.json — key-set parity', () => {
     // for haul/break claim-failure strings — haul.no_action_queued,
     // haul.claim_failed, break.no_action_queued, break.claim_failed —
     // both locales.
+    // Baseline is now 3514 (up from 3510): #1092 phase 6 nets +4. Out go the
+    // 5 keys of the deleted assign/move subcommands — vehicle.assign_usage,
+    // vehicle.assign_success, vehicle.move_usage, vehicle.move_success,
+    // vehicle.move_no_driver. In come 4 for the console `reposition` command
+    // — vehicle.reposition_usage, vehicle.reposition_reserved,
+    // vehicle.reposition_no_driver, vehicle.reposition_success — and 5 for
+    // the Fleet panel's Reposition control — ui.fleet.reposition,
+    // ui.fleet.reposition_hint, ui.fleet.reposition_busy,
+    // ui.fleet.reposition_pick_target, ui.fleet.reposition_pick_instruction —
+    // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3510);
+    expect(Object.keys(en).length).toBe(3514);
   });
 });
 

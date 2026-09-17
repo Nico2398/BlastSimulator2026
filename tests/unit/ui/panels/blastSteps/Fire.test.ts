@@ -91,7 +91,7 @@ describe('FireStep', () => {
     const state = makeState();
     addHole(state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
-    vehicle.driverId = 1; // driver aboard — not stranded
+    vehicle.occupantIds = [1]; // driver aboard — not stranded
 
     step.update(state, 'sunny');
 
@@ -103,9 +103,9 @@ describe('FireStep', () => {
     const state = makeState();
     addHole(state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle: driven } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
-    driven.driverId = 1;
+    driven.occupantIds = [1];
     const { vehicle: driverless } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
-    driverless.driverId = null;
+    driverless.occupantIds = [];
 
     step.update(state, 'sunny');
 
@@ -118,7 +118,7 @@ describe('FireStep', () => {
     const state = makeState();
     addHole(state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     step.update(state, 'sunny');
 
@@ -131,7 +131,7 @@ describe('FireStep', () => {
     addHole(state.drillHoles, 20, 20, 8, 0.15);
     addEmployee(state, 22, 22);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 23, 23);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     step.update(state, 'sunny');
 
@@ -143,7 +143,7 @@ describe('FireStep', () => {
     const state = makeState();
     addHole(state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     step.update(state, 'sunny');
 

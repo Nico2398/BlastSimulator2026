@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -195,10 +195,10 @@ describe('vehicle driver — successful assignment', () => {
     expect(result.success).toBe(true);
 
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
-    expect(vehicle!.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle!)).toBeNull();
 
     tickCommand(ctx, ['1'], {});
-    expect(vehicle!.driverId).toBe(employeeId);
+    expect(vehicleDriverId(vehicle!)).toBe(employeeId);
   });
 
   it('assigns a drill_rig driver with the driving.drill_rig licence, once a tick resolves arrival', () => {
@@ -210,10 +210,10 @@ describe('vehicle driver — successful assignment', () => {
 
     expect(result.success).toBe(true);
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
-    expect(vehicle!.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle!)).toBeNull();
 
     tickCommand(ctx, ['1'], {});
-    expect(vehicle!.driverId).toBe(employeeId);
+    expect(vehicleDriverId(vehicle!)).toBe(employeeId);
   });
 });
 
@@ -354,7 +354,7 @@ describe('vehicle driver — unassign with "none"', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toBe(`Vehicle #${vehicleId} driver unassigned.`);
-    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.driverId).toBeNull();
+    expect(vehicleDriverId(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!)).toBeNull();
   });
 
   it('the freed employee can board a different vehicle afterward', () => {
@@ -442,6 +442,114 @@ describe('vehicle scrap', () => {
     const result = vehicleCommand(ctx, ['scrap', 'abc'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe('Usage: vehicle scrap <id>');
+  });
+});
+
+// ── vehicle reposition — drive a vehicle somewhere with no work attached (#1092) ──
+
+describe('vehicle reposition — moves a vehicle with no PendingAction queued', () => {
+  it('drives an already-mounted vehicle to the target cell, ending with a reposition itinerary goal', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    // Board the driver first, same pattern as "vehicle driver" tests above.
+    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+
+    const result = vehicleCommand(ctx, ['reposition', String(vehicleId), '3', '3'], {});
+    expect(result.success).toBe(true);
+
+    const driver = ctx.state!.employees.employees.find(e => e.id === employeeId)!;
+    expect(driver.itinerary?.goal).toEqual({ kind: 'reposition', x: 3, z: 3 });
+
+    tickCommand(ctx, ['20'], {});
+
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.x).toBe(3);
+    expect(vehicle.z).toBe(3);
+  });
+});
+
+describe('vehicle reposition — refuses while the vehicle is mid vehicle-gated work', () => {
+  it('refuses, naming a reason, when reservedForActionId is non-null', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    vehicle.reservedForActionId = 7;
+
+    const result = vehicleCommand(ctx, ['reposition', String(vehicleId), '3', '3'], {});
+
+    expect(result.success).toBe(false);
+    // A real domain refusal, not an unrecognized-subcommand fallthrough.
+    expect(result.output).not.toBe(t('vehicle.usage'));
+    expect(result.output.length).toBeGreaterThan(0);
+  });
+});
+
+describe('vehicle reposition — refuses when no licensed idle driver is available', () => {
+  it('refuses, naming a reason, when the vehicle has no occupant and no employee holds the required licence', () => {
+    const ctx = makeCtx();
+    // rock_digger requires driving.excavator — no employees at all exist yet.
+    const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'rock_digger', 0, 0);
+
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '3', '3'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(t('vehicle.usage'));
+    expect(result.output.length).toBeGreaterThan(0);
+  });
+});
+
+describe('vehicle reposition — auto-selects a driver when the vehicle has none', () => {
+  it('boards an idle, licensed employee and drives the vehicle to the target cell', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx); // idle, driving.truck, co-located with the vehicle
+
+    const result = vehicleCommand(ctx, ['reposition', String(vehicleId), '3', '3'], {});
+    expect(result.success).toBe(true);
+
+    tickCommand(ctx, ['20'], {});
+
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.occupantIds[0]).toBe(employeeId);
+    expect(vehicle.x).toBe(3);
+    expect(vehicle.z).toBe(3);
+  });
+});
+
+// ── vehicle assign / vehicle move — deleted in favour of reposition (#1092) ──
+//
+// Both subcommands used to install a reposition itinerary on a vehicle's
+// driver; `vehicle reposition` above replaced them and their cases are gone
+// from vehicle.ts. These pin that removal: each now falls through to the same
+// unrecognized-subcommand usage error every other unknown subcommand produces.
+
+describe('vehicle assign / vehicle move — no longer recognized subcommands (#1092)', () => {
+  it('"vehicle assign" falls through to the generic usage error', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+
+    const result = vehicleCommand(ctx, ['assign', String(vehicleId)], { task: 'idle' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('vehicle.usage'));
+  });
+
+  it('"vehicle move" falls through to the generic usage error', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+
+    const result = vehicleCommand(ctx, ['move', String(vehicleId)], { to: '5,5' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('vehicle.usage'));
   });
 });
 

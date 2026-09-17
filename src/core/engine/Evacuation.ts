@@ -10,6 +10,7 @@ import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
@@ -74,8 +75,8 @@ export function isMidEvacuationWalk(employee: Employee): boolean {
  * NeedTaskInsertion.ts each repeated at their own call sites into the one
  * call those sites now make.
  */
-export function isMidEvacuation(state: GameState, employee: Employee): boolean {
-  return isMidEvacuationWalk(employee) || isMidEvacuationDrive(state.vehicles, employee);
+export function isMidEvacuation(employee: Employee): boolean {
+  return isMidEvacuationWalk(employee) || isMidEvacuationDrive(employee);
 }
 
 /**
@@ -225,7 +226,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
 
   for (const vehicle of state.vehicles.vehicles) {
     if (!isInZone(vehicle.x, vehicle.z, zone)) continue;
-    if (vehicle.driverId === null && vehicle.reservedForActionId !== null) {
+    if (vehicleDriverId(vehicle) === null && vehicle.reservedForActionId !== null) {
       releaseVehicleReservation(state, vehicle.reservedForActionId);
     }
   }

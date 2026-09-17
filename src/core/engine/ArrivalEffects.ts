@@ -24,6 +24,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
@@ -75,8 +76,9 @@ function resolveReservedGroundFragment(
  * reported a completion).
  */
 function completeFragmentGatedAction(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.reservedForActionId === null || vehicle.driverId === null) return;
-  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  const driverId = vehicleDriverId(vehicle);
+  if (vehicle.reservedForActionId === null || driverId === null) return;
+  const employee = state.employees.employees.find(e => e.id === driverId);
   if (!employee) return;
   completeVehicleGatedAction(state, employee, vehicle.reservedForActionId);
 }

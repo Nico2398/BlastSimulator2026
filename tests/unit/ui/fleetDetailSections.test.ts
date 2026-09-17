@@ -13,9 +13,9 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
-    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payload: null,
+    targetX: 5, targetZ: 5, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -98,18 +98,29 @@ describe('fleetDetailSections — makeLoadGauge', () => {
     expect(fill.style.width).toBe('50%');
     expect(value.textContent).toBe('100 / 200 kg');
   });
+
+  it('clamps the fill width at 100% when payload mass exceeds rated capacity (#1092)', () => {
+    // debris_hauler tier1 capacity is 200kg — 500kg overshoots it, which a
+    // real fleet can reach mid-haul (a fragment heavier than the estimate
+    // used at load time). The percentage shown must never exceed 100.
+    const row = makeLoadGauge(makeVehicle({
+      type: 'debris_hauler', tier: 1, payload: { fragmentId: 7, massKg: 500 },
+    }))!;
+    const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
+    expect(fill.style.width).toBe('100%');
+  });
 });
 
 describe('fleetDetailSections — makeDriverRow', () => {
   it('shows the real driver name when driverId matches a roster employee', () => {
     const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ driverId: 6 }), state);
+    const row = makeDriverRow(makeVehicle({ occupantIds: [6] }), state);
     expect(row.textContent).toContain('Dorian Kask');
   });
 
   it('falls back to "#<driverId>" when no roster employee matches driverId', () => {
     const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ driverId: 99 }), state);
+    const row = makeDriverRow(makeVehicle({ occupantIds: [99] }), state);
     expect(row.textContent).toContain('#99');
     expect(row.textContent).not.toContain('Dorian Kask');
   });

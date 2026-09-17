@@ -57,7 +57,6 @@ function makeDrivenHauler(state: GameState, x = 0, z = 0): { vehicle: Vehicle; d
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.truck', 1);
-  vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return { vehicle, driverId: employee.id };
@@ -69,7 +68,6 @@ function makeDrivenFragmenter(state: GameState, x = 0, z = 0): { vehicle: Vehicl
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
   assignSkill(state.employees, employee.id, 'driving.excavator', 1);
-  vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return { vehicle, driverId: employee.id };

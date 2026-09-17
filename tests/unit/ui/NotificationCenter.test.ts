@@ -141,7 +141,7 @@ describe('NotificationCenter (redesign P1)', () => {
       const state = makeState();
       state.vehicles.vehicles.push({
         id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-        targetX: 0, targetZ: 0, driverId: null, state: 'idle', payloadKg: 0,
+        targetX: 0, targetZ: 0, state: 'idle', payloadKg: 0,
         waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: true,
         haulingFragmentId: null, haulingPhase: null, haulDepotId: null,
       } as never);

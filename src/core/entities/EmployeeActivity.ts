@@ -6,6 +6,7 @@
 
 import type { Employee } from './Employee.js';
 import type { Vehicle } from './Vehicle.js';
+import { vehicleDriverId } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
 export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'idle';
@@ -29,7 +30,7 @@ const IDLE: EmployeeActivity = { kind: 'idle', ticksRemaining: null, totalTicks:
  * engine resolves these states in: a collapsed employee is never mid-task,
  * an arrived task takes over from the walk that led to it, and driving is
  * read off the fleet rather than the employee (nothing on Employee itself
- * marks "driving" — only the vehicle's own driverId does).
+ * marks "driving" — only the vehicle's own driver seat does).
  */
 export function computeEmployeeActivity(employee: Employee, vehicles: readonly Vehicle[]): EmployeeActivity {
   if (employee.collapsing) return { ...IDLE, kind: 'collapsed' };
@@ -85,5 +86,5 @@ export function taskProgressFraction(activity: EmployeeActivity): number | null 
  * 'driving'/'driving_to_task' activity kinds.
  */
 export function findDrivenVehicle(employeeId: number, vehicles: readonly Vehicle[]): Vehicle | null {
-  return vehicles.find(v => v.driverId === employeeId) ?? null;
+  return vehicles.find(v => vehicleDriverId(v) === employeeId) ?? null;
 }

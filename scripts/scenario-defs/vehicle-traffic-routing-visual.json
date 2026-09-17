@@ -271,8 +271,8 @@
       "description": "All four drivers spawn on the same tile as their haulers (#512), so 10 ticks is enough for every one of them to walk over and board -- confirmed live: `vehicle list` afterward shows driver:#1..#4 on all four. Shifts every absolute tick number the rest of this file's Finding #22 timing analysis depends on by +10 -- see the tick 6/tick 26 steps below."
     },
     {
-      "command": "vehicle move 1 to:37,33",
-      "description": "Real click path for the one hauler a mouse can actually pick: select #1 in the 3D scene, rest the cursor on (37,33), press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre, measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`. The three steps below stay console commands for a reason recorded there.",
+      "command": "vehicle reposition 1 37 33",
+      "description": "Real click path for the one hauler a mouse can actually pick: select #1 in the 3D scene, rest the cursor on (37,33), press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre, measured in a real browser until the dispatched command read `vehicle reposition 1 37 33`. The three steps below stay console commands for a reason recorded there.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -306,7 +306,7 @@
       "role": "player"
     },
     {
-      "command": "vehicle move 2 to:37,33",
+      "command": "vehicle reposition 2 37 33",
       "interaction": [
         {
           "type": "clickSelector",
@@ -340,7 +340,7 @@
       "description": "Fixed by issue #512: all four haulers spawn on ONE tile (vehicle buy stagger gets undone by NavGrid.findNearestReachableCell snapping every one of them to the same reachable cell), so scene-raycast clickEntity could only ever pick hauler #1 -- clickEntity for #2/#3/#4 always raycast onto #1 instead, with the selection bar reading \"Debris Hauler #1\" every time. FleetPanel rows are clickable now, so hauler #2 gets selected by clicking its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"2\"]`), routed through ScenePicking.select(), then MOVE HERE drives the same `vehicle move` command as the hauler #1 step above."
     },
     {
-      "command": "vehicle move 3 to:37,33",
+      "command": "vehicle reposition 3 37 33",
       "interaction": [
         {
           "type": "clickSelector",
@@ -374,7 +374,7 @@
       "description": "Fixed by issue #512, same fix as hauler #2 above: hauler #3 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"3\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
-      "command": "vehicle move 4 to:37,33",
+      "command": "vehicle reposition 4 37 33",
       "interaction": [
         {
           "type": "clickSelector",

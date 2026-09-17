@@ -101,7 +101,7 @@ export function autoInsertNeedTasks(
     // position — queuing a rest action targeted right back there — then
     // reclaimed it the moment it reached its real safe cell, walking all the
     // way back into the still-armed blast footprint to rest.
-    if (isMidEvacuation(state, emp)) continue;
+    if (isMidEvacuation(emp)) continue;
 
     // Skip employees already mid-rest — resting, or (#437) still walking to
     // rest with the timer not yet started. Their gauge is still below its

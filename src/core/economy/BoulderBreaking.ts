@@ -12,6 +12,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 
@@ -21,7 +22,7 @@ import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatc
  * findReachableOversizedFragment and the UI's Break button.
  */
 export function isBreakEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
-  return !!vehicle && vehicle.type === 'rock_fragmenter' && vehicle.driverId !== null && vehicle.reservedForActionId === null;
+  return !!vehicle && vehicle.type === 'rock_fragmenter' && vehicleDriverId(vehicle) !== null && vehicle.reservedForActionId === null;
 }
 
 /**
@@ -45,7 +46,7 @@ export function requestBreakBoulder(
   const found = findRequestVehicleOfRole(state, vehicleId, 'rock_fragmenter', 'Vehicle is not a rock fragmenter');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.reservedForActionId !== null) {
     return { success: false, error: 'Vehicle is already breaking a fragment' };
   }

@@ -7,7 +7,9 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, createEmployeeState } from '../../../src/core/entities/Employee.js';
+import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/balance.js';
@@ -15,9 +17,9 @@ import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../../../src/core/config/ba
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100, task: 'idle',
-    targetX: 0, targetZ: 0, driverId: null, state: 'idle', payload: null,
+    targetX: 0, targetZ: 0, state: 'idle', payload: null,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
-    reservedForActionId: null, pendingEvacuationDestination: null,
+    reservedForActionId: null,
     occupantIds: [],
     ...overrides,
   };
@@ -106,7 +108,6 @@ describe('computeVehicleStatus', () => {
     // the new mover instead of a dangling fake employee id).
     const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(1), 0, 1);
     vehicle.occupantIds = [driver.id];
-    vehicle.driverId = driver.id;
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Stationary blocker sitting on the only possible route — never ticked.
@@ -126,5 +127,83 @@ describe('computeVehicleStatus', () => {
     const status = computeVehicleStatus(vehicle);
     expect(status.kind).toBe('stuck');
     expect(status.ticks).toBe(vehicle.waitingTicks);
+  });
+});
+
+// ── issue #1092: the occupant overload ───────────────────────────────────────
+// A vehicle is a tool its occupant works and drives, so 'working'/'moving' come
+// off the driver when the caller has one. Every case below sets the vehicle's
+// own state/task field to the OPPOSITE of the driver's real state — that stale
+// pair is exactly what the locomotion tick leaves behind when a driver is
+// re-planned mid-journey, so an assertion that only agreed with the vehicle
+// would pass without the overload ever running.
+
+describe('computeVehicleStatus — occupant-derived working/moving', () => {
+  function makeOccupant(overrides: Partial<Employee> = {}): Employee {
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(7), 0, 0);
+    return Object.assign(employee, overrides);
+  }
+
+  function makeItinerary(): Itinerary {
+    return {
+      legs: [{ mode: 'drive', vehicleId: 1, destX: 9, destZ: 9, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 6 }],
+      goal: { kind: 'reposition', x: 9, z: 9 },
+      workTicks: 0,
+      estTotalTicks: 6,
+    };
+  }
+
+  it("reports working off the driver's own task timer, even while the vehicle still reads idle", () => {
+    const v = makeVehicle({ state: 'idle', task: 'drilling' });
+    const occupant = makeOccupant({ taskTicksRemaining: 4 });
+
+    const status = computeVehicleStatus(v, occupant);
+
+    expect(status.kind).toBe('working');
+    expect(status.task).toBe('drilling');
+  });
+
+  it("reports moving off the driver's itinerary, overriding the vehicle's stale 'working' state", () => {
+    const v = makeVehicle({ state: 'working', task: 'drilling' });
+    const occupant = makeOccupant({ taskTicksRemaining: null, itinerary: makeItinerary() });
+
+    expect(computeVehicleStatus(v, occupant).kind).toBe('moving');
+  });
+
+  it("reports idle for a driver doing nothing, overriding the vehicle's stale 'moving' state", () => {
+    const v = makeVehicle({ state: 'moving' });
+    const occupant = makeOccupant({ taskTicksRemaining: null, itinerary: null });
+
+    expect(computeVehicleStatus(v, occupant)).toEqual({ kind: 'idle', ticks: null, haulingPhase: null, task: null });
+  });
+
+  it('prefers a running task timer over an itinerary when the driver carries both', () => {
+    const v = makeVehicle({ state: 'idle', task: 'loading' });
+    const occupant = makeOccupant({ taskTicksRemaining: 2, itinerary: makeItinerary() });
+
+    const status = computeVehicleStatus(v, occupant);
+
+    expect(status.kind).toBe('working');
+    expect(status.task).toBe('loading');
+  });
+
+  it('leaves the machine-native kinds alone — stuck still wins over a working driver', () => {
+    const v = makeVehicle({ isMoveStuck: true, waitingTicks: 9, state: 'idle' });
+    const occupant = makeOccupant({ taskTicksRemaining: 4 });
+
+    const status = computeVehicleStatus(v, occupant);
+
+    expect(status.kind).toBe('stuck');
+    expect(status.ticks).toBe(9);
+  });
+
+  it('leaves the machine-native kinds alone — a reserved hauler still reads hauling with a driver aboard', () => {
+    const v = makeVehicle({ type: 'debris_hauler', reservedForActionId: 3, payload: null, state: 'idle' });
+    const occupant = makeOccupant({ taskTicksRemaining: null, itinerary: null });
+
+    const status = computeVehicleStatus(v, occupant);
+
+    expect(status.kind).toBe('hauling');
+    expect(status.haulingPhase).toBe('to_fragment');
   });
 });

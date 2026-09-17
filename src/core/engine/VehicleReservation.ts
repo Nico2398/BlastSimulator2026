@@ -24,6 +24,7 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
@@ -152,7 +153,7 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
   const action = state.pendingActions.find(a => a.id === employee.activeActionId);
   if (!action || action.requiredVehicleRole === null) return false;
   return state.vehicles.vehicles.some(
-    v => v.reservedForActionId === action.id && v.driverId === employee.id,
+    v => v.reservedForActionId === action.id && vehicleDriverId(v) === employee.id,
   );
 }
 
@@ -189,7 +190,7 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.state !== 'broken' &&
     v.reservedForActionId === null &&
-    (v.driverId === null || v.driverId === employee.id),
+    (vehicleDriverId(v) === null || vehicleDriverId(v) === employee.id),
   );
   if (qualifying.length === 0) return null;
 
@@ -338,7 +339,7 @@ function returnVehicleCargoToGround(state: GameState, vehicle: Vehicle): void {
  * it, task/state would sit frozen at whatever VEHICLE_ROLE_ARRIVAL_TASK the
  * arrival step set (Locomotion.ts) — e.g. still reading "drilling" — for as
  * long as a still-mounted driver goes without a same-role follow-up. Driver
- * mounting (driverId/locomotion) is untouched here — only the derived
+ * mounting (occupantIds/locomotion) is untouched here — only the derived
  * display fields reset.
  */
 function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicle | null {
@@ -355,11 +356,11 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
 
 /**
  * Full dismount of `vehicle`'s driver, if any: returns any loaded cargo to
- * the ground first, so that unassignDriver's own fail-closed guard
- * (Vehicle.ts — it refuses to clear driverId while `payload` is set) is
+ * the ground first, so that canReleaseDriver's own fail-closed guard
+ * (Vehicle.ts — it refuses the dismount while `payload` is set) is
  * guaranteed to succeed rather than silently no-op. A caller that skipped
- * that and ignored unassignDriver's return value could flip task/state to
- * idle while driverId/payload stayed set, reproducing the exact
+ * that and ignored canReleaseDriver's return value could flip task/state to
+ * idle while the driver seat and payload stayed set, reproducing the exact
  * stuck-forever bug this dismount exists to fix (#986 review follow-up).
  *
  * No-op (past the cargo return) if the vehicle currently has no driver.
@@ -396,7 +397,7 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  */
 export function dismountVehicleDriver(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   returnVehicleCargoToGround(state, vehicle);
-  if (vehicle.driverId === null) return;
+  if (vehicleDriverId(vehicle) === null) return;
 
   // #1089: Locomotion.ts is now the only writer of a vehicle's x/z, and it
   // writes the mounted employee's own x/z in the same step (I2) — the two
@@ -466,7 +467,7 @@ export function completeVehicleGatedAction(state: GameState, employee: Employee,
  * its work timer. If the vehicle's reservedForActionId still equals
  * `completedActionId`, dismounts the driver and frees the vehicle.
  * If it now names a different action id, a same-role follow-up already
- * claimed this same vehicle — leaves driverId/reservation untouched so
+ * claimed this same vehicle — leaves the driver seat and reservation untouched so
  * the employee stays mounted.
  */
 export function releaseVehicleOnCompletion(state: GameState, employee: Employee, completedActionId: number): void {
@@ -475,7 +476,8 @@ export function releaseVehicleOnCompletion(state: GameState, employee: Employee,
   // Defensive: only the driver whose action just completed may trigger the
   // release — a mismatch here means the reservation/driver bookkeeping has
   // already drifted, and reconcileVehicleReservations is the one to fix it.
-  if (vehicle.driverId !== null && vehicle.driverId !== employee.id) return;
+  const driverId = vehicleDriverId(vehicle);
+  if (driverId !== null && driverId !== employee.id) return;
 
   releaseVehicleReservation(state, completedActionId);
 }
@@ -483,7 +485,7 @@ export function releaseVehicleOnCompletion(state: GameState, employee: Employee,
 /**
  * Resolves the living employee currently holding `action`'s reservation on
  * `vehicle`: the action's own holderId when set, falling back to the
- * vehicle's driverId (the state before an action's holderId is assigned, at
+ * vehicle's own driver seat (the state before an action's holderId is assigned, at
  * claim time) — undefined when no id resolves, or when the resolved
  * employee no longer exists or is dead. Shared by reconcileVehicleReservations
  * below and WorldInvariants.ts's I5 check, which layers one more validity
@@ -494,7 +496,7 @@ export function resolveReservationHolder(
   vehicle: Vehicle,
   action: PendingAction,
 ): Employee | undefined {
-  const holderId = action.holderId ?? vehicle.driverId;
+  const holderId = action.holderId ?? vehicleDriverId(vehicle);
   if (holderId === null) return undefined;
   const holder = state.employees.employees.find(e => e.id === holderId);
   return holder && holder.alive ? holder : undefined;
@@ -577,14 +579,14 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
       // holder is dead (or, harmlessly, when nobody has boarded yet, in
       // which case dismountVehicleDriver is already a no-op). A dead
       // employee left mounted would otherwise violate I1/I2 forever, since
-      // nothing else ever revisits a stale driverId pointing at a corpse.
+      // nothing else ever revisits a stale occupant id pointing at a corpse.
       releaseVehicleReservation(state, actionId);
       dismountVehicleDriver(state, vehicle);
       continue;
     }
 
     if (
-      vehicle.driverId === holder.id
+      vehicleDriverId(vehicle) === holder.id
       && holder.activeActionId !== actionId
       // #1089 fix: a reservation still sitting in the holder's own taskQueue
       // (reserveOnePoolActionAhead) is legitimately not the active action —

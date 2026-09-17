@@ -21,7 +21,7 @@ import {
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import { assignSkill } from '../../src/core/entities/Employee.js';
-import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { board } from '../../src/core/engine/Mount.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import {
@@ -1048,7 +1048,6 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     buildLivingQuartersAndComplete(ctx, '20,20');
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
-    vehicle.driverId = empId;
     vehicle.occupantIds = [empId];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     emp.activeActionId = null; // idle
@@ -1073,7 +1072,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
 
     // The collapse policy released the vehicle rather than keeping it mounted.
     expect(vehicle.occupantIds).not.toContain(empId);
-    expect(vehicle.driverId).not.toBe(empId);
+    expect(vehicleDriverId(vehicle)).not.toBe(empId);
     expect(emp.locomotion).toEqual({ kind: 'on_foot' });
 
     // The vehicle is genuinely available to another qualified driver.
@@ -1097,7 +1096,6 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     buildLivingQuartersAndComplete(ctx, '20,20');
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
-    vehicle.driverId = empId;
     vehicle.occupantIds = [empId];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     emp.activeActionId = null; // idle
@@ -1108,7 +1106,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
 
     expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicle.occupantIds).toContain(empId);
-    expect(vehicle.driverId).toBe(empId);
+    expect(vehicleDriverId(vehicle)).toBe(empId);
 
     const violations = assertWorldInvariants(state);
     expect(violations.filter(v => v.kind === 'I2_mounted_position_mismatch')).toHaveLength(0);

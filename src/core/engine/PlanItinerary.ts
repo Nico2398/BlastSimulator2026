@@ -456,8 +456,9 @@ export function planItinerary(
   const role = resolved.requiredVehicleRole;
   // A 'reposition' goal carries no role of its own — an employee already
   // mounted planning one implicitly keeps driving the vehicle they're in
-  // (Zone.ts's already-driven-relocate case: `moveTo(state, v.driverId, {x,
-  // z})`, no explicit `via`) rather than stepping off it to walk, which
+  // (Zone.ts's already-driven-relocate case: `moveTo(state,
+  // vehicleDriverId(v), {x, z})`, no explicit `via`) rather than stepping off
+  // it to walk, which
   // would desync their position from the vehicle's (I2) without ever
   // alighting. An explicit `via` always wins when both are present.
   const via = opts?.via ?? (

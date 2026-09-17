@@ -132,7 +132,7 @@
       }
     },
     {
-      "command": "vehicle move 2 to:2,6",
+      "command": "vehicle reposition 2 2 6",
       "interaction": [
         {
           "type": "clickSelector",
@@ -175,7 +175,7 @@
       }
     },
     {
-      "command": "vehicle move 3 to:10,-2",
+      "command": "vehicle reposition 3 10 -2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -215,7 +215,7 @@
       }
     },
     {
-      "command": "vehicle move 4 to:11,1",
+      "command": "vehicle reposition 4 11 1",
       "interaction": [
         {
           "type": "clickSelector",

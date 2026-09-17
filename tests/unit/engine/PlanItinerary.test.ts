@@ -139,7 +139,6 @@ describe('planItinerary', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
     const employee = hireLicensedDriller(state, 'drill_rig', vehicle.x, vehicle.z);
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
     state.pendingActions.push(action);

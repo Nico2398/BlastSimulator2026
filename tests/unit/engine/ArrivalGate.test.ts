@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 // #1089: boarding itself, and a vehicle-gated action's own drive, now resolve
@@ -89,7 +89,7 @@ describe('tickArrivalGate — mid-transit employees are untouched', () => {
 
     const result = tickArrivalGate(state);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
     expect(result.driversBoarded).toEqual([]);
     expect(result.boardingCancelled).toEqual([]);
@@ -191,7 +191,7 @@ describe('tickArrivalGate — vehicle boarding (boarding itself now resolves in 
     expect(moveResult.success).toBe(true);
     tickLocomotion(state, emitter);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.pendingDriverVehicleId).toBeNull();
     expect(boardedEvents).toEqual([{ employeeId: employee.id, vehicleId: vehicle.id }]);
   });
@@ -220,7 +220,6 @@ describe('tickArrivalGate — vehicle boarding (boarding itself now resolves in 
     const { employee: otherDriver } = hireEmployee(state.employees, 'driver', new Random(SEED + 1));
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     vehicle.occupantIds = [otherDriver.id];
-    vehicle.driverId = otherDriver.id;
     otherDriver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     employee.x = 5;
@@ -229,7 +228,7 @@ describe('tickArrivalGate — vehicle boarding (boarding itself now resolves in 
     const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
 
     expect(moveResult.success).toBe(false);
-    expect(vehicle.driverId).toBe(otherDriver.id);
+    expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
     expect(employee.pendingDriverVehicleId).toBeNull();
   });
 
@@ -251,7 +250,7 @@ describe('tickArrivalGate — vehicle boarding (boarding itself now resolves in 
 
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(employee.itinerary).toBeNull();
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
   });
@@ -272,7 +271,7 @@ describe('tickArrivalGate — driverBoardingCount (issue #1083)', () => {
     expect(moveResult.success).toBe(true);
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(state.vehicles.driverBoardingCount).toBe(1);
   });
 
@@ -296,73 +295,71 @@ describe('tickArrivalGate — driverBoardingCount (issue #1083)', () => {
   });
 });
 
-describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
-  it('starts driving toward pendingEvacuationDestination once boarding resolves, for a vehicle not reserved for any action', () => {
+// #1092: an evacuation rescue is one itinerary — walk to the vehicle, board
+// it, drive it clear, step off — rather than a board whose arrival step read
+// a `pendingEvacuationDestination` marker off the vehicle and issued a second
+// moveTo. Nothing is staged on the vehicle at all any more, so what these
+// cover is the itinerary surviving (or being abandoned) across the board.
+describe('tickArrivalGate — evacuation-drive boarding (#1042, one itinerary since #1092)', () => {
+  it('keeps driving toward the safe cell once boarding resolves, for a vehicle not reserved for any action', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
     expect(vehicle.reservedForActionId).toBeNull();
 
     employee.x = 5;
     employee.z = 5;
 
-    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    // `via` is what clearZone (Zone.ts) plans the rescue with: one itinerary
+    // routing the driver through the vehicle to the safe cell.
+    const moveResult = moveTo(state, employee.id, { x: 40, z: 40 }, { via: vehicle.id });
     expect(moveResult.success).toBe(true);
-    // First tick resolves the board and installs the evacuation-drive
-    // itinerary (Locomotion.handlePostBoardIntent) — that itinerary's own
-    // drive leg only starts advancing (and writes vehicle.targetX/Z) on the
-    // NEXT tick (#1089: a board arrival step that installs a brand-new
-    // itinerary supersedes the one the walking loop was iterating, so it
-    // stops there for the tick rather than also advancing the new one).
+
     tickLocomotion(state);
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     tickLocomotion(state);
 
     expect(vehicle.targetX).toBe(40);
     expect(vehicle.targetZ).toBe(40);
   });
 
-  it('clears pendingEvacuationDestination when a boarding attempt is cancelled because another driver took the vehicle first', () => {
+  it('abandons the rescue itinerary when the boarding is cancelled because another driver took the vehicle first', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { employee: otherDriver } = hireEmployee(state.employees, 'driver', new Random(SEED + 1));
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
 
     employee.x = 5;
     employee.z = 5;
 
     // Plans successfully — the vehicle is still free at plan time.
-    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    const moveResult = moveTo(state, employee.id, { x: 40, z: 40 }, { via: vehicle.id });
     expect(moveResult.success).toBe(true);
 
     // Another driver claims the vehicle in the same tick, before this
     // employee's own (already-adjacent) board arrival step resolves.
     vehicle.occupantIds = [otherDriver.id];
-    vehicle.driverId = otherDriver.id;
     otherDriver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBe(otherDriver.id);
+    expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
     expect(employee.itinerary).toBeNull();
-    expect(vehicle.pendingEvacuationDestination).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
   });
 
-  it('clears pendingEvacuationDestination when a boarding attempt is cancelled because the vehicle moved away first', () => {
+  it('abandons the rescue itinerary when the boarding is cancelled because the vehicle moved away first', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.pendingEvacuationDestination = { x: 60, z: 60 };
 
     employee.x = 5;
     employee.z = 5;
 
-    const moveResult = moveTo(state, employee.id, { vehicleId: vehicle.id });
+    const moveResult = moveTo(state, employee.id, { x: 60, z: 60 }, { via: vehicle.id });
     expect(moveResult.success).toBe(true);
 
     // Vehicle drove off before the employee's (already-arrived, adjacent)
@@ -372,9 +369,9 @@ describe('tickArrivalGate — evacuation-drive boarding (#1042)', () => {
 
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(employee.itinerary).toBeNull();
-    expect(vehicle.pendingEvacuationDestination).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
   });
 });
 
@@ -398,7 +395,7 @@ describe('tickArrivalGate — dead employees are skipped entirely', () => {
 
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.taskTicksRemaining).toBeNull();
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
     expect(employee.pendingRestDuration).toBe(3);
     expect(employee.pendingTaskDuration).toBe(4);
     expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
@@ -441,7 +438,7 @@ describe('tickArrivalGate — combined multi-employee tick', () => {
     expect(result.taskStarted).toEqual([tasked.id]);
     expect(resting.restTicksRemaining).toBe(2);
     expect(tasked.taskTicksRemaining).toBe(3);
-    expect(vehicle.driverId).toBe(driver.id);
+    expect(vehicleDriverId(vehicle)).toBe(driver.id);
   });
 });
 
@@ -490,7 +487,7 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     expect(moveResult.success).toBe(true);
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     // The vehicle, not the employee, drives the rest of the way to the
     // action's own target — this is what #550 adds on top of plain boarding.
     expect(vehicle.targetX).toBe(20);
@@ -521,7 +518,7 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     const moveResult = moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
     expect(moveResult.success).toBe(true);
     tickLocomotion(state); // boards + starts the drive
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     tickArrivalGate(state);
 
     // Still driving — the work timer must not have started yet.
@@ -548,7 +545,7 @@ describe('tickArrivalGate — stale-claim guard on vehicle arrival (#928)', () =
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.targetX = 20;
     vehicle.targetZ = 20;
     // The vehicle has already arrived at the action's target this tick.
@@ -634,7 +631,6 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.targetX = 20;
@@ -651,7 +647,7 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     reconcileVehicleReservations(state);
 
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
   });
 
   it("interrupts (status back to 'queued') the employee's action when the reserved vehicle is destroyed mid-drive", () => {
@@ -660,7 +656,7 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.targetX = 20;
     vehicle.targetZ = 20;
 

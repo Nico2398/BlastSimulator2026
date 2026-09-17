@@ -38,7 +38,6 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -59,7 +58,7 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     employee.destinationX = 5;
     employee.destinationZ = 5;
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     const scene = new THREE.Scene();
     const characters = new CharacterMesh(scene);
@@ -94,7 +93,7 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
-    vehicle.driverId = null;
+    vehicle.occupantIds = [];
 
     const scene = new THREE.Scene();
     const characters = new CharacterMesh(scene);
@@ -103,7 +102,6 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
     expect(characters.count).toBe(1);
 
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
@@ -117,7 +115,6 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -135,7 +132,6 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     vehicle.z = 4;
     employee.x = 12;
     employee.z = 4;
-    vehicle.driverId = null;
     vehicle.occupantIds = [];
     employee.locomotion = { kind: 'on_foot' };
 
@@ -150,7 +146,6 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
     const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(SEED), 5, 5);
     const { employee: onFoot } = hireEmployee(state.employees, 'surveyor', new Random(SEED + 1), 8, 8);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
-    vehicle.driverId = driver.id;
     vehicle.occupantIds = [driver.id];
     driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -172,14 +167,13 @@ describe('syncEntitySets — suppresses the character mesh for a seated driver (
 // truth. These two cases set locomotion without ever touching driverId, so
 // they fail against today's syncEntitySets (still driverId-only) and pass
 // once it reads locomotion instead/in addition.
-describe('syncEntitySets — reads employee.locomotion, not just vehicle.driverId (#1087)', () => {
-  it('creates no character mesh for an employee whose locomotion is mounted, even when vehicle.driverId is still null', () => {
+describe('syncEntitySets — reads employee.locomotion, not just the driver seat (#1087)', () => {
+  it('creates no character mesh for an employee whose locomotion is mounted, even when the vehicle lists no driver', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
     // Deliberately not mirrored onto driverId — locomotion alone must suppress.
-    vehicle.driverId = null;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -198,7 +192,6 @@ describe('syncEntitySets — reads employee.locomotion, not just vehicle.driverI
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = null;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 

@@ -294,7 +294,7 @@ export function runTick(
   // fragment completion no longer needs a separate pass after this call
   // (#1091): ArrivalEffects.ts's own haul_unload/boulder_split effects call
   // completeVehicleGatedAction the instant they succeed, inside this call.
-  const arrivalResult = tickArrivalGate(state, emitter, grid ?? undefined);
+  const arrivalResult = tickArrivalGate(state, grid ?? undefined);
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).

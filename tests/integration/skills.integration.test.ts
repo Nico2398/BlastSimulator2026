@@ -24,6 +24,7 @@ import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
 import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/balance.js';
+import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -694,7 +695,7 @@ describe('Vehicle-gated dispatch grants driving licence XP tick-by-tick (#622)',
     let sawBoarded = false;
     for (let i = 0; i < 200 && emp().taskTicksRemaining === null; i++) {
       tickCommand(ctx, ['1'], {});
-      if (vehicle.driverId === driverId) sawBoarded = true;
+      if (vehicleDriverId(vehicle) === driverId) sawBoarded = true;
     }
     expect(sawBoarded).toBe(true);
     expect(emp().taskTicksRemaining).not.toBeNull();

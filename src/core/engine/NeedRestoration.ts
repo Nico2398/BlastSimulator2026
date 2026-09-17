@@ -49,7 +49,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // destination with a walk back toward whatever building is nearest. See
     // isMidEvacuationWalk's own doc comment (Evacuation.ts) for the shared
     // reasoning across all four call sites (#557).
-    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(state, emp)) continue;
+    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(emp)) continue;
 
     // First gauge (by NEED_SOFT_THRESHOLDS' own key order) below its warning
     // threshold — derived from the config map's keys rather than a
@@ -118,7 +118,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // dangerZoneClear` never resolving because two evacuating employees
     // collapsed mid-walk and orbited back to their pre-evacuation
     // living_quarters forever.
-    if (isMidEvacuation(state, emp)) continue;
+    if (isMidEvacuation(emp)) continue;
 
     // checkCollapse nulls activeActionId itself on collapse, so the previous
     // active action (if any) must be captured before calling it — otherwise
@@ -236,7 +236,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // ForceShiftRest.ts) keeps a mounted employee driving via beginRestTravel's
     // own mount continuity, but a fatigue floor this hard is a genuine "the
     // employee can no longer be trusted behind the wheel" event. alight's own
-    // guards (unassignDriver — mid-haul lock, e.g.) may refuse; that's fine —
+    // guards (canReleaseDriver — mid-haul lock, e.g.) may refuse; that's fine —
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
     alightIfMounted(state, emp, _emitter);

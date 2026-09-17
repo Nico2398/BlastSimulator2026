@@ -13,7 +13,7 @@ import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
@@ -223,8 +223,19 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     employee.fatigue = 10; // below the threshold of 25
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    vehicle.occupantIds = [employee.id];
+    // Mid-evacuation-drive is read off the driver's own itinerary since
+    // #1092: a `reposition` goal whose last leg puts them back on foot, the
+    // shape only clearZone (Zone.ts) ever plans.
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 40, destZ: 40,
+        arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9,
+      }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
@@ -245,7 +256,6 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     employee.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25)
@@ -763,8 +773,19 @@ describe('tickCollapse (7.6)', () => {
     employee.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue (0)
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    vehicle.occupantIds = [employee.id];
+    // Mid-evacuation-drive is read off the driver's own itinerary since
+    // #1092: a `reposition` goal whose last leg puts them back on foot, the
+    // shape only clearZone (Zone.ts) ever plans.
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 40, destZ: 40,
+        arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9,
+      }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
 
     const result = tickCollapse(state);
 
@@ -799,7 +820,6 @@ describe('tickCollapse (7.6)', () => {
     state.pendingActions.push(gatedAction);
     employee.activeActionId = gatedAction.id;
     employee.taskTicksRemaining = 3; // boarded, mid-execution
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.reservedForActionId = gatedAction.id;
@@ -819,7 +839,7 @@ describe('tickCollapse (7.6)', () => {
 
     // The vehicle reservation and its driver are released too.
     expect(vehicle.reservedForActionId).toBeNull();
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicleDriverId(vehicle)).toBeNull();
 
     const restAction = state.pendingActions.find(
       (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
@@ -929,7 +949,6 @@ describe('tickCollapse (7.6)', () => {
       state.pendingActions.push(activeAction);
       employee.activeActionId = activeAction.id;
       employee.taskTicksRemaining = 3; // boarded, mid-execution
-      vehicle.driverId = employee.id;
       vehicle.occupantIds = [employee.id];
       employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
       vehicle.reservedForActionId = activeAction.id;
@@ -947,7 +966,7 @@ describe('tickCollapse (7.6)', () => {
       expect(released.holderId).toBeNull();
       expect(employee.activeActionId).not.toBe(activeAction.id);
       expect(vehicle.reservedForActionId).toBeNull();
-      expect(vehicle.driverId).toBeNull();
+      expect(vehicleDriverId(vehicle)).toBeNull();
     });
 
     it('empty taskQueue on an already-collapsing employee: no crash, no unintended release', () => {
@@ -981,7 +1000,6 @@ describe('tickCollapse (7.6)', () => {
 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     employee.activeActionId = null; // idle — nothing being actively worked
@@ -993,7 +1011,7 @@ describe('tickCollapse (7.6)', () => {
 
     expect(result.collapsed).toEqual([employee.id]);
     expect(vehicle.occupantIds).not.toContain(employee.id);
-    expect(vehicle.driverId).not.toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).not.toBe(employee.id);
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
 
     const violations = assertWorldInvariants(state);

@@ -18,6 +18,7 @@
 
 import type { ActionType, GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { NavGrid } from '../nav/NavGrid.js';
@@ -122,7 +123,7 @@ export function claimAndDispatchFragmentAction(
     a.type === actionType && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
   if (!action) return { success: false, error: t(noActionQueuedKey) };
 
-  const employee = state.employees.employees.find(e => e.id === vehicle.driverId);
+  const employee = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle));
   if (!employee) return { success: false, error: 'Vehicle has no driver' };
 
   const claimed = claimPendingAction(state, action.id, employee.id);

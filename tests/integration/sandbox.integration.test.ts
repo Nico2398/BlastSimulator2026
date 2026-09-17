@@ -13,6 +13,7 @@ import { DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH, STARTING_SITE_STAFFED_COMPOSITIO
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
+import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 /** Solid-voxel count — a cheap fingerprint of a generated map. */
 function solidCount(grid: VoxelGrid): number {
@@ -178,7 +179,7 @@ describe('sandbox mode', () => {
       const remaining = [...vehicles];
       for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
         const idx = remaining.findIndex(v =>
-          v.type === slot.role && v.tier === slot.tier && v.driverId === null && v.state === 'idle',
+          v.type === slot.role && v.tier === slot.tier && vehicleDriverId(v) === null && v.state === 'idle',
         );
         expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
         remaining.splice(idx, 1);

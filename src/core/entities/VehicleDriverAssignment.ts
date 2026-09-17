@@ -6,7 +6,8 @@
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
-import { getVehicleDef } from './Vehicle.js';
+import { vehicleDriverId } from './Vehicle.js';
+import { isMounted } from './EmployeeLocomotion.js';
 import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 
 // ── Licence mapping ──
@@ -54,23 +55,12 @@ export function canAssignDriver(
     return { success: false, error: 'Vehicle is reserved for another task' };
   }
 
-  const alreadyDriving = vehicleState.vehicles.some(v => v.driverId === employeeId);
+  const alreadyDriving = vehicleState.vehicles.some(v => vehicleDriverId(v) === employeeId);
   if (alreadyDriving) return { success: false, error: 'Employee already driving another vehicle' };
 
-  if (vehicle.driverId !== null) return { success: false, error: 'Vehicle already has a driver' };
+  if (vehicleDriverId(vehicle) !== null) return { success: false, error: 'Vehicle already has a driver' };
 
   return { success: true, vehicle, employee };
-}
-
-/**
- * Returns the loading rate (kg/tick) for a rock_digger, or 0 for any other role.
- *
- * @note Function name intentionally kept as `getExcavatorLoadingRate` for
- *       public-API backward compatibility — do not rename without updating all callers.
- */
-export function getExcavatorLoadingRate(vehicle: Vehicle): number {
-  if (vehicle.type !== 'rock_digger') return 0;
-  return getVehicleDef('rock_digger').capacity;
 }
 
 // ── Evacuation driver assignment (#1042) ──
@@ -90,27 +80,7 @@ export function findBestEvacuationDriver(
   candidateEmployeeIds: readonly number[],
   canReach: EvacuationDriverReachabilityCheck,
 ): Employee | null {
-  const ranked = [...candidateEmployeeIds].sort((a, b) => {
-    const empA = employeeState.employees.find(e => e.id === a);
-    const empB = employeeState.employees.find(e => e.id === b);
-    const distA = empA ? distanceSq(empA, vehicle) : Infinity;
-    const distB = empB ? distanceSq(empB, vehicle) : Infinity;
-    if (distA !== distB) return distA - distB;
-    return a - b;
-  });
-
-  // Cheap, exact qualification filter (licence, availability) applied to the
-  // whole ranked pool before any real pathfinding — mirrors
-  // selectBestActionForEmployee's own pre-filter (ActionSelection.ts). Only
-  // the nearest EVACUATION_DRIVER_MAX_PATH_ATTEMPTS qualified candidates then
-  // get a real `findPath`-backed `canReach` call, capping per-vehicle
-  // evacuation dispatch cost regardless of how many employees are in the
-  // zone (#1042 review).
-  const qualified: Employee[] = [];
-  for (const candidateId of ranked) {
-    const check = canAssignDriver(vehicleState, employeeState, vehicle.id, candidateId);
-    if (check.success) qualified.push(check.employee);
-  }
+  const qualified = rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, candidateEmployeeIds);
 
   for (let i = 0; i < qualified.length && i < EVACUATION_DRIVER_MAX_PATH_ATTEMPTS; i++) {
     const candidate = qualified[i]!;
@@ -120,8 +90,81 @@ export function findBestEvacuationDriver(
   return null;
 }
 
+/**
+ * `candidateEmployeeIds` ranked nearest-first (lowest id breaking an exact
+ * tie) and filtered down to those `canAssignDriver` actually accepts for
+ * `vehicle` — licence, availability, and reservation, all cheap and exact,
+ * applied to the whole pool before any caller spends a real `findPath` on
+ * it (mirrors selectBestActionForEmployee's own pre-filter,
+ * ActionSelection.ts). Shared by evacuation dispatch and the player's own
+ * `reposition` order (#1092) — both want "the nearest employee who could
+ * legally drive this", differing only in what they additionally require.
+ */
+function rankQualifiedDriversByDistance(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  candidateEmployeeIds: readonly number[],
+): Employee[] {
+  const ranked = [...candidateEmployeeIds].sort((a, b) => {
+    const empA = employeeState.employees.find(e => e.id === a);
+    const empB = employeeState.employees.find(e => e.id === b);
+    const distA = empA ? distanceSq(empA, vehicle) : Infinity;
+    const distB = empB ? distanceSq(empB, vehicle) : Infinity;
+    if (distA !== distB) return distA - distB;
+    return a - b;
+  });
+
+  const qualified: Employee[] = [];
+  for (const candidateId of ranked) {
+    const check = canAssignDriver(vehicleState, employeeState, vehicle.id, candidateId);
+    if (check.success) qualified.push(check.employee);
+  }
+  return qualified;
+}
+
 function distanceSq(employee: Employee, vehicle: Vehicle): number {
   const dx = employee.x - vehicle.x;
   const dz = employee.z - vehicle.z;
   return dx * dx + dz * dz;
+}
+
+// ── Reposition driver assignment (#1092) ──
+
+/**
+ * Picks a licensed, genuinely idle employee to drive `vehicle` to a
+ * player-chosen parking spot (the `reposition` Goal — see
+ * `gameplay-vehicle-fleet` phase 6), or null when none qualifies. Unlike
+ * `findBestEvacuationDriver`, a reposition is player-initiated rather than
+ * urgency-ranked against a caller-supplied candidate pool, so the pool is
+ * the whole living roster and no `canReach` probe is spent up front —
+ * `moveTo`'s own exact-fidelity plan is what refuses an unreachable
+ * vehicle, and reports why.
+ *
+ * "Idle" is deliberately stricter than `canAssignDriver`'s availability
+ * check: a player parking a vehicle must never pull an employee off work
+ * they are already walking to, resting through, or collapsing from.
+ */
+export function findAvailableDriverForReposition(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+): Employee | null {
+  const candidateIds = employeeState.employees
+    .filter(e => isIdleForReposition(e, vehicle))
+    .map(e => e.id);
+
+  return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, candidateIds)[0] ?? null;
+}
+
+/** Alive, doing nothing at all, and not sitting in (or walking to) some other vehicle. */
+function isIdleForReposition(employee: Employee, vehicle: Vehicle): boolean {
+  if (!employee.alive || employee.injured || employee.collapsing) return false;
+  if (employee.activeActionId !== null || employee.itinerary !== null) return false;
+  if (employee.restTicksRemaining !== null || employee.pendingRestDuration !== null) return false;
+  if (employee.taskTicksRemaining !== null) return false;
+  if (employee.destinationX !== null || employee.destinationZ !== null) return false;
+  if (employee.pendingDriverVehicleId !== null && employee.pendingDriverVehicleId !== vehicle.id) return false;
+  if (isMounted(employee.locomotion)) return false;
+  return true;
 }

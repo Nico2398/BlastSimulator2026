@@ -6,11 +6,12 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import {
   isEvacuationHoldActive, clearResolvedEvacuationHolds, discardStaleRestAction, releaseInZoneTaskQueueEntries,
-  isMidEvacuationDrive, releaseArrivedEvacuationDrivers,
+  isMidEvacuationDrive,
 } from '../../../src/core/engine/EvacuationHold.js';
 import type { ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import type { ArrivalStep, Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { Random } from '../../../src/core/math/Random.js';
 
 const EVACUATION_SEED = 42;
@@ -28,6 +29,16 @@ function makeAction(overrides: Partial<PendingAction> & { id: number }): Pending
     holderId: null,
     queuedAtTick: 0,
     ...overrides,
+  };
+}
+
+/** A single-drive-leg reposition itinerary, ending in `onArrive`. */
+function makeRepositionItinerary(vehicleId: number, onArrive: ArrivalStep): Itinerary {
+  return {
+    goal: { kind: 'reposition', x: 40, z: 40 },
+    legs: [{ mode: 'drive', vehicleId, destX: 40, destZ: 40, arrival: 'exact', onArrive, estTicks: 9 }],
+    workTicks: 0,
+    estTotalTicks: 9,
   };
 }
 
@@ -221,20 +232,73 @@ describe('discardStaleRestAction', () => {
   });
 });
 
-describe('isMidEvacuationDrive (#1042)', () => {
+describe('isMidEvacuationDrive (#1042, itinerary-keyed since #1092)', () => {
   it('true for an employee with no active action who is driving a vehicle out as part of an evacuation', () => {
     const state = createGame({ seed: EVACUATION_SEED });
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-    // The marker that actually distinguishes an evacuation drive from an
-    // ordinary one (driverId alone is not unique to evacuation — see
-    // isMidEvacuationDrive's own doc comment).
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
+    vehicle.occupantIds = [employee.id];
+    // The shape that actually distinguishes an evacuation drive from an
+    // ordinary one (occupantIds[0] alone is not unique to evacuation — see
+    // isMidEvacuationDrive's own doc comment): a reposition goal whose last
+    // leg puts the driver back on foot, which only clearZone ever plans.
+    employee.itinerary = makeRepositionItinerary(vehicle.id, { kind: 'alight' });
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(true);
+    expect(isMidEvacuationDrive(employee)).toBe(true);
+  });
+
+  it('true while still walking over to board the vehicle — the rescue is one itinerary, board leg included', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [
+        { mode: 'foot', vehicleId: null, destX: 5, destZ: 5, arrival: 'adjacent', onArrive: { kind: 'board', vehicleId: vehicle.id }, estTicks: 5 },
+        { mode: 'drive', vehicleId: vehicle.id, destX: 40, destZ: 40, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9 },
+      ],
+      workTicks: 0,
+      estTotalTicks: 14,
+    };
+
+    expect(isMidEvacuationDrive(employee)).toBe(true);
+  });
+
+  it('false for an ordinary player-ordered reposition — the driver stays in the cab, so the last leg alights nobody (boundary)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.occupantIds = [employee.id];
+    employee.itinerary = makeRepositionItinerary(vehicle.id, { kind: 'none' });
+
+    expect(isMidEvacuationDrive(employee)).toBe(false);
+  });
+
+  it('false for a work itinerary that happens to end in an alight — only a reposition goal counts (rejection)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.occupantIds = [employee.id];
+    const itinerary = makeRepositionItinerary(vehicle.id, { kind: 'alight' });
+    employee.itinerary = { ...itinerary, goal: { kind: 'work', actionId: 7 } };
+
+    expect(isMidEvacuationDrive(employee)).toBe(false);
+  });
+
+  it('false once the drive lands and Locomotion clears the itinerary, even with the driver still aboard', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.occupantIds = [employee.id];
+    employee.itinerary = null;
+
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false for an employee not driving anything', () => {
@@ -244,7 +308,7 @@ describe('isMidEvacuationDrive (#1042)', () => {
     employee.activeActionId = null;
     purchaseVehicle(state.vehicles, 'debris_hauler'); // driverless
 
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 
   it('false for an ordinary vehicle-gated driver — activeActionId still non-null while driving (distinguishes a task drive from an evacuation drive)', () => {
@@ -253,69 +317,18 @@ describe('isMidEvacuationDrive (#1042)', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     employee.activeActionId = 7; // still claiming a normal vehicle-gated action
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
-
-    expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
-  });
-});
-
-describe('releaseArrivedEvacuationDrivers (#1042)', () => {
-  it('unassigns the driver and clears pendingEvacuationDestination the tick the vehicle arrives at it', () => {
-    const state = createGame({ seed: EVACUATION_SEED });
-    const rng = new Random(EVACUATION_SEED);
-    const { employee } = hireEmployee(state.employees, 'driver', rng);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    vehicle.targetX = 40;
-    vehicle.targetZ = 40;
-    vehicle.x = 40;
-    vehicle.z = 40; // already arrived
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
 
-    releaseArrivedEvacuationDrivers(state);
-
-    expect(vehicle.driverId).toBeNull();
-    expect(vehicle.pendingEvacuationDestination).toBeNull();
-  });
-
-  it('does nothing to a vehicle whose reservedForActionId is non-null — must not dismount a driver mid legitimate task', () => {
-    const state = createGame({ seed: EVACUATION_SEED });
-    const rng = new Random(EVACUATION_SEED);
-    const { employee } = hireEmployee(state.employees, 'driver', rng);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
-    vehicle.targetX = 40;
-    vehicle.targetZ = 40;
-    vehicle.x = 40;
-    vehicle.z = 40;
-    vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
-    vehicle.reservedForActionId = 5;
-
-    releaseArrivedEvacuationDrivers(state);
-
-    expect(vehicle.driverId).toBe(employee.id);
-    expect(vehicle.pendingEvacuationDestination).toEqual({ x: 40, z: 40 });
-  });
-
-  it('does nothing to a vehicle with pendingEvacuationDestination === null (boundary)', () => {
-    const state = createGame({ seed: EVACUATION_SEED });
-    const rng = new Random(EVACUATION_SEED);
-    const { employee } = hireEmployee(state.employees, 'driver', rng);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
-    vehicle.targetX = 40;
-    vehicle.targetZ = 40;
-    vehicle.x = 40;
-    vehicle.z = 40;
-    vehicle.pendingEvacuationDestination = null;
-
-    releaseArrivedEvacuationDrivers(state);
-
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(isMidEvacuationDrive(employee)).toBe(false);
   });
 });
+
+// The arrived-driver sweep this file used to test
+// (`releaseArrivedEvacuationDrivers`) is gone with #1092: the dismount is now
+// the evacuation itinerary's own final `alight` arrival step, installed by
+// `alightOnArrival` (MoveTo.ts, covered in MoveTo.test.ts) and executed by
+// tickLocomotion's arrival handling (Locomotion.test.ts). Nothing scans for
+// arrived vehicles any more, so there is no sweep left to test here.
 
 describe('releaseInZoneTaskQueueEntries', () => {
   it('discards an in-zone rest entry, releases an in-zone non-rest entry to the open pool, and leaves an out-of-zone entry untouched', () => {

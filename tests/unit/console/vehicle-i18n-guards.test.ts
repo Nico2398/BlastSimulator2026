@@ -29,7 +29,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee, type EmployeeRole } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { purchaseVehicle, getAllVehicleRoles, getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
@@ -56,19 +56,16 @@ function hireTestDriver(ctx: GameContext, role: EmployeeRole = 'driver') {
 /**
  * Hires a driver and mounts them onto `vehicle` directly — bypassing the
  * full walk-to-board flow (Mount.board), which these message-text tests
- * have no need to exercise. #1089: an employee is the only mobile agent,
- * so `vehicle move`/`assign task:moving` now drive through moveTo, which
- * requires a REAL employee at `vehicle.driverId` (unlike the pre-#1089
- * model, where a bare numeric driverId was enough to satisfy the driver
- * gate) — replaces this file's old `vehicle.driverId = 42` bypass for the
- * two success-path tests below.
+ * have no need to exercise. #1089: an employee is the only mobile agent, so
+ * `vehicle reposition` drives through moveTo, which needs a REAL employee in
+ * the driver seat (`occupantIds[0]`) — a bare numeric id no longer satisfies
+ * the driver gate.
  */
-function mountTestDriver(ctx: GameContext, vehicle: { id: number; x: number; z: number; driverId: number | null; occupantIds: number[] }) {
+function mountTestDriver(ctx: GameContext, vehicle: { id: number; x: number; z: number; occupantIds: number[] }) {
   const employee = hireTestDriver(ctx);
   employee.x = vehicle.x;
   employee.z = vehicle.z;
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-  vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   return employee;
 }
@@ -114,14 +111,14 @@ describe('vehicle.ts — English literal + fr divergence (table-driven)', () => 
       run: (ctx) => vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '9' }),
     },
     {
-      name: 'assign usage (invalid id)',
-      englishLiteral: 'Usage: vehicle assign <id> task:transport from:x,z to:x,z',
-      run: (ctx) => vehicleCommand(ctx, ['assign'], {}),
+      name: 'reposition usage (missing args)',
+      englishLiteral: 'Usage: vehicle reposition <id> <x> <z>',
+      run: (ctx) => vehicleCommand(ctx, ['reposition'], {}),
     },
     {
-      name: 'move usage (invalid args)',
-      englishLiteral: 'Usage: vehicle move <id> to:x,z',
-      run: (ctx) => vehicleCommand(ctx, ['move'], {}),
+      name: 'reposition usage (non-numeric coordinates)',
+      englishLiteral: 'Usage: vehicle reposition <id> <x> <z>',
+      run: (ctx) => vehicleCommand(ctx, ['reposition', '1', 'east', 'north'], {}),
     },
     {
       name: 'driver usage (invalid vehicleId)',
@@ -150,7 +147,7 @@ describe('vehicle.ts — English literal + fr divergence (table-driven)', () => 
     },
     {
       name: 'default/unknown subcommand usage',
-      englishLiteral: 'Usage: vehicle (list|buy|assign|move|driver|haul|scrap|break)',
+      englishLiteral: 'Usage: vehicle (list|buy|reposition|driver|haul|scrap|break)',
       run: (ctx) => vehicleCommand(ctx, ['bogus'], {}),
     },
   ];
@@ -171,9 +168,9 @@ describe('vehicle.ts — English literal + fr divergence (table-driven)', () => 
   }
 });
 
-// ── vehicle.not_found — shared across assign/move/driver/scrap ──────────────
+// ── vehicle.not_found — shared across reposition/driver/scrap ───────────────
 
-describe('vehicle.ts — not_found (shared across assign/move/driver/scrap)', () => {
+describe('vehicle.ts — not_found (shared across reposition/driver/scrap)', () => {
   const NOT_FOUND_ID = 999999;
   const NOT_FOUND_EN = `Vehicle #${NOT_FOUND_ID} not found.`;
 
@@ -181,8 +178,7 @@ describe('vehicle.ts — not_found (shared across assign/move/driver/scrap)', ()
     name: string;
     run: (ctx: GameContext) => { success: boolean; output: string };
   }> = [
-    { name: 'assign', run: (ctx) => vehicleCommand(ctx, ['assign', String(NOT_FOUND_ID)], { task: 'transport' }) },
-    { name: 'move', run: (ctx) => vehicleCommand(ctx, ['move', String(NOT_FOUND_ID)], { to: '5,5' }) },
+    { name: 'reposition', run: (ctx) => vehicleCommand(ctx, ['reposition', String(NOT_FOUND_ID), '5', '5'], {}) },
     { name: 'driver', run: (ctx) => vehicleCommand(ctx, ['driver', String(NOT_FOUND_ID), '1'], {}) },
     { name: 'scrap', run: (ctx) => vehicleCommand(ctx, ['scrap', String(NOT_FOUND_ID)], {}) },
   ];
@@ -205,58 +201,60 @@ describe('vehicle.ts — not_found (shared across assign/move/driver/scrap)', ()
   }
 });
 
-// ── move_no_driver — refuses to move a driverless vehicle (#947) ───────────
+// ── reposition_no_driver — refuses a vehicle nobody idle can crew (#1092) ──
+// Replaces the old move_no_driver/assign-task:moving guards (#947): both
+// subcommands are gone, and `reposition` answers the same question — a
+// vehicle with nobody aboard and nobody idle and licensed to board it cannot
+// be sent anywhere.
 
-describe('vehicle.ts — move refuses a driverless vehicle', () => {
+describe('vehicle.ts — reposition refuses a vehicle no idle licensed driver can crew', () => {
+  const noDriverEn = (id: number) => `No idle licensed driver is available for vehicle #${id}.`;
+
   it('resolves to the exact English literal and does not move the vehicle', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    expect(vehicle.driverId).toBeNull();
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    expect(vehicleDriverId(vehicle)).toBeNull();
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
-    expect(vehicle.task).not.toBe('moving');
+    expect(result.output).toBe(noDriverEn(vehicle.id));
+    expect(vehicle.x).toBe(5);
+    expect(vehicle.z).toBe(5);
   });
 
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
     setLocale('fr');
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);
-    expect(result.output).not.toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
+    expect(result.output).not.toBe(noDriverEn(vehicle.id));
   });
 });
 
-// ── assign task:moving refuses a driverless vehicle (#947) ─────────────────
+// ── reposition_reserved — refuses a vehicle already reserved for work ──────
 
-describe('vehicle.ts — assign task:moving refuses a driverless vehicle', () => {
-  it('resolves to the exact English literal and does not stage the moving task', () => {
+describe('vehicle.ts — reposition refuses a vehicle reserved for a task', () => {
+  const reservedEn = (id: number) => `Vehicle #${id} is busy with a task and cannot be repositioned.`;
+
+  it('resolves to the exact English literal by default', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    expect(vehicle.driverId).toBeNull();
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    mountTestDriver(ctx, vehicle);
+    vehicle.reservedForActionId = 7;
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
-    expect(vehicle.task).not.toBe('moving');
+    expect(result.output).toBe(reservedEn(vehicle.id));
   });
 
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    mountTestDriver(ctx, vehicle);
+    vehicle.reservedForActionId = 7;
     setLocale('fr');
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(false);
-    expect(result.output).not.toBe(`Vehicle #${vehicle.id} has no driver aboard and cannot move.`);
-  });
-
-  it('regression: assign task:moving succeeds and stages the task when a driver is aboard', () => {
-    const ctx = makeCtx();
-    const vehicle = buyTestVehicle(ctx);
-    mountTestDriver(ctx, vehicle); // #1089: a real, mounted driver — moveTo needs one to plan an itinerary
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'moving', to: '7,9' });
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(`Vehicle #${vehicle.id} assigned to moving.`);
+    expect(result.output).not.toBe(reservedEn(vehicle.id));
   });
 });
 
@@ -283,56 +281,31 @@ describe('vehicle.ts — buy success message', () => {
   });
 });
 
-// ── assign_success ────────────────────────────────────────────────────────
-
-describe('vehicle.ts — assign success message', () => {
-  it('matches the exact English literal, embedding the real id/task', () => {
-    const ctx = makeCtx();
-    const vehicle = buyTestVehicle(ctx);
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'transport' });
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(`Vehicle #${vehicle.id} assigned to transport.`);
-  });
-
-  it('differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    const vehicle = buyTestVehicle(ctx);
-    setLocale('fr');
-    const result = vehicleCommand(ctx, ['assign', String(vehicle.id)], { task: 'transport' });
-    expect(result.success).toBe(true);
-    expect(result.output).not.toBe(`Vehicle #${vehicle.id} assigned to transport.`);
-  });
-});
-
-// ── move_success ──────────────────────────────────────────────────────────
+// ── reposition_success ────────────────────────────────────────────────────
 // Exact literal has no space after the comma between x and z — matching
 // vehicle.ts's own template literal precisely.
 
-describe('vehicle.ts — move success message', () => {
+describe('vehicle.ts — reposition success message', () => {
   it('matches the exact English literal, embedding the real id/x/z with no space after the comma', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    // #947: canTickVehicle now requires a driver aboard to advance on tick at
-    // all -- a driverless `vehicle move` is refused outright. This test's own
-    // point is the success message's exact text, not the driver gate, so a
-    // real driver is mounted directly (bypassing the walk-to-board flow) —
-    // #1089: moveTo (which `move` now drives through) needs a real employee
-    // at `driverId`, unlike the old bare-numeric-id bypass this test used
-    // pre-#1089.
+    // A real, mounted driver — moveTo needs one to plan an itinerary, and
+    // this test's own point is the success message's exact text rather than
+    // the driver auto-selection `reposition` would otherwise run.
     mountTestDriver(ctx, vehicle);
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(true);
-    expect(result.output).toBe(`Vehicle #${vehicle.id} moving to (7,9).`);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} repositioning to (7,9).`);
   });
 
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
-    mountTestDriver(ctx, vehicle); // #1089: bypass the walk-to-board flow — see the test above
+    mountTestDriver(ctx, vehicle);
     setLocale('fr');
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '7,9' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '7', '9'], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toBe(`Vehicle #${vehicle.id} moving to (7,9).`);
+    expect(result.output).not.toBe(`Vehicle #${vehicle.id} repositioning to (7,9).`);
   });
 });
 
@@ -375,8 +348,8 @@ describe('vehicle.ts — driver <id> none: not-found routes through mount.vehicl
 describe('vehicle.ts — driver unassign success message', () => {
   function buyVehicleWithBypassedDriver(ctx: GameContext) {
     const vehicle = buyTestVehicle(ctx);
-    vehicle.driverId = 42; // bypass canAssignDriver entirely — only unassignDriver's own state matters here
-    vehicle.occupantIds = [42]; // Mount.alight (#1087) resolves the occupant to release from here, not driverId
+    // bypass canAssignDriver entirely — only canReleaseDriver's own state matters here
+    vehicle.occupantIds = [42];
     return vehicle;
   }
 
@@ -548,15 +521,15 @@ describe('vehicle.ts — no game loaded (bonus fix: requireGame(ctx))', () => {
   });
 });
 
-// ── MoveTo.ts errors, newly reachable now that move/assign task:moving/
-// driver route through moveTo instead of the old void moveVehicle (#1103) ──
+// ── MoveTo.ts errors, reachable because reposition/driver both route
+// through moveTo instead of the old void moveVehicle (#1103, #1092) ──
 //
 // MoveTo.ts's own error strings (src/core/engine/MoveTo.ts) are wrapped
 // through t('move_to.*') at the source, the same pattern #1108 used for
 // Mount.ts's errors — result.error already arrives translated, so vehicle.ts
 // needs no code change to surface it correctly.
 
-describe('vehicle.ts — move: no route available (MoveTo.ts, #1103)', () => {
+describe('vehicle.ts — reposition: no route available (MoveTo.ts, #1103)', () => {
   const NO_ROUTE_EN = 'No route available';
 
   it('resolves to the exact English literal when the target is unreachable', () => {
@@ -565,7 +538,7 @@ describe('vehicle.ts — move: no route available (MoveTo.ts, #1103)', () => {
     mountTestDriver(ctx, vehicle); // real, mounted driver — moveTo needs one to plan an itinerary
     // z=9999 is far outside the 32x32 grid — findPath's own clampToGrid
     // cannot make the leg's real (unclamped) destination reachable.
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '5,9999' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '5', '9999'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_ROUTE_EN);
   });
@@ -575,7 +548,7 @@ describe('vehicle.ts — move: no route available (MoveTo.ts, #1103)', () => {
     const vehicle = buyTestVehicle(ctx);
     mountTestDriver(ctx, vehicle);
     setLocale('fr');
-    const result = vehicleCommand(ctx, ['move', String(vehicle.id)], { to: '5,9999' });
+    const result = vehicleCommand(ctx, ['reposition', String(vehicle.id), '5', '9999'], {});
     expect(result.success).toBe(false);
     expect(result.output).not.toBe(NO_ROUTE_EN);
   });

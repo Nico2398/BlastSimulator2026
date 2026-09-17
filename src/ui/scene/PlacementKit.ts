@@ -5,10 +5,15 @@
 // at a time — PlacementController's single confirm/cancel/change slots are
 // simply overwritten by whichever panel armed most recently, which is
 // correct since arming always supersedes whatever was armed before.
+//
+// Also holds what every panel arming the kit shares: how a dead Confirm is
+// explained (placementRefusalReason) and the whole single-tile pick flow
+// (armPointPick).
 
-import type { PlacementController } from './PlacementController.js';
-import type { SelectionOverlay } from '../../renderer/SelectionOverlay.js';
+import type { PlacementController, PlacementSelection } from './PlacementController.js';
+import type { SelectionOverlay, OverlayPointUpdate } from '../../renderer/SelectionOverlay.js';
 import type { ParamStrip } from './ParamStrip.js';
+import type { IconName } from '../icons.js';
 import { t } from '../../core/i18n/I18n.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../core/config/balance.js';
@@ -45,4 +50,66 @@ export function placementRefusalReason(controller: PlacementController): string 
   if (controller.refusedTile) return t('shell.placement.outside_region');
   if (!controller.selection) return t('shell.placement.pick_first');
   return t('shell.placement.outside_region');
+}
+
+/** What a single-tile pick differs by, panel to panel — everything else about the flow is identical. Deliberately not exported: callers pass an object literal to `armPointPick` and never name the type. */
+interface PointPickSpec {
+  /** Strip header icon. */
+  icon: IconName;
+  /** Strip title, e.g. "Pick a survey target". */
+  title: string;
+  /** Strip subtitle naming the subject of the pick (the survey method, the vehicle). */
+  subtitle: string;
+  /** Chip text above the strip while armed. */
+  instruction: string;
+  /** RESULT line for the tile currently picked; the strip shows an em dash while nothing is. */
+  result: (sel: PlacementSelection) => string;
+  /** Overlay styling for the picked point — survey's teal tone and coverage radius; omitted for a plain tile marker. */
+  marker?: Pick<OverlayPointUpdate, 'tone' | 'radius'>;
+  /** Tile pre-filled as the selection so Confirm is reachable at once. */
+  initialSelection?: { x: number; z: number };
+  /** Runs on Confirm, before the overlay's confirm flash. */
+  onConfirm: (sel: PlacementSelection) => void;
+}
+
+/**
+ * Arm the shared tool for a single-tile pick: overlay marker, param strip,
+ * confirm/change wiring, then an immediate refresh so the strip is on screen
+ * before the player moves the mouse. Clicking again while armed cancels,
+ * which is what makes each panel's button a toggle.
+ *
+ * Shared by every panel whose flow is "pick one tile, then run a command"
+ * (survey targeting, vehicle repositioning) — the parts that genuinely differ
+ * are `PointPickSpec`, and nothing else about the sequence varies.
+ */
+export function armPointPick(kit: PlacementKit, spec: PointPickSpec): void {
+  const { controller, overlay, strip } = kit;
+  if (controller.isArmed) { controller.cancel(); return; }
+
+  const refresh = (): void => {
+    if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+    const sel = controller.selection;
+    overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, ...spec.marker } : null);
+    strip.show({
+      icon: spec.icon,
+      title: spec.title,
+      subtitle: spec.subtitle,
+      fields: [],
+      result: sel ? spec.result(sel) : '—',
+      confirmEnabled: controller.canConfirm,
+      confirmDisabledReason: placementRefusalReason(controller),
+      instruction: spec.instruction,
+    });
+  };
+
+  controller.setConfirmHandler((sel) => {
+    spec.onConfirm(sel);
+    overlay.flashConfirm();
+  });
+  controller.setChangeHandler(refresh);
+  controller.arm({
+    shape: 'point',
+    ...(spec.initialSelection ? { initialSelection: spec.initialSelection } : {}),
+  });
+  refresh();
 }

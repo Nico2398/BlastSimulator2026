@@ -1,0 +1,267 @@
+{
+  "name": "vehicle-reposition-before-blast",
+  "description": "Issue #1092 phase 6: the Fleet panel's new Reposition control drives a vehicle somewhere with no work attached (Itinerary's `reposition` Goal), the player-facing replacement for console-only `vehicle move`. Reuses blast-unevacuated-casualties.json's exact seed-42 drill/charge/sequence/fire pattern at (15,15)-(21,21) -- that file, with every staffed vehicle left exactly where it spawned, reports `vehicleCount` decreasing (the drill_rig it drove out on, plus a second vehicle the reckless 8m-hole/0.5m-stemming overcharge's flyrock reaches from spawn). This file moves the staffed debris_hauler (#2, spawned at (3,2) by STARTING_SITE_STAFFED_COMPOSITION) well clear of both the drilled footprint and that flyrock radius BEFORE the same pattern fires, entirely by clicking: open the Fleet panel, click vehicle #2's Reposition button, pick a far tile, confirm. No console command anywhere in that step. The final `vehicle list`/`state full` observe steps are this scenario's actual proof for the visual channel -- state-schema-definitions.ts has no per-vehicle position/survival field for `expect` to check programmatically (same gap vehicle-driver-assignment-visual.json's own observe steps document), so a human (or an automated screenshot/state-dump read) confirms vehicle #2 is listed, parked at the safe tile, undamaged, after the blast that damages/destroys vehicles left in place.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:100000 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:100000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "employeeCount": 5,
+          "vehicleCount": 4,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle reposition 2 2 30",
+      "description": "Vehicle #2 is the staffed debris_hauler (STARTING_SITE_STAFFED_COMPOSITION order: drill_rig, debris_hauler, rock_digger, rock_fragmenter), spawned at (3,2) -- close to the drill_rig's own spawn and well inside range of the reckless overcharge fired later in this file. (2,30) is far south of both the (15,15)-(21,21) drilled footprint and the (0,2)-(9,2) spawn row. No `vehicle` console command reaches the game here -- Reposition arms the shared placement tool (PlacementKit, same pattern as SurveyPanel's Run Survey button), a scene-tile click picks the destination, and the confirm button dispatches the command internally.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"reposition\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"reposition\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "Sandbox-measured pad: the auto-selected licensed driver (one of the two staffed driving.excavator drivers is NOT eligible -- debris_hauler needs driving.truck -- so the staffed driving.truck driver boards) walks to the debris_hauler and drives it clear well within 20 ticks. No pollable field exposes a specific vehicle's own position (same gap noted throughout this file), so this is a fixed pad rather than a wait_until, matching vehicle-driver-assignment-visual.json's own tick-30 pad for the same reason.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "vehicle list",
+      "description": "Mid-course observe: vehicle #2 should now read parked at (2,30), driver released (Mount.alight, once the reposition itinerary's drive leg completes with no further work queued). Proof for the visual channel -- no summary field carries a specific vehicle's own x/z.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 diameter:0.089 start:15,15",
+      "description": "Identical pattern to blast-unevacuated-casualties.json: 3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3), so the (15,15)-(21,21) drag needs no spacing-stepper click. diameter:0.089 matches the Charge panel's fixed UI diameter (no stepper exists for it); the depth stepper is raised from the tool's 6m default to the declared 8m before dragging, same as that file's own fix.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 21,
+          "z2": 21
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:9 max_ticks:300",
+      "description": "Drains the ordered drill plan -- the staffed driller/drill_rig pair claims and drives the work entirely on its own, same as blast-unevacuated-casualties.json.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
+      "description": "The same reckless, under-stemmed overcharge (0.5m on 8m holes) blast-unevacuated-casualties.json fires -- the whole point is that THIS exact pattern is dangerous enough to cost a vehicle when nothing is moved out of the way.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:200",
+      "description": "Drains the charge order(s).",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "description": "Blast panel is already open and BlastWorkshop's own autoAdvance has already moved it to the Sequence tab, same as blast-unevacuated-casualties.json -- ensurePanel avoids a toggle-closed click.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "description": "Fires the same deterministic pattern blast-unevacuated-casualties.json fires with nothing moved -- that file's `vehicleCount` decreases (the drill_rig it drove out on, plus a second vehicle the flyrock reaches). Vehicle #2, moved to (2,30) three steps ago, is far outside both the drilled footprint and that flyrock radius. This step's own `expect` only pins what's certain regardless of any single vehicle's fate (nothing here asserts total fleet survival); the follow-up observe steps are the actual proof that #2 specifically made it through.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle list",
+      "description": "Proof point: vehicle #2 must still be listed, parked at (2,30), undamaged -- state-schema-definitions.ts has no per-vehicle field for `expect` to check this programmatically, so this command's output (and the accompanying screenshot in interaction mode) is what the visual channel inspects.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "repositioned-clear",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "post-blast",
+      "yaw": 90,
+      "pitch": 30
+    }
+  ]
+}

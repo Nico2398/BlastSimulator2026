@@ -12,6 +12,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
@@ -30,7 +31,7 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
  * would lose those distinct error messages.
  */
 export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
-  return !!vehicle && vehicle.type === 'debris_hauler' && vehicle.driverId !== null && vehicle.reservedForActionId === null;
+  return !!vehicle && vehicle.type === 'debris_hauler' && vehicleDriverId(vehicle) !== null && vehicle.reservedForActionId === null;
 }
 
 /**
@@ -54,7 +55,7 @@ export function requestHaulFragment(
   const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.reservedForActionId !== null || vehicle.payload !== null) {
     return { success: false, error: 'Vehicle is already hauling' };
   }

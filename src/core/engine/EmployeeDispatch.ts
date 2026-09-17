@@ -173,7 +173,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // vehicle clear (isMidEvacuation, #1042). See isMidEvacuationWalk's own
     // doc comment (Evacuation.ts) for the shared reasoning across all four
     // call sites (#557).
-    if (isMidEvacuation(state, employee)) continue;
+    if (isMidEvacuation(employee)) continue;
     // Mid-collapse or mid-forced-rest (walking to rest, or already resting) —
     // like the guard above, outside the claim system entirely. Without this,
     // claimActionsTargetedAtEmployee reclaims a still-'queued',

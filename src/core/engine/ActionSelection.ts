@@ -14,6 +14,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
@@ -236,7 +237,7 @@ export function canReleaseStrandedOnFootAction(
  * now judged by the same real reachability check every other claim/release
  * decision in this module already uses instead of that function's own
  * weaker "nobody has boarded yet" heuristic — an employee who simply hasn't
- * started walking yet also has `vehicle.driverId === null`, so pairing that
+ * started walking yet also leaves `vehicleDriverId(vehicle) === null`, so pairing that
  * with a genuine `resolveActionCost` failure is what distinguishes actually
  * stranded from merely not-yet-started.
  *
@@ -251,7 +252,7 @@ export function canReleaseStrandedVehicleGatedAction(
 ): boolean {
   if (action.requiredVehicleRole === null) return false;
   const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-  if (!vehicle || vehicle.driverId !== null) return false;
+  if (!vehicle || vehicleDriverId(vehicle) !== null) return false;
   if (resolveActionCost(state, employee, action) !== null) return false;
 
   const role = action.requiredVehicleRole;

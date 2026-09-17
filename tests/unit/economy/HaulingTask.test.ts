@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
@@ -65,7 +65,6 @@ function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
   assignSkill(state.employees, employee.id, 'driving.truck', 1);
   // #1089/#1091: planItinerary/driving reads the driver off
   // vehicle.occupantIds[0]/employee.locomotion, not the driverId mirror alone.
-  vehicle.driverId = employee.id;
   vehicle.occupantIds = [employee.id];
   employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
   return vehicle;
@@ -182,7 +181,7 @@ describe('requestHaulFragment — precondition failures', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     assignSkill(state.employees, employee.id, 'driving.excavator', 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
@@ -315,7 +314,7 @@ describe('requestHaulFragment — happy path', () => {
     // arrival effects, per gameplay-vehicle-fleet's own
     // "[drive -> fragment, effect 'load'] [drive -> depot, effect 'unload']"
     // shape.
-    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
     expect(driver.itinerary).not.toBeNull();
     const itinerary = driver.itinerary!;
 
@@ -349,7 +348,7 @@ describe('requestHaulFragment — happy path', () => {
     const result = requestHaulFragment(state, vehicle.id, 1);
     expect(result.success).toBe(true);
 
-    const driver = state.employees.employees.find(e => e.id === vehicle.driverId)!;
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
     const unloadLeg = legsWithEffect(driver.itinerary!, 'haul_unload')[0]!;
     expect(Math.abs(unloadLeg.destX - near.x) + Math.abs(unloadLeg.destZ - near.z)).toBeLessThan(10);
   });
@@ -378,7 +377,7 @@ describe('findReachableGroundFragment — precondition failures', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     assignSkill(state.employees, employee.id, 'driving.excavator', 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     addBlastFragments(state.logistics, [makeFragment(1, 2, 2)]);
 
     expect(findReachableGroundFragment(state, vehicle.id)).toBeNull();
@@ -547,7 +546,7 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     addBlastFragments(haulState.logistics, [haulFragment], haulState.navGrid);
     syncHaulDispatch(haulState);
     requestHaulFragment(haulState, haulVehicle.id, 1);
-    const haulDriver = haulState.employees.employees.find(e => e.id === haulVehicle.driverId)!;
+    const haulDriver = haulState.employees.employees.find(e => e.id === vehicleDriverId(haulVehicle))!;
     const haulLoadLeg = legsWithEffect(haulDriver.itinerary!, 'haul_load')[0]!;
 
     const breakState = createGame({ seed: SEED });
@@ -556,7 +555,6 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     const { vehicle: breakVehicle } = purchaseVehicle(breakState.vehicles, 'rock_fragmenter', 0, 0);
     const { employee } = hireEmployee(breakState.employees, 'driver', rng);
     assignSkill(breakState.employees, employee.id, 'driving.excavator', 1);
-    breakVehicle.driverId = employee.id;
     breakVehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: breakVehicle.id };
     const breakFragment = makeFragment(1, 6, 9);

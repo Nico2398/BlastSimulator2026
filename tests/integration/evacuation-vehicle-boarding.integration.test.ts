@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
 import { isInZone, isZoneClear, type ZoneBounds } from '../../src/core/entities/Zone.js';
@@ -51,7 +51,7 @@ describe('Evacuation vehicle boarding (#1042)', () => {
 
     // Vehicle B never got a driver and never left — genuinely stranded, not
     // merely slow.
-    expect(strandedVehicle.driverId).toBeNull();
+    expect(vehicleDriverId(strandedVehicle)).toBeNull();
     expect(isInZone(strandedVehicle.x, strandedVehicle.z, zone)).toBe(true);
 
     // The zone reads clear of everything reachable — only the genuinely
@@ -79,7 +79,7 @@ describe('Evacuation vehicle boarding (#1042)', () => {
     expect(moveResult.success).toBe(true);
     tickLocomotion(state);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(employee.pendingDriverVehicleId).toBeNull();
   });
 });

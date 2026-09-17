@@ -222,6 +222,9 @@ export class UIManager {
     this.blastUI.setPlacementKit(kit);
     this.buildMenu.setPlacementKit(kit);
     this.surveyPanel.setPlacementKit(kit);
+    // #1092: FleetPanel's own arm/refresh wiring for the "Reposition" click
+    // flow is the implementer's job — this forwards the kit so it's ready.
+    this.fleetPanel.setPlacementKit(kit);
     // Esc cascade (see KeyboardShortcuts.onEscape doc comment): an armed placement
     // tool is "on top" and must consume Esc itself before handleEscape() falls
     // through to closing the panel that armed it. PlacementController has its own

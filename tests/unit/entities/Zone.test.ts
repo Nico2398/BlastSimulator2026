@@ -35,11 +35,11 @@ function makeState(seed: number): GameState {
  * shape moveTo's own "already mounted" continuity check
  * (isMounted(employee.locomotion)) requires to plan straight to a drive leg
  * — mirrors what a real board() call leaves behind, without walking there
- * first. `vehicle.driverId` is also set — the read-only mirror some of
- * these tests assert on directly.
+ * first. `occupantIds[0]` is the driver seat clearZone reads through
+ * `vehicleDriverId` (#1092), so filling it is what makes this a driven
+ * vehicle as far as the evacuation is concerned.
  */
 function mountDriver(vehicle: Vehicle, driver: Employee): void {
-  vehicle.driverId = driver.id;
   vehicle.occupantIds = [driver.id];
   driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 }
@@ -190,7 +190,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(11);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
-    vehicle.driverId = null; // no driver aboard — must strand even though findSafeDestination succeeds
+    // no driver aboard (occupantIds defaults to []) — must strand even though findSafeDestination succeeds
     const beforeX = vehicle.x;
     const beforeZ = vehicle.z;
     const beforeTask = vehicle.task;
@@ -217,7 +217,7 @@ describe('Zone clearing and evacuation', () => {
     const { employee: driver } = hireEmployee(employees, 'driller', rng, driven.x, driven.z);
     mountDriver(driven, driver); // driver aboard
     const { vehicle: driverless } = purchaseVehicle(vehicles, 'rock_digger', 20, 20);
-    driverless.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
     tickLocomotion(state);
@@ -239,7 +239,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(30);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const rng = new Random(30);
     const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
     assignSkill(employees, employee.id, 'driving.excavator', 1);
@@ -260,7 +260,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(31);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     // No employees in the game at all — nobody to even consider boarding.
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
@@ -272,7 +272,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(32);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const rng = new Random(31);
     // driller's starting qualification is 'blasting', not driving.excavator.
     hireEmployee(employees, 'driller', rng, 16, 16);
@@ -286,7 +286,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(33);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const rng = new Random(32);
     const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
     assignSkill(employees, employee.id, 'driving.excavator', 1);
@@ -301,7 +301,7 @@ describe('Zone clearing and evacuation', () => {
     const state = makeState(34);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    vehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const rng = new Random(33);
     const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
     assignSkill(employees, employee.id, 'driving.excavator', 1);
@@ -324,7 +324,7 @@ describe('Zone clearing and evacuation', () => {
 
     // Vehicle B is driverless, boardable only by a second, qualified employee.
     const { vehicle: vehicleB } = purchaseVehicle(vehicles, 'rock_digger', 16, 16);
-    vehicleB.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const { employee: boarder } = hireEmployee(employees, 'driller', rng, 17, 17);
     assignSkill(employees, boarder.id, 'driving.excavator', 1);
 
@@ -352,7 +352,7 @@ describe('Zone clearing and evacuation', () => {
     const { vehicles, employees } = state;
     const { vehicle: otherVehicle } = purchaseVehicle(vehicles, 'debris_hauler', 40, 40); // outside this zone
     const { vehicle: newVehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
-    newVehicle.driverId = null;
+    // driverless — occupantIds defaults to [] on purchase
     const rng = new Random(35);
     const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
     assignSkill(employees, employee.id, 'driving.excavator', 1);

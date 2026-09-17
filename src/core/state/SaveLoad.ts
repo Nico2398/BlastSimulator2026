@@ -247,30 +247,6 @@ function migrateV14ToV15(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
- * v16 -> v17: Vehicle gained a `pendingEvacuationDestination: { x: number; z:
- * number } | null` field (#1042 — a driverless vehicle can be boarded and
- * driven clear of an evacuating zone instead of always being stranded). A
- * pre-v17 save has no evacuation drive in flight — the field defaults to
- * null for every vehicle, matching purchaseVehicle's own default. Mutates
- * `obj` in place, matching every other migration block in `deserialize`
- * below.
- */
-function migrateV16ToV17(obj: Record<string, unknown>): Record<string, unknown> {
-  ensureFieldsOnEach(obj, 'vehicles', [
-    {
-      key: 'pendingEvacuationDestination',
-      predicate: v =>
-        v !== null &&
-        typeof v === 'object' &&
-        typeof (v as { x?: unknown }).x === 'number' &&
-        typeof (v as { z?: unknown }).z === 'number',
-      defaultValue: null,
-    },
-  ]);
-  return obj;
-}
-
-/**
  * v17 -> v18: PendingAction.queuedAtTick became required (#1060 — the
  * starvation check's `?? state.tickCount` fallback made an unstamped action
  * measure its own age as always 0, so it could never starve). A pre-v18 save
@@ -365,6 +341,31 @@ function migrateV19ToV20(obj: Record<string, unknown>): Record<string, unknown> 
     }
   }
 
+  return obj;
+}
+
+/**
+ * v20 -> v21 (#1092): the phase-6 dead-field strip — `driverId` and
+ * `pendingEvacuationDestination` are gone from `Vehicle`. Nothing is carried
+ * forward from either: `occupantIds` has held the mount truth since v19 (and
+ * `driverId` was only ever a mirror of `occupantIds[0]` after it), and a
+ * mid-evacuation drive now lives in the driving employee's own itinerary —
+ * whose `reposition` goal a v20 save already serialized — rather than in a
+ * per-vehicle destination marker. A resumed save either still carries that
+ * itinerary and finishes the drive, or carries none and leaves the vehicle
+ * parked where it stood, which is exactly what the marker would have
+ * produced. Mutates `obj` in place, matching every other migration block in
+ * `deserialize` below.
+ */
+function migrateV20ToV21(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesContainer = obj['vehicles'] as Record<string, unknown> | undefined;
+  const vehiclesList = vehiclesContainer?.['vehicles'] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(vehiclesList)) return obj;
+
+  for (const v of vehiclesList) {
+    delete v['driverId'];
+    delete v['pendingEvacuationDestination'];
+  }
   return obj;
 }
 
@@ -571,10 +572,10 @@ export function deserialize(json: string): GameState {
     migrateV14ToV15(obj);
   }
 
-  // v16 -> v17: Vehicle.pendingEvacuationDestination (#1042).
-  if ((obj['version'] as number) < 17) {
-    migrateV16ToV17(obj);
-  }
+  // v16 -> v17 had its own step (Vehicle.pendingEvacuationDestination, #1042).
+  // Retired with v21 below, which strips that field from every save older than
+  // 21 — including every v16 one — so defaulting it here first could only ever
+  // have been undone four steps later.
 
   // v17 -> v18: PendingAction.queuedAtTick required, backfilled (#1060).
   if ((obj['version'] as number) < 18) {
@@ -589,6 +590,11 @@ export function deserialize(json: string): GameState {
   // v19 -> v20: Vehicle.payload replaces the haul/break phase fields (#1091).
   if ((obj['version'] as number) < 20) {
     migrateV19ToV20(obj);
+  }
+
+  // v20 -> v21: Vehicle.driverId / .pendingEvacuationDestination stripped (#1092).
+  if ((obj['version'] as number) < 21) {
+    migrateV20ToV21(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

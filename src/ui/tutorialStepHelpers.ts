@@ -208,11 +208,11 @@ export function getEmployees(state: GameState): { role: string; fatigue: number;
 }
 
 /** Safe access to vehicles array from mock-friendly state. */
-export function getVehicles(state: GameState): { id: number; driverId: number | null; type: string }[] {
+export function getVehicles(state: GameState): { id: number; occupantIds: number[]; type: string }[] {
   const v = getGameStateDict(state).vehicles;
-  if (Array.isArray(v)) return v as unknown as { id: number; driverId: number | null; type: string }[];
+  if (Array.isArray(v)) return v as unknown as { id: number; occupantIds: number[]; type: string }[];
   const vObj = v as Record<string, unknown> | undefined;
-  return (vObj?.vehicles ?? []) as { id: number; driverId: number | null; type: string }[];
+  return (vObj?.vehicles ?? []) as { id: number; occupantIds: number[]; type: string }[];
 }
 
 /** Count vehicles of a given role/type — used by purchase-completing tutorial steps. */
@@ -277,9 +277,9 @@ export function isSellOreWaiting(state: GameState): boolean {
   return activeOreSales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
 }
 
-/** Count vehicles with a driver assigned. */
+/** Count vehicles with a driver aboard — the driver seat is `occupantIds[0]` (#1092). */
 export function countVehiclesWithDriver(state: GameState): number {
-  return getVehicles(state).filter(v => v.driverId !== null).length;
+  return getVehicles(state).filter(v => (v.occupantIds ?? []).length > 0).length;
 }
 
 /**
