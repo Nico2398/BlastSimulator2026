@@ -121,7 +121,22 @@ async function reconcileDependencies(api, number, options = {}) {
   return { created, skipped: null, failed };
 }
 
+/**
+ * The issue numbers a body declares under `## Blocked by`, minus self-reference.
+ * Shared by `missingRelationships` and `reconcileDependencies`'s log split,
+ * so the two never disagree on what counts as "declared".
+ *
+ * @param {number} number the issue being reconciled
+ * @param {string | null | undefined} body
+ * @returns {number[]}
+ */
+function declaredDependencies(number, body) {
+  // TODO(#1127): implement — parseDependencies(body).filter(dep => dep !== number), deduped
+  return [];
+}
+
 module.exports = {
   missingRelationships,
   reconcileDependencies,
+  declaredDependencies,
 };
