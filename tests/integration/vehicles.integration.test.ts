@@ -12,7 +12,6 @@ import {
   createVehicleState,
   purchaseVehicle,
   destroyVehicle,
-  getVehicleDef,
   getVehicleDefByTier,
   getAllVehicleRoles,
   ROLE_LICENCE_REQUIRED,
@@ -120,7 +119,7 @@ describe('Vehicle fleet', () => {
 
   it('buy vehicle reduces cash', () => {
     const cashBefore = ctx.state!.cash;
-    const def = getVehicleDef('debris_hauler');
+    const def = getVehicleDefByTier('debris_hauler', 1);
 
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
 
@@ -483,11 +482,11 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
-  // ── getVehicleDef returns tier-1 stats ──
+  // ── getVehicleDefByTier returns tier-1 stats ──
 
-  it('getVehicleDef returns tier-1 stats for each role', () => {
+  it('getVehicleDefByTier returns tier-1 stats for each role', () => {
     for (const role of getAllVehicleRoles()) {
-      const def = getVehicleDef(role);
+      const def = getVehicleDefByTier(role, 1);
       expect(def.type).toBe(role);
       expect(def.tier).toBe(1);
       expect(def.purchaseCost).toBeGreaterThan(0);

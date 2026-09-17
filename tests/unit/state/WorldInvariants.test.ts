@@ -97,7 +97,7 @@ function addFragment(state: GameState, id: number, fragState: FragmentState = 'o
 describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', () => {
   it('no violation when a mounted employee is listed in their vehicle\'s occupantIds', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const emp = addEmployee(state, { x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     v.occupantIds = [emp.id];
@@ -107,7 +107,7 @@ describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', 
 
   it('violation when locomotion says mounted on V but V.occupantIds does not contain the employee', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const emp = addEmployee(state, { x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     v.occupantIds = []; // mismatch: locomotion claims this vehicle, occupantIds disagrees
@@ -120,7 +120,7 @@ describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', 
 
   it('violation when V.occupantIds contains the employee but their locomotion is not mounted on V', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const emp = addEmployee(state, { x: 0, z: 0 });
     emp.locomotion = { kind: 'on_foot' }; // mismatch: occupantIds claims this employee, locomotion disagrees
     v.occupantIds = [emp.id];
@@ -135,7 +135,7 @@ describe('assertWorldInvariants — I1, occupant/locomotion agreement (#1087)', 
 describe('assertWorldInvariants — I2, mounted employee position agreement (#1087)', () => {
   it('no violation when a mounted employee\'s x/z matches their vehicle\'s x/z', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 12, z: 7 });
+    const v = addVehicle(state, { x: 12, z: 7 });
     const emp = addEmployee(state, { x: 12, z: 7 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     v.occupantIds = [emp.id];
@@ -145,7 +145,7 @@ describe('assertWorldInvariants — I2, mounted employee position agreement (#10
 
   it('violation when a mounted employee\'s x/z disagrees with their vehicle\'s x/z', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 20, z: 20 });
+    const v = addVehicle(state, { x: 20, z: 20 });
     const emp = addEmployee(state, { x: 12, z: 7 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     v.occupantIds = [emp.id];
@@ -160,7 +160,7 @@ describe('assertWorldInvariants — I2, mounted employee position agreement (#10
 describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)', () => {
   it('no violation when occupantIds stays within VEHICLE_SEAT_COUNT and no employee occupies two vehicles', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const emp = addEmployee(state, { x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     v.occupantIds = [emp.id];
@@ -171,7 +171,7 @@ describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)
 
   it('violation when occupantIds.length exceeds VEHICLE_SEAT_COUNT for that role', () => {
     const state = makeState();
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const emp1 = addEmployee(state, { x: 0, z: 0 });
     const emp2 = addEmployee(state, { x: 0, z: 0 });
     emp1.locomotion = { kind: 'mounted', vehicleId: v.id };
@@ -187,8 +187,8 @@ describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)
 
   it('violation when the same employee id appears in two different vehicles\' occupantIds', () => {
     const state = makeState();
-    const v1 = addVehicle(state, { driverId: null, x: 0, z: 0 });
-    const v2 = addVehicle(state, { driverId: null, x: 1, z: 1 });
+    const v1 = addVehicle(state, { x: 0, z: 0 });
+    const v2 = addVehicle(state, { x: 1, z: 1 });
     const emp = addEmployee(state, { x: 0, z: 0 });
     emp.locomotion = { kind: 'mounted', vehicleId: v1.id };
     v1.occupantIds = [emp.id];
@@ -261,7 +261,8 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
   it('no violation when the reservation\'s holder is the vehicle\'s own driver', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 0, z: 0 });
-    const v = addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
+    const v = addVehicle(state, { occupantIds: [emp.id], x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'in_progress' });
     v.reservedForActionId = action.id;
 
@@ -271,7 +272,7 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
   it('no violation when the reservation\'s holder is mid-walk to board it (pendingDriverVehicleId)', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 5, z: 5, pendingDriverVehicleId: 1 });
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     emp.pendingDriverVehicleId = v.id;
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
     v.reservedForActionId = action.id;
@@ -279,10 +280,11 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
-  it('no violation when the action\'s own holderId is absent but falls back to the vehicle\'s driverId', () => {
+  it('no violation when the action\'s own holderId is absent but falls back to the vehicle\'s occupantIds[0]', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 0, z: 0 });
-    const v = addVehicle(state, { driverId: emp.id, x: 0, z: 0 });
+    const v = addVehicle(state, { occupantIds: [emp.id], x: 0, z: 0 });
+    emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: null, status: 'in_progress' });
     v.reservedForActionId = action.id;
 
@@ -303,7 +305,7 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
   it('violation when the reservation\'s holder is neither the driver nor mid-walk to board it', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 9, z: 9, pendingDriverVehicleId: null });
-    const v = addVehicle(state, { driverId: null, x: 0, z: 0 });
+    const v = addVehicle(state, { x: 0, z: 0 });
     const action = addAction(state, { id: 1, requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
     v.reservedForActionId = action.id;
 

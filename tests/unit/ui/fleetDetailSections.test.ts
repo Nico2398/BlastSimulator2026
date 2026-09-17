@@ -98,6 +98,17 @@ describe('fleetDetailSections — makeLoadGauge', () => {
     expect(fill.style.width).toBe('50%');
     expect(value.textContent).toBe('100 / 200 kg');
   });
+
+  it('clamps the fill width at 100% when payload mass exceeds rated capacity (#1092)', () => {
+    // debris_hauler tier1 capacity is 200kg — 500kg overshoots it, which a
+    // real fleet can reach mid-haul (a fragment heavier than the estimate
+    // used at load time). The percentage shown must never exceed 100.
+    const row = makeLoadGauge(makeVehicle({
+      type: 'debris_hauler', tier: 1, payload: { fragmentId: 7, massKg: 500 },
+    }))!;
+    const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
+    expect(fill.style.width).toBe('100%');
+  });
 });
 
 describe('fleetDetailSections — makeDriverRow', () => {

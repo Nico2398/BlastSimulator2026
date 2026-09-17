@@ -1418,3 +1418,89 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     expect(restoredVehicle.payload).toEqual({ fragmentId: 7, massKg: 123 });
   });
 });
+
+// ── v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092) ──
+// occupantIds/locomotion (#1087) already made driverId a read-only mirror,
+// and the itinerary model's `reposition` Goal already carries what
+// pendingEvacuationDestination used to — so both fields drop off Vehicle
+// entirely at v21. A pre-v21 save still carries them; they must simply be
+// dropped on load, with occupantIds/locomotion (already the real source of
+// truth since v19) left exactly as they were.
+
+describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
+  it('SAVE_VERSION is 21', () => {
+    expect(SAVE_VERSION).toBe(21);
+  });
+
+  it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee: driver } = hireEmployee(state.employees, 'driver', rng, 5, 5);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 20;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    const rawVehicle = vehiclesList[0]!;
+    // A pre-v21 save still carries both legacy fields alongside the
+    // already-authoritative occupantIds.
+    rawVehicle['driverId'] = driver.id;
+    rawVehicle['pendingEvacuationDestination'] = { x: 40, z: 40 };
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect('driverId' in restoredVehicle).toBe(false);
+    expect('pendingEvacuationDestination' in restoredVehicle).toBe(false);
+    // The game remains playable: occupancy and the mount survive untouched.
+    expect(restoredVehicle.occupantIds).toEqual([driver.id]);
+    const restoredDriver = restored.employees.employees.find(e => e.id === driver.id)!;
+    expect(restoredDriver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+  });
+
+  it('a pre-v21 driverless vehicle with pendingEvacuationDestination null loads with neither field and an empty occupantIds (boundary)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 5, 5);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 20;
+
+    const vehiclesContainer = parsed['vehicles'] as Record<string, unknown>;
+    const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
+    const rawVehicle = vehiclesList[0]!;
+    rawVehicle['driverId'] = null;
+    rawVehicle['pendingEvacuationDestination'] = null;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect('driverId' in restoredVehicle).toBe(false);
+    expect('pendingEvacuationDestination' in restoredVehicle).toBe(false);
+    expect(restoredVehicle.occupantIds).toEqual([]);
+  });
+
+  it('a save that already carries neither legacy field is left untouched (no double-migration)', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 20;
+    // driverId/pendingEvacuationDestination are ALREADY absent here (current
+    // serialize output, once the implementer removes them from Vehicle) —
+    // migration must be a no-op, not an error, on a save that never had them.
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect('driverId' in restoredVehicle).toBe(false);
+    expect('pendingEvacuationDestination' in restoredVehicle).toBe(false);
+    expect(restoredVehicle.occupantIds).toEqual([]);
+  });
+});

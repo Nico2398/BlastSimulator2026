@@ -228,9 +228,9 @@ describe('isMidEvacuationDrive (#1042)', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     employee.activeActionId = null;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     // The marker that actually distinguishes an evacuation drive from an
-    // ordinary one (driverId alone is not unique to evacuation — see
+    // ordinary one (occupantIds[0] alone is not unique to evacuation — see
     // isMidEvacuationDrive's own doc comment).
     vehicle.pendingEvacuationDestination = { x: 40, z: 40 };
 
@@ -253,7 +253,7 @@ describe('isMidEvacuationDrive (#1042)', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     employee.activeActionId = 7; // still claiming a normal vehicle-gated action
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
 
     expect(isMidEvacuationDrive(state.vehicles, employee)).toBe(false);
   });
@@ -265,7 +265,6 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.targetX = 40;
@@ -276,7 +275,7 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
 
     releaseArrivedEvacuationDrivers(state);
 
-    expect(vehicle.driverId).toBeNull();
+    expect(vehicle.occupantIds[0]).toBeUndefined();
     expect(vehicle.pendingEvacuationDestination).toBeNull();
   });
 
@@ -285,7 +284,7 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.targetX = 40;
     vehicle.targetZ = 40;
     vehicle.x = 40;
@@ -295,7 +294,7 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
 
     releaseArrivedEvacuationDrivers(state);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicle.occupantIds[0]).toBe(employee.id);
     expect(vehicle.pendingEvacuationDestination).toEqual({ x: 40, z: 40 });
   });
 
@@ -304,7 +303,7 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 40, 40);
-    vehicle.driverId = employee.id;
+    vehicle.occupantIds = [employee.id];
     vehicle.targetX = 40;
     vehicle.targetZ = 40;
     vehicle.x = 40;
@@ -313,7 +312,7 @@ describe('releaseArrivedEvacuationDrivers (#1042)', () => {
 
     releaseArrivedEvacuationDrivers(state);
 
-    expect(vehicle.driverId).toBe(employee.id);
+    expect(vehicle.occupantIds[0]).toBe(employee.id);
   });
 });
 
