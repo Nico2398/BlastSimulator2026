@@ -12,7 +12,7 @@ import type { CompositionPalette } from '../../core/world/VoxelGrid.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 
 /** Chunk builds `update()` may perform in one call — budgets the per-frame cost so a camera move never stalls a frame. */
-export const MAX_CHUNK_BUILDS_PER_FRAME = 2;
+const MAX_CHUNK_BUILDS_PER_FRAME = 2;
 
 /** Small outward nudge past a chunk's own edge so a probe point falls
  *  unambiguously inside the neighbouring footprint instead of landing
