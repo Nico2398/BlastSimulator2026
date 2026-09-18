@@ -68,9 +68,15 @@ describe('Ramp building', () => {
     expect(result.success).toBe(true);
     expect(result.voxelsCleared).toBeGreaterThan(0);
 
-    // Check that voxels along the ramp path are cleared, at the column's real surface.
+    // The origin (step 0) has zero continuous depth by design — a ramp
+    // starts flush with the existing surface, not a voxel below it — so its
+    // floor-row cell is re-banded back to that same continuous height
+    // (#1151) rather than left as a hard, fully-cleared voxel: exactly 0.5,
+    // the crossing density at an integer surface height
+    // (VoxelGrid.surfaceDensityAt). It is still "solid" by the >=0.5
+    // walkability threshold, correctly reproducing "no drop here".
     const startVoxel = grid.getVoxel(10, surfaceY, 10);
-    expect(startVoxel?.density).toBe(0);
+    expect(startVoxel?.density).toBe(0.5);
   });
 
   it('ramp connects surface level to a lower elevation', () => {
@@ -87,8 +93,11 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(true);
 
-    // At the start (step 0): should be cleared at the column's real surface.
-    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0);
+    // At the start (step 0): zero continuous depth by design, so the
+    // floor-row cell is re-banded back to the original surface height
+    // (#1151) rather than fully cleared — exactly 0.5, still "solid" by the
+    // >=0.5 walkability threshold.
+    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0.5);
 
     // At the end (step 14): should be cleared at y≈9 (depth 10 * 14/15 ≈ 9.3 → floor=9)
     expect(grid.getVoxel(10, 9, 19)?.density).toBe(0);
@@ -135,12 +144,15 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(true);
 
-    // Origin column (start of ramp, step 0) — should be measurably lower than
-    // the untouched surface once the ramp is actually an open cut, not buried rock.
+    // Origin column (start of ramp, step 0) has zero continuous depth by
+    // design — the ramp starts flush with the existing surface, not a voxel
+    // below it — so continuous banding (#1151) re-grades its floor-row cell
+    // back to that exact original height instead of leaving the hard,
+    // fully-cleared voxel step the pre-#1151 rule produced. No drop at all
+    // is the correct, un-buried outcome here.
     const originSurfaceAfter = localSurfaceY(grid, 10, 10);
     const originDrop = originSurfaceBefore - originSurfaceAfter;
-    expect(originDrop).toBeGreaterThan(0);
-    expect(originDrop).toBeLessThanOrEqual(targetDepth);
+    expect(originDrop).toBe(0);
 
     // End column (last carved step, z = originZ + length - 1) — should have
     // dropped substantially further than the origin, consistent with targetDepth.
@@ -246,10 +258,18 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
     for (const segment of carved) carveRampSegment(grid, segment);
 
-    // Every carved segment's own declared cells are now cleared.
+    // Every carved segment's own declared cells are now cleared — except a
+    // column's own floor-row cell (`floorAdjustment` set), which continuous
+    // banding (#1151) re-grades to the column's true continuous depth: a
+    // residual crossing density in (0, 0.5], never a hard 0.
     for (const segment of carved) {
       for (const cell of segment.cells) {
-        expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        if (cell.floorAdjustment !== undefined) {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeLessThanOrEqual(0.5);
+        } else {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        }
       }
     }
 
@@ -844,11 +864,22 @@ describe('carveRampSegmentSlice (#946)', () => {
 
       // Every cell carved so far is actually cleared; every cell not yet
       // reached is still solid — carving proceeds in the segment's own
-      // (nearest-to-entrance-first) array order.
+      // (nearest-to-entrance-first) array order. A column's own floor-row
+      // cell (`floorAdjustment` set) is the one exception: continuous
+      // banding (#1151) re-grades it to the column's true continuous depth,
+      // a residual crossing density in (0, 0.5], never a hard 0.
       for (let i = 0; i < totalCells; i++) {
         const cell = segment.cells[i]!;
-        if (i < carvedSoFar) expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
-        else expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+        if (i < carvedSoFar) {
+          if (cell.floorAdjustment !== undefined) {
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeLessThanOrEqual(0.5);
+          } else {
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+          }
+        } else {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+        }
       }
     }
 

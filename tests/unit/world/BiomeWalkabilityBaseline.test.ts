@@ -36,14 +36,24 @@ const BIOME_IDS = [
 
 type BiomeId = (typeof BIOME_IDS)[number];
 
-/** Baseline reachable-percentage table from #1147, checked to ±TOLERANCE_PP. */
+/**
+ * Baseline reachable-percentage table for "today's" step-climb rule —
+ * originally recorded from #1147's fixed-height `NAV_MAX_CLIMB_HEIGHT` rule
+ * (100% everywhere), now the #1151 slope-based `isStepClimbable`/
+ * `NAV_MAX_SLOPE_RATIO` rule that `NavGrid.computeClimbReachableSet` reads.
+ * Converges on the standalone `GRADE_RULE_BASELINE_PCT` figures below since
+ * both now gate on the same 30-degree grade, computed two independent ways —
+ * the small residual gaps (~0.03-0.1pp) come from NavGrid's own cell-type
+ * gating (blocked/void cells, `climbY` clamping) that the standalone grade
+ * flood fill below doesn't reproduce.
+ */
 const STEP_RULE_BASELINE_PCT: Record<BiomeId, number> = {
   desert_badlands: 100,
   volcanic_flats: 100,
-  red_canyon: 100,
-  green_foothills: 100,
-  tropical_karst: 100,
-  alpine_granite: 100,
+  red_canyon: 98.7,
+  green_foothills: 96.7,
+  tropical_karst: 66.1,
+  alpine_granite: 48.2,
 };
 
 const GRADE_RULE_BASELINE_PCT: Record<BiomeId, number> = {
