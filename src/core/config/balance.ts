@@ -697,16 +697,18 @@ export const MOVE_STUCK_ABANDON_TICKS = 30;
  */
 export const ACTION_STUCK_BACKOFF_TICKS = 60;
 
-/** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
+/** Height of one bench level, in metres (#1149). Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 
 /**
- * Max voxel height-difference an agent can step between adjacent NavGrid
- * cells. Above this the step is a wall, not a grade: `NavGrid` stops
- * classifying it as a `ramp` and `Pathfinding` refuses it as a move (#953).
+ * Max height-difference, in metres (#1149), an agent can step between
+ * adjacent NavGrid cells. Above this the step is a wall, not a grade:
+ * `NavGrid` stops classifying it as a `ramp` and `Pathfinding` refuses it as
+ * a move (#953). Numerically unchanged from the old voxel-index reading —
+ * this grid's voxel pitch is 1m, so 3 voxels and 3 metres coincide.
  *
  * Sits deliberately between the two heights the world actually produces.
- * Natural relief on a generated level steps by up to three voxels between
+ * Natural relief on a generated level steps by up to three metres between
  * neighbouring columns — alpine slopes do it constantly — and that is
  * terrain a worker walks. A bench face is `NAV_BENCH_HEIGHT` (5) and a blast
  * crater is dug a hole-depth deeper still (6 in every level and tutorial

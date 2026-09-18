@@ -18,9 +18,13 @@ const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0],
 
 /**
  * True when stepping between two cells whose column surfaces sit at `fromY`
- * and `toY` is a physically negotiable climb (#953). Either side missing
- * `surfaceY` — hand-built test fixtures that don't model terrain height —
- * is treated as unconstrained.
+ * and `toY` is a physically negotiable climb (#953). `fromY`, `toY` and
+ * `maxClimb` are metres, not voxel indices — `NavCell.surfaceY` is the
+ * continuous marching-cubes crossing height (#1149), so a `maxClimb` of 3
+ * means 3 metres, numerically identical to the old 3-voxel reading since
+ * this grid's voxel pitch is 1m. Either side missing `surfaceY` —
+ * hand-built test fixtures that don't model terrain height — is treated as
+ * unconstrained.
  *
  * Lives here, next to the `NavCell.surfaceY` it reads, because three
  * separate layers apply the identical gate and must never drift apart:
@@ -67,9 +71,12 @@ export interface NavCell {
    */
   fragmentOccupancy?: number;
   /**
-   * Column's absolute world Y at classification time. Populated only by
-   * buildNavGrid/patchNavGrid; undefined for hand-built test fixtures that
-   * don't model terrain height (#953).
+   * Column's surface height, in metres, at classification time — the
+   * continuous 0.5 marching-cubes crossing (VoxelGrid.
+   * computeVoxelColumnSurfaceHeight), the same value the terrain mesh
+   * renders, not the integer topmost-solid-voxel index (#1149). Populated
+   * only by buildNavGrid/patchNavGrid; undefined for hand-built test
+   * fixtures that don't model terrain height (#953).
    */
   surfaceY?: number;
 }
@@ -204,8 +211,9 @@ export class NavGrid {
   }
 
   /**
-   * Compute the bench level for a cell given its surface Y and the max surface Y.
-   * Returns 0 if surfaceY < 0 (void cell).
+   * Compute the bench level for a cell given its surface height and the max
+   * surface height, both in metres (#1149; NAV_BENCH_HEIGHT is itself
+   * metres). Returns 0 if surfaceY < 0 (void cell).
    */
   static computeBenchLevel(maxSurfaceY: number, surfaceY: number): number {
     if (surfaceY < 0) return 0;
