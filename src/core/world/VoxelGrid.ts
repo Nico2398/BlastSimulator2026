@@ -928,7 +928,13 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
  * stack, and it is not itself a ground-clearing side effect of anything else.
  *
  * A column the grid does not own is a no-op, matching fillVoxel/setVoxel/
- * clearVoxel's own silent-no-op convention for unowned coordinates.
+ * clearVoxel's own silent-no-op convention for unowned coordinates. A
+ * non-finite `height` (NaN, Infinity, -Infinity) is likewise a silent no-op.
+ *
+ * A `height` outside [0, grid.sizeY - 1] is not rejected or reported — it is
+ * silently clamped into the grid's representable vertical range before the
+ * write, so a caller passing an out-of-range value gets a clamped result
+ * rather than a signal that anything was off.
  */
 export function setVoxelColumnSurfaceHeight(
   grid: VoxelGrid,
@@ -941,9 +947,11 @@ export function setVoxelColumnSurfaceHeight(
   if (!grid.containsColumn(x, z)) return;
   if (!Number.isFinite(height)) return;
 
-  // Read the OLD surface before any write and before clamping `height` —
-  // clampToGridColumn (inside computeVoxelColumnSurfaceY) would otherwise
-  // resolve an out-of-bounds column to the wrong one.
+  // Read the OLD surface before clamping `height`. `containsColumn` above
+  // already guarantees (x, z) is in bounds, so clampToGridColumn (inside
+  // computeVoxelColumnSurfaceY) is a no-op here either way — this ordering
+  // is simply the natural "read old, then compute new" sequence, not a
+  // correctness requirement.
   const existingTopY = computeVoxelColumnSurfaceY(grid, x, z);
   const clampedHeight = Math.max(0, Math.min(grid.sizeY - 1, height));
 
