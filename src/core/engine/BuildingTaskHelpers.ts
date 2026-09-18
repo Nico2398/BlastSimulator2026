@@ -13,7 +13,7 @@ import { NavGrid } from '../nav/NavGrid.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
+import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 
@@ -107,6 +107,17 @@ export function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastReg
   if (state.navGrid) {
     NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
   }
+}
+
+/**
+ * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the full-height
+ * region shape `terrain:updated`'s payload carries (adds minY/maxY spanning
+ * `grid`'s whole height), for building carves that emit the event directly
+ * instead of going through `LevelGround`/`Ramp`/`BlastExecution`.
+ */
+export function toFullHeightRegion(_region: BlastRegion, _grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
+  // TODO: implement
+  throw new Error('not implemented');
 }
 
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
