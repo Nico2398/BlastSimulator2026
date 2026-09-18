@@ -1000,9 +1000,20 @@ export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: n
 /**
  * After a voxel-level carve has dropped column (x, z)'s exposed top from
  * `oldTopY` to wherever it now sits, clear any leftover sub-threshold density
- * the carve stranded just above the new top, then re-grade the new top into
- * the same continuous band setVoxelColumnSurfaceHeight itself would write for
- * it — so a carved surface reads back identically to a written one.
+ * the carve stranded just above the new top. When the newly exposed top is
+ * itself already mid-band (a genuine fractional crossing the carve cut
+ * through, not a plain fully-solid voxel), also re-grade it into the same
+ * continuous band setVoxelColumnSurfaceHeight itself would write for it — so
+ * a carved surface that genuinely had a crossing reads back identically to a
+ * written one.
+ *
+ * A newly exposed top that reads fully solid (density === 1) is a flat rock
+ * boundary with no natural crossing of its own — carving through it exposes
+ * plain rock, not a slope — so this deliberately leaves it as a hard step
+ * rather than manufacturing a band that was never there. Re-grading
+ * unconditionally on every carve, including this case, is what carved a
+ * spurious sub-threshold voxel one cell above every plain flat-rock cut
+ * (#1148 fixer finding).
  *
  * Inputs: an existing VoxelGrid; a column (x, z); the column's topmost
  * solid-or-above (density >= 0.5) Y index from immediately before the carve
@@ -1050,6 +1061,13 @@ export function renormaliseVoxelColumnAfterCarve(
   }
 
   if (newTopY < 0) return touchedMaxY;
+
+  // A fully solid new top has no genuine crossing to reconstruct — carving
+  // through plain rock exposes more plain rock, and manufacturing a band
+  // here would smear a spurious sub-threshold voxel one cell above a
+  // perfectly clean cut. Only a top that is itself still mid-band (a real
+  // crossing the carve cut through) needs re-grading.
+  if (grid.densityAt(cx, newTopY, cz) >= 1) return touchedMaxY;
 
   const compId = grid.palette.intern(grid.compositionAt(cx, newTopY, cz));
   const ores = grid.oresAt(cx, newTopY, cz);

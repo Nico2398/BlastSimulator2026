@@ -5,7 +5,7 @@ import {
 } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
-  VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+  VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import {
@@ -278,7 +278,12 @@ describe('digVoxel', () => {
     }
   });
 
-  it('the freshly computed new surface height is a fixed point of setVoxelColumnSurfaceHeight after digging the top', () => {
+  it('the post-dig state needs no further cleanup — the exposed top is plain solid rock, not a manufactured crossing', () => {
+    // Digging through the genuine crossing exposes plain, never-graded rock
+    // below (y=0..2 were filled at density 1, not written via
+    // setVoxelColumnSurfaceHeight): there is no natural crossing left to
+    // preserve, so the new top stays a hard step rather than being smeared
+    // into a fresh band that never existed pre-carve.
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
     setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
@@ -286,15 +291,9 @@ describe('digVoxel', () => {
 
     digVoxel(grid, 2, oldTop, 2);
 
-    const newHeight = computeVoxelColumnSurfaceHeight(grid, 2, 2);
-    const before: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(2, y, 2));
-
-    setVoxelColumnSurfaceHeight(grid, 2, 2, newHeight, compId);
-
-    for (let y = 0; y < grid.sizeY; y++) {
-      expect(grid.densityAt(2, y, 2), `density at y=${y} should be unchanged`).toBe(before[y]);
-    }
+    const newTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(newTop).toBe(2);
+    expect(grid.densityAt(2, newTop, 2)).toBe(1);
   });
 
   it('digging a non-top voxel does not disturb anything above the unmoved top', () => {

@@ -12,7 +12,7 @@ import {
 import {
   VoxelGrid, type VoxelData,
   renormaliseVoxelColumnAfterCarve, computeVoxelColumnSurfaceY,
-  computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+  setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { CRACKED_VOXEL_WEAKENING } from '../../../src/core/config/balance.js';
@@ -305,27 +305,21 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     }
   });
 
-  it('clears stranded residue above the new top and re-grades it into a well-formed band', () => {
-    const { grid, compId, oldTopY } = buildFixture();
+  it('clears stranded residue above the new top, exposing plain solid rock rather than a manufactured band', () => {
+    const { grid, oldTopY } = buildFixture();
 
     fragmentAndClearTop(grid, oldTopY);
     renormaliseVoxelColumnAfterCarve(grid, COLUMN_X, COLUMN_Z, oldTopY);
 
+    // The blast cleared the genuine crossing itself, exposing the plain,
+    // never-graded rock below (solidGrid fills every voxel at density 1) —
+    // there is no natural crossing left above the new top to preserve, so
+    // renormalisation leaves a hard step rather than manufacturing a band
+    // that never existed pre-carve.
     const newTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
+    expect(grid.densityAt(COLUMN_X, newTopY, COLUMN_Z)).toBe(1);
     for (let y = newTopY + 1; y < grid.sizeY; y++) {
       expect(grid.densityAt(COLUMN_X, y, COLUMN_Z), `density at y=${y} should be 0`).toBe(0);
-    }
-
-    // Well-formed band: setVoxelColumnSurfaceHeight at the freshly computed
-    // height is a fixed point.
-    const h = computeVoxelColumnSurfaceHeight(grid, COLUMN_X, COLUMN_Z);
-    const before: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(COLUMN_X, y, COLUMN_Z));
-
-    setVoxelColumnSurfaceHeight(grid, COLUMN_X, COLUMN_Z, h, compId);
-
-    for (let y = 0; y < grid.sizeY; y++) {
-      expect(grid.densityAt(COLUMN_X, y, COLUMN_Z), `density at y=${y} should be unchanged`).toBe(before[y]!);
     }
   });
 

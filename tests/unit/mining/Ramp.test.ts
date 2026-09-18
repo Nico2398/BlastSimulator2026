@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  VoxelGrid, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+  VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
@@ -347,23 +347,22 @@ describe('carveRampSegment — post-carve renormalisation (#1148)', () => {
     }
   });
 
-  it('the carved floor\'s column is a fixed point of setVoxelColumnSurfaceHeight at its own computed surface height', () => {
-    const { grid, compId } = buildFractionalColumnFixture();
+  it('the carved floor\'s column is plain solid rock, not a manufactured crossing', () => {
+    // Carving through the genuine crossing exposes plain, never-graded rock
+    // below (y=0..2 were filled at density 1, not written via
+    // setVoxelColumnSurfaceHeight): there is no natural crossing left to
+    // preserve, so the new top stays a hard step rather than being smeared
+    // into a fresh band that never existed pre-carve.
+    const { grid } = buildFractionalColumnFixture();
 
     carveRampSegment(grid, {
       cells: [{ x: 5, y: 3, z: 5 }],
       region: { minX: 5, maxX: 5, minY: 3, maxY: 3, minZ: 5, maxZ: 5 },
     });
 
-    const h = computeVoxelColumnSurfaceHeight(grid, 5, 5);
-    const before: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(5, y, 5));
-
-    setVoxelColumnSurfaceHeight(grid, 5, 5, h, compId);
-
-    for (let y = 0; y < grid.sizeY; y++) {
-      expect(grid.densityAt(5, y, 5), `density at y=${y} should be unchanged`).toBe(before[y]);
-    }
+    const newTop = computeVoxelColumnSurfaceY(grid, 5, 5);
+    expect(newTop).toBe(2);
+    expect(grid.densityAt(5, newTop, 5)).toBe(1);
   });
 });
 
