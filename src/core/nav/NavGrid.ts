@@ -2,7 +2,12 @@
 // Each cell represents walkability for A* pathfinding.
 // Part of the navmesh system.
 
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import {
+  clampToGridColumn,
+  computeVoxelColumnSurfaceHeight,
+  computeVoxelColumnSurfaceY,
+  type VoxelGrid,
+} from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
@@ -186,13 +191,17 @@ export class NavGrid {
   }
 
   /**
-   * Find the highest solid voxel Y in column (x, z).
-   * Returns the Y coordinate of the voxel (not y+1).
-   * Returns -1 if the column is entirely void (no solid voxel with density >= 0.5).
-   * Out-of-bounds (x, z) coordinates are clamped to the grid limits.
+   * Column surface height in column (x, z), in continuous metres — the same
+   * 0.5 marching-cubes crossing the terrain mesh renders
+   * (computeVoxelColumnSurfaceHeight), not the rounded topmost-solid-voxel
+   * index (#1149). Returns -1 if the column is entirely void (no solid
+   * voxel with density >= 0.5). Out-of-bounds (x, z) coordinates are
+   * clamped to the grid limits.
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
-    return computeVoxelColumnSurfaceY(voxelGrid, x, z);
+    const { cx, cz } = clampToGridColumn(voxelGrid, x, z);
+    if (computeVoxelColumnSurfaceY(voxelGrid, cx, cz) === -1) return -1;
+    return computeVoxelColumnSurfaceHeight(voxelGrid, cx, cz);
   }
 
   /**
