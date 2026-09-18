@@ -61,12 +61,15 @@ export class BuildingMesh {
    * Entry (green) and exit (orange) markers are added above the roof.
    *
    * @param surfaceY - Terrain surface height under the building's footprint,
-   *   as the lowest of its 4 bounding-box corners (`buildingFootprintSurfaceY`
-   *   in EntitySync.ts) — a footprint spanning multiple voxel levels sits on
-   *   its lowest corner rather than floating or burying the opposite one.
-   *   Buildings are static once placed, so unlike vehicles/characters this is
-   *   baked into the mesh at construction rather than corrected every frame,
-   *   or the building renders at y=0 and sits buried underground (#408).
+   *   as the lowest surface height across every cell of its own footprint
+   *   (`buildingFootprintSurfaceY` in EntitySync.ts, sampling the building
+   *   def's `footprint` cell list) — a footprint spanning multiple voxel
+   *   levels sits on its lowest cell rather than floating or burying the
+   *   others. Buildings are static once placed, so unlike vehicles/characters
+   *   this is baked into the mesh at construction rather than corrected every
+   *   frame, or the building renders at y=0 and sits buried underground
+   *   (#408). It is later re-snapped via `setSurfaceY` when the terrain mesh
+   *   revision changes (#1145).
    */
   addBuilding(building: Building, surfaceY = 0): void {
     const def = getBuildingDef(building.type, building.tier);
@@ -89,6 +92,19 @@ export class BuildingMesh {
   updateBuilding(building: Building, surfaceY = 0): void {
     this.removeBuilding(building.id);
     this.addBuilding(building, surfaceY);
+  }
+
+  /**
+   * Correct a building's terrain-surface Y immediately, mirroring
+   * `VehicleMesh.setSurfaceY`/`CharacterMesh.setSurfaceY` — no-op when the
+   * building isn't rendered. Buildings resnap on terrain-revision change
+   * rather than every sync (#1145).
+   */
+  setSurfaceY(id: number, y: number): void {
+    const entry = this.buildings.get(id);
+    if (entry) {
+      entry.group.position.y = y;
+    }
   }
 
   /** Remove a building mesh from the scene. */

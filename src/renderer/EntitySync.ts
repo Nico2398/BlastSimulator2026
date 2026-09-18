@@ -3,7 +3,7 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import type { Building } from '../core/entities/Building.js';
-import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { getBuildingDef } from '../core/entities/Building.js';
 import { isMounted } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
@@ -12,23 +12,25 @@ import type { CharacterMesh } from './CharacterMesh.js';
 /**
  * Terrain surface height for a building's whole footprint, not just its
  * center — a footprint spanning multiple voxel levels buries one corner and
- * floats the opposite one under a single center sample. Samples the
- * footprint's 4 bounding-box corners and takes the lowest, so the building's
- * flat base sits on (or below) every corner of the ground beneath it rather
- * than clipping into a rising corner (#1007).
+ * floats the opposite one under a single center sample. Samples every
+ * footprint column the building actually occupies and takes the lowest, so
+ * the building's flat base sits on (or below) every corner of the ground
+ * beneath it rather than clipping into a rising corner (#1007, #1145 —
+ * bounding-box corners lay one column past the footprint's own edge on two
+ * axes; every column is sampled instead).
  */
 export function buildingFootprintSurfaceY(
   b: Building,
   getSurfaceY: (x: number, z: number) => number,
 ): number {
   const def = getBuildingDef(b.type, b.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-  return Math.min(
-    getSurfaceY(b.x, b.z),
-    getSurfaceY(b.x + sizeX, b.z),
-    getSurfaceY(b.x, b.z + sizeZ),
-    getSurfaceY(b.x + sizeX, b.z + sizeZ),
-  );
+  if (def.footprint.length === 0) return getSurfaceY(b.x, b.z);
+  let min = Infinity;
+  for (const [dx, dz] of def.footprint) {
+    const h = getSurfaceY(b.x + dx, b.z + dz);
+    if (h < min) min = h;
+  }
+  return min;
 }
 
 /**
@@ -37,9 +39,12 @@ export function buildingFootprintSurfaceY(
  * Mutates the three rendered-ID sets in place.
  *
  * @param getSurfaceY - Terrain surface height sampler, same one used for
- *   vehicles/characters. Buildings are static once placed (no per-frame
- *   resnap like vehicles/characters get in GameRenderer.syncFromContext), so
- *   the surface height is baked in here at add/update time (#408).
+ *   vehicles/characters. Buildings are static once placed, so unlike
+ *   vehicles/characters they get no per-frame resnap here — the surface
+ *   height is baked in at add/update time (#408). They are still re-snapped
+ *   later, but only when the terrain mesh revision changes rather than every
+ *   frame: GameRendererSync calls `BuildingMesh.setSurfaceY` for each
+ *   building whenever that revision advances (#1145).
  */
 export function syncEntitySets(
   state: GameState,
