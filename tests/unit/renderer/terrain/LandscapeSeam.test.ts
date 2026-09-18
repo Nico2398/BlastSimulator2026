@@ -211,6 +211,12 @@ describe('Playable/landscape seam — one continuous ground (#907)', () => {
 // synthetic fixture built directly from two flat lattice sheets rather than
 // through TerrainMesh/LandscapeMesh, so it stands on its own regardless of
 // what the real meshers do.
+//
+// The grid's z-bound is deliberately set short of the sheets' own z=16 shared
+// node, by 3 m — inside `Math.max(2, 8) / 2 = 4` but outside a hardcoded or
+// `min`-derived band of 2. That node's inclusion in `sharedNodes` therefore
+// depends on `band` being derived correctly: a wrong band (hardcoded 2, or
+// `min` instead of `max`) drops it and the count reads 2, not 3.
 
 /**
  * A flat lattice sheet at a constant height: every quad between adjacent
@@ -240,10 +246,13 @@ function buildFlatSheet(xs: readonly number[], zs: readonly number[], height: nu
 }
 
 describe('measureSeam generalizes to a step pair the codebase does not mesh today (2 m / 8 m, #1150)', () => {
-  const STEP_FINE = 2;
-  const STEP_COARSE = 8;
+  const FINE_STEP_SYNTHETIC = 2;
+  const COARSE_STEP_SYNTHETIC = 8;
   const HEIGHT_OFFSET = 0.4;
-  const Z_MAX = 16;
+  // Grid z-bound stops 3 m short of the sheets' z = 16 shared node — inside
+  // the correctly-derived band (max(2, 8) / 2 = 4) but outside a hardcoded or
+  // min-derived one (2 or 1), so that node's count depends on the derivation.
+  const GRID_MAX_Z = 13;
 
   it('measures the known height gap and counts shared nodes at the lcm(2, 8) spacing', () => {
     // "Playable" side: 2 m lattice over x in [0, 4], meeting the "landscape"
@@ -256,14 +265,17 @@ describe('measureSeam generalizes to a step pair the codebase does not mesh toda
 
     const fine = buildFlatSheet(xsFine, zsFine, 10.0);
     const coarse = buildFlatSheet(xsCoarse, zsCoarse, 10.0 + HEIGHT_OFFSET);
-    // Bounding box matches the fine sheet's own extent, so its west edge
-    // (x = 0) is exactly the line the two sheets meet along.
-    const grid = new VoxelGrid(4, 1, Z_MAX);
+    // West edge (x = 0) is exactly the line the two sheets meet along, same
+    // as the fine sheet's own extent. The z-bound is short of the sheets' own
+    // z = 16, on purpose — see GRID_MAX_Z above.
+    const grid = new VoxelGrid(4, 1, GRID_MAX_Z);
 
-    const seam = measureSeam([fine], [coarse], grid, STEP_FINE, STEP_COARSE);
+    const seam = measureSeam([fine], [coarse], grid, FINE_STEP_SYNTHETIC, COARSE_STEP_SYNTHETIC);
 
     // Both lattices place a node at x = 0 only where z is a multiple of
-    // lcm(2, 8) = 8: z = 0, 8, 16 across a 0..16 span — 3 nodes.
+    // lcm(2, 8) = 8: z = 0, 8, 16 across a 0..16 span — 3 nodes, but the
+    // z = 16 one only counts when the scan window reaches it, i.e. only when
+    // band is derived as max(2, 8) / 2 = 4 rather than hardcoded or min'd.
     expect(seam.sharedNodes).toBe(3);
     expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeCloseTo(HEIGHT_OFFSET, 6);
   });
