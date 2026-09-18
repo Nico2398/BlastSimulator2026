@@ -985,9 +985,21 @@ describe('construction levels the ground under the footprint (#1008)', () => {
     expect(queueResearchTask(bs, 'management_office', 2).success).toBe(true);
     tickResearch(bs);
 
-    // T1's own 2x2 is flat; the row T2 grows onto steps up two levels, past the
-    // placement tolerance — so the upgrade is refused on levelness grounds.
+    // Flatten the whole T2 footprint (including the row T2 grows onto) before
+    // T1 is even built, so T1's own completion-carve — which levels not just
+    // its own footprint but the one column past it (#1144's widened skirt) —
+    // has nothing to do there and T1 finishes standing on flat ground.
     flattenFootprint(ctx, 'management_office', 2, 20, 2, 5);
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    const before = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
+
+    // Raise the row T2 grows onto PAST the placement tolerance now, after T1
+    // has already finished — ground that changed since (e.g. a nearby blast)
+    // is exactly the case the upgrade's own levelness check still needs to
+    // catch. Bumping it before T1 finished would have been carved flush by
+    // T1's own widened completion-carve along with the rest of its skirt,
+    // since that skirt is exactly the row T2's 2x2 -> 2x3 growth lands on.
     for (const [dx, dz] of getBuildingDef('management_office', 2).footprint.filter(([, z]) => z === 2)) {
       for (let step = 0; step <= BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD; step++) {
         ctx.grid!.setVoxel(20 + dx, 5 + step, 2 + dz, {
@@ -996,11 +1008,7 @@ describe('construction levels the ground under the footprint (#1008)', () => {
       }
     }
 
-    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
-    tickUntilConstructionDone(ctx);
-    const before = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
     const cashBefore = ctx.state!.cash;
-
     const upgrade = buildCommand(ctx, ['upgrade', String(before.id)], {});
 
     expect(upgrade.success).toBe(false);
@@ -1036,11 +1044,23 @@ describe('construction levels the ground under the footprint (#1008)', () => {
     tickResearch(bs);
     expect(isTierUnlocked(bs, 'management_office', 2)).toBe(true);
 
-    // management_office T1 covers 2x2, T2 2x3 — so T2 grows onto row z+2.
-    // Flatten everything T2 will cover, then step that extra row up one level:
-    // the T1 build sees dead-flat ground, and the upgrade sees a slope inside
-    // the tolerance that only its own larger footprint touches.
+    // management_office T1 covers 2x2, T2 2x3 — so T2 grows onto row z+2,
+    // which is also exactly the one column past T1's own footprint that
+    // T1's completion-carve levels too (#1144's widened skirt). Flatten
+    // everything T2 will cover BEFORE T1 is built, so that skirt carve is a
+    // genuine no-op and T1 finishes on dead-flat ground either way.
     flattenFootprint(ctx, 'management_office', 2, 20, 2, 5);
+
+    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    const id = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!.id;
+
+    // Only NOW step the extra row up one level — after T1 has already
+    // finished construction. Doing this before T1 finished would have been
+    // carved flush by T1's own widened completion-carve along with the rest
+    // of its skirt, since that skirt is exactly this row; this is the
+    // levelness gap the upgrade's own widened level call still needs to
+    // catch, simulating ground that changed since (e.g. a nearby blast).
     const extraRow = getBuildingDef('management_office', 2).footprint
       .filter(([, dz]) => dz === 2);
     expect(extraRow.length).toBeGreaterThan(0);
@@ -1050,11 +1070,7 @@ describe('construction levels the ground under the footprint (#1008)', () => {
       });
     }
 
-    expect(buildCommand(ctx, ['management_office'], { at: '20,2' }).success).toBe(true);
-    tickUntilConstructionDone(ctx);
-    const id = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!.id;
-    // The T1 footprint came out flat; the ground the T2 footprint will cover
-    // has not been levelled by anything yet.
+    // The T1 footprint reads flat; the row T2 newly covers is uneven again.
     expect(new Set(footprintHeights(ctx, 'management_office', 1, 20, 2)).size).toBe(1);
     expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(2);
 

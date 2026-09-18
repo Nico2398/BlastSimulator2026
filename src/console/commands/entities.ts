@@ -25,9 +25,8 @@ import { evacuateZone } from '../../core/engine/Evacuation.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { makeFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
+import { makeFootprintRegion, levelBuildingFootprint, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
-import { levelGroundRect } from '../../core/mining/LevelGround.js';
 import { t } from '../../core/i18n/I18n.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
@@ -151,7 +150,18 @@ export function buildCommand(
         // it can be bigger than the tier it replaces — so it reaches onto ground
         // the original construction never levelled. Cut it flat here, the same
         // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
-        levelGroundRect(ctx.grid, makeFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ), ctx.emitter);
+        // levelBuildingFootprint (BuildingTaskHelpers.ts) widens the carve one
+        // column past the footprint but derives the target height from the
+        // TRUE (unwidened) footprint alone (#1144 follow-up, same reasoning as
+        // TaskCompletionEffects.ts's fresh-build branch) — the new tier's own
+        // pad height comes from ground it actually occupies, not from whatever
+        // the one-column skirt past its high side happens to naturally sit at
+        // — and skips any widened column that falls on an already-standing
+        // neighbour's own true footprint (#1144 review finding 1).
+        levelBuildingFootprint(
+          ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ,
+          state.buildings.buildings, ctx.emitter,
+        );
         patchNavGrid(state, ctx.grid, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
@@ -206,7 +216,18 @@ export function buildCommand(
         // new footprint gets the same cut a finished build does (#1008
         // refinement, tickTaskCompletion.ts). The vacated one is left as it is:
         // levelling is not undone by moving away from it.
-        levelGroundRect(ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.emitter);
+        // levelBuildingFootprint (BuildingTaskHelpers.ts) derives the target
+        // height from the TRUE (unwidened) footprint alone (#1144 follow-up,
+        // same reasoning as TaskCompletionEffects.ts's fresh-build branch) —
+        // the relocated building's own pad height comes from ground it
+        // actually occupies, not from whatever the skirt column past its high
+        // side naturally sits at — and skips any widened column that falls on
+        // an already-standing neighbour's own true footprint (#1144 review
+        // finding 1).
+        levelBuildingFootprint(
+          ctx.grid, toCoords[0]!, toCoords[1]!, sizeX, sizeZ,
+          state.buildings.buildings, ctx.emitter,
+        );
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }

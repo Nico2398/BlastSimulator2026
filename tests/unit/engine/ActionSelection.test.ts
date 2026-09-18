@@ -37,7 +37,8 @@ import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATIO
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { computeLevelVolume } from '../../../src/core/mining/LevelGround.js';
+import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -1185,6 +1186,78 @@ describe('computeActionWorkTicks — dig_ramp_segment scaling (#924)', () => {
     // entirely — true both before #924 (grid ignored outright) and after
     // (live count == stale count when nothing diverged).
     expect(ticksWithFullGrid).toBe(ticksWithNoGrid);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// computeActionWorkTicks — level_ground duration scaling (#1144 review
+// finding 5)
+//
+// Mirrors the dig_ramp_segment coverage immediately above: the 'level_ground'
+// branch re-derives the live continuous volume via computeLevelVolume when a
+// grid is supplied, and falls back to the stale payload.columns.length
+// otherwise — this had zero direct test coverage before this diff.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Columns for a `level_ground` action payload, one per x in [0, n). */
+function makeLevelColumns(n: number): { x: number; z: number }[] {
+  return Array.from({ length: n }, (_, i) => ({ x: i, z: 0 }));
+}
+
+function makeLevelGroundAction(columns: { x: number; z: number }[], targetY: number): PendingAction {
+  return makeWorkAction({
+    type: 'level_ground',
+    requiredSkill: 'driving.excavator',
+    payload: { rect: null, targetY, columns, region: null, orderCost: 0, footprint: [] },
+  });
+}
+
+/** A flat VoxelGrid where every column in `columns` has its surface set to `height`. */
+function makeLevelGridForColumns(columns: { x: number; z: number }[], height: number): VoxelGrid {
+  const grid = new VoxelGrid(Math.max(20, columns.length + 2), 20, 5);
+  const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+  for (const { x, z } of columns) {
+    setVoxelColumnSurfaceHeight(grid, x, z, height, compId);
+  }
+  return grid;
+}
+
+describe('computeActionWorkTicks — level_ground scaling (#1144 review finding 5)', () => {
+  const TARGET_Y = 5;
+  const COLUMN_COUNT = 100;
+  const COLUMN_HEIGHT = TARGET_Y + 8; // each column carries 8 voxels of volume above TARGET_Y
+
+  it('with a live grid, the live volume re-estimate via computeLevelVolume is used, not the stale column count', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 1);
+    // columns.length (100) != total volume (100 * 8 = 800) — the two must
+    // resolve to measurably different tick counts for this test to prove
+    // the live-grid path is actually taken rather than falling back.
+    const columns = makeLevelColumns(COLUMN_COUNT);
+    const action = makeLevelGroundAction(columns, TARGET_Y);
+    const grid = makeLevelGridForColumns(columns, COLUMN_HEIGHT);
+
+    const ticksWithGrid = computeActionWorkTicks(state, employee, action, grid);
+
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    const expectedVolume = Math.ceil(computeLevelVolume(grid, columns, TARGET_Y));
+    expect(expectedVolume).toBe(800); // sanity: the live re-estimate, not columns.length (100)
+    expect(ticksWithGrid).toBe(computeRampSegmentDurationTicks(expectedVolume, 1, 1, needMult, lqMult));
+    expect(ticksWithGrid).not.toBe(computeRampSegmentDurationTicks(columns.length, 1, 1, needMult, lqMult));
+  });
+
+  it('without a live grid, falls back to payload.columns.length', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 1);
+    const columns = makeLevelColumns(COLUMN_COUNT);
+    const action = makeLevelGroundAction(columns, TARGET_Y);
+
+    const ticksWithNoGrid = computeActionWorkTicks(state, employee, action);
+
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    expect(ticksWithNoGrid).toBe(computeRampSegmentDurationTicks(columns.length, 1, 1, needMult, lqMult));
   });
 });
 

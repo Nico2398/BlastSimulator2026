@@ -11,8 +11,10 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { footprintHeightSpread } from '../../src/core/entities/Building.js';
+import {
+  computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+} from '../../src/core/world/VoxelGrid.js';
+import { footprintHeightSpread, getBuildingDef, getDefSize } from '../../src/core/entities/Building.js';
 import { NAV_BENCH_HEIGHT, MAX_LEVEL_GROUND_AREA, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../src/core/config/balance.js';
 import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
@@ -38,6 +40,18 @@ function carveFlatRect(grid: VoxelGrid, minX: number, maxX: number, minZ: number
 /** Lower one column's surface by `drop` voxels below `fromHeight` — leaves a rect uneven. */
 function lowerColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, drop: number): void {
   for (let y = fromHeight; y > fromHeight - drop; y--) grid.clearVoxel(x, y, z);
+}
+
+/**
+ * Raise one column's surface by `rise` voxels above `fromHeight` — the
+ * opposite of `lowerColumn`. Levelling only ever cuts down to a target, never
+ * fills up to it, so proving a widened skirt column actually gets carved (as
+ * opposed to a column that already reads at or below target, which a carve
+ * would legitimately leave untouched) needs the column raised above the
+ * target, not dropped below it (#1144 defect 2, target-decoupling follow-up).
+ */
+function raiseColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, rise: number): void {
+  for (let y = fromHeight; y < fromHeight + rise; y++) grid.setVoxel(x, y, z, ROCK);
 }
 
 /**
@@ -366,5 +380,263 @@ describe('level_ground — console round trip (#1009)', () => {
     expect(result.success).toBe(false);
     expect(ctx.state!.cash).toBe(cashBefore);
     expect(ctx.state!.pendingActions.some(a => a.type === 'level_ground')).toBe(false);
+  });
+
+  it('20. every column of the ordered rect ends at the identical continuous height as the target, including a column integer-flush with target but fractionally proud (#1144 defect 1)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'sandite', coefficient: 1 }] });
+
+    // Three columns at 24.500, one (16,16) at 24.622 — every column shares
+    // integer floor 24, so the pre-#1144 Math.floor comparison would have
+    // treated the whole rect as already level and skipped the proud column.
+    for (let z = 15; z <= 16; z++) {
+      for (let x = 15; x <= 16; x++) setVoxelColumnSurfaceHeight(grid, x, z, 24.5, compId);
+    }
+    setVoxelColumnSurfaceHeight(grid, 16, 16, 24.622, compId);
+
+    const orderResult = runCommand(engine, 'level_ground minX:15 maxX:16 minZ:15 maxZ:16');
+    expect(orderResult.success).toBe(true);
+    const action = engine.ctx.state!.pendingActions.find(a => a.type === 'level_ground')!;
+    expect(tickUntilGone(engine, action.id)).toBe(true);
+
+    for (let z = 15; z <= 16; z++) {
+      for (let x = 15; x <= 16; x++) {
+        expect(computeVoxelColumnSurfaceHeight(grid, x, z)).toBeCloseTo(24.5, 6);
+      }
+    }
+  });
+
+  it('21. a moved building levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2: one-column-short)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    // A fresh build's own completion-carve is deliberately scoped to its
+    // UNWIDENED footprint (#1144 follow-up fix, TaskCompletionEffects.ts):
+    // widening it by one column reached into ground a second, adjacent
+    // building or this same building's own later tier upgrade needed
+    // untouched (buildings.integration.test.ts, needs.integration.test.ts
+    // #928/#945). The widened carve this test proves stays real for
+    // `entities.ts`'s move/upgrade paths, where the widened region only ever
+    // extends past the footprint the order itself just grew into or
+    // relocated onto — ground that order already owns. Build somewhere
+    // flat and unrelated first, then move onto the engineered pad below so
+    // the MOVE's own widened carve is what is under test, not construction's.
+    carveFlatRect(grid, 0, 1, 0, 1, BASE_HEIGHT);
+    expect(runCommand(engine, 'build management_office at:0,0').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+    const built = engine.ctx.state!.buildings.buildings[0]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(built.type, built.tier));
+    expect(sizeX).toBe(2);
+    expect(sizeZ).toBe(2);
+
+    // 4x4 flat pad: two columns past management_office tier1's own 2x2
+    // footprint (x=20,21 / z=20,21) on the high side.
+    carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
+    // One column past the TRUE footprint (x=22, i.e. x + sizeX) — RAISED
+    // above the pad, not lowered: levelling only ever cuts down to a target,
+    // so proving the widened region actually reaches and carves this column
+    // needs it starting above the target, not below (#1144 target-decoupling
+    // follow-up — the target itself now comes from the TRUE footprint alone,
+    // so a column started BELOW it, as this test used to do, would
+    // legitimately stay untouched and prove nothing about whether the carve
+    // reaches it).
+    raiseColumn(grid, 22, 20, BASE_HEIGHT, 3);
+    // Two columns past the true footprint (x=23) — must NOT be carved; the
+    // widened region only extends one column beyond the footprint. Raised by
+    // a DIFFERENT amount than the x=22 column above, so an untouched column
+    // landing on the same value as the pad height by chance would not make
+    // the assertion below pass regardless of whether the carve actually
+    // reached this column.
+    raiseColumn(grid, 23, 20, BASE_HEIGHT, 6);
+
+    // The true footprint itself (20,21 x 20,21) is untouched and flat, so
+    // the move succeeds regardless of the widened-carve fix under test.
+    const move = runCommand(engine, `build move ${built.id} to:20,20`);
+    expect(move.success, move.output).toBe(true);
+
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.id === built.id)!;
+    const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
+
+    // Every lattice column the building's own mesh spans — footprint x..x+sizeX
+    // and z..z+sizeZ INCLUSIVE — reads the same pad height.
+    for (let z = building.z; z <= building.z + sizeZ; z++) {
+      for (let x = building.x; x <= building.x + sizeX; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(padHeight);
+      }
+    }
+
+    // One column further out than the widened region was never touched.
+    expect(computeVoxelColumnSurfaceY(grid, building.x + sizeX + 1, building.z)).not.toBe(padHeight);
+  });
+
+  it('21b. a FRESH build levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2, fresh-construction path)', () => {
+    // Test 21 above proves the widened skirt carve for `build move` — the
+    // path the #1144 follow-up fixer round scoped this behaviour down to
+    // after finding it broke adjacent-building placement for FRESH
+    // construction (living_quarters then driving_center, touching with no
+    // gap between them). That regression was actually a target-computation
+    // bug (the widened region's own low skirt column was dragging the whole
+    // building's target height down with it, over-cutting), fixed by
+    // decoupling `levelGroundRect`'s target rect from its carve rect
+    // (TaskCompletionEffects.ts) rather than by disabling the widen for
+    // fresh builds — issue #1144's own Verification section requires this to
+    // hold for fresh construction specifically, the majority case, not just
+    // move/upgrade. This is that fresh-build proof, on an isolated pad with
+    // no neighbouring building to conflict with.
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+
+    // 4x4 flat pad far from anything else already on the map, two columns
+    // past management_office tier1's own 2x2 footprint (x=5,6 / z=5,6)
+    // on the high side.
+    carveFlatRect(grid, 5, 8, 5, 8, BASE_HEIGHT);
+    // One column past the TRUE footprint (x=7, i.e. x + sizeX) — raised
+    // above the pad. Levelling only ever cuts down to a target, so proving
+    // the widened region actually reaches and carves this column needs it
+    // starting above the target, not below.
+    raiseColumn(grid, 7, 5, BASE_HEIGHT, 3);
+    // Two columns past the true footprint (x=8) — must NOT be carved; the
+    // widened region only extends one column beyond the footprint. Raised by
+    // a DIFFERENT amount than the x=7 column above, so an untouched column
+    // landing on the same value as the pad height by chance would not make
+    // the assertion below pass regardless of whether the carve actually
+    // reached this column.
+    raiseColumn(grid, 8, 5, BASE_HEIGHT, 6);
+
+    // The true footprint itself (5,6 x 5,6) is untouched and flat, so
+    // the build succeeds regardless of the widened-carve fix under test.
+    expect(runCommand(engine, 'build management_office at:5,5').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.x === 5 && b.z === 5)!;
+    expect(building).toBeDefined();
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
+    // The true footprint's own target is untouched by either raised column —
+    // the fresh build finishes at the SAME height the pad started at.
+    expect(padHeight).toBe(BASE_HEIGHT);
+
+    // Every lattice column the building's own mesh spans — footprint x..x+sizeX
+    // and z..z+sizeZ INCLUSIVE — reads the same pad height.
+    for (let z = building.z; z <= building.z + sizeZ; z++) {
+      for (let x = building.x; x <= building.x + sizeX; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(padHeight);
+      }
+    }
+
+    // One column further out than the widened region was never touched.
+    expect(computeVoxelColumnSurfaceY(grid, building.x + sizeX + 1, building.z)).not.toBe(padHeight);
+  });
+
+  it('22. NavGrid occupancy after construction reflects only the true (unwidened) footprint — the widened carve does not expand the blocked area', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
+
+    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+
+    const building = engine.ctx.state!.buildings.buildings[engine.ctx.state!.buildings.buildings.length - 1]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    const nav = engine.ctx.state!.navGrid!;
+
+    // True footprint columns (x..x+sizeX-1, z..z+sizeZ-1) are occupied.
+    for (let z = building.z; z <= building.z + sizeZ - 1; z++) {
+      for (let x = building.x; x <= building.x + sizeX - 1; x++) {
+        expect(nav.cellAt(x, z)!.type).toBe('blocked');
+      }
+    }
+
+    // The widened carve's own extra column (x+sizeX, z+sizeZ) is levelled
+    // ground but was never claimed as occupied — the building's true
+    // footprint never grew to match the wider carve.
+    expect(nav.cellAt(building.x + sizeX, building.z)!.type).not.toBe('blocked');
+    expect(nav.cellAt(building.x, building.z + sizeZ)!.type).not.toBe('blocked');
+  });
+
+  it('23. a widened skirt column landing on an ALREADY-STANDING neighbouring building\'s own footprint is skipped, not carved (#1144 review finding 1)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+
+    // `firstBuilding` (management_office tier1, 2x2) stands first, at
+    // (20,21)x(20,21), flat and HIGHER than where the second building's own
+    // pad will land — the height gap is what makes carving this column
+    // actually observable, rather than a no-op carve to an identical height.
+    carveFlatRect(grid, 18, 23, 20, 21, BASE_HEIGHT + 5);
+    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    const firstBuilding = engine.ctx.state!.buildings.buildings.find(b => b.x === 20 && b.z === 20)!;
+    expect(firstBuilding).toBeDefined();
+    expect(computeVoxelColumnSurfaceY(grid, firstBuilding.x, firstBuilding.z)).toBe(BASE_HEIGHT + 5);
+
+    // `secondBuilding`, same 2x2 footprint, placed touching `firstBuilding`'s
+    // LOW side with zero gap at (18,20): its own true footprint is
+    // (18,19)x(20,21), lowered flat to BASE_HEIGHT before ordering so its own
+    // pad target is materially lower than `firstBuilding`'s. Its own widened
+    // carve region reaches one column past ITS OWN high side — x = 18 + 2 =
+    // 20 — which is exactly `firstBuilding`'s own true footprint column
+    // (x=20), already standing.
+    carveFlatRect(grid, 18, 19, 20, 21, BASE_HEIGHT);
+    expect(runCommand(engine, 'build management_office at:18,20').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    const secondBuilding = engine.ctx.state!.buildings.buildings.find(b => b.x === 18 && b.z === 20)!;
+    expect(secondBuilding).toBeDefined();
+
+    // Without the occupancy guard, `secondBuilding`'s widened skirt column
+    // (x=20) would carve `firstBuilding`'s own shared-boundary footprint
+    // column down to `secondBuilding`'s (lower) target — silently lowering
+    // an edge row of a building already standing there. With the guard, that
+    // column is excluded from the carve (occupied by `firstBuilding`'s true
+    // footprint) and stays exactly as `firstBuilding`'s own construction left it.
+    for (let z = firstBuilding.z; z <= firstBuilding.z + 1; z++) {
+      expect(computeVoxelColumnSurfaceY(grid, firstBuilding.x, z)).toBe(BASE_HEIGHT + 5);
+    }
+  });
+
+  it('24. a skirt column LOWER than the true footprint\'s own height does not drag the pad target down toward it (#1144 review finding 4: over-cutting)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+
+    // 4x4 flat pad at BASE_HEIGHT, true footprint (10,11)x(10,11) (management_
+    // office tier1's own 2x2 footprint) plus one column of margin on every
+    // side so the widened carve has room to reach without hitting anything
+    // else being tested.
+    carveFlatRect(grid, 9, 13, 9, 13, BASE_HEIGHT);
+    // The skirt column just past the true footprint's high side (x=12, i.e.
+    // x + sizeX) lowered well below BASE_HEIGHT. If `computeLevelTargetY`
+    // were still derived from the WIDENED carve rect (the bug `targetRect`
+    // exists to prevent — #1144 follow-up), this column would drag the
+    // building's whole target down to its own (lower) height, over-cutting
+    // the true footprint far past what its own tolerated one-level slope
+    // ever required.
+    lowerColumn(grid, 12, 10, BASE_HEIGHT, 5);
+
+    expect(runCommand(engine, 'build management_office at:10,10').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.x === 10 && b.z === 10)!;
+    expect(building).toBeDefined();
+
+    // The true footprint's own target stays pinned to its own (unlowered)
+    // height across the whole footprint — never dragged down toward the
+    // skirt column's much lower one.
+    for (let z = building.z; z <= building.z + 1; z++) {
+      for (let x = building.x; x <= building.x + 1; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(BASE_HEIGHT);
+      }
+    }
   });
 });

@@ -11,6 +11,7 @@ import {
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
+import { LEVEL_GROUND_COST_PER_VOXEL } from '../../../core/config/balance.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -20,7 +21,7 @@ import { claimForAction, cellsInRect } from '../siteExpansion.js';
 export interface LevelGroundActionPayload {
   rect: LevelOrderDef;
   targetY: number;
-  cells: { x: number; y: number; z: number }[];
+  columns: { x: number; z: number }[];
   region: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   orderCost: number;
   /**
@@ -96,10 +97,10 @@ export function levelGroundCommand(
   // scanned `grid` for this rect (validation.success guarantees both are
   // set), so the dispatch below reuses that instead of re-scanning it.
   const targetY = validation.targetY!;
-  const cells = validation.cells!;
+  const columns = validation.columns!;
   const region = validation.region ?? null;
 
-  if (cells.length === 0) {
+  if (columns.length === 0) {
     return { success: true, output: t('mining.level_ground.already_flat') };
   }
 
@@ -131,14 +132,21 @@ export function levelGroundCommand(
     targetZ: rect.minZ,
     targetY,
     payload: {
-      rect, targetY, cells, region, orderCost: validation.cost, footprint,
+      rect, targetY, columns, region, orderCost: validation.cost, footprint,
     } satisfies LevelGroundActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
+  // validation.cost is Math.ceil(volume) * LEVEL_GROUND_COST_PER_VOXEL
+  // (LevelGround.ts) — dividing back out reports the continuous voxel
+  // figure the cost was actually charged on. columns.length is now a count
+  // of proud COLUMNS, not voxels, since #1144's continuous-height rewrite —
+  // reporting it as "voxels" would misstate the job size.
+  const voxelEstimate = LEVEL_GROUND_COST_PER_VOXEL > 0 ? Math.round(validation.cost / LEVEL_GROUND_COST_PER_VOXEL) : 0;
+
   return {
     success: true,
-    output: `Ground levelling ordered: ${cells.length} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
+    output: t('mining.level_ground.ordered', { voxels: voxelEstimate, cost: formatMoney(validation.cost) }),
   };
 }
 

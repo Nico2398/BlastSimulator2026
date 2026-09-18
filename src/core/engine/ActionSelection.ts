@@ -13,6 +13,7 @@ import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
+import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
@@ -91,14 +92,28 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
   }
 
-  if (action.type === 'dig_ramp_segment' || action.type === 'level_ground') {
-    // Both action types carve a voxel `cells` list into the grid at the same
-    // rate — one shared duration formula (computeRampSegmentDurationTicks),
-    // caller-neutral despite its ramp-flavoured name (#1009 review finding 1).
+  if (action.type === 'dig_ramp_segment') {
+    // A shared duration formula (computeRampSegmentDurationTicks),
+    // caller-neutral despite its ramp-flavoured name (#1009 review finding 1)
+    // — 'level_ground' below feeds the same formula its own live re-estimate.
     const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
     const voxelCount = grid !== undefined
       ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
       : cells.length;
+    const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
+    const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
+    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
+  }
+
+  if (action.type === 'level_ground') {
+    // #1144: columns, not 3D cells — a live grid re-derives the remaining
+    // continuous volume (a column can be partially carved by progressive
+    // work) rather than reusing the stale voxel count captured at queue time.
+    const columns = (action.payload['columns'] as { x: number; z: number }[] | undefined) ?? [];
+    const targetY = (action.payload['targetY'] as number | undefined) ?? 0;
+    const voxelCount = grid !== undefined
+      ? Math.ceil(computeLevelVolume(grid, columns, targetY))
+      : columns.length;
     const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
     const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
     return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);

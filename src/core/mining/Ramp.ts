@@ -313,12 +313,13 @@ type RampSegmentCarveInput = Pick<RampSegmentDef, 'cells' | 'region'>;
  * and already has a precomputed `region`) and {@link carveRampSegmentSlice}
  * (which clears a sub-range and derives `region` from the cells it actually
  * cleared) — the only two carve loops in this file, and the only thing they
- * duplicated (#946 review finding 1). Exported so LevelGround.ts's
- * `carveLevelCells` — the same density-check-then-clear loop for a level-
- * ground order's cell list — reuses it instead of a third copy (#1009 review
- * finding 2).
+ * duplicated (#946 review finding 1). Module-private: LevelGround.ts used to
+ * reuse this for its own per-cell carve (#1009 review finding 2), but #1144's
+ * continuous-height rewrite replaced that with column-based
+ * setVoxelColumnSurfaceHeight writes (VoxelGrid.ts), so this cell-clearing
+ * step no longer has a consumer outside Ramp.ts's own two carve loops.
  */
-export function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: number }): boolean {
+function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: number }): boolean {
   if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
     grid.clearVoxel(cell.x, cell.y, cell.z);
     return true;

@@ -33,7 +33,18 @@ describe('applyTaskCompletion — level_ground (#1009)', () => {
 
     const progress = baseProgress({
       actionType: 'level_ground',
-      actionPayload: { cells: [{ x: 3, y: 3, z: 3 }], region: null },
+      actionPayload: {
+        rect: { minX: 3, maxX: 3, minZ: 3, maxZ: 3 },
+        // The single solid voxel at (3,3,3) puts the column's continuous
+        // surface at 3.5 (setVoxelColumnSurfaceHeight/getSmoothTerrainSurfaceY,
+        // VoxelGrid.ts) — targetY 2.5 carves exactly 1.0 of continuous height
+        // off it, matching this test's pre-#1144 "clears 1 voxel" intent.
+        targetY: 2.5,
+        columns: [{ x: 3, z: 3 }],
+        region: { minX: 3, maxX: 3, minZ: 3, maxZ: 3 },
+        orderCost: 0,
+        footprint: [[0, 0]],
+      },
     });
 
     const report = applyTaskCompletion(state, grid, employee, progress, new EventEmitter());

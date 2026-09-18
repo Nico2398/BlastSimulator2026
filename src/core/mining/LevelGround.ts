@@ -1,13 +1,21 @@
-// BlastSimulator2026 — Ground levelling system (#1009)
+// BlastSimulator2026 — Ground levelling system (#1009, continuous-height rewrite #1144)
 // Flattens a rectangular area to one target Y so it later satisfies the
 // building-placement levelness rule (#1008). Mirrors the order-then-work
 // shape `dig_ramp_segment`/Ramp.ts established: validate at order time,
 // carve progressively as a `level_ground` PendingAction. `levelGroundRect`
 // below is the un-ordered, un-charged variant construction itself uses.
+//
+// #1144: rewritten around continuous heights (getSmoothTerrainSurfaceY /
+// setVoxelColumnSurfaceHeight, VoxelGrid.ts) instead of integer column
+// surfaces, so a column fractionally proud of targetY is still carved
+// (defect 1), and columns are the unit of work throughout instead of 3D
+// voxel cells.
 
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import {
+  computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY, setVoxelColumnSurfaceHeight, type VoxelGrid,
+} from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { carveCellIfSolid, computeRampSegmentDurationTicks } from './Ramp.js';
+import { computeRampSegmentDurationTicks } from './Ramp.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import { MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL } from '../config/balance.js';
 
@@ -30,72 +38,93 @@ export interface LevelOrderValidation {
   messageKey?: string;
   messageParams?: Record<string, string | number>;
   /**
-   * `computeLevelTargetY`/`computeLevelCells` output, present on success only
-   * — the caller dispatching the order reuses these instead of re-scanning
-   * `grid` for the same rect right after validating it.
+   * `computeLevelTargetY`/`computeLevelColumns` output, present on success
+   * only — the caller dispatching the order reuses these instead of
+   * re-scanning `grid` for the same rect right after validating it.
    */
   targetY?: number;
-  cells?: { x: number; y: number; z: number }[];
+  columns?: { x: number; z: number }[];
   region?: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
 }
+
+/**
+ * Tolerance for "already at targetY". A column integer-flush with its target
+ * but fractionally proud of it (24.622 vs 24.500) must still be carved — this
+ * is small enough to catch that while absorbing float round-trip noise from
+ * the density-interpolation read/write pair in VoxelGrid.ts.
+ */
+const LEVEL_EPSILON = 1e-6;
 
 // ── Core functions ──
 
 /**
- * Target Y the rectangle should be levelled to — the minimum column surface
- * height (computeVoxelColumnSurfaceY) across every column in `rect`
- * (inclusive minX..maxX, minZ..maxZ). Levelling always cuts down to the
- * lowest point in the footprint, never fills.
+ * Target Y the rectangle should be levelled to — the minimum CONTINUOUS
+ * column surface height (getSmoothTerrainSurfaceY) across every column in
+ * `rect` (inclusive minX..maxX, minZ..maxZ). Levelling always cuts down to
+ * the lowest point in the footprint, never fills.
  */
 export function computeLevelTargetY(grid: VoxelGrid, rect: LevelOrderDef): number {
   let targetY = Infinity;
   for (let z = rect.minZ; z <= rect.maxZ; z++) {
     for (let x = rect.minX; x <= rect.maxX; x++) {
-      targetY = Math.min(targetY, computeVoxelColumnSurfaceY(grid, x, z));
+      targetY = Math.min(targetY, getSmoothTerrainSurfaceY(grid, x, z));
     }
   }
   return targetY;
 }
 
 /**
- * Cells to carve so every column in `rect` reaches `targetY` — for each
- * column, every solid voxel strictly above `targetY` (a column already at or
- * below `targetY` contributes nothing). The scan per column is bounded by
- * that column's own surface height (computeVoxelColumnSurfaceY), never the
- * whole grid height.
+ * Columns whose continuous surface height exceeds `targetY` by more than a
+ * small epsilon — one entry per column, not one entry per voxel. Renamed
+ * from `computeLevelCells` (#1144): a column integer-flush with `targetY`
+ * but fractionally proud of it must be included, not silently skipped.
  */
-export function computeLevelCells(
+export function computeLevelColumns(
   grid: VoxelGrid,
   rect: LevelOrderDef,
   targetY: number,
-): { x: number; y: number; z: number }[] {
-  const cells: { x: number; y: number; z: number }[] = [];
+): { x: number; z: number }[] {
+  const columns: { x: number; z: number }[] = [];
   for (let z = rect.minZ; z <= rect.maxZ; z++) {
     for (let x = rect.minX; x <= rect.maxX; x++) {
-      const surfaceY = computeVoxelColumnSurfaceY(grid, x, z);
-      if (surfaceY <= targetY) continue;
-      for (let y = surfaceY; y > targetY; y--) {
-        if (grid.densityAt(x, y, z) > 0) {
-          cells.push({ x, y, z });
-        }
-      }
+      const height = getSmoothTerrainSurfaceY(grid, x, z);
+      if (height - targetY > LEVEL_EPSILON) columns.push({ x, z });
     }
   }
-  return cells;
+  return columns;
 }
 
 /**
- * Bounding box of `cells`, or null when empty — mirrors the `region` shape
- * ramp segments compute for `terrain:updated`.
+ * Continuous volume (in cubic metres-equivalent) that carving `columns`
+ * down to `targetY` removes — sum of max(0, surfaceHeight(x,z) - targetY)
+ * across `columns`. Two real consumers: `validateLevelOrder` below (order
+ * cost) and `ActionSelection.ts`'s live work-ticks re-estimate for an
+ * in-progress `level_ground` action.
+ */
+export function computeLevelVolume(
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
+): number {
+  let volume = 0;
+  for (const { x, z } of columns) {
+    volume += Math.max(0, getSmoothTerrainSurfaceY(grid, x, z) - targetY);
+  }
+  return volume;
+}
+
+/**
+ * Bounding box of `columns`, or null when empty — mirrors the `region`
+ * shape ramp segments compute for `terrain:updated`.
  */
 export function computeLevelRegion(
-  cells: { x: number; y: number; z: number }[],
+  columns: { x: number; z: number }[],
 ): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
-  if (cells.length === 0) return null;
+  if (columns.length === 0) return null;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const cell of cells) {
-    minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
-    minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
+  for (const col of columns) {
+    minX = Math.min(minX, col.x); maxX = Math.max(maxX, col.x);
+    minZ = Math.min(minZ, col.z); maxZ = Math.max(maxZ, col.z);
   }
   return { minX, maxX, minZ, maxZ };
 }
@@ -106,9 +135,9 @@ export function computeLevelRegion(
  * caller claims a footprint or queues work.
  *
  * Checks run in order: (1) finite, non-inverted rect coordinates; (2) rect
- * area against MAX_LEVEL_GROUND_AREA, rejected before any cell array is
- * built; (3) cost, from the actual cells that need clearing; (4) cash
- * against that cost.
+ * area against MAX_LEVEL_GROUND_AREA, rejected before any column array is
+ * built; (3) cost, from the continuous volume the columns that need
+ * clearing actually carry; (4) cash against that cost.
  */
 export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: VoxelGrid): LevelOrderValidation {
   if (
@@ -138,8 +167,9 @@ export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: Voxe
   }
 
   const targetY = computeLevelTargetY(grid, rect);
-  const cells = computeLevelCells(grid, rect, targetY);
-  const cost = cells.length * LEVEL_GROUND_COST_PER_VOXEL;
+  const columns = computeLevelColumns(grid, rect, targetY);
+  const volume = computeLevelVolume(grid, columns, targetY);
+  const cost = Math.ceil(volume) * LEVEL_GROUND_COST_PER_VOXEL;
 
   if (cash < cost) {
     return { success: false, message: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}`, cost: 0 };
@@ -150,45 +180,70 @@ export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: Voxe
     message: `Ground levelling: ${cost > 0 ? `$${formatMoney(cost)}` : 'already flat'}`,
     cost,
     targetY,
-    cells,
-    region: computeLevelRegion(cells),
+    columns,
+    region: computeLevelRegion(columns),
   };
 }
 
 /**
- * Carve `cells` into `grid`, emitting `terrain:updated` for the affected
- * region — mirrors `carveRampSegment` (Ramp.ts). Density is re-checked per
- * cell at carve time: a cell already cleared by something else since the
- * cell list was computed is silently skipped, not double-counted.
+ * Resolve the palette composition index the newly exposed surface at column
+ * (x, z) should carry once cut down to `targetY` — the composition already
+ * present at (x, floor(targetY), z), so the carved-down surface exposes the
+ * rock that was actually sitting there rather than switching material. Falls
+ * back to the column's own topmost solid voxel's composition when that exact
+ * row reads as air (e.g. targetY lands inside a void/overhang).
  */
-export function carveLevelCells(
-  grid: VoxelGrid,
-  cells: { x: number; y: number; z: number }[],
-  emitter?: EventEmitter,
-): { voxelsCleared: number } {
-  let voxelsCleared = 0;
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
-
-  for (const cell of cells) {
-    if (carveCellIfSolid(grid, cell)) {
-      voxelsCleared++;
-      minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
-      minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
-      minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
-    }
+function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targetY: number): number {
+  const rowY = Math.floor(targetY);
+  let composition = grid.compositionAt(x, rowY, z);
+  if (composition.rocks.length === 0) {
+    const topY = computeVoxelColumnSurfaceY(grid, x, z);
+    if (topY >= 0) composition = grid.compositionAt(x, topY, z);
   }
-
-  if (voxelsCleared > 0) {
-    emitter?.emit('terrain:updated', { region: { minX, maxX, minY, maxY, minZ, maxZ } });
-  }
-
-  return { voxelsCleared };
+  return grid.palette.intern(composition);
 }
 
 /**
- * Level `rect` in one shot: compute its target Y, carve every solid voxel
- * above it, and emit `terrain:updated` — the compute/carve dance
- * `validateLevelOrder` + `carveLevelCells` split across order time and
+ * Carve `columns` down to `targetY` in `grid`, emitting `terrain:updated`
+ * for the affected region — mirrors `carveRampSegment` (Ramp.ts). Renamed
+ * from `carveLevelCells` (#1144): re-reads each column's live height at
+ * carve time (staleness guard) and skips it once already at or below
+ * `targetY` + epsilon, rather than iterating a precomputed 3D cell list.
+ */
+export function carveLevelColumns(
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
+  emitter?: EventEmitter,
+): { voxelsCleared: number } {
+  let totalDelta = 0;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+  for (const { x, z } of columns) {
+    const liveHeight = getSmoothTerrainSurfaceY(grid, x, z);
+    if (liveHeight - targetY <= LEVEL_EPSILON) continue;
+
+    const compId = resolveExposedCompId(grid, x, z, targetY);
+    setVoxelColumnSurfaceHeight(grid, x, z, targetY, compId);
+
+    totalDelta += liveHeight - targetY;
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  }
+
+  if (totalDelta > 0) {
+    emitter?.emit('terrain:updated', {
+      region: { minX, maxX, minY: 0, maxY: grid.sizeY - 1, minZ, maxZ },
+    });
+  }
+
+  return { voxelsCleared: Math.ceil(totalDelta) };
+}
+
+/**
+ * Level `rect` in one shot: compute its target Y, carve every column above
+ * it, and emit `terrain:updated` — the compute/carve dance
+ * `validateLevelOrder` + `carveLevelColumns` split across order time and
  * completion time, composed for a caller that does both at once.
  *
  * Used by the end of a building's construction (#1008 refinement): a
@@ -197,16 +252,42 @@ export function carveLevelCells(
  * job this charges nothing and needs no digger — it is part of the
  * construction the player already paid for. Already-level ground carves
  * nothing and emits nothing.
+ *
+ * `targetRect` (#1144 follow-up): when a caller carves a WIDENED rect (e.g.
+ * `makeLevelFootprintRegion`'s one-column skirt beyond a building's true
+ * footprint) but wants the target height derived from the narrower TRUE
+ * footprint only, pass it here. Left undefined, `rect` is used for both —
+ * the original, still-correct behaviour for a caller with only one rect in
+ * mind (e.g. entities.ts's upgrade/move paths, where the widened region is
+ * ground the order itself just grew onto, not a stranger's). Without this
+ * split, a fresh building's own pad height was dragged down by whatever the
+ * skirt column's untouched natural terrain happened to be — over-cutting the
+ * skirt beyond what the building's own footprint required and exaggerating
+ * the height step against a later-placed neighbour whose footprint lands on
+ * that same skirt column (#1144).
+ *
+ * `excludeColumn` (#1144 review finding 1): a predicate a caller can supply
+ * to drop specific columns from the carve after they're computed from
+ * `rect` — e.g. a widened skirt column that lands on an ALREADY-STANDING
+ * neighbouring building's own true footprint. Generic on purpose: this
+ * module knows nothing about buildings or occupancy, only that some columns
+ * a caller identifies are skipped. `levelBuildingFootprint`
+ * (`BuildingTaskHelpers.ts`) is the caller that turns "occupied by another
+ * building" into this predicate.
  */
 export function levelGroundRect(
   grid: VoxelGrid,
   rect: LevelOrderDef,
   emitter?: EventEmitter,
+  targetRect: LevelOrderDef = rect,
+  excludeColumn?: (x: number, z: number) => boolean,
 ): { targetY: number; voxelsCleared: number; region: { minX: number; maxX: number; minZ: number; maxZ: number } | null } {
-  const targetY = computeLevelTargetY(grid, rect);
-  const cells = computeLevelCells(grid, rect, targetY);
-  const region = computeLevelRegion(cells);
-  const { voxelsCleared } = carveLevelCells(grid, cells, emitter);
+  const targetY = computeLevelTargetY(grid, targetRect);
+  const columns = excludeColumn
+    ? computeLevelColumns(grid, rect, targetY).filter(c => !excludeColumn(c.x, c.z))
+    : computeLevelColumns(grid, rect, targetY);
+  const region = computeLevelRegion(columns);
+  const { voxelsCleared } = carveLevelColumns(grid, columns, targetY, emitter);
   return { targetY, voxelsCleared, region };
 }
 
