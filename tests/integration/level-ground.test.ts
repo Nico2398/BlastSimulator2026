@@ -395,9 +395,31 @@ describe('level_ground — console round trip (#1009)', () => {
     }
   });
 
-  it('21. building construction levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2: one-column-short)', () => {
+  it('21. a moved building levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2: one-column-short)', () => {
     const engine = makeStaffedRunner();
     const grid = engine.ctx.grid!;
+    // A fresh build's own completion-carve is deliberately scoped to its
+    // UNWIDENED footprint (#1144 follow-up fix, TaskCompletionEffects.ts):
+    // widening it by one column reached into ground a second, adjacent
+    // building or this same building's own later tier upgrade needed
+    // untouched (buildings.integration.test.ts, needs.integration.test.ts
+    // #928/#945). The widened carve this test proves stays real for
+    // `entities.ts`'s move/upgrade paths, where the widened region only ever
+    // extends past the footprint the order itself just grew into or
+    // relocated onto — ground that order already owns. Build somewhere
+    // flat and unrelated first, then move onto the engineered pad below so
+    // the MOVE's own widened carve is what is under test, not construction's.
+    carveFlatRect(grid, 0, 1, 0, 1, BASE_HEIGHT);
+    expect(runCommand(engine, 'build management_office at:0,0').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+    const built = engine.ctx.state!.buildings.buildings[0]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(built.type, built.tier));
+    expect(sizeX).toBe(2);
+    expect(sizeZ).toBe(2);
+
     // 4x4 flat pad: two columns past management_office tier1's own 2x2
     // footprint (x=20,21 / z=20,21) on the high side.
     carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
@@ -414,18 +436,11 @@ describe('level_ground — console round trip (#1009)', () => {
     lowerColumn(grid, 23, 20, BASE_HEIGHT, 6);
 
     // The true footprint itself (20,21 x 20,21) is untouched and flat, so
-    // placement succeeds regardless of the widened-carve fix under test.
-    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
-    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
-      runCommand(engine, 'tick 1');
-    }
-    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+    // the move succeeds regardless of the widened-carve fix under test.
+    const move = runCommand(engine, `build move ${built.id} to:20,20`);
+    expect(move.success, move.output).toBe(true);
 
-    const building = engine.ctx.state!.buildings.buildings[engine.ctx.state!.buildings.buildings.length - 1]!;
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
-    expect(sizeX).toBe(2);
-    expect(sizeZ).toBe(2);
-
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.id === built.id)!;
     const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
 
     // Every lattice column the building's own mesh spans — footprint x..x+sizeX

@@ -23,7 +23,7 @@ import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
-import { makeFootprintRegion, makeLevelFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
+import { makeFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
 
 /**
  * Apply the world effects of `emp`'s just-completed task (per `progress`)
@@ -232,8 +232,26 @@ export function applyTaskCompletion(
             // that check trivially pass and silently swallow a site a blast
             // wrecked mid-construction, which is exactly what it exists to
             // catch. A footprint already level carves nothing.
-            const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
-            const levelled = levelGroundRect(grid, levelRegion, emitter);
+            //
+            // Deliberately the UNWIDENED footprintRegion, not
+            // makeLevelFootprintRegion (#1144 fix, issue #1144 follow-up):
+            // widening a FRESH build's own completion-carve by one column
+            // reaches past this building's own footprint into ground that
+            // does not belong to it — most commonly the very next row/column
+            // a second, adjacent building is about to occupy (the tutorial's
+            // own living_quarters-then-driving_center placement, #945/#928),
+            // or the row a LATER tier upgrade of this same building will grow
+            // onto (buildings.integration.test.ts's "an upgrade levels the
+            // ground the larger tier newly covers"). Both regressed when a
+            // fresh build's own carve started widening: the neighbour's — or
+            // this building's own future upgrade's — footprint arrived on
+            // ground already (and unexpectedly) cut down by a stranger's
+            // construction. `makeLevelFootprintRegion`'s one-column cosmetic
+            // widen stays correct for `entities.ts`'s upgrade/move paths,
+            // where the widened region never extends past the footprint the
+            // order itself just grew into or relocated onto — ground that
+            // order already owns.
+            const levelled = levelGroundRect(grid, footprintRegion, emitter);
             footprintLevelled = levelled.voxelsCleared;
             // Patched after the carve, so the NavGrid cells around the site
             // carry their new surface heights (isStepClimbable reads them) and
