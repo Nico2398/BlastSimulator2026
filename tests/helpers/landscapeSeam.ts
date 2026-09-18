@@ -101,17 +101,21 @@ function angleBetweenDegrees(a: THREE.Vector3, b: THREE.Vector3): number {
 /**
  * Measure the join along the site's whole boundary.
  *
- * `band` is how far either side of the claim to check, in metres. Keep it
- * inside the landscape's FINE_STEP ring (one COARSE_STEP quad, 4 m): a coarse
- * quad puts only two triangle centroids in its sixteen cells, so a wider band
- * reports open ground as uncovered.
+ * `stepA` and `stepB` are the two sheets' own lattice steps, in metres. How
+ * far either side of the claim to check is derived from them — half the
+ * coarser of the two — rather than passed in directly. Keep the derived band
+ * inside the coarser sheet's own quad: a coarse quad puts only two triangle
+ * centroids in its cells, so a wider band reports open ground as uncovered.
  */
 export function measureSeam(
   playable: readonly THREE.Mesh[],
   landscape: readonly THREE.Mesh[],
   grid: VoxelGrid,
-  band = 2,
+  stepA: number,
+  stepB: number,
 ): SeamReport {
+  const band = Math.max(stepA, stepB) / 2;
+
   const playableNodes = indexedLatticeNodes(playable);
   const landscapeNodes = indexedLatticeNodes(landscape);
   const playableCells = coveredCells(playable);
