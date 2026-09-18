@@ -1485,12 +1485,15 @@ describe('NavGrid.computeReachableSet', () => {
 // Group 20: climb-aware reachability (#953)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map. */
+/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map.
+ * `climbY` (the integer field production climb-gating actually reads, #1149)
+ * mirrors `surfaceY` here since these hand-built fixtures have no real voxel
+ * grid to derive a separate integer index from. */
 function makeNavGridFromHeights(heights: number[][]): NavGrid {
   const height = heights.length;
   const width = heights[0]!.length;
   const cells = heights.map(row => row.map((surfaceY): NavCell => ({
-    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY,
+    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY, climbY: surfaceY,
   })));
   return new NavGrid(width, height, cells, Math.max(...heights.flat()));
 }

@@ -404,7 +404,7 @@ function resolveTargetWaypoint(
     const standingCell = navGrid.cellAt(navGrid.clampX(Math.floor(x)), navGrid.clampZ(Math.floor(z)));
     const blocked = !targetCell || isImpassable(targetCell, avoidVehicles, false);
     const climbLegal = !!standingCell && !!targetCell
-      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, NAV_MAX_CLIMB_HEIGHT);
+      && isStepClimbable(standingCell.climbY, targetCell.climbY, NAV_MAX_CLIMB_HEIGHT);
     if (blocked || !climbLegal) return adoptFresh();
   }
 
@@ -525,5 +525,5 @@ function firstUnwalkedWaypoint(
   const target = navGrid.cellAt(afterNext.x, afterNext.z);
   if (!target || target.type === 'blocked' || target.type === 'void') return 1;
   const standing = navGrid.cellAt(navGrid.clampX(x), navGrid.clampZ(z));
-  return isStepClimbable(standing?.surfaceY, target.surfaceY, NAV_MAX_CLIMB_HEIGHT) ? 2 : 1;
+  return isStepClimbable(standing?.climbY, target.climbY, NAV_MAX_CLIMB_HEIGHT) ? 2 : 1;
 }

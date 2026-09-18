@@ -299,7 +299,7 @@ function directLineWalk(
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
-      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, NAV_MAX_CLIMB_HEIGHT)) return null;
+      if (!isStepClimbable(prevCell?.climbY, cell.climbY, NAV_MAX_CLIMB_HEIGHT)) return null;
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
@@ -680,7 +680,7 @@ function findOrdinaryPath(
       const neighborCell = grid.cellAt(nx, nz);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (!isStepClimbable(currentCell.climbY, neighborCell.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

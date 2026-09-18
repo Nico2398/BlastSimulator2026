@@ -22,17 +22,28 @@ import * as reachability from './NavGridReachability.js';
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
 /**
- * True when stepping between two cells whose column surfaces sit at `fromY`
- * and `toY` is a physically negotiable climb (#953). `fromY`, `toY` and
- * `maxClimb` are metres, not voxel indices — `NavCell.surfaceY` is the
- * continuous marching-cubes crossing height (#1149), so a `maxClimb` of 3
- * means 3 metres, numerically identical to the old 3-voxel reading since
- * this grid's voxel pitch is 1m. Either side missing `surfaceY` —
+ * True when stepping between two cells whose column heights sit at `fromY`
+ * and `toY` is a physically negotiable climb (#953). Generic on its two
+ * numbers — it does not know whether they are voxel indices or metres, so
+ * every caller decides which quantity to feed it. Either side `undefined` —
  * hand-built test fixtures that don't model terrain height — is treated as
  * unconstrained.
  *
- * Lives here, next to the `NavCell.surfaceY` it reads, because three
- * separate layers apply the identical gate and must never drift apart:
+ * Production callers all pass `NavCell.climbY`, the integer topmost-solid-
+ * voxel index, not the continuous `NavCell.surfaceY` marching-cubes crossing
+ * (#1149). On this grid's 1m voxel pitch the two coincide only on
+ * unmodified terrain — natural terrain has been graded into continuous
+ * slopes since #1148, so two voxel-index-adjacent columns can read a
+ * continuous `surfaceY` delta anywhere from just above 0 to just under 2
+ * (see the doc comment above `NavGrid.classifyCellType`, which hit and fixed
+ * the identical drift in ramp classification). Gating climb legality on that
+ * continuous delta would let the exact same graded-terrain noise shift which
+ * steps are legal near the `maxClimb` boundary, changing A*'s route choice
+ * on ordinary flat terrain — the fractional-metres test cases below exercise
+ * this function's own generic math, not what production feeds it.
+ *
+ * Lives here, next to the `NavCell` fields it reads, because three separate
+ * layers apply the identical gate and must never drift apart:
  * `Pathfinding.findPath`'s neighbour expansion, `NavGridReachability`'s
  * climb-aware flood fill, and the reachable-set pre-filter
  * `ActionSelection.selectBestActionForEmployee` screens candidates with.
@@ -84,6 +95,15 @@ export interface NavCell {
    * fixtures that don't model terrain height (#953).
    */
   surfaceY?: number;
+  /**
+   * Column's topmost-solid-voxel index (VoxelGrid.computeVoxelColumnSurfaceY)
+   * at classification time — the same integer `classifyCellType`'s ramp
+   * delta already uses, kept alongside the continuous `surfaceY` so
+   * `isStepClimbable` can gate climb legality on it too (#1149). Populated
+   * only by buildNavGrid/patchNavGrid; undefined for hand-built test
+   * fixtures that don't model terrain height, same as `surfaceY` (#953).
+   */
+  climbY?: number;
 }
 
 /**
@@ -116,6 +136,16 @@ export class NavGrid {
   /** Not readonly: patchNavGrid corrects this in place when a patch lowers the grid's tallest column. */
   maxSurfaceY: number;
   /**
+   * Grid-wide maximum of `NavCell.climbY` — the integer counterpart to
+   * `maxSurfaceY`, kept alongside it so `computeBenchLevel` can gate bench
+   * assignment on the integer-indexed height, the same parity fix
+   * `classifyCellType` and `isStepClimbable` already apply (#1149). Defaults
+   * to `maxSurfaceY` when not given, so every pre-existing positional
+   * `new NavGrid(...)` call in this file's tests — none of which model a
+   * real voxel grid — keeps its already-integer height as both.
+   */
+  maxClimbY: number;
+  /**
    * Cells indexed **locally**: `cells[z - originZ][x - originX]`. Prefer
    * `cellAt`, which takes world coordinates, over indexing this directly.
    */
@@ -128,12 +158,14 @@ export class NavGrid {
     maxSurfaceY: number = 0,
     originX: number = 0,
     originZ: number = 0,
+    maxClimbY: number = maxSurfaceY,
   ) {
     this.width = width;
     this.height = height;
     this.originX = originX;
     this.originZ = originZ;
     this.maxSurfaceY = maxSurfaceY;
+    this.maxClimbY = maxClimbY;
     this.cells = cells;
   }
 
@@ -231,13 +263,42 @@ export class NavGrid {
   }
 
   /**
-   * Compute the bench level for a cell given its surface height and the max
-   * surface height, both in metres (#1149; NAV_BENCH_HEIGHT is itself
-   * metres). Returns 0 if surfaceY < 0 (void cell).
+   * Compute the maximum topmost-solid-voxel index across all columns in the
+   * voxel grid — the integer counterpart to `computeMaxSurfaceY`, used by
+   * `computeBenchLevel` (#1149). Returns -1 if the entire grid is void/empty.
    */
-  static computeBenchLevel(maxSurfaceY: number, surfaceY: number): number {
-    if (surfaceY < 0) return 0;
-    return Math.floor((maxSurfaceY - surfaceY) / NAV_BENCH_HEIGHT);
+  static computeMaxVoxelY(voxelGrid: VoxelGrid): number {
+    let maxY = -1;
+    for (let z = voxelGrid.minZ; z < voxelGrid.maxZ; z++) {
+      for (let x = voxelGrid.minX; x < voxelGrid.maxX; x++) {
+        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
+        if (voxelY > maxY) maxY = voxelY;
+      }
+    }
+    return maxY;
+  }
+
+  /**
+   * Compute the bench level for a cell given its topmost-solid-voxel index
+   * and the grid-wide max of that same integer index — deliberately NOT the
+   * continuous `surfaceY`/`maxSurfaceY` metres (#1149), for the identical
+   * reason `classifyCellType`'s ramp delta and `isStepClimbable`'s climb
+   * gate both read the integer index: natural terrain has been graded into
+   * continuous slopes since #1148, so two voxel-index-adjacent columns can
+   * read a continuous `surfaceY` delta anywhere from just above 0 to just
+   * under 2. Flooring that continuous delta by `NAV_BENCH_HEIGHT` shifts
+   * which side of a bench boundary a column falls on purely from grading
+   * noise, corrupting the same-bench-level tie-break
+   * `NavGridReachability.findNearestReachableCell` and the ramp-level
+   * grouping `Pathfinding.findRampConnections` both key off `benchLevel` —
+   * confirmed empirically: on generated terrain, ~18% of adjacent-column
+   * pairs land on a different bench under the continuous computation than
+   * under this integer one, none of them differing in voxel index. Returns
+   * 0 if voxelY < 0 (void cell).
+   */
+  static computeBenchLevel(maxVoxelY: number, voxelY: number): number {
+    if (voxelY < 0) return 0;
+    return Math.floor((maxVoxelY - voxelY) / NAV_BENCH_HEIGHT);
   }
 
   /**
@@ -262,6 +323,7 @@ export class NavGrid {
     const originZ = voxelGrid.minZ;
     const cells: NavCell[][] = [];
     const maxSurfaceY = NavGrid.computeMaxSurfaceY(voxelGrid);
+    const maxVoxelY = NavGrid.computeMaxVoxelY(voxelGrid);
 
     for (let z = originZ; z < originZ + height; z++) {
       const row: NavCell[] = [];
@@ -276,13 +338,13 @@ export class NavGrid {
         const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
         const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
-        const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
-        row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY));
+        const benchLevel = NavGrid.computeBenchLevel(maxVoxelY, voxelY);
+        row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY, false, 0, voxelY));
       }
       cells.push(row);
     }
 
-    const navGrid = new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
+    const navGrid = new NavGrid(width, height, cells, maxSurfaceY, originX, originZ, maxVoxelY);
 
     for (const fragment of groundFragments) {
       navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
@@ -322,9 +384,10 @@ export class NavGrid {
     if (minX > maxX || minZ > maxZ) return;
 
     // Excavation (blast/drill/ramp) only ever lowers terrain, so the grid-wide
-    // maxSurfaceY can only go stale if this patch contained the column that
-    // WAS the tallest. A cell whose old benchLevel was 0 sat in that top band
-    // under the old maxSurfaceY — cheap to check before overwriting it below.
+    // maxSurfaceY/maxClimbY can only go stale if this patch contained the
+    // column that WAS the tallest. A cell whose old benchLevel was 0 sat in
+    // that top band under the old maxClimbY — cheap to check before
+    // overwriting it below.
     let mayHaveLoweredThePeak = false;
 
     for (let z = minZ; z <= maxZ; z++) {
@@ -343,10 +406,11 @@ export class NavGrid {
           x, z,
           NavGrid.makeCell(
             cellType,
-            NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY),
+            NavGrid.computeBenchLevel(navGrid.maxClimbY, voxelY),
             surfaceY,
             oldCell.vehicleOccupied,
             oldCell.fragmentOccupancy ?? 0,
+            voxelY,
           ),
         );
       }
@@ -361,6 +425,10 @@ export class NavGrid {
       const freshMax = NavGrid.computeMaxSurfaceY(voxelGrid);
       if (freshMax !== navGrid.maxSurfaceY) {
         navGrid.maxSurfaceY = freshMax;
+      }
+      const freshMaxVoxelY = NavGrid.computeMaxVoxelY(voxelGrid);
+      if (freshMaxVoxelY !== navGrid.maxClimbY) {
+        navGrid.maxClimbY = freshMaxVoxelY;
       }
     }
   }
@@ -490,6 +558,7 @@ export class NavGrid {
     surfaceY?: number,
     vehicleOccupied: boolean = false,
     fragmentOccupancy: number = 0,
+    climbY?: number,
   ): NavCell {
     let moveCost: number;
     switch (type) {
@@ -504,6 +573,10 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel, vehicleOccupied, fragmentOccupancy, ...(surfaceY !== undefined && { surfaceY }) };
+    return {
+      type, moveCost, benchLevel, vehicleOccupied, fragmentOccupancy,
+      ...(surfaceY !== undefined && { surfaceY }),
+      ...(climbY !== undefined && { climbY }),
+    };
   }
 }

@@ -23,7 +23,11 @@ import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 
 /** Third `surfaceY` param defaults undefined — hand-built fixtures that don't
  * pass it model no terrain height and stay unconstrained by climb gating
- * (#953), matching every pre-existing call site in this file unmodified. */
+ * (#953), matching every pre-existing call site in this file unmodified.
+ * Also seeds `climbY` (the integer field production climb-gating actually
+ * reads, #1149) to the same value — these hand-built fixtures have no real
+ * voxel grid to derive a separate integer index from, so `surfaceY` and
+ * `climbY` are the same number here, exactly like pre-#1149 behaviour. */
 function makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number): NavCell {
   let moveCost: number;
   switch (type) {
@@ -33,7 +37,10 @@ function makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number):
     case 'blocked':
     case 'void':      moveCost = Infinity; break;
   }
-  return { type, moveCost, benchLevel, vehicleOccupied: false, ...(surfaceY !== undefined && { surfaceY }) };
+  return {
+    type, moveCost, benchLevel, vehicleOccupied: false,
+    ...(surfaceY !== undefined && { surfaceY, climbY: surfaceY }),
+  };
 }
 
 /** Create a flat NavGrid where every cell has the given type (default 'walkable'). */
@@ -49,10 +56,13 @@ function makeFlatGrid(width: number, height: number, fillType: NavCellType = 'wa
   return new NavGrid(width, height, cells);
 }
 
-/** Mutate a single cell's type and move cost (and optionally other NavCell fields). */
+/** Mutate a single cell's type and move cost (and optionally other NavCell fields).
+ * An override that sets `surfaceY` without its own `climbY` also seeds `climbY`
+ * to the same value, matching `makeCell`'s convention above. */
 function setCell(grid: NavGrid, x: number, z: number, type: NavCellType, overrides?: Partial<NavCell>): void {
   const cell = makeCell(type);
   if (overrides) Object.assign(cell, overrides);
+  if (overrides?.surfaceY !== undefined && overrides.climbY === undefined) cell.climbY = overrides.surfaceY;
   grid.cells[z]![x] = cell;
 }
 

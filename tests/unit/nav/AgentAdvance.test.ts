@@ -149,10 +149,13 @@ describe('advanceAlongPath', () => {
 // agent's continuous position into the cell it just left then hands it that
 // backwards hop every tick, and it oscillates instead of arriving.
 
-/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map. */
+/** NavGrid from a height map: every cell walkable, `surfaceY` taken from the map.
+ * `climbY` (the integer field production climb-gating actually reads, #1149)
+ * mirrors `surfaceY` here since these hand-built fixtures have no real voxel
+ * grid to derive a separate integer index from. */
 function heightGrid(heights: number[][]): NavGrid {
   const cells = heights.map(row => row.map((surfaceY): NavCell => ({
-    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY,
+    type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, surfaceY, climbY: surfaceY,
   })));
   return new NavGrid(heights[0]!.length, heights.length, cells, Math.max(...heights.flat()));
 }

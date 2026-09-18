@@ -68,9 +68,12 @@ function blockColumn(grid: NavGrid, x: number): void {
   }
 }
 
-/** A walkable cell carrying a `surfaceY`, so the climb-limit gate (#953) actually applies to it. */
+/** A walkable cell carrying a `surfaceY`, so the climb-limit gate (#953) actually applies
+ * to it. Also seeds `climbY` (the integer field production climb-gating actually reads,
+ * #1149) to the same value — this hand-built fixture has no real voxel grid to derive a
+ * separate integer index from. */
 function makeCellWithSurfaceY(surfaceY: number): NavCell {
-  return { ...makeCell('walkable'), surfaceY };
+  return { ...makeCell('walkable'), surfaceY, climbY: surfaceY };
 }
 
 /**
