@@ -92,7 +92,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
  * scope for T1.3 (no accept criterion calls for it) and would belong to a
  * future landscape-blending task if ever needed.
  */
-export { surfaceDensityAt, SURFACE_BAND_HALF };
+export { surfaceDensityAt };
 
 /** Fill one column (x, z) of `grid` from the sampling context. Pure in (config, x, z) — see #473 D3. */
 function generateColumn(
