@@ -336,14 +336,14 @@ function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: numb
  */
 export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number } {
   let voxelsCleared = 0;
-  const columns = captureColumnTopsForCarve(grid, segment.cells);
+  const carvedColumns = captureColumnTopsForCarve(grid, segment.cells);
 
   for (const cell of segment.cells) {
     if (carveCellIfSolid(grid, cell)) voxelsCleared++;
   }
 
   if (voxelsCleared > 0 && segment.region) {
-    const renormalisedMaxY = renormaliseCarvedColumns(grid, columns);
+    const renormalisedMaxY = renormaliseCarvedColumns(grid, carvedColumns);
     const region = renormalisedMaxY !== null && renormalisedMaxY > segment.region.maxY
       ? { ...segment.region, maxY: renormalisedMaxY }
       : segment.region;
@@ -383,7 +383,7 @@ export function carveRampSegmentSlice(
   let voxelsCleared = 0;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
-  const columns = captureColumnTopsForCarve(grid, cells.slice(fromIndex, toIndex));
+  const carvedColumns = captureColumnTopsForCarve(grid, cells.slice(fromIndex, toIndex));
 
   for (let i = fromIndex; i < toIndex; i++) {
     const cell = cells[i];
@@ -397,7 +397,7 @@ export function carveRampSegmentSlice(
   }
 
   if (voxelsCleared > 0) {
-    const renormalisedMaxY = renormaliseCarvedColumns(grid, columns);
+    const renormalisedMaxY = renormaliseCarvedColumns(grid, carvedColumns);
     if (renormalisedMaxY !== null) maxY = Math.max(maxY, renormalisedMaxY);
   }
 
