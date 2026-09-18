@@ -4,8 +4,8 @@
 
 import { formatMoney } from '../economy/formatMoney.js';
 import {
-  computeVoxelColumnSurfaceY, captureColumnTopsForCarve, renormaliseCarvedColumns,
-  resolveExposedCompId, setVoxelColumnSurfaceHeight, type VoxelGrid,
+  computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, captureColumnTopsForCarve,
+  renormaliseCarvedColumns, resolveExposedCompId, setVoxelColumnSurfaceHeight, type VoxelGrid,
 } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
@@ -258,6 +258,20 @@ function computeRampColumnDepth(step: number, length: number, targetDepth: numbe
   return (step / length) * targetDepth;
 }
 
+/**
+ * Median of three numbers — used below to reject a single-column terrain
+ * outlier from the sequence of per-column surface heights a ramp's floor is
+ * measured against (#1166), while leaving a genuine multi-column terrain
+ * feature (a real plateau/canyon boundary the ramp crosses, see the
+ * `defineRampSegments` "disjoint per-column floor/ceiling ranges" unit test)
+ * untouched — a sustained feature always has at least two same-sided
+ * neighbours agreeing with it, so its own median is itself; a lone outlier's
+ * two neighbours agree with each other instead, so its median is theirs.
+ */
+function median3(a: number, b: number, c: number): number {
+  return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
+}
+
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
   const offset = DIR_OFFSETS[ramp.direction];
   const perpDx = offset.dz !== 0 ? 1 : 0;
@@ -273,17 +287,45 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
   // still readable. `floorAdjustment` (gap between the carve's hard integer
   // floor and this continuous target) rides along on the one cell
   // (`floorRowY`) that carve time can identify as "this column is now done".
+  //
+  // `rawSurfaceY` is collected in a first pass (rather than read inline
+  // below) so each column's `floorY` can be measured against a median-of-3
+  // smoothing of its own raw value and its two ramp-direction neighbours
+  // (#1166): real terrain generation's own sub-voxel noise can nudge one
+  // column's discrete surface index down (or up) by a full voxel relative to
+  // two otherwise-flat neighbours either side — `computeColumnSurfaceY`'s
+  // integer scan turns that sub-voxel wobble into a full 1-voxel cliff the
+  // instant it crosses the 0.5-density threshold on one column but not its
+  // neighbours. Injected straight into `floorY`, that single-column
+  // discretisation artifact produced a non-monotonic, jagged carved floor —
+  // steeper than NAV_MAX_SLOPE_RATIO between two adjacent columns even
+  // though the ramp's own overall grade was gentle, stranding an employee at
+  // the ramp's own deepest carved column with no legal step back to the
+  // surface. `ceilingY` (headroom) deliberately keeps reading the raw,
+  // unsmoothed value — clearance above the floor should track actual local
+  // terrain, not a smoothed proxy of it.
   const columns: RampColumn[] = [];
   let globalMinY = Infinity;
   let globalMaxY = -Infinity;
+
+  const rawSurfaceY: number[] = [];
+  for (let step = 0; step < ramp.length; step++) {
+    const cx = ramp.originX + offset.dx * step;
+    const cz = ramp.originZ + offset.dz * step;
+    rawSurfaceY.push(computeColumnSurfaceY(grid, cx, cz));
+  }
 
   for (let step = 0; step < ramp.length; step++) {
     const currentDepth = computeRampColumnDepth(step, ramp.length, ramp.targetDepth);
     const cx = ramp.originX + offset.dx * step;
     const cz = ramp.originZ + offset.dz * step;
 
-    const surfaceY = computeColumnSurfaceY(grid, cx, cz);
-    const floorY = surfaceY - currentDepth;
+    const surfaceY = rawSurfaceY[step]!;
+    const prevSurfaceY = rawSurfaceY[Math.max(0, step - 1)]!;
+    const nextSurfaceY = rawSurfaceY[Math.min(ramp.length - 1, step + 1)]!;
+    const smoothedSurfaceY = median3(prevSurfaceY, surfaceY, nextSurfaceY);
+
+    const floorY = smoothedSurfaceY - currentDepth;
     const ceilingY = surfaceY + clearanceHeight;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
@@ -369,6 +411,15 @@ function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: numb
 }
 
 /**
+ * Float round-trip tolerance for the floor-row idempotency check below —
+ * mirrors `NavGrid.isStepClimbable`'s own `NAV_SLOPE_EPSILON` pattern: far
+ * smaller than any real depth difference this check cares about, just
+ * enough to keep a value that round-tripped through `setVoxelColumnSurfaceHeight`
+ * and back from reading as fractionally *above* its own just-written target.
+ */
+const FLOOR_TARGET_EPSILON = 1e-6;
+
+/**
  * Carve one ramp cell, additionally banding its column's floor immediately
  * when this cell is that column's own final (lowest) row — carries a
  * `floorAdjustment` — to the ramp's true continuous depth (#1151), instead
@@ -379,12 +430,20 @@ function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: numb
  * *nonzero* residual density (the crossing band's own far side —
  * `setVoxelColumnSurfaceHeight`'s round-trip guarantee needs it, not an
  * accident), so a naive re-check would see it as "still solid" and clear it
- * right back to zero, silently erasing the band. Gating on `=== 1` instead —
- * untouched rock, never a banded value — means a repeat carve of the same
- * segment (TaskCompletionEffects.ts deliberately carves a segment again at
- * `dig_ramp_segment` completion even when `carveRampSegmentSlice` already
- * finished it progressively) leaves an already-banded column alone rather
- * than double-processing it.
+ * right back to zero, silently erasing the band. This used to gate on
+ * `densityAt(...) !== 1` ("untouched rock, never a banded value") — wrong
+ * (#1166): natural terrain's own marching-cubes surface crossing is
+ * fractional exactly like a banded target is, so a shallow-depth column
+ * whose floor row landed inside that same never-touched crossing band read
+ * as "already banded" and was silently skipped, staying at its full natural
+ * height while neighbouring columns carved down on schedule — the resulting
+ * cliff between them is what stranded an employee with no legal step back to
+ * the surface. Gating instead on "this column's own continuous surface
+ * height is already at or below the ramp's intended floor for it" is
+ * idempotent the same way (a repeat carve of an already-banded column reads
+ * back at its own target, so it's skipped) without that false positive —
+ * pristine natural terrain always reads *above* the ramp's intended floor
+ * the first time a column is carved, whatever its density's exact value.
  */
 function carveRampCell(
   grid: VoxelGrid,
@@ -393,9 +452,22 @@ function carveRampCell(
   if (cell.floorAdjustment === undefined) {
     return { cleared: carveCellIfSolid(grid, cell), bandedMaxY: -1 };
   }
-  if (grid.densityAt(cell.x, cell.y, cell.z) !== 1) return { cleared: false, bandedMaxY: -1 };
-  grid.clearVoxel(cell.x, cell.y, cell.z);
-  return { cleared: true, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, cell.floorAdjustment) };
+
+  // The absolute continuous target this floor-row cell bands to once
+  // cleared: `cell.y` is the floor row itself, so the row exposed directly
+  // below it (`cell.y - 1`) is this column's carved top once `cell.y` is
+  // cleared, banded up by `floorAdjustment` — the same arithmetic
+  // `bandRampFloorColumn` used to redo from a post-clear rescan, computed
+  // up front here instead so the idempotency check below can run *before*
+  // clearing anything.
+  const intendedTarget = (cell.y - 1) + cell.floorAdjustment;
+  const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+  if (Number.isFinite(currentHeight) && currentHeight <= intendedTarget + FLOOR_TARGET_EPSILON) {
+    return { cleared: false, bandedMaxY: -1 };
+  }
+
+  if (!carveCellIfSolid(grid, cell)) return { cleared: false, bandedMaxY: -1 };
+  return { cleared: true, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, intendedTarget) };
 }
 
 /**
@@ -430,9 +502,8 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
 
 /**
  * Re-band column (x, z)'s floor from the hard, full-voxel step a ramp's
- * per-cell carve necessarily leaves it at, to the exact continuous depth
- * `adjustment` (a `RampSegmentDef.cells[i].floorAdjustment`) implies
- * (#1151). Without this, NavGrid's slope gate (`isStepClimbable`,
+ * per-cell carve necessarily leaves it at, to the exact continuous `target`
+ * depth (#1151). Without this, NavGrid's slope gate (`isStepClimbable`,
  * `NAV_MAX_SLOPE_RATIO`) sees a staircase of full-metre risers between
  * adjacent 1m-spaced ramp columns — a 45-degree step at every place the
  * integer voxel depth increments, however gently graded the ramp is
@@ -446,15 +517,17 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
  * or the last of many progressive slices. This is also what keeps an
  * in-progress ramp's already-finished prefix walkable while the rest is
  * still being dug, rather than only banding once the entire ramp completes.
+ * `target` is computed by the caller up front (#1166 — `cell.y - 1 +
+ * floorAdjustment`), not re-derived here from a post-clear rescan, so
+ * `carveRampCell`'s own idempotency check can compare against the identical
+ * value before ever touching the grid.
  *
  * Returns the highest Y touched (for the caller's own `terrain:updated`
  * region), or -1 when the column carved to nothing.
  */
-function bandRampFloorColumn(grid: VoxelGrid, x: number, z: number, adjustment: number): number {
-  const carvedTop = computeVoxelColumnSurfaceY(grid, x, z);
-  if (carvedTop < 0) return -1;
+function bandRampFloorColumn(grid: VoxelGrid, x: number, z: number, target: number): number {
+  if (computeVoxelColumnSurfaceY(grid, x, z) < 0) return -1;
 
-  const target = carvedTop + adjustment;
   const compId = resolveExposedCompId(grid, x, z, target);
   return setVoxelColumnSurfaceHeight(grid, x, z, target, compId);
 }

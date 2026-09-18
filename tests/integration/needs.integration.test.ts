@@ -952,7 +952,20 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
   // — high enough to absorb run-to-run scheduling noise, tight enough that a
   // genuine stall or regression still fails loudly by name rather than
   // exhausting a generous placeholder silently.
-  const MAX_TICKS = 119; // 99 measured × 1.2 headroom
+  //
+  // #1166 remeasurement: Ramp.ts's per-column floor-row carve used to gate
+  // on `densityAt(...) !== 1`, which silently skipped a floor-row cell
+  // whenever it landed inside natural terrain's own fractional marching-
+  // cubes surface crossing (indistinguishable by density value alone from
+  // an already-banded cell) — under-carving those columns rather than
+  // genuinely finishing them. Fixed to gate on the column's own continuous
+  // height against its intended target instead, which carves every column
+  // this suite's own depth:8 order actually calls for, genuinely more
+  // digging work than before. Remeasured at 132 ticks / 2 boardings
+  // post-fix (boarding count unaffected — same driver, same vehicle, just
+  // more segment-completion ticks). Ceiling set to measured + ~20%
+  // headroom, same convention as above.
+  const MAX_TICKS = 159; // 132 measured × 1.2 headroom (#1166)
   // History (each remeasurement superseded by the next, kept for context —
   // not the current number): 12 dismount/reboard cycles pre-#549-era fix,
   // then 3 once #549/#556/#867's continuity fixes landed (see git history on
