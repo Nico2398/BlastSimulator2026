@@ -509,8 +509,59 @@ export function buildChunkMesh(
     if (flatX) return chordHeight(sampleColumn, 'z', x, z, onWest ? neighbourSteps.west : neighbourSteps.east);
     return chordHeight(sampleColumn, 'x', x, z, onNorth ? neighbourSteps.north : neighbourSteps.south);
   };
-  const clampedHeightAt = (row: number, col: number): number =>
-    nodeHeightAt(Math.min(n - 1, Math.max(0, row)), Math.min(n - 1, Math.max(0, col)));
+  /**
+   * A neighbour sample for the normal's finite difference, one step off
+   * (row, col) — possibly past the chunk's own 33x33 array. Clamping the
+   * index into range and still dividing by the full `2 * step` (as this used
+   * to) turns a two-sided difference into a one-sided one at every chunk's
+   * outer ring without halving the denominator to match — the slope came out
+   * half its true value for any node on a chunk's own edge, which #559's
+   * dense boundary walk caught once chunks (rather than one huge tile) put an
+   * array edge within a couple of metres of the playable rect on every side.
+   * Sampling straight from the height field past the edge keeps both sides of
+   * the difference genuine, at the true `step` spacing, with no denominator
+   * mismatch — consistent with `shadingNormalAt`'s own rule that slope reads
+   * the live/theoretical field, never a flat-edge-adjusted or clamped value.
+   */
+  const neighbourHeightAt = (row: number, col: number): number => {
+    if (row >= 0 && row <= n - 1 && col >= 0 && col <= n - 1) return nodeHeightAt(row, col);
+    return sampleColumn(originX + col * step, originZ + row * step).height;
+  };
+
+  /**
+   * Slope at a chunk-own-lattice node, honoring the ladder's flat-edge rule
+   * the same way `nodeHeightAt` honors it for position (#1153 ladder rung
+   * joins). On a side whose neighbour samples coarser, BOTH derivatives use
+   * that neighbour's own step — not this chunk's native one — sampled
+   * straight from the height field around (x, z). That reproduces, digit for
+   * digit, the exact central difference the coarser neighbour's own node at
+   * this shared position computes nativelly for itself: same field, same two
+   * bracket points, same spacing. Differencing at each side's own native step
+   * instead does agree on POSITION (both take the same chorded height) but
+   * not on SLOPE the moment the field carries curvature at a wavelength
+   * shorter than the coarser step — the two sides then measure genuinely
+   * different local slopes of the same curve, and light the node they share
+   * differently (up to tens of degrees on this fixture's ridged terrain).
+   * Corners (flatX && flatZ) fall through to the interior/native-step case
+   * below, unaddressed here, like `nodeHeightAt`'s own corner rule.
+   */
+  const nodeNormalAt = (row: number, col: number, x: number, z: number): [number, number, number] => {
+    const onWest = col === 0, onEast = col === n - 1;
+    const onNorth = row === 0, onSouth = row === n - 1;
+    const flatX = (onWest && coarseWest) || (onEast && coarseEast);
+    const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+    if (flatX !== flatZ) {
+      const nStep = flatX
+        ? (onWest ? neighbourSteps.west : neighbourSteps.east)
+        : (onNorth ? neighbourSteps.north : neighbourSteps.south);
+      const dhdx = (sampleColumn(x + nStep, z).height - sampleColumn(x - nStep, z).height) / (2 * nStep);
+      const dhdz = (sampleColumn(x, z + nStep).height - sampleColumn(x, z - nStep).height) / (2 * nStep);
+      return heightFieldNormal(dhdx, dhdz);
+    }
+    const dhdx = (neighbourHeightAt(row, col + 1) - neighbourHeightAt(row, col - 1)) / (2 * step);
+    const dhdz = (neighbourHeightAt(row + 1, col) - neighbourHeightAt(row - 1, col)) / (2 * step);
+    return heightFieldNormal(dhdx, dhdz);
+  };
 
   const positions: number[] = [];
   const normals: number[] = [];
@@ -527,9 +578,7 @@ export function buildChunkMesh(
       const y = nodeHeightAt(row, col);
       positions.push(x, y, z);
 
-      const dhdx = (clampedHeightAt(row, col + 1) - clampedHeightAt(row, col - 1)) / (2 * step);
-      const dhdz = (clampedHeightAt(row + 1, col) - clampedHeightAt(row - 1, col)) / (2 * step);
-      const normal = heightFieldNormal(dhdx, dhdz);
+      const normal = nodeNormalAt(row, col, x, z);
       normals.push(normal[0], normal[1], normal[2]);
 
       const blend = rockBlendFor(palette, chunk.surfCompIds[idx]!);
