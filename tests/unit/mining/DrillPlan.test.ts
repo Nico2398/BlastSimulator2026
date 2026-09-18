@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel,
   landDrilledHole, computeDrillHoleDurationTicks,
@@ -8,6 +8,7 @@ import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
@@ -310,5 +311,29 @@ describe('digVoxel', () => {
     const aboveAfter: number[] = [];
     for (let y = oldTop; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
     expect(aboveAfter).toEqual(aboveBefore);
+  });
+
+  it('#1148: emits terrain:updated with region maxY widened by renormalisation past the dug voxel\'s own y', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    // Genuine fractional crossing above the real top: y=3 is the real top
+    // (density >= 0.5), y=4 carries the residual sub-threshold crossing that
+    // setVoxelColumnSurfaceHeight's own band write leaves above it.
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).toBe(3);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    digVoxel(grid, 2, oldTop, 2, emitter);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    // The dug voxel's own y is oldTop (3), but renormalisation reaches one
+    // cell higher to clear the stranded residue at oldTop+1 — the emitted
+    // region must widen to match, not stop at the raw dug voxel's own y.
+    expect(emitted.region.maxY).toBe(oldTop + 1);
   });
 });

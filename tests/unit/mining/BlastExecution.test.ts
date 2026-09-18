@@ -3,13 +3,16 @@
 // enough energy for its burden must break through to the surface, one buried too
 // deep must not, and neither may touch rock outside the blast zone.
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  VoxelGrid, setVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight,
+} from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { GRAVITY } from '../../../src/core/config/balance.js';
 
 function fillRegion(
@@ -124,6 +127,141 @@ describe('executeBlast — crater', () => {
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
     expect(grid.getVoxel(5, 5, 5)?.density).toBe(1.0);
+  });
+});
+
+// ── Post-carve renormalisation (#1148) ──────────────────────────────────────
+//
+// BlastExecution's own wiring around captureColumnTopsForCarve /
+// renormaliseCarvedColumns (lines ~299-333) had zero coverage touching
+// executeBlast itself — every existing #1148 test drove the standalone
+// VoxelGrid primitive directly. The tests below close that gap.
+//
+// Note on the first two: identifyFragmentedVoxels' own
+// liftUnderminedBurden pass (VoxelFragmentation.ts) already breaks a thin
+// (<= BURDEN_BREAKOUT_MAX voxels) cap that reaches open air within the
+// blast's own energy box, which is exactly the shape a stray sub-threshold
+// residue directly above a freshly broken column takes — so a plain
+// "residue gets cleared" fixture passes even with the #1148 wiring stubbed
+// out, and doesn't by itself prove this file's own call sites fire. The
+// third test below (stale, off-formula residue density) is the
+// discriminating one instead: manually stubbing renormaliseCarvedColumns
+// out of executeBlast leaves that residue at the stale values it started
+// with, while the real wiring rewrites them to the canonical band — so
+// that test genuinely fails without this file's own call sites running.
+
+describe('executeBlast — post-carve renormalisation (#1148)', () => {
+  const CRUST_HEIGHT = 10.5;
+
+  /**
+   * 2×3 hole grid over a fractional crust: every column in the fill footprint
+   * has its real top at y=10 (density 0.75) and a connected sub-threshold
+   * residue slab at y=11 (density 0.25) above it.
+   */
+  function buildCrustFixture() {
+    const grid = new VoxelGrid(40, 20, 40);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1.0 }] });
+    for (let z = 5; z <= 25; z++) {
+      for (let x = 5; x <= 25; x++) {
+        setVoxelColumnSurfaceHeight(grid, x, z, CRUST_HEIGHT, compId);
+      }
+    }
+
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const delays = autoVPattern(holes, 25);
+    return { grid, plan: assembleBlastPlan(holes, charges, delays) };
+  }
+
+  it('leaves no dangling sub-threshold residue above a carved column\'s new top', () => {
+    const { grid, plan } = buildCrustFixture();
+    // Sanity-check the fixture: a genuine residue voxel sits above the real top.
+    expect(grid.densityAt(12, 10, 12)).toBeGreaterThanOrEqual(0.5);
+    expect(grid.densityAt(12, 11, 12)).toBeGreaterThan(0);
+    expect(grid.densityAt(12, 11, 12)).toBeLessThan(0.5);
+
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+
+    // Breaks through to the surface, same as the plain crater fixture...
+    expect(grid.densityAt(12, 10, 12)).toBe(0);
+    // ...and the stranded residue above it is gone too, not left dangling.
+    expect(grid.densityAt(12, 11, 12)).toBe(0);
+  });
+
+  it('widens the emitted terrain:updated region\'s maxY to cover renormalisation, not just the raw fragmented voxels', () => {
+    const { grid, plan } = buildCrustFixture();
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = executeBlast(plan, grid, [], undefined, undefined, emitter);
+    expect(result).not.toBeNull();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    // Renormalisation reaches y=11 (the residue) — one cell above the raw
+    // fragmented voxels' own top (y=10) — so the emitted event's region must
+    // widen to cover it, not stop at the raw fragmented voxels' own Y range.
+    expect(emitted.region.maxY).toBeGreaterThanOrEqual(11);
+  });
+
+  /**
+   * A single shallow hole over bedrock (y=0..3, solid) topped by a
+   * deliberately STALE crossing pair — y=4/y=5 hand-set to densities
+   * (0.6, 0.4) that do NOT match the canonical band `setVoxelColumnSurfaceHeight`
+   * would write for whatever height they interpolate to (0.75/0.25 for the
+   * 4.5 that pair implies) — plus a single fully solid burden voxel at y=6
+   * that the blast breaks through. This is the discriminating case: unlike
+   * the crust fixture above, nothing here needs liftUnderminedBurden or the
+   * unsupported-flood-fill pass — the stale pair survives untouched by
+   * ordinary fragmentation (it's already below the new top once y=6 is
+   * cleared), so only renormaliseVoxelColumnAfterCarve's REGRADE branch can
+   * possibly rewrite it. Verified by hand: stubbing
+   * renormaliseCarvedColumns out of executeBlast leaves y=4/y=5 at their
+   * stale (0.6, 0.4) values; the real wiring rewrites them to (0.75, 0.25).
+   */
+  function buildStaleResidueFixture() {
+    const grid = new VoxelGrid(30, 20, 30);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1.0 }] });
+    for (let z = 5; z <= 20; z++) {
+      for (let x = 5; x <= 20; x++) {
+        for (let y = 0; y <= 3; y++) grid.fillVoxel(x, y, z, compId, undefined, 1);
+        grid.fillVoxel(x, 4, z, compId, undefined, 0.6);
+        grid.fillVoxel(x, 5, z, compId, undefined, 0.4);
+        grid.fillVoxel(x, 6, z, compId, undefined, 1);
+      }
+    }
+
+    const holes = createGridPlan({ x: 12, z: 12 }, 1, 1, 4, 1, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 1, 0.5);
+    const delays = autoVPattern(holes, 25);
+    return { grid, plan: assembleBlastPlan(holes, charges, delays) };
+  }
+
+  it('regrades a stale, off-formula crossing exposed by the carve into the canonical band', () => {
+    const { grid, plan } = buildStaleResidueFixture();
+
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+
+    // The burden voxel broke, exposing the crossing pair as the new top.
+    expect(grid.densityAt(12, 6, 12)).toBe(0);
+    expect(computeVoxelColumnSurfaceY(grid, 12, 12)).toBe(4);
+
+    // The stale (0.6, 0.4) pair — self-consistent enough to interpolate a
+    // height (4.5), but not what a fresh write for that height would
+    // produce — must have been rewritten to the canonical (0.75, 0.25) band,
+    // not left exactly as it was found.
+    expect(grid.densityAt(12, 4, 12)).toBeCloseTo(0.75, 6);
+    expect(grid.densityAt(12, 5, 12)).toBeCloseTo(0.25, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, 12, 12)).toBeCloseTo(4.5, 6);
   });
 });
 

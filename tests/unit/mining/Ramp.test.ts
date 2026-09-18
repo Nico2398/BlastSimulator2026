@@ -888,4 +888,33 @@ describe('carveRampSegmentSlice (#946)', () => {
     expect(handler).toHaveBeenCalledTimes(totalTicks);
     expect(handler.mock.calls.length).toBeLessThan(totalCells);
   });
+
+  it('#1148: widens the emitted terrain:updated region\'s maxY to include renormalisation past the raw carved cell', () => {
+    const grid = new VoxelGrid(20, 10, 20);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    const X = 5, Z = 5, TOP_Y = 3;
+    for (let y = 0; y <= TOP_Y; y++) grid.fillVoxel(X, y, Z, compId, undefined, 1);
+    // Stray sub-threshold residue stranded one cell above the real top — the
+    // carve below removes the real top, exposing this leftover crossing that
+    // renormalisation must sweep away, one cell past the carve's own cell.
+    grid.fillVoxel(X, TOP_Y + 1, Z, compId, undefined, 0.3);
+
+    const cells = [{ x: X, y: TOP_Y, z: Z }];
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = carveRampSegmentSlice(grid, cells, 0, 1, emitter);
+
+    expect(result.voxelsCleared).toBe(1);
+    // The raw carved cell's own Y is TOP_Y, but renormalisation reaches one
+    // cell higher to clear the stranded residue — the region must widen to match.
+    expect(result.region!.maxY).toBe(TOP_Y + 1);
+    expect(grid.densityAt(X, TOP_Y + 1, Z)).toBe(0);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    expect(emitted.region.maxY).toBe(TOP_Y + 1);
+  });
 });
