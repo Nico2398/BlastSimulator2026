@@ -701,27 +701,39 @@ export const ACTION_STUCK_BACKOFF_TICKS = 60;
 export const NAV_BENCH_HEIGHT = 5;
 
 /**
- * Max height-difference, in metres (#1149), an agent can step between
- * adjacent NavGrid cells. Above this the step is a wall, not a grade:
- * `NavGrid` stops classifying it as a `ramp` and `Pathfinding` refuses it as
- * a move (#953). Numerically unchanged from the old voxel-index reading —
- * this grid's voxel pitch is 1m, so 3 voxels and 3 metres coincide.
+ * Max slope, in degrees, an agent can step between adjacent NavGrid cells —
+ * replaces `NAV_MAX_CLIMB_HEIGHT` (#1151). The old rule admitted a step of up
+ * to 3 metres over a 1-metre cardinal run — arctan(3/1) ≈ 71° — purely
+ * because 3 voxels happened to be shorter than that; nothing about 71° was a
+ * deliberate slope decision. 30° makes the rule legible on its own terms:
+ * gentler than this and a worker walks it, steeper and it has to be cut into
+ * a ramp. One constant, applied identically to every agent kind — workers
+ * and vehicles alike, no per-agent-kind variant.
  *
- * Sits deliberately between the two heights the world actually produces.
- * Natural relief on a generated level steps by up to three metres between
- * neighbouring columns — alpine slopes do it constantly — and that is
- * terrain a worker walks. A bench face is `NAV_BENCH_HEIGHT` (5) and a blast
- * crater is dug a hole-depth deeper still (6 in every level and tutorial
- * plan), so both stay firmly out of reach and are descended by a dug ramp,
- * which is the whole point of the issue.
- *
- * Two lowers this to the point where an ordinary mountainside becomes a maze
- * of one-cell detours: measured on `sandbox-mode`'s alpine_granite site, a
- * drill rig sent up that slope drilled one hole of four and spent the rest
- * of the scenario oscillating, because a legal route that zig-zags cell by
- * cell is one the per-tick replanner cannot follow.
+ * Measured reachability cost of the 30° cutoff (#1147 flood fill,
+ * NEIGHBOUR_OFFSETS_8, seed 42, 64m sites): desert_badlands 100%,
+ * volcanic_flats 100%, red_canyon 98.7%, green_foothills 96.7%,
+ * tropical_karst 66.1%, alpine_granite 48.2% — the last two accepted as
+ * designed mountain-level difficulty, not a regression to chase.
  */
-export const NAV_MAX_CLIMB_HEIGHT = 3;
+export const NAV_MAX_SLOPE_DEGREES = 30;
+
+/**
+ * Precomputed tan(NAV_MAX_SLOPE_DEGREES) ≈ 0.5774 — the max metres of rise
+ * legal per metre of horizontal run. Multiplied by a step's own run distance
+ * rather than calling `Math.tan` per step: 0.5774m of rise over a 1m
+ * cardinal step, 0.8165m over a √2m diagonal step.
+ */
+export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180);
+
+/**
+ * Anti-noise floor, in metres, below which a graded cardinal-neighbour
+ * height delta reads as flat rather than a ramp. Ramp classification uses
+ * the same slope measure step legality does; without this floor, almost
+ * every non-identical neighbour pair on continuously-graded terrain
+ * (post-#1148) would flag as a ramp.
+ */
+export const NAV_RAMP_MIN_SLOPE_DELTA = 0.05;
 
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 

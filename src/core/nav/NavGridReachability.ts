@@ -8,7 +8,6 @@
 
 import type { NavGrid } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied } from './NavGrid.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
@@ -262,8 +261,8 @@ function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, cl
 /**
  * Nearest cell to (targetX, targetZ) inside the grid's **largest
  * climb-connected region** — the main body of ground an agent standing
- * anywhere in it can walk across without scaling a face taller than
- * `NAV_MAX_CLIMB_HEIGHT` (#953).
+ * anywhere in it can walk across without scaling a face steeper than
+ * `NAV_MAX_SLOPE_RATIO` (#953, slope-based since #1151).
  *
  * Unlike `findNearestReachableCell`, it takes no anchor. That helper's
  * contract — "pass a world corner, it sits in the map's main connected
@@ -316,7 +315,7 @@ export function findNearestNavigableCell(
         const nx = x + dx;
         const nz = z + dz;
         if (!isTraversableCell(navGrid, nx, nz)) continue;
-        if (!isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+        if (!isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, Math.hypot(dx, dz))) continue;
         const neighbourIdx = (nz - originZ) * width + (nx - originX);
         if (componentOf[neighbourIdx] !== UNVISITED) continue;
         componentOf[neighbourIdx] = startIdx;
@@ -386,8 +385,8 @@ function ensureReachabilityScratch(size: number): void {
  * callers must either consume it synchronously (findNearestReachableCell) or
  * copy what they need out of it (computeReachableSet).
  *
- * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_CLIMB_HEIGHT`
- * per step (#953), which is what makes the fill match `findPath`'s own
+ * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_SLOPE_RATIO`
+ * per step (#953, slope-based since #1151), which is what makes the fill match `findPath`'s own
  * neighbour expansion exactly rather than only its impassability check.
  *
  * `avoidOccupancy` (#954 follow-up fix, default false — every pre-existing
@@ -425,7 +424,7 @@ function floodFillReachable(
       const nz = z + dz;
       if (!isTraversableCell(navGrid, nx, nz)) continue;
       if (avoidOccupancy && isOccupiedCell(navGrid, nx, nz)) continue;
-      if (climbAware && !isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (climbAware && !isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, Math.hypot(dx, dz))) continue;
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
       visitedArr[neighborIdx] = 1;

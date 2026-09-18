@@ -3,7 +3,7 @@
 
 import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
+import { pathfindingNodeBudget } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
@@ -299,9 +299,9 @@ function directLineWalk(
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
-      if (!isStepClimbable(prevCell?.climbY, cell.climbY, NAV_MAX_CLIMB_HEIGHT)) return null;
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
+      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz))) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       totalCost += isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost;
     }
@@ -680,7 +680,7 @@ function findOrdinaryPath(
       const neighborCell = grid.cellAt(nx, nz);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.climbY, neighborCell.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

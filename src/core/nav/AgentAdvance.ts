@@ -7,7 +7,6 @@
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
 import { isImpassable } from './Pathfinding.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -404,7 +403,7 @@ function resolveTargetWaypoint(
     const standingCell = navGrid.cellAt(navGrid.clampX(Math.floor(x)), navGrid.clampZ(Math.floor(z)));
     const blocked = !targetCell || isImpassable(targetCell, avoidVehicles, false);
     const climbLegal = !!standingCell && !!targetCell
-      && isStepClimbable(standingCell.climbY, targetCell.climbY, NAV_MAX_CLIMB_HEIGHT);
+      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, Math.hypot(committed.waypointX - x, committed.waypointZ - z));
     if (blocked || !climbLegal) return adoptFresh();
   }
 
@@ -525,5 +524,5 @@ function firstUnwalkedWaypoint(
   const target = navGrid.cellAt(afterNext.x, afterNext.z);
   if (!target || target.type === 'blocked' || target.type === 'void') return 1;
   const standing = navGrid.cellAt(navGrid.clampX(x), navGrid.clampZ(z));
-  return isStepClimbable(standing?.climbY, target.climbY, NAV_MAX_CLIMB_HEIGHT) ? 2 : 1;
+  return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - x, afterNext.z - z)) ? 2 : 1;
 }
