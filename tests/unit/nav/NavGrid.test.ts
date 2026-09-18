@@ -578,6 +578,15 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     // A non-integer delta — the exact sub-voxel grade the old integer-only
     // representation rounded away.
     expect(Number.isInteger(surfaceB - surfaceA)).toBe(false);
+
+    // classifyCellType deliberately gates ramp detection on the integer
+    // computeVoxelColumnSurfaceY delta (both columns: 4, delta 0), not on
+    // this continuous surfaceY delta — regression guard for the auto-hauler
+    // routing bug the doc comment above classifyCellType describes (#1149).
+    // A future "simplification" back to a continuous-delta ramp gate would
+    // flip one or both of these to 'ramp' and fail here.
+    expect(nav.cells[3]![3]!.type).toBe('walkable');
+    expect(nav.cells[3]![4]!.type).toBe('walkable');
   });
 });
 

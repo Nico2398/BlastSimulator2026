@@ -200,7 +200,18 @@ export class NavGrid {
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
     const { cx, cz } = clampToGridColumn(voxelGrid, x, z);
-    if (computeVoxelColumnSurfaceY(voxelGrid, cx, cz) === -1) return -1;
+    return NavGrid.surfaceHeightFromVoxelY(voxelGrid, cx, cz, computeVoxelColumnSurfaceY(voxelGrid, cx, cz));
+  }
+
+  /**
+   * Shared tail of `computeSurfaceY`, taking the column's integer voxel-index
+   * (from `computeVoxelColumnSurfaceY`) as a parameter instead of
+   * recomputing it. `buildNavGrid`/`patchNavGrid` compute that index once per
+   * column and pass it here AND to `classifyCellType`'s ramp-delta, so the
+   * same column is no longer top-down scanned twice per cell (#1149).
+   */
+  private static surfaceHeightFromVoxelY(voxelGrid: VoxelGrid, cx: number, cz: number, voxelY: number): number {
+    if (voxelY === -1) return -1;
     return computeVoxelColumnSurfaceHeight(voxelGrid, cx, cz);
   }
 
@@ -262,8 +273,9 @@ export class NavGrid {
           row.push(NavGrid.makeCell('void', 0));
           continue;
         }
-        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
-        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
+        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
+        const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
+        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
         const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
         row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY));
       }
@@ -324,8 +336,9 @@ export class NavGrid {
           navGrid.setCellAt(x, z, NavGrid.makeCell('void', 0));
           continue;
         }
-        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
-        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
+        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
+        const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
+        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
         navGrid.setCellAt(
           x, z,
           NavGrid.makeCell(
@@ -447,13 +460,15 @@ export class NavGrid {
     buildings: Building[],
     drillHoles: DrillHole[],
     surfaceY: number = NavGrid.computeSurfaceY(voxelGrid, x, z),
+    ownVoxelY: number = computeVoxelColumnSurfaceY(voxelGrid, x, z),
   ): NavCellType {
-    // surfaceY is now passed in; fallback to computeSurfaceY if not provided
+    // surfaceY and ownVoxelY are passed in by buildNavGrid/patchNavGrid,
+    // which already scanned this column once; default recomputes them for
+    // any other caller.
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
     // Ramp detection: cardinal neighbor with topmost-solid-voxel index delta > 1
-    const ownVoxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
     for (const [dx, dz] of CARDINAL_OFFSETS) {
       const neighborVoxelY = computeVoxelColumnSurfaceY(voxelGrid, x + dx, z + dz);
       if (neighborVoxelY !== -1) {
