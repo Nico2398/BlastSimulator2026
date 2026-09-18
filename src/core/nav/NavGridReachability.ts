@@ -316,7 +316,7 @@ export function findNearestNavigableCell(
         const nx = x + dx;
         const nz = z + dz;
         if (!isTraversableCell(navGrid, nx, nz)) continue;
-        if (!isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
+        if (!isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
         const neighbourIdx = (nz - originZ) * width + (nx - originX);
         if (componentOf[neighbourIdx] !== UNVISITED) continue;
         componentOf[neighbourIdx] = startIdx;
@@ -425,7 +425,7 @@ function floodFillReachable(
       const nz = z + dz;
       if (!isTraversableCell(navGrid, nx, nz)) continue;
       if (avoidOccupancy && isOccupiedCell(navGrid, nx, nz)) continue;
-      if (climbAware && !isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (climbAware && !isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
       visitedArr[neighborIdx] = 1;

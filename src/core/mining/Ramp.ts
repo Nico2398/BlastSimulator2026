@@ -98,11 +98,14 @@ export function buildRamp(
 
 /**
  * Resolve the local surface Y for column (x, z) — the highest voxel with
- * density >= 0.5, matching NavGrid.computeSurfaceY's contract. Both delegate
- * to VoxelGrid.computeVoxelColumnSurfaceY (a leaf-module free function) so
- * core/mining doesn't need to import from core/nav (core/nav already depends
- * on core/mining — DrillPlan, BlastExecution — so the reverse edge would
- * cycle). Returns -1 if the column is entirely void.
+ * density >= 0.5, for this module's own voxel-indexed excavation math.
+ * Deliberately the integer voxel index, independent of
+ * `NavGrid.computeSurfaceY`'s contract, which returns continuous
+ * marching-cubes metres (#1149) — ramp carving here stays voxel-indexed.
+ * Delegates to VoxelGrid.computeVoxelColumnSurfaceY (a leaf-module free
+ * function) so core/mining doesn't need to import from core/nav (core/nav
+ * already depends on core/mining — DrillPlan, BlastExecution — so the
+ * reverse edge would cycle). Returns -1 if the column is entirely void.
  */
 function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   return computeVoxelColumnSurfaceY(grid, x, z);
