@@ -9,7 +9,11 @@ import {
   indexOf,
   type BlastBox,
 } from '../../../src/core/mining/EnergyPropagation.js';
-import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import {
+  VoxelGrid, type VoxelData,
+  renormaliseVoxelColumnAfterCarve, computeVoxelColumnSurfaceY,
+  setVoxelColumnSurfaceHeight,
+} from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { CRACKED_VOXEL_WEAKENING } from '../../../src/core/config/balance.js';
 
@@ -237,5 +241,104 @@ describe('VoxelFragmentation — unsupported rock', () => {
     // x=3 touches neither shell face, and its only path out went through the bridge.
     expect(isFragmented(result, field, 2, 3, 3)).toBe(true);
     expect(result.detachedCount).toBeGreaterThan(0);
+  });
+});
+
+// ── Post-carve renormalisation (#1148) ──────────────────────────────────────
+//
+// After a blast clears its fragmented voxels, the affected columns' topmost
+// run must be re-normalised into a well-formed density band — but only when
+// the column's own exposed top actually moved. An overhang/roof kept
+// standing by identifyFragmentedVoxels' connectivity check (mirrors "an arch
+// whose footings are blasted away collapses") must come out of
+// renormaliseVoxelColumnAfterCarve completely untouched, since its own top
+// never dropped.
+
+describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
+  const ROOF_X = 4, ROOF_Z = 4;
+  const COLUMN_X = 8, COLUMN_Z = 0;
+
+  /**
+   * A 9x9x9 solid grid with the arch/overhang fixture from "an arch whose
+   * footings are blasted away collapses" (hollowed 3x3 under y=5, roof
+   * surviving via sideways connection), plus a separate column — far from
+   * the arch — authored with a genuine fractional crossing above its real
+   * top via setVoxelColumnSurfaceHeight.
+   */
+  function buildFixture() {
+    const grid = solidGrid(9);
+    for (let y = 0; y < 5; y++) {
+      for (let z = 3; z <= 5; z++) for (let x = 3; x <= 5; x++) grid.clearVoxel(x, y, z);
+    }
+
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    // Real top (density >= 0.5) at y=6; residue at y=7 (density < 0.5) is the
+    // stray fractional crossing above it.
+    setVoxelColumnSurfaceHeight(grid, COLUMN_X, COLUMN_Z, 6.5, compId);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
+    expect(oldTopY).toBe(6);
+    expect(grid.densityAt(COLUMN_X, oldTopY + 1, COLUMN_Z)).toBeGreaterThan(0);
+
+    const roofBefore: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) roofBefore.push(grid.densityAt(ROOF_X, y, ROOF_Z));
+
+    return { grid, compId, oldTopY, roofBefore };
+  }
+
+  /** Fragments and clears the column's topmost voxel, mirroring BlastExecution's own identify -> toClear -> clearVoxel loop. */
+  function fragmentAndClearTop(grid: VoxelGrid, oldTopY: number) {
+    const field = createEnergyField(grid, wholeGrid(grid));
+    seedEnergy(field, [{ x: COLUMN_X, y: oldTopY, z: COLUMN_Z, energy: CRUITE * 5 }]);
+    const fragResult = identifyFragmentedVoxels(field, grid);
+    expect(isFragmented(fragResult, field, COLUMN_X, oldTopY, COLUMN_Z)).toBe(true);
+    for (const { x, y, z } of fragResult.fragmented) grid.clearVoxel(x, y, z);
+  }
+
+  it('leaves the overhang/roof column completely untouched — its own top never moved', () => {
+    const { grid, oldTopY, roofBefore } = buildFixture();
+
+    fragmentAndClearTop(grid, oldTopY);
+    renormaliseVoxelColumnAfterCarve(grid, COLUMN_X, COLUMN_Z, oldTopY);
+
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(ROOF_X, y, ROOF_Z), `roof density at y=${y} should be unchanged`).toBe(roofBefore[y]!);
+    }
+  });
+
+  it('clears stranded residue above the new top, exposing plain solid rock rather than a manufactured band', () => {
+    const { grid, oldTopY } = buildFixture();
+
+    fragmentAndClearTop(grid, oldTopY);
+    renormaliseVoxelColumnAfterCarve(grid, COLUMN_X, COLUMN_Z, oldTopY);
+
+    // The blast cleared the genuine crossing itself, exposing the plain,
+    // never-graded rock below (solidGrid fills every voxel at density 1) —
+    // there is no natural crossing left above the new top to preserve, so
+    // renormalisation leaves a hard step rather than manufacturing a band
+    // that never existed pre-carve.
+    const newTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
+    expect(grid.densityAt(COLUMN_X, newTopY, COLUMN_Z)).toBe(1);
+    for (let y = newTopY + 1; y < grid.sizeY; y++) {
+      expect(grid.densityAt(COLUMN_X, y, COLUMN_Z), `density at y=${y} should be 0`).toBe(0);
+    }
+  });
+
+  it('returns null and touches nothing when the column\'s exposed top never moved', () => {
+    const grid = solidGrid(7);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 5.5, compId);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+
+    const before: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(3, y, 3));
+
+    // A carve that never reaches this column at all — the exposed top is
+    // identical to oldTopY, so renormalisation must be a complete no-op.
+    const touchedY = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
+
+    expect(touchedY).toBeNull();
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(3, y, 3), `density at y=${y} should be unchanged`).toBe(before[y]!);
+    }
   });
 });

@@ -935,6 +935,10 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
  * silently clamped into the grid's representable vertical range before the
  * write, so a caller passing an out-of-range value gets a clamped result
  * rather than a signal that anything was off.
+ *
+ * Returns the highest Y index written or cleared by this call, or -1 for a
+ * no-op (unowned column or non-finite height) — for a caller tracking a
+ * dirty-region bound (`renormaliseVoxelColumnAfterCarve`).
  */
 export function setVoxelColumnSurfaceHeight(
   grid: VoxelGrid,
@@ -943,9 +947,9 @@ export function setVoxelColumnSurfaceHeight(
   height: number,
   compId: number,
   ores?: Record<string, number>,
-): void {
-  if (!grid.containsColumn(x, z)) return;
-  if (!Number.isFinite(height)) return;
+): number {
+  if (!grid.containsColumn(x, z)) return -1;
+  if (!Number.isFinite(height)) return -1;
 
   // Read the OLD surface before clamping `height`. `containsColumn` above
   // already guarantees (x, z) is in bounds, so clampToGridColumn (inside
@@ -968,6 +972,7 @@ export function setVoxelColumnSurfaceHeight(
     if (density > 0) grid.fillVoxel(cx, y, cz, compId, ores, density);
     else grid.clearVoxel(cx, y, cz);
   }
+  return highY;
 }
 
 /**
@@ -990,4 +995,124 @@ export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: n
   const { cx, cz } = clampToGridColumn(grid, x, z);
   const h = computeVoxelColumnSurfaceHeight(grid, cx, cz);
   return Number.isNaN(h) ? 0 : h;
+}
+
+/**
+ * After a voxel-level carve has dropped column (x, z)'s exposed top from
+ * `oldTopY` to wherever it now sits, clear any leftover sub-threshold density
+ * the carve stranded just above the new top. When the newly exposed top is
+ * itself already mid-band (a genuine fractional crossing the carve cut
+ * through, not a plain fully-solid voxel), also re-grade it into the same
+ * continuous band setVoxelColumnSurfaceHeight itself would write for it — so
+ * a carved surface that genuinely had a crossing reads back identically to a
+ * written one.
+ *
+ * A newly exposed top that reads fully solid (density === 1) is a flat rock
+ * boundary with no natural crossing of its own — carving through it exposes
+ * plain rock, not a slope — so this deliberately leaves it as a hard step
+ * rather than manufacturing a band that was never there. Re-grading
+ * unconditionally on every carve, including this case, is what carved a
+ * spurious sub-threshold voxel one cell above every plain flat-rock cut
+ * (#1148 fixer finding).
+ *
+ * Inputs: an existing VoxelGrid; a column (x, z); the column's topmost
+ * solid-or-above (density >= 0.5) Y index from immediately before the carve
+ * that just ran.
+ *
+ * Output: null when the column's exposed top did not move (the carve never
+ * reached above the column's current top — a cavity dug from below/inside,
+ * or a fragmented voxel that wasn't the column's topmost run) — in this case
+ * nothing is touched, so any existing overhang or crossing band above stays
+ * completely untouched. Otherwise, the highest Y this call wrote or cleared,
+ * for a caller tracking a dirty-region bounding box to report onward.
+ *
+ * Never reaches below the highest carved gap in the column: rock separated
+ * from the new top by empty space (an overhang, a cavity roof, a tunnel
+ * floor) is never read or written by this function.
+ *
+ * A column carved down to nothing (no solid voxel left at all) is left
+ * empty — there is no top to write a band for.
+ */
+export function renormaliseVoxelColumnAfterCarve(
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  oldTopY: number,
+): number | null {
+  if (!grid.containsColumn(x, z)) return null;
+
+  const newTopY = computeVoxelColumnSurfaceY(grid, x, z);
+  if (newTopY === oldTopY) return null;
+
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
+
+  // Bounded sweep: the only place a legitimate pre-existing crossing band
+  // above the old top could have been sitting. Never reaches further than
+  // SURFACE_BAND_HALF above oldTopY, so this is O(SURFACE_BAND_HALF), not a
+  // column-wide scan.
+  let touchedMaxY: number | null = null;
+  const sweepHigh = Math.min(grid.sizeY - 1, oldTopY + SURFACE_BAND_HALF);
+  for (let y = oldTopY + 1; y <= sweepHigh; y++) {
+    if (grid.densityAt(cx, y, cz) !== 0) {
+      grid.clearVoxel(cx, y, cz);
+      touchedMaxY = touchedMaxY === null ? y : Math.max(touchedMaxY, y);
+    }
+  }
+
+  if (newTopY < 0) return touchedMaxY;
+
+  // A fully solid new top has no genuine crossing to reconstruct — carving
+  // through plain rock exposes more plain rock, and manufacturing a band
+  // here would smear a spurious sub-threshold voxel one cell above a
+  // perfectly clean cut. Only a top that is itself still mid-band (a real
+  // crossing the carve cut through) needs re-grading.
+  if (grid.densityAt(cx, newTopY, cz) >= 1) return touchedMaxY;
+
+  const compId = grid.palette.intern(grid.compositionAt(cx, newTopY, cz));
+  const ores = grid.oresAt(cx, newTopY, cz);
+  const height = computeVoxelColumnSurfaceHeight(grid, cx, cz);
+  const bandTop = setVoxelColumnSurfaceHeight(grid, cx, cz, height, compId, ores);
+
+  return touchedMaxY === null ? bandTop : Math.max(touchedMaxY, bandTop);
+}
+
+/**
+ * Distinct (x, z) columns among `cells`, each mapped to its topmost
+ * solid-or-above Y read before a multi-cell carve's clear loop runs —
+ * captured once per column, not once per cell, so a carve touching several
+ * cells in the same column doesn't re-capture a top an earlier cell's clear
+ * already moved. Feeds `renormaliseCarvedColumns` after the clear loop.
+ * Shared by every multi-cell carve site (Ramp.ts, BlastExecution.ts) so each
+ * keeps its own clear loop but not its own column-dedup bookkeeping (#1148).
+ */
+export function captureColumnTopsForCarve(
+  grid: VoxelGrid,
+  cells: ReadonlyArray<{ x: number; z: number }>,
+): Map<string, { x: number; z: number; oldTopY: number }> {
+  const columns = new Map<string, { x: number; z: number; oldTopY: number }>();
+  for (const cell of cells) {
+    const key = `${cell.x},${cell.z}`;
+    if (!columns.has(key)) {
+      columns.set(key, { x: cell.x, z: cell.z, oldTopY: computeVoxelColumnSurfaceY(grid, cell.x, cell.z) });
+    }
+  }
+  return columns;
+}
+
+/**
+ * Renormalise every column captured by `captureColumnTopsForCarve`, once the
+ * carve's clear loop has run. Returns the highest Y any of them touched, or
+ * null if none moved — for widening the caller's `terrain:updated` region.
+ */
+export function renormaliseCarvedColumns(
+  grid: VoxelGrid,
+  columns: ReadonlyMap<string, { x: number; z: number; oldTopY: number }>,
+): number | null {
+  let maxY: number | null = null;
+  for (const { x, z, oldTopY } of columns.values()) {
+    const touched = renormaliseVoxelColumnAfterCarve(grid, x, z, oldTopY);
+    if (touched !== null) maxY = maxY === null ? touched : Math.max(maxY, touched);
+  }
+  return maxY;
 }

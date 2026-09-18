@@ -31,7 +31,7 @@ import { groupProjectiles } from './ProjectileGrouping.js';
 import { resolveFragmentLanding, type FragmentFlight } from './BlastResolve.js';
 import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
-import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import type { AccidentRecord } from '../entities/Damage.js';
@@ -296,7 +296,14 @@ export function executeBlast(
 
   // 4b. Clear the rock before working out where the fragments land — they fall
   //     into the hole the blast just made, not onto the ground it removed.
+  const carvedColumns = captureColumnTopsForCarve(grid, toClear);
   for (const { x, y, z } of toClear) grid.clearVoxel(x, y, z);
+
+  // 4b-cont. Clean up any leftover sub-threshold density the clear stranded
+  //          above each carved column's new top, and re-grade that top into
+  //          its canonical band — before fragment landing reads terrain
+  //          heights below, so it sees the renormalised surface (#1148).
+  const renormalisedMaxY = renormaliseCarvedColumns(grid, carvedColumns);
 
   // 4c. Fly the thrown rock, drop the rest, and stack it all where it lands.
   //     Fragments that travel together are grouped into a capped number of
@@ -323,6 +330,7 @@ export function executeBlast(
     if (z < regMinZ) regMinZ = z;
     if (z > regMaxZ) regMaxZ = z;
   }
+  if (renormalisedMaxY !== null && renormalisedMaxY > regMaxY) regMaxY = renormalisedMaxY;
   const clearedRegion: BlastRegion = toClear.length === 0
     ? { minX: 0, maxX: -1, minZ: 0, maxZ: -1 }
     : { minX: regMinX, maxX: regMaxX, minZ: regMinZ, maxZ: regMaxZ };

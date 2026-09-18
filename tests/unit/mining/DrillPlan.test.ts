@@ -1,11 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel,
   landDrilledHole, computeDrillHoleDurationTicks,
 } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import {
+  VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
+} from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
@@ -254,5 +257,83 @@ describe('digVoxel', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
+  });
+
+  // ── #1148: post-carve renormalisation ─────────────────────────────────────
+
+  it('digging the column\'s real top leaves no stranded sub-threshold density above the new top', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    // Genuine fractional crossing above the real top: y=3 is the real top
+    // (density >= 0.5), y=4 carries the residual sub-threshold crossing that
+    // setVoxelColumnSurfaceHeight's own band write leaves above it.
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).toBe(3);
+    expect(grid.densityAt(2, oldTop + 1, 2)).toBeGreaterThan(0);
+
+    digVoxel(grid, 2, oldTop, 2);
+
+    for (let y = oldTop; y < grid.sizeY; y++) {
+      expect(grid.densityAt(2, y, 2), `density at y=${y} should be 0`).toBe(0);
+    }
+  });
+
+  it('the post-dig state needs no further cleanup — the exposed top is plain solid rock, not a manufactured crossing', () => {
+    // Digging through the genuine crossing exposes plain, never-graded rock
+    // below (y=0..2 were filled at density 1, not written via
+    // setVoxelColumnSurfaceHeight): there is no natural crossing left to
+    // preserve, so the new top stays a hard step rather than being smeared
+    // into a fresh band that never existed pre-carve.
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+
+    digVoxel(grid, 2, oldTop, 2);
+
+    const newTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(newTop).toBe(2);
+    expect(grid.densityAt(2, newTop, 2)).toBe(1);
+  });
+
+  it('digging a non-top voxel does not disturb anything above the unmoved top', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    const aboveBefore: number[] = [];
+    for (let y = oldTop; y < grid.sizeY; y++) aboveBefore.push(grid.densityAt(2, y, 2));
+
+    digVoxel(grid, 2, 1, 2); // dig a buried, non-top voxel — the top never moves
+
+    expect(computeVoxelColumnSurfaceY(grid, 2, 2)).toBe(oldTop);
+    const aboveAfter: number[] = [];
+    for (let y = oldTop; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
+    expect(aboveAfter).toEqual(aboveBefore);
+  });
+
+  it('#1148: emits terrain:updated with region maxY widened by renormalisation past the dug voxel\'s own y', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    // Genuine fractional crossing above the real top: y=3 is the real top
+    // (density >= 0.5), y=4 carries the residual sub-threshold crossing that
+    // setVoxelColumnSurfaceHeight's own band write leaves above it.
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).toBe(3);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    digVoxel(grid, 2, oldTop, 2, emitter);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    // The dug voxel's own y is oldTop (3), but renormalisation reaches one
+    // cell higher to clear the stranded residue at oldTop+1 — the emitted
+    // region must widen to match, not stop at the raw dug voxel's own y.
+    expect(emitted.region.maxY).toBe(oldTop + 1);
   });
 });

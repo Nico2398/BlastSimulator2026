@@ -6,6 +6,9 @@ import {
   computeVoxelColumnSurfaceY,
   computeVoxelColumnSurfaceHeight,
   setVoxelColumnSurfaceHeight,
+  renormaliseVoxelColumnAfterCarve,
+  captureColumnTopsForCarve,
+  renormaliseCarvedColumns,
   setVoxelBoundsReporter,
   chunkIndexOf,
   clampChunkRectToTile,
@@ -814,6 +817,218 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
     expect(() => setVoxelColumnSurfaceHeight(grid, 99, 99, 5, compId)).not.toThrow();
 
     expect(grid.containsColumn(99, 99)).toBe(false);
+  });
+});
+
+// ── Post-carve renormalisation primitives (#1148) ───────────────────────────
+//
+// Mirrored home for renormaliseVoxelColumnAfterCarve, captureColumnTopsForCarve
+// and renormaliseCarvedColumns, per core-purity's "exported function here means
+// its unit test in the mirrored tests/unit/ path" rule. renormaliseVoxelColumnAfterCarve
+// also gets end-to-end coverage through executeBlast in
+// tests/unit/mining/VoxelFragmentation.test.ts and BlastExecution.test.ts — the
+// tests below are the direct, standalone coverage this file itself owns.
+
+describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
+  it('returns null and touches nothing when the column\'s exposed top never moved', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 5.5, compId);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+
+    const before: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(3, y, 3));
+
+    const touched = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
+
+    expect(touched).toBeNull();
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(3, y, 3), `density at y=${y} should be unchanged`).toBe(before[y]!);
+    }
+  });
+
+  it('SKIP branch: a plain fully solid new top is left as a hard step, no band manufactured', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(oldTopY).toBe(6);
+
+    grid.clearVoxel(3, 6, 3); // mirrors a fragmented-voxel carve clearing the old top
+
+    const touched = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
+
+    const newTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(newTopY).toBe(5);
+    expect(grid.densityAt(3, newTopY, 3)).toBe(1);
+    // No residue existed above the old top and the new top is plain solid rock,
+    // so nothing needed clearing or regrading.
+    expect(touched).toBeNull();
+  });
+
+  it('REGRADE branch: reconstructs a genuine mid-band crossing exposed by the carve', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    const X = 3, Z = 3;
+
+    // Author a genuine fractional crossing at height 4.3...
+    setVoxelColumnSurfaceHeight(grid, X, Z, 4.3, compId);
+    // ...then stack a plain solid voxel above it — what the carve below removes,
+    // exposing the already-graded crossing underneath as the new top.
+    grid.fillVoxel(X, 6, Z, compId, undefined, 1);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, X, Z);
+    expect(oldTopY).toBe(6);
+
+    grid.clearVoxel(X, 6, Z); // mirrors the carve's clear loop
+
+    const touched = renormaliseVoxelColumnAfterCarve(grid, X, Z, oldTopY);
+
+    const newTopY = computeVoxelColumnSurfaceY(grid, X, Z);
+    expect(newTopY).toBe(4);
+    // The newly exposed top is itself mid-band (a genuine crossing), not plain rock.
+    const newTopDensity = grid.densityAt(X, newTopY, Z);
+    expect(newTopDensity).toBeGreaterThanOrEqual(0.5);
+    expect(newTopDensity).toBeLessThan(1);
+
+    const height = computeVoxelColumnSurfaceHeight(grid, X, Z);
+    expect(Number.isFinite(height)).toBe(true);
+
+    // A fresh, equivalent column written directly via setVoxelColumnSurfaceHeight
+    // at the same height must read back identically, voxel by voxel.
+    const control = new VoxelGrid(16, 16, 16);
+    setVoxelColumnSurfaceHeight(control, X, Z, height, compId);
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(X, y, Z), `density at y=${y} should match a fresh write`)
+        .toBeCloseTo(control.densityAt(X, y, Z), 6);
+    }
+    expect(touched).not.toBeNull();
+  });
+
+  it('a column outside the grid bounds is a silent no-op', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    expect(grid.containsColumn(99, 99)).toBe(false);
+    expect(() => renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).not.toThrow();
+    expect(renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).toBeNull();
+  });
+});
+
+describe('captureColumnTopsForCarve (#1148)', () => {
+  it('captures one entry per distinct column, keyed by its pre-carve top', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+    const expectedOldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(expectedOldTopY).toBe(6);
+
+    // Several cells in the same column, at different y.
+    const cells = [
+      { x: 3, y: 6, z: 3 },
+      { x: 3, y: 5, z: 3 },
+      { x: 3, y: 4, z: 3 },
+    ];
+
+    const columns = captureColumnTopsForCarve(grid, cells);
+
+    expect(columns.size).toBe(1);
+    expect(columns.get('3,3')).toEqual({ x: 3, z: 3, oldTopY: expectedOldTopY });
+  });
+
+  it('captures the PRE-carve top, not a re-read after an earlier cell\'s clear already moved it', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+    const expectedOldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(expectedOldTopY).toBe(6);
+
+    const cells = [
+      { x: 3, y: 6, z: 3 },
+      { x: 3, y: 5, z: 3 },
+    ];
+
+    // Capture runs before any clearing happens, mirroring the real call order
+    // (capture -> clear loop -> renormaliseCarvedColumns).
+    const columns = captureColumnTopsForCarve(grid, cells);
+    // Now clear the top cell, as the carve's own clear loop would.
+    grid.clearVoxel(3, 6, 3);
+
+    // The captured top must still be the PRE-carve value, not a stale re-read
+    // of the grid after the first cell's clear already dropped the top to 5.
+    expect(columns.get('3,3')!.oldTopY).toBe(expectedOldTopY);
+  });
+
+  it('captures a distinct entry per column when cells span more than one column', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 4, 3, compId, undefined, 1);
+    grid.fillVoxel(5, 2, 5, compId, undefined, 1);
+
+    const cells = [{ x: 3, y: 4, z: 3 }, { x: 5, y: 2, z: 5 }];
+    const columns = captureColumnTopsForCarve(grid, cells);
+
+    expect(columns.size).toBe(2);
+    expect(columns.get('3,3')).toEqual({ x: 3, z: 3, oldTopY: 4 });
+    expect(columns.get('5,5')).toEqual({ x: 5, z: 5, oldTopY: 2 });
+  });
+
+  it('returns an empty map for an empty cells array', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const columns = captureColumnTopsForCarve(grid, []);
+    expect(columns.size).toBe(0);
+  });
+});
+
+describe('renormaliseCarvedColumns (#1148)', () => {
+  it('renormalises every captured column and returns the highest touched Y across all of them', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    // Column A: plain solid top at y=6, plus stray residue stranded at y=7
+    // (above the old top, inside the sweep band) that the carve below exposes.
+    for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+    grid.fillVoxel(3, 7, 3, compId, undefined, 0.3);
+    const oldTopA = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(oldTopA).toBe(6);
+
+    // Column B: separate column, no carve happens to it at all.
+    grid.fillVoxel(9, 0, 9, compId, undefined, 1);
+    grid.fillVoxel(9, 3, 9, compId, undefined, 1);
+    const oldTopB = computeVoxelColumnSurfaceY(grid, 9, 9);
+    expect(oldTopB).toBe(3);
+
+    // Carve only touches column A.
+    grid.clearVoxel(3, 6, 3);
+
+    const columns = new Map([
+      ['3,3', { x: 3, z: 3, oldTopY: oldTopA }],
+      ['9,9', { x: 9, z: 9, oldTopY: oldTopB }],
+    ]);
+
+    const maxY = renormaliseCarvedColumns(grid, columns);
+
+    // Column A's new top (y=5) is plain solid, so nothing to regrade, but the
+    // sweep still clears the stranded residue at y=7.
+    expect(grid.densityAt(3, 7, 3)).toBe(0);
+    expect(maxY).toBe(7);
+    // Column B never moved, so it contributes nothing to the aggregate.
+    expect(computeVoxelColumnSurfaceY(grid, 9, 9)).toBe(oldTopB);
+  });
+
+  it('returns null when none of the captured columns moved', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 4, 3, compId, undefined, 1);
+    const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+
+    const columns = new Map([['3,3', { x: 3, z: 3, oldTopY }]]);
+
+    const maxY = renormaliseCarvedColumns(grid, columns);
+
+    expect(maxY).toBeNull();
+  });
+
+  it('returns null for an empty columns map', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    expect(renormaliseCarvedColumns(grid, new Map())).toBeNull();
   });
 });
 
