@@ -6,7 +6,7 @@ import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
-import { buildLandscapeMap, sampleLandscapeColumn, type LandscapeMap } from '../../core/world/LandscapeMap.js';
+import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
@@ -29,7 +29,7 @@ import type { NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
  * handful of extra points.
  */
 export interface LandscapeHandle {
-  map: LandscapeMap;
+  map: LazyLandscapeMap;
   playableRect: Rect;
   sampleColumn(x: number, z: number): { height: number; biomeId: number; surfCompId: number };
   /** Ground mean world-y (`groundOffset + centerHeight`) — the aerial-perspective pass's height reference for "thick in valleys, thin on peaks" (#458 T5.2/A21). */
@@ -66,7 +66,7 @@ export interface GameContext {
  * Build the live `NavGridSyncTarget` for `ctx`'s current game, or null when
  * no game (or no navGrid/grid yet) exists. Shared by createRunner.ts's
  * production wiring and tests/helpers/gameContext.ts's fixture wiring
- * (#1146) so both `subscribeNavGridToTerrainUpdates` call sites read `ctx`
+ * (#1146) so both `subscribeNavGridToUpdates` call sites read `ctx`
  * fresh through one place instead of each hand-rolling the same closure.
  */
 export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | null {
@@ -181,7 +181,7 @@ export function ensureLandscape(
   const { worldGen, biome, strata } = buildTerrainContext(params);
   const structureSet = buildStructureSet(params.seed, worldGen.fields, worldGen.shapingAt, biome.forestDensity, worldGen.playableRect);
   const palette = ctx.grid.palette;
-  const map = buildLandscapeMap(worldGen, params.climateBias, structureSet, strata, palette);
+  const map = createLazyLandscapeMap(worldGen, params.climateBias, structureSet, strata, palette);
 
   ctx.landscape = {
     map,
@@ -378,9 +378,8 @@ export function landscapeInfoCommand(
   return {
     success: true,
     output: [
-      `Tiles: ${map.tiles.length}`,
-      `Samples/tile: ${map.samplesPerTile}x${map.samplesPerTile}`,
-      `Tile span: ${map.tileSpan}m, coarse step: ${map.coarseStep}m`,
+      `Ladder steps (m): ${LADDER_STEPS.join(', ')}`,
+      `Cached chunks: ${map.cachedChunkIds.length}`,
       `Extent half: ${map.extentHalf}m`,
     ].join('\n'),
   };

@@ -1,9 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 import { buildStructureSet, type StructureSet } from '../../../src/core/world/Structures.js';
-import { buildLandscapeMap, sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
+import {
+  createLazyLandscapeMap,
+  sampleLandscapeColumn,
+  chunkOrigin,
+  selectLandscapeChunks,
+  chunkSpanAt,
+  NODES_PER_CHUNK,
+  LADDER_STEPS,
+  EXTENT_HALF,
+  type LandscapeChunkId,
+} from '../../../src/core/world/LandscapeMap.js';
 import { getBiome, biomeIndexOf } from '../../../src/core/world/BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY, sampleSurfaceHeightY, applyPitMask, sampleBaseHeight } from '../../../src/core/world/WorldGen.js';
+import { sampleSurfaceVoxelY, sampleSurfaceHeightY, applyPitMask, sampleBaseHeight } from '../../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { StrataSampler, buildStrataProfile } from '../../../src/core/world/Strata.js';
 import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
@@ -15,13 +25,33 @@ function makeConfig(seed: number, biomeId = 'alpine_granite'): TerrainConfig {
   return { sizeX: 40, sizeY: 30, sizeZ: 40, seed, climateBias: biome.climateCenter };
 }
 
-/** Builds grid + landscape context sharing one palette, at a small extentHalf for test speed. */
+/**
+ * Builds grid + landscape sampling context sharing one palette, at a small
+ * extentHalf for test speed. Deliberately does NOT build a lazy landscape
+ * map — most callers only need sampleLandscapeColumn's own inputs (worldGen,
+ * strata, structureSet, palette), and sampleLandscapeColumn itself is
+ * untouched by #1153, so those tests must keep passing whether or not
+ * createLazyLandscapeMap is implemented yet.
+ */
 function buildAll(config: TerrainConfig, extentHalf = 300) {
   const grid = generateTerrain(config);
   const { worldGen, biome, strata } = buildTerrainContext(config);
   const structureSet = buildStructureSet(config.seed, worldGen.fields, worldGen.shapingAt, biome.forestDensity, worldGen.playableRect, extentHalf);
-  const landscape = buildLandscapeMap(worldGen, config.climateBias, structureSet, strata, grid.palette, extentHalf);
-  return { grid, worldGen, biome, strata, structureSet, landscape };
+  return { grid, worldGen, biome, strata, structureSet };
+}
+
+/**
+ * A cheap fixture for the lazy-map ladder tests: real WorldGen/strata (via
+ * buildTerrainContext), no voxel grid and no structure set — those tests
+ * exercise chunk sampling and caching, not boundary-agreement with a real
+ * grid, so paying for generateTerrain()/buildStructureSet() on every case
+ * would only slow the suite down.
+ */
+function buildLazySetup(seed: number, biomeId = 'alpine_granite', extentHalf = EXTENT_HALF) {
+  const config = makeConfig(seed, biomeId);
+  const { worldGen, strata } = buildTerrainContext(config);
+  const palette = new CompositionPalette();
+  return { config, worldGen, strata, palette, extentHalf };
 }
 
 describe('sampleLandscapeColumn', () => {
@@ -54,7 +84,7 @@ describe('sampleLandscapeColumn', () => {
   });
 });
 
-describe('buildLandscapeMap — a grid too short for the relief it stands in (#1077)', () => {
+describe('sampleLandscapeColumn — a grid too short for the relief it stands in (#1077)', () => {
   // The suite below deliberately gives itself a 200 m grid so nothing clamps.
   // Every real level is the opposite case: alpine_granite's relief runs tens of
   // metres through a 20 m grid, the tutorial's own north-east corner dips 1.2 m
@@ -95,7 +125,7 @@ describe('buildLandscapeMap — a grid too short for the relief it stands in (#1
   });
 });
 
-describe('buildLandscapeMap — boundary agreement (#458 T2.1 accept criterion)', () => {
+describe('sampleLandscapeColumn — boundary agreement (#458 T2.1 accept criterion)', () => {
   // sizeY generously larger than alpine_granite's max relief (spline tops
   // out around 75m base + 55 pvAmplitude): a too-short grid clamps
   // sampleSurfaceVoxelY's result (heightToVoxelY clamps to [1, sizeY-1]),
@@ -233,60 +263,256 @@ describe('buildLandscapeMap — boundary agreement (#458 T2.1 accept criterion)'
   });
 });
 
-describe('buildLandscapeMap — tile layout', () => {
-  it('is deterministic for the same seed and inputs', () => {
-    const config = makeConfig(5);
-    const a = buildAll(config, 700);
-    const b = buildAll(config, 700);
-    expect(a.landscape.tiles.length).toBe(b.landscape.tiles.length);
-    for (let i = 0; i < a.landscape.tiles.length; i++) {
-      expect(a.landscape.tiles[i]!.heights).toEqual(b.landscape.tiles[i]!.heights);
-      expect(a.landscape.tiles[i]!.biomeIds).toEqual(b.landscape.tiles[i]!.biomeIds);
-      expect(a.landscape.tiles[i]!.surfCompIds).toEqual(b.landscape.tiles[i]!.surfCompIds);
+describe('chunkSpanAt', () => {
+  it("is (NODES_PER_CHUNK - 1) * that level's ladder step, for every rung", () => {
+    for (let level = 0; level < LADDER_STEPS.length; level++) {
+      expect(chunkSpanAt(level)).toBe((NODES_PER_CHUNK - 1) * LADDER_STEPS[level]!);
+    }
+  });
+});
+
+describe('createLazyLandscapeMap / getChunk — per-chunk lazy ladder (#1153)', () => {
+  it('every node of a level-0 (finest) chunk matches sampleLandscapeColumn at that node\'s world (x, z)', () => {
+    const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(21);
+    const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+    const chunk = map.getChunk({ level: 0, cx: 0, cz: 0 });
+    expect(chunk.step).toBe(LADDER_STEPS[0]);
+
+    for (let row = 0; row < NODES_PER_CHUNK; row++) {
+      for (let col = 0; col < NODES_PER_CHUNK; col++) {
+        const x = chunk.originX + col * chunk.step;
+        const z = chunk.originZ + row * chunk.step;
+        const expected = sampleLandscapeColumn(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, x, z);
+        const idx = row * NODES_PER_CHUNK + col;
+        expect(chunk.heights[idx]).toBeCloseTo(expected.height, 3); // float32 tolerance
+        expect(chunk.biomeIds[idx]).toBe(expected.biomeId);
+        expect(chunk.surfCompIds[idx]).toBe(expected.surfCompId);
+      }
     }
   });
 
-  it('every tile has 129x129 samples (fence-post: 512/4 + 1) and correct metadata', () => {
-    const config = makeConfig(9);
-    const { landscape } = buildAll(config, 700);
-    expect(landscape.samplesPerTile).toBe(129);
-    expect(landscape.tileSpan).toBe(512);
-    expect(landscape.coarseStep).toBe(4);
-    expect(landscape.tiles.length).toBeGreaterThan(0);
-    for (const tile of landscape.tiles) {
-      expect(tile.heights.length).toBe(129 * 129);
-      expect(tile.biomeIds.length).toBe(129 * 129);
-      expect(tile.surfCompIds.length).toBe(129 * 129);
+  for (let level = 0; level < LADDER_STEPS.length; level++) {
+    it(`level ${level} (step ${LADDER_STEPS[level]}m): every node matches sampleLandscapeColumn at that node's world (x, z)`, () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(21 + level);
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      const chunk = map.getChunk({ level, cx: 0, cz: 0 });
+      expect(chunk.step).toBe(LADDER_STEPS[level]);
+
+      for (let row = 0; row < NODES_PER_CHUNK; row++) {
+        for (let col = 0; col < NODES_PER_CHUNK; col++) {
+          const x = chunk.originX + col * chunk.step;
+          const z = chunk.originZ + row * chunk.step;
+          const expected = sampleLandscapeColumn(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, x, z);
+          const idx = row * NODES_PER_CHUNK + col;
+          expect(chunk.heights[idx]).toBeCloseTo(expected.height, 3);
+          expect(chunk.biomeIds[idx]).toBe(expected.biomeId);
+          expect(chunk.surfCompIds[idx]).toBe(expected.surfCompId);
+        }
+      }
+    });
+
+    it(`level ${level}: heights.length === biomeIds.length === surfCompIds.length === NODES_PER_CHUNK ** 2`, () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(31 + level);
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      const chunk = map.getChunk({ level, cx: 0, cz: 0 });
+      const expectedLength = NODES_PER_CHUNK * NODES_PER_CHUNK;
+      expect(chunk.heights.length).toBe(expectedLength);
+      expect(chunk.biomeIds.length).toBe(expectedLength);
+      expect(chunk.surfCompIds.length).toBe(expectedLength);
+    });
+  }
+
+  describe('laziness', () => {
+    it('makes zero calls into the sampling pipeline between construction and the first getChunk', () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(41);
+      const spy = vi.spyOn(worldGen.fields, 'temperature');
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      expect(spy).not.toHaveBeenCalled();
+      // keep map reachable for lint (unused-var would otherwise flag it if the
+      // implementation-under-test path never runs) — also documents that the
+      // map itself is the thing under test, not the spy alone.
+      expect(map).toBeDefined();
+    });
+
+    it('the first getChunk(id) call samples exactly NODES_PER_CHUNK ** 2 nodes', () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(42);
+      const spy = vi.spyOn(worldGen.fields, 'temperature');
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      map.getChunk({ level: 0, cx: 0, cz: 0 });
+      expect(spy).toHaveBeenCalledTimes(NODES_PER_CHUNK * NODES_PER_CHUNK);
+    });
+
+    it('a second getChunk(id) with the same id makes no additional samples (cached)', () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(43);
+      const spy = vi.spyOn(worldGen.fields, 'temperature');
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      const id: LandscapeChunkId = { level: 0, cx: 0, cz: 0 };
+      map.getChunk(id);
+      const afterFirst = spy.mock.calls.length;
+      map.getChunk(id);
+      expect(spy.mock.calls.length).toBe(afterFirst);
+    });
+
+    it('hasChunk(id) is false before the first getChunk(id) and true after', () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(44);
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      const id: LandscapeChunkId = { level: 1, cx: 0, cz: 0 };
+      expect(map.hasChunk(id)).toBe(false);
+      map.getChunk(id);
+      expect(map.hasChunk(id)).toBe(true);
+    });
+
+    it('cachedChunkIds lists exactly the chunks getChunk has been asked for', () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(45);
+      const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+      expect(map.cachedChunkIds.length).toBe(0);
+      map.getChunk({ level: 0, cx: 0, cz: 0 });
+      expect(map.cachedChunkIds.length).toBe(1);
+      map.getChunk({ level: 0, cx: 0, cz: 0 }); // same id again: no growth
+      expect(map.cachedChunkIds.length).toBe(1);
+      map.getChunk({ level: 1, cx: 0, cz: 0 });
+      expect(map.cachedChunkIds.length).toBe(2);
+    });
+  });
+
+  it("a chunk's own originX/originZ agree with the pure chunkOrigin(id, centerX, centerZ) function", () => {
+    const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(46);
+    const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+    const id: LandscapeChunkId = { level: 2, cx: 0, cz: 0 };
+    const chunk = map.getChunk(id);
+    const origin = chunkOrigin(id, map.centerX, map.centerZ);
+    expect(chunk.originX).toBeCloseTo(origin.originX, 6);
+    expect(chunk.originZ).toBeCloseTo(origin.originZ, 6);
+  });
+
+  it('two separately-constructed maps with identical inputs produce identical chunk data for the same id', () => {
+    const seed = 47;
+    const build = () => {
+      const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(seed);
+      return createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+    };
+    const id: LandscapeChunkId = { level: 3, cx: 0, cz: 0 };
+    const a = build().getChunk(id);
+    const b = build().getChunk(id);
+    expect(Array.from(a.heights)).toEqual(Array.from(b.heights));
+    expect(Array.from(a.biomeIds)).toEqual(Array.from(b.biomeIds));
+    expect(Array.from(a.surfCompIds)).toEqual(Array.from(b.surfCompIds));
+    expect(a.originX).toBeCloseTo(b.originX, 9);
+    expect(a.originZ).toBeCloseTo(b.originZ, 9);
+  });
+
+  it('throws for a level outside [0, LADDER_STEPS.length)', () => {
+    const { config, worldGen, strata, palette, extentHalf } = buildLazySetup(48);
+    const map = createLazyLandscapeMap(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, extentHalf);
+    expect(() => map.getChunk({ level: -1, cx: 0, cz: 0 })).toThrow();
+    expect(() => map.getChunk({ level: LADDER_STEPS.length, cx: 0, cz: 0 })).toThrow();
+  });
+});
+
+// ── selectLandscapeChunks — pure geometry, no terrain generation needed ────
+
+/** World-space footprint of chunk `id`'s NODES_PER_CHUNK x NODES_PER_CHUNK lattice. */
+function footprintOf(id: LandscapeChunkId, centerX: number, centerZ: number): { minX: number; minZ: number; maxX: number; maxZ: number } {
+  const { originX, originZ } = chunkOrigin(id, centerX, centerZ);
+  const span = chunkSpanAt(id.level);
+  return { minX: originX, minZ: originZ, maxX: originX + span, maxZ: originZ + span };
+}
+
+/**
+ * Proves the returned chunks tile `[centerX-extentHalf, centerX+extentHalf] x
+ * [centerZ-extentHalf, centerZ+extentHalf]` exactly: every point of the
+ * square is covered by precisely one chunk footprint. A sweep over the
+ * distinct rect-boundary coordinates rather than a fixed-spacing sample grid
+ * — each strip between two adjacent boundary lines has a constant covering
+ * set, so checking one point per strip (its centre) is exhaustive, not a
+ * a sample that could miss a thin sliver of gap or overlap.
+ */
+function assertExactTiling(chunks: readonly LandscapeChunkId[], centerX: number, centerZ: number, extentHalf: number): void {
+  const rects = chunks.map(id => footprintOf(id, centerX, centerZ));
+  const squareMinX = centerX - extentHalf, squareMaxX = centerX + extentHalf;
+  const squareMinZ = centerZ - extentHalf, squareMaxZ = centerZ + extentHalf;
+
+  const xs = new Set<number>([squareMinX, squareMaxX]);
+  const zs = new Set<number>([squareMinZ, squareMaxZ]);
+  for (const r of rects) {
+    if (r.minX > squareMinX && r.minX < squareMaxX) xs.add(r.minX);
+    if (r.maxX > squareMinX && r.maxX < squareMaxX) xs.add(r.maxX);
+    if (r.minZ > squareMinZ && r.minZ < squareMaxZ) zs.add(r.minZ);
+    if (r.maxZ > squareMinZ && r.maxZ < squareMaxZ) zs.add(r.maxZ);
+  }
+  const xsSorted = [...xs].sort((a, b) => a - b);
+  const zsSorted = [...zs].sort((a, b) => a - b);
+
+  for (let i = 0; i < xsSorted.length - 1; i++) {
+    const midX = (xsSorted[i]! + xsSorted[i + 1]!) / 2;
+    for (let j = 0; j < zsSorted.length - 1; j++) {
+      const midZ = (zsSorted[j]! + zsSorted[j + 1]!) / 2;
+      const covering = rects.filter(r => midX > r.minX && midX < r.maxX && midZ > r.minZ && midZ < r.maxZ);
+      expect(covering.length, `point (${midX}, ${midZ}) covered by ${covering.length} chunks, want 1`).toBe(1);
+    }
+  }
+}
+
+describe('selectLandscapeChunks (#1153)', () => {
+  const centerX = 300, centerZ = -100, extentHalf = 200;
+
+  it('tiles the square exactly with the camera at the centre', () => {
+    const chunks = selectLandscapeChunks(centerX, centerZ, centerX, centerZ, extentHalf);
+    assertExactTiling(chunks, centerX, centerZ, extentHalf);
+  });
+
+  it('tiles the square exactly with the camera at the square\'s own edge', () => {
+    const chunks = selectLandscapeChunks(centerX + extentHalf, centerZ, centerX, centerZ, extentHalf);
+    assertExactTiling(chunks, centerX, centerZ, extentHalf);
+  });
+
+  it('tiles the square exactly with the camera well outside extentHalf', () => {
+    const chunks = selectLandscapeChunks(centerX + 5 * extentHalf, centerZ - 5 * extentHalf, centerX, centerZ, extentHalf);
+    assertExactTiling(chunks, centerX, centerZ, extentHalf);
+  });
+
+  it('level is non-decreasing as a chunk\'s footprint distance from the camera increases', () => {
+    const cameraX = centerX, cameraZ = centerZ;
+    const chunks = selectLandscapeChunks(cameraX, cameraZ, centerX, centerZ, extentHalf);
+    const withDist = chunks.map(id => {
+      const r = footprintOf(id, centerX, centerZ);
+      const dx = Math.max(r.minX - cameraX, 0, cameraX - r.maxX);
+      const dz = Math.max(r.minZ - cameraZ, 0, cameraZ - r.maxZ);
+      return { level: id.level, dist: Math.hypot(dx, dz) };
+    });
+    for (const a of withDist) {
+      for (const b of withDist) {
+        if (a.dist < b.dist - 1e-6) {
+          expect(a.level).toBeLessThanOrEqual(b.level);
+        }
+      }
     }
   });
 
-  it("a tile's stored samples land at originX/Z + col/row * coarseStep", () => {
-    const config = makeConfig(9);
-    const { landscape, worldGen, structureSet, strata, grid } = buildAll(config, 700);
-    const tile = landscape.tiles[0]!;
-    for (const [row, col] of [[0, 0], [0, 128], [128, 0], [64, 64]] as const) {
-      const x = tile.originX + col * landscape.coarseStep;
-      const z = tile.originZ + row * landscape.coarseStep;
-      const expected = sampleLandscapeColumn(worldGen, config.climateBias, structureSet, strata, grid.palette, x, z);
-      const idx = row * landscape.samplesPerTile + col;
-      // heights are stored as Float32Array (~7 significant digits) — compare
-      // at a tolerance float32 rounding can't violate, not full f64 precision.
-      expect(tile.heights[idx]).toBeCloseTo(expected.height, 3);
-      expect(tile.biomeIds[idx]).toBe(expected.biomeId);
-      expect(tile.surfCompIds[idx]).toBe(expected.surfCompId);
+  it('is deterministic: the same camera position returns the same set of chunk ids', () => {
+    const a = selectLandscapeChunks(centerX + 10, centerZ - 5, centerX, centerZ, extentHalf);
+    const b = selectLandscapeChunks(centerX + 10, centerZ - 5, centerX, centerZ, extentHalf);
+    const keyOf = (id: LandscapeChunkId): string => `${id.level},${id.cx},${id.cz}`;
+    expect(a.map(keyOf).sort()).toEqual(b.map(keyOf).sort());
+  });
+
+  it('never returns a chunk whose footprint lies entirely outside extentHalf', () => {
+    // The camera position most tempting for a buggy implementation to pull in
+    // a stray far-away coarse chunk: well outside the square.
+    const chunks = selectLandscapeChunks(centerX + 5 * extentHalf, centerZ - 5 * extentHalf, centerX, centerZ, extentHalf);
+    const squareMinX = centerX - extentHalf, squareMaxX = centerX + extentHalf;
+    const squareMinZ = centerZ - extentHalf, squareMaxZ = centerZ + extentHalf;
+    for (const id of chunks) {
+      const r = footprintOf(id, centerX, centerZ);
+      const overlaps = r.maxX > squareMinX && r.minX < squareMaxX && r.maxZ > squareMinZ && r.minZ < squareMaxZ;
+      expect(overlaps, `chunk ${JSON.stringify(id)} footprint ${JSON.stringify(r)} does not overlap the square`).toBe(true);
     }
   });
 
-  it('skips every tile whose entire span lies inside the playable rect', () => {
-    // A playable rect (4000x4000) far larger than the whole tile grid at
-    // this extentHalf (halfTiles=1 => tiles span up to +-1024m from centre),
-    // with generous margin on every side so every tile is fully inside —
-    // every candidate tile should be skipped, producing an empty tile set.
-    // The strata/palette here are real but never actually get sampled, since
-    // every tile is skipped before any per-sample work happens.
-    const worldGen = createWorldGenContext(1, 4000, 30, 4000);
-    const strata = new StrataSampler(1, []);
-    const landscape = buildLandscapeMap(worldGen, [0, 0], EMPTY_STRUCTURES, strata, new CompositionPalette(), 600);
-    expect(landscape.tiles.length).toBe(0);
+  it('defaults extentHalf to EXTENT_HALF when omitted', () => {
+    const withDefault = selectLandscapeChunks(centerX, centerZ, centerX, centerZ);
+    const withExplicit = selectLandscapeChunks(centerX, centerZ, centerX, centerZ, EXTENT_HALF);
+    const keyOf = (id: LandscapeChunkId): string => `${id.level},${id.cx},${id.cz}`;
+    expect(withDefault.map(keyOf).sort()).toEqual(withExplicit.map(keyOf).sort());
   });
 });

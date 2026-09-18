@@ -35,7 +35,7 @@
 //   followed the sampled ground between the same two coarse nodes.
 import * as THREE from 'three';
 import type { LandscapeHandle } from '../../console/commands/world.js';
-import type { LandscapeTile } from '../../core/world/LandscapeMap.js';
+import { NODES_PER_CHUNK, chunkKey, type LandscapeChunk, type LandscapeChunkId } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { type CompositionPalette } from '../../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../../core/world/RockCatalog.js';
@@ -47,11 +47,6 @@ const FINE_STEP = 1;
  *  cell, the west/north sealing halo (`PlayableCoverage.meshedCellRect`). Only
  *  used to reject quads that cannot possibly touch the claim. */
 const PLAYABLE_HALO_CELLS = 1;
-
-/** Intermediate subdivision step between FINE_STEP boundary quads and the
- *  coarse open-ground quads, so the resolution jump isn't a one-step cliff
- *  that itself reads as a seam (#559). */
-export const MID_STEP = 2;
 
 type SampleFn = (x: number, z: number) => { height: number; biomeId: number; surfCompId: number };
 
@@ -86,16 +81,45 @@ function heightFieldNormal(dhdx: number, dhdz: number): [number, number, number]
   return [-dhdx / len, 1 / len, -dhdz / len];
 }
 
-/** Key for the tile lookup used to read a neighbouring tile's samples. */
-function tileKey(tileX: number, tileZ: number): string {
-  return `${tileX},${tileZ}`;
-}
-
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
 function distanceInsideRect(rect: Rect, x: number, z: number): number {
   const dx = Math.min(x - rect.minX, rect.maxX - x);
   const dz = Math.min(z - rect.minZ, rect.maxZ - z);
   return Math.min(dx, dz);
+}
+
+/**
+ * Which of a node's four incident sides sample coarser than `ownStep` — the
+ * ladder's flat-edge trigger, shared by the claim boundary (`sides` are the
+ * boundary quad's own FINE_STEP-relative neighbours) and a chunk's outer ring
+ * (`sides` are the cross-chunk `NeighbourSteps`, relative to the chunk's step).
+ */
+function coarseSides(
+  west: number, east: number, north: number, south: number, ownStep: number,
+): { coarseWest: boolean; coarseEast: boolean; coarseNorth: boolean; coarseSouth: boolean } {
+  return {
+    coarseWest: west > ownStep,
+    coarseEast: east > ownStep,
+    coarseNorth: north > ownStep,
+    coarseSouth: south > ownStep,
+  };
+}
+
+/**
+ * Which edge(s) of a `bound`-sized lattice a (row, col) node sits on, and
+ * whether the flat-edge rule applies to it along each axis — shared by every
+ * per-node pass (boundary-quad vertices, a chunk's own height/normal lattice)
+ * that has to place a node on a coarse-neighbour chord instead of sampling it.
+ */
+function flatEdgeSides(
+  row: number, col: number, bound: number,
+  coarseWest: boolean, coarseEast: boolean, coarseNorth: boolean, coarseSouth: boolean,
+): { onWest: boolean; onEast: boolean; onNorth: boolean; onSouth: boolean; flatX: boolean; flatZ: boolean } {
+  const onWest = col === 0, onEast = col === bound;
+  const onNorth = row === 0, onSouth = row === bound;
+  const flatX = (onWest && coarseWest) || (onEast && coarseEast);
+  const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+  return { onWest, onEast, onNorth, onSouth, flatX, flatZ };
 }
 
 /**
@@ -224,25 +248,49 @@ export function classifyQuad(playable: PlayableCut, x0: number, z0: number, x1: 
 }
 
 /**
- * Which sides of a boundary quad face a neighbour emitted at a COARSER step
- * than FINE_STEP (an 'outside' quad, whether coarse or MID_STEP). Those sides —
- * and only those — take the flat-edge rule.
+ * The neighbouring chunk's sample step on each of a chunk's four sides — the
+ * ladder replacement for the old boundary-quad-local `BoundaryQuadSides`
+ * (#1153). A side whose neighbour samples coarser than this chunk's own step
+ * takes the flat-edge rule on that side, the same way a coarser 'outside'
+ * quad used to.
  *
  * Sides are named by the axis end they sit on: west/north are the x0/z0 sides,
  * east/south the x1/z1 sides.
  */
-export interface BoundaryQuadSides {
-  coarseWest: boolean;
-  coarseEast: boolean;
-  coarseNorth: boolean;
-  coarseSouth: boolean;
+export interface NeighbourSteps {
+  west: number;
+  east: number;
+  north: number;
+  south: number;
 }
 
-/** Every side coarse — the pre-#907 behaviour, and the right answer for a lone
- *  quad with no classified neighbourhood (tests, and callers with no map). */
-const ALL_SIDES_COARSE: BoundaryQuadSides = {
-  coarseWest: true, coarseEast: true, coarseNorth: true, coarseSouth: true,
-};
+/** Every side at `step` — the right answer for a lone chunk with no classified neighbourhood (tests, and callers with no streamer). */
+export function uniformNeighbourSteps(step: number): NeighbourSteps {
+  return { west: step, east: step, north: step, south: step };
+}
+
+/**
+ * Height of a chord node on a chunk edge shared with a coarser neighbour —
+ * the ladder's flat-edge rule (#1153), read along `axis` at (x, z) against a
+ * neighbour sampled at `neighbourStep`.
+ *
+ * Finds the two lattice nodes spaced `neighbourStep` apart along `axis`
+ * (holding the other coordinate fixed) that bracket (x, z), samples both via
+ * `sampleColumn`, and linearly interpolates between them — the same math the
+ * pre-#1153 claim-boundary flat-edge rule used against its single hardcoded
+ * coarse step, generalized to any neighbour step on the resolution ladder.
+ */
+export function chordHeight(
+  sampleColumn: SampleFn, axis: 'x' | 'z', x: number, z: number, neighbourStep: number,
+): number {
+  const coord = axis === 'x' ? x : z;
+  const lower = Math.floor(coord / neighbourStep) * neighbourStep;
+  const upper = lower + neighbourStep;
+  const t = (coord - lower) / neighbourStep;
+  const hLower = (axis === 'x' ? sampleColumn(lower, z) : sampleColumn(x, lower)).height;
+  const hUpper = (axis === 'x' ? sampleColumn(upper, z) : sampleColumn(x, upper)).height;
+  return hLower + t * (hUpper - hLower);
+}
 
 /**
  * The normal to shade a landscape node at (x, z) with: the playable mesh's own
@@ -306,10 +354,17 @@ export function buildBoundaryQuad(
   sampleColumn: SampleFn,
   palette: CompositionPalette,
   playable: PlayableCut,
-  sides: BoundaryQuadSides = ALL_SIDES_COARSE,
+  sides: NeighbourSteps = uniformNeighbourSteps(FINE_STEP),
 ): void {
   const subdiv = Math.max(1, Math.round((x1 - x0) / FINE_STEP));
   const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
+
+  // The ladder's NeighbourSteps replaces the old boolean BoundaryQuadSides —
+  // a side is flat-edged when its neighbour samples coarser than this quad's
+  // own FINE_STEP. Behaviour is unchanged from the pre-#1153 boolean rule;
+  // only the parameter's shape has moved.
+  const { coarseWest, coarseEast, coarseNorth, coarseSouth } =
+    coarseSides(sides.west, sides.east, sides.north, sides.south, FINE_STEP);
 
   // Parent coarse corner heights, read directly (never boundary-adjusted) —
   // the flat-edge rule's whole point is to reproduce exactly what an
@@ -355,10 +410,8 @@ export function buildBoundaryQuad(
     const z = z0 + row * FINE_STEP;
     const sample = sampleColumn(x, z);
 
-    const onWest = col === 0, onEast = col === subdiv;
-    const onNorth = row === 0, onSouth = row === subdiv;
-    const flatX = (onWest && sides.coarseWest) || (onEast && sides.coarseEast);
-    const flatZ = (onNorth && sides.coarseNorth) || (onSouth && sides.coarseSouth);
+    const { onWest, onEast, onNorth, onSouth, flatX, flatZ } =
+      flatEdgeSides(row, col, subdiv, coarseWest, coarseEast, coarseNorth, coarseSouth);
 
     let y: number;
     if ((onWest || onEast) && (onNorth || onSouth)) {
@@ -416,317 +469,275 @@ export function buildBoundaryQuad(
 }
 
 /**
- * Subdivides a coarse 'outside' quad adjacent to the boundary at an
- * intermediate resolution (MID_STEP) so the jump from FINE_STEP boundary
- * quads to coarse open-ground quads isn't a one-step cliff that itself reads
- * as a seam. Flat-edge-interpolates its own outer perimeter against
- * unsubdivided coarse neighbours per the existing #491 rule.
+ * Builds one chunk's mesh geometry against its live neighbour steps and the
+ * playable cut, replacing the old per-tile `buildTileMesh` (#1153) — the
+ * resolution ladder makes every mesh unit a single chunk rather than a
+ * classify-and-subdivide pass over one giant tile. Null when the chunk
+ * carries no geometry (fully claimed by the playable mesh).
  *
- * `step` is the target sample spacing to subdivide the quad down to (the
- * caller always passes MID_STEP) — the same "spacing, not a count" meaning
- * FINE_STEP carries in buildBoundaryQuad, not the coarse tile's own step.
+ * Returns a `THREE.Mesh` with no material set — `LandscapeMesh.buildChunk`
+ * assigns the shared terrain material, since this free function (unlike the
+ * old class-private `buildTileMesh`) has no `this.material` to read.
+ *
+ * Two independent adjustments compose here, and they answer different
+ * questions:
+ *  - The claim boundary (classifyQuad/buildBoundaryQuad): cells the playable
+ *    mesh owns are dropped; cells straddling its edge are subdivided to 1 m
+ *    and flat-edged against WITHIN-CHUNK neighbours that stayed at the
+ *    chunk's own step (mirrors the pre-#1153 tile-local rule exactly).
+ *  - The resolution ladder (chordHeight): nodes on the chunk's own OUTER
+ *    ring, on a side whose `neighbourSteps` entry is coarser than this
+ *    chunk's step, are placed on the coarser neighbour's own lattice instead
+ *    of this chunk's sampled height, so the two chunks' shared edge is one
+ *    line instead of two.
  */
-export function subdivideOutsideQuad(
-  positions: number[],
-  normals: number[],
-  rockA: number[],
-  rockB: number[],
-  rockWeight: number[],
-  ore: number[],
-  indices: number[],
-  x0: number,
-  z0: number,
-  x1: number,
-  z1: number,
-  sampleColumn: SampleFn,
+export function buildChunkMesh(
+  chunk: LandscapeChunk,
+  neighbourSteps: NeighbourSteps,
   palette: CompositionPalette,
-  step: number,
-): void {
-  const subdiv = Math.max(1, Math.round((x1 - x0) / step));
+  playable: PlayableCut,
+  sampleColumn: SampleFn,
+): THREE.Mesh | null {
+  const n = NODES_PER_CHUNK;
+  const step = chunk.step;
+  const { originX, originZ } = chunk;
 
-  // Parent coarse corner heights. A plain bilinear interpolation of these
-  // four naturally reduces to the flat-edge rule's linear interpolation
-  // along every side of the quad, so no separate perimeter special-case is
-  // needed here the way buildBoundaryQuad needs one (its interior deviates
-  // from bilinear by using live/theoretical sampled height; this function's
-  // interior never does — it's unconditionally outside the claim).
-  const h00 = sampleColumn(x0, z0).height;
-  const h10 = sampleColumn(x1, z0).height;
-  const h01 = sampleColumn(x0, z1).height;
-  const h11 = sampleColumn(x1, z1).height;
+  const maxX = originX + (n - 1) * step;
+  const maxZ = originZ + (n - 1) * step;
+  const touchesRect =
+    maxX > playable.rect.minX && originX < playable.rect.maxX &&
+    maxZ > playable.rect.minZ && originZ < playable.rect.maxZ;
 
-  const bilinearHeight = (x: number, z: number): number => {
-    const u = (x - x0) / (x1 - x0);
-    const v = (z - z0) / (z1 - z0);
-    return (1 - u) * (1 - v) * h00 + u * (1 - v) * h10 + (1 - u) * v * h01 + u * v * h11;
+  const { coarseWest, coarseEast, coarseNorth, coarseSouth } =
+    coarseSides(neighbourSteps.west, neighbourSteps.east, neighbourSteps.north, neighbourSteps.south, step);
+
+  /**
+   * A chunk-own-lattice node's height, honoring the resolution-ladder chord
+   * rule on the chunk's outer ring. A corner shared by two coarse sides is
+   * an exact lattice node of every coarser ancestor too (the ladder's chunks
+   * nest by construction), so it takes the plain sampled/cached value rather
+   * than either side's chord — same reasoning as the pre-#1153 claim-edge
+   * corner rule.
+   */
+  const nodeHeightAt = (row: number, col: number): number => {
+    const { onWest, onNorth, flatX, flatZ } =
+      flatEdgeSides(row, col, n - 1, coarseWest, coarseEast, coarseNorth, coarseSouth);
+    if (!flatX && !flatZ) return chunk.heights[row * n + col]!;
+    if (flatX && flatZ) return chunk.heights[row * n + col]!;
+
+    const x = originX + col * step;
+    const z = originZ + row * step;
+    if (flatX) return chordHeight(sampleColumn, 'z', x, z, onWest ? neighbourSteps.west : neighbourSteps.east);
+    return chordHeight(sampleColumn, 'x', x, z, onNorth ? neighbourSteps.north : neighbourSteps.south);
+  };
+  /**
+   * A neighbour sample for the normal's finite difference, one step off
+   * (row, col) — possibly past the chunk's own 33x33 array. Clamping the
+   * index into range and still dividing by the full `2 * step` (as this used
+   * to) turns a two-sided difference into a one-sided one at every chunk's
+   * outer ring without halving the denominator to match — the slope came out
+   * half its true value for any node on a chunk's own edge, which #559's
+   * dense boundary walk caught once chunks (rather than one huge tile) put an
+   * array edge within a couple of metres of the playable rect on every side.
+   * Sampling straight from the height field past the edge keeps both sides of
+   * the difference genuine, at the true `step` spacing, with no denominator
+   * mismatch — consistent with `shadingNormalAt`'s own rule that slope reads
+   * the live/theoretical field, never a flat-edge-adjusted or clamped value.
+   */
+  const neighbourHeightAt = (row: number, col: number): number => {
+    if (row >= 0 && row <= n - 1 && col >= 0 && col <= n - 1) return nodeHeightAt(row, col);
+    return sampleColumn(originX + col * step, originZ + row * step).height;
   };
 
-  const vertexIndex = new Map<number, number>();
-
-  const emitVertex = (row: number, col: number): number => {
-    const key = row * (subdiv + 1) + col;
-    const existing = vertexIndex.get(key);
-    if (existing !== undefined) return existing;
-
-    const x = x0 + col * MID_STEP;
-    const z = z0 + row * MID_STEP;
-    const y = bilinearHeight(x, z);
-
-    const dhdx = (bilinearHeight(x + MID_STEP, z) - bilinearHeight(x - MID_STEP, z)) / (2 * MID_STEP);
-    const dhdz = (bilinearHeight(x, z + MID_STEP) - bilinearHeight(x, z - MID_STEP)) / (2 * MID_STEP);
-    const normal = heightFieldNormal(dhdx, dhdz);
-
-    const idx = positions.length / 3;
-    positions.push(x, y, z);
-    normals.push(normal[0], normal[1], normal[2]);
-
-    const sample = sampleColumn(x, z);
-    const blend = rockBlendFor(palette, sample.surfCompId);
-    rockA.push(blend.rockA);
-    rockB.push(blend.rockB);
-    rockWeight.push(blend.weight);
-    ore.push(-1, 0); // landscape never carries ore (#458 A18)
-
-    vertexIndex.set(key, idx);
-    return idx;
+  /**
+   * Slope at a chunk-own-lattice node, honoring the ladder's flat-edge rule
+   * the same way `nodeHeightAt` honors it for position (#1153 ladder rung
+   * joins). On a side whose neighbour samples coarser, BOTH derivatives use
+   * that neighbour's own step — not this chunk's native one — sampled
+   * straight from the height field around (x, z). That reproduces, digit for
+   * digit, the exact central difference the coarser neighbour's own node at
+   * this shared position computes nativelly for itself: same field, same two
+   * bracket points, same spacing. Differencing at each side's own native step
+   * instead does agree on POSITION (both take the same chorded height) but
+   * not on SLOPE the moment the field carries curvature at a wavelength
+   * shorter than the coarser step — the two sides then measure genuinely
+   * different local slopes of the same curve, and light the node they share
+   * differently (up to tens of degrees on this fixture's ridged terrain).
+   * Corners (flatX && flatZ) fall through to the interior/native-step case
+   * below, unaddressed here, like `nodeHeightAt`'s own corner rule.
+   */
+  const nodeNormalAt = (row: number, col: number, x: number, z: number): [number, number, number] => {
+    const { onWest, onNorth, flatX, flatZ } =
+      flatEdgeSides(row, col, n - 1, coarseWest, coarseEast, coarseNorth, coarseSouth);
+    if (flatX !== flatZ) {
+      const nStep = flatX
+        ? (onWest ? neighbourSteps.west : neighbourSteps.east)
+        : (onNorth ? neighbourSteps.north : neighbourSteps.south);
+      const dhdx = (sampleColumn(x + nStep, z).height - sampleColumn(x - nStep, z).height) / (2 * nStep);
+      const dhdz = (sampleColumn(x, z + nStep).height - sampleColumn(x, z - nStep).height) / (2 * nStep);
+      return heightFieldNormal(dhdx, dhdz);
+    }
+    const dhdx = (neighbourHeightAt(row, col + 1) - neighbourHeightAt(row, col - 1)) / (2 * step);
+    const dhdz = (neighbourHeightAt(row + 1, col) - neighbourHeightAt(row - 1, col)) / (2 * step);
+    return heightFieldNormal(dhdx, dhdz);
   };
 
-  for (let row = 0; row < subdiv; row++) {
-    for (let col = 0; col < subdiv; col++) {
-      const i0 = emitVertex(row, col);
-      const i1 = emitVertex(row, col + 1);
-      const i2 = emitVertex(row + 1, col);
-      const i3 = emitVertex(row + 1, col + 1);
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const rockA: number[] = [];
+  const rockB: number[] = [];
+  const rockWeight: number[] = [];
+  const ore: number[] = []; // (id, amt) pairs; landscape never carries ore (#458 A18)
+
+  for (let row = 0; row < n; row++) {
+    const z = originZ + row * step;
+    for (let col = 0; col < n; col++) {
+      const x = originX + col * step;
+      const idx = row * n + col;
+      const y = nodeHeightAt(row, col);
+      positions.push(x, y, z);
+
+      const normal = nodeNormalAt(row, col, x, z);
+      normals.push(normal[0], normal[1], normal[2]);
+
+      const blend = rockBlendFor(palette, chunk.surfCompIds[idx]!);
+      rockA.push(blend.rockA);
+      rockB.push(blend.rockB);
+      rockWeight.push(blend.weight);
+      ore.push(-1, 0);
+    }
+  }
+
+  const quadClass = new Map<string, 'inside' | 'outside' | 'boundary'>();
+  const classAt = (x0: number, z0: number): 'inside' | 'outside' | 'boundary' => {
+    if (!touchesRect) return 'outside';
+    const key = `${x0},${z0}`;
+    const cached = quadClass.get(key);
+    if (cached !== undefined) return cached;
+    const cls = classifyQuad(playable, x0, z0, x0 + step, z0 + step);
+    quadClass.set(key, cls);
+    return cls;
+  };
+  /** True when the WITHIN-CHUNK quad at (x0, z0) stays at the chunk's own step (not subdivided). */
+  const isCoarserQuad = (x0: number, z0: number): boolean => classAt(x0, z0) === 'outside';
+
+  const indices: number[] = [];
+  for (let row = 0; row < n - 1; row++) {
+    const z0 = originZ + row * step, z1 = z0 + step;
+    for (let col = 0; col < n - 1; col++) {
+      const x0 = originX + col * step, x1 = x0 + step;
+      if (touchesRect) {
+        const cls = classAt(x0, z0);
+        if (cls === 'inside') continue;
+        if (cls === 'boundary') {
+          // A quad on the chunk's own outer ring also faces the cross-chunk
+          // ladder neighbour on that side — take whichever of the two
+          // (within-chunk step-transition, cross-chunk NeighbourSteps) is
+          // coarser, since either alone can force the flat-edge rule.
+          const westStep = Math.max(
+            isCoarserQuad(x0 - step, z0) ? step : FINE_STEP,
+            col === 0 ? neighbourSteps.west : FINE_STEP,
+          );
+          const eastStep = Math.max(
+            isCoarserQuad(x1, z0) ? step : FINE_STEP,
+            col === n - 2 ? neighbourSteps.east : FINE_STEP,
+          );
+          const northStep = Math.max(
+            isCoarserQuad(x0, z0 - step) ? step : FINE_STEP,
+            row === 0 ? neighbourSteps.north : FINE_STEP,
+          );
+          const southStep = Math.max(
+            isCoarserQuad(x0, z1) ? step : FINE_STEP,
+            row === n - 2 ? neighbourSteps.south : FINE_STEP,
+          );
+          buildBoundaryQuad(
+            positions, normals, rockA, rockB, rockWeight, ore, indices,
+            x0, z0, x1, z1, sampleColumn, palette, playable,
+            { west: westStep, east: eastStep, north: northStep, south: southStep },
+          );
+          continue;
+        }
+      }
+      const i0 = row * n + col;
+      const i1 = i0 + 1;
+      const i2 = i0 + n;
+      const i3 = i2 + 1;
       pushQuad(indices, i0, i1, i2, i3, row + col);
     }
   }
+  if (indices.length === 0) return null;
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
+  geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
+  geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
+  geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+
+  const mesh = new THREE.Mesh(geometry);
+  mesh.frustumCulled = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export class LandscapeMesh {
-  private readonly scene: THREE.Scene;
-  private readonly material: THREE.Material;
-  private readonly tileMeshes: THREE.Mesh[] = [];
-  /** Tiles by grid index, so a vertex on a tile's edge can read its neighbour's samples for a slope. */
-  private readonly tileIndex = new Map<string, LandscapeTile>();
+  private readonly meshesByChunk = new Map<string, THREE.Mesh>();
 
-  /** `material` is shared with TerrainMesh and FragmentMesh (D9's "one shared terrain material" — one shader, one draw-state everywhere). */
-  constructor(scene: THREE.Scene, material: THREE.Material) {
-    this.scene = scene;
-    this.material = material;
-  }
+  constructor(private readonly scene: THREE.Scene, private readonly material: THREE.Material) {}
 
-  /** Total mesh count (one per non-empty tile) — diagnostics and tests. */
-  get meshCount(): number {
-    return this.tileMeshes.length;
-  }
+  /** Total mesh count (one per resident chunk) — diagnostics and tests. */
+  get meshCount(): number { return this.meshesByChunk.size; }
 
   /**
-   * Every tile mesh, for raycasting past the site's claimed edge (#558) —
-   * mirrors TerrainMesh.meshes so a caller can raycast both without knowing
-   * which one it hit.
+   * Every resident chunk mesh, for raycasting past the site's claimed edge
+   * (#558) — mirrors TerrainMesh.meshes so a caller can raycast both without
+   * knowing which one it hit.
    */
-  get meshes(): THREE.Mesh[] {
-    return this.tileMeshes;
-  }
+  get meshes(): THREE.Mesh[] { return Array.from(this.meshesByChunk.values()); }
 
   /**
+   * Builds (or rebuilds) chunk `id`'s mesh against its live neighbour steps
+   * and adds it to the scene, replacing the old whole-map `build()` (#1153)
+   * — a chunk streamer calls this per-chunk as the camera moves instead of
+   * rebuilding every tile on any site change.
+   *
    * `cut` defaults to the handle's own generation-time rect, for callers with
    * no live site to cut against (tests, and any level that never expands).
    */
-  build(handle: LandscapeHandle, palette: CompositionPalette, cut?: PlayableCut): void {
-    this.dispose();
-
+  buildChunk(
+    id: LandscapeChunkId, handle: LandscapeHandle, palette: CompositionPalette,
+    neighbourSteps: NeighbourSteps, cut?: PlayableCut,
+  ): void {
+    this.disposeChunk(id);
+    const chunk = handle.map.getChunk(id);
     const playable = cut ?? rectCut(handle.playableRect);
-
-    for (const tile of handle.map.tiles) this.tileIndex.set(tileKey(tile.tileX, tile.tileZ), tile);
-
-    for (const tile of handle.map.tiles) {
-      const mesh = this.buildTileMesh(
-        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, playable, handle.sampleColumn,
-      );
-      if (mesh) {
-        this.scene.add(mesh);
-        this.tileMeshes.push(mesh);
-      }
-    }
+    const mesh = buildChunkMesh(chunk, neighbourSteps, palette, playable, handle.sampleColumn);
+    if (!mesh) return;
+    mesh.material = this.material;
+    this.scene.add(mesh);
+    this.meshesByChunk.set(chunkKey(id), mesh);
   }
 
+  /** Removes and disposes chunk `id`'s mesh, if resident. */
+  disposeChunk(id: LandscapeChunkId): void {
+    const key = chunkKey(id);
+    const mesh = this.meshesByChunk.get(key);
+    if (!mesh) return;
+    this.scene.remove(mesh);
+    mesh.geometry.dispose();
+    this.meshesByChunk.delete(key);
+  }
+
+  /** Removes and disposes every resident chunk mesh. */
   dispose(): void {
-    for (const mesh of this.tileMeshes) {
+    for (const mesh of this.meshesByChunk.values()) {
       this.scene.remove(mesh);
       mesh.geometry.dispose();
     }
-    this.tileMeshes.length = 0;
-    this.tileIndex.clear();
-  }
-
-  // ---------- Internal ----------
-
-  /**
-   * One sample's height, addressed by tile-local (row, col) and allowed to run
-   * one node past either end.
-   *
-   * Neighbouring tiles share their edge samples — a tile's last column is the
-   * next tile's first — so col n means the neighbour's col 1, and col -1 means
-   * the previous tile's col n-2. Off the edge of the built map there is no
-   * neighbour, and the index is clamped instead: a one-sided difference at the
-   * very rim of the world, which no camera reaches.
-   */
-  private nodeHeight(tile: LandscapeTile, row: number, col: number, n: number): number {
-    let tx = tile.tileX, tz = tile.tileZ, r = row, c = col;
-    if (c < 0) { tx -= 1; c = n - 2; } else if (c > n - 1) { tx += 1; c = 1; }
-    if (r < 0) { tz -= 1; r = n - 2; } else if (r > n - 1) { tz += 1; r = 1; }
-
-    if (tx === tile.tileX && tz === tile.tileZ) return tile.heights[r * n + c]!;
-    const neighbour = this.tileIndex.get(tileKey(tx, tz));
-    if (neighbour) return neighbour.heights[r * n + c]!;
-
-    const clampedRow = Math.min(n - 1, Math.max(0, row));
-    const clampedCol = Math.min(n - 1, Math.max(0, col));
-    return tile.heights[clampedRow * n + clampedCol]!;
-  }
-
-  /**
-   * Indexed grid mesh from one tile's stored samples, smooth-shaded (#458 A16).
-   *
-   * A tile spans 512 m while a playable rect is 32–160 m, so every rect sits
-   * deep inside its tiles. Each coarse quad is classified against the live
-   * claim boundary (classifyQuad): 'inside' quads are dropped (the voxel mesh
-   * owns that ground), 'outside' quads are emitted whole exactly as before,
-   * and 'boundary' quads — the single quad-wide ring actually straddling the
-   * claim edge — are subdivided by buildBoundaryQuad instead of a second,
-   * overlapping seam mesh (#491).
-   */
-  private buildTileMesh(
-    tile: LandscapeTile, step: number, n: number, palette: CompositionPalette, playable: PlayableCut,
-    sampleColumn: SampleFn,
-  ): THREE.Mesh | null {
-    if (tile.heights.length === 0) return null;
-
-    // Most tiles are nowhere near the rect — test the tile's own span once and
-    // skip the per-quad work entirely for those.
-    const tileMaxX = tile.originX + (n - 1) * step;
-    const tileMaxZ = tile.originZ + (n - 1) * step;
-    const touchesRect =
-      tileMaxX > playable.rect.minX && tile.originX < playable.rect.maxX &&
-      tileMaxZ > playable.rect.minZ && tile.originZ < playable.rect.maxZ;
-
-    // Growable, not fixed-size: boundary quads append extra fine-grid
-    // vertices past the tile's own n*n coarse nodes.
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const rockA: number[] = [];
-    const rockB: number[] = [];
-    const rockWeight: number[] = [];
-    const ore: number[] = []; // (id, amt) pairs; landscape never carries ore (#458 A18)
-
-    // Coarse nodes are pushed unconditionally, in row-major order, so index
-    // row*n+col stays valid for every 'outside' quad regardless of which
-    // quads elsewhere in the tile turn out to be 'inside'/'boundary'.
-    for (let row = 0; row < n; row++) {
-      const z = tile.originZ + row * step;
-      for (let col = 0; col < n; col++) {
-        const x = tile.originX + col * step;
-        const idx = row * n + col;
-        const y = tile.heights[idx]!;
-
-        positions.push(x, y, z);
-
-        // Central differences over the sample spacing, reaching into the
-        // neighbouring tile at a tile edge so the slope — and therefore the
-        // shading — stays continuous from one tile to the next.
-        const dhdx = (this.nodeHeight(tile, row, col + 1, n) - this.nodeHeight(tile, row, col - 1, n)) / (2 * step);
-        const dhdz = (this.nodeHeight(tile, row + 1, col, n) - this.nodeHeight(tile, row - 1, col, n)) / (2 * step);
-        const normal = heightFieldNormal(dhdx, dhdz);
-        normals.push(normal[0], normal[1], normal[2]);
-
-        const blend = rockBlendFor(palette, tile.surfCompIds[idx]!);
-        rockA.push(blend.rockA);
-        rockB.push(blend.rockB);
-        rockWeight.push(blend.weight);
-        ore.push(-1, 0); // id = -1 (none); amt stays 0
-      }
-    }
-
-    // Classify quads by WORLD position, not by tile-local index, and memoize.
-    //
-    // Two tiles meet along a shared line of quads, and a claim can straddle it
-    // (LandscapeMap tiles the world from the playable rect's own centre, so the
-    // tutorial site sits astride a tile corner). A tile-local lookup answers
-    // "not a boundary quad" for anything past its own edge, so the two tiles
-    // disagreed about the resolution — and therefore about the flat-edge rule —
-    // on exactly the quads they share. classifyQuad is a pure function of world
-    // coordinates and the cut, so asking it directly gives both tiles the same
-    // answer (#907).
-    const quadClass = new Map<string, 'inside' | 'outside' | 'boundary'>();
-    const classAt = (x0: number, z0: number): 'inside' | 'outside' | 'boundary' => {
-      if (!touchesRect) return 'outside';
-      const key = `${x0},${z0}`;
-      const cached = quadClass.get(key);
-      if (cached !== undefined) return cached;
-      const cls = classifyQuad(playable, x0, z0, x0 + step, z0 + step);
-      quadClass.set(key, cls);
-      return cls;
-    };
-    /** True when the quad at (x0, z0) is emitted at a coarser step than
-     *  FINE_STEP, and a fine neighbour must flat-edge the side facing it. */
-    const isCoarserQuad = (x0: number, z0: number): boolean => classAt(x0, z0) === 'outside';
-
-    const indices: number[] = [];
-    for (let row = 0; row < n - 1; row++) {
-      const z0 = tile.originZ + row * step, z1 = z0 + step;
-      for (let col = 0; col < n - 1; col++) {
-        if (touchesRect) {
-          const x0 = tile.originX + col * step, x1 = x0 + step;
-          const cls = classAt(x0, z0);
-          if (cls === 'inside') continue;
-          if (cls === 'boundary') {
-            buildBoundaryQuad(
-              positions, normals, rockA, rockB, rockWeight, ore, indices,
-              x0, z0, x1, z1, sampleColumn, palette, playable,
-              {
-                coarseWest: isCoarserQuad(x0 - step, z0),
-                coarseEast: isCoarserQuad(x1, z0),
-                coarseNorth: isCoarserQuad(x0, z0 - step),
-                coarseSouth: isCoarserQuad(x0, z1),
-              },
-            );
-            continue;
-          }
-          const adjacentToBoundary =
-            classAt(x0 - step, z0) === 'boundary' || classAt(x1, z0) === 'boundary' ||
-            classAt(x0, z0 - step) === 'boundary' || classAt(x0, z1) === 'boundary';
-          if (adjacentToBoundary) {
-            subdivideOutsideQuad(
-              positions, normals, rockA, rockB, rockWeight, ore, indices,
-              x0, z0, x1, z1, sampleColumn, palette, MID_STEP,
-            );
-            continue;
-          }
-        }
-        const i0 = row * n + col;
-        const i1 = i0 + 1;
-        const i2 = i0 + n;
-        const i3 = i2 + 1;
-        pushQuad(indices, i0, i1, i2, i3, row + col);
-      }
-    }
-    if (indices.length === 0) return null;
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
-    geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
-    geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
-    geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setIndex(indices);
-    geometry.computeBoundingSphere();
-
-    const mesh = new THREE.Mesh(geometry, this.material);
-    mesh.frustumCulled = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    this.meshesByChunk.clear();
   }
 }

@@ -15,7 +15,7 @@ import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 import { createLogisticsState, addBlastFragments } from '../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { subscribeNavGridToTerrainUpdates } from '../../src/core/nav/NavGridSync.js';
+import { subscribeNavGridToUpdates } from '../../src/core/nav/NavGridSync.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -533,7 +533,7 @@ describe('NavMesh and pathfinding', () => {
     // per segment (see its own region-emit above), so the subscription is
     // the only thing that needs to patch the NavGrid from here on.
     const emitter = new EventEmitter();
-    subscribeNavGridToTerrainUpdates(emitter, () => ({ navGrid: nav, grid, buildings: [], drillHoles: [] }));
+    subscribeNavGridToUpdates(emitter, () => ({ navGrid: nav, grid, buildings: [], drillHoles: [] }));
 
     const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
     expect(segments.length).toBeGreaterThan(0);

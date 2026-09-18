@@ -180,7 +180,6 @@
     "src/renderer/WorldBorderWall.ts:WorldBorderWallOptions",
     "src/renderer/WorldBorderWall.ts:buildWallGeometry",
     "src/renderer/post/AerialPerspectivePass.ts:BiomeGrade",
-    "src/renderer/terrain/LandscapeMesh.ts:BoundaryQuadSides",
     "src/renderer/terrain/NoiseGLSL.ts:NOISE_BASE_GLSL",
     "src/renderer/terrain/NoiseGLSL.ts:NOISE_FBM_GLSL",
     "src/renderer/terrain/PlayableCoverage.ts:CellRect",
