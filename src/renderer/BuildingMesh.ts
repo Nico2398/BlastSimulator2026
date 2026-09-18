@@ -91,6 +91,18 @@ export class BuildingMesh {
     this.addBuilding(building, surfaceY);
   }
 
+  /**
+   * Correct a building's terrain-surface Y immediately, mirroring
+   * `VehicleMesh.setSurfaceY`/`CharacterMesh.setSurfaceY` — no-op when the
+   * building isn't rendered. Buildings resnap on terrain-revision change
+   * rather than every sync (#1145).
+   */
+  setSurfaceY(id: number, y: number): void {
+    // TODO(test-writer/implementer): stub only
+    void id;
+    void y;
+  }
+
   /** Remove a building mesh from the scene. */
   removeBuilding(id: number): void {
     const entry = this.buildings.get(id);
