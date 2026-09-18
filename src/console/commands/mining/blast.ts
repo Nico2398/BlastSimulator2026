@@ -16,7 +16,7 @@ import { recordBlastResult, snapshotStats } from '../../../core/campaign/Success
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
-import { toFullHeightRegion } from '../../../core/engine/BuildingTaskHelpers.js';
+import { toFullHeightRegion } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';

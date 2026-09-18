@@ -5,11 +5,12 @@
 // `terrain:updated` event every carve already emits. Wired once at the
 // composition root instead of once per call site.
 
-import type { EventEmitter } from '../state/EventEmitter.js';
+import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
+import type { BlastRegion } from '../mining/BlastExecution.js';
 
 /** The live objects a `terrain:updated` event needs to patch a NavGrid. */
 export interface NavGridSyncTarget {
@@ -17,6 +18,16 @@ export interface NavGridSyncTarget {
   grid: VoxelGrid;
   buildings: Building[];
   drillHoles: DrillHole[];
+}
+
+/**
+ * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the full-height
+ * region shape `terrain:updated`'s payload carries (adds minY/maxY spanning
+ * `grid`'s whole height), for building carves that emit the event directly
+ * instead of going through `LevelGround`/`Ramp`/`BlastExecution`.
+ */
+export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
+  return { minX: region.minX, maxX: region.maxX, minZ: region.minZ, maxZ: region.maxZ, minY: 0, maxY: grid.sizeY - 1 };
 }
 
 /**

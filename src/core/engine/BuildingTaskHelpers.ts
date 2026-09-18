@@ -12,7 +12,7 @@ import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 
@@ -99,16 +99,6 @@ export function levelBuildingFootprint(
 export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; depth: number; originX: number; originZ: number } {
   if (!grid) return { width: DEFAULT_GRID_SIZE, depth: DEFAULT_GRID_SIZE, originX: 0, originZ: 0 };
   return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
-}
-
-/**
- * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the full-height
- * region shape `terrain:updated`'s payload carries (adds minY/maxY spanning
- * `grid`'s whole height), for building carves that emit the event directly
- * instead of going through `LevelGround`/`Ramp`/`BlastExecution`.
- */
-export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
-  return { minX: region.minX, maxX: region.maxX, minZ: region.minZ, maxZ: region.maxZ, minY: 0, maxY: grid.sizeY - 1 };
 }
 
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */

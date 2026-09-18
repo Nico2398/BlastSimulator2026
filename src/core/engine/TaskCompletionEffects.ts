@@ -20,11 +20,12 @@ import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { toFullHeightRegion } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
   makeFootprintRegion, makeLevelFootprintRegion, levelBuildingFootprint,
-  siteBoundsForGrid, refreshLogisticsCapacity, toFullHeightRegion,
+  siteBoundsForGrid, refreshLogisticsCapacity,
 } from './BuildingTaskHelpers.js';
 
 /**
