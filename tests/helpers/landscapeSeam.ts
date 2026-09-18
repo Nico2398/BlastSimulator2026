@@ -101,12 +101,11 @@ function angleBetweenDegrees(a: THREE.Vector3, b: THREE.Vector3): number {
 /**
  * Measure the join along the site's whole boundary.
  *
- * `stepA` and `stepB` are the two sheets' own lattice steps, in metres — the
- * band to check either side of the claim is derived from them rather than
- * passed in directly. Keep the derived band inside the landscape's FINE_STEP
- * ring (one COARSE_STEP quad, 4 m): a coarse quad puts only two triangle
- * centroids in its sixteen cells, so a wider band reports open ground as
- * uncovered.
+ * `stepA` and `stepB` are the two sheets' own lattice steps, in metres. How
+ * far either side of the claim to check is derived from them — half the
+ * coarser of the two — rather than passed in directly. Keep the derived band
+ * inside the coarser sheet's own quad: a coarse quad puts only two triangle
+ * centroids in its cells, so a wider band reports open ground as uncovered.
  */
 export function measureSeam(
   playable: readonly THREE.Mesh[],
@@ -115,9 +114,55 @@ export function measureSeam(
   stepA: number,
   stepB: number,
 ): SeamReport {
-  // TODO: implement — derive band from Math.max(stepA, stepB) / 2, then walk
-  // the grid as before using indexedLatticeNodes/coveredCells/angleBetweenDegrees.
-  void playable; void landscape; void grid; void stepA; void stepB;
-  void indexedLatticeNodes; void coveredCells; void angleBetweenDegrees;
-  throw new Error('not implemented');
+  const band = Math.max(stepA, stepB) / 2;
+
+  const playableNodes = indexedLatticeNodes(playable);
+  const landscapeNodes = indexedLatticeNodes(landscape);
+  const playableCells = coveredCells(playable);
+  const landscapeCells = coveredCells(landscape);
+
+  const report: SeamReport = {
+    sharedNodes: 0, worstDisagreement: 0, worstAt: '',
+    worstNormalAngle: 0, worstNormalAt: '',
+    doubleCovered: [], uncovered: [],
+  };
+
+  for (let x = grid.minX - band; x < grid.maxX + band; x++) {
+    for (let z = grid.minZ - band; z < grid.maxZ + band; z++) {
+      const key = `${x},${z}`;
+
+      const a = playableNodes.get(key), b = landscapeNodes.get(key);
+      if (a && b) {
+        report.sharedNodes++;
+        // A cliff column carries several playable vertices; the ring node is
+        // the one the landscape also placed, so compare the nearest pair — and
+        // read that same pair's normals, since only the vertices the two
+        // sheets actually share light a shared edge.
+        let nearest = Infinity;
+        let nearestPair: [NodeVertex, NodeVertex] | null = null;
+        for (const va of a) for (const vb of b) {
+          const gap = Math.abs(va.y - vb.y);
+          if (gap >= nearest) continue;
+          nearest = gap;
+          nearestPair = [va, vb];
+        }
+        if (nearest > report.worstDisagreement) {
+          report.worstDisagreement = nearest;
+          report.worstAt = key;
+        }
+        if (nearestPair) {
+          const angle = angleBetweenDegrees(nearestPair[0].normal, nearestPair[1].normal);
+          if (angle > report.worstNormalAngle) {
+            report.worstNormalAngle = angle;
+            report.worstNormalAt = key;
+          }
+        }
+      }
+
+      const inPlayable = playableCells.has(key), inLandscape = landscapeCells.has(key);
+      if (inPlayable && inLandscape) report.doubleCovered.push(key);
+      if (!inPlayable && !inLandscape) report.uncovered.push(key);
+    }
+  }
+  return report;
 }
