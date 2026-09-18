@@ -4,7 +4,7 @@ import { createRunner, runCommand, type RunnerWithContext } from '../../src/cons
 import { ensureLandscape } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
-import { chunkOrigin, chunkSpanAt, type LandscapeChunkId, type LazyLandscapeMap } from '../../src/core/world/LandscapeMap.js';
+import { chunkSpanAt, type LandscapeChunkId, type LazyLandscapeMap } from '../../src/core/world/LandscapeMap.js';
 import type { Rect } from '../../src/core/world/WorldGen.js';
 import { TerrainMesh } from '../../src/renderer/TerrainMesh.js';
 import { LandscapeMesh, uniformNeighbourSteps, type PlayableCut } from '../../src/renderer/terrain/LandscapeMesh.js';

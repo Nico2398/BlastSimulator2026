@@ -13,7 +13,7 @@ import {
   type LandscapeChunkId,
 } from '../../../src/core/world/LandscapeMap.js';
 import { getBiome, biomeIndexOf } from '../../../src/core/world/BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY, sampleSurfaceHeightY, applyPitMask, sampleBaseHeight } from '../../../src/core/world/WorldGen.js';
+import { sampleSurfaceVoxelY, sampleSurfaceHeightY, applyPitMask, sampleBaseHeight } from '../../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { StrataSampler, buildStrataProfile } from '../../../src/core/world/Strata.js';
 import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';

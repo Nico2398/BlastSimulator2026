@@ -89,7 +89,7 @@ describe('buildChunkMesh (#1153)', () => {
     const rect: Rect = { minX: -1000, minZ: -1000, maxX: 1000, maxZ: 1000 };
     const chunk = makeFakeChunk({ level: 0, cx: 0, cz: 0 }, 0, 0, 4, compId);
     const cut: PlayableCut = { rect, ownsColumn: () => true };
-    const sampleColumn = (x: number, z: number): { height: number; biomeId: number; surfCompId: number } => ({ height: 10, biomeId: 0, surfCompId: compId });
+    const sampleColumn = (_x: number, _z: number): { height: number; biomeId: number; surfCompId: number } => ({ height: 10, biomeId: 0, surfCompId: compId });
 
     const mesh = buildChunkMesh(chunk, uniformNeighbourSteps(chunk.step), palette, cut, sampleColumn);
     expect(mesh).toBeNull();
@@ -100,7 +100,7 @@ describe('buildChunkMesh (#1153)', () => {
     const rect: Rect = { minX: 1_000_000, minZ: 1_000_000, maxX: 1_000_001, maxZ: 1_000_001 }; // far away
     const chunk = makeFakeChunk({ level: 0, cx: 0, cz: 0 }, -100, -100, 4, compId, () => 10);
     const cut: PlayableCut = { rect, ownsColumn: () => false };
-    const sampleColumn = (x: number, z: number): { height: number; biomeId: number; surfCompId: number } => ({ height: 10, biomeId: 0, surfCompId: compId });
+    const sampleColumn = (_x: number, _z: number): { height: number; biomeId: number; surfCompId: number } => ({ height: 10, biomeId: 0, surfCompId: compId });
 
     const mesh = buildChunkMesh(chunk, uniformNeighbourSteps(chunk.step), palette, cut, sampleColumn);
     expect(mesh).not.toBeNull();
