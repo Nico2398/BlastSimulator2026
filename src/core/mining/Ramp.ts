@@ -3,7 +3,7 @@
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
 import { formatMoney } from '../economy/formatMoney.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, captureColumnTopsForCarve, renormaliseCarvedColumns, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
@@ -336,13 +336,18 @@ function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: numb
  */
 export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number } {
   let voxelsCleared = 0;
+  const columns = captureColumnTopsForCarve(grid, segment.cells);
 
   for (const cell of segment.cells) {
     if (carveCellIfSolid(grid, cell)) voxelsCleared++;
   }
 
   if (voxelsCleared > 0 && segment.region) {
-    emitter?.emit('terrain:updated', { region: segment.region });
+    const renormalisedMaxY = renormaliseCarvedColumns(grid, columns);
+    const region = renormalisedMaxY !== null && renormalisedMaxY > segment.region.maxY
+      ? { ...segment.region, maxY: renormalisedMaxY }
+      : segment.region;
+    emitter?.emit('terrain:updated', { region });
   }
 
   return { voxelsCleared };
@@ -378,6 +383,8 @@ export function carveRampSegmentSlice(
   let voxelsCleared = 0;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
+  const columns = captureColumnTopsForCarve(grid, cells.slice(fromIndex, toIndex));
+
   for (let i = fromIndex; i < toIndex; i++) {
     const cell = cells[i];
     if (!cell) continue;
@@ -387,6 +394,11 @@ export function carveRampSegmentSlice(
       minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
       minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);
     }
+  }
+
+  if (voxelsCleared > 0) {
+    const renormalisedMaxY = renormaliseCarvedColumns(grid, columns);
+    if (renormalisedMaxY !== null) maxY = Math.max(maxY, renormalisedMaxY);
   }
 
   const region = voxelsCleared > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null;

@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Drill plan definition
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
-import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceY, renormaliseVoxelColumnAfterCarve } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
@@ -152,8 +152,11 @@ export function digVoxel(
     return fail(`Voxel at (${x}, ${y}, ${z}) is already empty.`);
   }
 
+  const oldTopY = computeVoxelColumnSurfaceY(grid, x, z);
   grid.clearVoxel(x, y, z);
-  emitter?.emit('terrain:updated', { region: { minX: x, maxX: x, minY: y, maxY: y, minZ: z, maxZ: z } });
+  const renormalisedMaxY = renormaliseVoxelColumnAfterCarve(grid, x, z, oldTopY);
+  const maxY = renormalisedMaxY !== null ? Math.max(y, renormalisedMaxY) : y;
+  emitter?.emit('terrain:updated', { region: { minX: x, maxX: x, minY: y, maxY, minZ: z, maxZ: z } });
 
   const newSurfaceY = computeVoxelColumnSurfaceY(grid, x, z);
 
