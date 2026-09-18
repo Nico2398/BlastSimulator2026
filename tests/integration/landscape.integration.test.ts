@@ -4,8 +4,10 @@ import { createRunner, runCommand, type RunnerWithContext } from '../../src/cons
 import { ensureLandscape } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
+import { chunkOrigin, chunkSpanAt, type LandscapeChunkId, type LazyLandscapeMap } from '../../src/core/world/LandscapeMap.js';
+import type { Rect } from '../../src/core/world/WorldGen.js';
 import { TerrainMesh } from '../../src/renderer/TerrainMesh.js';
-import { LandscapeMesh } from '../../src/renderer/terrain/LandscapeMesh.js';
+import { LandscapeMesh, uniformNeighbourSteps, type PlayableCut } from '../../src/renderer/terrain/LandscapeMesh.js';
 import { meshClaimsCell, haloSurfaceHeight, nodeTouchesMeshedCell } from '../../src/renderer/terrain/PlayableCoverage.js';
 import { measureSeam } from '../helpers/landscapeSeam.js';
 
@@ -25,10 +27,17 @@ describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => 
     runCommand(engine, 'new_game mine_type:desert_badlands seed:42 size:32');
     const result = runCommand(engine, 'landscape_info');
     expect(result.success).toBe(true);
-    expect(result.output).toContain('Tiles:');
-    expect(result.output).toContain('129x129');
+    // #1153 replaced the eager, fixed-resolution tile grid with a lazy,
+    // per-chunk resolution ladder — there is no fixed "129x129" tile array
+    // any more, so landscapeInfoCommand reports the ladder's own shape
+    // instead: its step sizes, how many chunks have actually been sampled
+    // (none yet — this call itself only triggers ensureLandscape, never a
+    // getChunk), and the extent the ladder covers.
+    expect(result.output).toContain('Ladder steps (m): 1, 2, 4, 8, 16');
+    expect(result.output).toContain('Cached chunks: 0');
+    expect(result.output).toContain('Extent half:');
     expect(engine.ctx.landscape).not.toBeNull();
-    expect(engine.ctx.landscape!.map.tiles.length).toBeGreaterThan(0);
+    expect(engine.ctx.landscape!.map.cachedChunkIds.length).toBe(0);
   });
 
   it('landscape_info is idempotent — a second call reuses the cached map', () => {
@@ -74,7 +83,33 @@ describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => 
 
 describe('Landscape/playable seam on a real level (#907)', () => {
   const PLAYABLE_STEP = 1;
-  const LANDSCAPE_STEP = 4;
+  // Pinned to level-0 (finest, 1m) chunks on both sides, per #1153: this
+  // proves the claim boundary join independent of the resolution ladder,
+  // the same way the unit suite's own claim-boundary fixtures are pinned.
+  const LANDSCAPE_STEP = 1;
+
+  /**
+   * Every level-0 chunk whose 32m footprint the site's rect overlaps — the
+   * per-chunk replacement for #1153's `LandscapeMesh.build()`, which used to
+   * mesh the whole stored tile map in one call. Chunk `cx=0` sits at the
+   * map's own centre (`chunkOrigin`), so a chunk covers `[centerX + cx*span,
+   * centerX + (cx+1)*span)`; the loop below finds the smallest cx/cz range
+   * whose union of those footprints covers `rect` exactly, with no margin
+   * chunk needed — `buildChunkMesh` samples straight through `sampleColumn`
+   * for its boundary quads, never through a neighbouring chunk's own array.
+   */
+  function level0ChunksCovering(map: LazyLandscapeMap, rect: Rect): LandscapeChunkId[] {
+    const span = chunkSpanAt(0);
+    const cxMin = Math.floor((rect.minX - map.centerX) / span);
+    const cxMax = Math.ceil((rect.maxX - map.centerX) / span) - 1;
+    const czMin = Math.floor((rect.minZ - map.centerZ) / span);
+    const czMax = Math.ceil((rect.maxZ - map.centerZ) / span) - 1;
+    const ids: LandscapeChunkId[] = [];
+    for (let cx = cxMin; cx <= cxMax; cx++) {
+      for (let cz = czMin; cz <= czMax; cz++) ids.push({ level: 0, cx, cz });
+    }
+    return ids;
+  }
 
   function buildBothMeshes(engine: RunnerWithContext): {
     playable: TerrainMesh; landscape: LandscapeMesh; grid: NonNullable<typeof engine.ctx.grid>;
@@ -90,8 +125,7 @@ describe('Landscape/playable seam on a real level (#907)', () => {
     playable.setEdgeHeightSampler((x, z) => handle.sampleColumn(x, z).height);
     playable.buildAll();
 
-    const landscape = new LandscapeMesh(new THREE.Scene(), new THREE.MeshBasicMaterial());
-    landscape.build(handle, grid.palette, {
+    const cut: PlayableCut = {
       rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
       ownsColumn: (x, z) => grid.containsColumn(x, z),
       boundaryHeightAt: (x, z) => {
@@ -101,7 +135,12 @@ describe('Landscape/playable seam on a real level (#907)', () => {
         return haloSurfaceHeight(grid, handle.sampleColumn(x, z).height);
       },
       meshClaimsColumn: (x, z) => meshClaimsCell(grid, x, z),
-    });
+    };
+
+    const landscape = new LandscapeMesh(new THREE.Scene(), new THREE.MeshBasicMaterial());
+    for (const id of level0ChunksCovering(handle.map, cut.rect)) {
+      landscape.buildChunk(id, handle, grid.palette, uniformNeighbourSteps(LANDSCAPE_STEP), cut);
+    }
     return { playable, landscape, grid };
   }
 
