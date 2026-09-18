@@ -990,6 +990,20 @@ describe('isStepClimbable', () => {
     expect(isStepClimbable(100, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
     expect(isStepClimbable(undefined, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
   });
+
+  // #1149: production surfaceY values are now the continuous marching-cubes
+  // crossing height, so a real fromY/toY pair is typically fractional
+  // (e.g. 4.5, not 4). The gate itself is unchanged — it never rounds — but
+  // this pins that a fractional delta admits/refuses at exactly the same
+  // boundary an integer one does, verifying the gate genuinely needs no
+  // change for the representation switch.
+  it('admits and refuses fractional surfaceY deltas at the same boundary as integer ones', () => {
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT + 0.01, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+    // A sub-voxel grade difference well inside the limit — exactly the kind
+    // of delta the old integer-index representation rounded away entirely.
+    expect(isStepClimbable(4.3, 4.7, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

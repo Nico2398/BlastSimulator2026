@@ -61,7 +61,9 @@ function makeGroundFragment(id: number, x: number, z: number): FragmentData {
 describe('NavMesh and pathfinding', () => {
 
   it('buildNavGrid creates walkable surface on solid terrain', () => {
-    // 5×10×5 voxel grid, solid y=0..4 → every column has surfaceY=4 → all walkable
+    // 5×10×5 voxel grid, solid y=0..4, air above → every column's continuous
+    // marching-cubes crossing sits at 4.5 (#1149 — not the bare integer 4
+    // the topmost-solid-voxel index would give) → all walkable
     const vg = new VoxelGrid(5, 10, 5);
     fillSolid(vg, 4);
 
@@ -69,7 +71,7 @@ describe('NavMesh and pathfinding', () => {
 
     expect(nav.width).toBe(5);
     expect(nav.height).toBe(5);
-    expect(nav.maxSurfaceY).toBe(4);
+    expect(nav.maxSurfaceY).toBe(4.5);
 
     for (let z = 0; z < nav.height; z++) {
       for (let x = 0; x < nav.width; x++) {
