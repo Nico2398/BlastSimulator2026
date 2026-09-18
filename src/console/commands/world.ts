@@ -17,6 +17,7 @@ import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } fro
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import type { NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -59,6 +60,24 @@ export interface GameContext {
   playableArea: PlayableArea | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
+}
+
+/**
+ * Build the live `NavGridSyncTarget` for `ctx`'s current game, or null when
+ * no game (or no navGrid/grid yet) exists. Shared by createRunner.ts's
+ * production wiring and tests/helpers/gameContext.ts's fixture wiring
+ * (#1146) so both `subscribeNavGridToTerrainUpdates` call sites read `ctx`
+ * fresh through one place instead of each hand-rolling the same closure.
+ */
+export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | null {
+  return ctx.state && ctx.state.navGrid && ctx.grid
+    ? {
+        navGrid: ctx.state.navGrid,
+        grid: ctx.grid,
+        buildings: ctx.state.buildings.buildings,
+        drillHoles: ctx.state.drillHoles,
+      }
+    : null;
 }
 
 /** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */

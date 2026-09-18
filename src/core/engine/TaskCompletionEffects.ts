@@ -19,13 +19,13 @@ import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
-import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { toFullHeightRegion } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
   makeFootprintRegion, makeLevelFootprintRegion, levelBuildingFootprint,
-  siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity,
+  siteBoundsForGrid, refreshLogisticsCapacity,
 } from './BuildingTaskHelpers.js';
 
 /**
@@ -75,10 +75,7 @@ export function applyTaskCompletion(
       const tracker = ramp?.segments.find(s => s.index === segmentIndex);
 
       if (ramp && tracker) {
-        const carveResult = carveRampSegment(grid, { cells, region }, emitter);
-        if (carveResult.voxelsCleared > 0) {
-          patchNavGridForRegion(state, grid, region);
-        }
+        carveRampSegment(grid, { cells, region }, emitter);
         tracker.done = true;
         tracker.carvedCount = tracker.cells.length;
         // Progressive carving (#946) clears a segment's cells over the
@@ -102,15 +99,12 @@ export function applyTaskCompletion(
     // finished the work, not the instant it was ordered (#1009, mirrors the
     // 'dig_ramp_segment' branch above). Unlike a ramp, a level-ground order
     // is one atomic PendingAction, so there's no per-segment tracker to mark
-    // done — carving and the nav patch are the entire completion side effect.
+    // done — carving (which emits `terrain:updated`, keeping the NavGrid in
+    // sync via NavGridSync) is the entire completion side effect.
     if (progress.actionType === 'level_ground' && progress.actionPayload && grid) {
       const columns = progress.actionPayload['columns'] as { x: number; z: number }[];
       const targetY = progress.actionPayload['targetY'] as number;
-      const region = progress.actionPayload['region'] as { minX: number; maxX: number; minZ: number; maxZ: number } | null;
       const carveResult = carveLevelColumns(grid, columns, targetY, emitter);
-      if (carveResult.voxelsCleared > 0) {
-        patchNavGridForRegion(state, grid, region);
-      }
       report.groundLevelled = { voxelsCleared: carveResult.voxelsCleared };
     }
 
@@ -266,11 +260,13 @@ export function applyTaskCompletion(
             const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
             const levelled = levelBuildingFootprint(grid, order.x, order.z, sizeX, sizeZ, state.buildings.buildings, emitter);
             footprintLevelled = levelled.voxelsCleared;
-            // Patched after the carve, so the NavGrid cells around the site
-            // (including the widened skirt column the carve just touched)
-            // carry their new surface heights (isStepClimbable reads them)
-            // and not the pre-construction ones.
-            patchBuildingNavGrid(state, grid, levelRegion);
+            // Emitted after the carve (unconditionally — even a footprint
+            // already flat still needs its occupancy reflected), so the
+            // NavGrid cells around the site (including the widened skirt
+            // column the carve just touched) carry their new surface heights
+            // (isStepClimbable reads them) and not the pre-construction
+            // ones. NavGridSync patches on this event; no direct call here.
+            emitter.emit('terrain:updated', { region: toFullHeightRegion(levelRegion, grid) });
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just

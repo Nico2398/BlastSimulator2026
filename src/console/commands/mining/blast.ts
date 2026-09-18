@@ -16,7 +16,7 @@ import { recordBlastResult, snapshotStats } from '../../../core/campaign/Success
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
-import { NavGrid } from '../../../core/nav/NavGrid.js';
+import { toFullHeightRegion } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
@@ -64,9 +64,9 @@ export function blastCommand(
   const state = ctx.state!;
 
   // Buildings destroyed by the blast: score penalty per building. Their freed
-  // footprint is already inside clearedRegion (a building is only destroyed
-  // when its footprint overlaps a cleared voxel), so the NavGrid patch below
-  // — keyed on clearedRegion — covers it without a second patch call.
+  // footprint is already inside clearedRegion, which executeBlast's own
+  // `terrain:updated` emit above covers — NavGridSync patches from that
+  // event, so no separate NavGrid call is needed here.
   for (const destroyed of result.destroyedBuildings) {
     recordBuildingDestruction(state.scores, destroyed.type === 'explosive_warehouse');
   }
@@ -181,9 +181,15 @@ export function blastCommand(
   state.plannedChargesByHole = {};
   state.sequenceDelays = {};
 
-  // Patch NavGrid to reflect terrain changes from the blast
-  if (state.navGrid) {
-    NavGrid.patchNavGrid(state.navGrid, ctx.grid!, state.buildings.buildings, state.drillHoles, result.clearedRegion);
+  // Re-emit for the cleared region now that the consumed holes are gone from
+  // state.drillHoles: executeBlast's own `terrain:updated` emit (above, inside
+  // executeBlast) fires before this clear, so NavGridSync's patch from that
+  // first emit still sees the blasted holes as live obstacles. A second emit,
+  // scoped to the same region, re-patches with the now-accurate (hole-free)
+  // occupant list — mirrors the pre-#1146 manual patch call, which ran after
+  // this same clear for the same reason.
+  if (result.clearedVoxels > 0) {
+    ctx.emitter.emit('terrain:updated', { region: toFullHeightRegion(result.clearedRegion, ctx.grid!) });
   }
 
   return {

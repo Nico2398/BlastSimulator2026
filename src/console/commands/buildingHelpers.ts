@@ -13,7 +13,7 @@ import type { GameContext } from './world.js';
 
 export {
   makeFootprintRegion, levelBuildingFootprint,
-  patchNavGrid, refreshLogisticsCapacity,
+  refreshLogisticsCapacity,
 } from '../../core/engine/BuildingTaskHelpers.js';
 
 /**

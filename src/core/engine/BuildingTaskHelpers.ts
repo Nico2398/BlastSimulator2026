@@ -9,7 +9,6 @@
 
 import { getStorageCapacity, getBuildingDef, getDefSize, type Building } from '../entities/Building.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
-import { NavGrid } from '../nav/NavGrid.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
@@ -100,13 +99,6 @@ export function levelBuildingFootprint(
 export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; depth: number; originX: number; originZ: number } {
   if (!grid) return { width: DEFAULT_GRID_SIZE, depth: DEFAULT_GRID_SIZE, originX: 0, originZ: 0 };
   return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
-}
-
-/** Patch the NavGrid for a region affected by a building mutation. */
-export function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastRegion): void {
-  if (state.navGrid) {
-    NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
-  }
 }
 
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */

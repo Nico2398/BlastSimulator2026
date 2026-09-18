@@ -12,35 +12,6 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
-import type { BlastRegion } from '../mining/BlastExecution.js';
-import { NavGrid } from '../nav/NavGrid.js';
-
-/**
- * Patch `state.navGrid` scoped to `region`, when both a navGrid exists and a
- * region was actually carved. Shared "carve, then conditionally patch nav"
- * step between this file's progressive per-tick ramp carving and
- * `tickTaskCompletion.ts`'s completion-time carve (#946 review finding 2) —
- * the `NavGrid.patchNavGrid` call itself was byte-for-byte duplicated
- * between the two. Lives here (not in `core/mining/Ramp.ts`, which this
- * module already imports NavGrid alongside) because `core/mining` must stay
- * free of a `core/nav` import (core/nav already depends on core/mining, so
- * the reverse edge would cycle — see Ramp.ts's `computeColumnSurfaceY`
- * comment), while `core/engine` already sits above both.
- *
- * Typed to `BlastRegion` (minX/maxX/minZ/maxZ only) rather than
- * `RampSegmentDef['region']` (#1009) — the only shape `NavGrid.patchNavGrid`
- * actually reads, and the narrower type a level-ground region (no Y bounds)
- * also satisfies without fabricating minY/maxY it doesn't have.
- */
-export function patchNavGridForRegion(
-  state: GameState,
-  grid: VoxelGrid,
-  region: BlastRegion | null,
-): void {
-  if (region && state.navGrid) {
-    NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
-  }
-}
 
 /** One skill category's level-up, reported when a single tick's XP gain crosses a proficiency threshold. */
 export interface TaskProgressLevelUp {
@@ -126,9 +97,8 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
       const target = carvedCount + computeRampSegmentCarveTarget(remainingCells, ticksElapsed, totalTicks);
 
       if (target > carvedCount) {
-        const sliceResult = carveRampSegmentSlice(grid, tracker.cells, carvedCount, target, emitter);
+        carveRampSegmentSlice(grid, tracker.cells, carvedCount, target, emitter);
         tracker.carvedCount = target;
-        patchNavGridForRegion(state, grid, sliceResult.region);
       }
     }
   }
