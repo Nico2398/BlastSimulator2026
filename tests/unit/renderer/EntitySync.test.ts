@@ -21,6 +21,7 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from '../../../src/renderer/EntitySync.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, getSmoothTerrainSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 
@@ -217,42 +218,57 @@ describe('syncEntitySets — reads employee.locomotion, not just the driver seat
   });
 });
 
-describe('buildingFootprintSurfaceY (#1007)', () => {
-  it('samples the 4 footprint corners and returns their minimum', () => {
-    const b = makeBuilding(10, 10); // 2x2 footprint -> corners (10,10) (12,10) (10,12) (12,12)
+describe('buildingFootprintSurfaceY (#1007, corrected columns #1145)', () => {
+  // driving_center tier 1's footprint is rect(2,2): dx/dz offsets
+  // (0,0),(1,0),(0,1),(1,1) — the footprint's OWN 4 cells for a building at
+  // (10,10) are (10,10),(11,10),(10,11),(11,11). Before #1145, the sampled
+  // columns were one past the footprint's own edge — (10,10),(12,10),
+  // (10,12),(12,12) — three of which lie OUTSIDE the footprint entirely.
+  it('samples the footprint\'s own 4 cells (never a column one past the edge) and returns their minimum', () => {
+    const b = makeBuilding(10, 10);
     const heights = new Map<string, number>([
       ['10,10', 3],
-      ['12,10', 5],
-      ['10,12', 7],
-      ['12,12', 2],
+      ['11,10', 5],
+      ['10,11', 7],
+      ['11,11', 2],
     ]);
     const getSurfaceY = (x: number, z: number): number => {
       const h = heights.get(`${x},${z}`);
-      if (h === undefined) throw new Error(`unexpected sample (${x},${z})`);
+      if (h === undefined) throw new Error(`unexpected sample (${x},${z}) — must be one of the footprint's own cells`);
       return h;
     };
 
     expect(buildingFootprintSurfaceY(b, getSurfaceY)).toBe(2);
   });
 
-  it('returns the single shared height on a flat pad, matching the old center-sample behavior (regression guard)', () => {
+  it('rests at the pad height on a levelled pad, regardless of what the neighbouring OUTSIDE-footprint columns read', () => {
     const b = makeBuilding(10, 10);
-    const getSurfaceY = (): number => 6;
+    const insideFootprint = new Set(['10,10', '11,10', '10,11', '11,11']);
+    const getSurfaceY = (x: number, z: number): number => {
+      const key = `${x},${z}`;
+      // Every column the footprint actually occupies reads the same,
+      // levelled 24.5 — every neighbouring column one past the edge (what
+      // the pre-#1145 code sampled instead) reads wildly different values.
+      // A correct implementation never calls getSurfaceY on any of these.
+      if (insideFootprint.has(key)) return 24.5;
+      if (key === '12,10' || key === '10,12' || key === '12,12') return 10.0;
+      throw new Error(`unexpected sample (${x},${z})`);
+    };
 
-    expect(buildingFootprintSurfaceY(b, getSurfaceY)).toBe(6);
+    expect(buildingFootprintSurfaceY(b, getSurfaceY)).toBe(24.5);
   });
 
-  it('never floats above any individual corner\'s sampled height, for an arbitrary multi-level footprint', () => {
+  it('still returns the min of only the footprint\'s own columns on an uneven pad', () => {
     const b = makeBuilding(0, 0);
-    const cornerHeights = { '0,0': 8, '2,0': 1, '0,2': 4, '2,2': 9 };
-    const getSurfaceY = (x: number, z: number): number => cornerHeights[`${x},${z}` as keyof typeof cornerHeights];
+    const cornerHeights = { '0,0': 8, '1,0': 1, '0,1': 4, '1,1': 9 };
+    const getSurfaceY = (x: number, z: number): number => {
+      const h = cornerHeights[`${x},${z}` as keyof typeof cornerHeights];
+      if (h === undefined) throw new Error(`unexpected sample (${x},${z})`);
+      return h;
+    };
 
     const result = buildingFootprintSurfaceY(b, getSurfaceY);
 
-    // The property under test (never floats above any corner) plus an exact
-    // check against the min — the property alone is satisfied trivially by
-    // a stub that always returns 0, since 0 sits below every positive corner
-    // here.
     expect(result).toBe(Math.min(...Object.values(cornerHeights)));
     for (const h of Object.values(cornerHeights)) {
       expect(result).toBeLessThanOrEqual(h);
@@ -262,9 +278,9 @@ describe('buildingFootprintSurfaceY (#1007)', () => {
   it('still returns a sane finite value for a footprint flush against the grid boundary, sampled through the real clamping surface sampler', () => {
     const grid = new VoxelGrid(16, 8, 16);
     grid.fillVoxel(15, 4, 15, 0, undefined, 1);
-    // Placed so 2 of its 4 corners (17,*) fall outside the 16-wide grid —
-    // getSmoothTerrainSurfaceY clamps those to the nearest edge column
-    // rather than throwing or returning NaN.
+    // Placed so 2 of its 4 own footprint cells (x=16) fall outside the
+    // 16-wide grid (valid columns 0..15) — getSmoothTerrainSurfaceY clamps
+    // those to the nearest edge column rather than throwing or returning NaN.
     const b = makeBuilding(15, 15);
     const getSurfaceY = (x: number, z: number): number => getSmoothTerrainSurfaceY(grid, x, z);
 
@@ -272,14 +288,58 @@ describe('buildingFootprintSurfaceY (#1007)', () => {
 
     expect(Number.isFinite(result)).toBe(true);
     expect(Number.isNaN(result)).toBe(false);
-    // The min of the 4 corner samples (2 of them clamped to the x=15 edge
-    // column, same as the 2 in-bounds ones) — not the stub's placeholder 0,
-    // which happens to also be "finite" and would pass the two checks above
-    // even though it isn't derived from any real sample.
+    // The min of the footprint's own 4 cells (15,15),(16,15),(15,16),(16,16)
+    // — 2 of them clamped to the x=15/z=15 edge columns — not the stub's
+    // placeholder 0, which happens to also be "finite" and would pass the
+    // two checks above even though it isn't derived from any real sample.
     const expected = Math.min(
-      getSurfaceY(15, 15), getSurfaceY(17, 15),
-      getSurfaceY(15, 17), getSurfaceY(17, 17),
+      getSurfaceY(15, 15), getSurfaceY(16, 15),
+      getSurfaceY(15, 16), getSurfaceY(16, 16),
     );
     expect(result).toBe(expected);
+  });
+
+  // An empty footprint cannot be constructed from the real BUILDING_DEFS
+  // catalog today — every entry uses rect(sizeX, sizeZ) with sizeX/sizeZ >=
+  // 2 (BuildingDefs.ts) — so the "empty footprint falls back to
+  // getSurfaceY(b.x, b.z)" case is skipped rather than inventing a fixture
+  // outside this issue's scope.
+});
+
+describe('BuildingMesh.setSurfaceY (#1145) — mirrors VehicleMesh/CharacterMesh setSurfaceY', () => {
+  it('updates only the y component, leaving x/z and the drawn model/tint untouched', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    const b = makeBuilding(4, 9);
+    bm.addBuilding(b, 3);
+    const posBefore = bm.getPosition(b.id)!;
+    const instanceBefore = bm.getInstance(b.id);
+    const xBefore = posBefore.x;
+    const zBefore = posBefore.z;
+
+    bm.setSurfaceY(b.id, 7);
+
+    const posAfter = bm.getPosition(b.id)!;
+    expect(posAfter.y).toBe(7);
+    expect(posAfter.x).toBe(xBefore);
+    expect(posAfter.z).toBe(zBefore);
+    // Same model instance — a Y-only mutation, never a mesh rebuild
+    // (updateBuilding()'s remove+re-add would swap this reference).
+    expect(bm.getInstance(b.id)).toBe(instanceBefore);
+    bm.dispose();
+  });
+
+  it('is a no-op for a building id that is not currently rendered', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    const b = makeBuilding(4, 9);
+    bm.addBuilding(b, 3);
+
+    expect(() => bm.setSurfaceY(999, 42)).not.toThrow();
+
+    // The one actually-rendered building is unaffected.
+    expect(bm.getPosition(b.id)!.y).toBe(3);
+    expect(bm.count).toBe(1);
+    bm.dispose();
   });
 });
