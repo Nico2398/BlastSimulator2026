@@ -21,6 +21,20 @@ export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: 
 }
 
 /**
+ * `makeFootprintRegion`'s region, widened by one column on the maxX/maxZ
+ * sides only (minX/minZ identical) — the ground-carve region for a
+ * building's footprint (#1144). A building's mesh spans one column further
+ * on its high sides than the footprint's own occupancy cells, so carving
+ * only `makeFootprintRegion` left that extra column unlevelled and the
+ * building ramped toward it. NOT used for occupancy, NavGrid patching, or
+ * placement checks — those keep using `makeFootprintRegion`.
+ */
+export function makeLevelFootprintRegion(_x: number, _z: number, _sizeX: number, _sizeZ: number): BlastRegion {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
  * The site's live bounding box, as `placeBuilding`/`moveBuilding` want it.
  * Falls back to a 64 m square at the origin only when no grid exists.
  */

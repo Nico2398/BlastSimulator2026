@@ -20,7 +20,7 @@ import { claimForAction, cellsInRect } from '../siteExpansion.js';
 export interface LevelGroundActionPayload {
   rect: LevelOrderDef;
   targetY: number;
-  cells: { x: number; y: number; z: number }[];
+  columns: { x: number; z: number }[];
   region: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   orderCost: number;
   /**
@@ -96,10 +96,10 @@ export function levelGroundCommand(
   // scanned `grid` for this rect (validation.success guarantees both are
   // set), so the dispatch below reuses that instead of re-scanning it.
   const targetY = validation.targetY!;
-  const cells = validation.cells!;
+  const columns = validation.columns!;
   const region = validation.region ?? null;
 
-  if (cells.length === 0) {
+  if (columns.length === 0) {
     return { success: true, output: t('mining.level_ground.already_flat') };
   }
 
@@ -131,14 +131,14 @@ export function levelGroundCommand(
     targetZ: rect.minZ,
     targetY,
     payload: {
-      rect, targetY, cells, region, orderCost: validation.cost, footprint,
+      rect, targetY, columns, region, orderCost: validation.cost, footprint,
     } satisfies LevelGroundActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
   return {
     success: true,
-    output: `Ground levelling ordered: ${cells.length} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
+    output: `Ground levelling ordered: ${columns.length} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
   };
 }
 

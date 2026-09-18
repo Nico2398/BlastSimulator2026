@@ -18,7 +18,7 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
-import { carveLevelCells, levelGroundRect } from '../mining/LevelGround.js';
+import { carveLevelColumns, levelGroundRect } from '../mining/LevelGround.js';
 import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
@@ -101,9 +101,10 @@ export function applyTaskCompletion(
     // is one atomic PendingAction, so there's no per-segment tracker to mark
     // done — carving and the nav patch are the entire completion side effect.
     if (progress.actionType === 'level_ground' && progress.actionPayload && grid) {
-      const cells = progress.actionPayload['cells'] as { x: number; y: number; z: number }[];
+      const columns = progress.actionPayload['columns'] as { x: number; z: number }[];
+      const targetY = progress.actionPayload['targetY'] as number;
       const region = progress.actionPayload['region'] as { minX: number; maxX: number; minZ: number; maxZ: number } | null;
-      const carveResult = carveLevelCells(grid, cells, emitter);
+      const carveResult = carveLevelColumns(grid, columns, targetY, emitter);
       if (carveResult.voxelsCleared > 0) {
         patchNavGridForRegion(state, grid, region);
       }

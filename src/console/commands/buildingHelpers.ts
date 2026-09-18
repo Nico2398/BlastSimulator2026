@@ -11,7 +11,7 @@
 import { siteBoundsForGrid } from '../../core/engine/BuildingTaskHelpers.js';
 import type { GameContext } from './world.js';
 
-export { makeFootprintRegion, patchNavGrid, refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
+export { makeFootprintRegion, makeLevelFootprintRegion, patchNavGrid, refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 
 /**
  * The site's live bounding box, as `placeBuilding`/`moveBuilding` want it.
