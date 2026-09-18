@@ -938,8 +938,28 @@ export function setVoxelColumnSurfaceHeight(
   compId: number,
   ores?: Record<string, number>,
 ): void {
-  void grid; void x; void z; void height; void compId; void ores;
-  // TODO: implement (issue #1143)
+  if (!grid.containsColumn(x, z)) return;
+  if (!Number.isFinite(height)) return;
+
+  // Read the OLD surface before any write and before clamping `height` —
+  // clampToGridColumn (inside computeVoxelColumnSurfaceY) would otherwise
+  // resolve an out-of-bounds column to the wrong one.
+  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z);
+  const clampedHeight = Math.max(0, Math.min(grid.sizeY - 1, height));
+
+  // Union of "what used to be filled that must now clear" and "what the new
+  // crossing band needs" — never reaches below either surface, so an
+  // overhang or cavity buried deeper in the column is left untouched.
+  const lowY = Math.max(0, Math.min(existingTopY + 1, Math.floor(clampedHeight) - SURFACE_BAND_HALF + 1));
+  const highY = Math.min(grid.sizeY - 1, Math.max(existingTopY, Math.ceil(clampedHeight) + SURFACE_BAND_HALF - 1));
+
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
+  for (let y = lowY; y <= highY; y++) {
+    const density = surfaceDensityAt(y, clampedHeight);
+    if (density > 0) grid.fillVoxel(cx, y, cz, compId, ores, density);
+    else grid.clearVoxel(cx, y, cz);
+  }
 }
 
 /**
