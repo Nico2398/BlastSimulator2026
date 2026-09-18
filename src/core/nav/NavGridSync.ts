@@ -37,7 +37,7 @@ export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEv
  * navGrid+grid exist yet (pre-game) or either was torn down — the
  * subscription then no-ops for that event.
  */
-export function subscribeNavGridToTerrainUpdates(
+export function subscribeNavGridToUpdates(
   emitter: EventEmitter,
   getTarget: () => NavGridSyncTarget | null,
 ): void {

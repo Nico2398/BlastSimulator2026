@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Unit tests: NavGridSync (#1146)
 //
-// `subscribeNavGridToTerrainUpdates` replaces the scattered manual
+// `subscribeNavGridToUpdates` replaces the scattered manual
 // `NavGrid.patchNavGrid` call sites with a single subscription to the
 // `terrain:updated` event. These tests prove the subscription itself: that
 // emitting the event patches whatever `getTarget()` currently returns, that
@@ -9,7 +9,7 @@
 // in sequence each patch only their own area.
 
 import { describe, it, expect } from 'vitest';
-import { subscribeNavGridToTerrainUpdates, toFullHeightRegion } from '../../../src/core/nav/NavGridSync.js';
+import { subscribeNavGridToUpdates, toFullHeightRegion } from '../../../src/core/nav/NavGridSync.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -48,7 +48,7 @@ function fullHeightRegion(minX: number, maxX: number, minZ: number, maxZ: number
 const NO_BUILDINGS: Building[] = [];
 const NO_HOLES: DrillHole[] = [];
 
-describe('subscribeNavGridToTerrainUpdates', () => {
+describe('subscribeNavGridToUpdates', () => {
   it('patches the NavGrid for the emitted region, reflecting the current VoxelGrid state', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
@@ -58,7 +58,7 @@ describe('subscribeNavGridToTerrainUpdates', () => {
     for (let y = 0; y <= 4; y++) grid.clearVoxel(3, y, 3);
 
     const emitter = new EventEmitter();
-    subscribeNavGridToTerrainUpdates(emitter, () => ({
+    subscribeNavGridToUpdates(emitter, () => ({
       navGrid: nav, grid, buildings: NO_BUILDINGS, drillHoles: NO_HOLES,
     }));
 
@@ -72,7 +72,7 @@ describe('subscribeNavGridToTerrainUpdates', () => {
 
   it('does not throw when getTarget() returns null (no live game state, e.g. pre-game)', () => {
     const emitter = new EventEmitter();
-    subscribeNavGridToTerrainUpdates(emitter, () => null);
+    subscribeNavGridToUpdates(emitter, () => null);
 
     expect(() => {
       emitter.emit('terrain:updated', { region: { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 } });
@@ -92,7 +92,7 @@ describe('subscribeNavGridToTerrainUpdates', () => {
     };
 
     const emitter = new EventEmitter();
-    subscribeNavGridToTerrainUpdates(emitter, () => current);
+    subscribeNavGridToUpdates(emitter, () => current);
 
     for (let y = 0; y <= 3; y++) gridA.clearVoxel(2, y, 2);
     emitter.emit('terrain:updated', { region: fullHeightRegion(2, 2, 2, 2, gridA) });
@@ -118,7 +118,7 @@ describe('subscribeNavGridToTerrainUpdates', () => {
     expect(nav.cells[8]![8]!.type).toBe('walkable');
 
     const emitter = new EventEmitter();
-    subscribeNavGridToTerrainUpdates(emitter, () => ({
+    subscribeNavGridToUpdates(emitter, () => ({
       navGrid: nav, grid, buildings: NO_BUILDINGS, drillHoles: NO_HOLES,
     }));
 

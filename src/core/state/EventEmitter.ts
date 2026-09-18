@@ -3,10 +3,15 @@
 
 import type { SkillCategory } from '../entities/Employee.js';
 
+/** Inclusive-bounds voxel-space region, shared by every terrain/nav-affecting event's payload. */
+type TerrainRegion = { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number };
+
 /** Map of all game events and their payload types. */
 export interface GameEventMap {
   /** Fired after any voxel mutation (generation, blast, drill, ramp) with the affected AABB, inclusive voxel coords. */
-  'terrain:updated': { region: { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number } };
+  'terrain:updated': { region: TerrainRegion };
+  /** Fired for a building-occupancy change (destroy/upgrade/move/construction-complete, and the blast corrective re-patch) that needs the NavGrid resynced but did not itself carve a voxel. Kept distinct from `terrain:updated` (#1161) so the renderer's remesh subscription (`src/main.ts`) does not fire on a pure occupancy change. */
+  'nav:occupancy_changed': { region: TerrainRegion };
   'blast:started': { originX: number; originY: number; originZ: number };
   'blast:ended': undefined;
   'fragment:created': { count: number };

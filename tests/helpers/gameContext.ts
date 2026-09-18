@@ -11,7 +11,7 @@ import { newGameCommand, buildNavGridSyncTarget, type GameContext, type Landscap
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { PlayableArea } from '../../src/core/world/PlayableArea.js';
-import { subscribeNavGridToTerrainUpdates } from '../../src/core/nav/NavGridSync.js';
+import { subscribeNavGridToUpdates } from '../../src/core/nav/NavGridSync.js';
 
 // Re-exported so callers of this module don't need to reach into
 // console/commands/world.js separately just to type a ctx.
@@ -42,7 +42,7 @@ export function makeEmptyGameContext(overrides?: GameContextOverrides): GameCont
   // Mirrors createRunner.ts's own wiring (#1146) — every test built on this
   // fixture keeps getting NavGrid patched automatically from `terrain:updated`
   // now that the manual per-call-site patch calls are gone.
-  subscribeNavGridToTerrainUpdates(ctx.emitter, () => buildNavGridSyncTarget(ctx));
+  subscribeNavGridToUpdates(ctx.emitter, () => buildNavGridSyncTarget(ctx));
 
   return ctx;
 }
