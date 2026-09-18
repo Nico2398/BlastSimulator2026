@@ -62,6 +62,24 @@ export function defineZone(state: ZoneState, bounds: ZoneBounds): void {
 }
 
 /**
+ * Order a driver clear of the zone: moves them (and, when `viaVehicleId` is
+ * given, the vehicle they board en route) to `dest`, then puts them back on
+ * foot once they arrive. Shared by clearZone's driven-vehicle branch (no
+ * `viaVehicleId` — the driver is already mounted) and its driverless-vehicle
+ * branch (`viaVehicleId` set — the picked driver walks to the vehicle first).
+ */
+function orderDriverClear(
+  state: GameState,
+  driverId: number,
+  dest: EvacuationDestination,
+  viaVehicleId?: number,
+): ReturnType<typeof moveTo> {
+  const ordered = moveTo(state, driverId, { x: dest.x, z: dest.z }, viaVehicleId !== undefined ? { via: viaVehicleId } : undefined);
+  if (ordered.success) alightOnArrival(state.employees.employees.find(e => e.id === driverId));
+  return ordered;
+}
+
+/**
  * Clear the zone: order all employees and vehicles out to a safe cell found
  * by `findSafeDestination`. See Evacuation.ts for the real pathfinding-aware
  * evacuation orchestration (interrupting in-progress work, aborting a
@@ -116,9 +134,12 @@ export function clearZone(
         // discarding it and stranding the vehicle inside the zone (#1110).
         // alightOnArrival puts the driver back on foot the moment the
         // vehicle is clear, exactly like an ordinary on-foot evacuee.
-        const ordered = moveTo(state, driverId, { x: dest.x, z: dest.z });
-        if (ordered.success) alightOnArrival(employees.employees.find(e => e.id === driverId));
-        result.orderedVehicleIds.push(v.id);
+        const ordered = orderDriverClear(state, driverId, dest);
+        if (ordered.success) {
+          result.orderedVehicleIds.push(v.id);
+        } else {
+          result.strandedVehicleIds.push(v.id);
+        }
       } else {
         result.strandedVehicleIds.push(v.id);
       }
@@ -154,12 +175,11 @@ export function clearZone(
     // routes the reposition through it rather than walking the driver to
     // safety on foot and leaving the vehicle behind — no per-vehicle
     // destination marker, and no second `moveTo` once the board resolves.
-    const ordered = moveTo(state, driver.id, { x: dest.x, z: dest.z }, { via: v.id });
+    const ordered = orderDriverClear(state, driver.id, dest, v.id);
     if (!ordered.success) {
       result.strandedVehicleIds.push(v.id);
       continue;
     }
-    alightOnArrival(driver);
     boardingEmployeeIds.add(driver.id);
     result.orderedVehicleIds.push(v.id);
   }
