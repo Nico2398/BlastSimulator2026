@@ -573,9 +573,9 @@
       }
     },
     {
-      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "command": "build_ramp start:16,19 end:16,31 depth:6",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923. #1151: depth explicit 8 -> 6 -- length 12 (z:19-31, can't extend further without running off this 32-wide map's edge) now caps the legal depth at floor(12 / 1.8) = 6 to keep every per-column step within NAV_MAX_SLOPE_RATIO. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan below is depth:8, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth by up to 1 (the old depth:8/length:12 pairing actually bottomed out at floor(11/12*8)=7, not 8) -- at depth:6 the ramp's real floor is floor(11/12*6)=5, up to 3m short of this file's 8-deep crater floor. A gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of how ramp length/depth are tuned in this file alone; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts) -- not something a scenario-def edit can fix on its own.",
       "role": "player",
       "interaction": [
         {
@@ -594,6 +594,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
         },
         {
           "type": "dragTiles",

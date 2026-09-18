@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   advanceAlongPath, NULL_ROUTE_COMMITMENT, type AdvanceAlongPathInput, type RouteCommitment,
 } from '../../../src/core/nav/AgentAdvance.js';
-import { AGENT_WALK_SPEED, NAV_MAX_CLIMB_HEIGHT, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 function baseInput(overrides?: Partial<AdvanceAlongPathInput>): AdvanceAlongPathInput {
@@ -187,11 +187,12 @@ describe('advanceAlongPath — waypoints the agent has already walked', () => {
 
   it('keeps the stepping stone when skipping it would invent a climb-illegal step', () => {
     // (1,1) → (1,2) → (2,1) descends and comes back up precisely because
-    // (1,1) → (2,1) is a face taller than the climb limit.
+    // (1,1) → (2,1) is a face far steeper than the slope limit (10m over a
+    // 1m cardinal run — well past NAV_MAX_SLOPE_RATIO's ~0.5774m).
     const stepped = heightGrid([
       [0, 0, 0],
-      [0, NAV_MAX_CLIMB_HEIGHT + 1, 0],
-      [0, NAV_MAX_CLIMB_HEIGHT + 1, 0],
+      [0, 10, 0],
+      [0, 10, 0],
     ]);
 
     const result = advanceAlongPath(baseInput({

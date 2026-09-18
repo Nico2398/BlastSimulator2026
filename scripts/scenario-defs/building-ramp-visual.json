@@ -1,6 +1,6 @@
 {
   "name": "building-ramp-visual",
-  "description": "#555/#925: ordering a ramp queues progressive dig_ramp_segment excavation work instead of carving the whole corridor instantly, and each segment is now one horizontal Y-layer (bench) spanning the whole footprint, top to bottom, rather than one full-depth column at a time (#925) — a staffed, excavator-crewed rock_digger clears the topmost bench across the whole corridor before starting the next bench down. For this map/seed the origin:20,20 south length:6 depth:6 order carves surface Y=35 down to Y=30 (clearanceHeight 3 + max per-column depth 5), producing 8 layers. This scenario screenshots the corridor half-dug (orderedRampSegmentCount:4 — top 4 benches cleared across the full corridor, not one column dug to full depth) and again once every layer has landed (orderedRampSegmentCount:0), proving the dig happens bench-by-bench rather than column-by-column or in one synchronous burst.",
+  "description": "#555/#925: ordering a ramp queues progressive dig_ramp_segment excavation work instead of carving the whole corridor instantly, and each segment is now one horizontal Y-layer (bench) spanning the whole footprint, top to bottom, rather than one full-depth column at a time (#925) — a staffed, excavator-crewed rock_digger clears the topmost bench across the whole corridor before starting the next bench down. For this map/seed the origin:20,20 south length:11 depth:6 order (#1151: length lengthened from 6 to 11 — length >= ceil(depth * 1.8) is now required to keep every per-column step within NAV_MAX_SLOPE_RATIO) carves surface Y=35 down to Y=30 (clearanceHeight 3 + max per-column depth 5), producing 8 layers — unchanged by the length increase, since the deepest column's own floor()'d depth was already 5 at length 6 and stays 5 at length 11. This scenario screenshots the corridor half-dug (orderedRampSegmentCount:4 — top 4 benches cleared across the full corridor, not one column dug to full depth) and again once every layer has landed (orderedRampSegmentCount:0), proving the dig happens bench-by-bench rather than column-by-column or in one synchronous burst.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -32,8 +32,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "build_ramp origin:20,20 direction:south length:6 depth:6",
-      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per horizontal Y-layer (#925, reworking #555's one-per-column split) instead of carving anything yet. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default.",
+      "command": "build_ramp origin:20,20 direction:south length:11 depth:6",
+      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per horizontal Y-layer (#925, reworking #555's one-per-column split) instead of carving anything yet. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default. Length 11 (#1151): the drag now spans z:20-31 instead of z:20-26, satisfying length >= ceil(depth * 1.8) so every per-column step stays within NAV_MAX_SLOPE_RATIO.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -57,7 +57,7 @@
           "x1": 20,
           "z1": 20,
           "x2": 20,
-          "z2": 26
+          "z2": 31
         },
         {
           "type": "clickSelector",
@@ -76,12 +76,12 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:4 max_ticks:400",
       "timeout": 95,
-      "description": "Drain half the ordered layers — the crewed rock_digger clears one dig_ramp_segment bench at a time, topmost first (isRampSegmentClaimable still gates strictly by index, now a layer index rather than a column index). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor should show a flat bench across its full width and length at the current depth, not a single deep notch at one column while its neighbours sit untouched at the original surface. cameraFocus targets (20,23) — the corridor's midpoint (RAMP_WIDTH=3 centred on x:20, length 6 spanning z:20-26) — at a close distance so the excavated cross-section actually fills the frame instead of sitting as a small distant patch at the default orbiting camera (#925 visual-loop finding); it is re-issued here rather than relying on a prior step's framing because the shots loop below resets the camera (`__cameraReset`) after every step that has any shots.",
+      "description": "Drain half the ordered layers — the crewed rock_digger clears one dig_ramp_segment bench at a time, topmost first (isRampSegmentClaimable still gates strictly by index, now a layer index rather than a column index). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor should show a flat bench across its full width and length at the current depth, not a single deep notch at one column while its neighbours sit untouched at the original surface. cameraFocus targets (20,25.5) — the corridor's midpoint (RAMP_WIDTH=3 centred on x:20, length 11 spanning z:20-31, #1151) — at a close distance so the excavated cross-section actually fills the frame instead of sitting as a small distant patch at the default orbiting camera (#925 visual-loop finding); it is re-issued here rather than relying on a prior step's framing because the shots loop below resets the camera (`__cameraReset`) after every step that has any shots.",
       "interaction": [
         {
           "type": "cameraFocus",
           "x": 20,
-          "z": 23,
+          "z": 25.5,
           "distance": 16
         },
         {
@@ -108,7 +108,7 @@
         {
           "type": "cameraFocus",
           "x": 20,
-          "z": 23,
+          "z": 25.5,
           "distance": 16
         },
         {
@@ -143,21 +143,21 @@
       "name": "overview",
       "yaw": 0,
       "pitch": 45,
-      "target": [20, 23],
+      "target": [20, 25.5],
       "distance": 18
     },
     {
       "name": "closeup",
       "yaw": 90,
       "pitch": 15,
-      "target": [20, 23],
+      "target": [20, 25.5],
       "distance": 14
     },
     {
       "name": "birdseye",
       "yaw": 0,
       "pitch": 80,
-      "target": [20, 23],
+      "target": [20, 25.5],
       "distance": 18
     }
   ]

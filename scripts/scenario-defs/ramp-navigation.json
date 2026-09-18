@@ -19,8 +19,8 @@
       }
     },
     {
-      "command": "build_ramp start:15,15 end:20,25",
-      "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario.",
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario. Explicit depth:5 added (#1151): the 10m length's max legal depth is length / 1.8 ≈ 5.77, so the default depth:8 (grade 0.8) is now too steep — 5 keeps every per-column step within NAV_MAX_SLOPE_RATIO.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -33,6 +33,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
         },
         {
           "type": "dragTiles",

@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -979,40 +979,51 @@ describe('findPath — multi-level routing', () => {
 // Group 12: isStepClimbable (#953)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('isStepClimbable', () => {
-  it('returns true when the surfaceY delta is under the climb limit', () => {
-    expect(isStepClimbable(10, 11, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(11, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+describe('isStepClimbable — slope-based (#1151)', () => {
+  it('returns true when the surfaceY delta is under the slope limit for a cardinal run (1.0m)', () => {
+    expect(isStepClimbable(10, 10.3, 1)).toBe(true);
+    expect(isStepClimbable(10.3, 10, 1)).toBe(true);
   });
 
-  it('returns true when the surfaceY delta is exactly the climb limit (boundary)', () => {
-    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  it('returns true when the surfaceY delta is exactly at the slope limit for a cardinal run (boundary)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO, 1)).toBe(true);
+    expect(isStepClimbable(10 + NAV_MAX_SLOPE_RATIO, 10, 1)).toBe(true);
   });
 
-  it('returns false when the surfaceY delta exceeds the climb limit', () => {
-    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT + 1, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
-    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT + 1, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+  it('returns false when the surfaceY delta exceeds the slope limit for a cardinal run', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO + 0.01, 1)).toBe(false);
+    expect(isStepClimbable(10 + NAV_MAX_SLOPE_RATIO + 0.01, 10, 1)).toBe(false);
   });
 
   it('falls back to unconstrained (true) when either side is missing surfaceY', () => {
-    expect(isStepClimbable(undefined, 100, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(100, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(undefined, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(undefined, 100, 1)).toBe(true);
+    expect(isStepClimbable(100, undefined, 1)).toBe(true);
+    expect(isStepClimbable(undefined, undefined, 1)).toBe(true);
   });
 
-  // #1149: production surfaceY values are now the continuous marching-cubes
+  // #1149: production surfaceY values are the continuous marching-cubes
   // crossing height, so a real fromY/toY pair is typically fractional
-  // (e.g. 4.5, not 4). The gate itself is unchanged — it never rounds — but
-  // this pins that a fractional delta admits/refuses at exactly the same
-  // boundary an integer one does, verifying the gate genuinely needs no
-  // change for the representation switch.
+  // (e.g. 4.5, not 4). The gate itself never rounds — this pins that a
+  // fractional delta admits/refuses at exactly the same boundary an integer
+  // one does.
   it('admits and refuses fractional surfaceY deltas at the same boundary as integer ones', () => {
-    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT + 0.01, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_SLOPE_RATIO, 1)).toBe(true);
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_SLOPE_RATIO + 0.01, 1)).toBe(false);
     // A sub-voxel grade difference well inside the limit — exactly the kind
     // of delta the old integer-index representation rounded away entirely.
-    expect(isStepClimbable(4.3, 4.7, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(4.3, 4.7, 1)).toBe(true); // delta 0.4 < NAV_MAX_SLOPE_RATIO (~0.5774)
+  });
+
+  // #1151: the legal delta scales with the step's own run distance — a
+  // diagonal step (√2m) tolerates more rise than a cardinal one (1m) for the
+  // same 30° slope.
+  it('scales the legal delta with a diagonal run (√2m)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO * Math.SQRT2, Math.SQRT2)).toBe(true);
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO * Math.SQRT2 + 0.01, Math.SQRT2)).toBe(false);
+    // The identical absolute delta (0.6m) is illegal over a cardinal run but
+    // legal over a diagonal one.
+    expect(isStepClimbable(10, 10.6, 1)).toBe(false);
+    expect(isStepClimbable(10, 10.6, Math.SQRT2)).toBe(true);
   });
 });
 
@@ -1028,8 +1039,9 @@ describe('isStepClimbable', () => {
 
 /**
  * Build a flat plateau NavGrid with a rectangular "pit" whose surfaceY sits
- * far below the plateau — every pit-perimeter step exceeds NAV_MAX_CLIMB_HEIGHT.
- * All cells are 'walkable' by cell type; only surfaceY marks the pit.
+ * far below the plateau — every pit-perimeter step exceeds the slope limit
+ * (NAV_MAX_SLOPE_RATIO). All cells are 'walkable' by cell type; only
+ * surfaceY marks the pit.
  */
 function makePlateauWithPit(
   width: number,
@@ -1053,7 +1065,7 @@ function makePlateauWithPit(
 describe('findPath — climb-limit gating on surfaceY (#953)', () => {
   const PIT = { minX: 5, maxX: 9, minZ: 5, maxZ: 9 };
   const PLATEAU_Y = 20;
-  const PIT_Y = 5; // delta 15, well beyond NAV_MAX_CLIMB_HEIGHT
+  const PIT_Y = 5; // delta 15 over at most a √2m run — far beyond NAV_MAX_SLOPE_RATIO (~0.577/m)
 
   it('routes around a pit whose rim exceeds the climb limit — no waypoint enters the pit footprint', () => {
     const grid = makePlateauWithPit(15, 15, PIT, PLATEAU_Y, PIT_Y);
@@ -1071,15 +1083,58 @@ describe('findPath — climb-limit gating on surfaceY (#953)', () => {
     expect(result.found).toBe(false);
   });
 
-  it('refuses a diagonal step whose surfaceY delta exceeds the climb limit, same as a cardinal one', () => {
+  it('refuses a diagonal step whose surfaceY delta exceeds the slope limit, same as a cardinal one', () => {
     // 2×2 grid: only a diagonal step connects start to goal (both cardinal
     // neighbours are blocked), and that diagonal step's surfaceY delta is
-    // far beyond the climb limit.
+    // far beyond the slope limit.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
     setCell(grid, 1, 0, 'blocked');
     setCell(grid, 0, 1, 'blocked');
-    setCell(grid, 1, 1, 'walkable', { surfaceY: NAV_MAX_CLIMB_HEIGHT + 5 });
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 10 }); // 10m over a √2m diagonal run — far too steep
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+
+  it('finds a route across ground graded at 29° on the only path (cardinal-only fixture)', () => {
+    // Single row (height 1) — no diagonal step is ever possible, so the
+    // only route from (0,0) to (2,0) is two cardinal steps of 0.55m each,
+    // within the slope limit.
+    const grid = makeFlatGrid(3, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 0.55 });
+    setCell(grid, 2, 0, 'walkable', { surfaceY: 0.55 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 0, avoidVehicles: false });
+    expect(result.found).toBe(true);
+  });
+
+  it('refuses a route across ground graded at 31° on the only path (cardinal-only fixture)', () => {
+    const grid = makeFlatGrid(3, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 0.6 });
+    setCell(grid, 2, 0, 'walkable', { surfaceY: 0.6 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 0, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+
+  it('finds a route across ground graded at ~29.6° on the only path (diagonal-only fixture)', () => {
+    // 2×2 grid, both cardinal neighbours blocked — the only route is the
+    // 0.80m diagonal step, within the (larger) diagonal slope limit.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 0.8 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(true);
+  });
+
+  it('refuses a route across ground graded at ~31.3° on the only path (diagonal-only fixture)', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 0.83 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(false);
   });

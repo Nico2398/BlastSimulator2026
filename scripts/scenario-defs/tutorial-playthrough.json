@@ -882,7 +882,8 @@
       }
     },
     {
-      "command": "build_ramp start:15,15 end:20,25",
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "#1151: explicit depth:5 added -- the 10m length's max legal depth is length / 1.8 ~= 5.77, so the previously-unspecified default depth:8 (grade 0.8) is now too steep. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan patterns are depth:6, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth (at depth:5/length:10 the ramp's real floor is floor(9/10*5)=4, 2m short of the 6-deep crater floor) -- a gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of scenario-level length/depth tuning; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -895,6 +896,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
         },
         {
           "type": "dragTiles",

@@ -162,7 +162,8 @@
       "role": "observe"
     },
     {
-      "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
+      "command": "build_ramp origin:5,15 direction:south length:15 depth:8",
+      "description": "#1151: length lengthened from 10 to 15 — length >= ceil(depth * 1.8) = 15 for depth:8, keeping every per-column step within NAV_MAX_SLOPE_RATIO.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -181,7 +182,7 @@
           "x1": 5,
           "z1": 15,
           "x2": 5,
-          "z2": 25
+          "z2": 30
         },
         {
           "type": "screenshot"

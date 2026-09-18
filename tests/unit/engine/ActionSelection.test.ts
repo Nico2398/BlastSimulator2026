@@ -33,7 +33,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NAV_MAX_CLIMB_HEIGHT, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
@@ -78,8 +78,8 @@ function makeCellWithSurfaceY(surfaceY: number): NavCell {
 
 /**
  * Flat NavGrid at `surfaceY: 0` everywhere, except every (x, z) in
- * `craterCells` sunk to `surfaceY: craterY` — deep enough below
- * `NAV_MAX_CLIMB_HEIGHT` that stepping between a crater cell and any
+ * `craterCells` sunk to `surfaceY: craterY` — deep enough below the slope
+ * limit (NAV_MAX_SLOPE_RATIO) that stepping between a crater cell and any
  * surrounding flat cell is climb-illegal, while every crater cell stays
  * climb-legal relative to its crater neighbours (same `craterY`). Mirrors a
  * fresh blast crater's own walled-off interior (#953).
@@ -88,7 +88,7 @@ function makeGridWithCraterPocket(
   width: number,
   height: number,
   craterCells: ReadonlySet<string>,
-  craterY = -(NAV_MAX_CLIMB_HEIGHT + 8),
+  craterY = -18, // 18m below the surrounding surface — far beyond NAV_MAX_SLOPE_RATIO (~0.577/m)
 ): NavGrid {
   const cells: NavCell[][] = [];
   for (let z = 0; z < height; z++) {
@@ -846,8 +846,8 @@ describe('selectBestActionForEmployee', () => {
 
   // ── Climb-limit pocket starvation (#953) ───────────────────────────────
   //
-  // A fresh blast crater's own interior sinks well below NAV_MAX_CLIMB_HEIGHT
-  // relative to the surrounding surface, so every step in or out of it is
+  // A fresh blast crater's own interior sinks well below the slope limit
+  // (NAV_MAX_SLOPE_RATIO) relative to the surrounding surface, so every step in or out of it is
   // climb-illegal (Pathfinding.ts's isStepClimbable) even though the
   // crater's own cells are all mutually climb-legal with each other — a
   // candidate deep inside one has plenty of climb-legal neighbours immediately

@@ -140,7 +140,7 @@
       }
     },
     {
-      "command": "build_ramp origin:1,20 direction:south length:10 depth:8",
+      "command": "build_ramp origin:1,20 direction:south length:15 depth:8",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -159,7 +159,7 @@
           "x1": 1,
           "z1": 20,
           "x2": 1,
-          "z2": 10
+          "z2": 5
         },
         {
           "type": "screenshot"
@@ -172,9 +172,9 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -1000
+          "cash": -1500
         },
-        "note": "confirmed against the real state dump (1000 for this 10-tile ramp), not computed from the pricing formula. 20544 carries forward the +188 diameter fix from the office step above (21544-1000)."
+        "note": "#1151: length lengthened from 10 to 15 (length >= ceil(depth * 1.8) = 15 for depth:8, keeping every per-column step within NAV_MAX_SLOPE_RATIO). Cost is length * RAMP_COST_PER_METER (100/m) = 1500 for this 15-tile ramp, per Ramp.ts's validateRampOrder — this step's own cash delta, independent of any earlier step's absolute total."
       }
     },
     {

@@ -1009,7 +1009,7 @@
       }
     },
     {
-      "command": "build_ramp start:24,12 end:24,19",
+      "command": "build_ramp start:24,6 end:24,19 depth:7",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1024,9 +1024,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 7
+        },
+        {
           "type": "dragTiles",
           "x1": 24,
-          "z1": 12,
+          "z1": 6,
           "x2": 24,
           "z2": 19
         },
@@ -1038,7 +1043,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "#953: a blasted bench is no longer terrain a worker walks off -- its face is a six-voxel drop, and pathfinding now refuses that step instead of letting haulers stroll over the edge. Access to the pit floor is a dug ramp, exactly as gameplay-navmesh describes it, so this level digs one from the rim at (24,14) down into the block it is about to blast, before the blast rather than after (cash is still positive here, and the excavation crew has the three tick-150 steps below to finish it). Without it every haul_debris action queued by the first blast targets a cell no employee can reach: traced flat at one stored fragment for 2400 ticks, and the four contract-deliver steps below all refuse with 'Not enough stored material'.",
+      "description": "#953: a blasted bench is no longer terrain a worker walks off -- its face is a six-voxel drop, and pathfinding now refuses that step instead of letting haulers stroll over the edge. Access to the pit floor is a dug ramp, exactly as gameplay-navmesh describes it, so this level digs one from the rim at (24,14) down into the block it is about to blast, before the blast rather than after (cash is still positive here, and the excavation crew has the three tick-150 steps below to finish it). Without it every haul_debris action queued by the first blast targets a cell no employee can reach: traced flat at one stored fragment for 2400 ticks, and the four contract-deliver steps below all refuse with 'Not enough stored material'. #1151: origin moved from (24,12) to (24,6) and depth set explicitly to 7 (was the unspecified default 8) -- length 13 now satisfies length >= ceil(depth * 1.8), keeping every per-column step within NAV_MAX_SLOPE_RATIO, while floor((length-1)/length * depth) = floor(12/13*7) = 6 keeps the ramp's actual deepest carved column at the same six-voxel drop the surrounding blast (drill depth:6) and this description already assume -- the old length:7/depth:8 pairing reached that same 6 via floor(6/7*8). The corridor's own footprint roughly doubles in length, so its total excavated volume is larger than before; if a future scenario run finds the ramp not fully dug by the point haul_debris needs it, widen the tick-150 budget below rather than re-shorten the ramp back below the new slope minimum.",
       "role": "player"
     },
     {

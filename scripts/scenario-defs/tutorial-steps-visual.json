@@ -566,7 +566,8 @@
       }
     },
     {
-      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "command": "build_ramp start:16,19 end:16,31 depth:6",
+      "description": "#1151: depth explicit 8 -> 6 -- length 12 (z:19-31, can't extend further without running off this 32-wide map's edge) now caps the legal depth at floor(12 / 1.8) = 6 to keep every per-column step within NAV_MAX_SLOPE_RATIO. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan below is depth:8, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth by up to 1 -- at depth:6/length:12 the ramp's real floor is floor(11/12*6)=5, up to 3m short of this file's 8-deep crater floor. A gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of scenario-level length/depth tuning; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts).",
       "timeout": 90,
       "interaction": [
         {
@@ -580,6 +581,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
         },
         {
           "type": "dragTiles",
@@ -1595,15 +1601,15 @@
       "role": "observe"
     },
     {
-      "command": "build_ramp start:10,15 end:10,25",
+      "command": "build_ramp start:10,15 end:10,25 depth:5",
       "timeout": 90,
       "interaction": [
         {
           "type": "command",
-          "command": "build_ramp start:10,15 end:10,25"
+          "command": "build_ramp start:10,15 end:10,25 depth:5"
         }
       ],
-      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again. #1151: explicit depth:5 added -- the 10m length's max legal depth is length / 1.8 ~= 5.77, so the previously-unspecified default depth:8 (grade 0.8) is now too steep. This ramp gates nothing checked later in this file (bootstrap, off the active tutorial rail), so the shallower depth carries no reachability risk here.",
       "role": "bootstrap",
       "expect": {
         "decreased": [

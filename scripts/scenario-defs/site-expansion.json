@@ -173,8 +173,8 @@
       "role": "observe"
     },
     {
-      "command": "build_ramp origin:30,20 direction:east length:8 depth:6",
-      "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the drill steps above; converted now that #558 lets the picker raycast the landscape past the site. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding, same as building-ramp-visual.json): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default and queueing extra excavation layers that stall the buildingCount wait further down this file.",
+      "command": "build_ramp origin:30,20 direction:east length:11 depth:6",
+      "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the drill steps above; converted now that #558 lets the picker raycast the landscape past the site. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding, same as building-ramp-visual.json): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default and queueing extra excavation layers that stall the buildingCount wait further down this file. Length lengthened from 8 to 11 (#1151: length >= ceil(depth * 1.8) = 11 for depth:6, keeping every per-column step within NAV_MAX_SLOPE_RATIO) — the footprint's new far edge (x:41) still sits comfortably inside the world bound (worldSizeX:64, worldMinX:-16 → world spans to x:47) the earlier far-west drill hole already claimed, so this alone triggers no further site expansion.",
       "timeout": 150,
       "interaction": [
         {
@@ -198,7 +198,7 @@
           "type": "dragTiles",
           "x1": 30,
           "z1": 20,
-          "x2": 38,
+          "x2": 41,
           "z2": 20
         },
         {
