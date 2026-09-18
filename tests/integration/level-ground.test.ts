@@ -11,8 +11,10 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { footprintHeightSpread } from '../../src/core/entities/Building.js';
+import {
+  computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+} from '../../src/core/world/VoxelGrid.js';
+import { footprintHeightSpread, getBuildingDef, getDefSize } from '../../src/core/entities/Building.js';
 import { NAV_BENCH_HEIGHT, MAX_LEVEL_GROUND_AREA, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../src/core/config/balance.js';
 import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
@@ -366,5 +368,99 @@ describe('level_ground — console round trip (#1009)', () => {
     expect(result.success).toBe(false);
     expect(ctx.state!.cash).toBe(cashBefore);
     expect(ctx.state!.pendingActions.some(a => a.type === 'level_ground')).toBe(false);
+  });
+
+  it('20. every column of the ordered rect ends at the identical continuous height as the target, including a column integer-flush with target but fractionally proud (#1144 defect 1)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'sandite', coefficient: 1 }] });
+
+    // Three columns at 24.500, one (16,16) at 24.622 — every column shares
+    // integer floor 24, so the pre-#1144 Math.floor comparison would have
+    // treated the whole rect as already level and skipped the proud column.
+    for (let z = 15; z <= 16; z++) {
+      for (let x = 15; x <= 16; x++) setVoxelColumnSurfaceHeight(grid, x, z, 24.5, compId);
+    }
+    setVoxelColumnSurfaceHeight(grid, 16, 16, 24.622, compId);
+
+    const orderResult = runCommand(engine, 'level_ground minX:15 maxX:16 minZ:15 maxZ:16');
+    expect(orderResult.success).toBe(true);
+    const action = engine.ctx.state!.pendingActions.find(a => a.type === 'level_ground')!;
+    expect(tickUntilGone(engine, action.id)).toBe(true);
+
+    for (let z = 15; z <= 16; z++) {
+      for (let x = 15; x <= 16; x++) {
+        expect(computeVoxelColumnSurfaceHeight(grid, x, z)).toBeCloseTo(24.5, 6);
+      }
+    }
+  });
+
+  it('21. building construction levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2: one-column-short)', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    // 4x4 flat pad: two columns past management_office tier1's own 2x2
+    // footprint (x=20,21 / z=20,21) on the high side.
+    carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
+    // One column past the TRUE footprint (x=22, i.e. x + sizeX) — must be
+    // carved by the widened level region the fix introduces.
+    lowerColumn(grid, 22, 20, BASE_HEIGHT, 3);
+    // Two columns past the true footprint (x=23) — must NOT be carved; the
+    // widened region only extends one column beyond the footprint.
+    lowerColumn(grid, 23, 20, BASE_HEIGHT, 3);
+
+    // The true footprint itself (20,21 x 20,21) is untouched and flat, so
+    // placement succeeds regardless of the widened-carve fix under test.
+    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+
+    const building = engine.ctx.state!.buildings.buildings[engine.ctx.state!.buildings.buildings.length - 1]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    expect(sizeX).toBe(2);
+    expect(sizeZ).toBe(2);
+
+    const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
+
+    // Every lattice column the building's own mesh spans — footprint x..x+sizeX
+    // and z..z+sizeZ INCLUSIVE — reads the same pad height.
+    for (let z = building.z; z <= building.z + sizeZ; z++) {
+      for (let x = building.x; x <= building.x + sizeX; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(padHeight);
+      }
+    }
+
+    // One column further out than the widened region was never touched.
+    expect(computeVoxelColumnSurfaceY(grid, building.x + sizeX + 1, building.z)).not.toBe(padHeight);
+  });
+
+  it('22. NavGrid occupancy after construction reflects only the true (unwidened) footprint — the widened carve does not expand the blocked area', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+    carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
+
+    expect(runCommand(engine, 'build management_office at:20,20').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+
+    const building = engine.ctx.state!.buildings.buildings[engine.ctx.state!.buildings.buildings.length - 1]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    const nav = engine.ctx.state!.navGrid!;
+
+    // True footprint columns (x..x+sizeX-1, z..z+sizeZ-1) are occupied.
+    for (let z = building.z; z <= building.z + sizeZ - 1; z++) {
+      for (let x = building.x; x <= building.x + sizeX - 1; x++) {
+        expect(nav.cellAt(x, z)!.type).toBe('blocked');
+      }
+    }
+
+    // The widened carve's own extra column (x+sizeX, z+sizeZ) is levelled
+    // ground but was never claimed as occupied — the building's true
+    // footprint never grew to match the wider carve.
+    expect(nav.cellAt(building.x + sizeX, building.z)!.type).not.toBe('blocked');
+    expect(nav.cellAt(building.x, building.z + sizeZ)!.type).not.toBe('blocked');
   });
 });
