@@ -39,7 +39,7 @@ import {
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import type { PendingAction } from '../../src/core/state/GameState.js';
-import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, setVoxelColumnSurfaceHeight, resolveExposedCompId, computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 // #922: driver-position invariant — no console command drives this directly,
 // so the assertions below read findDrivenVehicle, the core-level lookup
@@ -276,6 +276,30 @@ describe('Vehicle fleet', () => {
     // diagonal detour instead of the straight line this test means to check.
     const targetX = origX + 4;
     const targetZ = v.z;
+    // Flatten the straight strip the drive leg needs (#1151 fixer): the real
+    // generated terrain right at spawn is not reliably flat in any cardinal
+    // direction under the slope-based climb rule (a genuine >30° step can
+    // sit one or two cells out in every direction), which would silently
+    // reroute the drive onto a longer, non-straight-line path and break this
+    // test's exact per-tick distance assertion below for a reason that has
+    // nothing to do with tickLocomotion's own speed math. Re-grades every
+    // column on the route to the vehicle's own spawn height so the leg is
+    // guaranteed straight and climbable, then patches the NavGrid for that
+    // region so the cached cells reflect it.
+    const flattenHeight = ctx.grid ? computeVoxelColumnSurfaceHeight(ctx.grid, Math.floor(origX), Math.floor(targetZ)) : 0;
+    if (ctx.grid) {
+      for (let x = Math.floor(origX) - 1; x <= Math.floor(targetX) + 1; x++) {
+        const compId = resolveExposedCompId(ctx.grid, x, Math.floor(targetZ), flattenHeight);
+        setVoxelColumnSurfaceHeight(ctx.grid, x, Math.floor(targetZ), flattenHeight, compId);
+      }
+      if (ctx.state!.navGrid) {
+        NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, [], [], {
+          minX: Math.floor(origX) - 1, maxX: Math.floor(targetX) + 1,
+          minY: 0, maxY: ctx.grid.sizeY - 1,
+          minZ: Math.floor(targetZ) - 1, maxZ: Math.floor(targetZ) + 1,
+        });
+      }
+    }
     // #1089: a vehicle only ever moves through its occupant's own advance —
     // nobody aboard, nothing moves, everywhere in the game. Give it a real,
     // licensed, co-located driver (rather than a dangling fake employee id —

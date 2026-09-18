@@ -631,17 +631,37 @@ describe('NavMesh and pathfinding', () => {
   // succeeds via a ramp built on realistic (elevated) terrain" — the
   // fullPath assertions below need the same Ramp.ts continuous-carving fix.
   it('the ramp\'s deepest column only reaches its fully-excavated depth once every segment has landed — the last (deepest) layer landing is what completes full multi-level routing', () => {
+    // A ramp of its own, distinct from PROGRESSIVE_RAMP (whose 6m depth over
+    // 12 steps crosses the NAV_BENCH_HEIGHT=5 boundary several steps before
+    // its deepest column — every column's own headroom clearing reaches down
+    // to just above its floor in an earlier, higher-y segment, so the
+    // boundary is generally crossed there, not at the final layer). This
+    // ramp's depth (5m, exactly one bench) is tuned so its deepest column's
+    // own final descent — a fractional depth of 4.5m at step 9 of 10 — is
+    // itself what pushes its climbY from 18 (bench 0) to 17 (bench 1),
+    // landing only once the last segment (the sole layer at y=18) carves.
+    const RAMP_TO_BENCH_BOUNDARY: RampDef = {
+      originX: 10, originZ: 5, direction: 'south', length: 10, targetDepth: 5,
+    };
+    // The ramp's true deepest column (step length-1), read directly rather
+    // than via `segments[last].cells[0]` — the final y-layer can be shared
+    // by more than one column (any column whose own floor happens to land
+    // on that same integer row), and array order does not guarantee the
+    // first cell listed there is this ramp's actual deepest step.
+    const lastX = RAMP_TO_BENCH_BOUNDARY.originX;
+    const lastZ = RAMP_TO_BENCH_BOUNDARY.originZ + RAMP_TO_BENCH_BOUNDARY.length - 1;
+
     // Reference: every segment carved and patched in order — the target depth
     // the fully-dug ramp reaches at its deepest (last) layer.
     const gridFull = buildElevatedPlateau();
     const navFull = NavGrid.buildNavGrid(gridFull, [], []);
-    const segmentsFull = defineRampSegments(gridFull, PROGRESSIVE_RAMP);
+    const segmentsFull = defineRampSegments(gridFull, RAMP_TO_BENCH_BOUNDARY);
     expect(segmentsFull.length).toBeGreaterThan(1);
     for (const segment of segmentsFull) {
       carveRampSegment(gridFull, segment);
       if (segment.region) NavGrid.patchNavGrid(navFull, gridFull, [], [], segment.region);
     }
-    const lastCell = segmentsFull[segmentsFull.length - 1]!.cells[0]!;
+    const lastCell = { x: lastX, z: lastZ };
     const fullyDugSurfaceY = NavGrid.computeSurfaceY(gridFull, lastCell.x, lastCell.z);
 
     // #953: findRampConnections looks for a single 'ramp'-typed cell whose
@@ -675,7 +695,7 @@ describe('NavMesh and pathfinding', () => {
     // Every layer except the very deepest one — the ramp is not fully dug yet.
     const gridPrefix = buildElevatedPlateau();
     const navPrefix = NavGrid.buildNavGrid(gridPrefix, [], []);
-    const segmentsPrefix = defineRampSegments(gridPrefix, PROGRESSIVE_RAMP);
+    const segmentsPrefix = defineRampSegments(gridPrefix, RAMP_TO_BENCH_BOUNDARY);
     for (const segment of segmentsPrefix.slice(0, -1)) {
       carveRampSegment(gridPrefix, segment);
       if (segment.region) NavGrid.patchNavGrid(navPrefix, gridPrefix, [], [], segment.region);
