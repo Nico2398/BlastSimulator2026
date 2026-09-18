@@ -405,8 +405,13 @@ describe('level_ground — console round trip (#1009)', () => {
     // carved by the widened level region the fix introduces.
     lowerColumn(grid, 22, 20, BASE_HEIGHT, 3);
     // Two columns past the true footprint (x=23) — must NOT be carved; the
-    // widened region only extends one column beyond the footprint.
-    lowerColumn(grid, 23, 20, BASE_HEIGHT, 3);
+    // widened region only extends one column beyond the footprint. Dropped by
+    // a DIFFERENT amount than the x=22 column above so it doesn't coincide
+    // with the pad's own target height (the min across the widened region,
+    // which x=22's drop sets to BASE_HEIGHT-3): an untouched column landing on
+    // the same value as the target by chance would make the assertion below
+    // pass regardless of whether the carve actually reached this column.
+    lowerColumn(grid, 23, 20, BASE_HEIGHT, 6);
 
     // The true footprint itself (20,21 x 20,21) is untouched and flat, so
     // placement succeeds regardless of the widened-carve fix under test.
