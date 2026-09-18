@@ -235,6 +235,30 @@ describe('Zone clearing and evacuation', () => {
     expect(resolveVehicleDriver(driverless, employees.employees)).toBeUndefined();
   });
 
+  it('strands an already-driven vehicle when its route to a safe destination fails to plan, instead of reporting it ordered (#1140)', () => {
+    const state = makeState(50);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    const rng = new Random(50);
+    const { employee: driver } = hireEmployee(employees, 'driller', rng, vehicle.x, vehicle.z);
+    mountDriver(vehicle, driver);
+
+    // findSafeDestination picks a coordinate genuinely outside the world's own
+    // NavGrid bounds — findExactPath rejects an out-of-bounds target rather than
+    // silently clamping onto the nearest in-grid cell (#1109), so this is a
+    // deterministic, real "no route" outcome — the same class of failure a
+    // newly-blocked destination cell would produce.
+    const unreachableDestination: SafeDestinationFinder = (_fromX, fromZ) => ({ x: 100000, z: fromZ });
+
+    const result = clearZone(zone, state, vehicles, employees, unreachableDestination, () => true);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+    // No route was planned — the driver's itinerary is untouched, still
+    // mounted, not silently alighted or redirected.
+    expect(driver.itinerary).toBeNull();
+  });
+
   // ── #1042: a driverless vehicle with a qualified, reachable employee is
   // boarded and driven clear instead of being stranded outright.
 
