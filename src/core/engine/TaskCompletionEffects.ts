@@ -23,7 +23,7 @@ import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
-import { makeFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
+import { makeFootprintRegion, makeLevelFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
 
 /**
  * Apply the world effects of `emp`'s just-completed task (per `progress`)
@@ -232,7 +232,8 @@ export function applyTaskCompletion(
             // that check trivially pass and silently swallow a site a blast
             // wrecked mid-construction, which is exactly what it exists to
             // catch. A footprint already level carves nothing.
-            const levelled = levelGroundRect(grid, footprintRegion, emitter);
+            const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
+            const levelled = levelGroundRect(grid, levelRegion, emitter);
             footprintLevelled = levelled.voxelsCleared;
             // Patched after the carve, so the NavGrid cells around the site
             // carry their new surface heights (isStepClimbable reads them) and

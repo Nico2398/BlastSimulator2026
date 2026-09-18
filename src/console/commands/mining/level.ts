@@ -11,6 +11,7 @@ import {
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
+import { LEVEL_GROUND_COST_PER_VOXEL } from '../../../core/config/balance.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -136,9 +137,16 @@ export function levelGroundCommand(
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
+  // validation.cost is Math.ceil(volume) * LEVEL_GROUND_COST_PER_VOXEL
+  // (LevelGround.ts) — dividing back out reports the continuous voxel
+  // figure the cost was actually charged on. columns.length is now a count
+  // of proud COLUMNS, not voxels, since #1144's continuous-height rewrite —
+  // reporting it as "voxels" would misstate the job size.
+  const voxelEstimate = LEVEL_GROUND_COST_PER_VOXEL > 0 ? Math.round(validation.cost / LEVEL_GROUND_COST_PER_VOXEL) : 0;
+
   return {
     success: true,
-    output: `Ground levelling ordered: ${columns.length} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
+    output: `Ground levelling ordered: ${voxelEstimate} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
   };
 }
 

@@ -29,9 +29,8 @@ export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: 
  * building ramped toward it. NOT used for occupancy, NavGrid patching, or
  * placement checks — those keep using `makeFootprintRegion`.
  */
-export function makeLevelFootprintRegion(_x: number, _z: number, _sizeX: number, _sizeZ: number): BlastRegion {
-  // TODO: implement
-  throw new Error('not implemented');
+export function makeLevelFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
+  return { minX: x, maxX: x + sizeX, minZ: z, maxZ: z + sizeZ };
 }
 
 /**

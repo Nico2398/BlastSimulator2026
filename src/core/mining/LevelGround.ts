@@ -11,9 +11,13 @@
 // (defect 1), and columns are the unit of work throughout instead of 3D
 // voxel cells.
 
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import {
+  computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY, setVoxelColumnSurfaceHeight, type VoxelGrid,
+} from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { computeRampSegmentDurationTicks } from './Ramp.js';
+import { formatMoney } from '../economy/formatMoney.js';
+import { MAX_LEVEL_GROUND_AREA, LEVEL_GROUND_COST_PER_VOXEL } from '../config/balance.js';
 
 // ── Types ──
 
@@ -43,17 +47,30 @@ export interface LevelOrderValidation {
   region?: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
 }
 
+/**
+ * Tolerance for "already at targetY". A column integer-flush with its target
+ * but fractionally proud of it (24.622 vs 24.500) must still be carved — this
+ * is small enough to catch that while absorbing float round-trip noise from
+ * the density-interpolation read/write pair in VoxelGrid.ts.
+ */
+const LEVEL_EPSILON = 1e-6;
+
 // ── Core functions ──
 
 /**
- * Target Y the rectangle should be levelled to — the minimum continuous
- * column surface height across every column in `rect` (inclusive
- * minX..maxX, minZ..maxZ). Levelling always cuts down to the lowest point
- * in the footprint, never fills.
+ * Target Y the rectangle should be levelled to — the minimum CONTINUOUS
+ * column surface height (getSmoothTerrainSurfaceY) across every column in
+ * `rect` (inclusive minX..maxX, minZ..maxZ). Levelling always cuts down to
+ * the lowest point in the footprint, never fills.
  */
-export function computeLevelTargetY(_grid: VoxelGrid, _rect: LevelOrderDef): number {
-  // TODO: implement
-  throw new Error('not implemented');
+export function computeLevelTargetY(grid: VoxelGrid, rect: LevelOrderDef): number {
+  let targetY = Infinity;
+  for (let z = rect.minZ; z <= rect.maxZ; z++) {
+    for (let x = rect.minX; x <= rect.maxX; x++) {
+      targetY = Math.min(targetY, getSmoothTerrainSurfaceY(grid, x, z));
+    }
+  }
+  return targetY;
 }
 
 /**
@@ -63,12 +80,18 @@ export function computeLevelTargetY(_grid: VoxelGrid, _rect: LevelOrderDef): num
  * but fractionally proud of it must be included, not silently skipped.
  */
 export function computeLevelColumns(
-  _grid: VoxelGrid,
-  _rect: LevelOrderDef,
-  _targetY: number,
+  grid: VoxelGrid,
+  rect: LevelOrderDef,
+  targetY: number,
 ): { x: number; z: number }[] {
-  // TODO: implement
-  throw new Error('not implemented');
+  const columns: { x: number; z: number }[] = [];
+  for (let z = rect.minZ; z <= rect.maxZ; z++) {
+    for (let x = rect.minX; x <= rect.maxX; x++) {
+      const height = getSmoothTerrainSurfaceY(grid, x, z);
+      if (height - targetY > LEVEL_EPSILON) columns.push({ x, z });
+    }
+  }
+  return columns;
 }
 
 /**
@@ -79,12 +102,15 @@ export function computeLevelColumns(
  * in-progress `level_ground` action.
  */
 export function computeLevelVolume(
-  _grid: VoxelGrid,
-  _columns: { x: number; z: number }[],
-  _targetY: number,
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
 ): number {
-  // TODO: implement
-  throw new Error('not implemented');
+  let volume = 0;
+  for (const { x, z } of columns) {
+    volume += Math.max(0, getSmoothTerrainSurfaceY(grid, x, z) - targetY);
+  }
+  return volume;
 }
 
 /**
@@ -92,20 +118,89 @@ export function computeLevelVolume(
  * shape ramp segments compute for `terrain:updated`.
  */
 export function computeLevelRegion(
-  _columns: { x: number; z: number }[],
+  columns: { x: number; z: number }[],
 ): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
-  // TODO: implement
-  throw new Error('not implemented');
+  if (columns.length === 0) return null;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const col of columns) {
+    minX = Math.min(minX, col.x); maxX = Math.max(maxX, col.x);
+    minZ = Math.min(minZ, col.z); maxZ = Math.max(maxZ, col.z);
+  }
+  return { minX, maxX, minZ, maxZ };
 }
 
 /**
  * Validate a level-ground order against `cash` without carving anything —
  * mirrors `validateRampOrder` (Ramp.ts): area/cash checks run before any
  * caller claims a footprint or queues work.
+ *
+ * Checks run in order: (1) finite, non-inverted rect coordinates; (2) rect
+ * area against MAX_LEVEL_GROUND_AREA, rejected before any column array is
+ * built; (3) cost, from the continuous volume the columns that need
+ * clearing actually carry; (4) cash against that cost.
  */
-export function validateLevelOrder(_rect: LevelOrderDef, _cash: number, _grid: VoxelGrid): LevelOrderValidation {
-  // TODO: implement
-  throw new Error('not implemented');
+export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: VoxelGrid): LevelOrderValidation {
+  if (
+    !Number.isFinite(rect.minX) || !Number.isFinite(rect.maxX) ||
+    !Number.isFinite(rect.minZ) || !Number.isFinite(rect.maxZ) ||
+    !Number.isInteger(rect.minX) || !Number.isInteger(rect.maxX) ||
+    !Number.isInteger(rect.minZ) || !Number.isInteger(rect.maxZ) ||
+    rect.minX > rect.maxX || rect.minZ > rect.maxZ
+  ) {
+    return {
+      success: false,
+      message: 'Invalid area: minX/maxX/minZ/maxZ must be finite whole numbers describing a non-empty rectangle.',
+      cost: 0,
+      messageKey: 'mining.level_ground.invalid_area',
+    };
+  }
+
+  const area = (rect.maxX - rect.minX + 1) * (rect.maxZ - rect.minZ + 1);
+  if (area > MAX_LEVEL_GROUND_AREA) {
+    return {
+      success: false,
+      message: `Area too large: ${area} voxels exceeds the ${MAX_LEVEL_GROUND_AREA} voxel limit per order.`,
+      cost: 0,
+      messageKey: 'mining.level_ground.too_large',
+      messageParams: { area, limit: MAX_LEVEL_GROUND_AREA },
+    };
+  }
+
+  const targetY = computeLevelTargetY(grid, rect);
+  const columns = computeLevelColumns(grid, rect, targetY);
+  const volume = computeLevelVolume(grid, columns, targetY);
+  const cost = Math.ceil(volume) * LEVEL_GROUND_COST_PER_VOXEL;
+
+  if (cash < cost) {
+    return { success: false, message: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}`, cost: 0 };
+  }
+
+  return {
+    success: true,
+    message: `Ground levelling: ${cost > 0 ? `$${formatMoney(cost)}` : 'already flat'}`,
+    cost,
+    targetY,
+    columns,
+    region: computeLevelRegion(columns),
+  };
+}
+
+/**
+ * Resolve the palette composition index the newly exposed surface at column
+ * (x, z) should carry once cut down to `targetY` — the composition already
+ * present at (x, floor(targetY), z), so the carved-down surface exposes the
+ * rock that was actually sitting there rather than switching material. Falls
+ * back to the column's own topmost solid voxel's composition when that exact
+ * row reads as air (e.g. targetY lands inside a void/overhang).
+ */
+function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targetY: number): number {
+  const rowY = Math.floor(targetY);
+  let composition = grid.compositionAt(x, rowY, z);
+  if (composition.rocks.length === 0) {
+    const topY = computeVoxelColumnSurfaceY(grid, x, z);
+    if (topY >= 0) composition = grid.compositionAt(x, topY, z);
+  }
+  return grid.palette.intern(composition);
 }
 
 /**
@@ -116,13 +211,33 @@ export function validateLevelOrder(_rect: LevelOrderDef, _cash: number, _grid: V
  * `targetY` + epsilon, rather than iterating a precomputed 3D cell list.
  */
 export function carveLevelColumns(
-  _grid: VoxelGrid,
-  _columns: { x: number; z: number }[],
-  _targetY: number,
-  _emitter?: EventEmitter,
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
+  emitter?: EventEmitter,
 ): { voxelsCleared: number } {
-  // TODO: implement
-  throw new Error('not implemented');
+  let totalDelta = 0;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+  for (const { x, z } of columns) {
+    const liveHeight = getSmoothTerrainSurfaceY(grid, x, z);
+    if (liveHeight - targetY <= LEVEL_EPSILON) continue;
+
+    const compId = resolveExposedCompId(grid, x, z, targetY);
+    setVoxelColumnSurfaceHeight(grid, x, z, targetY, compId);
+
+    totalDelta += liveHeight - targetY;
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  }
+
+  if (totalDelta > 0) {
+    emitter?.emit('terrain:updated', {
+      region: { minX, maxX, minY: 0, maxY: grid.sizeY - 1, minZ, maxZ },
+    });
+  }
+
+  return { voxelsCleared: Math.ceil(totalDelta) };
 }
 
 /**
@@ -139,12 +254,15 @@ export function carveLevelColumns(
  * nothing and emits nothing.
  */
 export function levelGroundRect(
-  _grid: VoxelGrid,
-  _rect: LevelOrderDef,
-  _emitter?: EventEmitter,
+  grid: VoxelGrid,
+  rect: LevelOrderDef,
+  emitter?: EventEmitter,
 ): { targetY: number; voxelsCleared: number; region: { minX: number; maxX: number; minZ: number; maxZ: number } | null } {
-  // TODO: implement
-  throw new Error('not implemented');
+  const targetY = computeLevelTargetY(grid, rect);
+  const columns = computeLevelColumns(grid, rect, targetY);
+  const region = computeLevelRegion(columns);
+  const { voxelsCleared } = carveLevelColumns(grid, columns, targetY, emitter);
+  return { targetY, voxelsCleared, region };
 }
 
 /**

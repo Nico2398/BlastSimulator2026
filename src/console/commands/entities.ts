@@ -25,7 +25,7 @@ import { evacuateZone } from '../../core/engine/Evacuation.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { makeFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
+import { makeFootprintRegion, makeLevelFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
 import { levelGroundRect } from '../../core/mining/LevelGround.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -151,7 +151,7 @@ export function buildCommand(
         // it can be bigger than the tier it replaces — so it reaches onto ground
         // the original construction never levelled. Cut it flat here, the same
         // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
-        levelGroundRect(ctx.grid, makeFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ), ctx.emitter);
+        levelGroundRect(ctx.grid, makeLevelFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ), ctx.emitter);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
@@ -206,7 +206,7 @@ export function buildCommand(
         // new footprint gets the same cut a finished build does (#1008
         // refinement, tickTaskCompletion.ts). The vacated one is left as it is:
         // levelling is not undone by moving away from it.
-        levelGroundRect(ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.emitter);
+        levelGroundRect(ctx.grid, makeLevelFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.emitter);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }
