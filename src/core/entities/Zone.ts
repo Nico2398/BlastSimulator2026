@@ -62,6 +62,27 @@ export function defineZone(state: ZoneState, bounds: ZoneBounds): void {
 }
 
 /**
+ * Order a driver clear of the zone: moves them (and, when `viaVehicleId` is
+ * given, the vehicle they board en route) to `dest`, then puts them back on
+ * foot once they arrive. Shared by clearZone's driven-vehicle branch (no
+ * `viaVehicleId` — the driver is already mounted) and its driverless-vehicle
+ * branch (`viaVehicleId` set — the picked driver walks to the vehicle first).
+ *
+ * // TODO: implement — call alightOnArrival(employee) on a successful move.
+ */
+function orderDriverClear(
+  state: GameState,
+  driverId: number,
+  dest: EvacuationDestination,
+  viaVehicleId?: number,
+): ReturnType<typeof moveTo> {
+  return moveTo(state, driverId, { x: dest.x, z: dest.z }, viaVehicleId !== undefined ? { via: viaVehicleId } : undefined);
+}
+// Not yet wired into clearZone's driver branches — implementer does that
+// (#1140). Referenced here only to satisfy noUnusedLocals until then.
+void orderDriverClear;
+
+/**
  * Clear the zone: order all employees and vehicles out to a safe cell found
  * by `findSafeDestination`. See Evacuation.ts for the real pathfinding-aware
  * evacuation orchestration (interrupting in-progress work, aborting a
