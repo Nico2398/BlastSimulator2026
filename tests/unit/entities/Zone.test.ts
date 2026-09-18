@@ -19,6 +19,35 @@ import { Random } from '../../../src/core/math/Random.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+
+// ── NavGrid helpers (mirrors tests/unit/engine/PlanItinerary.test.ts) ──────
+
+function makeCell(type: NavCellType): NavCell {
+  const moveCost = type === 'blocked' || type === 'void' ? Infinity
+    : type === 'ramp' ? 1.8
+    : type === 'drill_hole' ? 5.0
+    : 1.0;
+  return { type, moveCost, benchLevel: 0, vehicleOccupied: false };
+}
+
+/** Flat, fully-walkable NavGrid of the given size. */
+function makeFlatGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) row.push(makeCell('walkable'));
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
+
+/** Block one column across an inclusive z range — a wall forcing a detour. */
+function blockColumnRange(grid: NavGrid, x: number, zMin: number, zMax: number): void {
+  for (let z = zMin; z <= zMax; z++) {
+    grid.cells[z]![x] = makeCell('blocked');
+  }
+}
 
 /**
  * #1089: clearZone now takes the owning GameState too (moveTo needs it to
@@ -238,17 +267,24 @@ describe('Zone clearing and evacuation', () => {
   it('strands an already-driven vehicle when its route to a safe destination fails to plan, instead of reporting it ordered (#1140)', () => {
     const state = makeState(50);
     const { vehicles, employees } = state;
+
+    // A real NavGrid wide enough to cover the zone (10-30) and the vehicle's
+    // position (15,15), with a full-height wall at x=32 the vehicle at x=15
+    // can never cross — genuinely unreachable, not merely out of bounds.
+    const grid = makeFlatGrid(40, 40);
+    blockColumnRange(grid, 32, 0, 39);
+    state.navGrid = grid;
+
     const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
     const rng = new Random(50);
     const { employee: driver } = hireEmployee(employees, 'driller', rng, vehicle.x, vehicle.z);
     mountDriver(vehicle, driver);
 
-    // findSafeDestination picks a coordinate genuinely outside the world's own
-    // NavGrid bounds — findExactPath rejects an out-of-bounds target rather than
-    // silently clamping onto the nearest in-grid cell (#1109), so this is a
-    // deterministic, real "no route" outcome — the same class of failure a
-    // newly-blocked destination cell would produce.
-    const unreachableDestination: SafeDestinationFinder = (_fromX, fromZ) => ({ x: 100000, z: fromZ });
+    // findSafeDestination picks a coordinate on the far side of the wall —
+    // in-bounds and itself walkable, but genuinely unreachable from the
+    // vehicle's side, so findExactPath truly returns found: false rather
+    // than merely rejecting an out-of-bounds target.
+    const unreachableDestination: SafeDestinationFinder = (_fromX, fromZ) => ({ x: 35, z: fromZ });
 
     const result = clearZone(zone, state, vehicles, employees, unreachableDestination, () => true);
 
