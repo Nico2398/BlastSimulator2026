@@ -578,6 +578,7 @@ export class GameRenderer {
       lastCutBounds: sceneDeps.lastCutBounds,
       landscape: sceneDeps.landscape,
       landscapeHandle: sceneDeps.landscapeHandle,
+      landscapeStreamer: null, // TODO(#1153): wire a real LandscapeChunkStreamer once implemented
       borderWall: sceneDeps.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),
@@ -603,6 +604,7 @@ export class GameRenderer {
       lastCutBounds: this.lastCutBounds,
       landscape: this.landscape,
       landscapeHandle: this.landscapeHandle,
+      landscapeStreamer: null, // TODO(#1153): wire a real LandscapeChunkStreamer once implemented
       borderWall: this.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),

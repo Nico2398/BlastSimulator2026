@@ -18,6 +18,7 @@ import { type VoxelGrid, computeVoxelColumnSurfaceHeight, getSmoothTerrainSurfac
 import type { SceneManager } from './SceneManager.js';
 import { densityGradientNormal, type TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
+import type { LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { markSceneOverlay, unmarkSceneOverlay } from './post/SceneOverlay.js';
@@ -42,10 +43,21 @@ export interface TerrainDeps {
   lastCutBounds: string;
   landscape: LandscapeMesh | null;
   landscapeHandle: LandscapeHandle | null;
+  /** Drives per-chunk lazy landscape mesh residency against the camera (#1153) — null before the streamer is wired up (tests, and callers with no live camera). */
+  landscapeStreamer: LandscapeChunkStreamer | null;
   borderWall: WorldBorderWall | null;
   sm: SceneManager;
   refreshPanLeash: () => void;
 }
+
+/**
+ * Streams the resident set of landscape chunks against the camera position
+ * (#1153) — the per-frame counterpart to `remeshTerrainRegion`'s per-edit
+ * rebuild, replacing the old eager whole-map `LandscapeMesh.build()` call.
+ */
+export function updateLandscapeStreaming(
+  _deps: TerrainDeps, _ctx: MiningContext, _cameraX: number, _cameraZ: number, _dt: number,
+): void { throw new Error('not implemented'); }
 
 /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). */
 export function rebuildTerrain(deps: TerrainDeps): void {
@@ -76,8 +88,12 @@ export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, regio
   // level's landscape and then be thrown away.
   if (!ctx.landscape || !ctx.grid || !deps.landscape || !deps.landscapeHandle) return;
 
+  // TODO(#1153): LandscapeMesh.build() is retired in favour of per-chunk
+  // buildChunk()/disposeChunk() driven by updateLandscapeStreaming(); the
+  // site-bounds-changed branch below no-ops the landscape rebuild until the
+  // implementer wires the streamer through this call site.
   const handle = deps.landscapeHandle;
-  deps.landscape.build(deps.landscapeHandle, ctx.grid.palette, playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height));
+  void playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height);
   rebuildBorderWall(deps, ctx);
 }
 

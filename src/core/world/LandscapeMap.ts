@@ -13,34 +13,45 @@ import { applyOverlays, type StructureSet } from './Structures.js';
 import type { StrataSampler } from './Strata.js';
 import type { CompositionPalette } from './VoxelGrid.js';
 
-/** Half-extent (metres) of the landscape build area around the playable rect's centre (#458 A16). */
-const EXTENT_HALF = 1600;
-/** One tile's world-metre span (square). */
-const TILE_SPAN = 512;
-/** Sample spacing within a tile, metres. */
-const COARSE_STEP = 4;
-/** Fence-post: a tile spanning TILE_SPAN at COARSE_STEP resolution needs span/step + 1 samples per axis. */
-const SAMPLES_PER_TILE = TILE_SPAN / COARSE_STEP + 1;
+/** Fence-post: a chunk spanning 32 cells at any ladder step needs 32 + 1 samples per axis. */
+export const NODES_PER_CHUNK = 33;
 
-export interface LandscapeTile {
-  /** Tile grid index (not world coordinates) — for addressing/debugging, not sampling. */
-  readonly tileX: number;
-  readonly tileZ: number;
-  /** World-metre position of this tile's (0, 0) sample. */
+/** Sample-spacing ladder (metres) a chunk is generated at, indexed by `LandscapeChunkId.level` — 0 is finest/nearest, resolution coarsens with distance from camera. */
+export const LADDER_STEPS: readonly number[] = [1, 2, 4, 8, 16];
+
+/** One chunk's world-metre span at `level` (33 nodes, 32 cells, at that level's ladder step). */
+export function chunkSpanAt(_level: number): number { throw new Error('not implemented'); }
+
+/** Half-extent (metres) of the landscape build area around the playable rect's centre (#458 A16). */
+export const EXTENT_HALF = 1600;
+
+/** Addresses one chunk on the resolution ladder — a level (ring/resolution), plus its grid index within that level's lattice. */
+export interface LandscapeChunkId {
+  readonly level: number;
+  readonly cx: number;
+  readonly cz: number;
+}
+
+/** One lazily-sampled patch of landscape, at its ladder level's resolution. */
+export interface LandscapeChunk {
+  readonly id: LandscapeChunkId;
+  readonly step: number;
   readonly originX: number;
   readonly originZ: number;
-  /** SAMPLES_PER_TILE x SAMPLES_PER_TILE, row-major (index = row * SAMPLES_PER_TILE + col), row = z, col = x. */
+  /** NODES_PER_CHUNK x NODES_PER_CHUNK, row-major (index = row * NODES_PER_CHUNK + col), row = z, col = x. */
   readonly heights: Float32Array;
   readonly biomeIds: Uint8Array;
   readonly surfCompIds: Uint16Array;
 }
 
-export interface LandscapeMap {
-  readonly tiles: readonly LandscapeTile[];
+/** Per-chunk lazy replacement for the old eager `LandscapeMap`/`buildLandscapeMap` (#1153) — chunks are sampled and cached on first request rather than the whole extent up front. */
+export interface LazyLandscapeMap {
   readonly extentHalf: number;
-  readonly tileSpan: number;
-  readonly coarseStep: number;
-  readonly samplesPerTile: number;
+  readonly centerX: number;
+  readonly centerZ: number;
+  getChunk(id: LandscapeChunkId): LandscapeChunk;
+  hasChunk(id: LandscapeChunkId): boolean;
+  readonly cachedChunkIds: readonly LandscapeChunkId[];
 }
 
 /**
@@ -88,65 +99,31 @@ export function sampleLandscapeColumn(
 }
 
 /**
- * Builds the full tiled landscape map around worldGen's playable rect.
+ * Builds a lazy, per-chunk landscape map around worldGen's playable rect,
+ * replacing the eager single-resolution `buildLandscapeMap` (#1153). Chunks
+ * are sampled on first `getChunk` request and cached, at whichever ladder
+ * step their `LandscapeChunkId.level` selects.
+ *
  * `palette` must be the SAME CompositionPalette instance the playable grid
  * used (`grid.palette`) — palette ids are assigned by insertion order, so a
  * separately-built palette would intern the same rock blend under a
  * different id and silently break "shader rock indices agree" (#458 A16).
  */
-export function buildLandscapeMap(
-  worldGen: WorldGenContext,
-  climateBias: readonly [number, number],
-  structureSet: StructureSet,
-  strata: StrataSampler,
-  palette: CompositionPalette,
-  extentHalf: number = EXTENT_HALF,
-): LandscapeMap {
-  const rect = worldGen.playableRect;
-  const centerX = (rect.minX + rect.maxX) / 2;
-  const centerZ = (rect.minZ + rect.maxZ) / 2;
+export function createLazyLandscapeMap(
+  _worldGen: WorldGenContext,
+  _climateBias: readonly [number, number],
+  _structureSet: StructureSet,
+  _strata: StrataSampler,
+  _palette: CompositionPalette,
+  _extentHalf: number = EXTENT_HALF,
+): LazyLandscapeMap { throw new Error('not implemented'); }
 
-  // Odd tile count, symmetric about the playable centre (#458 A16 "aligned to
-  // playable centre"). floor (not ceil) matches D7's own "~7x7 tiles" sizing
-  // at the default 1600/512 — the last partial tile-span at the true extent
-  // edge is dropped rather than padded to a full tile, which costs ~64m of
-  // coverage at the far edge (well past typical camera draw distance) for a
-  // meaningful chunk of buildLandscapeMap's per-sample cost.
-  const halfTiles = Math.floor(extentHalf / TILE_SPAN);
-  const tilesPerAxis = halfTiles * 2 + 1;
+/** World-metre origin of chunk `id`'s (0, 0) sample, given the map's centre. */
+export function chunkOrigin(
+  _id: LandscapeChunkId, _centerX: number, _centerZ: number,
+): { originX: number; originZ: number } { throw new Error('not implemented'); }
 
-  const tiles: LandscapeTile[] = [];
-  for (let tz = 0; tz < tilesPerAxis; tz++) {
-    for (let tx = 0; tx < tilesPerAxis; tx++) {
-      const originX = centerX + (tx - halfTiles) * TILE_SPAN;
-      const originZ = centerZ + (tz - halfTiles) * TILE_SPAN;
-
-      // Skip any tile whose entire span lies inside the playable rect (#458 A16) — never triggers
-      // at today's level sizes (rects are far smaller than one tile) but kept for correctness.
-      if (
-        originX >= rect.minX && originX + TILE_SPAN <= rect.maxX &&
-        originZ >= rect.minZ && originZ + TILE_SPAN <= rect.maxZ
-      ) continue;
-
-      const heights = new Float32Array(SAMPLES_PER_TILE * SAMPLES_PER_TILE);
-      const biomeIds = new Uint8Array(SAMPLES_PER_TILE * SAMPLES_PER_TILE);
-      const surfCompIds = new Uint16Array(SAMPLES_PER_TILE * SAMPLES_PER_TILE);
-
-      for (let row = 0; row < SAMPLES_PER_TILE; row++) {
-        const z = originZ + row * COARSE_STEP;
-        for (let col = 0; col < SAMPLES_PER_TILE; col++) {
-          const x = originX + col * COARSE_STEP;
-          const sample = sampleLandscapeColumn(worldGen, climateBias, structureSet, strata, palette, x, z);
-          const idx = row * SAMPLES_PER_TILE + col;
-          heights[idx] = sample.height;
-          biomeIds[idx] = sample.biomeId;
-          surfCompIds[idx] = sample.surfCompId;
-        }
-      }
-
-      tiles.push({ tileX: tx - halfTiles, tileZ: tz - halfTiles, originX, originZ, heights, biomeIds, surfCompIds });
-    }
-  }
-
-  return { tiles, extentHalf, tileSpan: TILE_SPAN, coarseStep: COARSE_STEP, samplesPerTile: SAMPLES_PER_TILE };
-}
+/** Which chunks should be resident for a camera at (cameraX, cameraZ) — the resolution ladder's near-to-far selection. */
+export function selectLandscapeChunks(
+  _cameraX: number, _cameraZ: number, _centerX: number, _centerZ: number, _extentHalf: number = EXTENT_HALF,
+): LandscapeChunkId[] { throw new Error('not implemented'); }

@@ -236,7 +236,10 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
   // landmark for this seed — hand it to the claim path rather than have it
   // trace them all a second time (#473 D6).
   ctx.playableArea?.adoptStructures(handle.structureSet);
-  deps.landscape.build(handle, ctx.grid.palette, deps.playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height));
+  // TODO(#1153): LandscapeMesh.build() is retired in favour of per-chunk
+  // buildChunk()/disposeChunk(), driven by a LandscapeChunkStreamer.
+  // Skeleton no-ops here; implementer wires the streamer in.
+  void deps.playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height);
   // Record what we just cut against, so the next terrain:updated only
   // rebuilds when the site has actually moved since this build.
   deps.siteBoundsChanged(ctx.grid);
