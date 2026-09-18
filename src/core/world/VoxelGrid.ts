@@ -991,3 +991,41 @@ export function getSmoothTerrainSurfaceY(grid: VoxelGrid | null, x: number, z: n
   const h = computeVoxelColumnSurfaceHeight(grid, cx, cz);
   return Number.isNaN(h) ? 0 : h;
 }
+
+/**
+ * After a voxel-level carve has dropped column (x, z)'s exposed top from
+ * `oldTopY` to wherever it now sits, clear any leftover sub-threshold density
+ * the carve stranded just above the new top, then re-grade the new top into
+ * the same continuous band setVoxelColumnSurfaceHeight itself would write for
+ * it — so a carved surface reads back identically to a written one.
+ *
+ * Inputs: an existing VoxelGrid; a column (x, z); the column's topmost
+ * solid-or-above (density >= 0.5) Y index from immediately before the carve
+ * that just ran.
+ *
+ * Output: null when the column's exposed top did not move (the carve never
+ * reached above the column's current top — a cavity dug from below/inside,
+ * or a fragmented voxel that wasn't the column's topmost run) — in this case
+ * nothing is touched, so any existing overhang or crossing band above stays
+ * completely untouched. Otherwise, the highest Y this call wrote or cleared,
+ * for a caller tracking a dirty-region bounding box to report onward.
+ *
+ * Never reaches below the highest carved gap in the column: rock separated
+ * from the new top by empty space (an overhang, a cavity roof, a tunnel
+ * floor) is never read or written by this function.
+ *
+ * A column carved down to nothing (no solid voxel left at all) is left
+ * empty — there is no top to write a band for.
+ */
+export function renormaliseVoxelColumnAfterCarve(
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  oldTopY: number,
+): number | null {
+  void grid;
+  void x;
+  void z;
+  void oldTopY;
+  throw new Error('not implemented');
+}
