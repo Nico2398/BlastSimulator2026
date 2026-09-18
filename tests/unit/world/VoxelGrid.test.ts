@@ -5,6 +5,7 @@ import {
   CompositionPalette,
   computeVoxelColumnSurfaceY,
   computeVoxelColumnSurfaceHeight,
+  setVoxelColumnSurfaceHeight,
   setVoxelBoundsReporter,
   chunkIndexOf,
   clampChunkRectToTile,
@@ -683,6 +684,136 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
 
   it('returns 0 for a column with no solid voxel at all', () => {
     expect(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
+  });
+});
+
+describe('setVoxelColumnSurfaceHeight (#1143)', () => {
+  it('rounds a column previously solid well above the target down to a fractional height', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 10; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 5.3, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(5.3, 6);
+  });
+
+  it('raises a column previously low (mostly air) up to a fractional height', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 0, 3, compId, undefined, 1);
+    grid.fillVoxel(3, 1, 3, compId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 5.3, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(5.3, 6);
+  });
+
+  it('an integer target height round-trips to exactly that integer for a column previously higher', () => {
+    // The literal #1143 bug: a boolean-style carve down to an integer height
+    // used to leave the readback at 24.5 (or some other stray fraction), not
+    // the 24 that was actually written.
+    const grid = new VoxelGrid(16, 32, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 28; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 24, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBe(24);
+  });
+
+  it('an integer target height round-trips to exactly that integer for a column previously lower', () => {
+    const grid = new VoxelGrid(16, 32, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 0, 3, compId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 24, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBe(24);
+  });
+
+  it('leaves zero density above the touched band', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 15; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 8.4, compId);
+
+    for (let y = Math.ceil(8.4) + 2; y <= grid.sizeY - 1; y++) {
+      expect(grid.densityAt(3, y, 3), `density at y=${y} should be exactly 0`).toBe(0);
+    }
+  });
+
+  it('leaves rock strictly below the touched band fully solid and untouched', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const lowCompId = grid.palette.intern({ rocks: [{ rockId: 'grumpite', coefficient: 1 }] });
+    const targetCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 0, 3, lowCompId, undefined, 1);
+    grid.fillVoxel(3, 1, 3, lowCompId, undefined, 1);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 12.7, targetCompId);
+
+    // The write itself actually happened...
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(12.7, 6);
+    // ...without disturbing the rock well below the touched band.
+    expect(grid.densityAt(3, 0, 3)).toBe(1);
+    expect(grid.densityAt(3, 1, 3)).toBe(1);
+    expect(grid.dominantRockAt(3, 0, 3)).toBe('grumpite');
+    expect(grid.dominantRockAt(3, 1, 3)).toBe('grumpite');
+  });
+
+  it('two columns started in different states report identical computeVoxelColumnSurfaceHeight once written to the same fractional height', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    // Column A: previously solid well above the target.
+    for (let y = 0; y <= 15; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
+    // Column B: previously low and uneven (a fractional crossing of its own).
+    grid.fillVoxel(5, 0, 5, compId, undefined, 1);
+    grid.fillVoxel(5, 3, 5, compId, undefined, 0.4);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 12.7, compId);
+    setVoxelColumnSurfaceHeight(grid, 5, 5, 12.7, compId);
+
+    const heightA = computeVoxelColumnSurfaceHeight(grid, 3, 3);
+    const heightB = computeVoxelColumnSurfaceHeight(grid, 5, 5);
+    expect(heightA).toBeCloseTo(12.7, 6);
+    expect(heightB).toBe(heightA);
+  });
+
+  it('preserves a buried overhang/cavity below the touched band', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const crustCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    const rockCompId = grid.palette.intern({ rocks: [{ rockId: 'grumpite', coefficient: 1 }] });
+    // Buried solid rock.
+    for (let y = 0; y <= 4; y++) grid.fillVoxel(3, y, 3, rockCompId, undefined, 1);
+    // Air gap (cavity) — already air by default, cleared explicitly for clarity.
+    for (let y = 5; y <= 7; y++) grid.clearVoxel(3, y, 3);
+    // Solid crust at the top.
+    for (let y = 8; y <= 10; y++) grid.fillVoxel(3, y, 3, crustCompId, undefined, 1);
+
+    // Target stays within/near the existing crust — never reaches the gap or the rock below it.
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 9.5, crustCompId);
+
+    // The write itself actually happened (crust surface moved down from 10.5 to 9.5)...
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(9.5, 6);
+    // ...without flattening the cavity or the rock buried beneath it.
+    for (let y = 5; y <= 7; y++) {
+      expect(grid.densityAt(3, y, 3), `cavity at y=${y} should still be air`).toBe(0);
+    }
+    for (let y = 0; y <= 4; y++) {
+      expect(grid.densityAt(3, y, 3), `buried rock at y=${y} should still be solid`).toBe(1);
+      expect(grid.dominantRockAt(3, y, 3)).toBe('grumpite');
+    }
+  });
+
+  it('a column outside the grid bounds is a silent no-op', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    expect(grid.containsColumn(99, 99)).toBe(false);
+
+    expect(() => setVoxelColumnSurfaceHeight(grid, 99, 99, 5, compId)).not.toThrow();
+
+    expect(grid.containsColumn(99, 99)).toBe(false);
   });
 });
 

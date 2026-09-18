@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, SURFACE_BAND_HALF } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -73,50 +73,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   return { worldGen, biome, strata, oreVeins };
 }
 
-/**
- * Generate terrain into a new VoxelGrid.
- * Algorithm:
- *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
- *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
- *      heightmap reads from (LandscapeMap.ts, #458 T2.1), so the two representations cannot disagree
- *      at their shared boundary.
- *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
- *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
- *   4. Clear border zone of ores (neutral zone)
- *
- * Height blends every biome's shaping by climate weight, evaluated per
- * column — a real gradient at a climate transition, not a seam. Rock/ore
- * generation (steps 2-4) still uses ONE dominant biome for the whole grid
- * (the highest-weighted biome at the grid's own centre) rather than
- * blending per column — full per-column biome-blended strata is out of
- * scope for T1.3 (no accept criterion calls for it) and would belong to a
- * future landscape-blending task if ever needed.
- */
-/**
- * Half-width, in voxels, of the band over which density falls from solid to
- * air across the surface.
- *
- * One full voxel either side. A narrower band would need a density below zero
- * on the air side to keep the crossing linear, and densities are clamped to
- * [0, 1] — the crossing would then bend and the surface would drift off the
- * height it is supposed to sit on.
- */
-const SURFACE_BAND_HALF = 1;
-
-/**
- * Density for voxel `y` in a column whose surface sits at continuous height
- * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
- *
- * Marching cubes finds the 0.5 crossing by interpolating linearly between two
- * corner densities, so a field that is linear in y with value 0.5 at surfaceH
- * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
- * up to a rounded surface instead is what terraced the whole site into 1 m
- * steps while the landscape beside it stayed smooth (#458).
- */
-export function surfaceDensityAt(y: number, surfaceH: number): number {
-  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
-  return Math.max(0, Math.min(1, d));
-}
+export { surfaceDensityAt };
 
 /** Fill one column (x, z) of `grid` from the sampling context. Pure in (config, x, z) — see #473 D3. */
 function generateColumn(
@@ -176,6 +133,25 @@ export function generateTerrainRegion(
   }
 }
 
+/**
+ * Generate terrain into a new VoxelGrid.
+ * Algorithm:
+ *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
+ *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
+ *      heightmap reads from (LandscapeMap.ts, #458 T2.1), so the two representations cannot disagree
+ *      at their shared boundary.
+ *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
+ *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
+ *   4. Clear border zone of ores (neutral zone)
+ *
+ * Height blends every biome's shaping by climate weight, evaluated per
+ * column — a real gradient at a climate transition, not a seam. Rock/ore
+ * generation (steps 2-4) still uses ONE dominant biome for the whole grid
+ * (the highest-weighted biome at the grid's own centre) rather than
+ * blending per column — full per-column biome-blended strata is out of
+ * scope for T1.3 (no accept criterion calls for it) and would belong to a
+ * future landscape-blending task if ever needed.
+ */
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const { sizeX, sizeY, sizeZ } = config;
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);

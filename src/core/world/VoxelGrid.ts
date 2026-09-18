@@ -849,6 +849,32 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
 }
 
 /**
+ * Half-width, in voxels, of the band over which density falls from solid to
+ * air across the surface.
+ *
+ * One full voxel either side. A narrower band would need a density below zero
+ * on the air side to keep the crossing linear, and densities are clamped to
+ * [0, 1] — the crossing would then bend and the surface would drift off the
+ * height it is supposed to sit on.
+ */
+export const SURFACE_BAND_HALF = 1;
+
+/**
+ * Density for voxel `y` in a column whose surface sits at continuous height
+ * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
+ *
+ * Marching cubes finds the 0.5 crossing by interpolating linearly between two
+ * corner densities, so a field that is linear in y with value 0.5 at surfaceH
+ * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
+ * up to a rounded surface instead is what terraced the whole site into 1 m
+ * steps while the landscape beside it stayed smooth (#458).
+ */
+export function surfaceDensityAt(y: number, surfaceH: number): number {
+  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
+  return Math.max(0, Math.min(1, d));
+}
+
+/**
  * Continuous height of the topmost solid-to-air crossing at column (x, z),
  * in the same datum as heightToVoxelYContinuous. Mirrors
  * computeVoxelColumnSurfaceY's top-down scan, but returns the fractional
@@ -886,6 +912,62 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
     }
   }
   return 0;
+}
+
+/**
+ * Writes column (x, z)'s top surface to continuous height `height`: fully
+ * solid below the crossing, the straddling pair carrying the fractional
+ * density surfaceDensityAt defines, zero above — so
+ * computeVoxelColumnSurfaceHeight reads back exactly `height` afterwards.
+ *
+ * Touches only the band between the column's existing topmost solid voxel
+ * (computeVoxelColumnSurfaceY) and the new target's own band — never reaches
+ * below the old surface's immediate neighbourhood, so an overhang or cavity
+ * buried deeper in the column survives untouched. This is the primitive
+ * that expresses "ground ends here"; it does not flatten the column's whole
+ * stack, and it is not itself a ground-clearing side effect of anything else.
+ *
+ * A column the grid does not own is a no-op, matching fillVoxel/setVoxel/
+ * clearVoxel's own silent-no-op convention for unowned coordinates. A
+ * non-finite `height` (NaN, Infinity, -Infinity) is likewise a silent no-op.
+ *
+ * A `height` outside [0, grid.sizeY - 1] is not rejected or reported — it is
+ * silently clamped into the grid's representable vertical range before the
+ * write, so a caller passing an out-of-range value gets a clamped result
+ * rather than a signal that anything was off.
+ */
+export function setVoxelColumnSurfaceHeight(
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  height: number,
+  compId: number,
+  ores?: Record<string, number>,
+): void {
+  if (!grid.containsColumn(x, z)) return;
+  if (!Number.isFinite(height)) return;
+
+  // Read the OLD surface before clamping `height`. `containsColumn` above
+  // already guarantees (x, z) is in bounds, so clampToGridColumn (inside
+  // computeVoxelColumnSurfaceY) is a no-op here either way — this ordering
+  // is simply the natural "read old, then compute new" sequence, not a
+  // correctness requirement.
+  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z);
+  const clampedHeight = Math.max(0, Math.min(grid.sizeY - 1, height));
+
+  // Union of "what used to be filled that must now clear" and "what the new
+  // crossing band needs" — never reaches below either surface, so an
+  // overhang or cavity buried deeper in the column is left untouched.
+  const lowY = Math.max(0, Math.min(existingTopY + 1, Math.floor(clampedHeight) - SURFACE_BAND_HALF + 1));
+  const highY = Math.min(grid.sizeY - 1, Math.max(existingTopY, Math.ceil(clampedHeight) + SURFACE_BAND_HALF - 1));
+
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
+  for (let y = lowY; y <= highY; y++) {
+    const density = surfaceDensityAt(y, clampedHeight);
+    if (density > 0) grid.fillVoxel(cx, y, cz, compId, ores, density);
+    else grid.clearVoxel(cx, y, cz);
+  }
 }
 
 /**
