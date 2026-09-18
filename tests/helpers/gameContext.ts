@@ -39,9 +39,10 @@ export function makeEmptyGameContext(overrides?: GameContextOverrides): GameCont
     emitter: overrides?.emitter !== undefined ? overrides.emitter : new EventEmitter(),
   };
 
-  // Mirrors createRunner.ts's own wiring (#1146) — every test built on this
-  // fixture keeps getting NavGrid patched automatically from `terrain:updated`
-  // now that the manual per-call-site patch calls are gone.
+  // Mirrors createRunner.ts's own wiring (#1146, #1161) — every test built on
+  // this fixture keeps getting NavGrid patched automatically from
+  // `terrain:updated` and `nav:occupancy_changed` now that the manual
+  // per-call-site patch calls are gone.
   subscribeNavGridToUpdates(ctx.emitter, () => buildNavGridSyncTarget(ctx));
 
   return ctx;

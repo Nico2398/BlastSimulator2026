@@ -1,9 +1,14 @@
-// BlastSimulator2026 — NavGridSync: wires NavGrid patching to `terrain:updated` (#1146)
+// BlastSimulator2026 — NavGridSync: wires NavGrid patching to `terrain:updated`
+// and `nav:occupancy_changed` (#1146, #1161)
 //
 // Replaces the scattered manual `patchNavGridForRegion`/`patchNavGrid` calls
 // at every terrain-carve call site with a single subscription to the
-// `terrain:updated` event every carve already emits. Wired once at the
-// composition root instead of once per call site.
+// `terrain:updated` event every carve already emits, plus `nav:occupancy_changed`
+// for building-occupancy-only changes (destroy/upgrade/move/construction) that
+// carve zero voxels. Splitting the two lets the renderer's `terrain:updated`-only
+// remesh subscription in `src/main.ts` skip pure occupancy changes while NavGrid
+// still patches on both. Wired once at the composition root instead of once per
+// call site.
 
 import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
