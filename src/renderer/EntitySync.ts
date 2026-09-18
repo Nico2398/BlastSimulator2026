@@ -39,9 +39,12 @@ export function buildingFootprintSurfaceY(
  * Mutates the three rendered-ID sets in place.
  *
  * @param getSurfaceY - Terrain surface height sampler, same one used for
- *   vehicles/characters. Buildings are static once placed (no per-frame
- *   resnap like vehicles/characters get in GameRenderer.syncFromContext), so
- *   the surface height is baked in here at add/update time (#408).
+ *   vehicles/characters. Buildings are static once placed, so unlike
+ *   vehicles/characters they get no per-frame resnap here — the surface
+ *   height is baked in at add/update time (#408). They are still re-snapped
+ *   later, but only when the terrain mesh revision changes rather than every
+ *   frame: GameRendererSync calls `BuildingMesh.setSurfaceY` for each
+ *   building whenever that revision advances (#1145).
  */
 export function syncEntitySets(
   state: GameState,

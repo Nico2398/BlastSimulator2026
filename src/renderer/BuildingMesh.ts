@@ -61,12 +61,15 @@ export class BuildingMesh {
    * Entry (green) and exit (orange) markers are added above the roof.
    *
    * @param surfaceY - Terrain surface height under the building's footprint,
-   *   as the lowest of its 4 bounding-box corners (`buildingFootprintSurfaceY`
-   *   in EntitySync.ts) — a footprint spanning multiple voxel levels sits on
-   *   its lowest corner rather than floating or burying the opposite one.
-   *   Buildings are static once placed, so unlike vehicles/characters this is
-   *   baked into the mesh at construction rather than corrected every frame,
-   *   or the building renders at y=0 and sits buried underground (#408).
+   *   as the lowest surface height across every cell of its own footprint
+   *   (`buildingFootprintSurfaceY` in EntitySync.ts, sampling the building
+   *   def's `footprint` cell list) — a footprint spanning multiple voxel
+   *   levels sits on its lowest cell rather than floating or burying the
+   *   others. Buildings are static once placed, so unlike vehicles/characters
+   *   this is baked into the mesh at construction rather than corrected every
+   *   frame, or the building renders at y=0 and sits buried underground
+   *   (#408). It is later re-snapped via `setSurfaceY` when the terrain mesh
+   *   revision changes (#1145).
    */
   addBuilding(building: Building, surfaceY = 0): void {
     const def = getBuildingDef(building.type, building.tier);
