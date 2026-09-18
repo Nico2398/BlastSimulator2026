@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeFootprintRegion, siteBoundsForGrid, patchNavGrid, refreshLogisticsCapacity,
-  levelBuildingFootprint,
+  levelBuildingFootprint, toFullHeightRegion,
 } from '../../../src/core/engine/BuildingTaskHelpers.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
@@ -75,6 +75,35 @@ describe('patchNavGrid', () => {
     expect(state.navGrid).toBeNull();
     expect(() => patchNavGrid(state, grid, { minX: 0, maxX: 0, minZ: 0, maxZ: 0 })).not.toThrow();
     expect(state.navGrid).toBeNull();
+  });
+});
+
+describe('toFullHeightRegion (#1146)', () => {
+  it('widens a 4-field footprint region to the full column height, preserving X/Z bounds', () => {
+    const grid = new VoxelGrid(10, 20, 10);
+    const region = { minX: 2, maxX: 5, minZ: 3, maxZ: 6 };
+
+    const result = toFullHeightRegion(region, grid);
+
+    expect(result).toEqual({ minX: 2, maxX: 5, minY: 0, maxY: grid.sizeY - 1, minZ: 3, maxZ: 6 });
+  });
+
+  it('a single-cell footprint region widens the same way', () => {
+    const grid = new VoxelGrid(4, 8, 4);
+    const region = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+
+    const result = toFullHeightRegion(region, grid);
+
+    expect(result).toEqual({ minX: 0, maxX: 0, minY: 0, maxY: 7, minZ: 0, maxZ: 0 });
+  });
+
+  it('uses the given grid own sizeY, not a hardcoded height', () => {
+    const shortGrid = new VoxelGrid(5, 3, 5);
+    const tallGrid = new VoxelGrid(5, 50, 5);
+    const region = { minX: 1, maxX: 1, minZ: 1, maxZ: 1 };
+
+    expect(toFullHeightRegion(region, shortGrid).maxY).toBe(2);
+    expect(toFullHeightRegion(region, tallGrid).maxY).toBe(49);
   });
 });
 

@@ -14,6 +14,8 @@ import {
 import { NAV_MAX_CLIMB_HEIGHT } from '../../src/core/config/balance.js';
 import { createLogisticsState, addBlastFragments } from '../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { subscribeNavGridToTerrainUpdates } from '../../src/core/nav/NavGridSync.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -478,23 +480,32 @@ describe('NavMesh and pathfinding', () => {
     originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
   };
 
-  it('after each segment lands, the NavGrid has no blocked/void cell inside that segment\'s own carved region', () => {
+  it('after each segment lands, the NavGrid has no blocked/void cell inside that segment\'s own carved region (event-driven, #1146)', () => {
     const grid = buildElevatedPlateau();
     const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    // The event-driven path end-to-end: one subscription, wired before any
+    // carving happens, replaces every manual `NavGrid.patchNavGrid` call in
+    // this test body. `carveRampSegment` already emits `terrain:updated`
+    // per segment (see its own region-emit above), so the subscription is
+    // the only thing that needs to patch the NavGrid from here on.
+    const emitter = new EventEmitter();
+    subscribeNavGridToTerrainUpdates(emitter, () => ({ navGrid: nav, grid, buildings: [], drillHoles: [] }));
 
     const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
     expect(segments.length).toBeGreaterThan(0);
 
     for (const segment of segments) {
-      carveRampSegment(grid, segment);
+      carveRampSegment(grid, segment, emitter);
       // Layer-based excavation (#925): the topmost layer(s) are pure
       // clearance headroom above the (flat) plateau surface and carve
       // nothing — region is legitimately null there, mirroring the
       // production guard (tickTaskCompletion.ts only patches the NavGrid
-      // when a segment's region is non-null).
+      // when a segment's region is non-null). No event fires for those
+      // (carveRampSegment only emits when voxelsCleared > 0 && region), so
+      // there is nothing for the subscription to have patched either.
       if (!segment.region) continue;
       const region = segment.region;
-      NavGrid.patchNavGrid(nav, grid, [], [], region);
 
       for (let z = region.minZ; z <= region.maxZ; z++) {
         for (let x = region.minX; x <= region.maxX; x++) {
