@@ -60,6 +60,7 @@ import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
+import { subscribeNavGridToTerrainUpdates, type NavGridSyncTarget } from '../core/nav/NavGridSync.js';
 
 export interface RunnerWithContext {
   runner: ConsoleRunner;
@@ -144,6 +145,22 @@ export function createRunner(): RunnerWithContext {
   const emitter = new EventEmitter();
   const runner = new ConsoleRunner();
   const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter };
+
+  // Single subscription keeps NavGrid in sync with every terrain/occupancy
+  // write, wherever it happens (#1146) — replaces the scattered manual
+  // patch calls this used to require at each carve/building-mutation site.
+  // Reads ctx fresh on every event so it tracks `new_game` replacing
+  // ctx.state/ctx.grid, rather than a snapshot taken here at wiring-time.
+  subscribeNavGridToTerrainUpdates(emitter, (): NavGridSyncTarget | null =>
+    ctx.state && ctx.state.navGrid && ctx.grid
+      ? {
+          navGrid: ctx.state.navGrid,
+          grid: ctx.grid,
+          buildings: ctx.state.buildings.buildings,
+          drillHoles: ctx.state.drillHoles,
+        }
+      : null,
+  );
 
   // --- World commands (Phase 2) ---
   runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>

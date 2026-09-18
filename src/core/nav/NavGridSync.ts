@@ -6,7 +6,7 @@
 // composition root instead of once per call site.
 
 import type { EventEmitter } from '../state/EventEmitter.js';
-import type { NavGrid } from './NavGrid.js';
+import { NavGrid } from './NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
@@ -27,9 +27,12 @@ export interface NavGridSyncTarget {
  * subscription then no-ops for that event.
  */
 export function subscribeNavGridToTerrainUpdates(
-  _emitter: EventEmitter,
-  _getTarget: () => NavGridSyncTarget | null,
+  emitter: EventEmitter,
+  getTarget: () => NavGridSyncTarget | null,
 ): void {
-  // TODO: implement
-  throw new Error('not implemented');
+  emitter.on('terrain:updated', ({ region }) => {
+    const target = getTarget();
+    if (!target) return;
+    NavGrid.patchNavGrid(target.navGrid, target.grid, target.buildings, target.drillHoles, region);
+  });
 }
