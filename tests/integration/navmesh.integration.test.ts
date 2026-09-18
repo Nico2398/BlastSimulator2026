@@ -231,17 +231,17 @@ describe('NavMesh and pathfinding', () => {
     expect(nav.cells[2]![2]!.moveCost).toBe(1.0);
   });
 
-  it('computeSurfaceY returns highest solid voxel', () => {
+  it('computeSurfaceY returns continuous surface height above highest solid voxel', () => {
     const vg = new VoxelGrid(5, 10, 5);
     fillSolid(vg, 5); // solid y=0..5
 
-    // The highest solid voxel is at y=5
-    expect(NavGrid.computeSurfaceY(vg, 2, 2)).toBe(5);
-    expect(NavGrid.computeSurfaceY(vg, 0, 0)).toBe(5);
-    expect(NavGrid.computeSurfaceY(vg, 4, 4)).toBe(5);
+    // The highest solid voxel is at y=5, surface sits at its top face, y=5.5
+    expect(NavGrid.computeSurfaceY(vg, 2, 2)).toBe(5.5);
+    expect(NavGrid.computeSurfaceY(vg, 0, 0)).toBe(5.5);
+    expect(NavGrid.computeSurfaceY(vg, 4, 4)).toBe(5.5);
 
-    // Edge clamped column (999, 999 → (4,4)) also returns 5
-    expect(NavGrid.computeSurfaceY(vg, 999, 999)).toBe(5);
+    // Edge clamped column (999, 999 → (4,4)) also returns 5.5
+    expect(NavGrid.computeSurfaceY(vg, 999, 999)).toBe(5.5);
 
     // All-air column returns -1
     const empty = new VoxelGrid(3, 10, 3);

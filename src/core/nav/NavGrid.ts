@@ -414,14 +414,31 @@ export class NavGrid {
    * Classify a single NavGrid cell based on column solidity, drill holes, buildings, and ramps.
    * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
    *
-   * Ramp detection: if any cardinal neighbor's surface Y differs from this cell's
-   * surface Y by more than 1 voxel and at most NAV_MAX_CLIMB_HEIGHT voxels, the
-   * cell is classified as a ramp. This allows pathfinding to handle elevation
-   * changes (e.g. stepped terrain or ramp transitions). A delta beyond
-   * NAV_MAX_CLIMB_HEIGHT (e.g. a blast crater wall) does NOT classify as a ramp —
-   * it falls through to walkable, and Pathfinding's per-step climb gate (#953)
-   * is what actually refuses that illegal step, since a cell can be legitimately
-   * walkable from one neighbor and illegally steep relative to another.
+   * Ramp detection: if any cardinal neighbor's topmost-solid-voxel index
+   * differs from this cell's by more than 1 voxel and at most
+   * NAV_MAX_CLIMB_HEIGHT voxels, the cell is classified as a ramp. This
+   * allows pathfinding to handle elevation changes (e.g. stepped terrain or
+   * ramp transitions). A delta beyond NAV_MAX_CLIMB_HEIGHT (e.g. a blast
+   * crater wall) does NOT classify as a ramp — it falls through to walkable,
+   * and Pathfinding's per-step climb gate (#953) is what actually refuses
+   * that illegal step, since a cell can be legitimately walkable from one
+   * neighbor and illegally steep relative to another.
+   *
+   * Deliberately voxel-indexed (computeVoxelColumnSurfaceY), not the
+   * continuous `surfaceY` metres (#1149) — "how many whole voxel steps
+   * apart" is a genuinely integer, stepped concept, the same kind
+   * `computeBenchLevel` already floors to a bench index. Natural terrain's
+   * marching-cubes crossing height varies smoothly across a graded slope
+   * (#1148), so two columns one voxel-index apart can read a continuous
+   * delta anywhere from just above 0 to just under 2 depending on where each
+   * column's own crossing falls — a plain `computeSurfaceY` delta spuriously
+   * promotes an ordinary one-voxel walkable step to 'ramp' (moveCost 1.8)
+   * whenever the local grade pushes that delta past 1, which perturbs A*'s
+   * cost landscape enough to change which of several equal-length routes it
+   * picks (confirmed live: a staffed site's auto-hauler driving straight
+   * into a permanently parked vehicle it used to path around, stuck forever
+   * — #1149 fixer). The continuous `surfaceY` stored on the cell is
+   * untouched and still what `isStepClimbable` gates physical movement on.
    */
   private static classifyCellType(
     x: number,
@@ -435,11 +452,12 @@ export class NavGrid {
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
-    // Ramp detection: cardinal neighbor with surface height delta > 1 voxel
+    // Ramp detection: cardinal neighbor with topmost-solid-voxel index delta > 1
+    const ownVoxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
     for (const [dx, dz] of CARDINAL_OFFSETS) {
-      const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
-      if (neighborSurfaceY !== -1) {
-        const delta = Math.abs(surfaceY - neighborSurfaceY);
+      const neighborVoxelY = computeVoxelColumnSurfaceY(voxelGrid, x + dx, z + dz);
+      if (neighborVoxelY !== -1) {
+        const delta = Math.abs(ownVoxelY - neighborVoxelY);
         if (delta > 1 && delta <= NAV_MAX_CLIMB_HEIGHT) {
           return 'ramp';
         }
