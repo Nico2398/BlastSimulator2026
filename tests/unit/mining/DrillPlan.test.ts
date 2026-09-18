@@ -4,7 +4,9 @@ import {
   landDrilledHole, computeDrillHoleDurationTicks,
 } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import {
+  VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+} from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
@@ -254,5 +256,60 @@ describe('digVoxel', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
+  });
+
+  // ── #1148: post-carve renormalisation ─────────────────────────────────────
+
+  it('digging the column\'s real top leaves no stranded sub-threshold density above the new top', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    // Genuine fractional crossing above the real top: y=3 is the real top
+    // (density >= 0.5), y=4 carries the residual sub-threshold crossing that
+    // setVoxelColumnSurfaceHeight's own band write leaves above it.
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).toBe(3);
+    expect(grid.densityAt(2, oldTop + 1, 2)).toBeGreaterThan(0);
+
+    digVoxel(grid, 2, oldTop, 2);
+
+    for (let y = oldTop; y < grid.sizeY; y++) {
+      expect(grid.densityAt(2, y, 2), `density at y=${y} should be 0`).toBe(0);
+    }
+  });
+
+  it('the freshly computed new surface height is a fixed point of setVoxelColumnSurfaceHeight after digging the top', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+
+    digVoxel(grid, 2, oldTop, 2);
+
+    const newHeight = computeVoxelColumnSurfaceHeight(grid, 2, 2);
+    const before: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(2, y, 2));
+
+    setVoxelColumnSurfaceHeight(grid, 2, 2, newHeight, compId);
+
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(2, y, 2), `density at y=${y} should be unchanged`).toBe(before[y]);
+    }
+  });
+
+  it('digging a non-top voxel does not disturb anything above the unmoved top', () => {
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
+    const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    const aboveBefore: number[] = [];
+    for (let y = oldTop; y < grid.sizeY; y++) aboveBefore.push(grid.densityAt(2, y, 2));
+
+    digVoxel(grid, 2, 1, 2); // dig a buried, non-top voxel — the top never moves
+
+    expect(computeVoxelColumnSurfaceY(grid, 2, 2)).toBe(oldTop);
+    const aboveAfter: number[] = [];
+    for (let y = oldTop; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
+    expect(aboveAfter).toEqual(aboveBefore);
   });
 });

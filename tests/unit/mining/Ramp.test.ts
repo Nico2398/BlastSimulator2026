@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import {
+  VoxelGrid, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
+} from '../../../src/core/world/VoxelGrid.js';
 import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
@@ -162,6 +164,28 @@ describe('Ramp building', () => {
     const farSurfaceAfter = localSurfaceY(grid, 2, 2);
     expect(farSurfaceAfter).toBe(farSurfaceBefore);
   });
+
+  // #1148 — extends the "far outside the ramp path" check above from just the
+  // surface index to every voxel in the column, and authors a genuine
+  // fractional crossing on that far column so a stray touch would be visible
+  // even if it happened well above the flat surface index.
+  it('a column entirely outside the ramp path is bit-for-bit unchanged at every Y', () => {
+    const grid = makeElevatedGrid(20, 30, 30, 22);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    setVoxelColumnSurfaceHeight(grid, 2, 2, 22.5, compId);
+
+    const farBefore: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) farBefore.push(grid.densityAt(2, y, 2));
+
+    const result = buildRamp(grid, {
+      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+    }, 50000);
+
+    expect(result.success).toBe(true);
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(2, y, 2), `density at y=${y} should be unchanged`).toBe(farBefore[y]);
+    }
+  });
 });
 
 // ── #555: ordered ramp excavation — validateRampOrder / defineRampSegments /
@@ -286,6 +310,60 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
     const result = carveRampSegment(grid, segment);
     expect(result.voxelsCleared).toBe(0);
+  });
+});
+
+// ── #1148: post-carve renormalisation ─────────────────────────────────────
+//
+// carveRampSegment/carveRampSegmentSlice clear exactly the cells they're
+// handed — they don't know about a column's own crossing band above those
+// cells. A column authored with setVoxelColumnSurfaceHeight can carry a
+// genuine fractional crossing (sub-threshold density) immediately above its
+// real top; carving that real top's own cell must not leave that residue
+// stranded, and the newly exposed top must read back as a well-formed band.
+
+describe('carveRampSegment — post-carve renormalisation (#1148)', () => {
+  function buildFractionalColumnFixture() {
+    const grid = new VoxelGrid(20, 10, 20);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let y = 0; y <= 2; y++) grid.fillVoxel(5, y, 5, compId, undefined, 1);
+    // Genuine fractional crossing above the real top: y=3 is the real top
+    // (density >= 0.5), y=4 carries the residual sub-threshold crossing.
+    setVoxelColumnSurfaceHeight(grid, 5, 5, 3.5, compId);
+    return { grid, compId };
+  }
+
+  it('carving the column\'s real-top cell leaves no nonzero density strictly above the new top', () => {
+    const { grid } = buildFractionalColumnFixture();
+
+    const result = carveRampSegment(grid, {
+      cells: [{ x: 5, y: 3, z: 5 }],
+      region: { minX: 5, maxX: 5, minY: 3, maxY: 3, minZ: 5, maxZ: 5 },
+    });
+
+    expect(result.voxelsCleared).toBe(1);
+    for (let y = 3; y < grid.sizeY; y++) {
+      expect(grid.densityAt(5, y, 5), `density at y=${y} should be 0`).toBe(0);
+    }
+  });
+
+  it('the carved floor\'s column is a fixed point of setVoxelColumnSurfaceHeight at its own computed surface height', () => {
+    const { grid, compId } = buildFractionalColumnFixture();
+
+    carveRampSegment(grid, {
+      cells: [{ x: 5, y: 3, z: 5 }],
+      region: { minX: 5, maxX: 5, minY: 3, maxY: 3, minZ: 5, maxZ: 5 },
+    });
+
+    const h = computeVoxelColumnSurfaceHeight(grid, 5, 5);
+    const before: number[] = [];
+    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(5, y, 5));
+
+    setVoxelColumnSurfaceHeight(grid, 5, 5, h, compId);
+
+    for (let y = 0; y < grid.sizeY; y++) {
+      expect(grid.densityAt(5, y, 5), `density at y=${y} should be unchanged`).toBe(before[y]);
+    }
   });
 });
 
