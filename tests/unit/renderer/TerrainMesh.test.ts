@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid, CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import {
   TerrainMesh,
   SurveyConfidenceOverlay,
@@ -544,6 +544,46 @@ describe('TerrainMesh', () => {
         const hits = raycaster.intersectObjects(mesh.meshes, false);
         expect(hits.length, `see-through into the crater at y=${y}`).toBeGreaterThan(0);
         expect(hits[0]!.point.x, `wall at y=${y} is not at the site edge`).toBeLessThanOrEqual(0.001);
+      }
+      mesh.dispose();
+    });
+  });
+
+  describe('setVoxelColumnSurfaceHeight — mesh agrees with the write (#1143)', () => {
+    it('every touched column\'s integer lattice node reports the exact written height', () => {
+      const grid = new VoxelGrid(16, 16, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      const height = 12.7;
+
+      for (let x = 4; x < 8; x++) {
+        for (let z = 4; z < 8; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, height, compId);
+        }
+      }
+
+      const mesh = new TerrainMesh(new THREE.Scene(), grid);
+      mesh.buildAll();
+
+      const out = new Map<string, number[]>();
+      for (const m of mesh.meshes) {
+        const pos = m.geometry.attributes['position'] as THREE.BufferAttribute;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          if (Math.abs(x - Math.round(x)) > 1e-6 || Math.abs(z - Math.round(z)) > 1e-6) continue;
+          const k = `${Math.round(x)},${Math.round(z)}`;
+          out.set(k, [...(out.get(k) ?? []), pos.getY(i)]);
+        }
+      }
+
+      for (let x = 4; x < 8; x++) {
+        for (let z = 4; z < 8; z++) {
+          const ys = out.get(`${x},${z}`);
+          expect(ys, `no vertex at column ${x},${z}`).toBeDefined();
+          expect(
+            ys!.some(y => Math.abs(y - height) < 1e-6),
+            `column ${x},${z}: expected height ${height}, got ${ys!.join(',')}`,
+          ).toBe(true);
+        }
       }
       mesh.dispose();
     });
