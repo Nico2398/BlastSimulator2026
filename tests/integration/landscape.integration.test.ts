@@ -73,6 +73,9 @@ describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => 
 // survey-overlay integration suites already do.
 
 describe('Landscape/playable seam on a real level (#907)', () => {
+  const PLAYABLE_STEP = 1;
+  const LANDSCAPE_STEP = 4;
+
   function buildBothMeshes(engine: RunnerWithContext): {
     playable: TerrainMesh; landscape: LandscapeMesh; grid: NonNullable<typeof engine.ctx.grid>;
   } {
@@ -104,7 +107,7 @@ describe('Landscape/playable seam on a real level (#907)', () => {
 
   function assertSeamClosed(engine: RunnerWithContext, when: string): void {
     const { playable, landscape, grid } = buildBothMeshes(engine);
-    const seam = measureSeam(playable.meshes, landscape.meshes, grid);
+    const seam = measureSeam(playable.meshes, landscape.meshes, grid, PLAYABLE_STEP, LANDSCAPE_STEP);
     expect(seam.doubleCovered, `cells drawn by both sheets ${when}`).toEqual([]);
     expect(seam.uncovered, `cells drawn by neither sheet ${when}`).toEqual([]);
     expect(seam.sharedNodes, `shared ring nodes ${when}`).toBe(132); // the full 4 * 33 perimeter ring
