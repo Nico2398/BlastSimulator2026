@@ -39,6 +39,7 @@ import { FragmentMesh } from './FragmentMesh.js';
 import { FragmentAnimator } from './FragmentAnimator.js';
 import { BlastEffects } from './BlastEffects.js';
 import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
+import { createLandscapeChunkStreamer, type LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
@@ -86,6 +87,8 @@ export interface SceneSetupDeps {
   blastEffects: BlastEffects | null;
   landscape: LandscapeMesh | null;
   landscapeHandle: LandscapeHandle | null;
+  /** Drives per-chunk lazy landscape mesh residency against the camera (#1153) — one per `landscape` instance, created alongside it. */
+  landscapeStreamer: LandscapeChunkStreamer | null;
   borderWall: WorldBorderWall | null;
   blastOverlay: BlastPlanOverlay | null;
   ghosts: GhostMesh | null;
@@ -225,6 +228,14 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
 
   if (!deps.landscape) {
     deps.landscape = new LandscapeMesh(deps.sm.scene, deps.terrain.sharedMaterial);
+    deps.landscapeStreamer = createLandscapeChunkStreamer(deps.landscape);
+  } else {
+    // Idempotent re-apply (a campaign level swap keeping the same GameRenderer
+    // instance): the handle just changed under an existing mesh/streamer, so
+    // drop every previously-resident chunk rather than let the next
+    // updateLandscapeStreaming() call compare new chunks against stale ones
+    // built from the old grid.
+    deps.landscapeStreamer?.reset();
   }
   deps.landscapeHandle = handle;
   // Idempotent re-apply: a campaign level swap rebuilds the grid (and
@@ -236,10 +247,9 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
   // landmark for this seed — hand it to the claim path rather than have it
   // trace them all a second time (#473 D6).
   ctx.playableArea?.adoptStructures(handle.structureSet);
-  // TODO(#1153): LandscapeMesh.build() is retired in favour of per-chunk
-  // buildChunk()/disposeChunk(), driven by a LandscapeChunkStreamer.
-  // Skeleton no-ops here; implementer wires the streamer in.
-  void deps.playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height);
+  // Landscape geometry itself is no longer built eagerly here (#1153) — the
+  // per-frame updateLandscapeStreaming() call streams chunks in against the
+  // camera, budgeted, starting the next frame.
   // Record what we just cut against, so the next terrain:updated only
   // rebuilds when the site has actually moved since this build.
   deps.siteBoundsChanged(ctx.grid);
@@ -367,6 +377,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   disposeAmbientModules(deps);
   deps.fragments?.dispose();
   deps.blastEffects?.dispose();
+  deps.landscapeStreamer?.reset();
   deps.landscape?.dispose();
   deps.blastOverlay?.dispose();
   deps.ghosts?.dispose();
@@ -399,6 +410,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.fragments = null;
   deps.blastEffects = null;
   deps.landscape = null;
+  deps.landscapeStreamer = null;
   deps.blastOverlay = null;
   deps.ghosts = null;
   deps.taskProgress = null;

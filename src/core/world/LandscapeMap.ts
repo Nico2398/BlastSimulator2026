@@ -20,7 +20,11 @@ export const NODES_PER_CHUNK = 33;
 export const LADDER_STEPS: readonly number[] = [1, 2, 4, 8, 16];
 
 /** One chunk's world-metre span at `level` (33 nodes, 32 cells, at that level's ladder step). */
-export function chunkSpanAt(_level: number): number { throw new Error('not implemented'); }
+export function chunkSpanAt(level: number): number {
+  const step = LADDER_STEPS[level];
+  if (step === undefined) throw new Error(`chunkSpanAt: level ${level} out of range [0, ${LADDER_STEPS.length})`);
+  return step * (NODES_PER_CHUNK - 1);
+}
 
 /** Half-extent (metres) of the landscape build area around the playable rect's centre (#458 A16). */
 export const EXTENT_HALF = 1600;
@@ -98,6 +102,11 @@ export function sampleLandscapeColumn(
   return { height, biomeId, surfCompId };
 }
 
+/** Stable string key for a chunk id, for Map lookups. */
+function chunkKey(id: LandscapeChunkId): string {
+  return `${id.level}:${id.cx}:${id.cz}`;
+}
+
 /**
  * Builds a lazy, per-chunk landscape map around worldGen's playable rect,
  * replacing the eager single-resolution `buildLandscapeMap` (#1153). Chunks
@@ -110,20 +119,116 @@ export function sampleLandscapeColumn(
  * different id and silently break "shader rock indices agree" (#458 A16).
  */
 export function createLazyLandscapeMap(
-  _worldGen: WorldGenContext,
-  _climateBias: readonly [number, number],
-  _structureSet: StructureSet,
-  _strata: StrataSampler,
-  _palette: CompositionPalette,
-  _extentHalf: number = EXTENT_HALF,
-): LazyLandscapeMap { throw new Error('not implemented'); }
+  worldGen: WorldGenContext,
+  climateBias: readonly [number, number],
+  structureSet: StructureSet,
+  strata: StrataSampler,
+  palette: CompositionPalette,
+  extentHalf: number = EXTENT_HALF,
+): LazyLandscapeMap {
+  const rect = worldGen.playableRect;
+  const centerX = (rect.minX + rect.maxX) / 2;
+  const centerZ = (rect.minZ + rect.maxZ) / 2;
+
+  const cache = new Map<string, LandscapeChunk>();
+
+  return {
+    extentHalf,
+    centerX,
+    centerZ,
+    getChunk(id: LandscapeChunkId): LandscapeChunk {
+      const key = chunkKey(id);
+      const cached = cache.get(key);
+      if (cached) return cached;
+
+      const step = LADDER_STEPS[id.level];
+      if (step === undefined) throw new Error(`getChunk: level ${id.level} out of range [0, ${LADDER_STEPS.length})`);
+      const { originX, originZ } = chunkOrigin(id, centerX, centerZ);
+
+      const n = NODES_PER_CHUNK;
+      const heights = new Float32Array(n * n);
+      const biomeIds = new Uint8Array(n * n);
+      const surfCompIds = new Uint16Array(n * n);
+
+      for (let row = 0; row < n; row++) {
+        const z = originZ + row * step;
+        for (let col = 0; col < n; col++) {
+          const x = originX + col * step;
+          const sample = sampleLandscapeColumn(worldGen, climateBias, structureSet, strata, palette, x, z);
+          const idx = row * n + col;
+          heights[idx] = sample.height;
+          biomeIds[idx] = sample.biomeId;
+          surfCompIds[idx] = sample.surfCompId;
+        }
+      }
+
+      const chunk: LandscapeChunk = { id, step, originX, originZ, heights, biomeIds, surfCompIds };
+      cache.set(key, chunk);
+      return chunk;
+    },
+    hasChunk(id: LandscapeChunkId): boolean {
+      return cache.has(chunkKey(id));
+    },
+    get cachedChunkIds(): readonly LandscapeChunkId[] {
+      return Array.from(cache.values(), chunk => chunk.id);
+    },
+  };
+}
 
 /** World-metre origin of chunk `id`'s (0, 0) sample, given the map's centre. */
 export function chunkOrigin(
-  _id: LandscapeChunkId, _centerX: number, _centerZ: number,
-): { originX: number; originZ: number } { throw new Error('not implemented'); }
+  id: LandscapeChunkId, centerX: number, centerZ: number,
+): { originX: number; originZ: number } {
+  const span = chunkSpanAt(id.level);
+  return { originX: centerX + id.cx * span, originZ: centerZ + id.cz * span };
+}
 
-/** Which chunks should be resident for a camera at (cameraX, cameraZ) — the resolution ladder's near-to-far selection. */
+/**
+ * Which chunks should be resident for a camera at (cameraX, cameraZ) — the
+ * resolution ladder's near-to-far selection (#1153).
+ *
+ * Starts from the coarsest level's grid tiling the full extent (rounded up
+ * to a whole number of coarsest chunks, so the covered square may run
+ * slightly past `extentHalf` — see the module doc), then recursively
+ * quarters any chunk whose centre falls within `1.5 * chunkSpanAt(level)` of
+ * the camera into its 4 same-footprint children one level finer. Since
+ * `chunkSpanAt(level) = 2 * chunkSpanAt(level - 1)`, the 4 children exactly
+ * tile the parent's footprint with no gap and no overlap.
+ */
 export function selectLandscapeChunks(
-  _cameraX: number, _cameraZ: number, _centerX: number, _centerZ: number, _extentHalf: number = EXTENT_HALF,
-): LandscapeChunkId[] { throw new Error('not implemented'); }
+  cameraX: number, cameraZ: number, centerX: number, centerZ: number, extentHalf: number = EXTENT_HALF,
+): LandscapeChunkId[] {
+  const coarsestLevel = LADDER_STEPS.length - 1;
+  const coarsestSpan = chunkSpanAt(coarsestLevel);
+  const halfCount = Math.max(1, Math.ceil(extentHalf / coarsestSpan));
+
+  const result: LandscapeChunkId[] = [];
+
+  const refine = (id: LandscapeChunkId): void => {
+    const span = chunkSpanAt(id.level);
+    const { originX, originZ } = chunkOrigin(id, centerX, centerZ);
+    const chunkCenterX = originX + span / 2;
+    const chunkCenterZ = originZ + span / 2;
+    const dist = Math.hypot(cameraX - chunkCenterX, cameraZ - chunkCenterZ);
+
+    if (id.level > 0 && dist < 1.5 * span) {
+      const childLevel = id.level - 1;
+      for (const dcx of [0, 1]) {
+        for (const dcz of [0, 1]) {
+          refine({ level: childLevel, cx: id.cx * 2 + dcx, cz: id.cz * 2 + dcz });
+        }
+      }
+      return;
+    }
+
+    result.push(id);
+  };
+
+  for (let cx = -halfCount; cx < halfCount; cx++) {
+    for (let cz = -halfCount; cz < halfCount; cz++) {
+      refine({ level: coarsestLevel, cx, cz });
+    }
+  }
+
+  return result;
+}

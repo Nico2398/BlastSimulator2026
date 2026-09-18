@@ -35,6 +35,7 @@ import type { FragmentMesh } from './FragmentMesh.js';
 import type { BlastEffects } from './BlastEffects.js';
 import type { FragmentAnimator } from './FragmentAnimator.js';
 import type { LandscapeMesh } from './terrain/LandscapeMesh.js';
+import type { LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import type { GhostMesh } from './GhostMesh.js';
@@ -46,6 +47,7 @@ import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions 
 import {
   rebuildTerrain, remeshTerrainRegion, siteBoundsChanged, playableCut,
   landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
+  updateLandscapeStreaming,
   type TerrainDeps,
 } from './GameRendererTerrain.js';
 import {
@@ -86,6 +88,8 @@ export class GameRenderer {
   public landscape: LandscapeMesh | null = null;
   /** Kept so a claim can re-cut the landscape without rebuilding the (expensive) landscape map. */
   private landscapeHandle: LandscapeHandle | null = null;
+  /** Drives per-chunk lazy landscape mesh residency against the camera (#1153) — see update(). */
+  private landscapeStreamer: LandscapeChunkStreamer | null = null;
   private borderWall: WorldBorderWall | null = null;
   /** Site bounding box the landscape and border wall were last built against, so a claim can be detected. */
   private lastCutBounds = '';
@@ -107,6 +111,8 @@ export class GameRenderer {
   private lastModelRevision = -1;
   /** Context of the last buildAmbient(), so update() can rebuild the layer once its missing props load. */
   private lastAmbientCtx: MiningContext | null = null;
+  /** MiningContext of the last sync, so update()'s per-frame landscape chunk streaming (#1153) has a grid/landscape handle to stream against without needing its own ctx param. */
+  private lastCtx: MiningContext | null = null;
   /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
   private lastWeather: WeatherState = 'sunny';
 
@@ -183,6 +189,7 @@ export class GameRenderer {
    */
   syncFromContext(ctx: MiningContext): void {
     if (!ctx.state || !ctx.grid) return;
+    this.lastCtx = ctx;
 
     // New game (or first load) — rebuild everything
     if (this.loadedSeed !== ctx.state.seed) {
@@ -224,6 +231,7 @@ export class GameRenderer {
    */
   finishLevelLoad(ctx: MiningContext): void {
     if (!ctx.state || !ctx.grid) return;
+    this.lastCtx = ctx;
     this.frameCameraOnGrid();
     this.loadedSeed = ctx.state.seed;
     this.lastState = ctx.state;
@@ -301,6 +309,14 @@ export class GameRenderer {
       ? dt * this.lastState.timeScale
       : 0;
     const cam = this.sm.camera;
+
+    // Per-chunk lazy landscape chunk residency against the camera (#1153) —
+    // budgeted, so a camera move never stalls a frame. Ground-plane look-at
+    // point, not the camera's own (elevated, angled) eye position.
+    if (this.lastCtx) {
+      const viewTarget = this.sm.cameraController.viewTarget;
+      updateLandscapeStreaming(this.terrainDeps(), this.lastCtx, viewTarget.x, viewTarget.z, dt);
+    }
 
     // Rock still falling from the last blast.
     this.fragmentAnimator?.update(dt);
@@ -578,7 +594,7 @@ export class GameRenderer {
       lastCutBounds: sceneDeps.lastCutBounds,
       landscape: sceneDeps.landscape,
       landscapeHandle: sceneDeps.landscapeHandle,
-      landscapeStreamer: null, // TODO(#1153): wire a real LandscapeChunkStreamer once implemented
+      landscapeStreamer: sceneDeps.landscapeStreamer,
       borderWall: sceneDeps.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),
@@ -593,6 +609,7 @@ export class GameRenderer {
     sceneDeps.lastCutBounds = deps.lastCutBounds;
     sceneDeps.landscape = deps.landscape;
     sceneDeps.landscapeHandle = deps.landscapeHandle;
+    sceneDeps.landscapeStreamer = deps.landscapeStreamer;
     sceneDeps.borderWall = deps.borderWall;
   }
 
@@ -604,7 +621,7 @@ export class GameRenderer {
       lastCutBounds: this.lastCutBounds,
       landscape: this.landscape,
       landscapeHandle: this.landscapeHandle,
-      landscapeStreamer: null, // TODO(#1153): wire a real LandscapeChunkStreamer once implemented
+      landscapeStreamer: this.landscapeStreamer,
       borderWall: this.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),
@@ -618,6 +635,7 @@ export class GameRenderer {
     this.lastCutBounds = deps.lastCutBounds;
     this.landscape = deps.landscape;
     this.landscapeHandle = deps.landscapeHandle;
+    this.landscapeStreamer = deps.landscapeStreamer;
     this.borderWall = deps.borderWall;
   }
 
@@ -646,6 +664,7 @@ export class GameRenderer {
       blastEffects: this.blastEffects,
       landscape: this.landscape,
       landscapeHandle: this.landscapeHandle,
+      landscapeStreamer: this.landscapeStreamer,
       borderWall: this.borderWall,
       blastOverlay: this.blastOverlay,
       ghosts: this.ghosts,
@@ -699,6 +718,7 @@ export class GameRenderer {
     this.blastEffects = deps.blastEffects;
     this.landscape = deps.landscape;
     this.landscapeHandle = deps.landscapeHandle;
+    this.landscapeStreamer = deps.landscapeStreamer;
     this.borderWall = deps.borderWall;
     this.blastOverlay = deps.blastOverlay;
     this.ghosts = deps.ghosts;

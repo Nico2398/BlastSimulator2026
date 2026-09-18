@@ -35,7 +35,7 @@
 //   followed the sampled ground between the same two coarse nodes.
 import * as THREE from 'three';
 import type { LandscapeHandle } from '../../console/commands/world.js';
-import type { LandscapeChunk, LandscapeChunkId } from '../../core/world/LandscapeMap.js';
+import { NODES_PER_CHUNK, type LandscapeChunk, type LandscapeChunkId } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { type CompositionPalette } from '../../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../../core/world/RockCatalog.js';
@@ -231,16 +231,32 @@ export interface NeighbourSteps {
 }
 
 /** Every side at `step` — the right answer for a lone chunk with no classified neighbourhood (tests, and callers with no streamer). */
-export function uniformNeighbourSteps(_step: number): NeighbourSteps { throw new Error('not implemented'); }
+export function uniformNeighbourSteps(step: number): NeighbourSteps {
+  return { west: step, east: step, north: step, south: step };
+}
 
 /**
  * Height of a chord node on a chunk edge shared with a coarser neighbour —
  * the ladder's flat-edge rule (#1153), read along `axis` at (x, z) against a
  * neighbour sampled at `neighbourStep`.
+ *
+ * Finds the two lattice nodes spaced `neighbourStep` apart along `axis`
+ * (holding the other coordinate fixed) that bracket (x, z), samples both via
+ * `sampleColumn`, and linearly interpolates between them — the same math the
+ * pre-#1153 claim-boundary flat-edge rule used against its single hardcoded
+ * coarse step, generalized to any neighbour step on the resolution ladder.
  */
 export function chordHeight(
-  _sampleColumn: SampleFn, _axis: 'x' | 'z', _x: number, _z: number, _neighbourStep: number,
-): number { throw new Error('not implemented'); }
+  sampleColumn: SampleFn, axis: 'x' | 'z', x: number, z: number, neighbourStep: number,
+): number {
+  const coord = axis === 'x' ? x : z;
+  const lower = Math.floor(coord / neighbourStep) * neighbourStep;
+  const upper = lower + neighbourStep;
+  const t = (coord - lower) / neighbourStep;
+  const hLower = (axis === 'x' ? sampleColumn(lower, z) : sampleColumn(x, lower)).height;
+  const hUpper = (axis === 'x' ? sampleColumn(upper, z) : sampleColumn(x, upper)).height;
+  return hLower + t * (hUpper - hLower);
+}
 
 /**
  * The normal to shade a landscape node at (x, z) with: the playable mesh's own
@@ -422,33 +438,198 @@ export function buildBoundaryQuad(
   }
 }
 
+/** Stable string key for a chunk id, for Map lookups — mirrors LandscapeMap.ts's own (unexported) chunkKey. */
+function chunkKey(id: LandscapeChunkId): string {
+  return `${id.level}:${id.cx}:${id.cz}`;
+}
+
 /**
  * Builds one chunk's mesh geometry against its live neighbour steps and the
  * playable cut, replacing the old per-tile `buildTileMesh` (#1153) — the
  * resolution ladder makes every mesh unit a single chunk rather than a
  * classify-and-subdivide pass over one giant tile. Null when the chunk
  * carries no geometry (fully claimed by the playable mesh).
+ *
+ * Returns a `THREE.Mesh` with no material set — `LandscapeMesh.buildChunk`
+ * assigns the shared terrain material, since this free function (unlike the
+ * old class-private `buildTileMesh`) has no `this.material` to read.
+ *
+ * Two independent adjustments compose here, and they answer different
+ * questions:
+ *  - The claim boundary (classifyQuad/buildBoundaryQuad): cells the playable
+ *    mesh owns are dropped; cells straddling its edge are subdivided to 1 m
+ *    and flat-edged against WITHIN-CHUNK neighbours that stayed at the
+ *    chunk's own step (mirrors the pre-#1153 tile-local rule exactly).
+ *  - The resolution ladder (chordHeight): nodes on the chunk's own OUTER
+ *    ring, on a side whose `neighbourSteps` entry is coarser than this
+ *    chunk's step, are placed on the coarser neighbour's own lattice instead
+ *    of this chunk's sampled height, so the two chunks' shared edge is one
+ *    line instead of two.
  */
 export function buildChunkMesh(
-  _chunk: LandscapeChunk,
-  _neighbourSteps: NeighbourSteps,
-  _palette: CompositionPalette,
-  _playable: PlayableCut,
-  _sampleColumn: SampleFn,
-): THREE.Mesh | null { throw new Error('not implemented'); }
+  chunk: LandscapeChunk,
+  neighbourSteps: NeighbourSteps,
+  palette: CompositionPalette,
+  playable: PlayableCut,
+  sampleColumn: SampleFn,
+): THREE.Mesh | null {
+  const n = NODES_PER_CHUNK;
+  const step = chunk.step;
+  const { originX, originZ } = chunk;
+
+  const maxX = originX + (n - 1) * step;
+  const maxZ = originZ + (n - 1) * step;
+  const touchesRect =
+    maxX > playable.rect.minX && originX < playable.rect.maxX &&
+    maxZ > playable.rect.minZ && originZ < playable.rect.maxZ;
+
+  const coarseWest = neighbourSteps.west > step;
+  const coarseEast = neighbourSteps.east > step;
+  const coarseNorth = neighbourSteps.north > step;
+  const coarseSouth = neighbourSteps.south > step;
+
+  /**
+   * A chunk-own-lattice node's height, honoring the resolution-ladder chord
+   * rule on the chunk's outer ring. A corner shared by two coarse sides is
+   * an exact lattice node of every coarser ancestor too (the ladder's chunks
+   * nest by construction), so it takes the plain sampled/cached value rather
+   * than either side's chord — same reasoning as the pre-#1153 claim-edge
+   * corner rule.
+   */
+  const nodeHeightAt = (row: number, col: number): number => {
+    const onWest = col === 0, onEast = col === n - 1;
+    const onNorth = row === 0, onSouth = row === n - 1;
+    const flatX = (onWest && coarseWest) || (onEast && coarseEast);
+    const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+    if (!flatX && !flatZ) return chunk.heights[row * n + col]!;
+    if (flatX && flatZ) return chunk.heights[row * n + col]!;
+
+    const x = originX + col * step;
+    const z = originZ + row * step;
+    if (flatX) return chordHeight(sampleColumn, 'z', x, z, onWest ? neighbourSteps.west : neighbourSteps.east);
+    return chordHeight(sampleColumn, 'x', x, z, onNorth ? neighbourSteps.north : neighbourSteps.south);
+  };
+  const clampedHeightAt = (row: number, col: number): number =>
+    nodeHeightAt(Math.min(n - 1, Math.max(0, row)), Math.min(n - 1, Math.max(0, col)));
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const rockA: number[] = [];
+  const rockB: number[] = [];
+  const rockWeight: number[] = [];
+  const ore: number[] = []; // (id, amt) pairs; landscape never carries ore (#458 A18)
+
+  for (let row = 0; row < n; row++) {
+    const z = originZ + row * step;
+    for (let col = 0; col < n; col++) {
+      const x = originX + col * step;
+      const idx = row * n + col;
+      const y = nodeHeightAt(row, col);
+      positions.push(x, y, z);
+
+      const dhdx = (clampedHeightAt(row, col + 1) - clampedHeightAt(row, col - 1)) / (2 * step);
+      const dhdz = (clampedHeightAt(row + 1, col) - clampedHeightAt(row - 1, col)) / (2 * step);
+      const normal = heightFieldNormal(dhdx, dhdz);
+      normals.push(normal[0], normal[1], normal[2]);
+
+      const blend = rockBlendFor(palette, chunk.surfCompIds[idx]!);
+      rockA.push(blend.rockA);
+      rockB.push(blend.rockB);
+      rockWeight.push(blend.weight);
+      ore.push(-1, 0);
+    }
+  }
+
+  const quadClass = new Map<string, 'inside' | 'outside' | 'boundary'>();
+  const classAt = (x0: number, z0: number): 'inside' | 'outside' | 'boundary' => {
+    if (!touchesRect) return 'outside';
+    const key = `${x0},${z0}`;
+    const cached = quadClass.get(key);
+    if (cached !== undefined) return cached;
+    const cls = classifyQuad(playable, x0, z0, x0 + step, z0 + step);
+    quadClass.set(key, cls);
+    return cls;
+  };
+  /** True when the WITHIN-CHUNK quad at (x0, z0) stays at the chunk's own step (not subdivided). */
+  const isCoarserQuad = (x0: number, z0: number): boolean => classAt(x0, z0) === 'outside';
+
+  const indices: number[] = [];
+  for (let row = 0; row < n - 1; row++) {
+    const z0 = originZ + row * step, z1 = z0 + step;
+    for (let col = 0; col < n - 1; col++) {
+      const x0 = originX + col * step, x1 = x0 + step;
+      if (touchesRect) {
+        const cls = classAt(x0, z0);
+        if (cls === 'inside') continue;
+        if (cls === 'boundary') {
+          // A quad on the chunk's own outer ring also faces the cross-chunk
+          // ladder neighbour on that side — take whichever of the two
+          // (within-chunk step-transition, cross-chunk NeighbourSteps) is
+          // coarser, since either alone can force the flat-edge rule.
+          const westStep = Math.max(
+            isCoarserQuad(x0 - step, z0) ? step : FINE_STEP,
+            col === 0 ? neighbourSteps.west : FINE_STEP,
+          );
+          const eastStep = Math.max(
+            isCoarserQuad(x1, z0) ? step : FINE_STEP,
+            col === n - 2 ? neighbourSteps.east : FINE_STEP,
+          );
+          const northStep = Math.max(
+            isCoarserQuad(x0, z0 - step) ? step : FINE_STEP,
+            row === 0 ? neighbourSteps.north : FINE_STEP,
+          );
+          const southStep = Math.max(
+            isCoarserQuad(x0, z1) ? step : FINE_STEP,
+            row === n - 2 ? neighbourSteps.south : FINE_STEP,
+          );
+          buildBoundaryQuad(
+            positions, normals, rockA, rockB, rockWeight, ore, indices,
+            x0, z0, x1, z1, sampleColumn, palette, playable,
+            { west: westStep, east: eastStep, north: northStep, south: southStep },
+          );
+          continue;
+        }
+      }
+      const i0 = row * n + col;
+      const i1 = i0 + 1;
+      const i2 = i0 + n;
+      const i3 = i2 + 1;
+      pushQuad(indices, i0, i1, i2, i3, row + col);
+    }
+  }
+  if (indices.length === 0) return null;
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
+  geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
+  geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
+  geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+
+  const mesh = new THREE.Mesh(geometry);
+  mesh.frustumCulled = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
 
 export class LandscapeMesh {
+  private readonly meshesByChunk = new Map<string, THREE.Mesh>();
+
   constructor(private readonly scene: THREE.Scene, private readonly material: THREE.Material) {}
 
   /** Total mesh count (one per resident chunk) — diagnostics and tests. */
-  get meshCount(): number { throw new Error('not implemented'); return this.scene.children.length; }
+  get meshCount(): number { return this.meshesByChunk.size; }
 
   /**
    * Every resident chunk mesh, for raycasting past the site's claimed edge
    * (#558) — mirrors TerrainMesh.meshes so a caller can raycast both without
    * knowing which one it hit.
    */
-  get meshes(): THREE.Mesh[] { throw new Error('not implemented'); }
+  get meshes(): THREE.Mesh[] { return Array.from(this.meshesByChunk.values()); }
 
   /**
    * Builds (or rebuilds) chunk `id`'s mesh against its live neighbour steps
@@ -460,13 +641,35 @@ export class LandscapeMesh {
    * no live site to cut against (tests, and any level that never expands).
    */
   buildChunk(
-    _id: LandscapeChunkId, _handle: LandscapeHandle, _palette: CompositionPalette,
-    _neighbourSteps: NeighbourSteps, _cut?: PlayableCut,
-  ): void { throw new Error('not implemented'); rectCut(_handle.playableRect); }
+    id: LandscapeChunkId, handle: LandscapeHandle, palette: CompositionPalette,
+    neighbourSteps: NeighbourSteps, cut?: PlayableCut,
+  ): void {
+    this.disposeChunk(id);
+    const chunk = handle.map.getChunk(id);
+    const playable = cut ?? rectCut(handle.playableRect);
+    const mesh = buildChunkMesh(chunk, neighbourSteps, palette, playable, handle.sampleColumn);
+    if (!mesh) return;
+    mesh.material = this.material;
+    this.scene.add(mesh);
+    this.meshesByChunk.set(chunkKey(id), mesh);
+  }
 
   /** Removes and disposes chunk `id`'s mesh, if resident. */
-  disposeChunk(_id: LandscapeChunkId): void { throw new Error('not implemented'); }
+  disposeChunk(id: LandscapeChunkId): void {
+    const key = chunkKey(id);
+    const mesh = this.meshesByChunk.get(key);
+    if (!mesh) return;
+    this.scene.remove(mesh);
+    mesh.geometry.dispose();
+    this.meshesByChunk.delete(key);
+  }
 
   /** Removes and disposes every resident chunk mesh. */
-  dispose(): void { throw new Error('not implemented'); return void (this.scene && this.material); }
+  dispose(): void {
+    for (const mesh of this.meshesByChunk.values()) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    this.meshesByChunk.clear();
+  }
 }

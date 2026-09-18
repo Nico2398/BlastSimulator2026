@@ -6,7 +6,7 @@ import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
-import { createLazyLandscapeMap, sampleLandscapeColumn, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
+import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
@@ -181,8 +181,6 @@ export function ensureLandscape(
   const { worldGen, biome, strata } = buildTerrainContext(params);
   const structureSet = buildStructureSet(params.seed, worldGen.fields, worldGen.shapingAt, biome.forestDensity, worldGen.playableRect);
   const palette = ctx.grid.palette;
-  // TODO(#1153): implementer replaces this with the real lazy per-chunk map;
-  // createLazyLandscapeMap itself is still a skeleton stub.
   const map = createLazyLandscapeMap(worldGen, params.climateBias, structureSet, strata, palette);
 
   ctx.landscape = {
@@ -376,12 +374,11 @@ export function landscapeInfoCommand(
   const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   if (!landscape) return { success: false, output: t('world.landscape_build_failed') };
 
-  // TODO(#1153): report per-chunk stats once createLazyLandscapeMap/getChunk
-  // are implemented; cachedChunkIds is empty until something calls getChunk.
   const { map } = landscape;
   return {
     success: true,
     output: [
+      `Ladder steps (m): ${LADDER_STEPS.join(', ')}`,
       `Cached chunks: ${map.cachedChunkIds.length}`,
       `Extent half: ${map.extentHalf}m`,
     ].join('\n'),

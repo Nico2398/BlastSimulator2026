@@ -20,6 +20,7 @@ import { densityGradientNormal, type TerrainMesh, type DirtyRegion } from './Ter
 import type { LandscapeMesh, PlayableCut } from './terrain/LandscapeMesh.js';
 import type { LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import { haloSurfaceHeight, meshClaimsCell, nodeTouchesMeshedCell } from './terrain/PlayableCoverage.js';
+import type { Rect } from '../core/world/WorldGen.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { markSceneOverlay, unmarkSceneOverlay } from './post/SceneOverlay.js';
 
@@ -56,8 +57,14 @@ export interface TerrainDeps {
  * rebuild, replacing the old eager whole-map `LandscapeMesh.build()` call.
  */
 export function updateLandscapeStreaming(
-  _deps: TerrainDeps, _ctx: MiningContext, _cameraX: number, _cameraZ: number, _dt: number,
-): void { throw new Error('not implemented'); }
+  deps: TerrainDeps, ctx: MiningContext, cameraX: number, cameraZ: number, dt: number,
+): void {
+  if (!deps.landscapeStreamer || !deps.landscape || !deps.landscapeHandle || !ctx.grid) return;
+
+  const handle = deps.landscapeHandle;
+  const cut = playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height);
+  deps.landscapeStreamer.update(dt, cameraX, cameraZ, handle, ctx.grid.palette, cut);
+}
 
 /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). */
 export function rebuildTerrain(deps: TerrainDeps): void {
@@ -88,12 +95,11 @@ export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, regio
   // level's landscape and then be thrown away.
   if (!ctx.landscape || !ctx.grid || !deps.landscape || !deps.landscapeHandle) return;
 
-  // TODO(#1153): LandscapeMesh.build() is retired in favour of per-chunk
-  // buildChunk()/disposeChunk() driven by updateLandscapeStreaming(); the
-  // site-bounds-changed branch below no-ops the landscape rebuild until the
-  // implementer wires the streamer through this call site.
-  const handle = deps.landscapeHandle;
-  void playableCut(ctx.grid, (x, z) => handle.sampleColumn(x, z).height);
+  // The claim only moved within the site's own bounding box, so only the
+  // landscape chunks that box touches can have gone stale — narrower than
+  // the old eager whole-map rebuild this replaces (#1153).
+  const claimRect: Rect = { minX: ctx.grid.minX, minZ: ctx.grid.minZ, maxX: ctx.grid.maxX, maxZ: ctx.grid.maxZ };
+  deps.landscapeStreamer?.invalidateNear(claimRect);
   rebuildBorderWall(deps, ctx);
 }
 
