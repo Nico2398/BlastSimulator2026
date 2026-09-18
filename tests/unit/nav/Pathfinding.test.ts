@@ -973,6 +973,68 @@ describe('findPath — multi-level routing', () => {
     // The stub returns [], but the real implementation should detect the ramp
     // For now we just verify the call doesn't crash and returns an array
   });
+
+  // ── #1166: chained multi-hop ramp routing across 3+ bench levels ──
+  //
+  // findMultiLevelPath used to try only a single direct ramp hop between
+  // startLevel and goalLevel (filterRampsForLevels required an exact match
+  // against a ramp's own upper/lower level pair). Two genuinely walkable
+  // points 2+ bench levels apart with no ramp bridging them directly (only
+  // 0<->1 and 1<->2 ramps exist, none spanning 0<->2 in one hop) then
+  // reported found:false even though a real route exists one hop at a time.
+  // findLevelHopSequence/findChainedRoute chain the two single-level hops
+  // together, falling back to this only when the direct single-hop search
+  // finds nothing.
+  it('chains two ramp hops across 3 bench levels when no ramp connects level 0 directly to level 2', () => {
+    // 10-wide × 14-tall grid: level 0 (z=0..3), void wall at z=4 except a
+    // ramp at (5,4) connecting level 0<->1, level 1 (z=5..8), void wall at
+    // z=9 except a ramp at (5,9) connecting level 1<->2, level 2 (z=10..13).
+    // No ramp anywhere connects level 0 directly to level 2.
+    //
+    // Every level cell sits at surfaceY=0 (flat), but both ramp cells sit at
+    // surfaceY=50 — a cliff on both sides ordinary A*'s own climb-legality
+    // gate (isStepClimbable) refuses to step onto or off of, so the plain
+    // "try ordinary A* first" path (findPath step 5) cannot cross either
+    // wall at all and must fall through to ramp-graph routing (step 6). The
+    // ramp graph itself (findRampConnections/rampEndpoints) never applies a
+    // climb check — a ramp cell is the sanctioned connector regardless of
+    // height — so multi-level routing can still legitimately cross.
+    const width = 10;
+    const height = 14;
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        if (z <= 3) {
+          row.push(makeCell('walkable', 0, 0));
+        } else if (z === 4) {
+          row.push(x === 5 ? makeCell('ramp', 0, 50) : makeCell('void', 0));
+        } else if (z <= 8) {
+          row.push(makeCell('walkable', 1, 0));
+        } else if (z === 9) {
+          row.push(x === 5 ? makeCell('ramp', 1, 50) : makeCell('void', 1));
+        } else {
+          row.push(makeCell('walkable', 2, 0));
+        }
+      }
+      cells.push(row);
+    }
+    const grid = new NavGrid(width, height, cells, 50);
+
+    expect(getBenchLevel(grid, 0, 0)).toBe(0);
+    expect(getBenchLevel(grid, 0, 13)).toBe(2);
+    // No single ramp directly spans level 0 <-> level 2.
+    expect(findRampConnections(grid).some(r =>
+      (r.upperLevel === 0 && r.lowerLevel === 2) || (r.upperLevel === 2 && r.lowerLevel === 0),
+    )).toBe(false);
+
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 0, toZ: 13, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    // The chained route walks through both ramps, one hop at a time.
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 4)).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 9)).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

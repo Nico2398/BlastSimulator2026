@@ -6,7 +6,7 @@ import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice,
-  type RampDef, type RampDirection,
+  type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
@@ -564,6 +564,66 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     }
     expect(segments.some(s => s.targetY >= 2 && s.targetY <= 7)).toBe(true);
     expect(segments.some(s => s.targetY >= 15 && s.targetY <= 22)).toBe(true);
+  });
+
+  // ── #1166: median3 rejects a single-column sub-voxel noise spike ────────
+  //
+  // Real terrain generation's own sub-voxel noise can nudge one column's
+  // discrete surface index down (or up) by a full voxel relative to two
+  // otherwise-flat neighbours, the instant it crosses the 0.5-density
+  // threshold on that one column but not its neighbours. Pre-fix, floorY was
+  // measured against each column's own raw surfaceY, so that lone-column
+  // outlier alone produced a non-monotonic, illegal-slope floor jump at
+  // carve time. `defineRampSegments` now measures floorY against a
+  // median-of-3 smoothing of the column's raw surfaceY and its two
+  // ramp-direction neighbours — a lone outlier's two neighbours agree with
+  // each other, so the median rejects it entirely.
+
+  /** Per-column solid-to-`surfaceY` grid, one column per z (ramp runs south, so
+   * every column along the ramp shares the same x band). */
+  function makeGridFromSurfaceFn(fn: (z: number) => number): VoxelGrid {
+    const grid = new VoxelGrid(40, 30, 40);
+    for (let z = 0; z < 40; z++) {
+      const s = fn(z);
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= s; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+
+  /** Maps each column's z to the y-row carrying that column's own
+   * `floorAdjustment` — i.e. the column's own carved floor row. */
+  function floorRowsByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const rows = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment !== undefined) rows.set(cell.z, cell.y);
+      }
+    }
+    return rows;
+  }
+
+  it('a single-column sub-voxel noise spike does not perturb the carved floor row at all, unlike a genuine multi-column terrain feature', () => {
+    const flatGrid = makeGridFromSurfaceFn(() => 20);
+    // One lone column (z=24, step 4) sits one voxel lower than its flat
+    // neighbours either side — the sub-voxel noise spike shape, not a
+    // genuine sustained terrain feature.
+    const spikedGrid = makeGridFromSurfaceFn(z => (z === 24 ? 19 : 20));
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const flatRows = floorRowsByZ(defineRampSegments(flatGrid, ramp));
+    const spikedRows = floorRowsByZ(defineRampSegments(spikedGrid, ramp));
+
+    // median3(prev=20, raw=19, next=20) === 20 — the spike is fully
+    // rejected, so the carved floor row is identical, column for column, to
+    // the noise-free flat grid's. No jump for the slope check to trip on.
+    expect(spikedRows.size).toBe(flatRows.size);
+    for (const [z, y] of flatRows) {
+      expect(spikedRows.get(z)).toBe(y);
+    }
   });
 });
 

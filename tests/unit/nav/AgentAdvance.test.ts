@@ -436,6 +436,77 @@ describe('advanceAlongPath — stationary-at-dead-end does not misfire the retra
   });
 });
 
+// ── #1166: climb-legality re-check uses the fixed inter-cell run, not the
+// agent's shrinking distance to the committed waypoint ──────────────────────
+//
+// Pre-fix, resolveTargetWaypoint's climb-legality re-check measured `run` as
+// Math.hypot(committed.waypointX - x, committed.waypointZ - z) — the agent's
+// own live distance to the waypoint, which shrinks toward 0 every tick it
+// approaches. A step whose rise is legal over the true 1.0m cardinal run
+// (0.5 <= NAV_MAX_SLOPE_RATIO*1.0 ≈ 0.577) then reads as spuriously illegal
+// once the agent gets close enough (remaining distance below ~0.866),
+// dropping the commitment and forcing a replan every tick. The fix reads
+// `run` from the fixed cell pair `RouteCommitment.originX/originZ` ->
+// `waypointX/waypointZ` instead, which never changes while the commitment is
+// held.
+
+describe('advanceAlongPath — climb re-check uses fixed inter-cell run, not shrinking distance (#1166)', () => {
+  it('keeps a climb-legal committed waypoint across several ticks as the agent gets closer to it', () => {
+    // Column 0 sits at height 0, column 1 at height 0.5 — a cardinal step
+    // legal over the fixed 1.0m run but illegal over anything narrower than
+    // ~0.866m, which the agent's own remaining distance passes through well
+    // before arrival.
+    const grid = heightGrid([
+      [0, 0.5],
+      [0, 0.5],
+      [0, 0.5],
+    ]);
+
+    const destinationX = 1;
+    const destinationZ = 0;
+    let committed: RouteCommitment = {
+      waypointX: 1, waypointZ: 0, destX: destinationX, destZ: destinationZ,
+      remainingCost: 5,
+      fromX: 0, fromZ: 0,
+      // The fixed edge A* actually validated: (0,0) -> (1,0). Never changes
+      // while this waypoint stays committed.
+      originX: 0, originZ: 0,
+    };
+
+    let x = 0;
+    const z = 0;
+    // Successively smaller ticks closing the gap — remaining distance to the
+    // committed waypoint (1,0) shrinks well under the ~0.866 threshold a
+    // shrinking-distance climb check would have started failing at.
+    const walkSteps = [0.5, 0.3, 0.15, 0.04, 0.005];
+
+    for (const step of walkSteps) {
+      const result = advanceAlongPath(baseInput({
+        x, z,
+        walkSpeed: step,
+        destinationX, destinationZ,
+        // A fresh replan pointing at a different cell, with a cost that is
+        // NOT clearly better than the committed baseline (tied, in fact) —
+        // must not win over the held commitment on its own.
+        path: { found: true, waypoints: [{ x, z }, { x: 0, z: 1 }], totalCost: 5 },
+        committed,
+        navGrid: grid,
+      }));
+
+      // The commitment toward (1,0) must survive every tick — never
+      // dropped for the fresh alternative (0,1) purely because the agent
+      // got closer to it.
+      expect(result.committed.waypointX).toBe(1);
+      expect(result.committed.waypointZ).toBe(0);
+      expect(result.z).toBe(0);
+      expect(result.x).toBeGreaterThan(x);
+
+      x = result.x;
+      committed = result.committed;
+    }
+  });
+});
+
 // ── #1130: period-2 oscillation trips isStuck even though pathFound stays true ──
 //
 // findPath can hand back two equal-cost route shapes that alternate tick over
