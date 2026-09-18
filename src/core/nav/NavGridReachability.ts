@@ -112,12 +112,13 @@ export function findNearestTraversableCell(
  * (targetX, targetZ) unchanged if the anchor itself resolves to no
  * traversable cell, or if the connected component containing it is empty.
  *
- * Same-bench-level preference (#458 T6.1/D13): this flood fill is a flat
- * 8-directional walkable/ramp/drill_hole adjacency check with no notion of
- * bench level, so it happily calls a cell "reachable" that sits across a
- * bench-level boundary from the anchor — connected by grid adjacency, but
- * only actually walkable via Pathfinding.findMultiLevelPath's ramp-entrance/
- * exit routing, which re-picks the cheapest candidate ramp fresh every tick
+ * Same-bench-level preference (#458 T6.1/D13): the flood fill is climb-aware
+ * (#1166 — see the fill call's own doc comment below) but still has no
+ * notion of bench level as such, so it can still call a cell "reachable"
+ * that sits across a bench-level boundary from the anchor — connected by a
+ * chain of individually climb-legal steps, but only actually walkable via
+ * Pathfinding.findMultiLevelPath's ramp-entrance/exit routing, which
+ * re-picks the cheapest candidate ramp fresh every tick
  * from the agent's current (sub-cell, continuously moving) position. When
  * two ramps have close-enough cost, that fresh-every-tick re-pick flips
  * between them as the agent moves, producing a stable walk-forward/
@@ -150,8 +151,16 @@ export function findNearestReachableCell(
     return { x: targetX, z: targetZ };
   }
 
-  // 8-directional flood fill from the anchor — same adjacency A* uses.
-  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z, false, avoidOccupancy);
+  // 8-directional, climb-aware flood fill from the anchor — same adjacency
+  // AND climb gate findPath's own neighbour expansion uses (#1166; was
+  // climb-UNaware — see this function's own doc comment above, "same
+  // adjacency A* uses", which stopped being true once a step steeper than
+  // NAV_MAX_SLOPE_RATIO became illegal, #1151). A flat fill could call a
+  // cell "reachable" that a real climb-gated findPath from the same anchor
+  // can never actually walk to — confirmed live: tutorial_pit's own driver
+  // hire landing on a climb-disconnected island this way, "No route to
+  // vehicle" on the very next driver-assign command.
+  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z, true, avoidOccupancy);
   const anchorLevel = navGrid.cellAt(anchor.x, anchor.z)?.benchLevel;
 
   let best = anchor;
