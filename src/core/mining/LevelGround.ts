@@ -12,7 +12,7 @@
 // voxel cells.
 
 import {
-  computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY, setVoxelColumnSurfaceHeight, type VoxelGrid,
+  getSmoothTerrainSurfaceY, resolveExposedCompId, setVoxelColumnSurfaceHeight, type VoxelGrid,
 } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { computeRampSegmentDurationTicks } from './Ramp.js';
@@ -183,24 +183,6 @@ export function validateLevelOrder(rect: LevelOrderDef, cash: number, grid: Voxe
     columns,
     region: computeLevelRegion(columns),
   };
-}
-
-/**
- * Resolve the palette composition index the newly exposed surface at column
- * (x, z) should carry once cut down to `targetY` — the composition already
- * present at (x, floor(targetY), z), so the carved-down surface exposes the
- * rock that was actually sitting there rather than switching material. Falls
- * back to the column's own topmost solid voxel's composition when that exact
- * row reads as air (e.g. targetY lands inside a void/overhang).
- */
-function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targetY: number): number {
-  const rowY = Math.floor(targetY);
-  let composition = grid.compositionAt(x, rowY, z);
-  if (composition.rocks.length === 0) {
-    const topY = computeVoxelColumnSurfaceY(grid, x, z);
-    if (topY >= 0) composition = grid.compositionAt(x, topY, z);
-  }
-  return grid.palette.intern(composition);
 }
 
 /**

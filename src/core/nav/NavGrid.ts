@@ -15,7 +15,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { isVehicleCurrentlyDriving } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
-import { NAV_BENCH_HEIGHT } from '../config/balance.js';
+import { NAV_BENCH_HEIGHT, NAV_MAX_SLOPE_RATIO, NAV_RAMP_MIN_SLOPE_DELTA } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
@@ -42,8 +42,8 @@ const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0],
  * `ActionSelection.selectBestActionForEmployee` screens candidates with.
  */
 export function isStepClimbable(fromY: number | undefined, toY: number | undefined, run: number): boolean {
-  void fromY; void toY; void run;
-  return true; // STUB: see #1151
+  if (fromY === undefined || toY === undefined) return true;
+  return Math.abs(fromY - toY) <= NAV_MAX_SLOPE_RATIO * run;
 }
 
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';
@@ -520,11 +520,11 @@ export class NavGrid {
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
-    // TODO: implement — ramp detection over cardinal neighbours using
-    // isStepClimbable/NAV_RAMP_MIN_SLOPE_DELTA (#1151).
     for (const [dx, dz] of CARDINAL_OFFSETS) {
       const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
-      if (neighborSurfaceY !== -1 && !isStepClimbable(surfaceY, neighborSurfaceY, 1.0)) {
+      if (neighborSurfaceY === -1) continue;
+      const delta = Math.abs(surfaceY - neighborSurfaceY);
+      if (delta > NAV_RAMP_MIN_SLOPE_DELTA && isStepClimbable(surfaceY, neighborSurfaceY, 1.0)) {
         return 'ramp';
       }
     }
