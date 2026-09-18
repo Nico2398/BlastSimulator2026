@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, isStepClimbable, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   VoxelGrid,
   type VoxelData,
@@ -587,6 +587,49 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     // flip one or both of these to 'ramp' and fail here.
     expect(nav.cells[3]![3]!.type).toBe('walkable');
     expect(nav.cells[3]![4]!.type).toBe('walkable');
+  });
+
+  it('climb reachability across two adjacent columns stays gated on climbY, not surfaceY, even when the surfaceY delta alone would exceed NAV_MAX_CLIMB_HEIGHT (#1149)', () => {
+    // Column A's topmost-solid-voxel index sits right at the bottom of its
+    // voxel (fraction .02) and column B's sits right at the top of its own
+    // (fraction .98) — same trick as the test above, but pushed to the
+    // opposite extreme so the *fractional* surfaceY delta (3.96) clears
+    // NAV_MAX_CLIMB_HEIGHT (3) while the integer climbY delta (3) sits
+    // exactly on its boundary, still legal. Every other column is left void
+    // (no solid voxel at all), so A and B are reachable from each other only
+    // via this one direct step — nothing to route around a blocked step.
+    const grid = new VoxelGrid(10, 10, 10);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 0.02, compId);
+    setVoxelColumnSurfaceHeight(grid, 4, 3, 3.98, compId);
+
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(0);
+    expect(computeVoxelColumnSurfaceY(grid, 4, 3)).toBe(3);
+
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const cellA = nav.cells[3]![3]!;
+    const cellB = nav.cells[3]![4]!;
+
+    expect(cellA.climbY).toBe(0);
+    expect(cellB.climbY).toBe(3);
+    expect(cellB.surfaceY! - cellA.surfaceY!).toBeCloseTo(3.96, 1);
+
+    // Hand-computed expectation on the integer field production actually
+    // gates on: delta 3 sits exactly at NAV_MAX_CLIMB_HEIGHT, so the step is
+    // legal.
+    expect(isStepClimbable(cellA.climbY, cellB.climbY, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    // The same boundary fed the continuous surfaceY instead would refuse the
+    // step (delta 3.96 > 3) — this is the swap a future edit must not make.
+    expect(isStepClimbable(cellA.surfaceY, cellB.surfaceY, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+
+    // Production behaviour, through the real climb-aware reachable set
+    // (NavGridReachability.computeClimbReachableSet, the mechanism
+    // ActionSelection screens candidates through): B must be reachable from
+    // A. A future call site that swapped `.climbY` back to `.surfaceY` would
+    // flip this to false, since no other path between the two columns
+    // exists on this otherwise-void grid.
+    const reachableFromA = NavGrid.computeClimbReachableSet(nav, 3, 3);
+    expect(reachableFromA.has(4, 3)).toBe(true);
   });
 });
 

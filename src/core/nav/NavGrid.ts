@@ -248,6 +248,26 @@ export class NavGrid {
   }
 
   /**
+   * Shared per-column classification: voxel index, continuous surface
+   * height, and cell type, in one pass over this column — the three lines
+   * `buildNavGrid`'s and `patchNavGrid`'s per-cell loops both repeated
+   * verbatim (#1149). Each loop still does its own genuinely different work
+   * (bench-level, occupancy carry-forward, void handling) around this call.
+   */
+  private static computeColumnData(
+    voxelGrid: VoxelGrid,
+    x: number,
+    z: number,
+    buildings: Building[],
+    drillHoles: DrillHole[],
+  ): { voxelY: number; surfaceY: number; cellType: NavCellType } {
+    const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
+    const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
+    const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
+    return { voxelY, surfaceY, cellType };
+  }
+
+  /**
    * Compute the maximum surface Y across all columns in the voxel grid.
    * Returns -1 if the entire grid is void/empty.
    */
@@ -257,22 +277,6 @@ export class NavGrid {
       for (let x = voxelGrid.minX; x < voxelGrid.maxX; x++) {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         if (surfaceY > maxY) maxY = surfaceY;
-      }
-    }
-    return maxY;
-  }
-
-  /**
-   * Compute the maximum topmost-solid-voxel index across all columns in the
-   * voxel grid — the integer counterpart to `computeMaxSurfaceY`, used by
-   * `computeBenchLevel` (#1149). Returns -1 if the entire grid is void/empty.
-   */
-  static computeMaxVoxelY(voxelGrid: VoxelGrid): number {
-    let maxY = -1;
-    for (let z = voxelGrid.minZ; z < voxelGrid.maxZ; z++) {
-      for (let x = voxelGrid.minX; x < voxelGrid.maxX; x++) {
-        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
-        if (voxelY > maxY) maxY = voxelY;
       }
     }
     return maxY;
@@ -323,7 +327,12 @@ export class NavGrid {
     const originZ = voxelGrid.minZ;
     const cells: NavCell[][] = [];
     const maxSurfaceY = NavGrid.computeMaxSurfaceY(voxelGrid);
-    const maxVoxelY = NavGrid.computeMaxVoxelY(voxelGrid);
+    // Integer counterpart to maxSurfaceY: computeVoxelColumnSurfaceY's
+    // topmost-solid-voxel index and Math.floor(computeVoxelColumnSurfaceHeight(...))
+    // agree for every non-void column (both key off the same density >= 0.5
+    // threshold), Math.floor is monotonic, and the void sentinel -1 survives
+    // it unchanged — so the grid-wide max needs no separate rescan (#1149).
+    const maxVoxelY = Math.floor(maxSurfaceY);
 
     for (let z = originZ; z < originZ + height; z++) {
       const row: NavCell[] = [];
@@ -335,9 +344,7 @@ export class NavGrid {
           row.push(NavGrid.makeCell('void', 0));
           continue;
         }
-        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
-        const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
-        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
+        const { voxelY, surfaceY, cellType } = NavGrid.computeColumnData(voxelGrid, x, z, buildings, drillHoles);
         const benchLevel = NavGrid.computeBenchLevel(maxVoxelY, voxelY);
         row.push(NavGrid.makeCell(cellType, benchLevel, surfaceY, false, 0, voxelY));
       }
@@ -399,9 +406,7 @@ export class NavGrid {
           navGrid.setCellAt(x, z, NavGrid.makeCell('void', 0));
           continue;
         }
-        const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
-        const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
-        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY, voxelY);
+        const { voxelY, surfaceY, cellType } = NavGrid.computeColumnData(voxelGrid, x, z, buildings, drillHoles);
         navGrid.setCellAt(
           x, z,
           NavGrid.makeCell(
@@ -426,7 +431,8 @@ export class NavGrid {
       if (freshMax !== navGrid.maxSurfaceY) {
         navGrid.maxSurfaceY = freshMax;
       }
-      const freshMaxVoxelY = NavGrid.computeMaxVoxelY(voxelGrid);
+      // See buildNavGrid's identical Math.floor(maxSurfaceY) derivation.
+      const freshMaxVoxelY = Math.floor(freshMax);
       if (freshMaxVoxelY !== navGrid.maxClimbY) {
         navGrid.maxClimbY = freshMaxVoxelY;
       }
