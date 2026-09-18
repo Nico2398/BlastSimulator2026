@@ -3348,6 +3348,7 @@
   "mining.level_ground.too_large": "Zone trop grande : {area} voxels dépassent la limite de {limit} voxels par commande.",
   "mining.level_ground.refused_building_overlap": "Refusé : un bâtiment occupe une partie de cette zone.",
   "mining.level_ground.already_flat": "Terrain déjà plat ici — rien à niveler.",
+  "mining.level_ground.ordered": "Nivellement commandé : {voxels} voxels en attente d'excavation ({cost} $).",
   "mining.weather.set_usage": "Utilisation : weather set <état>. Valides : {valid}",
   "mining.survey.usage": "Utilisation : survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Méthode \"{method}\" inconnue. Utilisation : survey <seismic|core_sample|aerial> x:<X> z:<Z>",

@@ -7,12 +7,14 @@
 // the one field it actually reads — the grid — since GameContext (a console
 // concept) isn't available in core.
 
-import { getStorageCapacity } from '../entities/Building.js';
+import { getStorageCapacity, getBuildingDef, getDefSize, type Building } from '../entities/Building.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
+import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
@@ -31,6 +33,64 @@ export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: 
  */
 export function makeLevelFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
   return { minX: x, maxX: x + sizeX, minZ: z, maxZ: z + sizeZ };
+}
+
+/** True when (cx, cz) falls inside the true (unwidened) footprint of any building in `buildings`. */
+function isInsideAnyFootprint(
+  cx: number,
+  cz: number,
+  buildings: ReadonlyArray<Pick<Building, 'type' | 'tier' | 'x' | 'z'>>,
+): boolean {
+  for (const b of buildings) {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
+    if (cx >= b.x && cx <= b.x + sizeX - 1 && cz >= b.z && cz <= b.z + sizeZ - 1) return true;
+  }
+  return false;
+}
+
+/**
+ * Level a building's footprint at the end of construction, upgrade or move —
+ * the widen-carve-then-level idiom `TaskCompletionEffects.ts` and
+ * `entities.ts`'s upgrade/move branches each built independently (#1144
+ * review finding 2). Widens the carve to `makeLevelFootprintRegion` (a
+ * building's mesh spans one column further than its occupancy footprint) but
+ * derives the target height from the TRUE footprint only
+ * (`makeFootprintRegion`, via `levelGroundRect`'s `targetRect` param) so a low
+ * skirt column never drags the building's own pad down further than its
+ * footprint requires.
+ *
+ * Guards the widened skirt against an ALREADY-STANDING neighbour (#1144
+ * review finding 1): when two buildings are placed touching with zero gap,
+ * a just-finished building's widened skirt column can land exactly on a
+ * neighbour's own TRUE footprint. Any widened column that falls inside
+ * another building's true footprint (per `buildings`) is skipped rather than
+ * carved — carving it would silently lower an edge row of that neighbour's
+ * own pad. `buildings` is passed as the plain data the check needs (not
+ * `GameState`), so this stays callable from a console command that only
+ * holds `state.buildings.buildings`.
+ */
+export function levelBuildingFootprint(
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  sizeX: number,
+  sizeZ: number,
+  buildings: ReadonlyArray<Pick<Building, 'type' | 'tier' | 'x' | 'z'>>,
+  emitter?: EventEmitter,
+): ReturnType<typeof levelGroundRect> {
+  // `buildings` already carries this same building (place/upgrade/move all
+  // land their own mutation before calling this) — its own TRUE footprint
+  // origin is (x, z), the exact anchor this call levels, so it's excluded
+  // here rather than being treated as "another building occupies this
+  // column" and having its own footprint skipped from the carve.
+  const others = buildings.filter(b => !(b.x === x && b.z === z));
+  return levelGroundRect(
+    grid,
+    makeLevelFootprintRegion(x, z, sizeX, sizeZ),
+    emitter,
+    makeFootprintRegion(x, z, sizeX, sizeZ),
+    (cx, cz) => isInsideAnyFootprint(cx, cz, others),
+  );
 }
 
 /**

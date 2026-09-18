@@ -265,15 +265,27 @@ export function carveLevelColumns(
  * skirt beyond what the building's own footprint required and exaggerating
  * the height step against a later-placed neighbour whose footprint lands on
  * that same skirt column (#1144).
+ *
+ * `excludeColumn` (#1144 review finding 1): a predicate a caller can supply
+ * to drop specific columns from the carve after they're computed from
+ * `rect` — e.g. a widened skirt column that lands on an ALREADY-STANDING
+ * neighbouring building's own true footprint. Generic on purpose: this
+ * module knows nothing about buildings or occupancy, only that some columns
+ * a caller identifies are skipped. `levelBuildingFootprint`
+ * (`BuildingTaskHelpers.ts`) is the caller that turns "occupied by another
+ * building" into this predicate.
  */
 export function levelGroundRect(
   grid: VoxelGrid,
   rect: LevelOrderDef,
   emitter?: EventEmitter,
   targetRect: LevelOrderDef = rect,
+  excludeColumn?: (x: number, z: number) => boolean,
 ): { targetY: number; voxelsCleared: number; region: { minX: number; maxX: number; minZ: number; maxZ: number } | null } {
   const targetY = computeLevelTargetY(grid, targetRect);
-  const columns = computeLevelColumns(grid, rect, targetY);
+  const columns = excludeColumn
+    ? computeLevelColumns(grid, rect, targetY).filter(c => !excludeColumn(c.x, c.z))
+    : computeLevelColumns(grid, rect, targetY);
   const region = computeLevelRegion(columns);
   const { voxelsCleared } = carveLevelColumns(grid, columns, targetY, emitter);
   return { targetY, voxelsCleared, region };

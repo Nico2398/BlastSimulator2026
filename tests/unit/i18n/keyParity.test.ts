@@ -354,8 +354,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3509 (down from 3514): #1138 refactor removes the 5
     // orphaned vehicle_state.* keys (idle/moving/working/waiting/broken) —
     // their last call sites migrated to describeStatus() — both locales.
+    // Baseline is now 3510 (up from 3509): #1144 review-fix pass adds
+    // mining.level_ground.ordered — the order-confirmation message's voxel
+    // estimate and cost now go through i18n instead of a hardcoded template
+    // literal — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3509);
+    expect(Object.keys(en).length).toBe(3510);
   });
 });
 

@@ -146,7 +146,7 @@ export function levelGroundCommand(
 
   return {
     success: true,
-    output: `Ground levelling ordered: ${voxelEstimate} voxels queued for excavation ($${formatMoney(validation.cost)}).`,
+    output: t('mining.level_ground.ordered', { voxels: voxelEstimate, cost: formatMoney(validation.cost) }),
   };
 }
 

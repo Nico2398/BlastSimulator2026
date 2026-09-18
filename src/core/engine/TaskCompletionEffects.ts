@@ -18,12 +18,15 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
-import { carveLevelColumns, levelGroundRect } from '../mining/LevelGround.js';
+import { carveLevelColumns } from '../mining/LevelGround.js';
 import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
-import { makeFootprintRegion, makeLevelFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
+import {
+  makeFootprintRegion, makeLevelFootprintRegion, levelBuildingFootprint,
+  siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity,
+} from './BuildingTaskHelpers.js';
 
 /**
  * Apply the world effects of `emp`'s just-completed task (per `progress`)
@@ -253,8 +256,15 @@ export function applyTaskCompletion(
             // the true footprint, the widened carve only ever cuts the skirt
             // down to a height this building's own footprint already settled
             // on — never further.
+            //
+            // `levelBuildingFootprint` (BuildingTaskHelpers.ts) also guards the
+            // widened skirt against an ALREADY-STANDING neighbour: two
+            // buildings placed touching with zero gap can put this building's
+            // widened skirt column exactly on the neighbour's own TRUE
+            // footprint, and carving it would silently lower an edge row of
+            // that neighbour's pad (#1144 review finding 1).
             const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
-            const levelled = levelGroundRect(grid, levelRegion, emitter, footprintRegion);
+            const levelled = levelBuildingFootprint(grid, order.x, order.z, sizeX, sizeZ, state.buildings.buildings, emitter);
             footprintLevelled = levelled.voxelsCleared;
             // Patched after the carve, so the NavGrid cells around the site
             // (including the widened skirt column the carve just touched)
