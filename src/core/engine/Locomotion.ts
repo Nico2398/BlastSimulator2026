@@ -39,6 +39,8 @@ function readCommitted(emp: Employee): RouteCommitment {
     remainingCost: emp.committedRemainingCost ?? null,
     fromX: emp.committedFromX ?? null,
     fromZ: emp.committedFromZ ?? null,
+    originX: emp.committedOriginX ?? null,
+    originZ: emp.committedOriginZ ?? null,
   };
 }
 
@@ -51,6 +53,8 @@ function writeCommitted(emp: Employee, committed: RouteCommitment): void {
   emp.committedRemainingCost = committed.remainingCost;
   emp.committedFromX = committed.fromX ?? null;
   emp.committedFromZ = committed.fromZ ?? null;
+  emp.committedOriginX = committed.originX ?? null;
+  emp.committedOriginZ = committed.originZ ?? null;
 }
 
 /** Reads `emp`'s carried move-history shift-register (#1130) into the shape `advanceAlongPath` takes. */
@@ -117,9 +121,23 @@ function advanceLegacyFootWalk(state: GameState, emp: Employee, result: Locomoti
 
   const avoidVehicles = !isDestinationOccupied(state, destX, destZ);
 
+  // Snapped through NavGrid's own (nearest-cell, round-based) convention
+  // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
+  // clampToGrid floors instead, which can choose a start cell up to a full
+  // diagonal away from the agent's true nearest cell — on steep terrain,
+  // that phantom floor cell can have locally poor connectivity (neighbours
+  // it alone finds climb-illegal) that the agent's real nearest cell does
+  // not, producing a needlessly long fresh replan every tick and, combined
+  // with a `committed` route already near-optimal, a stable no-progress
+  // cycle between the two. `Pathfinding.ts`'s own neighbour-expansion stays
+  // untouched; only the request's own start point moves to agree with the
+  // rest of the nav stack (`NavGrid.clampX`/`clampZ`, used throughout
+  // AgentAdvance.ts) on which cell a continuous position belongs to.
+  const fromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
+  const fromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
   const path = state.navGrid
     ? findPath(state.navGrid, {
-        agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ,
+        agentId: emp.id, fromX, fromZ, toX: destX, toZ: destZ,
         avoidVehicles,
       })
     : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: destX, z: destZ }] };
@@ -271,8 +289,13 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // drill_rig is still parked on) — mirrors the old tickEmployeeMovement.
   const avoidVehicles = isDrive ? false : !isDestinationOccupied(state, leg.destX, leg.destZ);
 
+  // Snapped through NavGrid's own round-based cell convention rather than
+  // handed to findPath continuous — see advanceLegacyFootWalk's identical
+  // fix above (#1166) for why.
+  const driveFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
+  const driveFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
   const path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = state.navGrid
-    ? findPath(state.navGrid, { agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ, avoidVehicles })
+    ? findPath(state.navGrid, { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles })
     : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
 
   if (isDrive && state.navGrid && path.found) {

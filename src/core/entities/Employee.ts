@@ -168,6 +168,16 @@ export interface Employee {
   committedFromX?: number | null;
   committedFromZ?: number | null;
   /**
+   * The integer grid cell the committed waypoint was adopted as a single
+   * step FROM (#1166) — mirrors `RouteCommitment.originX`/`originZ`. Fixed
+   * for as long as the same waypoint stays committed, unlike
+   * `committedFromX`/`committedFromZ` above, which #1129's retrace guard
+   * needs rewritten every hop. Round-tripped by Locomotion.ts's
+   * readCommitted/writeCommitted the same way.
+   */
+  committedOriginX?: number | null;
+  committedOriginZ?: number | null;
+  /**
    * Own position 2 ticks back — cross-references AgentAdvance.ts's
    * shift-register invariant (moveHistoryX/Z == P(n-2), x/z == P(n-1) at the
    * start of tick n), which the stuck-detection oscillation fix (#1130)
