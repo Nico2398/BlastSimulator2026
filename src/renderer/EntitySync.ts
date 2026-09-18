@@ -3,7 +3,7 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import type { Building } from '../core/entities/Building.js';
-import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { getBuildingDef } from '../core/entities/Building.js';
 import { isMounted } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
@@ -12,23 +12,25 @@ import type { CharacterMesh } from './CharacterMesh.js';
 /**
  * Terrain surface height for a building's whole footprint, not just its
  * center — a footprint spanning multiple voxel levels buries one corner and
- * floats the opposite one under a single center sample. Samples the
- * footprint's 4 bounding-box corners and takes the lowest, so the building's
- * flat base sits on (or below) every corner of the ground beneath it rather
- * than clipping into a rising corner (#1007).
+ * floats the opposite one under a single center sample. Samples every
+ * footprint column the building actually occupies and takes the lowest, so
+ * the building's flat base sits on (or below) every corner of the ground
+ * beneath it rather than clipping into a rising corner (#1007, #1145 —
+ * bounding-box corners lay one column past the footprint's own edge on two
+ * axes; every column is sampled instead).
  */
 export function buildingFootprintSurfaceY(
   b: Building,
   getSurfaceY: (x: number, z: number) => number,
 ): number {
   const def = getBuildingDef(b.type, b.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-  return Math.min(
-    getSurfaceY(b.x, b.z),
-    getSurfaceY(b.x + sizeX, b.z),
-    getSurfaceY(b.x, b.z + sizeZ),
-    getSurfaceY(b.x + sizeX, b.z + sizeZ),
-  );
+  if (def.footprint.length === 0) return getSurfaceY(b.x, b.z);
+  let min = Infinity;
+  for (const [dx, dz] of def.footprint) {
+    const h = getSurfaceY(b.x + dx, b.z + dz);
+    if (h < min) min = h;
+  }
+  return min;
 }
 
 /**

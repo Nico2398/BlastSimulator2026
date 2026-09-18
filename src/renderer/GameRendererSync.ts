@@ -17,7 +17,7 @@ import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
-import { syncEntitySets } from './EntitySync.js';
+import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 
@@ -67,6 +67,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   let lastGhostRevision = deps.lastGhostRevision;
   let lastSyncedTerrainRevision = deps.lastSyncedTerrainRevision;
   let lastWeather: WeatherState | undefined;
+  const terrainDirty = deps.terrainMeshRevision !== lastSyncedTerrainRevision;
 
   // Sync entities added since last call
   syncEntitySets(
@@ -100,6 +101,19 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     }
   }
 
+  // Buildings are baked once at add/update time (syncEntitySets above) and
+  // never re-snapped per sync like vehicles/characters — resnap only when
+  // the terrain actually changed (blast, level_ground, ramp dig), or a
+  // building placed once and never touched again keeps rendering at its
+  // stale surface height forever (#1145).
+  if (deps.buildings && deps.lastGrid && terrainDirty) {
+    for (const b of state.buildings.buildings) {
+      if (deps.renderedBuildingIds.has(b.id)) {
+        deps.buildings.setSurfaceY(b.id, buildingFootprintSurfaceY(b, deps.getTerrainSurfaceY));
+      }
+    }
+  }
+
   // Sync ghost previews for pending actions. Every dispatch sets targetY:0
   // (see employees.ts), so at the terrain's actual height that box renders
   // buried inside solid voxels — snap it onto the surface like vehicles and
@@ -112,15 +126,20 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   // command (movement ticks, drilling, etc.) was measurably expensive.
   if (deps.ghosts) {
     const ghostsDirty = state.ghostPreviewsRevision !== lastGhostRevision;
-    const terrainDirty = deps.terrainMeshRevision !== lastSyncedTerrainRevision;
     if (ghostsDirty || terrainDirty) {
       const previews = deps.lastGrid
         ? state.ghostPreviews.map(p => ({ ...p, targetY: deps.getTerrainSurfaceY(p.targetX, p.targetZ) }))
         : state.ghostPreviews;
       deps.ghosts.sync(previews);
       lastGhostRevision = state.ghostPreviewsRevision;
-      lastSyncedTerrainRevision = deps.terrainMeshRevision;
     }
+  }
+
+  // Single write site for both consumers above (#1145) — living only inside
+  // the ghosts block would skip updating it whenever ghosts are absent but
+  // buildings still needed a resnap.
+  if (terrainDirty) {
+    lastSyncedTerrainRevision = deps.terrainMeshRevision;
   }
 
   // Task progress bars — reflect the current working/idle state each sync (#546)

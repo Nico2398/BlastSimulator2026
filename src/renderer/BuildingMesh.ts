@@ -98,9 +98,10 @@ export class BuildingMesh {
    * rather than every sync (#1145).
    */
   setSurfaceY(id: number, y: number): void {
-    // TODO(test-writer/implementer): stub only
-    void id;
-    void y;
+    const entry = this.buildings.get(id);
+    if (entry) {
+      entry.group.position.y = y;
+    }
   }
 
   /** Remove a building mesh from the scene. */
