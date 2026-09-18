@@ -111,6 +111,48 @@ describe('subscribeNavGridToUpdates', () => {
     expect(navB.cells[4]![4]!.type).toBe('void');
   });
 
+  it('patches the NavGrid identically when driven by nav:occupancy_changed instead of terrain:updated (#1161)', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
+    expect(nav.cells[3]![3]!.type).toBe('walkable');
+
+    // Carve a hole in the VoxelGrid, out from under the already-built NavGrid.
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(3, y, 3);
+
+    const emitter = new EventEmitter();
+    subscribeNavGridToUpdates(emitter, () => ({
+      navGrid: nav, grid, buildings: NO_BUILDINGS, drillHoles: NO_HOLES,
+    }));
+
+    // nav:occupancy_changed carries the same region shape as terrain:updated
+    // and must patch the NavGrid the same way — it exists to reach NavGrid
+    // resync from an occupancy-only change that carved zero voxels, not to
+    // skip the patch.
+    emitter.emit('nav:occupancy_changed', { region: fullHeightRegion(3, 3, 3, 3, grid) });
+
+    expect(nav.cells[3]![3]!.type).toBe('void');
+    expect(nav.cells[3]![3]!.moveCost).toBe(Infinity);
+  });
+
+  it('calls getTarget() for nav:occupancy_changed too, and does not throw when it returns null (#1161)', () => {
+    const emitter = new EventEmitter();
+    let getTargetCalls = 0;
+    const getTarget = (): null => {
+      getTargetCalls++;
+      return null;
+    };
+    subscribeNavGridToUpdates(emitter, getTarget);
+
+    expect(() => {
+      emitter.emit('nav:occupancy_changed', { region: { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 } });
+    }).not.toThrow();
+
+    // getTarget must actually be reached from the nav:occupancy_changed
+    // subscription (proving it is wired, not merely that nothing threw when
+    // nothing was wired at all).
+    expect(getTargetCalls).toBe(1);
+  });
+
   it('two independent regions emitted in sequence each patch only their own area', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);

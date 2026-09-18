@@ -442,3 +442,105 @@ describe('NavGrid patching — blast', () => {
     expect(nav.cells[0]![0]!.type).toBe(prevType);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NavGrid patching — event names (#1161)
+//
+// The tests above only assert resulting NavGrid cell state, which stays true
+// whichever event drives the patch. These pin the EVENT NAME each
+// occupancy-only site uses: destroy/upgrade/move/the blast corrective patch
+// must emit 'nav:occupancy_changed', not 'terrain:updated' — so the
+// renderer's terrain:updated-only remesh subscription (src/main.ts) never
+// fires on a pure occupancy change. A real voxel carve (construction's own
+// levelBuildingFootprint carve, or a blast's own clear) still emits
+// 'terrain:updated' and is untouched by this split.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid patching — event names (#1161)', () => {
+  it('destroy emits nav:occupancy_changed, not terrain:updated, for its footprint patch', () => {
+    const ctx = makeCtx();
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    tickUntilConstructionDone(ctx);
+    const buildingId = ctx.state!.buildings.buildings[0]!.id;
+
+    const events: string[] = [];
+    ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
+    ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
+
+    const result = buildCommand(ctx, ['destroy', String(buildingId)], {});
+    expect(result.success).toBe(true);
+
+    // Destroy carves zero voxels — was always occupancy-only, so it must
+    // emit exactly one nav:occupancy_changed and zero terrain:updated.
+    expect(events).toEqual(['nav:occupancy_changed']);
+  });
+
+  it('upgrade emits nav:occupancy_changed as the final (wrapping) footprint-occupancy patch', () => {
+    const ctx = makeCtx();
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    tickUntilConstructionDone(ctx);
+    const buildingId = ctx.state!.buildings.buildings[0]!.id;
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+
+    const events: string[] = [];
+    ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
+    ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
+
+    const result = buildCommand(ctx, ['upgrade', String(buildingId)], {});
+    expect(result.success).toBe(true);
+
+    // levelBuildingFootprint's own internal carve (if it fired at all, real
+    // rock removed) emits terrain:updated and always runs BEFORE the
+    // wrapping occupancy emit in upgrade's own code — so whatever else
+    // happened, the LAST event recorded for this command is the wrapping
+    // one, and it must be nav:occupancy_changed.
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[events.length - 1]).toBe('nav:occupancy_changed');
+  });
+
+  it('move emits nav:occupancy_changed for both the old- and new-footprint patches', () => {
+    const ctx = makeCtx();
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    tickUntilConstructionDone(ctx);
+    const buildingId = ctx.state!.buildings.buildings[0]!.id;
+
+    const events: string[] = [];
+    ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
+    ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
+
+    const result = buildCommand(ctx, ['move', String(buildingId)], { to: '4,4' });
+    expect(result.success).toBe(true);
+
+    // Both wrapping emits (old-footprint-clear, new-footprint-block) run
+    // after any internal levelBuildingFootprint carve, so they are always
+    // the last two events recorded for this command.
+    expect(events.length).toBeGreaterThanOrEqual(2);
+    expect(events.slice(-2)).toEqual(['nav:occupancy_changed', 'nav:occupancy_changed']);
+  });
+
+  it('blast emits terrain:updated exactly once (the real carve) and nav:occupancy_changed exactly once (the corrective post-clear patch)', () => {
+    const ctx = makeCtx();
+
+    resetHoleIds();
+    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const events: string[] = [];
+    ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
+    ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
+
+    const result = blastCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+
+    const terrainCount = events.filter(e => e === 'terrain:updated').length;
+    const occupancyCount = events.filter(e => e === 'nav:occupancy_changed').length;
+    // executeBlast's own carve emits terrain:updated once. The corrective
+    // post-drillHoles-clear re-patch must switch to nav:occupancy_changed —
+    // today it double-fires terrain:updated instead.
+    expect(terrainCount).toBe(1);
+    expect(occupancyCount).toBe(1);
+  });
+});
