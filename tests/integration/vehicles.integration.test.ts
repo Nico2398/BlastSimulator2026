@@ -295,7 +295,6 @@ describe('Vehicle fleet', () => {
       if (ctx.state!.navGrid) {
         NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, [], [], {
           minX: Math.floor(origX) - 1, maxX: Math.floor(targetX) + 1,
-          minY: 0, maxY: ctx.grid.sizeY - 1,
           minZ: Math.floor(targetZ) - 1, maxZ: Math.floor(targetZ) + 1,
         });
       }

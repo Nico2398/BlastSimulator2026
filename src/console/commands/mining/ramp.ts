@@ -18,7 +18,7 @@ import { claimForAction, cellsInRect } from '../siteExpansion.js';
 export interface RampSegmentActionPayload {
   rampId: number;
   segmentIndex: number;
-  cells: { x: number; y: number; z: number }[];
+  cells: { x: number; y: number; z: number; floorAdjustment?: number }[];
   region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
   segmentCost: number;
 }
