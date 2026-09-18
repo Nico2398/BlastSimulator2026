@@ -265,8 +265,9 @@ export function applyTaskCompletion(
             // NavGrid cells around the site (including the widened skirt
             // column the carve just touched) carry their new surface heights
             // (isStepClimbable reads them) and not the pre-construction
-            // ones. NavGridSync patches on this event; no direct call here.
-            emitter.emit('terrain:updated', { region: toFullHeightRegion(levelRegion, grid) });
+            // ones. NavGridSync patches on nav:occupancy_changed; no direct
+            // call here.
+            emitter.emit('nav:occupancy_changed', { region: toFullHeightRegion(levelRegion, grid) });
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just

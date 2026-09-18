@@ -184,12 +184,15 @@ export function blastCommand(
   // Re-emit for the cleared region now that the consumed holes are gone from
   // state.drillHoles: executeBlast's own `terrain:updated` emit (above, inside
   // executeBlast) fires before this clear, so NavGridSync's patch from that
-  // first emit still sees the blasted holes as live obstacles. A second emit,
-  // scoped to the same region, re-patches with the now-accurate (hole-free)
-  // occupant list — mirrors the pre-#1146 manual patch call, which ran after
-  // this same clear for the same reason.
+  // first emit still sees the blasted holes as live obstacles. A corrective
+  // `nav:occupancy_changed` emit, scoped to the same region, re-patches the
+  // NavGrid with the now-accurate (hole-free) occupant list — mirrors the
+  // pre-#1146 manual patch call, which ran after this same clear for the same
+  // reason. Using `nav:occupancy_changed` instead of `terrain:updated` here
+  // means the renderer (subscribed only to `terrain:updated`) does not
+  // double-remesh for what carves zero further voxels.
   if (result.clearedVoxels > 0) {
-    ctx.emitter.emit('terrain:updated', { region: toFullHeightRegion(result.clearedRegion, ctx.grid!) });
+    ctx.emitter.emit('nav:occupancy_changed', { region: toFullHeightRegion(result.clearedRegion, ctx.grid!) });
   }
 
   return {

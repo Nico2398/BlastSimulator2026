@@ -78,10 +78,10 @@ export function buildCommand(
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       destroyBuilding(state.buildings, id);
       refreshLogisticsCapacity(state);
-      // Notify NavGridSync of the removed building's footprint
+      // Notify NavGridSync via nav:occupancy_changed of the removed building's footprint
       if (ctx.grid) {
         const { sizeX, sizeZ } = getDefSize(destroyDef);
-        ctx.emitter.emit('terrain:updated', {
+        ctx.emitter.emit('nav:occupancy_changed', {
           region: toFullHeightRegion(makeFootprintRegion(toDestroy.x, toDestroy.z, sizeX, sizeZ), ctx.grid),
         });
       }
@@ -145,7 +145,7 @@ export function buildCommand(
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
       refreshLogisticsCapacity(state);
-      // Notify NavGridSync covering both old and new footprint (size may change between tiers)
+      // Notify NavGridSync via nav:occupancy_changed, covering both old and new footprint (size may change between tiers)
       if (ctx.grid) {
         const maxX = Math.max(getDefSize(oldDef).sizeX, getDefSize(newDef).sizeX);
         const maxZ = Math.max(getDefSize(oldDef).sizeZ, getDefSize(newDef).sizeZ);
@@ -165,7 +165,7 @@ export function buildCommand(
           ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ,
           state.buildings.buildings, ctx.emitter,
         );
-        ctx.emitter.emit('terrain:updated', {
+        ctx.emitter.emit('nav:occupancy_changed', {
           region: toFullHeightRegion(makeFootprintRegion(x, z, maxX, maxZ), ctx.grid),
         });
       }
@@ -215,7 +215,7 @@ export function buildCommand(
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       refreshLogisticsCapacity(state);
-      // Notify NavGridSync for old and new positions
+      // Notify NavGridSync via nav:occupancy_changed for old and new positions
       if (ctx.grid) {
         // A relocated building lands on ground nothing has levelled yet, so its
         // new footprint gets the same cut a finished build does (#1008
@@ -233,10 +233,10 @@ export function buildCommand(
           ctx.grid, toCoords[0]!, toCoords[1]!, sizeX, sizeZ,
           state.buildings.buildings, ctx.emitter,
         );
-        ctx.emitter.emit('terrain:updated', {
+        ctx.emitter.emit('nav:occupancy_changed', {
           region: toFullHeightRegion(makeFootprintRegion(oldX, oldZ, sizeX, sizeZ), ctx.grid),
         });
-        ctx.emitter.emit('terrain:updated', {
+        ctx.emitter.emit('nav:occupancy_changed', {
           region: toFullHeightRegion(makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.grid),
         });
       }
