@@ -151,7 +151,17 @@ export function buildCommand(
         // it can be bigger than the tier it replaces — so it reaches onto ground
         // the original construction never levelled. Cut it flat here, the same
         // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
-        levelGroundRect(ctx.grid, makeLevelFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ), ctx.emitter);
+        // targetRect is the TRUE (unwidened) footprint, not the widened carve
+        // region (#1144 follow-up, same reasoning as TaskCompletionEffects.ts's
+        // fresh-build branch): the new tier's own pad height must come from
+        // ground it actually occupies, not from whatever the one-column skirt
+        // past its high side happens to naturally sit at.
+        levelGroundRect(
+          ctx.grid,
+          makeLevelFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ),
+          ctx.emitter,
+          makeFootprintRegion(x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ),
+        );
         patchNavGrid(state, ctx.grid, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
@@ -205,8 +215,18 @@ export function buildCommand(
         // A relocated building lands on ground nothing has levelled yet, so its
         // new footprint gets the same cut a finished build does (#1008
         // refinement, tickTaskCompletion.ts). The vacated one is left as it is:
-        // levelling is not undone by moving away from it.
-        levelGroundRect(ctx.grid, makeLevelFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ), ctx.emitter);
+        // levelling is not undone by moving away from it. targetRect is the
+        // TRUE (unwidened) footprint (#1144 follow-up, same reasoning as
+        // TaskCompletionEffects.ts's fresh-build branch) — the relocated
+        // building's own pad height comes from ground it actually occupies,
+        // not from whatever the skirt column past its high side naturally
+        // sits at.
+        levelGroundRect(
+          ctx.grid,
+          makeLevelFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ),
+          ctx.emitter,
+          makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ),
+        );
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }

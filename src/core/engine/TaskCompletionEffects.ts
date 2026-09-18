@@ -23,7 +23,7 @@ import { patchNavGridForRegion } from './TaskProgress.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
-import { makeFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
+import { makeFootprintRegion, makeLevelFootprintRegion, siteBoundsForGrid, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './BuildingTaskHelpers.js';
 
 /**
  * Apply the world effects of `emp`'s just-completed task (per `progress`)
@@ -233,30 +233,34 @@ export function applyTaskCompletion(
             // wrecked mid-construction, which is exactly what it exists to
             // catch. A footprint already level carves nothing.
             //
-            // Deliberately the UNWIDENED footprintRegion, not
-            // makeLevelFootprintRegion (#1144 fix, issue #1144 follow-up):
-            // widening a FRESH build's own completion-carve by one column
-            // reaches past this building's own footprint into ground that
-            // does not belong to it — most commonly the very next row/column
-            // a second, adjacent building is about to occupy (the tutorial's
-            // own living_quarters-then-driving_center placement, #945/#928),
-            // or the row a LATER tier upgrade of this same building will grow
-            // onto (buildings.integration.test.ts's "an upgrade levels the
-            // ground the larger tier newly covers"). Both regressed when a
-            // fresh build's own carve started widening: the neighbour's — or
-            // this building's own future upgrade's — footprint arrived on
-            // ground already (and unexpectedly) cut down by a stranger's
-            // construction. `makeLevelFootprintRegion`'s one-column cosmetic
-            // widen stays correct for `entities.ts`'s upgrade/move paths,
-            // where the widened region never extends past the footprint the
-            // order itself just grew into or relocated onto — ground that
-            // order already owns.
-            const levelled = levelGroundRect(grid, footprintRegion, emitter);
+            // The CARVE region is `makeLevelFootprintRegion` — widened by one
+            // column on the maxX/maxZ sides — because the building's mesh
+            // spans one column further than its occupancy footprint (#1144).
+            // The TARGET height, though, is computed from the narrower TRUE
+            // footprint only (`levelGroundRect`'s `targetRect` param, #1144
+            // follow-up): the building's own pad height must come from ground
+            // this building actually occupies, never from whatever the extra
+            // skirt column's untouched natural terrain happens to be. Coupling
+            // them — deriving targetY from the widened rect too — was the
+            // actual bug the previous fix (reverting the widen outright)
+            // papered over: a low skirt column dragged targetY down further
+            // than this building's own footprint required, over-cutting the
+            // skirt and exaggerating the height step against whatever gets
+            // placed next door onto that same skirt column (the tutorial's
+            // living_quarters-then-driving_center placement, #945/#928) or
+            // onto the row a later tier upgrade of this same building grows
+            // onto (buildings.integration.test.ts). With the target pinned to
+            // the true footprint, the widened carve only ever cuts the skirt
+            // down to a height this building's own footprint already settled
+            // on — never further.
+            const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
+            const levelled = levelGroundRect(grid, levelRegion, emitter, footprintRegion);
             footprintLevelled = levelled.voxelsCleared;
             // Patched after the carve, so the NavGrid cells around the site
-            // carry their new surface heights (isStepClimbable reads them) and
-            // not the pre-construction ones.
-            patchBuildingNavGrid(state, grid, footprintRegion);
+            // (including the widened skirt column the carve just touched)
+            // carry their new surface heights (isStepClimbable reads them)
+            // and not the pre-construction ones.
+            patchBuildingNavGrid(state, grid, levelRegion);
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just

@@ -179,8 +179,19 @@ export const REGION = {
   drivingCenter: { x1: 29, z1: 14, x2: 29, z2: 14, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
-  // #1008-followup) this superseded.
-  livingQuarters: { x1: 29, z1: 11, x2: 29, z2: 11, exact: true },
+  // #1008-followup) this superseded. #1144 follow-up: z 11 -> 10 — a fresh
+  // building's own completion-carve now also levels the one lattice column
+  // past its footprint (#1144's widened skirt), and living_quarters' own
+  // high side (z13) sat exactly one tile from driving_center's footprint
+  // (z14, zero gap): the skirt carved that shared boundary down to
+  // living_quarters' own (lower) pad height before driving_center was ever
+  // ordered, so driving_center's own placement check then read a >1-level
+  // step between its own already-carved z14 and its still-natural z15 and
+  // refused as uneven. Moving living_quarters one tile north stops its own
+  // skirt reaching z14 at all (it now tops out at z13, one tile short of
+  // driving_center's footprint) — a free tile of buffer neither building's
+  // own true footprint claims, so the skirt has nowhere left to conflict.
+  livingQuarters: { x1: 29, z1: 10, x2: 29, z2: 10, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** A single-tile hazard the tutorial's fixed building pins must clear. */

@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:29,11",
+      "command": "build living_quarters at:29,10",
       "timeout": 90,
       "interaction": [
         {
@@ -256,7 +256,7 @@
         {
           "type": "pickTile",
           "x": 29,
-          "z": 11
+          "z": 10
         },
         {
           "type": "screenshot"
@@ -315,7 +315,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,11) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,10) and builds the tier-1 living_quarters. First building of the scenario, so buildingCount settles at exactly 1.",
       "expect": {
         "equals": {
           "buildingCount": 1

@@ -43,6 +43,18 @@ function lowerColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, 
 }
 
 /**
+ * Raise one column's surface by `rise` voxels above `fromHeight` — the
+ * opposite of `lowerColumn`. Levelling only ever cuts down to a target, never
+ * fills up to it, so proving a widened skirt column actually gets carved (as
+ * opposed to a column that already reads at or below target, which a carve
+ * would legitimately leave untouched) needs the column raised above the
+ * target, not dropped below it (#1144 defect 2, target-decoupling follow-up).
+ */
+function raiseColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, rise: number): void {
+  for (let y = fromHeight; y < fromHeight + rise; y++) grid.setVoxel(x, y, z, ROCK);
+}
+
+/**
  * A flat 2x2 rect at (15,15)-(16,16), except (15,15) sits one voxel past the
  * placement tolerance below the rest — uneven enough to be refused, and
  * matching management_office tier1's own 2x2 footprint.
@@ -423,17 +435,22 @@ describe('level_ground — console round trip (#1009)', () => {
     // 4x4 flat pad: two columns past management_office tier1's own 2x2
     // footprint (x=20,21 / z=20,21) on the high side.
     carveFlatRect(grid, 20, 23, 20, 23, BASE_HEIGHT);
-    // One column past the TRUE footprint (x=22, i.e. x + sizeX) — must be
-    // carved by the widened level region the fix introduces.
-    lowerColumn(grid, 22, 20, BASE_HEIGHT, 3);
+    // One column past the TRUE footprint (x=22, i.e. x + sizeX) — RAISED
+    // above the pad, not lowered: levelling only ever cuts down to a target,
+    // so proving the widened region actually reaches and carves this column
+    // needs it starting above the target, not below (#1144 target-decoupling
+    // follow-up — the target itself now comes from the TRUE footprint alone,
+    // so a column started BELOW it, as this test used to do, would
+    // legitimately stay untouched and prove nothing about whether the carve
+    // reaches it).
+    raiseColumn(grid, 22, 20, BASE_HEIGHT, 3);
     // Two columns past the true footprint (x=23) — must NOT be carved; the
-    // widened region only extends one column beyond the footprint. Dropped by
-    // a DIFFERENT amount than the x=22 column above so it doesn't coincide
-    // with the pad's own target height (the min across the widened region,
-    // which x=22's drop sets to BASE_HEIGHT-3): an untouched column landing on
-    // the same value as the target by chance would make the assertion below
-    // pass regardless of whether the carve actually reached this column.
-    lowerColumn(grid, 23, 20, BASE_HEIGHT, 6);
+    // widened region only extends one column beyond the footprint. Raised by
+    // a DIFFERENT amount than the x=22 column above, so an untouched column
+    // landing on the same value as the pad height by chance would not make
+    // the assertion below pass regardless of whether the carve actually
+    // reached this column.
+    raiseColumn(grid, 23, 20, BASE_HEIGHT, 6);
 
     // The true footprint itself (20,21 x 20,21) is untouched and flat, so
     // the move succeeds regardless of the widened-carve fix under test.
@@ -442,6 +459,67 @@ describe('level_ground — console round trip (#1009)', () => {
 
     const building = engine.ctx.state!.buildings.buildings.find(b => b.id === built.id)!;
     const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
+
+    // Every lattice column the building's own mesh spans — footprint x..x+sizeX
+    // and z..z+sizeZ INCLUSIVE — reads the same pad height.
+    for (let z = building.z; z <= building.z + sizeZ; z++) {
+      for (let x = building.x; x <= building.x + sizeX; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(padHeight);
+      }
+    }
+
+    // One column further out than the widened region was never touched.
+    expect(computeVoxelColumnSurfaceY(grid, building.x + sizeX + 1, building.z)).not.toBe(padHeight);
+  });
+
+  it('21b. a FRESH build levels every lattice column from footprint x..x+sizeX and z..z+sizeZ INCLUSIVE, not just x+sizeX-1 (#1144 defect 2, fresh-construction path)', () => {
+    // Test 21 above proves the widened skirt carve for `build move` — the
+    // path the #1144 follow-up fixer round scoped this behaviour down to
+    // after finding it broke adjacent-building placement for FRESH
+    // construction (living_quarters then driving_center, touching with no
+    // gap between them). That regression was actually a target-computation
+    // bug (the widened region's own low skirt column was dragging the whole
+    // building's target height down with it, over-cutting), fixed by
+    // decoupling `levelGroundRect`'s target rect from its carve rect
+    // (TaskCompletionEffects.ts) rather than by disabling the widen for
+    // fresh builds — issue #1144's own Verification section requires this to
+    // hold for fresh construction specifically, the majority case, not just
+    // move/upgrade. This is that fresh-build proof, on an isolated pad with
+    // no neighbouring building to conflict with.
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+
+    // 4x4 flat pad far from anything else already on the map, two columns
+    // past management_office tier1's own 2x2 footprint (x=5,6 / z=5,6)
+    // on the high side.
+    carveFlatRect(grid, 5, 8, 5, 8, BASE_HEIGHT);
+    // One column past the TRUE footprint (x=7, i.e. x + sizeX) — raised
+    // above the pad. Levelling only ever cuts down to a target, so proving
+    // the widened region actually reaches and carves this column needs it
+    // starting above the target, not below.
+    raiseColumn(grid, 7, 5, BASE_HEIGHT, 3);
+    // Two columns past the true footprint (x=8) — must NOT be carved; the
+    // widened region only extends one column beyond the footprint. Raised by
+    // a DIFFERENT amount than the x=7 column above, so an untouched column
+    // landing on the same value as the pad height by chance would not make
+    // the assertion below pass regardless of whether the carve actually
+    // reached this column.
+    raiseColumn(grid, 8, 5, BASE_HEIGHT, 6);
+
+    // The true footprint itself (5,6 x 5,6) is untouched and flat, so
+    // the build succeeds regardless of the widened-carve fix under test.
+    expect(runCommand(engine, 'build management_office at:5,5').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    expect(engine.ctx.state!.buildings.buildings.length).toBeGreaterThan(0);
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.x === 5 && b.z === 5)!;
+    expect(building).toBeDefined();
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    const padHeight = computeVoxelColumnSurfaceY(grid, building.x, building.z);
+    // The true footprint's own target is untouched by either raised column —
+    // the fresh build finishes at the SAME height the pad started at.
+    expect(padHeight).toBe(BASE_HEIGHT);
 
     // Every lattice column the building's own mesh spans — footprint x..x+sizeX
     // and z..z+sizeZ INCLUSIVE — reads the same pad height.

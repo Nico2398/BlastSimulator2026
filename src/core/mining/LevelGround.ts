@@ -252,13 +252,27 @@ export function carveLevelColumns(
  * job this charges nothing and needs no digger — it is part of the
  * construction the player already paid for. Already-level ground carves
  * nothing and emits nothing.
+ *
+ * `targetRect` (#1144 follow-up): when a caller carves a WIDENED rect (e.g.
+ * `makeLevelFootprintRegion`'s one-column skirt beyond a building's true
+ * footprint) but wants the target height derived from the narrower TRUE
+ * footprint only, pass it here. Left undefined, `rect` is used for both —
+ * the original, still-correct behaviour for a caller with only one rect in
+ * mind (e.g. entities.ts's upgrade/move paths, where the widened region is
+ * ground the order itself just grew onto, not a stranger's). Without this
+ * split, a fresh building's own pad height was dragged down by whatever the
+ * skirt column's untouched natural terrain happened to be — over-cutting the
+ * skirt beyond what the building's own footprint required and exaggerating
+ * the height step against a later-placed neighbour whose footprint lands on
+ * that same skirt column (#1144).
  */
 export function levelGroundRect(
   grid: VoxelGrid,
   rect: LevelOrderDef,
   emitter?: EventEmitter,
+  targetRect: LevelOrderDef = rect,
 ): { targetY: number; voxelsCleared: number; region: { minX: number; maxX: number; minZ: number; maxZ: number } | null } {
-  const targetY = computeLevelTargetY(grid, rect);
+  const targetY = computeLevelTargetY(grid, targetRect);
   const columns = computeLevelColumns(grid, rect, targetY);
   const region = computeLevelRegion(columns);
   const { voxelsCleared } = carveLevelColumns(grid, columns, targetY, emitter);
