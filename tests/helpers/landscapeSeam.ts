@@ -66,11 +66,39 @@ function indexedLatticeNodes(meshes: readonly THREE.Mesh[]): Map<string, NodeVer
   return nodes;
 }
 
+/** Sign of the cross product (p - b) x (a - b), for the point-in-triangle test below. */
+function edgeSign(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  return (px - bx) * (az - bz) - (ax - bx) * (pz - bz);
+}
+
+/** True when (px, pz) falls inside (or on an edge of) the 2D triangle a/b/c. */
+function pointInTriangle(
+  px: number, pz: number,
+  ax: number, az: number, bx: number, bz: number, cx: number, cz: number,
+): boolean {
+  const d1 = edgeSign(px, pz, ax, az, bx, bz);
+  const d2 = edgeSign(px, pz, bx, bz, cx, cz);
+  const d3 = edgeSign(px, pz, cx, cz, ax, az);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+}
+
 /**
- * Every 1 m cell a mesh puts ground over. A triangle belongs to the cell its
- * centroid falls in; one lying exactly in a vertical boundary plane has no
- * ground footprint at all and is skipped, or the ring itself would read as
- * doubly covered.
+ * Every 1 m cell a mesh puts ground over. A cell belongs to a triangle when
+ * the cell's own centre point falls inside it — checked across every cell in
+ * the triangle's bounding box, not just the one its own centroid lands in.
+ *
+ * A single centroid-per-triangle test (the pre-#1153 rule, when every
+ * triangle this ran over was already a 1 m cell) silently under-reports once
+ * a coarser ladder rung's own quads reach this helper directly (#1153):
+ * a >1 m quad's two triangles split it along one diagonal, and a triangle's
+ * centroid always lands in the cell nearest its own right-angle corner —
+ * so only the diagonal's own two cells were ever marked, and the other two
+ * cells of a >1×1 m quad read as "uncovered" though the triangle plainly
+ * draws ground over them too. A triangle lying exactly in a vertical
+ * boundary plane has no ground footprint at all and is skipped, or the ring
+ * itself would read as doubly covered.
  */
 function coveredCells(meshes: readonly THREE.Mesh[]): Set<string> {
   const cells = new Set<string>();
@@ -82,12 +110,20 @@ function coveredCells(meshes: readonly THREE.Mesh[]): Set<string> {
       const a = index ? index.getX(i) : i;
       const b = index ? index.getX(i + 1) : i + 1;
       const c = index ? index.getX(i + 2) : i + 2;
-      const ax = pos.getX(b) - pos.getX(a), az = pos.getZ(b) - pos.getZ(a);
-      const bx = pos.getX(c) - pos.getX(a), bz = pos.getZ(c) - pos.getZ(a);
-      if (Math.abs(ax * bz - az * bx) < 1e-9) continue; // vertical face
-      const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
-      const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
-      cells.add(`${Math.floor(cx)},${Math.floor(cz)}`);
+      const ax = pos.getX(a), az = pos.getZ(a);
+      const bx = pos.getX(b), bz = pos.getZ(b);
+      const cx = pos.getX(c), cz = pos.getZ(c);
+      const edgeAx = bx - ax, edgeAz = bz - az;
+      const edgeBx = cx - ax, edgeBz = cz - az;
+      if (Math.abs(edgeAx * edgeBz - edgeAz * edgeBx) < 1e-9) continue; // vertical face
+
+      const loX = Math.floor(Math.min(ax, bx, cx)), hiX = Math.ceil(Math.max(ax, bx, cx));
+      const loZ = Math.floor(Math.min(az, bz, cz)), hiZ = Math.ceil(Math.max(az, bz, cz));
+      for (let gx = loX; gx < hiX; gx++) {
+        for (let gz = loZ; gz < hiZ; gz++) {
+          if (pointInTriangle(gx + 0.5, gz + 0.5, ax, az, bx, bz, cx, cz)) cells.add(`${gx},${gz}`);
+        }
+      }
     }
   }
   return cells;
@@ -127,8 +163,19 @@ export function measureSeam(
     doubleCovered: [], uncovered: [],
   };
 
-  for (let x = grid.minX - band; x < grid.maxX + band; x++) {
-    for (let z = grid.minZ - band; z < grid.maxZ + band; z++) {
+  // Every node/cell key is an integer world-metre coordinate (indexedLatticeNodes
+  // rounds to the nearest one, coveredCells floors to one), so the scan itself
+  // has to land on integers too. `band` is derived from a step pair and is not
+  // always a whole number (two level-0, 1 m/1 m sheets give band = 0.5) — a loop
+  // that starts at the fractional `grid.minX - band` and steps by a plain `x++`
+  // never lands on an integer again, so every lookup below misses by construction
+  // and the whole scanned area reads as uncovered with zero shared nodes. Round
+  // the scan bounds outward to the nearest integer instead of shifting the whole
+  // lattice off it.
+  const xLo = Math.floor(grid.minX - band), xHi = Math.ceil(grid.maxX + band);
+  const zLo = Math.floor(grid.minZ - band), zHi = Math.ceil(grid.maxZ + band);
+  for (let x = xLo; x < xHi; x++) {
+    for (let z = zLo; z < zHi; z++) {
       const key = `${x},${z}`;
 
       const a = playableNodes.get(key), b = landscapeNodes.get(key);

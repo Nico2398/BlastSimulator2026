@@ -267,6 +267,21 @@ describe('buildChunkMesh — ladder rung joins meet exactly when neighbourSteps 
     // same-resolution neighbour, so the finer side never chords toward the
     // coarser lattice. Proves the test above would catch a regression that
     // dropped the chord, rather than passing regardless of whether it runs.
+    //
+    // worstDisagreement can't be that proof: a "shared node" only exists at a
+    // (x, z) BOTH meshes place an actual vertex at, and the only such
+    // positions on this join are exact multiples of the coarser step — where
+    // both meshes read the SAME raw field sample whether the chord runs or
+    // not (chordHeight's own bracket collapses to that identical sample the
+    // moment t = 0). The chord instead fixes the position of the FINE side's
+    // extra, in-between vertices — nodes the coarse side never places one at,
+    // so no "shared node" comparison ever sees them. What the missing chord
+    // does leave visible at an actual shared node is the SLOPE either side
+    // measures around it: with the chord, both sides difference across the
+    // same (coarser) bracket and get the identical value (< 0.05 degrees
+    // apart, the positive cases above); without it, the fine side measures
+    // its own tight local curve while the coarse side averages across its
+    // whole quad — a difference this ridged fixture makes large.
     const stepA = 1, stepB = 4;
     const { meshA, meshB } = buildJoin(stepA, stepB, uniformNeighbourSteps(stepA), uniformNeighbourSteps(stepB));
     expect(meshA).not.toBeNull();
@@ -275,7 +290,8 @@ describe('buildChunkMesh — ladder rung joins meet exactly when neighbourSteps 
     const commonZSpan = 3 * stepB;
     const grid = new VoxelGrid(4, 1, commonZSpan);
     const seam = measureSeam([meshA!], [meshB!], grid, stepA, stepB);
-    expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeGreaterThan(0.5);
+    expect(seam.sharedNodes).toBeGreaterThan(0);
+    expect(seam.worstNormalAngle, `worst at ${seam.worstNormalAt}`).toBeGreaterThan(10);
   });
 });
 
