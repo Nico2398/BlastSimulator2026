@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, SURFACE_BAND_HALF } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -92,31 +92,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
  * scope for T1.3 (no accept criterion calls for it) and would belong to a
  * future landscape-blending task if ever needed.
  */
-/**
- * Half-width, in voxels, of the band over which density falls from solid to
- * air across the surface.
- *
- * One full voxel either side. A narrower band would need a density below zero
- * on the air side to keep the crossing linear, and densities are clamped to
- * [0, 1] — the crossing would then bend and the surface would drift off the
- * height it is supposed to sit on.
- */
-const SURFACE_BAND_HALF = 1;
-
-/**
- * Density for voxel `y` in a column whose surface sits at continuous height
- * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
- *
- * Marching cubes finds the 0.5 crossing by interpolating linearly between two
- * corner densities, so a field that is linear in y with value 0.5 at surfaceH
- * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
- * up to a rounded surface instead is what terraced the whole site into 1 m
- * steps while the landscape beside it stayed smooth (#458).
- */
-export function surfaceDensityAt(y: number, surfaceH: number): number {
-  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
-  return Math.max(0, Math.min(1, d));
-}
+export { surfaceDensityAt, SURFACE_BAND_HALF };
 
 /** Fill one column (x, z) of `grid` from the sampling context. Pure in (config, x, z) — see #473 D3. */
 function generateColumn(

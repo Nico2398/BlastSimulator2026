@@ -849,6 +849,32 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
 }
 
 /**
+ * Half-width, in voxels, of the band over which density falls from solid to
+ * air across the surface.
+ *
+ * One full voxel either side. A narrower band would need a density below zero
+ * on the air side to keep the crossing linear, and densities are clamped to
+ * [0, 1] — the crossing would then bend and the surface would drift off the
+ * height it is supposed to sit on.
+ */
+export const SURFACE_BAND_HALF = 1;
+
+/**
+ * Density for voxel `y` in a column whose surface sits at continuous height
+ * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
+ *
+ * Marching cubes finds the 0.5 crossing by interpolating linearly between two
+ * corner densities, so a field that is linear in y with value 0.5 at surfaceH
+ * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
+ * up to a rounded surface instead is what terraced the whole site into 1 m
+ * steps while the landscape beside it stayed smooth (#458).
+ */
+export function surfaceDensityAt(y: number, surfaceH: number): number {
+  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
+  return Math.max(0, Math.min(1, d));
+}
+
+/**
  * Continuous height of the topmost solid-to-air crossing at column (x, z),
  * in the same datum as heightToVoxelYContinuous. Mirrors
  * computeVoxelColumnSurfaceY's top-down scan, but returns the fractional
@@ -886,6 +912,34 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
     }
   }
   return 0;
+}
+
+/**
+ * Writes column (x, z)'s top surface to continuous height `height`: fully
+ * solid below the crossing, the straddling pair carrying the fractional
+ * density surfaceDensityAt defines, zero above — so
+ * computeVoxelColumnSurfaceHeight reads back exactly `height` afterwards.
+ *
+ * Touches only the band between the column's existing topmost solid voxel
+ * (computeVoxelColumnSurfaceY) and the new target's own band — never reaches
+ * below the old surface's immediate neighbourhood, so an overhang or cavity
+ * buried deeper in the column survives untouched. This is the primitive
+ * that expresses "ground ends here"; it does not flatten the column's whole
+ * stack, and it is not itself a ground-clearing side effect of anything else.
+ *
+ * A column the grid does not own is a no-op, matching fillVoxel/setVoxel/
+ * clearVoxel's own silent-no-op convention for unowned coordinates.
+ */
+export function setVoxelColumnSurfaceHeight(
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  height: number,
+  compId: number,
+  ores?: Record<string, number>,
+): void {
+  void grid; void x; void z; void height; void compId; void ores;
+  // TODO: implement (issue #1143)
 }
 
 /**
