@@ -103,7 +103,7 @@ export function sampleLandscapeColumn(
 }
 
 /** Stable string key for a chunk id, for Map lookups. */
-function chunkKey(id: LandscapeChunkId): string {
+export function chunkKey(id: LandscapeChunkId): string {
   return `${id.level}:${id.cx}:${id.cz}`;
 }
 

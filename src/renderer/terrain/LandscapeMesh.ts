@@ -35,7 +35,7 @@
 //   followed the sampled ground between the same two coarse nodes.
 import * as THREE from 'three';
 import type { LandscapeHandle } from '../../console/commands/world.js';
-import { NODES_PER_CHUNK, type LandscapeChunk, type LandscapeChunkId } from '../../core/world/LandscapeMap.js';
+import { NODES_PER_CHUNK, chunkKey, type LandscapeChunk, type LandscapeChunkId } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { type CompositionPalette } from '../../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../../core/world/RockCatalog.js';
@@ -86,6 +86,40 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
   const dx = Math.min(x - rect.minX, rect.maxX - x);
   const dz = Math.min(z - rect.minZ, rect.maxZ - z);
   return Math.min(dx, dz);
+}
+
+/**
+ * Which of a node's four incident sides sample coarser than `ownStep` — the
+ * ladder's flat-edge trigger, shared by the claim boundary (`sides` are the
+ * boundary quad's own FINE_STEP-relative neighbours) and a chunk's outer ring
+ * (`sides` are the cross-chunk `NeighbourSteps`, relative to the chunk's step).
+ */
+function coarseSides(
+  west: number, east: number, north: number, south: number, ownStep: number,
+): { coarseWest: boolean; coarseEast: boolean; coarseNorth: boolean; coarseSouth: boolean } {
+  return {
+    coarseWest: west > ownStep,
+    coarseEast: east > ownStep,
+    coarseNorth: north > ownStep,
+    coarseSouth: south > ownStep,
+  };
+}
+
+/**
+ * Which edge(s) of a `bound`-sized lattice a (row, col) node sits on, and
+ * whether the flat-edge rule applies to it along each axis — shared by every
+ * per-node pass (boundary-quad vertices, a chunk's own height/normal lattice)
+ * that has to place a node on a coarse-neighbour chord instead of sampling it.
+ */
+function flatEdgeSides(
+  row: number, col: number, bound: number,
+  coarseWest: boolean, coarseEast: boolean, coarseNorth: boolean, coarseSouth: boolean,
+): { onWest: boolean; onEast: boolean; onNorth: boolean; onSouth: boolean; flatX: boolean; flatZ: boolean } {
+  const onWest = col === 0, onEast = col === bound;
+  const onNorth = row === 0, onSouth = row === bound;
+  const flatX = (onWest && coarseWest) || (onEast && coarseEast);
+  const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+  return { onWest, onEast, onNorth, onSouth, flatX, flatZ };
 }
 
 /**
@@ -325,14 +359,12 @@ export function buildBoundaryQuad(
   const subdiv = Math.max(1, Math.round((x1 - x0) / FINE_STEP));
   const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
 
-  // TODO(#1153): the ladder's NeighbourSteps replaces the old boolean
-  // BoundaryQuadSides — a side is flat-edged when its neighbour samples
-  // coarser than this quad's own FINE_STEP. Behaviour is unchanged from the
-  // pre-#1153 boolean rule; only the parameter's shape has moved.
-  const coarseWest = sides.west > FINE_STEP;
-  const coarseEast = sides.east > FINE_STEP;
-  const coarseNorth = sides.north > FINE_STEP;
-  const coarseSouth = sides.south > FINE_STEP;
+  // The ladder's NeighbourSteps replaces the old boolean BoundaryQuadSides —
+  // a side is flat-edged when its neighbour samples coarser than this quad's
+  // own FINE_STEP. Behaviour is unchanged from the pre-#1153 boolean rule;
+  // only the parameter's shape has moved.
+  const { coarseWest, coarseEast, coarseNorth, coarseSouth } =
+    coarseSides(sides.west, sides.east, sides.north, sides.south, FINE_STEP);
 
   // Parent coarse corner heights, read directly (never boundary-adjusted) —
   // the flat-edge rule's whole point is to reproduce exactly what an
@@ -378,10 +410,8 @@ export function buildBoundaryQuad(
     const z = z0 + row * FINE_STEP;
     const sample = sampleColumn(x, z);
 
-    const onWest = col === 0, onEast = col === subdiv;
-    const onNorth = row === 0, onSouth = row === subdiv;
-    const flatX = (onWest && coarseWest) || (onEast && coarseEast);
-    const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+    const { onWest, onEast, onNorth, onSouth, flatX, flatZ } =
+      flatEdgeSides(row, col, subdiv, coarseWest, coarseEast, coarseNorth, coarseSouth);
 
     let y: number;
     if ((onWest || onEast) && (onNorth || onSouth)) {
@@ -438,11 +468,6 @@ export function buildBoundaryQuad(
   }
 }
 
-/** Stable string key for a chunk id, for Map lookups — mirrors LandscapeMap.ts's own (unexported) chunkKey. */
-function chunkKey(id: LandscapeChunkId): string {
-  return `${id.level}:${id.cx}:${id.cz}`;
-}
-
 /**
  * Builds one chunk's mesh geometry against its live neighbour steps and the
  * playable cut, replacing the old per-tile `buildTileMesh` (#1153) — the
@@ -483,10 +508,8 @@ export function buildChunkMesh(
     maxX > playable.rect.minX && originX < playable.rect.maxX &&
     maxZ > playable.rect.minZ && originZ < playable.rect.maxZ;
 
-  const coarseWest = neighbourSteps.west > step;
-  const coarseEast = neighbourSteps.east > step;
-  const coarseNorth = neighbourSteps.north > step;
-  const coarseSouth = neighbourSteps.south > step;
+  const { coarseWest, coarseEast, coarseNorth, coarseSouth } =
+    coarseSides(neighbourSteps.west, neighbourSteps.east, neighbourSteps.north, neighbourSteps.south, step);
 
   /**
    * A chunk-own-lattice node's height, honoring the resolution-ladder chord
@@ -497,10 +520,8 @@ export function buildChunkMesh(
    * corner rule.
    */
   const nodeHeightAt = (row: number, col: number): number => {
-    const onWest = col === 0, onEast = col === n - 1;
-    const onNorth = row === 0, onSouth = row === n - 1;
-    const flatX = (onWest && coarseWest) || (onEast && coarseEast);
-    const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+    const { onWest, onNorth, flatX, flatZ } =
+      flatEdgeSides(row, col, n - 1, coarseWest, coarseEast, coarseNorth, coarseSouth);
     if (!flatX && !flatZ) return chunk.heights[row * n + col]!;
     if (flatX && flatZ) return chunk.heights[row * n + col]!;
 
@@ -546,10 +567,8 @@ export function buildChunkMesh(
    * below, unaddressed here, like `nodeHeightAt`'s own corner rule.
    */
   const nodeNormalAt = (row: number, col: number, x: number, z: number): [number, number, number] => {
-    const onWest = col === 0, onEast = col === n - 1;
-    const onNorth = row === 0, onSouth = row === n - 1;
-    const flatX = (onWest && coarseWest) || (onEast && coarseEast);
-    const flatZ = (onNorth && coarseNorth) || (onSouth && coarseSouth);
+    const { onWest, onNorth, flatX, flatZ } =
+      flatEdgeSides(row, col, n - 1, coarseWest, coarseEast, coarseNorth, coarseSouth);
     if (flatX !== flatZ) {
       const nStep = flatX
         ? (onWest ? neighbourSteps.west : neighbourSteps.east)

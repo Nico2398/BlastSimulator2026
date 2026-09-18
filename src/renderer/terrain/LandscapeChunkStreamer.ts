@@ -4,7 +4,7 @@
 // call with a per-frame near/far resolution-ladder residency update.
 
 import {
-  selectLandscapeChunks, chunkOrigin, chunkSpanAt, LADDER_STEPS, type LandscapeChunkId,
+  selectLandscapeChunks, chunkOrigin, chunkSpanAt, chunkKey, LADDER_STEPS, type LandscapeChunkId,
 } from '../../core/world/LandscapeMap.js';
 import type { LandscapeMesh, NeighbourSteps, PlayableCut } from './LandscapeMesh.js';
 import type { LandscapeHandle } from '../../console/commands/world.js';
@@ -19,11 +19,6 @@ const MAX_CHUNK_BUILDS_PER_FRAME = 2;
  *  exactly on the shared boundary line. Well under the finest chunk span
  *  (32 m), so it can never skip past a genuine neighbour. */
 const EDGE_PROBE_EPSILON = 0.5;
-
-/** Stable string key for a chunk id, for Map lookups — mirrors LandscapeMap.ts's own (unexported) chunkKey. */
-function chunkKey(id: LandscapeChunkId): string {
-  return `${id.level}:${id.cx}:${id.cz}`;
-}
 
 interface ChunkFootprint {
   id: LandscapeChunkId;
