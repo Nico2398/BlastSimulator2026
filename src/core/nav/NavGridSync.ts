@@ -1,9 +1,14 @@
-// BlastSimulator2026 — NavGridSync: wires NavGrid patching to `terrain:updated` (#1146)
+// BlastSimulator2026 — NavGridSync: wires NavGrid patching to `terrain:updated`
+// and `nav:occupancy_changed` (#1146, #1161)
 //
 // Replaces the scattered manual `patchNavGridForRegion`/`patchNavGrid` calls
 // at every terrain-carve call site with a single subscription to the
-// `terrain:updated` event every carve already emits. Wired once at the
-// composition root instead of once per call site.
+// `terrain:updated` event every carve already emits, plus `nav:occupancy_changed`
+// for building-occupancy-only changes (destroy/upgrade/move/construction) that
+// carve zero voxels. Splitting the two lets the renderer's `terrain:updated`-only
+// remesh subscription in `src/main.ts` skip pure occupancy changes while NavGrid
+// still patches on both. Wired once at the composition root instead of once per
+// call site.
 
 import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
@@ -31,19 +36,24 @@ export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEv
 }
 
 /**
- * Subscribe `emitter`'s `terrain:updated` event to keep a NavGrid in sync.
- * Calls `getTarget()` fresh on every event (never caches) so it tracks a
- * mutable composition root. `getTarget` returns null when no live
- * navGrid+grid exist yet (pre-game) or either was torn down — the
- * subscription then no-ops for that event.
+ * Subscribe `emitter`'s `terrain:updated` (real voxel carves) and
+ * `nav:occupancy_changed` (occupancy-only changes that carve zero voxels)
+ * events to keep a NavGrid in sync. Both events share the same region
+ * payload shape, and both drive the same patch logic. Calls `getTarget()`
+ * fresh on every event (never caches) so it tracks a mutable composition
+ * root. `getTarget` returns null when no live navGrid+grid exist yet
+ * (pre-game) or either was torn down — the subscription then no-ops for
+ * that event.
  */
-export function subscribeNavGridToTerrainUpdates(
+export function subscribeNavGridToUpdates(
   emitter: EventEmitter,
   getTarget: () => NavGridSyncTarget | null,
 ): void {
-  emitter.on('terrain:updated', ({ region }) => {
+  const patchRegion = (region: GameEventMap['terrain:updated']['region']): void => {
     const target = getTarget();
     if (!target) return;
     NavGrid.patchNavGrid(target.navGrid, target.grid, target.buildings, target.drillHoles, region);
-  });
+  };
+  emitter.on('terrain:updated', ({ region }) => patchRegion(region));
+  emitter.on('nav:occupancy_changed', ({ region }) => patchRegion(region));
 }

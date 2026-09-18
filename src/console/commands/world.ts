@@ -66,7 +66,7 @@ export interface GameContext {
  * Build the live `NavGridSyncTarget` for `ctx`'s current game, or null when
  * no game (or no navGrid/grid yet) exists. Shared by createRunner.ts's
  * production wiring and tests/helpers/gameContext.ts's fixture wiring
- * (#1146) so both `subscribeNavGridToTerrainUpdates` call sites read `ctx`
+ * (#1146) so both `subscribeNavGridToUpdates` call sites read `ctx`
  * fresh through one place instead of each hand-rolling the same closure.
  */
 export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | null {
