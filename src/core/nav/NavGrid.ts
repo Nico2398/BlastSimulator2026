@@ -43,7 +43,12 @@ const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0],
  */
 export function isStepClimbable(fromY: number | undefined, toY: number | undefined, run: number): boolean {
   if (fromY === undefined || toY === undefined) return true;
-  return Math.abs(fromY - toY) <= NAV_MAX_SLOPE_RATIO * run;
+  // Epsilon absorbs float round-trip error from `toY - fromY` (computed by
+  // callers as e.g. `fromY + NAV_MAX_SLOPE_RATIO`) so the documented `<=`
+  // boundary is inclusive in practice, not just in exact arithmetic — far
+  // smaller than any real slope difference this gate cares about.
+  const NAV_SLOPE_EPSILON = 1e-9;
+  return Math.abs(fromY - toY) <= NAV_MAX_SLOPE_RATIO * run + NAV_SLOPE_EPSILON;
 }
 
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';

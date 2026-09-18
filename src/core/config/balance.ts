@@ -729,11 +729,21 @@ export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 18
 /**
  * Anti-noise floor, in metres, below which a graded cardinal-neighbour
  * height delta reads as flat rather than a ramp. Ramp classification uses
- * the same slope measure step legality does; without this floor, almost
- * every non-identical neighbour pair on continuously-graded terrain
- * (post-#1148) would flag as a ramp.
+ * the same slope measure step legality does; without a floor near the
+ * climbable ceiling, almost every non-identical neighbour pair on
+ * continuously-graded terrain (post-#1148) flags as a ramp — measured
+ * directly against a fresh 32x32 site (desert, seeds 1/2/42): a flat 0.05m
+ * floor still left 62-81% of every legally-climbable cardinal step
+ * classified 'ramp' (moveCost 1.8x), because ordinary graded ground alone
+ * commonly varies more than 5cm between adjacent cells — nowhere near "noise
+ * ignored", closer to "ramp is the default terrain type" (#1151 fixer
+ * finding). 95% of NAV_MAX_SLOPE_RATIO instead keeps only the steepest sliver
+ * of the legally-climbable range — genuinely near-cliff ground, or an actual
+ * built ramp's own grade, which is deliberately cut close to the ceiling
+ * (`length >= depth * 1.8`) — as 'ramp'; the same measurement gives 0.7-2.9%
+ * at this floor, in line with the pre-#1151 whole-voxel rule's ~0.15%.
  */
-export const NAV_RAMP_MIN_SLOPE_DELTA = 0.05;
+export const NAV_RAMP_MIN_SLOPE_DELTA = NAV_MAX_SLOPE_RATIO * 0.95;
 
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 
