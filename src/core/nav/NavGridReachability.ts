@@ -146,9 +146,27 @@ export function findNearestReachableCell(
   targetZ: number,
   avoidOccupancy: boolean = false,
 ): { x: number; z: number } {
+  return reachableAnswer(navGrid, anchorX, anchorZ, targetX, targetZ, avoidOccupancy).cell;
+}
+
+/**
+ * `findNearestReachableCell`'s whole body, plus the size of the anchor's own
+ * connected region. `findNearestSpawnCell` needs that size to tell — exactly,
+ * not heuristically — whether the anchor sits in the grid's largest region,
+ * and getting it from this fill keeps that check free rather than paying for
+ * a second one (the hire benchmark's 200ms budget, #458 T6.2/D14).
+ */
+function reachableAnswer(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+  targetX: number,
+  targetZ: number,
+  avoidOccupancy: boolean,
+): { cell: { x: number; z: number }; count: number } {
   const anchor = findNearestTraversableCell(navGrid, anchorX, anchorZ, undefined, avoidOccupancy);
   if (!isTraversableCell(navGrid, anchor.x, anchor.z) || (avoidOccupancy && isOccupiedCell(navGrid, anchor.x, anchor.z))) {
-    return { x: targetX, z: targetZ };
+    return { cell: { x: targetX, z: targetZ }, count: 0 };
   }
 
   // 8-directional, climb-aware flood fill from the anchor — same adjacency
@@ -185,7 +203,7 @@ export function findNearestReachableCell(
     }
   }
 
-  return bestSameLevel ?? best;
+  return { cell: bestSameLevel ?? best, count };
 }
 
 /**
@@ -357,16 +375,18 @@ export function findNearestNavigableCell(
     // displaces one — otherwise the largest region could win the comparison
     // and then hand back nothing, dropping the caller onto a genuine island.
     if (nearest === null) continue;
+    const answer = nearest;
+    const answerDistSq = nearestDistSq;
 
     // Strictly-greater keeps the scan deterministic: on a tie the region
     // whose first cell comes first in row-major order wins.
     if (count > bestComponentSize) {
       bestComponentSize = count;
-      best = nearest;
-      bestDistSq = nearestDistSq;
-    } else if (count === bestComponentSize && nearestDistSq < bestDistSq) {
-      best = nearest;
-      bestDistSq = nearestDistSq;
+      best = answer;
+      bestDistSq = answerDistSq;
+    } else if (count === bestComponentSize && answerDistSq < bestDistSq) {
+      best = answer;
+      bestDistSq = answerDistSq;
     }
   }
 
@@ -390,21 +410,49 @@ export function findNearestNavigableCell(
  * and the drill rig bought for it both landed inside, unable to reach any
  * work for the rest of the run.
  *
- * So the anchor is derived rather than assumed: `findNearestNavigableCell`
- * answers from the largest climb-connected region, whatever it is, and the
- * cell it returns nearest the corner becomes the anchor. On a site whose
- * ground is all one region — every site, until a blast splits one — that is
- * the corner itself, so this resolves to exactly the call the two spawn
- * paths already made, tie-breaks included. It differs only where the old
- * assumption was actually false, which is the whole point.
+ * The corner is still tried first, exactly as before: the same anchor, the
+ * same fill, the same tie-breaks, so on a healthy site this returns the cell
+ * the two spawn paths always got. What is new is that the answer is checked
+ * rather than assumed. The fill reports how many cells the corner's own
+ * region holds; if that is more than half of the grid's usable cells, no
+ * other region can be bigger, so the corner IS the main region and the answer
+ * stands. Only when it is not does this pay for `findNearestNavigableCell`'s
+ * all-regions scan, to re-anchor on the main region and ask again — the case
+ * where the old code was simply wrong.
+ *
+ * The check is exact, not a heuristic, and costs one cell count rather than a
+ * second flood fill: two fills measured 277ms on treranium_depths' 160x160
+ * grid against the hire benchmark's 200ms budget (#458 T6.2/D14).
  */
 export function findNearestSpawnCell(
   navGrid: NavGrid,
   targetX: number,
   targetZ: number,
 ): { x: number; z: number } {
+  const fromCorner = reachableAnswer(navGrid, 0, 0, targetX, targetZ, true);
+  if (fromCorner.count * 2 > countUsableCells(navGrid)) return fromCorner.cell;
+  // The corner is on an island. Re-anchor on the main region and ask the same
+  // question again, so the answer still comes back through the same selection
+  // — the bench-level preference (#458 T6.1/D13) included — rather than from
+  // a second, subtly different one.
   const anchor = findNearestNavigableCell(navGrid, 0, 0, true);
   return findNearestReachableCell(navGrid, anchor.x, anchor.z, targetX, targetZ, true);
+}
+
+/**
+ * How many cells a spawn could stand on at all — traversable and unoccupied,
+ * the same predicate `reachableAnswer`'s fill counts under. A plain sweep, no
+ * BFS: this exists so the majority test above stays cheap.
+ */
+function countUsableCells(navGrid: NavGrid): number {
+  const { width, height, originX, originZ } = navGrid;
+  let n = 0;
+  for (let z = originZ; z < originZ + height; z++) {
+    for (let x = originX; x < originX + width; x++) {
+      if (isTraversableCell(navGrid, x, z) && !isOccupiedCell(navGrid, x, z)) n++;
+    }
+  }
+  return n;
 }
 
 /** Component label for a cell no component scan has claimed yet. */
