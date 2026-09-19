@@ -516,6 +516,37 @@ describe('Vehicle fleet', () => {
 
   // ── vehicle buy — tier arg (#411) ──
 
+  describe('boarding walk ignores vehicle occupancy (#1166)', () => {
+    // buildBoardLeg used to decide its `avoidVehicles` flag by asking the
+    // NavGrid whether a vehicle stands on the destination — a question whose
+    // answer is true by construction here, since the destination IS the
+    // vehicle's own cell. It read false whenever occupancy was stale, which
+    // it routinely is for a vehicle that has never moved: NavGrid.build seeds
+    // `vehicleOccupied` from the vehicle list and Locomotion maintains it
+    // thereafter, so a vehicle bought into an already-built world is marked
+    // by neither until its first drive. The boarding walk then planned around
+    // every other parked vehicle, which under a slope gate is often no route.
+    it('can plan a boarding walk to a bought vehicle across a fleet-blocked row', () => {
+      const state = ctx.state!;
+      const rng = new Random(1);
+      const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+
+      const bought = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      expect(bought.success).toBe(true);
+      const v = state.vehicles.vehicles[state.vehicles.vehicles.length - 1]!;
+
+      // Wall off the row between the employee and the rest of the map with
+      // parked vehicles, so any route that avoids occupancy has to take the
+      // long way round — or, where the terrain gate forbids that, no route.
+      for (let x = 0; x < state.navGrid!.width; x++) {
+        const cell = state.navGrid!.cellAt(x, Math.round(employee.z) + 1);
+        if (cell) cell.vehicleOccupied = true;
+      }
+
+      expect(moveTo(state, employee.id, { vehicleId: v.id })).toEqual({ success: true });
+    });
+  });
+
   describe('vehicle buy — tier arg (#411)', () => {
     it('buy with tier:2 purchases a tier-2 vehicle', () => {
       const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '2' });
