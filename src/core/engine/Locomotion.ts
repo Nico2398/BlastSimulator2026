@@ -57,6 +57,46 @@ function writeCommitted(emp: Employee, committed: RouteCommitment): void {
   emp.committedOriginZ = committed.originZ ?? null;
 }
 
+/**
+ * True while `emp`'s drive leg is still detouring around a parked vehicle
+ * (#1166) — i.e. a blocker cell was recorded and some other vehicle is still
+ * sitting on it. Clears the latch and returns false otherwise, so ordinary
+ * routing resumes the moment the chokepoint frees up.
+ *
+ * The latch is what makes a reroute survive past the tick it was computed on.
+ * `advanceLeg` repaths from scratch every tick with `avoidVehicles: false`
+ * (a drive leg must be able to drive onto another vehicle's cell to interact
+ * with it), so the unconstrained shortest route heads straight back at the
+ * blocker as soon as the detour's first step is taken. Where the way around
+ * is much longer than the way through — a chokepoint, which is what #1151's
+ * slope gate turns ordinary relief into — that produces a permanent
+ * back-and-forth: block, wait out VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+ * one step of detour, repath, block again. Nothing escalates it, either:
+ * every reroute resets isMoveStuck/moveConsecutiveFailures and the ticks in
+ * between are ordinary successful movement, so the stuck-abandon path never
+ * fires.
+ */
+function isDetouringAroundVehicle(state: GameState, emp: Employee, selfVehicleId: number): boolean {
+  const x = emp.vehicleDetourX ?? null;
+  const z = emp.vehicleDetourZ ?? null;
+  if (x === null || z === null) return false;
+  if (isOccupiedByOtherVehicle(state, selfVehicleId, x, z)) return true;
+  clearVehicleDetour(emp);
+  return false;
+}
+
+/** Records the cell `emp`'s drive leg is detouring around (#1166) — see `isDetouringAroundVehicle`. */
+function markVehicleDetour(emp: Employee, x: number, z: number): void {
+  emp.vehicleDetourX = x;
+  emp.vehicleDetourZ = z;
+}
+
+/** Drops `emp`'s detour latch (#1166): the blocker moved off, or the leg it was recorded for is over. */
+function clearVehicleDetour(emp: Employee): void {
+  emp.vehicleDetourX = null;
+  emp.vehicleDetourZ = null;
+}
+
 /** Reads `emp`'s carried move-history shift-register (#1130) into the shape `advanceAlongPath` takes. */
 function readMoveHistory(emp: Employee): { moveHistoryX: number | null; moveHistoryZ: number | null } {
   return {
@@ -199,6 +239,7 @@ function isLegArrived(x: number, z: number, leg: Leg): boolean {
 
 function clearItineraryOnFailure(emp: Employee): void {
   emp.itinerary = null;
+  clearVehicleDetour(emp);
   syncPendingDriverVehicleId(emp);
 }
 
@@ -255,6 +296,9 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     }
 
     itinerary.legs.shift();
+    // #1166: the detour latch is scoped to the leg that recorded it — the
+    // next leg starts from a clean route and finds its own blockers.
+    clearVehicleDetour(emp);
     syncPendingDriverVehicleId(emp);
     if (itinerary.legs.length === 0) {
       emp.itinerary = null;
@@ -294,14 +338,29 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // fix above (#1166) for why.
   const driveFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
   const driveFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
-  const path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = state.navGrid
-    ? findPath(state.navGrid, { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles })
-    : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
+
+  // #1166: a drive leg part-way around a still-parked blocker keeps following
+  // the vehicle-avoiding route it committed to, rather than repathing back
+  // through the blocker and stalling again — see isDetouringAroundVehicle.
+  // A detour that stops resolving (the way around closed behind it) falls
+  // back to ordinary routing, which re-enters handleOccupancyBlock below and
+  // reaches its own stuck/relocate escalation from there.
+  let detourPath: PathResult | null = null;
+  if (isDrive && state.navGrid && isDetouringAroundVehicle(state, emp, vehicle!.id)) {
+    const rerouted = findPathAvoidingOtherVehicles(state, emp, vehicle!, leg.destX, leg.destZ);
+    if (rerouted.found) detourPath = rerouted;
+    else clearVehicleDetour(emp);
+  }
+
+  const path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = detourPath
+    ?? (state.navGrid
+      ? findPath(state.navGrid, { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles })
+      : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
 
   if (isDrive && state.navGrid && path.found) {
     const nextStep = nextGridStep(emp.x, emp.z, path.waypoints);
     if (nextStep && isOccupiedByOtherVehicle(state, vehicle!.id, nextStep.x, nextStep.z)) {
-      return handleOccupancyBlock(state, emp, vehicle!, leg, result, emitter);
+      return handleOccupancyBlock(state, emp, vehicle!, leg, nextStep, result, emitter);
     }
   }
 
@@ -389,7 +448,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
  * finally escalating the employee (not the vehicle) to stuck, once, on the
  * rising edge. Absorbed from the old VehicleOccupancyReroute.ts.
  */
-function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
+function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, blockedStep: { x: number; z: number }, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
   emp.vehicleWaitingTicks++;
 
@@ -417,6 +476,9 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     emp.moveConsecutiveFailures = outcome.consecutiveFailures;
     emp.isMoveStuck = false;
     emp.vehicleWaitingTicks = 0;
+    // #1166: hold the route that got us moving, instead of throwing it away
+    // and repathing back into this same blocker next tick.
+    markVehicleDetour(emp, blockedStep.x, blockedStep.z);
     writeCommitted(emp, outcome.committed);
     writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
 

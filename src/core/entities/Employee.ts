@@ -187,6 +187,18 @@ export interface Employee {
   moveHistoryX?: number | null;
   moveHistoryZ?: number | null;
   /**
+   * Grid cell another vehicle was parked on when this employee's current
+   * drive leg last had to detour around it (#1166), or null when not
+   * detouring. A drive leg routes with `avoidVehicles: false` — it must be
+   * able to drive onto another vehicle's cell to interact with it — so
+   * without this latch the tick after a reroute repaths straight back at the
+   * blocker, and a blocker on a chokepoint livelocks the driver in front of
+   * it. Held only while that cell is genuinely still occupied; cleared by
+   * Locomotion.ts the moment it frees up or the leg completes.
+   */
+  vehicleDetourX?: number | null;
+  vehicleDetourZ?: number | null;
+  /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside
    * destinationX/destinationZ by the claim step; consumed by
