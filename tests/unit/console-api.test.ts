@@ -275,12 +275,20 @@ describe('console-api', () => {
       expect(runner.ctx.state!.plannedBuildings).toHaveLength(0);
       expect(runner.ctx.state!.buildings.buildings).toHaveLength(3);
 
-      // Hiring after the pocket is sealed: `employee hire`'s spawn-placement
-      // reachability search is anchored at (0,0) (Employee hire, entities.ts),
-      // so once (0,0)'s own neighbourhood is walled off this new hire lands
-      // inside that now-isolated pocket instead of the map's main open area.
+      // #1151: this used to rely on `employee hire` itself landing the new
+      // driller inside the pocket, because its spawn placement was anchored at
+      // (0,0) and followed the seal in. That was the defect, not a feature —
+      // a hire stranded on an island can never work again — and hire now
+      // places onto the grid's largest climb-connected region instead
+      // (findNearestSpawnCell). The subject here is serializeGameState's
+      // stuckEmployeeCount, not where a hire lands, so the employee is put in
+      // the pocket directly and the field is measured on the state that
+      // produces.
       runner.runner.run('employee hire role:driller');
-      const drillerId = runner.ctx.state!.employees.employees.find(e => e.role === 'driller')!.id;
+      const driller = runner.ctx.state!.employees.employees.find(e => e.role === 'driller')!;
+      const drillerId = driller.id;
+      driller.x = 0;
+      driller.z = 0;
       // Dispatch them toward a target well outside the sealed pocket — the
       // walk repeatedly fails to find a path out, flipping isMoveStuck after
       // STUCK_THRESHOLD consecutive failures (navmesh.integration.test.ts's

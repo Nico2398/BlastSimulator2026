@@ -460,7 +460,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:5,5",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:6,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -480,9 +480,9 @@
         },
         {
           "type": "dragTiles",
-          "x1": 5,
+          "x1": 6,
           "z1": 5,
-          "x2": 14,
+          "x2": 15,
           "z2": 14
         },
         {
@@ -500,7 +500,8 @@
           "holeCount": 0
         },
         "note": "#553: confirming the grid only orders the 16 holes -- they're ghosts until employee #1 drives vehicle #1 to each one, drained by the tick-wait steps below."
-      }
+      },
+      "description": "#1151: shifted one cell east. Under the 30-degree slope gate (5,11) sits outside the crew's climb-reachable patch on dusty_hollow, so no driller could ever claim that hole and the pattern stalled at 15 of 16 forever. Measured by replaying this file's own steps to this point; start:6,5 is the nearest origin whose whole 4x4 grid is reachable."
     },
     {
       "command": "tick 283",

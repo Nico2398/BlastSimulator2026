@@ -491,8 +491,21 @@ export class NavGrid {
    * climb-connected region. See NavGridReachability.findNearestNavigableCell
    * for the full doc.
    */
-  static findNearestNavigableCell(navGrid: NavGrid, targetX: number, targetZ: number): { x: number; z: number } {
-    return reachability.findNearestNavigableCell(navGrid, targetX, targetZ);
+  static findNearestNavigableCell(
+    navGrid: NavGrid,
+    targetX: number,
+    targetZ: number,
+    avoidOccupancy = false,
+  ): { x: number; z: number } {
+    return reachability.findNearestNavigableCell(navGrid, targetX, targetZ, avoidOccupancy);
+  }
+
+  /**
+   * Placement for a mid-game entity spawn. See
+   * NavGridReachability.findNearestSpawnCell for the full doc.
+   */
+  static findNearestSpawnCell(navGrid: NavGrid, targetX: number, targetZ: number): { x: number; z: number } {
+    return reachability.findNearestSpawnCell(navGrid, targetX, targetZ);
   }
 
   /**

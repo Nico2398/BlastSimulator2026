@@ -1692,6 +1692,95 @@ describe('NavGrid.findNearestNavigableCell', () => {
 
     expect(NavGrid.findNearestNavigableCell(makeNavGridFromTypes(rows), 1, 1)).toEqual({ x: 1, z: 1 });
   });
+
+  // #1151: entity-spawn placement (hire, vehicle purchase) needs BOTH
+  // properties at once — the main landmass (this helper) and an unoccupied
+  // cell (#954's avoidOccupancy). Before this flag the two were only
+  // available from two different helpers, so the spawn call sites kept using
+  // findNearestReachableCell's fixed (0,0) anchor to get the occupancy guard
+  // and inherited the corner-island assumption the slope gate broke.
+  it('skips vehicle-occupied cells on the main region when avoidOccupancy is set', () => {
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ]);
+    nav.cellAt(1, 1)!.vehicleOccupied = true;
+
+    expect(NavGrid.findNearestNavigableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+    expect(NavGrid.findNearestNavigableCell(nav, 1, 1, true)).not.toEqual({ x: 1, z: 1 });
+  });
+
+  it('is what findNearestSpawnCell resolves to, so a healthy site spawns exactly where it used to', () => {
+    // Every cell one region: the derived anchor IS the corner, so the spawn
+    // helper must agree cell-for-cell with the corner-anchored call the two
+    // spawn paths made before #1151 — tie-breaks included.
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+
+    for (const [tx, tz] of [[2, 2], [4, 0], [0, 4], [3, 1]] as Array<[number, number]>) {
+      expect(NavGrid.findNearestSpawnCell(nav, tx, tz))
+        .toEqual(NavGrid.findNearestReachableCell(nav, 0, 0, tx, tz, true));
+    }
+  });
+
+  it('still answers from the largest region, not the nearest free cell, when avoiding occupancy', () => {
+    const summit = 20;
+    const nav = makeNavGridFromHeights([
+      [summit, summit, 0, 0, 0],
+      [summit, summit, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+    // The 2x2 summit is its own climb-connected island; the floor is the main
+    // region. A target on the island must come back on the floor even though
+    // the island holds free cells far closer to it.
+    const snapped = NavGrid.findNearestNavigableCell(nav, 0, 0, true);
+
+    expect(nav.cellAt(snapped.x, snapped.z)!.surfaceY).toBe(0);
+    expect(NavGrid.computeClimbReachableSet(nav, snapped.x, snapped.z).size).toBeGreaterThan(4);
+  });
+});
+
+describe('NavGrid.findNearestSpawnCell', () => {
+  it('spawns onto the main region when the corner has been cut off into an island', () => {
+    const summit = 40;
+    // The 2x2 corner is walled off by a face far past the climb limit. The
+    // corner-anchored call this helper replaces snaps the target *into* that
+    // island, which is how a mid-game hire ends up unable to reach any work.
+    const nav = makeNavGridFromHeights([
+      [summit, summit, 0, 0, 0],
+      [summit, summit, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+
+    const spawn = NavGrid.findNearestSpawnCell(nav, 0, 0);
+    const cornerAnchored = NavGrid.findNearestReachableCell(nav, 0, 0, 0, 0, true);
+
+    expect(nav.cellAt(cornerAnchored.x, cornerAnchored.z)!.surfaceY).toBe(summit);
+    expect(nav.cellAt(spawn.x, spawn.z)!.surfaceY).toBe(0);
+    expect(NavGrid.computeClimbReachableSet(nav, spawn.x, spawn.z).size).toBeGreaterThan(4);
+  });
+
+  it('keeps a spawn off a cell a vehicle or fragment already occupies', () => {
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ]);
+    nav.cellAt(1, 1)!.vehicleOccupied = true;
+
+    expect(NavGrid.findNearestSpawnCell(nav, 1, 1)).not.toEqual({ x: 1, z: 1 });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

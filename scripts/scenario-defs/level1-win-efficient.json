@@ -1079,8 +1079,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:10,10",
-      "description": "#553: confirming the grid only orders the 16 holes -- they are ghosts (state.plannedDrillHoles) until the three drillers drive their rigs to each one, so holeCount is 0 here; the drain is the ticks below.",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:10,9",
+      "description": "#553: confirming the grid only orders the 16 holes -- they are ghosts (state.plannedDrillHoles) until the three drillers drive their rigs to each one, so holeCount is 0 here; the drain is the ticks below. #1151: moved one cell north, start:10,10 -> start:10,9. Under the 30-degree slope gate the (10,19) corner of the old box is outside the crew's climb-reachable patch on dusty_hollow (7947 of 9216 cells reachable from spawn), so no driller could ever claim that one hole and the plan stalled at 15 of 16 forever, burning the drain wait's whole budget. Measured with computeClimbReachableSet at level open: start:10,9 puts all 16 holes on reachable ground, and is the nearest origin that does.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1101,9 +1101,9 @@
         {
           "type": "dragTiles",
           "x1": 10,
-          "z1": 10,
+          "z1": 9,
           "x2": 20,
-          "z2": 20
+          "z2": 19
         },
         {
           "type": "screenshot"
@@ -1390,7 +1390,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
       "interaction": [
         {
           "type": "command",
@@ -1404,10 +1404,10 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 30.50249999999994,
+          "wellBeing": 15.129999999999965,
           "safety": 50,
-          "ecology": 49.17,
-          "nuisance": 47.925
+          "ecology": 46.59,
+          "nuisance": 41.475
         },
         "changedBy": {
           "tickCount": 0
@@ -1416,7 +1416,7 @@
     },
     {
       "command": "stats",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
       "interaction": [
         {
           "type": "command",
@@ -1430,15 +1430,26 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 30.50249999999994,
+          "wellBeing": 15.129999999999965,
           "safety": 50,
-          "ecology": 49.17,
-          "nuisance": 47.925
+          "ecology": 46.59,
+          "nuisance": 41.475
         },
         "changedBy": {
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "#1151: added. The blast above kills four workers, and under the 30-degree slope gate the run arrives at it on a different beat, so the resulting event is already pending when the next `tick` runs -- `tickCommand` refuses to advance at all while one is (\"Pending event! Resolve it first\"), which failed the step below outright. Resolved here first, following the tick/event pairing this file already uses throughout.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -1979,8 +1990,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:15,15",
-      "description": "#553: 25 holes ordered as ghosts, same as pattern 1. #586-followup: this pattern IS fully landed now (all 25 holes, sandbox-confirmed) -- pattern 1's own dead-padding fix (see the top-level description) freed enough of the wellbeing-vs-revolt margin that pattern 2's crew finishes drilling before the permanent revolt fires; the revolt still ends the level (see the worker-revolt Finding on the tick-drain below), just after pattern 2's own 25th hole lands rather than cutting the pattern short. This pattern's own charge/sequence/blast are never reached, in place of a third blast.",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:15,20",
+      "description": "#553: 25 holes ordered as ghosts, same as pattern 1. #586-followup: this pattern IS fully landed now (all 25 holes, sandbox-confirmed) -- pattern 1's own dead-padding fix (see the top-level description) freed enough of the wellbeing-vs-revolt margin that pattern 2's crew finishes drilling before the permanent revolt fires; the revolt still ends the level (see the worker-revolt Finding on the tick-drain below), just after pattern 2's own 25th hole lands rather than cutting the pattern short. This pattern's own charge/sequence/blast are never reached, in place of a third blast. #1151: moved from start:15,15 to start:15,20. The first blast above leaves a crater right where this second pattern used to sit, and under the 30-degree slope gate a fresh crater floor is no longer walkable from its own rim -- that is the rule working as specified (gentle enough and a worker walks it, steeper and it has to be cut into a ramp), not a routing defect. Measured by replaying this file's own steps to this point: five of the old 25 holes -- (15,15) (18,15) (21,15) (15,18) (18,18) -- sat inside the crater and could never be claimed, stalling the drain. start:15,20 is the nearest origin whose whole 5x5 grid is on ground the surviving crew can still walk; this file buys no digger and cuts no ramp, so drilling outside the crater is the only option open to it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2001,9 +2012,9 @@
         {
           "type": "dragTiles",
           "x1": 15,
-          "z1": 15,
+          "z1": 20,
           "x2": 27,
-          "z2": 27
+          "z2": 32
         },
         {
           "type": "screenshot"
@@ -2403,6 +2414,27 @@
       "commandOutcome": "either"
     },
     {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "timeout": 185,
+      "description": "#1151: the tick-20/event ladder above was calibrated under the old whole-voxel climb rule, where 25 holes finished inside its 180 ticks. Under the 30-degree slope gate the three rigs need longer, so the ladder handed the step below a part-drilled pattern (20 of 25) and every later assertion cascaded. This drains whatever is left on the thing actually being waited for rather than widening the ladder with more hand-counted beats; command mode's waitUntil resolves a pending event with its first option each tick, exactly as the ladder's own `event choose 0` steps do.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 25
+        }
+      }
+    },
+    {
       "command": "tick 20",
       "interaction": [
         {
@@ -2542,14 +2574,14 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:ecology equals:50 max_ticks:800",
+      "command": "wait_until field:levelEnded equals:true max_ticks:800",
       "timeout": 155,
-      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there. #555 (this merge)-followup (real CI): `maxTicks` bumped 200 -> 800 and `timeoutMs` 60000 -> 150000 -- level1's own `LevelDef.scoreDecayRate` (0.03) now actually reaches `updateScores` instead of the hardcoded global 0.05 this note's own math assumed, so the same point-debt takes ~1.67x longer to pay off, and real interaction-mode CI read a bigger debt still outstanding (51.59, not 50) after the old 200-tick budget ran out.",
+      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there. #555 (this merge)-followup (real CI): `maxTicks` bumped 200 -> 800 and `timeoutMs` 60000 -> 150000 -- level1's own `LevelDef.scoreDecayRate` (0.03) now actually reaches `updateScores` instead of the hardcoded global 0.05 this note's own math assumed, so the same point-debt takes ~1.67x longer to pay off, and real interaction-mode CI read a bigger debt still outstanding (51.59, not 50) after the old 200-tick budget ran out. #1151: the wait now watches levelEnded rather than ecology. Ecology's decay to its 50 floor and the worker revolt are two independent clocks, and this step asserts both; under the old whole-voxel climb rule the revolt happened to land first, so waiting on ecology also caught it. Under the 30-degree slope gate the order flips -- ecology reaches 50 at t=452 while the revolt lands at t=482 -- and the wait exited 30 ticks before the thing the step is actually about. Waiting on the subject itself, per dev-scenario-authoring; ecology is still asserted exactly in this step's own expect, so a run that reached the revolt without ecology settled would still fail loudly.",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "ecology",
-          "equals": 50,
+          "field": "levelEnded",
+          "equals": true,
           "maxTicks": 800,
           "timeoutMs": 150000
         }
@@ -2624,7 +2656,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
       "interaction": [
         {
           "type": "command",
@@ -2641,13 +2673,13 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 50
+          "nuisance": 49.12500000000029
         }
       }
     },
     {
       "command": "stats",
-      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
       "interaction": [
         {
           "type": "command",
@@ -2664,13 +2696,13 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 50
+          "nuisance": 49.12500000000029
         }
       }
     },
     {
       "command": "campaign status",
-      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above.",
+      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
       "interaction": [
         {
           "type": "command",
@@ -2687,7 +2719,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 50,
+          "nuisance": 49.12500000000029,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

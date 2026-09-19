@@ -293,6 +293,56 @@ describe('alight', () => {
     expect(employee.z).toBe(vehicle.z);
   });
 
+  // #1151: a driver who steps down onto a cell they could not have walked to
+  // is stranded there for good — nothing ever relocates an on-foot employee.
+  it('skips a free neighbour the driver could not legally step onto, taking a climbable one instead', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    // (4,4) comes first in NEIGHBOUR_OFFSETS_8 order and is walkable and
+    // free, but sits a full 3m above the vehicle over a diagonal run — far
+    // past NAV_MAX_SLOPE_RATIO. (6,6) is level with the vehicle.
+    state.navGrid = makeNavGrid(4, 4, 3, 3, (x, z) => {
+      const c = cell('walkable', x === vehicle.x && z === vehicle.z);
+      c.surfaceY = x === 4 && z === 4 ? 3 : 0;
+      c.climbY = c.surfaceY;
+      return c;
+    });
+
+    const result = alight(state, vehicle.id);
+
+    expect(result.success).toBe(true);
+    expect({ x: employee.x, z: employee.z }).not.toEqual({ x: 4, z: 4 });
+    expect(state.navGrid!.cellAt(employee.x, employee.z)!.surfaceY).toBe(0);
+  });
+
+  it('falls back to the vehicle\'s own cell when every free neighbour is too steep to step onto', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    // The vehicle's own cell is the only one at its level — it drove up here,
+    // so standing on it is always legal, unlike stepping off a cliff edge.
+    state.navGrid = makeNavGrid(4, 4, 3, 3, (x, z) => {
+      const own = x === vehicle.x && z === vehicle.z;
+      const c = cell('walkable', own);
+      c.surfaceY = own ? 0 : 5;
+      c.climbY = c.surfaceY;
+      return c;
+    });
+
+    const result = alight(state, vehicle.id);
+
+    expect(result.success).toBe(true);
+    expect(employee.x).toBe(vehicle.x);
+    expect(employee.z).toBe(vehicle.z);
+  });
+
   it('when several neighbours are free, lands on one of the 8 neighbour offsets (not an arbitrary far cell)', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);

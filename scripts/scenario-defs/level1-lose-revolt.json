@@ -297,8 +297,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5 diameter:0.089",
-      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts), same class of fix as level1-lose-ecology.json's Finding #42/Ground rule #15. spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct. #553: this only ORDERS the 25 holes as ghosts (state.plannedDrillHoles) -- holeCount stays 0 until a driller physically reaches one. #591: previously only employee #12/vehicle #5 could ever contribute (vehicle #1 stayed permanently deadlocked); now vehicle #1 drills too (see the tick-40 checkpoint below). diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/tutorial-playthrough.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a console-only default (0.15, mining.ts) that drilled each hole slower -- with the real default, holes land a little sooner, shifting the holeCount/cash progression through the fixed tick-40 checkpoints below (re-measured, confirmed via direct trace) while leaving the revolt's own outcome (tick 410, worker_revolt) unchanged in kind.",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:6,4 diameter:0.089",
+      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts), same class of fix as level1-lose-ecology.json's Finding #42/Ground rule #15. spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct. #553: this only ORDERS the 25 holes as ghosts (state.plannedDrillHoles) -- holeCount stays 0 until a driller physically reaches one. #591: previously only employee #12/vehicle #5 could ever contribute (vehicle #1 stayed permanently deadlocked); now vehicle #1 drills too (see the tick-40 checkpoint below). diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/tutorial-playthrough.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a console-only default (0.15, mining.ts) that drilled each hole slower -- with the real default, holes land a little sooner, shifting the holeCount/cash progression through the fixed tick-40 checkpoints below (re-measured, confirmed via direct trace) while leaving the revolt's own outcome (tick 410, worker_revolt) unchanged in kind. #1151: shifted one cell east and one north. Under the 30-degree slope gate (5,11) and (8,17) sit outside the crew's climb-reachable patch on dusty_hollow, so those two holes could never be claimed and the pattern stalled at 23 of 25. Measured by replaying this file's own steps to this point; start:6,4 is the nearest origin whose whole 5x5 grid is reachable.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -318,10 +318,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 5,
-          "z1": 5,
-          "x2": 17,
-          "z2": 17
+          "x1": 6,
+          "z1": 4,
+          "x2": 18,
+          "z2": 16
         },
         {
           "type": "screenshot"
@@ -354,8 +354,8 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "holeCount": 5,
-          "orderedHoleCount": 20
+          "holeCount": 1,
+          "orderedHoleCount": 24
         },
         "increased": [
           "wellBeing"
@@ -364,7 +364,8 @@
           "cash"
         ],
         "note": "sandbox-measured: wellBeing still rising here, same as the pre-#553 trajectory this early -- avgMorale hasn't crashed yet, employee #12 is still travelling to the pattern. The reversal comes later (see tick 290 below). cash relaxed from equals:479050 to decreased (this batch's own fallback for a genuine command-vs-interaction divergence, not just interaction-mode drift): command mode's own trace reliably computes 479050 at this tick, while a live interaction-mode trace (`npx tsx scripts/run-all-scenarios.ts --mode interaction --port 5202 level1-lose-revolt`) reliably reads 479500, $450 more -- both figures reproduce consistently in their own mode, so this is not noise to re-pin but a real economic-timing difference between the click-driven `drill_plan`/`vehicle driver` steps earlier in this file and their command-mode equivalents (likely a payroll/fuel tick landing on one side or the other of a boundary once the driller's travel is driven by real clicks instead of an instantaneous console command). #553-followup (issue #586 CI): wellBeing joins cash as relaxed (equals:70.21000000000012 -> increased) -- a real CI run read 70.04833333333346, the same real-time-accrual class, just a smaller-magnitude float instead of a dollar figure. #591: holeCount updated 0->5 and orderedHoleCount (holes still ordered but not yet drilled) 25->20 -- the staffed fleet's spawn spacing widened (SPAWN_TILE_SPACING, GameState.ts) so vehicle #1's spawn no longer sits on the debris_hauler's, and EntityMovementTick.ts now wires in VehicleOccupancyReroute.ts's stuck-detection/reroute for any blocked-but-pathable route -- vehicle #1 is never deadlocked at (1,2) the way the rest of this file's notes below describe, and drills 5 of the pattern's holes by this checkpoint alongside employee #12/vehicle #5. tickCount stays exact; it is not host-timing-sensitive. This does not change the file's real conclusion (see top-level description and the tick-410 revolt step below, sandbox-measured unaffected by this fix): employee #1 remains continuously busy (driving and drilling instead of blocked-and-waiting) with no living quarters anywhere on this level to replenish its needs either way, so wellBeing's collapse to 0 and the revolt at tick 410 are unchanged."
-      }
+      },
+      "description": "#1151: holeCount 5 -> 1 and orderedHoleCount 20 -> 24 at this fixed 40-tick checkpoint. Two things moved it: the pattern's origin shifted one cell (see the step above, which had holes the crew could not reach), and under the 30-degree slope gate the rigs take longer to drive to each hole. This step's own subject is the note below -- wellBeing still rising at this point -- and the tickCount ladder that steps 18 and 20 continue; the hole counts are incidental progress, re-measured rather than widened, so the ladder's absolute tick checkpoints stay intact."
     },
     {
       "command": "event choose 0",

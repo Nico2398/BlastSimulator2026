@@ -10,6 +10,7 @@ import { isMounted } from '../entities/EmployeeLocomotion.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
+import { isStepClimbable } from '../nav/NavGrid.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
 type MountResult = { success: true } | { success: false; error: string };
@@ -127,20 +128,38 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
 
 /**
  * First free, walkable cell among the vehicle's 8 neighbours (in the shared
- * neighbour-offset declaration order), or the vehicle's own cell when none
- * qualifies or no NavGrid has been built yet.
+ * neighbour-offset declaration order) that the driver could actually have
+ * walked onto, or the vehicle's own cell when none qualifies or no NavGrid
+ * has been built yet.
+ *
+ * The climb gate (#1151) is not decoration: alighting is the one movement in
+ * the game that places an employee without routing them, and nothing ever
+ * relocates an on-foot employee afterwards. Under the slope-based rule a
+ * neighbour can be walkable, unoccupied, and still be a cell no agent could
+ * ever reach on foot — so dropping a driver onto it strands them there for
+ * the rest of the run, with their vehicle parked one cell away and no way to
+ * board it again. Confirmed live on level1-playthrough-win: the hauler is
+ * repositioned to (2,7) on sound, fully-connected ground, its driver steps
+ * down onto (2,6) — 0.66m higher over a 1m run, past NAV_MAX_SLOPE_RATIO —
+ * and that cell's own climb-reachable set is exactly one cell, itself. The
+ * whole rubble haul never happened, and the level went bankrupt paying a
+ * driver who could not move.
+ *
+ * The vehicle's own cell stays the fallback: whatever the terrain around it,
+ * the vehicle drove there, so standing on it is reachable by construction.
  */
 function findAlightCell(state: GameState, vehicle: Vehicle): { x: number; z: number } {
   const grid = state.navGrid;
   if (!grid) return { x: vehicle.x, z: vehicle.z };
 
+  const from = grid.cellAt(vehicle.x, vehicle.z)?.surfaceY;
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
     const x = vehicle.x + dx;
     const z = vehicle.z + dz;
     const cell = grid.cellAt(x, z);
-    if (cell && !isImpassable(cell, true)) {
-      return { x, z };
-    }
+    if (!cell || isImpassable(cell, true)) continue;
+    if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
+    return { x, z };
   }
 
   return { x: vehicle.x, z: vehicle.z };

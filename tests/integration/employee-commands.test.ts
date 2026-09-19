@@ -7,6 +7,7 @@ import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
+import { NavGrid } from '../../src/core/nav/NavGrid.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -623,5 +624,36 @@ describe('Console — employee hire — spawn position on a site grown into nega
     // The buggy formula (sizeX/2, sizeZ/2) ignores minX/minZ entirely.
     expect(employee.x).not.toBe(world.sizeX / 2);
     expect(employee.z).not.toBe(world.sizeZ / 2);
+  });
+});
+
+// ── employee hire — spawn lands on the main landmass (#1151) ──
+
+describe('Console — employee hire — spawn is on the grid\'s main climb-connected region', () => {
+  // Before #1151 this snapped with findNearestReachableCell(navGrid, 0, 0, …),
+  // i.e. "the region connected to world (0, 0)". That anchor assumed every
+  // traversable cell was connected to every other one; under the slope gate a
+  // corner can be a small island of its own, and every hire then lands inside
+  // it, unable to reach any work on the rest of the site.
+  it('does not spawn into a corner island cut off from the bulk of the site', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+    const navGrid = ctx.state!.navGrid!;
+
+    // Wall a 2x2 corner off from everything else with a cliff far past the
+    // climb limit, leaving the rest of the grid as the main region.
+    const summit = 40;
+    for (const [x, z] of [[0, 0], [1, 0], [0, 1], [1, 1]] as Array<[number, number]>) {
+      navGrid.cellAt(x, z)!.surfaceY = summit;
+      navGrid.cellAt(x, z)!.climbY = summit;
+    }
+
+    const result = employeeCommand(ctx, ['hire'], { role: 'driller' });
+    expect(result.success).toBe(true);
+
+    const employee = ctx.state!.employees.employees.at(-1)!;
+    const reachable = NavGrid.computeClimbReachableSet(navGrid, employee.x, employee.z);
+    // The island holds 4 cells; the main region holds the rest.
+    expect(reachable.size).toBeGreaterThan(4);
+    expect(navGrid.cellAt(employee.x, employee.z)!.surfaceY).not.toBe(summit);
   });
 });

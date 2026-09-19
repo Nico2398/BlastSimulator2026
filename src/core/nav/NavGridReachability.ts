@@ -285,13 +285,27 @@ function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, cl
  * assumption: the answer is a cell the site's workforce, its vehicles and
  * its work area can all actually reach each other from.
  *
+ * avoidOccupancy (#1151, default false — every pre-existing caller's
+ * behaviour is unchanged): when true, a vehicle- or fragment-occupied cell is
+ * treated as unusable, exactly as in `findNearestTraversableCell`/
+ * `findNearestReachableCell`'s flag of the same name (#954 — see its doc
+ * comment for why entity-spawn placement needs it). Occupancy is applied to
+ * the *answer* only, not to the component scan: a parked vehicle does not
+ * split the ground it stands on into two regions, so letting it do so here
+ * would shrink the main region for no reason and could hand back a cell on a
+ * genuine island. Spawn placement is the caller that needs both properties at
+ * once — the main landmass and a free cell — and before this flag the only
+ * helper offering the occupancy guard was `findNearestReachableCell`, whose
+ * fixed-anchor contract is the very assumption this function exists to drop.
+ *
  * Returns (targetX, targetZ) unchanged when the grid holds no traversable
- * cell at all.
+ * cell at all, or no usable one under `avoidOccupancy`.
  */
 export function findNearestNavigableCell(
   navGrid: NavGrid,
   targetX: number,
   targetZ: number,
+  avoidOccupancy = false,
 ): { x: number; z: number } {
   const { width, height, originX, originZ } = navGrid;
   const componentOf = new Int32Array(width * height).fill(UNVISITED);
@@ -312,8 +326,10 @@ export function findNearestNavigableCell(
     let count = 0;
     componentOf[startIdx] = startIdx;
     queue[count++] = startIdx;
-    let nearest = { x: sx, z: sz };
-    let nearestDistSq = (sx - targetX) ** 2 + (sz - targetZ) ** 2;
+    const usable = (x: number, z: number): boolean =>
+      !avoidOccupancy || !isOccupiedCell(navGrid, x, z);
+    let nearest: { x: number; z: number } | null = usable(sx, sz) ? { x: sx, z: sz } : null;
+    let nearestDistSq = nearest ? (sx - targetX) ** 2 + (sz - targetZ) ** 2 : Infinity;
 
     for (let head = 0; head < count; head++) {
       const idx = queue[head]!;
@@ -330,12 +346,17 @@ export function findNearestNavigableCell(
         componentOf[neighbourIdx] = startIdx;
         queue[count++] = neighbourIdx;
         const distSq = (nx - targetX) ** 2 + (nz - targetZ) ** 2;
-        if (distSq < nearestDistSq) {
+        if (distSq < nearestDistSq && usable(nx, nz)) {
           nearestDistSq = distSq;
           nearest = { x: nx, z: nz };
         }
       }
     }
+
+    // A region every cell of which is occupied offers no answer, so it never
+    // displaces one — otherwise the largest region could win the comparison
+    // and then hand back nothing, dropping the caller onto a genuine island.
+    if (nearest === null) continue;
 
     // Strictly-greater keeps the scan deterministic: on a tie the region
     // whose first cell comes first in row-major order wins.
@@ -350,6 +371,40 @@ export function findNearestNavigableCell(
   }
 
   return best ?? { x: targetX, z: targetZ };
+}
+
+/**
+ * Where a mid-game entity spawn (an `employee hire`, a `vehicle buy`) may
+ * actually be placed: the cell nearest (targetX, targetZ) that is on the
+ * site's main body of ground, free of vehicles and fragments, and genuinely
+ * walkable to from it.
+ *
+ * Both call sites used to ask `findNearestReachableCell` with a literal
+ * `(0, 0)` anchor, on the reasoning that "blast sites are never placed on
+ * the map edge" so a corner always sits in the main region. The slope gate
+ * (#1151) broke that: a corner can be walled off into a small island by
+ * nothing more than the craters the player's own blasts leave around it, and
+ * `findNearestReachableCell` then faithfully snaps every later spawn *into*
+ * that island. Measured on blast-execution-visual's 64x64 site, five blast
+ * cycles in: the corner region had shrunk to 24 of 4096 cells, and the hire
+ * and the drill rig bought for it both landed inside, unable to reach any
+ * work for the rest of the run.
+ *
+ * So the anchor is derived rather than assumed: `findNearestNavigableCell`
+ * answers from the largest climb-connected region, whatever it is, and the
+ * cell it returns nearest the corner becomes the anchor. On a site whose
+ * ground is all one region — every site, until a blast splits one — that is
+ * the corner itself, so this resolves to exactly the call the two spawn
+ * paths already made, tie-breaks included. It differs only where the old
+ * assumption was actually false, which is the whole point.
+ */
+export function findNearestSpawnCell(
+  navGrid: NavGrid,
+  targetX: number,
+  targetZ: number,
+): { x: number; z: number } {
+  const anchor = findNearestNavigableCell(navGrid, 0, 0, true);
+  return findNearestReachableCell(navGrid, anchor.x, anchor.z, targetX, targetZ, true);
 }
 
 /** Component label for a cell no component scan has claimed yet. */

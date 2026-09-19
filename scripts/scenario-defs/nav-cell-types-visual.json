@@ -3,12 +3,12 @@
   "description": "Tests the 4 console-reachable NavCell types (walkable, blocked, drill_hole, ramp) render on the overlay",
   "steps": [
     {
-      "command": "new_game seed:42 cash:70000 staffed:true",
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $70,000 so the site stays comfortably clear of BANKRUPTCY_THRESHOLD ($5,000) through the ~140-tick wait below plus the office/ramp purchases after it (no income anywhere in this file).",
+      "command": "new_game seed:42 cash:120000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $70,000 so the site stays comfortably clear of BANKRUPTCY_THRESHOLD ($5,000) through the ~140-tick wait below plus the office/ramp purchases after it (no income anywhere in this file). #1151: opening cash raised $70,000 -> $120,000. Drilling this pattern now takes 229 ticks instead of 133 under the 30-degree slope gate, and the extra 96 ticks of payroll left the site short of the $8,000 management_office below — the run failed on funds, not on anything this file tests. Cash is incidental infrastructure here (the subject is the navgrid overlay's cell types), so the remedy is a bigger cushion, per dev-scenario-authoring. Every later cash assertion in this file is a step-local changedBy and is unaffected.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:70000 staffed:true"
+          "command": "new_game seed:42 cash:120000 staffed:true"
         },
         {
           "type": "keypress",
@@ -18,7 +18,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 70000,
+          "cash": 120000,
           "buildingCount": 0,
           "holeCount": 0
         }
@@ -64,12 +64,15 @@
       }
     },
     {
-      "command": "tick 140",
-      "description": "#553: drain the ordered plan so the 'drill_hole' NavCell type actually appears on the overlay — sandbox-measured landing at tick 133 for this pattern.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "description": "#553: drain the ordered plan so the 'drill_hole' NavCell type actually appears on the overlay — sandbox-measured landing at tick 133 for this pattern. #1151: was a hand-measured `tick 140` pad, calibrated under the old whole-voxel climb rule. Under the 30-degree slope gate the same plan lands at tick 229, so the pad expired before the plan was drilled and every later step cascaded off an undrilled site. Replaced with a waitUntil on the thing actually being waited for, per dev-scenario-authoring: it costs only the ticks the drilling really takes, and a stall now fails loudly and by name instead of silently handing the next step a half-drilled plan.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 140"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 180000
         }
       ],
       "role": "setup",
@@ -79,7 +82,8 @@
           "holeCount": 9
         },
         "note": "All 9 holes have landed — the NavCell overlay now has real 'drill_hole' cells to render."
-      }
+      },
+      "timeout": 185
     },
     {
       "command": "build management_office at:0,3",
@@ -111,7 +115,9 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["orderedBuildingCount"],
+        "increased": [
+          "orderedBuildingCount"
+        ],
         "changedBy": {
           "cash": -8000
         },
@@ -197,7 +203,9 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["tickCount"]
+        "increased": [
+          "tickCount"
+        ]
       }
     }
   ],
