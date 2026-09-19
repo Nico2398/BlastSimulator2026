@@ -1428,7 +1428,7 @@ describe('buildRampCommand', () => {
     const cashBefore = ctx.state!.cash;
 
     const result = buildRampCommand(ctx, [], {
-      origin: '5,5', direction: 'south', length: '5', depth: '8',
+      origin: '5,5', direction: 'south', length: '5', depth: '2',
     });
 
     expect(result.success).toBe(true);
@@ -1440,7 +1440,9 @@ describe('buildRampCommand', () => {
     const ctx = makeMiningContext();
     const cashBefore = ctx.state!.cash;
 
-    const result = buildRampCommand(ctx, [], { start: '5,5', end: '5,10', depth: '6' });
+    // depth:2 stays within RAMP_CUT_SLOPE_RATIO for the inferred length-5 run
+    // (#1152) — this test is about direction/length inference, not slope.
+    const result = buildRampCommand(ctx, [], { start: '5,5', end: '5,10', depth: '2' });
 
     expect(result.success).toBe(true);
     // Inferred length = |10 - 5| = 5
@@ -1451,7 +1453,7 @@ describe('buildRampCommand', () => {
     const ctx = makeMiningContext();
     const cashBefore = ctx.state!.cash;
 
-    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
 
     expect(ctx.state!.finances.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
@@ -1669,7 +1671,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
   it('cancelling a partially-dug ramp keeps already-carved cells carved and refunds only the undone segments', () => {
     const ctx = makeMiningContext();
 
-    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
     expect(buildResult.success).toBe(true);
     const ramp = ctx.state!.plannedRamps[0]!;
     const rampId = ramp.id;
@@ -1724,7 +1726,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
 
   it('cancelling a non-existent ramp id fails cleanly with no state change', () => {
     const ctx = makeMiningContext();
-    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
     const cashBefore = ctx.state!.cash;
     const rampsBefore = ctx.state!.plannedRamps.length;
     const actionsBefore = ctx.state!.pendingActions.length;
@@ -1741,7 +1743,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
   it('the generic "employee cancel <id>" path cancels only one segment of a multi-segment ramp, leaving the rest untouched', () => {
     const ctx = makeMiningContext();
 
-    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
     expect(buildResult.success).toBe(true);
     const ramp = ctx.state!.plannedRamps[0]!;
     const rampId = ramp.id;
@@ -1795,7 +1797,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     const ctx = makeMiningContext();
 
     const cashBeforeOrder = ctx.state!.cash;
-    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
     expect(buildResult.success).toBe(true);
     const chargedCost = cashBeforeOrder - ctx.state!.cash;
 
@@ -1847,7 +1849,7 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     const ctx = makeMiningContext();
 
     const buildResult = buildRampCommand(ctx, [], {
-      origin: '5,5', direction: 'south', length: '1', depth: '3',
+      origin: '5,5', direction: 'south', length: '2', depth: '1',
     });
     expect(buildResult.success).toBe(true);
     expect(ctx.state!.plannedRamps).toHaveLength(1);
@@ -1904,7 +1906,7 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     const ctx = makeMiningContext();
 
     const buildResult = buildRampCommand(ctx, [], {
-      origin: '5,5', direction: 'south', length: '1', depth: '3',
+      origin: '5,5', direction: 'south', length: '2', depth: '1',
     });
     expect(buildResult.success).toBe(true);
     const ramp = ctx.state!.plannedRamps[0]!;
@@ -1942,7 +1944,7 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     const ctx = makeMiningContext();
 
     const buildResult = buildRampCommand(ctx, [], {
-      origin: '5,5', direction: 'south', length: '3', depth: '6',
+      origin: '5,5', direction: 'south', length: '5', depth: '2',
     });
     expect(buildResult.success).toBe(true);
     const ramp = ctx.state!.plannedRamps[0]!;

@@ -248,7 +248,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step_boxcut.title',
     textKey: 'tutorial.step_boxcut',
     highlightTarget: TOOLBAR_TARGET.build,
-    commands: ['build_ramp start:16,19 end:16,31 depth:8'],
+    commands: ['build_ramp start:16,19 end:16,31 depth:6'],
     waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({
       prevRampCount: state.navGrid

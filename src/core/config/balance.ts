@@ -802,7 +802,7 @@ export const NAV_RAMP_MIN_SLOPE_DELTA = NAV_MAX_SLOPE_RATIO * 0.95;
 /** Fraction of NAV_MAX_SLOPE_RATIO a freshly-cut ramp's floor is graded to — strictly
  * under 1 so the finished floor always tests as legally climbable with headroom for
  * float rounding across the ramp's full length (#1152). */
-export const RAMP_CUT_SLOPE_MARGIN = 0.98;
+const RAMP_CUT_SLOPE_MARGIN = 0.98;
 
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;

@@ -358,8 +358,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // mining.level_ground.ordered — the order-confirmation message's voxel
     // estimate and cost now go through i18n instead of a hardcoded template
     // literal — both locales.
+    // Baseline is now 3512 (up from 3510): #1152 adds
+    // mining.build_ramp.slope_too_steep (validateRampOrder's new slope-cap
+    // rejection) and ui.build.ramp_needs_length (the ramp tool's ghost-preview
+    // hint) — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3510);
+    expect(Object.keys(en).length).toBe(3512);
   });
 });
 

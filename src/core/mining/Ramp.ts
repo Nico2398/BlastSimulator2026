@@ -10,7 +10,10 @@ import {
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
-import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
+import {
+  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_CUT_SLOPE_RATIO,
+  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS,
+} from '../config/balance.js';
 
 // ── Config ──
 
@@ -168,18 +171,40 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
     };
   }
 
+  if (ramp.targetDepth <= 0) {
+    return { success: false, message: 'Target depth must be positive', cost: 0 };
+  }
+
+  const minLength = computeMinimumRampLength(ramp.targetDepth);
+  if (ramp.length < minLength - RAMP_MIN_LENGTH_EPSILON) {
+    const displayMinLength = Math.ceil(minLength);
+    return {
+      success: false,
+      message: `Ramp too short: ${ramp.targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${NAV_MAX_SLOPE_DEGREES}° slope limit (got ${ramp.length}m).`,
+      cost: 0,
+      messageKey: 'mining.build_ramp.slope_too_steep',
+      messageParams: {
+        depth: ramp.targetDepth, minLength: displayMinLength, length: ramp.length, maxDegrees: NAV_MAX_SLOPE_DEGREES,
+      },
+    };
+  }
+
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
   if (cash < totalCost) {
     return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
   }
 
-  if (ramp.targetDepth <= 0) {
-    return { success: false, message: 'Target depth must be positive', cost: 0 };
-  }
-
   return { success: true, message: '', cost: totalCost };
 }
+
+/**
+ * Float tolerance for the minimum-ramp-length check above — same scale and
+ * purpose as `FLOOR_TARGET_EPSILON` below: a requested `length` landing
+ * within this of the computed minimum is float rounding, not a genuine
+ * shortfall, and still validates (#1152).
+ */
+const RAMP_MIN_LENGTH_EPSILON = 1e-6;
 
 /** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
 export interface RampSegmentDef {
@@ -262,23 +287,9 @@ function computeRampColumnDepth(step: number, length: number, targetDepth: numbe
  * Shortest ramp length that reaches `targetDepth` without the floor's
  * rise-per-metre-of-run exceeding `RAMP_CUT_SLOPE_RATIO` (#1152).
  */
-export function computeMinimumRampLength(_targetDepth: number): number {
-  // TODO: implement
-  return 0;
-}
-
-/**
- * Median of three numbers — used below to reject a single-column terrain
- * outlier from the sequence of per-column surface heights a ramp's floor is
- * measured against (#1166), while leaving a genuine multi-column terrain
- * feature (a real plateau/canyon boundary the ramp crosses, see the
- * `defineRampSegments` "disjoint per-column floor/ceiling ranges" unit test)
- * untouched — a sustained feature always has at least two same-sided
- * neighbours agreeing with it, so its own median is itself; a lone outlier's
- * two neighbours agree with each other instead, so its median is theirs.
- */
-function median3(a: number, b: number, c: number): number {
-  return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
+export function computeMinimumRampLength(targetDepth: number): number {
+  if (targetDepth <= 0) return 0;
+  return targetDepth / RAMP_CUT_SLOPE_RATIO;
 }
 
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
@@ -297,22 +308,18 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
   // floor and this continuous target) rides along on the one cell
   // (`floorRowY`) that carve time can identify as "this column is now done".
   //
-  // `rawSurfaceY` is collected in a first pass (rather than read inline
-  // below) so each column's `floorY` can be measured against a median-of-3
-  // smoothing of its own raw value and its two ramp-direction neighbours
-  // (#1166): real terrain generation's own sub-voxel noise can nudge one
-  // column's discrete surface index down (or up) by a full voxel relative to
-  // two otherwise-flat neighbours either side — `computeColumnSurfaceY`'s
-  // integer scan turns that sub-voxel wobble into a full 1-voxel cliff the
-  // instant it crosses the 0.5-density threshold on one column but not its
-  // neighbours. Injected straight into `floorY`, that single-column
-  // discretisation artifact produced a non-monotonic, jagged carved floor —
-  // steeper than NAV_MAX_SLOPE_RATIO between two adjacent columns even
-  // though the ramp's own overall grade was gentle, stranding an employee at
-  // the ramp's own deepest carved column with no legal step back to the
-  // surface. `ceilingY` (headroom) deliberately keeps reading the raw,
-  // unsmoothed value — clearance above the floor should track actual local
-  // terrain, not a smoothed proxy of it.
+  // (#1152) `floorY` descends at a constant, continuous rise-per-metre-of-run
+  // from the ramp's own origin surface elevation (`rawSurfaceY[0]`), not from
+  // each column's own local surface — a per-column floor read follows local
+  // terrain noise into a non-monotonic, jagged line, steeper than
+  // NAV_MAX_SLOPE_RATIO between two adjacent columns even though the ramp's
+  // own overall grade is gentle, stranding an employee at the ramp's own
+  // deepest carved column with no legal step back to the surface.
+  // `validateRampOrder`'s slope check (`computeMinimumRampLength`) is what
+  // keeps this straight line's own grade within `RAMP_CUT_SLOPE_RATIO`, so no
+  // per-column smoothing is needed here anymore. `ceilingY` (headroom) keeps
+  // reading each column's own raw local surface height — clearance above the
+  // floor must track actual local terrain, only the floor is a straight line.
   const columns: RampColumn[] = [];
   let globalMinY = Infinity;
   let globalMaxY = -Infinity;
@@ -323,6 +330,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     const cz = ramp.originZ + offset.dz * step;
     rawSurfaceY.push(computeColumnSurfaceY(grid, cx, cz));
   }
+  const originSurfaceY = rawSurfaceY[0]!;
 
   for (let step = 0; step < ramp.length; step++) {
     const currentDepth = computeRampColumnDepth(step, ramp.length, ramp.targetDepth);
@@ -330,11 +338,8 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     const cz = ramp.originZ + offset.dz * step;
 
     const surfaceY = rawSurfaceY[step]!;
-    const prevSurfaceY = rawSurfaceY[Math.max(0, step - 1)]!;
-    const nextSurfaceY = rawSurfaceY[Math.min(ramp.length - 1, step + 1)]!;
-    const smoothedSurfaceY = median3(prevSurfaceY, surfaceY, nextSurfaceY);
 
-    const floorY = smoothedSurfaceY - currentDepth;
+    const floorY = originSurfaceY - currentDepth;
     const ceilingY = surfaceY + clearanceHeight;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
