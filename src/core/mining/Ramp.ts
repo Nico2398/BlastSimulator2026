@@ -259,6 +259,15 @@ function computeRampColumnDepth(step: number, length: number, targetDepth: numbe
 }
 
 /**
+ * Shortest ramp length that reaches `targetDepth` without the floor's
+ * rise-per-metre-of-run exceeding `RAMP_CUT_SLOPE_RATIO` (#1152).
+ */
+export function computeMinimumRampLength(_targetDepth: number): number {
+  // TODO: implement
+  return 0;
+}
+
+/**
  * Median of three numbers — used below to reject a single-column terrain
  * outlier from the sequence of per-column surface heights a ramp's floor is
  * measured against (#1166), while leaving a genuine multi-column terrain
