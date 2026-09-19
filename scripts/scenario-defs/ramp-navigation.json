@@ -1,26 +1,40 @@
 {
   "name": "ramp-navigation",
-  "description": "Chapter 6: Build ramp between two benches and verify agent can reach lower bench",
+  "description": "Chapter 6: Build ramp between two benches, dig it with a crewed rock_digger, and verify an employee can walk it end to end (#1152 verification: a dug ramp is walked end to end).",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "cash": 50000,
-          "holeCount": 0
-        }
+          "holeCount": 0,
+          "vehicleCount": 4,
+          "employeeCount": 5
+        },
+        "note": "staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants the roster/fleet for free at game-open, including the two driving.excavator drivers and the rock_digger this scenario needs to actually carve the ramp below — a plain new_game has neither, so ordering a ramp would only ever queue dig_ramp_segment work, never carve it."
       }
     },
     {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors building-ramp-visual.json's own crewing step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "build_ramp start:15,15 end:20,25 depth:5",
-      "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario. Explicit depth:5 added (#1151): the 10m length's max legal depth is length / 1.8 ≈ 5.77, so the default depth:8 (grade 0.8) is now too steep — 5 keeps every per-column step within NAV_MAX_SLOPE_RATIO.",
+      "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario. Explicit depth:5 added (#1151): the 10m length's max legal depth is length / 1.8 ≈ 5.77, so the default depth:8 (grade 0.8) is now too steep — 5 keeps every per-column step within NAV_MAX_SLOPE_RATIO, and stays comfortably under RAMP_CUT_SLOPE_RATIO too (#1152, ratio 0.5 vs cap ~0.566). Ordering only queues dig_ramp_segment work (#555/#925) — the crewed rock_digger below carves it over the following ticks, it isn't carved instantly by this command.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -59,7 +73,28 @@
         "changedBy": {
           "cash": -1000
         },
-        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000; a ramp carves the voxel grid directly rather than creating a tracked entity (no rampCount field exists to check), so a real cash deduction is the strongest state-level proof available that the build actually landed"
+        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000; a ramp carves the voxel grid directly rather than creating a tracked entity (no rampCount field exists to check), so a real cash deduction is the strongest state-level proof available that the order actually landed"
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
+      "timeout": 95,
+      "description": "Drain every queued dig_ramp_segment layer — the crewed rock_digger (vehicle #3, driver #4) clears one horizontal bench at a time, topmost first (#925), until the whole corridor is carved end to end. Only once this reaches 0 does the ramp exist as a walkable slope rather than solid rock with pending work queued against it.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully dug: every dig_ramp_segment layer landed."
       }
     },
     {
@@ -84,41 +119,67 @@
           "cash": -1200
         },
         "equals": {
-          "employeeCount": 1
+          "employeeCount": 6
         },
-        "note": "HIRING_COSTS.surveyor = 1200 (balance.ts)"
+        "note": "HIRING_COSTS.surveyor = 1200 (balance.ts); staffed:true's roster of 5 (driller/blaster/2 drivers/1 driver, STARTING_SITE_STAFFED_COMPOSITION) already occupies ids 1-5, so this surveyor lands as employee #6."
       }
     },
     {
-      "command": "employee list",
+      "command": "employee dispatch 6 x:15 z:24",
+      "description": "Walk the newly hired surveyor down the now-fully-dug ramp to its far end (#1152 verification: a dug ramp is walked end to end). The ramp runs south from origin (15,15), width 3 centred on x:15, 10m long — z:24 is its last carved column. No UI control drives this exact command (same class as nav-ramp-routing-visual.json's own `employee dispatch`) — a test hook by design, employees.ts's own `dispatch` case comment notes no player-facing flow reaches it yet.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee list"
+          "command": "employee dispatch 6 x:15 z:24"
         }
       ],
-      "role": "observe"
+      "role": "bootstrap"
     },
     {
-      "command": "tick 30",
+      "command": "tick 15",
+      "description": "#1152 red-phase probe: MOVE_STUCK_ABANDON_TICKS (balance.ts) is 30, and a genuinely illegal step along the route flags isMoveStuck within a few ticks of the failed move attempt, then self-heals (abandons the claim, resetting isMoveStuck to false) at the 30-tick mark — so a wider tick budget here would silently read stuckEmployeeCount:0 again even while broken. 15 ticks lands inside that window: today, before #1152's constant-slope floor exists, defineRampSegments measures floorY against each column's own local (pre-#1152: median-smoothed) surface, so this map's natural terrain undulation along the ramp's footprint produces per-column floor deltas exceeding NAV_MAX_SLOPE_RATIO at some interior step — direct-traced, seed 42: the surveyor reliably reads isMoveStuck at tick+3 post-dispatch, comfortably inside this 15-tick checkpoint. Once #1152 lands, the floor is a straight line capped under RAMP_CUT_SLOPE_RATIO end to end, no per-column illegal step exists, and the surveyor simply walks — isMoveStuck never sets at all, so this checkpoint reads 0 throughout.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 15"
         }
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
-        "note": "salary drain over 30 ticks with a surveyor on payroll — decreased, not an exact value (Finding #12: new_game leaves isPaused:false, so interaction mode's real wall-clock keeps ticking during the click round-trip beyond exactly 30, a drift command mode's headless tick 30 doesn't have)"
+        "equals": {
+          "stuckEmployeeCount": 0
+        },
+        "note": "#1152: not yet true pre-fix — a per-column illegal step midway down the ramp stalls the walk here. Must read 0 once the constant-slope floor lands."
       }
     },
     {
-      "command": "inspect 20,20,0",
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:100",
+      "timeout": 65,
+      "description": "The dispatched walk is the only PendingAction targeting this employee, and dig work already drained to 0 above — pendingActionCount reaching 0 again means the surveyor's own dispatch action actually completed (arrived at (15,24) and did its token work), not merely that it isn't currently flagged stuck. #1152: pre-fix, the same illegal step this file's tick-15 checkpoint documents leaves the walk permanently stuck-and-requeued (stuck -> MOVE_STUCK_ABANDON_TICKS abandon -> re-claimed -> stuck again), so pendingActionCount never reaches 0 within the budget and this step times out — direct-traced, seed 42: still nonzero at 100+ ticks past dispatch. Passes once #1152's constant-slope floor lets the walk actually finish.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 100,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "note": "#1152 verification: a dug ramp is walked end to end — the dispatched surveyor's walk-and-work action actually completed."
+      }
+    },
+    {
+      "command": "inspect 15,24,0",
+      "description": "Inspect the ramp's own far end — proves the column is carved (walkable), not just that the employee reports unstuck.",
       "interaction": [
         {
           "type": "command",
-          "command": "inspect 20,20,0"
+          "command": "inspect 15,24,0"
         }
       ],
       "role": "observe"

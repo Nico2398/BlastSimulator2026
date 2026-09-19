@@ -83,7 +83,7 @@ const SCENARIOS: Scenario[] = [
     setup: [
       'new_game seed:42 size:24',
       'campaign start level:tutorial_pit',
-      'build_ramp start:16,19 end:16,31 depth:8',
+      'build_ramp start:16,19 end:16,31 depth:6',
       'drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20',
       'charge hole:* explosive:boomite amount:5 stemming:2',
       'sequence auto delay_step:25',

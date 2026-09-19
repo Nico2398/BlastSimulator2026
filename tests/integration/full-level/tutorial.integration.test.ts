@@ -304,10 +304,13 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(deliverResult.output).not.toContain('Payment: $0');
 
     // 23. Build a ramp at (12,12) going south for 10m
+    // depth:5 stays within RAMP_CUT_SLOPE_RATIO for a 10m run (#1152) —
+    // this step is exercising a second ramp order, not testing slope.
     const rampResult = buildRampCommand(ctx as any, [], {
       origin: '12,12',
       direction: 'south',
       length: '10',
+      depth: '5',
     });
     expect(rampResult.success).toBe(true);
 
@@ -358,7 +361,7 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
     expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
-    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:6').success).toBe(true);
 
     const state = engine.ctx.state!;
     const prevRampCount = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;

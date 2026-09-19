@@ -97,7 +97,9 @@ describe('site expansion — buildings and ramps', () => {
   });
 
   it('claims the ground a ramp runs onto before cutting it', () => {
-    const result = buildRampCommand(ctx, [], { origin: '30,10', direction: 'east', length: '8' });
+    // depth:4 stays within RAMP_CUT_SLOPE_RATIO for an 8m run (#1152) — this
+    // test is about site-expansion claiming, not slope.
+    const result = buildRampCommand(ctx, [], { origin: '30,10', direction: 'east', length: '8', depth: '4' });
     expect(result.success).toBe(true);
     expect(ctx.grid!.containsColumn(38, 10)).toBe(true);
   });
@@ -192,7 +194,9 @@ describe('site expansion — bridging a target that is not edge-adjacent', () =>
     expect(buildCtx.grid!.containsColumn(70, 10)).toBe(true);
 
     const rampCtx = makeCtx();
-    const ramp = buildRampCommand(rampCtx, [], { origin: '70,10', direction: 'east', length: '4' });
+    // depth:2 stays within RAMP_CUT_SLOPE_RATIO for a 4m run (#1152) — this
+    // test is about bridging site claims, not slope.
+    const ramp = buildRampCommand(rampCtx, [], { origin: '70,10', direction: 'east', length: '4', depth: '2' });
     expect(ramp.success).toBe(true);
     expect(rampCtx.grid!.containsColumn(70, 10)).toBe(true);
   });
