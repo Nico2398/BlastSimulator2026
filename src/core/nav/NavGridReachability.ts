@@ -332,6 +332,8 @@ export function findNearestNavigableCell(
   let bestComponentSize = 0;
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
+  const usable = (x: number, z: number): boolean =>
+    !avoidOccupancy || !isOccupiedCell(navGrid, x, z);
 
   for (let startIdx = 0; startIdx < componentOf.length; startIdx++) {
     if (componentOf[startIdx] !== UNVISITED) continue;
@@ -344,8 +346,6 @@ export function findNearestNavigableCell(
     let count = 0;
     componentOf[startIdx] = startIdx;
     queue[count++] = startIdx;
-    const usable = (x: number, z: number): boolean =>
-      !avoidOccupancy || !isOccupiedCell(navGrid, x, z);
     let nearest: { x: number; z: number } | null = usable(sx, sz) ? { x: sx, z: sz } : null;
     let nearestDistSq = nearest ? (sx - targetX) ** 2 + (sz - targetZ) ** 2 : Infinity;
 
@@ -357,10 +357,17 @@ export function findNearestNavigableCell(
       for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
         const nx = x + dx;
         const nz = z + dz;
-        if (!isTraversableCell(navGrid, nx, nz)) continue;
-        if (!isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, Math.hypot(dx, dz))) continue;
+        if (nx < originX || nx >= originX + width || nz < originZ || nz >= originZ + height) continue;
+        // Label check first: in a dense region each cell is offered by up to
+        // eight neighbours but labelled once, so testing it before the cell
+        // lookups and the slope maths below skips that work on roughly seven
+        // of every eight edges. Behaviour is identical — everything past this
+        // point only ever ran for a newly-labelled cell anyway.
         const neighbourIdx = (nz - originZ) * width + (nx - originX);
         if (componentOf[neighbourIdx] !== UNVISITED) continue;
+        const neighbourCell = navGrid.cellAt(nx, nz);
+        if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+        if (!isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
         componentOf[neighbourIdx] = startIdx;
         queue[count++] = neighbourIdx;
         const distSq = (nx - targetX) ** 2 + (nz - targetZ) ** 2;
@@ -460,7 +467,13 @@ function countUsableCells(navGrid: NavGrid): number {
   let n = 0;
   for (let z = originZ; z < originZ + height; z++) {
     for (let x = originX; x < originX + width; x++) {
-      if (isTraversableCell(navGrid, x, z) && !isOccupiedCell(navGrid, x, z)) n++;
+      // One cell lookup, not the two that `isTraversableCell` plus
+      // `isOccupiedCell` would each make separately — this sweep runs over
+      // every cell of the grid on every mid-game spawn.
+      const cell = navGrid.cellAt(x, z);
+      if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
+      if (isCellOccupied(cell)) continue;
+      n++;
     }
   }
   return n;
@@ -545,11 +558,16 @@ function floodFillReachable(
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
-      if (!isTraversableCell(navGrid, nx, nz)) continue;
-      if (avoidOccupancy && isOccupiedCell(navGrid, nx, nz)) continue;
-      if (climbAware && !isStepClimbable(cell?.surfaceY, navGrid.cellAt(nx, nz)?.surfaceY, Math.hypot(dx, dz))) continue;
+      if (!navGrid.containsCell(nx, nz)) continue;
+      // Visited check first — see the identical note in
+      // findNearestNavigableCell's own fill. Behaviour is unchanged; the
+      // checks below only ever mattered for a cell about to be enqueued.
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
+      const neighbourCell = navGrid.cellAt(nx, nz);
+      if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+      if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
+      if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }
