@@ -88,6 +88,7 @@ export function sandboxCommand(
     sizeY: level.gridY,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    startingCrew: true,
   });
 
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);

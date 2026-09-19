@@ -162,6 +162,37 @@ export const SPAWN_RING_SIZE = 3;
 export const SPAWN_TILE_SPACING = 3;
 
 /**
+ * Cells between two starting vehicles when `placeStartingCrew`
+ * (src/core/state/SpawnPlacement.ts) lays the fresh crew out on
+ * climb-connected ground (#1166). Same job as SPAWN_TILE_SPACING's gap in the
+ * old fixed row: at closer range two vehicles tie on octile cost and A* can
+ * resolve a route onto the cell the other one blocks (#591). Kept as its own
+ * constant because the two placements answer to different things — that one
+ * to mesh legibility around a depot, this one to routing between crew and
+ * fleet on natural ground.
+ */
+export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
+
+/**
+ * How much longer than a straight line the starting crew's route to the
+ * middle of the site may run before `placeStartingCrew` treats its authored
+ * spawn as walled in and moves it (#1166). Measured across desert seeds:
+ * ordinary ground comes out at 0.98 — routes are effectively straight — while
+ * a crew stuck behind a face measured 2.78 on average and 14.41 at worst. 1.5
+ * sits well clear of ordinary terrain relief and well under any real detour.
+ */
+export const CREW_SPAWN_MAX_ROUTE_INFLATION = 1.5;
+
+/**
+ * How far from its authored spawn `placeStartingCrew` will look for ground
+ * with an acceptable route (#1166). A level's spawn coordinates are a design
+ * decision — work sites are authored near where the crew starts — so a crew
+ * that must move moves as little as possible, and the search stays cheap
+ * enough to run once at game open.
+ */
+export const CREW_SPAWN_SEARCH_RADIUS = 16;
+
+/**
  * Render-only queue offsets for vehicles in the 'waiting' operational state
  * that share a contended target cell (#411 round 2). detectTrafficJam groups
  * waiting vehicles by exact targetX/targetZ, so the simulation intentionally
