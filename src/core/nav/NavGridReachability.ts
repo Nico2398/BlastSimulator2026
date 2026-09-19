@@ -417,8 +417,14 @@ export function findNearestNavigableCell(
  * region holds; if that is more than half of the grid's usable cells, no
  * other region can be bigger, so the corner IS the main region and the answer
  * stands. Only when it is not does this pay for `findNearestNavigableCell`'s
- * all-regions scan, to re-anchor on the main region and ask again — the case
- * where the old code was simply wrong.
+ * all-regions scan — the case where the old code was simply wrong, and where
+ * there is therefore no earlier answer worth reproducing.
+ *
+ * That case is not hypothetical: on treranium_depths, the campaign's biggest
+ * level, the corner's region is 16 cells of 25,600, so every hire and every
+ * vehicle bought there used to land on a 16-cell rock. It is also why the
+ * hire/buy benchmarks got faster as they got wronger — filling a 16-cell
+ * island costs nothing.
  *
  * The check is exact, not a heuristic, and costs one cell count rather than a
  * second flood fill: two fills measured 277ms on treranium_depths' 160x160
@@ -430,13 +436,18 @@ export function findNearestSpawnCell(
   targetZ: number,
 ): { x: number; z: number } {
   const fromCorner = reachableAnswer(navGrid, 0, 0, targetX, targetZ, true);
+  // Usable cells can only ever be a subset of all cells, so clearing half of
+  // the whole grid clears half of the usable ones without counting them. That
+  // is the case on any ordinary site, and it keeps the common path free of
+  // even the sweep below.
+  if (fromCorner.count * 2 > navGrid.width * navGrid.height) return fromCorner.cell;
   if (fromCorner.count * 2 > countUsableCells(navGrid)) return fromCorner.cell;
-  // The corner is on an island. Re-anchor on the main region and ask the same
-  // question again, so the answer still comes back through the same selection
-  // — the bench-level preference (#458 T6.1/D13) included — rather than from
-  // a second, subtly different one.
-  const anchor = findNearestNavigableCell(navGrid, 0, 0, true);
-  return findNearestReachableCell(navGrid, anchor.x, anchor.z, targetX, targetZ, true);
+  // The corner is on an island, so there is no prior behaviour worth
+  // reproducing here — answer from the largest region directly. One scan,
+  // not a scan plus a second fill: treranium_depths reaches this path on
+  // every spawn (its corner region is 16 cells of 25,600), so this is the
+  // path the hire and buy benchmarks actually measure.
+  return findNearestNavigableCell(navGrid, targetX, targetZ, true);
 }
 
 /**
