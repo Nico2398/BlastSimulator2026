@@ -11,13 +11,22 @@ import {
   computeRampSegmentCarveTarget, carveRampSegmentSlice,
   type RampDef,
 } from '../../src/core/mining/Ramp.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../../src/core/config/balance.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 import { createLogisticsState, addBlastFragments } from '../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { subscribeNavGridToUpdates } from '../../src/core/nav/NavGridSync.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Max legal surfaceY delta between two waypoints a `run` metres apart
+ * (#1151: slope-based, replaces the flat NAV_MAX_CLIMB_HEIGHT literal).
+ * `run` is 1.0 for a cardinal step, √2 for a diagonal one.
+ */
+function maxLegalDelta(run: number): number {
+  return NAV_MAX_SLOPE_RATIO * run;
+}
 
 /** Fill every column with solid rock from y=0 to yMax (inclusive). */
 function fillSolid(grid: VoxelGrid, yMax: number) {
@@ -292,7 +301,19 @@ describe('NavMesh and pathfinding', () => {
   // world Y, so on realistic (elevated, non-flat-from-0) terrain it never
   // changed any column's surface height and multi-level routing could never
   // discover a ramp connection between benches.
-
+  //
+  // #1151 implementer note: `Ramp.ts`'s `defineRampSegments` computes each
+  // column's depth as `Math.floor((step / ramp.length) * ramp.targetDepth)`
+  // — an integer voxel staircase. Wherever that floor()'d value increments
+  // between two adjacent (1m-apart) columns, the jump is a full 1m rise —
+  // 45°, always past NAV_MAX_SLOPE_RATIO (~30°) regardless of the ramp's
+  // overall length:depth ratio. Satisfying this test (and the two other
+  // real-`buildRamp()` routing tests below) needs that per-column depth to
+  // become continuous (drop the `floor()`, carve via a fractional height
+  // the way `setVoxelColumnSurfaceHeight` already does elsewhere) so a
+  // gentle-average ramp doesn't hide an isolated too-steep single-column
+  // cliff. This is a `src/core/mining/Ramp.ts` change the skeleton commit
+  // did not make — it is in scope for the implementer, not a follow-up.
   it('multi-level routing succeeds via a ramp built on realistic (elevated) terrain', () => {
     const grid = new VoxelGrid(20, 30, 30);
     fillSolid(grid, 22); // flat plateau, surface Y=22 — not flat-from-0
@@ -301,8 +322,13 @@ describe('NavMesh and pathfinding', () => {
     const navBefore = NavGrid.buildNavGrid(grid, [], []);
     expect(findRampConnections(navBefore)).toEqual([]);
 
+    // Ramp grade (#1151): length must satisfy length >= ceil(depth * 1.8) —
+    // an empirical margin over the theoretical depth*√3 minimum, absorbing
+    // Ramp.ts's own per-column floor() rounding — for the descent to stay
+    // within NAV_MAX_SLOPE_RATIO (~0.5774 per metre of cardinal run).
+    // length:12, targetDepth:6 → grade 0.5, comfortably inside the limit.
     const rampResult = buildRamp(grid, {
-      originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+      originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 6,
     }, 100000);
     expect(rampResult.success).toBe(true);
 
@@ -335,12 +361,12 @@ describe('NavMesh and pathfinding', () => {
     expect(result.found).toBe(true);
 
     // Augmentation (#953): a level-spanning findPath succeeding over one
-    // short hop is not sufficient proof post-fix — climb gating could in
+    // short hop is not sufficient proof post-fix — slope gating could in
     // principle still block a longer route that has to actually traverse
     // the ramp's own gradual descent rather than a single nearby pair.
     // Drive a genuinely distant surface point down to the carved trench
     // floor and confirm every step of the real route stays within the
-    // climb limit end to end.
+    // slope limit end to end.
     const distantSurface = { x: 0, z: 0 };
     const endToEnd = findPath(navAfter, {
       agentId: 1, fromX: distantSurface.x, fromZ: distantSurface.z,
@@ -354,7 +380,8 @@ describe('NavMesh and pathfinding', () => {
       const by = navAfter.cellAt(b.x, b.z)!.surfaceY;
       expect(ay).toBeDefined();
       expect(by).toBeDefined();
-      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+      const run = Math.hypot(b.x - a.x, b.z - a.z);
+      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(maxLegalDelta(run));
     }
   });
 
@@ -383,7 +410,7 @@ describe('NavMesh and pathfinding', () => {
 
   // ── #953: a blast crater must be routed AROUND or through a dug ramp,
   // never walked straight across. A sheer crater wall (delta well beyond
-  // NAV_MAX_CLIMB_HEIGHT) falls through to 'walkable' cell type post-fix
+  // the slope limit) falls through to 'walkable' cell type post-fix
   // (see NavGrid.test.ts), so cell-type labels alone can't prove the fix —
   // only an end-to-end findPath plus a per-step surfaceY delta check can.
 
@@ -408,18 +435,28 @@ describe('NavMesh and pathfinding', () => {
       return grid;
     }
 
-    it('routes through a dug ramp into the crater — every waypoint step respects the climb limit', () => {
+    // #1151 implementer note: see the comment above "multi-level routing
+    // succeeds via a ramp built on realistic (elevated) terrain" — this
+    // real-buildRamp() test needs the same Ramp.ts continuous-carving fix.
+    it('routes through a dug ramp into the crater — every waypoint step respects the slope limit', () => {
       const grid = buildCraterPlateau();
 
+      // Ramp grade (#1151): the ramp band is fixed at 8 columns wide
+      // (RAMP_BAND_MAX_Z - originZ + 1), so targetDepth is capped at
+      // floor(8 / 1.8) = 4 to keep every per-column step within
+      // NAV_MAX_SLOPE_RATIO — the ramp reaches partway into the crater
+      // (down to y=18) rather than all the way to the crater's own sheer
+      // floor (y=14); that partial descent is still enough to prove a
+      // legal graded route exists where a sheer wall would refuse one.
       const rampResult = buildRamp(grid, {
-        originX: 10, originZ: 14, direction: 'south', length: 8, targetDepth: 8,
+        originX: 10, originZ: 14, direction: 'south', length: 8, targetDepth: 4,
       }, 1_000_000);
       expect(rampResult.success).toBe(true);
 
       const nav = NavGrid.buildNavGrid(grid, [], []);
 
       const from = { x: 10, z: 5 };  // surface, well outside the crater
-      const to = { x: 10, z: 21 };   // ramp's own last carved column — crater floor
+      const to = { x: 10, z: 21 };   // ramp's own last carved column
 
       const result = findPath(nav, {
         agentId: 1, fromX: from.x, fromZ: from.z, toX: to.x, toZ: to.z, avoidVehicles: false,
@@ -428,7 +465,7 @@ describe('NavMesh and pathfinding', () => {
       expect(result.found).toBe(true);
 
       // Real proof it used the ramp, independent of cell-type labels: every
-      // consecutive waypoint pair's surfaceY delta stays within the climb limit.
+      // consecutive waypoint pair's surfaceY delta stays within the slope limit.
       for (let i = 0; i < result.waypoints.length - 1; i++) {
         const a = result.waypoints[i]!;
         const b = result.waypoints[i + 1]!;
@@ -436,7 +473,8 @@ describe('NavMesh and pathfinding', () => {
         const by = nav.cellAt(b.x, b.z)!.surfaceY;
         expect(ay).toBeDefined();
         expect(by).toBeDefined();
-        expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+        const run = Math.hypot(b.x - a.x, b.z - a.z);
+        expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(maxLegalDelta(run));
       }
     });
 
@@ -478,8 +516,11 @@ describe('NavMesh and pathfinding', () => {
     return grid;
   }
 
+  // Ramp grade (#1151): length:12, targetDepth:6 → grade 0.5, within the
+  // length >= ceil(depth * 1.8) rule (matches the earlier realistic-terrain
+  // ramp test above).
   const PROGRESSIVE_RAMP: RampDef = {
-    originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+    originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 6,
   };
 
   it('after each segment lands, the NavGrid has no blocked/void cell inside that segment\'s own carved region (event-driven, #1146)', () => {
@@ -586,18 +627,41 @@ describe('NavMesh and pathfinding', () => {
     expect(notches).toEqual([]);
   });
 
+  // #1151 implementer note: see the comment above "multi-level routing
+  // succeeds via a ramp built on realistic (elevated) terrain" — the
+  // fullPath assertions below need the same Ramp.ts continuous-carving fix.
   it('the ramp\'s deepest column only reaches its fully-excavated depth once every segment has landed — the last (deepest) layer landing is what completes full multi-level routing', () => {
+    // A ramp of its own, distinct from PROGRESSIVE_RAMP (whose 6m depth over
+    // 12 steps crosses the NAV_BENCH_HEIGHT=5 boundary several steps before
+    // its deepest column — every column's own headroom clearing reaches down
+    // to just above its floor in an earlier, higher-y segment, so the
+    // boundary is generally crossed there, not at the final layer). This
+    // ramp's depth (5m, exactly one bench) is tuned so its deepest column's
+    // own final descent — a fractional depth of 4.5m at step 9 of 10 — is
+    // itself what pushes its climbY from 18 (bench 0) to 17 (bench 1),
+    // landing only once the last segment (the sole layer at y=18) carves.
+    const RAMP_TO_BENCH_BOUNDARY: RampDef = {
+      originX: 10, originZ: 5, direction: 'south', length: 10, targetDepth: 5,
+    };
+    // The ramp's true deepest column (step length-1), read directly rather
+    // than via `segments[last].cells[0]` — the final y-layer can be shared
+    // by more than one column (any column whose own floor happens to land
+    // on that same integer row), and array order does not guarantee the
+    // first cell listed there is this ramp's actual deepest step.
+    const lastX = RAMP_TO_BENCH_BOUNDARY.originX;
+    const lastZ = RAMP_TO_BENCH_BOUNDARY.originZ + RAMP_TO_BENCH_BOUNDARY.length - 1;
+
     // Reference: every segment carved and patched in order — the target depth
     // the fully-dug ramp reaches at its deepest (last) layer.
     const gridFull = buildElevatedPlateau();
     const navFull = NavGrid.buildNavGrid(gridFull, [], []);
-    const segmentsFull = defineRampSegments(gridFull, PROGRESSIVE_RAMP);
+    const segmentsFull = defineRampSegments(gridFull, RAMP_TO_BENCH_BOUNDARY);
     expect(segmentsFull.length).toBeGreaterThan(1);
     for (const segment of segmentsFull) {
       carveRampSegment(gridFull, segment);
       if (segment.region) NavGrid.patchNavGrid(navFull, gridFull, [], [], segment.region);
     }
-    const lastCell = segmentsFull[segmentsFull.length - 1]!.cells[0]!;
+    const lastCell = { x: lastX, z: lastZ };
     const fullyDugSurfaceY = NavGrid.computeSurfaceY(gridFull, lastCell.x, lastCell.z);
 
     // #953: findRampConnections looks for a single 'ramp'-typed cell whose
@@ -624,13 +688,14 @@ describe('NavMesh and pathfinding', () => {
       const b = fullPath.waypoints[i + 1]!;
       const ay = navFull.cellAt(a.x, a.z)!.surfaceY;
       const by = navFull.cellAt(b.x, b.z)!.surfaceY;
-      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(NAV_MAX_CLIMB_HEIGHT);
+      const run = Math.hypot(b.x - a.x, b.z - a.z);
+      expect(Math.abs(ay! - by!)).toBeLessThanOrEqual(maxLegalDelta(run));
     }
 
     // Every layer except the very deepest one — the ramp is not fully dug yet.
     const gridPrefix = buildElevatedPlateau();
     const navPrefix = NavGrid.buildNavGrid(gridPrefix, [], []);
-    const segmentsPrefix = defineRampSegments(gridPrefix, PROGRESSIVE_RAMP);
+    const segmentsPrefix = defineRampSegments(gridPrefix, RAMP_TO_BENCH_BOUNDARY);
     for (const segment of segmentsPrefix.slice(0, -1)) {
       carveRampSegment(gridPrefix, segment);
       if (segment.region) NavGrid.patchNavGrid(navPrefix, gridPrefix, [], [], segment.region);

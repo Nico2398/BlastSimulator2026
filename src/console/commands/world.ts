@@ -2,6 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
+import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
@@ -140,6 +141,14 @@ export function regenerateGrid(
     seed: number; climateBias: readonly [number, number];
     sizeX: number; sizeY: number; sizeZ: number;
     mixedRockHardness?: boolean;
+    /**
+     * True only where this grid is a game's first (`new_game`, a campaign
+     * level start, `sandbox`): the starting crew is then laid out on real
+     * ground through `placeStartingCrew` (#1166). A save load reaches the
+     * same function with crew positions that are the save's own — mid-shift,
+     * mid-route, wherever the player left them — and must never be regrouped.
+     */
+    startingCrew?: boolean;
   },
 ): void {
   if (!ctx.state) return;
@@ -155,6 +164,13 @@ export function regenerateGrid(
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   // Terrain only exists now, so this is the first moment a spawn point picked
   // blind (staffed roster, campaign level literals) can be checked against it.
+  // On a game's first grid the whole crew is regrouped onto one patch of
+  // mutually climb-connected ground (#1166); the navgrid is then rebuilt
+  // because the vehicles carried their own `vehicleOccupied` cells with them.
+  // Everywhere else — a save load — only genuinely stranded agents move.
+  if (params.startingCrew && placeStartingCrew(ctx.state)) {
+    buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  }
   snapAgentsToNavigableGround(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
@@ -243,7 +259,7 @@ export function newGameCommand(
     ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
   ctx.state.world = createWorldState(size, sizeY, size, true);
-  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size });
+  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size, startingCrew: true });
 
   return {
     success: true,

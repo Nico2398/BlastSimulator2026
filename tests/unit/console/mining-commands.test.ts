@@ -1866,10 +1866,22 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     // The PlannedRamp is fully spliced out once its last segment lands.
     expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
 
-    // Every one of its cells has actually been carved (density 0), not just
-    // marked done in bookkeeping.
+    // Every one of its cells has actually been carved, not just marked done
+    // in bookkeeping — a hard 0 for a plain cell, or a residual crossing
+    // density in (0, 1) for a column's own floor-row cell, which continuous
+    // banding (#1151) re-grades to that column's true continuous depth
+    // instead of leaving a hard, fully-cleared voxel step. Unlike Ramp.test's
+    // hand-built flat fixtures, this ramp sits on real generated terrain, so
+    // its width band's per-column surface heights vary independently of the
+    // centre-line depth the floor adjustment is computed from — the residual
+    // isn't tightly bounded to (0, 0.5] the way a flat fixture's is.
     for (const cell of segmentCells) {
-      expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+      if (cell.floorAdjustment !== undefined) {
+        expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+        expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBeLessThan(1);
+      } else {
+        expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+      }
     }
 
     // No leftover dig_ramp_segment action/ghost survives for this ramp.

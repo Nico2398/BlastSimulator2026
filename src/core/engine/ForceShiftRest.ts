@@ -19,7 +19,7 @@ import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
 
 /**
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
@@ -305,23 +305,64 @@ export function forceShiftRestIfNeededByPolicy(
   // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
   // (see its own comment on the same check) for the same reason.
   if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
-  // Already arrived and mid-execution of a boarded vehicle-gated action
-  // (e.g. dig_ramp_segment — #945; see isMidVehicleGatedWork's own doc
-  // comment, VehicleReservation.ts, and this function's own doc comment
-  // above for why this guard survives #1090). Interrupting mid-execution
-  // forces a fresh walk-and-reboard/re-approach cycle once the rest ends,
-  // instead of letting the driver finish this segment first.
+  // Boarded and driving toward, or already arrived and mid-execution of, a
+  // claimed vehicle-gated action (e.g. dig_ramp_segment, drill_hole — #945;
+  // see isMidVehicleGatedWork's own doc comment, VehicleReservation.ts, and
+  // this function's own doc comment above for why this guard survives
+  // #1090). Interrupting either phase forces a fresh walk-and-reboard/
+  // re-approach cycle once the rest ends, instead of letting the driver
+  // reach and finish this segment first.
   //
-  // Deliberately does NOT also cover the mid-drive-to-target phase (taskTicksRemaining
-  // still null) — unlike the mid-execution case above, a long initial approach
-  // drive protected the same way just defers the same crossing to
-  // tickCollapse's unconditional hard floor instead of this policy's own
-  // proactive one, trading a healthy rest at the policy's threshold for a
-  // drive-to-zero collapse with no net reduction in how many times the
-  // vehicle gets boarded. #922's own VehicleReservation.test.ts already pins
-  // mid-drive interruption as intended behavior for the legacy (non-policy)
-  // forceShiftRestIfNeeded — this mirrors that scope for the policy path too.
-  if (isMidClaimedTaskExecution(emp) && isMidVehicleGatedWork(state, emp)) return;
+  // Used to cover only the already-arrived execution phase
+  // (isMidClaimedTaskExecution(emp) && isMidVehicleGatedWork(state, emp)),
+  // deliberately excluding the mid-drive-to-target phase — on the reasoning
+  // that protecting a long initial approach drive the same way just defers
+  // the same crossing to tickCollapse's unconditional hard floor instead of
+  // this policy's own proactive one. That reasoning assumed a short
+  // approach drive relative to the fatigue budget between thresholds; #1151's
+  // slope-based traversal (#1166 follow-up) can now make the SINGLE initial
+  // approach alone cost more ticks than a full fatigue charge affords, and
+  // unlike the long-running execution phase this guard already protects,
+  // that approach drive has no fallback that ever converges: interrupting it
+  // walks the vehicle all the way back to living_quarters (mount continuity
+  // through rest, #1118 — the return trip is itself a drive, not a foot
+  // walk) and, once rested, re-drives the identical distance from scratch,
+  // landing at the same fraction of the same route and re-crossing the
+  // threshold at the same point every time — a deterministic livelock with
+  // zero variance to ever break it, confirmed live via both this suite's own
+  // #945 box-cut repro (rock_digger driver stuck oscillating between (28,13)
+  // and its own dig site for 5000+ ticks, dig_ramp_segment count static at
+  // 10 the entire time) and tutorial-interactive-revolt.integration.test.ts's
+  // #707 repro (driller stuck the same way against a drill_hole).
+  //
+  // Extending this guard to the drive phase unconditionally, the same way
+  // execution is protected (tried first), closed both livelocks but traded
+  // them for a different regression: a vehicle-gated claim protected end to
+  // end (drive AND execution, with #1090's own hasClaimableSameRoleFollowUp
+  // guard below also deferring the one-tick idle gap between consecutive
+  // same-role claims) gives a multi-segment order like the #945 box-cut ramp
+  // NO natural interruption point at all for its whole duration — fatigue
+  // and the morale it drives (NEED_MORALE_EFFECT_PENALTIES) sink for the
+  // entire grind with no intervening rest, direct-traced via
+  // tutorial-interactive-revolt's own #707 repro sinking wellBeing to 0 well
+  // before the blast step, worse than the unprotected original despite
+  // converging structurally.
+  //
+  // Execution stays unconditionally protected (isMidClaimedTaskExecution),
+  // matching the pre-#1166 contract this file's own pinned unit test still
+  // asserts (a bounded work stint, always deferred to tickCollapse's hard
+  // floor rather than fragmented by this policy's own threshold) — only the
+  // DRIVE phase gets the new, narrower condition: protected while fatigue
+  // still has headroom above NEED_SOFT_THRESHOLDS.fatigue (25), so this
+  // policy's own ROUTINE threshold crossing (fatigueRestThreshold, typically
+  // 60) no longer interrupts a single approach drive it can't recover from
+  // mid-route, but steps aside once fatigue is already low enough that the
+  // REACTIVE path (autoInsertNeedTasks) would be queueing a rest of its own
+  // — so a genuinely long multi-segment order still gets rest before
+  // fatigue/morale bottom out, just later than the old routine-threshold
+  // cadence rather than never.
+  if (isMidVehicleGatedWork(state, emp)
+    && (isMidClaimedTaskExecution(emp) || emp.fatigue > NEED_SOFT_THRESHOLDS.fatigue)) return;
   // Already arrived and mid-execution of a task in
   // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
   // working one (taskTicksRemaining !== null, not just claimed-but-still-

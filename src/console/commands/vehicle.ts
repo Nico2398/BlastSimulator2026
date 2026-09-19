@@ -106,25 +106,16 @@ export function vehicleCommand(
       const rawSpawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
       const rawSpawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
       // A blast can clear the grid centre down to a floorless 'void' column,
-      // or wall off a pocket of "nearest" traversable tiles from the rest of
-      // the map entirely — #437 regression: driver boarding now walks to the
-      // vehicle instead of assigning instantly, and nothing can path onto an
-      // unreachable tile. Snap the spawn point to the nearest NavGrid cell
-      // that is actually path-connected to the map's main region (anchored
-      // at a corner, since blast sites are never placed on the map edge) so
-      // a freshly bought vehicle is always reachable on foot.
-      //
-      // avoidOccupancy: true (#954 follow-up fix): a raw spawn point can also
-      // land inside a dense post-blast fragment field — still 'walkable' by
-      // cell type, so the reachability check above alone would accept it
-      // unmoved, but with every neighbour fragment-occupied no driver could
-      // ever walk up to board it (foot travel avoids occupied cells, #954),
-      // stranding the vehicle exactly as "always reachable on foot" above
-      // promises it never should be. Same hazard, same fix as the employee
-      // hire spawn point right above this file's own sibling in
-      // employees.ts — see that call site's own comment for the live repro.
+      // wall off a pocket of "nearest" traversable tiles from the rest of the
+      // map (#437: driver boarding walks to the vehicle, and nothing can path
+      // onto an unreachable tile), or bury the point in a fragment field
+      // whose cells still read 'walkable' but that no driver can step through
+      // (#954). findNearestSpawnCell rules out all three — see its own doc
+      // for why the anchor it snaps against is derived rather than the
+      // literal corner this call site used to assume (#1151). Same call, same
+      // reasons, as the employee hire spawn point in employees.ts.
       const { x: spawnX, z: spawnZ } = state.navGrid
-        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ, true)
+        ? NavGrid.findNearestSpawnCell(state.navGrid, rawSpawnX, rawSpawnZ)
         : { x: rawSpawnX, z: rawSpawnZ };
       // Deducts the same `cost` the guard above tested, so the checked amount
       // and the charged amount can never drift apart.

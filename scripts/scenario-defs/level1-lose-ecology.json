@@ -460,7 +460,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:7 cols:7 spacing:2 depth:6 diameter:0.089 start:5,5",
+      "command": "drill_plan grid rows:7 cols:7 spacing:2 depth:6 diameter:0.089 start:9,4",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -485,10 +485,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 5,
-          "z1": 5,
-          "x2": 17,
-          "z2": 17
+          "x1": 9,
+          "z1": 4,
+          "x2": 21,
+          "z2": 16
         },
         {
           "type": "clickSelector",
@@ -496,7 +496,7 @@
         }
       ],
       "role": "player",
-      "description": "One decrement click on the strip's own spacing stepper (data-field=\"spacing\", DEFAULT_SPACING_M=3 -> 2, Drill.ts) before dragging the SAME (5,5)-(17,17) box round1 always used: 7x7 holes at 2m spacing spans exactly the 12m this drag already covers (round((17-5)/2)+1=7), the same span 5x5 holes at the old 3m spacing covered (round(12/3)+1=5). Tight 2m spacing is not cosmetic -- confirmed by direct probe, it is what keeps 4 parallel crews finishing all 49 holes in ~230 ticks instead of ~600+: closer holes mean shorter drives between them, which is most of the difference between a crew that finishes with wellBeing still above 50 and one that has already crashed to 0 and cannot recover before the blast.",
+      "description": "One decrement click on the strip's own spacing stepper (data-field=\"spacing\", DEFAULT_SPACING_M=3 -> 2, Drill.ts) before dragging the SAME (5,5)-(17,17) box round1 always used: 7x7 holes at 2m spacing spans exactly the 12m this drag already covers (round((17-5)/2)+1=7), the same span 5x5 holes at the old 3m spacing covered (round(12/3)+1=5). Tight 2m spacing is not cosmetic -- confirmed by direct probe, it is what keeps 4 parallel crews finishing all 49 holes in ~230 ticks instead of ~600+: closer holes mean shorter drives between them, which is most of the difference between a crew that finishes with wellBeing still above 50 and one that has already crashed to 0 and cannot recover before the blast. #1151: box moved from (5,5) to (9,4). Under the 30-degree slope gate four of the old box's holes -- (5,11) (7,15) (7,17) (9,17) -- sit outside the crew's climb-reachable patch on dusty_hollow, so they could never be claimed and the plan stalled short of 49 forever, surfacing as \"Missing charge\" at the blast. Measured with computeClimbReachableSet at level open; start:9,4 is the nearest origin whose whole 7x7 grid is reachable. Where the box sits is incidental to this file -- its subject is losing on ecology, which needs 49 holes blasted, not 49 holes in one particular place.",
       "expect": {
         "equals": {
           "orderedHoleCount": 49,

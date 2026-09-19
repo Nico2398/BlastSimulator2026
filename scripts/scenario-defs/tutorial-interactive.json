@@ -342,9 +342,9 @@
       }
     },
     {
-      "command": "set_policy mode:continuous",
+      "command": "set_policy mode:continuous fatigue:75",
       "timeout": 30,
-      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Selects Continuous under Shift Mode first, then Apply -- shift_8h's own SHIFT_DURATIONS_TICKS (8) is shorter than a single drill_hole action, so applying it this early interrupted the queued vehicle-gated work below before it could finish (confirmed live pre-#700). Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap. The later set-policy step (unchanged) still teaches shift_8h once the grind is over. #707: timeout 15 -> 30 -- this was the only step in the file below the 30s floor every other player step uses; its `waitForTutorialStep` action's own inner deadline defaults to 30000ms (interaction-executor.ts) but effectiveStepTimeoutMs (scenario-utils.ts) doesn't know that action's `timeout` field (only `timeoutMs`/its own DEFAULT_INNER_TIMEOUT_MS table), so the outer 15000ms raced and lost first on a slow (no-GPU, #475) render -- confirmed live: the tutorial card had already reached 'build-driving-center' by the time the step's own 15s wall clock expired.",
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Selects Continuous under Shift Mode first, then Apply -- shift_8h's own SHIFT_DURATIONS_TICKS (8) is shorter than a single drill_hole action, so applying it this early interrupted the queued vehicle-gated work below before it could finish (confirmed live pre-#700). Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap. The later set-policy step (unchanged) still teaches shift_8h once the grind is over. #707: timeout 15 -> 30 -- this was the only step in the file below the 30s floor every other player step uses; its `waitForTutorialStep` action's own inner deadline defaults to 30000ms (interaction-executor.ts) but effectiveStepTimeoutMs (scenario-utils.ts) doesn't know that action's `timeout` field (only `timeoutMs`/its own DEFAULT_INNER_TIMEOUT_MS table), so the outer 15000ms raced and lost first on a slow (no-GPU, #475) render -- confirmed live: the tutorial card had already reached 'build-driving-center' by the time the step's own 15s wall clock expired. #1151: the rest threshold is now set explicitly to 75 instead of left at its default 60 \u2014 the same change e11081b made to the identical step in tutorial-steps-visual.json, for the same reason: under the 30-degree slope gate a drive to a drill hole is long enough that a worker protected from rest-interruption mid-drive arrives with almost nothing left. e11081b measured that in command mode, where only the sibling file showed it; this file fails the same way in interaction mode only, where the extra real ticks a player-driven step spends deepen the same drain. Measured here: wellBeing falls 99.99 -> 1.34 across the nine-hole drill wait and the run ends in a worker revolt at the zone-clear step. Resting at 75 starts the walk back while it is still affordable.",
       "role": "player",
       "interaction": [
         {
@@ -361,6 +361,11 @@
         {
           "type": "clickSelector",
           "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-policy-fatigue",
+          "value": "75"
         },
         {
           "type": "clickSelector",
@@ -573,9 +578,9 @@
       }
     },
     {
-      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "command": "build_ramp start:16,19 end:16,31 depth:6",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923. #1151: depth explicit 8 -> 6 -- length 12 (z:19-31, can't extend further without running off this 32-wide map's edge) now caps the legal depth at floor(12 / 1.8) = 6 to keep every per-column step within NAV_MAX_SLOPE_RATIO. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan below is depth:8, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth by up to 1 (the old depth:8/length:12 pairing actually bottomed out at floor(11/12*8)=7, not 8) -- at depth:6 the ramp's real floor is floor(11/12*6)=5, up to 3m short of this file's 8-deep crater floor. A gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of how ramp length/depth are tuned in this file alone; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts) -- not something a scenario-def edit can fix on its own.",
       "role": "player",
       "interaction": [
         {
@@ -594,6 +599,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
         },
         {
           "type": "dragTiles",

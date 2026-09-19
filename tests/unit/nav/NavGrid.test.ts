@@ -26,7 +26,7 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
+import { NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_DEGREES, NAV_RAMP_MIN_SLOPE_DELTA, NAV_BENCH_HEIGHT } from '../../../src/core/config/balance.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createVehicleState, purchaseVehicle, isVehicleCurrentlyDriving, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
@@ -35,6 +35,17 @@ import { Random } from '../../../src/core/math/Random.js';
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A cardinal-neighbour height delta that sits strictly between the
+ * anti-noise floor (NAV_RAMP_MIN_SLOPE_DELTA) and the climbable ceiling
+ * (NAV_MAX_SLOPE_RATIO) for a 1m run — climbable, and steep enough to read
+ * as a ramp rather than flat graded ground. Shared by every "in-band ramp
+ * delta" fixture below instead of each hardcoding a value against a
+ * specific floor (#1151 fixer: NAV_RAMP_MIN_SLOPE_DELTA moved from a flat
+ * 0.05m to ~0.95 * NAV_MAX_SLOPE_RATIO).
+ */
+const IN_BAND_RAMP_DELTA = (NAV_RAMP_MIN_SLOPE_DELTA + NAV_MAX_SLOPE_RATIO) / 2;
 
 /** Create a solid voxel with optional overrides. */
 function solidVoxel(overrides?: Partial<VoxelData>): VoxelData {
@@ -343,94 +354,86 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     }
   });
 
-  it('ramp detected when neighbor surface Y differs by > 1', () => {
-    // 3×3 grid, center column (1,1) solidY=4, neighbor (1,2) solidY=2
-    // Diff = |4-2| = 2 (> 1) → center should be ramp
+  it('ramp detected when a cardinal neighbour surfaceY delta sits within the legal slope band (#1151)', () => {
+    // 3×3 grid, every column at continuous height 4.0m except south neighbor
+    // (1,2) graded up by IN_BAND_RAMP_DELTA — above the anti-noise floor
+    // (NAV_RAMP_MIN_SLOPE_DELTA) and within NAV_MAX_SLOPE_RATIO
+    // (~0.5774) for a 1m cardinal run, so the step is climbable and steep
+    // enough to read as a ramp rather than flat ground. A whole-voxel height
+    // difference can no longer produce this: the smallest possible nonzero
+    // delta between two integer-quantized columns is 1.0m, already past the
+    // 0.5774m ceiling — ramps now only form on continuously graded terrain
+    // (#1148/#1149), the same one buildRamp() itself carves.
     const grid = new VoxelGrid(3, 10, 3);
-    // Fill center column solid to Y=4
-    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
-    // Fill south neighbor column solid to Y=2 (lower)
-    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
-    // Fill remaining columns solid to Y=4 to avoid void neighbors
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
-      for (let x = 0; x < 3; x++) {
-        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
-        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
-      }
+      for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
     }
+    setVoxelColumnSurfaceHeight(grid, 1, 2, 4.0 + IN_BAND_RAMP_DELTA, compId);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cells[1]![1]!.type).toBe('ramp');
   });
 
-  it('ramp NOT triggered when neighbor diff = 1', () => {
-    // 3×3 grid, center solidY=4, neighbor solidY=3 → diff=1 (not > 1) → walkable
+  it('ramp NOT triggered when neighbour delta sits at or below the anti-noise floor (#1151)', () => {
+    // Center 4.0m, south neighbour graded by half of NAV_RAMP_MIN_SLOPE_DELTA
+    // — below the anti-noise floor, so it reads as flat, not a ramp.
     const grid = new VoxelGrid(3, 10, 3);
-    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
-    for (let y = 0; y <= 3; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
-      for (let x = 0; x < 3; x++) {
-        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
-        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
-      }
+      for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
     }
+    setVoxelColumnSurfaceHeight(grid, 1, 2, 4.0 + NAV_RAMP_MIN_SLOPE_DELTA / 2, compId);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cells[1]![1]!.type).toBe('walkable');
   });
 
   it('ramp cell has moveCost 1.8', () => {
-    // 3×3 grid with height diff > 1 → ramp cell should have moveCost 1.8
+    // Same in-band delta (IN_BAND_RAMP_DELTA) as the "ramp detected" case
+    // above → ramp cell should have moveCost 1.8.
     const grid = new VoxelGrid(3, 10, 3);
-    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
-    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
-      for (let x = 0; x < 3; x++) {
-        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
-        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
-      }
+      for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
     }
+    setVoxelColumnSurfaceHeight(grid, 1, 2, 4.0 + IN_BAND_RAMP_DELTA, compId);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cells[1]![1]!.moveCost).toBe(1.8);
   });
 
-  it('ramp detected with height diff on each cardinal direction', () => {
-    // North: center (2,2) solidY=4, north neighbor (2,1) solidY=2
+  it('ramp detected with an in-band height delta on each cardinal direction', () => {
+    // North: center (2,2) at 4.0m, north neighbor (2,1) graded up by IN_BAND_RAMP_DELTA
     const gridNorth = new VoxelGrid(5, 10, 5);
+    const compIdNorth = gridNorth.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
-      for (let x = 0; x < 5; x++)
-        for (let y = 0; y <= 4; y++) gridNorth.setVoxel(x, y, z, solidVoxel());
-    // Lower north neighbor column
-    for (let y = 0; y <= 4; y++) gridNorth.clearVoxel(2, y, 1);
-    for (let y = 0; y <= 2; y++) gridNorth.setVoxel(2, y, 1, solidVoxel());
+      for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridNorth, x, z, 4.0, compIdNorth);
+    setVoxelColumnSurfaceHeight(gridNorth, 2, 1, 4.0 + IN_BAND_RAMP_DELTA, compIdNorth);
     const navNorth = NavGrid.buildNavGrid(gridNorth, [], []);
     expect(navNorth.cells[1]![2]!.type).toBe('ramp');
 
-    // South: center (2,2) solidY=4, south neighbor (2,3) solidY=2
+    // South: center (2,2) at 4.0m, south neighbor (2,3) graded up by IN_BAND_RAMP_DELTA
     const gridSouth = new VoxelGrid(5, 10, 5);
+    const compIdSouth = gridSouth.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
-      for (let x = 0; x < 5; x++)
-        for (let y = 0; y <= 4; y++) gridSouth.setVoxel(x, y, z, solidVoxel());
-    for (let y = 0; y <= 4; y++) gridSouth.clearVoxel(2, y, 3);
-    for (let y = 0; y <= 2; y++) gridSouth.setVoxel(2, y, 3, solidVoxel());
+      for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridSouth, x, z, 4.0, compIdSouth);
+    setVoxelColumnSurfaceHeight(gridSouth, 2, 3, 4.0 + IN_BAND_RAMP_DELTA, compIdSouth);
     const navSouth = NavGrid.buildNavGrid(gridSouth, [], []);
     expect(navSouth.cells[3]![2]!.type).toBe('ramp');
 
-    // West: center (2,2) solidY=4, west neighbor (1,2) solidY=2
+    // West: center (2,2) at 4.0m, west neighbor (1,2) graded up by IN_BAND_RAMP_DELTA
     const gridWest = new VoxelGrid(5, 10, 5);
+    const compIdWest = gridWest.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
-      for (let x = 0; x < 5; x++)
-        for (let y = 0; y <= 4; y++) gridWest.setVoxel(x, y, z, solidVoxel());
-    for (let y = 0; y <= 4; y++) gridWest.clearVoxel(1, y, 2);
-    for (let y = 0; y <= 2; y++) gridWest.setVoxel(1, y, 2, solidVoxel());
+      for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridWest, x, z, 4.0, compIdWest);
+    setVoxelColumnSurfaceHeight(gridWest, 1, 2, 4.0 + IN_BAND_RAMP_DELTA, compIdWest);
     const navWest = NavGrid.buildNavGrid(gridWest, [], []);
     expect(navWest.cells[2]![1]!.type).toBe('ramp');
 
-    // East: center (2,2) solidY=4, east neighbor (3,2) solidY=2
+    // East: center (2,2) at 4.0m, east neighbor (3,2) graded up by IN_BAND_RAMP_DELTA
     const gridEast = new VoxelGrid(5, 10, 5);
+    const compIdEast = gridEast.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
-      for (let x = 0; x < 5; x++)
-        for (let y = 0; y <= 4; y++) gridEast.setVoxel(x, y, z, solidVoxel());
-    for (let y = 0; y <= 4; y++) gridEast.clearVoxel(3, y, 2);
-    for (let y = 0; y <= 2; y++) gridEast.setVoxel(3, y, 2, solidVoxel());
+      for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridEast, x, z, 4.0, compIdEast);
+    setVoxelColumnSurfaceHeight(gridEast, 3, 2, 4.0 + IN_BAND_RAMP_DELTA, compIdEast);
     const navEast = NavGrid.buildNavGrid(gridEast, [], []);
     expect(navEast.cells[2]![3]!.type).toBe('ramp');
   });
@@ -499,14 +502,14 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     }
   });
 
-  it('a neighbour delta well beyond NAV_MAX_CLIMB_HEIGHT does NOT classify as ramp — bounded band (#953)', () => {
+  it('a neighbour delta far beyond NAV_MAX_SLOPE_RATIO does NOT classify as ramp — bounded band (#953, slope-based since #1151)', () => {
     // 3×3 grid, center column (1,1) solidY=10, south neighbor (1,2) lowered
-    // far past NAV_MAX_CLIMB_HEIGHT — an eight-metre crater wall, matching
-    // the issue's own example. Before the fix, ramp classification was
-    // unbounded (any delta > 1), so an 8-voxel cliff read as a walkable
-    // 'ramp' at cost 1.8, identical to a dug haul road.
+    // far past the legal slope ceiling — a ten-metre crater wall, matching
+    // the issue's own example. Ramp classification is bounded: an unbounded
+    // rule (any delta > the anti-noise floor) would read an 8-voxel cliff as
+    // a walkable 'ramp' at cost 1.8, identical to a dug haul road.
     const centerTop = 10;
-    const bigDelta = NAV_MAX_CLIMB_HEIGHT + 6;
+    const bigDelta = 10; // 10m over a 1m cardinal run — far past NAV_MAX_SLOPE_RATIO (~0.5774)
     const neighborTop = centerTop - bigDelta;
     const grid = new VoxelGrid(3, 15, 3);
     for (let y = 0; y <= centerTop; y++) grid.setVoxel(1, y, 1, solidVoxel());
@@ -518,7 +521,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
       }
     }
     const nav = NavGrid.buildNavGrid(grid, [], []);
-    // Bounded band: delta > NAV_MAX_CLIMB_HEIGHT falls through to walkable,
+    // Bounded band: delta > NAV_MAX_SLOPE_RATIO falls through to walkable,
     // never ramp — the actual impassability gate lives in Pathfinding.
     expect(nav.cells[1]![1]!.type).toBe('walkable');
   });
@@ -555,15 +558,18 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     expect(NavGrid.computeSurfaceY(single, 20, 5)).toBe(-1);
   });
 
-  it('two adjacent columns with a genuine sub-voxel graded difference report different fractional surfaceY — invisible flickering under the old integer-index contract (#1149)', () => {
+  it('two adjacent columns with a genuine sub-voxel graded difference classify as ramp — the continuous delta is now the correct ramp gate (#1151)', () => {
     // Both columns share the exact same topmost-solid-voxel integer index
     // (4) — under the old computeVoxelColumnSurfaceY-only behaviour they
-    // would read as identical, exactly the flickering ramp/walkable
-    // misclassification the issue describes for a constant-grade cut.
+    // would read as identical. #1151 moves ramp gating onto the continuous
+    // surfaceY delta (via isStepClimbable/NAV_RAMP_MIN_SLOPE_DELTA), which is
+    // exactly what makes this real in-band grade visible.
     const grid = new VoxelGrid(10, 10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
-    setVoxelColumnSurfaceHeight(grid, 3, 3, 4.3, compId);
-    setVoxelColumnSurfaceHeight(grid, 4, 3, 4.7, compId);
+    const heightA = 4.1;
+    const heightB = heightA + IN_BAND_RAMP_DELTA;
+    setVoxelColumnSurfaceHeight(grid, 3, 3, heightA, compId);
+    setVoxelColumnSurfaceHeight(grid, 4, 3, heightB, compId);
 
     expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
     expect(computeVoxelColumnSurfaceY(grid, 4, 3)).toBe(4);
@@ -572,64 +578,125 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     const surfaceA = nav.cells[3]![3]!.surfaceY!;
     const surfaceB = nav.cells[3]![4]!.surfaceY!;
 
-    expect(surfaceA).toBeCloseTo(4.3, 6);
-    expect(surfaceB).toBeCloseTo(4.7, 6);
-    expect(surfaceB - surfaceA).toBeCloseTo(0.4, 6);
+    expect(surfaceA).toBeCloseTo(heightA, 6);
+    expect(surfaceB).toBeCloseTo(heightB, 6);
+    expect(surfaceB - surfaceA).toBeCloseTo(IN_BAND_RAMP_DELTA, 6);
     // A non-integer delta — the exact sub-voxel grade the old integer-only
     // representation rounded away.
     expect(Number.isInteger(surfaceB - surfaceA)).toBe(false);
 
-    // classifyCellType deliberately gates ramp detection on the integer
-    // computeVoxelColumnSurfaceY delta (both columns: 4, delta 0), not on
-    // this continuous surfaceY delta — regression guard for the auto-hauler
-    // routing bug the doc comment above classifyCellType describes (#1149).
-    // A future "simplification" back to a continuous-delta ramp gate would
-    // flip one or both of these to 'ramp' and fail here.
-    expect(nav.cells[3]![3]!.type).toBe('walkable');
-    expect(nav.cells[3]![4]!.type).toBe('walkable');
+    // classifyCellType now gates ramp detection on this continuous surfaceY
+    // delta (IN_BAND_RAMP_DELTA): above NAV_RAMP_MIN_SLOPE_DELTA and within
+    // NAV_MAX_SLOPE_RATIO (~0.5774) for a 1m cardinal run, so both columns
+    // read as ramp. Before #1151, this same continuous delta was
+    // deliberately ignored in favor of the integer voxel-index delta (0,
+    // since both columns share topmost-solid-voxel index 4) to dodge grading
+    // noise on ordinary flat terrain — #1151 replaces that whole-voxel-index
+    // gate with a slope-based one, so a genuine sub-voxel grade like this one
+    // is exactly the case the new design is meant to classify correctly.
+    expect(nav.cells[3]![3]!.type).toBe('ramp');
+    expect(nav.cells[3]![4]!.type).toBe('ramp');
   });
 
-  it('climb reachability across two adjacent columns stays gated on climbY, not surfaceY, even when the surfaceY delta alone would exceed NAV_MAX_CLIMB_HEIGHT (#1149)', () => {
-    // Column A's topmost-solid-voxel index sits right at the bottom of its
-    // voxel (fraction .02) and column B's sits right at the top of its own
-    // (fraction .98) — same trick as the test above, but pushed to the
-    // opposite extreme so the *fractional* surfaceY delta (3.96) clears
-    // NAV_MAX_CLIMB_HEIGHT (3) while the integer climbY delta (3) sits
-    // exactly on its boundary, still legal. Every other column is left void
-    // (no solid voxel at all), so A and B are reachable from each other only
-    // via this one direct step — nothing to route around a blocked step.
+  it('climb legality is gated on the continuous surfaceY, not the integer climbY — #1151 supersedes the old climbY-gating design (#1149)', () => {
+    // Column A's topmost-solid-voxel index sits near the bottom of its own
+    // voxel (fraction .02) and column B's sits near the top of the SAME
+    // voxel (fraction .85) — both floor to the identical integer climbY (4),
+    // so gating on climbY alone would read this step as perfectly flat
+    // (delta 0). The continuous surfaceY delta (0.83m) tells the true story:
+    // it clears NAV_MAX_SLOPE_RATIO (~0.5774) for a 1m cardinal run, so the
+    // step is actually too steep. #1151 moved every production call site
+    // (AgentAdvance, NavGridReachability, Pathfinding) off climbY and onto
+    // surfaceY for exactly this reason — a future edit that swapped a call
+    // site back to climbY would silently let a physically-too-steep sub-
+    // voxel-graded step through, undetected by any test gating on the
+    // integer field alone.
     const grid = new VoxelGrid(10, 10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
-    setVoxelColumnSurfaceHeight(grid, 3, 3, 0.02, compId);
-    setVoxelColumnSurfaceHeight(grid, 4, 3, 3.98, compId);
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 4.02, compId);
+    setVoxelColumnSurfaceHeight(grid, 4, 3, 4.85, compId);
 
-    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(0);
-    expect(computeVoxelColumnSurfaceY(grid, 4, 3)).toBe(3);
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
+    expect(computeVoxelColumnSurfaceY(grid, 4, 3)).toBe(4);
 
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const cellA = nav.cells[3]![3]!;
     const cellB = nav.cells[3]![4]!;
 
-    expect(cellA.climbY).toBe(0);
-    expect(cellB.climbY).toBe(3);
-    expect(cellB.surfaceY! - cellA.surfaceY!).toBeCloseTo(3.96, 1);
+    expect(cellA.climbY).toBe(4);
+    expect(cellB.climbY).toBe(4);
+    expect(cellB.surfaceY! - cellA.surfaceY!).toBeCloseTo(0.83, 2);
 
-    // Hand-computed expectation on the integer field production actually
-    // gates on: delta 3 sits exactly at NAV_MAX_CLIMB_HEIGHT, so the step is
-    // legal.
-    expect(isStepClimbable(cellA.climbY, cellB.climbY, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    // The same boundary fed the continuous surfaceY instead would refuse the
-    // step (delta 3.96 > 3) — this is the swap a future edit must not make.
-    expect(isStepClimbable(cellA.surfaceY, cellB.surfaceY, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+    // Gating on climbY (delta 0, same integer index) would wrongly read this
+    // step as trivially legal.
+    expect(isStepClimbable(cellA.climbY, cellB.climbY, 1)).toBe(true);
+    // Gating on the real surfaceY delta (0.83m) correctly refuses it — a 1m
+    // cardinal run only tolerates NAV_MAX_SLOPE_RATIO (~0.5774m) of rise.
+    expect(isStepClimbable(cellA.surfaceY, cellB.surfaceY, 1)).toBe(false);
 
     // Production behaviour, through the real climb-aware reachable set
-    // (NavGridReachability.computeClimbReachableSet, the mechanism
-    // ActionSelection screens candidates through): B must be reachable from
-    // A. A future call site that swapped `.climbY` back to `.surfaceY` would
-    // flip this to false, since no other path between the two columns
-    // exists on this otherwise-void grid.
+    // (NavGridReachability.computeClimbReachableSet, which now reads
+    // surfaceY, not climbY): B must NOT be reachable from A, since no other
+    // path between the two columns exists on this otherwise-void grid. A
+    // future call site that swapped `.surfaceY` back to `.climbY` would flip
+    // this to true.
     const reachableFromA = NavGrid.computeClimbReachableSet(nav, 3, 3);
-    expect(reachableFromA.has(4, 3)).toBe(true);
+    expect(reachableFromA.has(4, 3)).toBe(false);
+  });
+});
+
+describe('isStepClimbable — slope-based traversability (#1151)', () => {
+  it('NAV_MAX_SLOPE_RATIO is exactly tan(NAV_MAX_SLOPE_DEGREES)', () => {
+    expect(NAV_MAX_SLOPE_RATIO).toBeCloseTo(Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180), 10);
+  });
+
+  it('either side undefined is always climbable, unconstrained (unchanged from the old fixed-height rule)', () => {
+    expect(isStepClimbable(undefined, 5, 1.0)).toBe(true);
+    expect(isStepClimbable(5, undefined, 1.0)).toBe(true);
+    expect(isStepClimbable(undefined, undefined, 1.0)).toBe(true);
+  });
+
+  it('cardinal run (1.0m): a 0.55m delta (~29°) is climbable', () => {
+    expect(isStepClimbable(10, 10.55, 1.0)).toBe(true);
+  });
+
+  it('cardinal run (1.0m): a 0.60m delta (~31°) is refused', () => {
+    expect(isStepClimbable(10, 10.6, 1.0)).toBe(false);
+  });
+
+  it('cardinal run (1.0m): the exact NAV_MAX_SLOPE_RATIO boundary is climbable (<=, not <)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO, 1)).toBe(true);
+  });
+
+  it('cardinal run (1.0m): just past the NAV_MAX_SLOPE_RATIO boundary is refused', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO + 0.01, 1)).toBe(false);
+  });
+
+  it('diagonal run (√2m): a 0.80m delta (~29.6°) is climbable', () => {
+    expect(isStepClimbable(10, 10.8, Math.SQRT2)).toBe(true);
+  });
+
+  it('diagonal run (√2m): a 0.83m delta (~31.3°) is refused', () => {
+    expect(isStepClimbable(10, 10.83, Math.SQRT2)).toBe(false);
+  });
+
+  it('diagonal run (√2m): the exact NAV_MAX_SLOPE_RATIO*√2 boundary is climbable', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO * Math.SQRT2, Math.SQRT2)).toBe(true);
+  });
+
+  it('a drop is gated identically to a rise (the check is on the absolute delta)', () => {
+    expect(isStepClimbable(10.6, 10, 1.0)).toBe(false);
+    expect(isStepClimbable(10.55, 10, 1.0)).toBe(true);
+  });
+
+  it('a bench face (NAV_BENCH_HEIGHT=5, run 1.0, ~78.7°) is not climbable — well past NAV_MAX_SLOPE_DEGREES', () => {
+    expect(isStepClimbable(0, NAV_BENCH_HEIGHT, 1.0)).toBe(false);
+  });
+
+  it('a fresh blast crater wall (large drop, run 1.0) is not climbable', () => {
+    // A blast crater is dug a hole-depth (6m in every level/tutorial plan)
+    // deeper than the surrounding bench — far steeper than 30° over 1m.
+    expect(isStepClimbable(10, 10 - 6, 1.0)).toBe(false);
   });
 });
 
@@ -654,8 +721,12 @@ describe('NavGrid.buildNavGrid — ramp detection after buildRamp() on elevated 
       }
     }
 
+    // Grade (targetDepth/length ≈ 0.556) sits just above the anti-noise
+    // floor (NAV_RAMP_MIN_SLOPE_DELTA, ~0.95 * NAV_MAX_SLOPE_RATIO) and
+    // within the climbable ceiling (NAV_MAX_SLOPE_RATIO) — steep enough to
+    // register as a ramp, not just graded ground.
     const rampResult = buildRamp(grid, {
-      originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+      originX: 10, originZ: 5, direction: 'south', length: 18, targetDepth: 10,
     }, 100000);
     expect(rampResult.success).toBe(true);
 
@@ -1054,26 +1125,29 @@ describe('NavGrid.patchNavGrid — full-grid equivalence', () => {
 });
 
 describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
-  it('detects ramp when terrain height changes within the patched region', () => {
+  it('detects ramp when terrain height changes within the patched region (#1151)', () => {
     const grid = new VoxelGrid(5, 10, 5);
-    // Fill all columns solid to Y=4
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    // Fill all columns to a flat continuous height of 4.0m
     for (let z = 0; z < 5; z++)
-      for (let x = 0; x < 5; x++)
-        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+      for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
 
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // Flat terrain → no ramps initially
     expect(nav.cells[2]![2]!.type).toBe('walkable');
 
-    // Lower column (2,3) to Y=2, creating height diff with (2,2)
-    for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 3);
-    for (let y = 0; y <= 2; y++) grid.setVoxel(2, y, 3, solidVoxel());
+    // Grade column (2,3) up to a delta from (2,2) that sits strictly between
+    // the anti-noise floor (NAV_RAMP_MIN_SLOPE_DELTA) and the slope ceiling
+    // (NAV_MAX_SLOPE_RATIO) for a 1m cardinal run — climbable, and steep
+    // enough to clear the floor.
+    const rampDelta = (NAV_RAMP_MIN_SLOPE_DELTA + NAV_MAX_SLOPE_RATIO) / 2;
+    setVoxelColumnSurfaceHeight(grid, 2, 3, 4.0 + rampDelta, compId);
 
     // Patch region covering (2,2) and its neighbors
     const region: BlastRegion = { minX: 1, maxX: 3, minZ: 1, maxZ: 3 };
     NavGrid.patchNavGrid(nav, grid, [], [], region);
 
-    // (2,2) should now be ramp because neighbor (2,3) has height diff > 1
+    // (2,2) should now be ramp because neighbor (2,3)'s in-band slope delta
     expect(nav.cells[2]![2]!.type).toBe('ramp');
     expect(nav.cells[2]![2]!.moveCost).toBe(1.8);
   });
@@ -1544,7 +1618,7 @@ function makeNavGridFromHeights(heights: number[][]): NavGrid {
 describe('NavGrid.computeClimbReachableSet', () => {
   it('stops at a face taller than the climb limit, where the plain set walks straight over it', () => {
     const floor = 0;
-    const bench = floor + NAV_MAX_CLIMB_HEIGHT + 1;
+    const bench = floor + 10; // 10m over a 1m cardinal run — far past NAV_MAX_SLOPE_RATIO (~0.5774), definitely illegal
     const nav = makeNavGridFromHeights([
       [bench, bench, bench, bench],
       [bench, bench, bench, bench],
@@ -1560,11 +1634,13 @@ describe('NavGrid.computeClimbReachableSet', () => {
     expect(plain.has(0, 2)).toBe(true);
   });
 
-  it('walks a grade the climb limit allows', () => {
+  it('walks a grade the slope limit allows', () => {
+    // Each column step is exactly at the NAV_MAX_SLOPE_RATIO boundary —
+    // legal (<=), whether taken as three cardinal steps or via the diagonal.
     const nav = makeNavGridFromHeights([
-      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
-      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
-      [0, NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT * 2],
+      [0, NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_RATIO * 2],
+      [0, NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_RATIO * 2],
+      [0, NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_RATIO * 2],
     ]);
 
     const reachable = NavGrid.computeClimbReachableSet(nav, 0, 0);
@@ -1615,6 +1691,95 @@ describe('NavGrid.findNearestNavigableCell', () => {
       Array.from({ length: 3 }, (): NavCellType => 'void'));
 
     expect(NavGrid.findNearestNavigableCell(makeNavGridFromTypes(rows), 1, 1)).toEqual({ x: 1, z: 1 });
+  });
+
+  // #1151: entity-spawn placement (hire, vehicle purchase) needs BOTH
+  // properties at once — the main landmass (this helper) and an unoccupied
+  // cell (#954's avoidOccupancy). Before this flag the two were only
+  // available from two different helpers, so the spawn call sites kept using
+  // findNearestReachableCell's fixed (0,0) anchor to get the occupancy guard
+  // and inherited the corner-island assumption the slope gate broke.
+  it('skips vehicle-occupied cells on the main region when avoidOccupancy is set', () => {
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ]);
+    nav.cellAt(1, 1)!.vehicleOccupied = true;
+
+    expect(NavGrid.findNearestNavigableCell(nav, 1, 1)).toEqual({ x: 1, z: 1 });
+    expect(NavGrid.findNearestNavigableCell(nav, 1, 1, true)).not.toEqual({ x: 1, z: 1 });
+  });
+
+  it('is what findNearestSpawnCell resolves to, so a healthy site spawns exactly where it used to', () => {
+    // Every cell one region: the derived anchor IS the corner, so the spawn
+    // helper must agree cell-for-cell with the corner-anchored call the two
+    // spawn paths made before #1151 — tie-breaks included.
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+
+    for (const [tx, tz] of [[2, 2], [4, 0], [0, 4], [3, 1]] as Array<[number, number]>) {
+      expect(NavGrid.findNearestSpawnCell(nav, tx, tz))
+        .toEqual(NavGrid.findNearestReachableCell(nav, 0, 0, tx, tz, true));
+    }
+  });
+
+  it('still answers from the largest region, not the nearest free cell, when avoiding occupancy', () => {
+    const summit = 20;
+    const nav = makeNavGridFromHeights([
+      [summit, summit, 0, 0, 0],
+      [summit, summit, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+    // The 2x2 summit is its own climb-connected island; the floor is the main
+    // region. A target on the island must come back on the floor even though
+    // the island holds free cells far closer to it.
+    const snapped = NavGrid.findNearestNavigableCell(nav, 0, 0, true);
+
+    expect(nav.cellAt(snapped.x, snapped.z)!.surfaceY).toBe(0);
+    expect(NavGrid.computeClimbReachableSet(nav, snapped.x, snapped.z).size).toBeGreaterThan(4);
+  });
+});
+
+describe('NavGrid.findNearestSpawnCell', () => {
+  it('spawns onto the main region when the corner has been cut off into an island', () => {
+    const summit = 40;
+    // The 2x2 corner is walled off by a face far past the climb limit. The
+    // corner-anchored call this helper replaces snaps the target *into* that
+    // island, which is how a mid-game hire ends up unable to reach any work.
+    const nav = makeNavGridFromHeights([
+      [summit, summit, 0, 0, 0],
+      [summit, summit, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ]);
+
+    const spawn = NavGrid.findNearestSpawnCell(nav, 0, 0);
+    const cornerAnchored = NavGrid.findNearestReachableCell(nav, 0, 0, 0, 0, true);
+
+    expect(nav.cellAt(cornerAnchored.x, cornerAnchored.z)!.surfaceY).toBe(summit);
+    expect(nav.cellAt(spawn.x, spawn.z)!.surfaceY).toBe(0);
+    expect(NavGrid.computeClimbReachableSet(nav, spawn.x, spawn.z).size).toBeGreaterThan(4);
+  });
+
+  it('keeps a spawn off a cell a vehicle or fragment already occupies', () => {
+    const nav = makeNavGridFromHeights([
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ]);
+    nav.cellAt(1, 1)!.vehicleOccupied = true;
+
+    expect(NavGrid.findNearestSpawnCell(nav, 1, 1)).not.toEqual({ x: 1, z: 1 });
   });
 });
 

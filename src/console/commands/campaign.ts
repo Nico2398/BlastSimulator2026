@@ -141,6 +141,7 @@ export function campaignStartCommand(
     sizeY: level.gridY,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    startingCrew: true,
   });
 
   // Generate initial contracts so they're available immediately

@@ -3,7 +3,7 @@
 
 import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget, NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
+import { pathfindingNodeBudget } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
@@ -299,9 +299,9 @@ function directLineWalk(
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
-      if (!isStepClimbable(prevCell?.climbY, cell.climbY, NAV_MAX_CLIMB_HEIGHT)) return null;
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
+      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz))) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       totalCost += isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost;
     }
@@ -406,28 +406,51 @@ function concatPaths(
   return waypoints;
 }
 
-function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
-  const start = clampToGrid(grid, request.fromX, request.fromZ);
-  const goal = clampToGrid(grid, request.toX, request.toZ);
-  const sx = start.x, sz = start.z, gx = goal.x, gz = goal.z;
-  const { avoidVehicles, agentId } = request;
-
-  const startLevel = getBenchLevel(grid, sx, sz);
-  const goalLevel = getBenchLevel(grid, gx, gz);
-
-  // If same level, delegate to normal pathfinding
-  if (startLevel === goalLevel) {
-    return findPath(grid, request);
+/** The ramp-side entrance (on `fromLevel`) and exit (on the ramp's other level) for a single hop. */
+function rampEndpoints(ramp: RampConnection, fromLevel: number): {
+  entrance: { x: number; z: number };
+  exit: { x: number; z: number };
+} {
+  if (ramp.upperLevel === fromLevel) {
+    return { entrance: { x: ramp.upperX, z: ramp.upperZ }, exit: { x: ramp.lowerX, z: ramp.lowerZ } };
   }
+  return { entrance: { x: ramp.lowerX, z: ramp.lowerZ }, exit: { x: ramp.upperX, z: ramp.upperZ } };
+}
 
-  const ramps = findRampConnections(grid);
+/** Appends `additional` onto `target`, skipping a leading point that duplicates the running last waypoint (same join-point dedup concatPaths already does for a single splice). */
+function appendWaypoints(
+  target: Array<{ x: number; z: number }>,
+  additional: Array<{ x: number; z: number }>,
+): Array<{ x: number; z: number }> {
+  const result = [...target];
+  for (const wp of additional) {
+    const last = result[result.length - 1];
+    if (!last || last.x !== wp.x || last.z !== wp.z) result.push(wp);
+  }
+  return result;
+}
 
-  // Filter ramps connecting startLevel ↔ goalLevel
+/**
+ * Direct, single-ramp-hop route between two bench levels — the original
+ * findMultiLevelPath behaviour, unchanged: only ramps whose OWN upper/lower
+ * level pair exactly matches (startLevel, goalLevel) are considered. Returns
+ * null (not found:false) when nothing here works, so the caller can fall
+ * back to findLevelHopSequence's chained routing instead of giving up.
+ */
+function findSingleHopRoute(
+  grid: NavGrid,
+  ramps: RampConnection[],
+  startLevel: number,
+  goalLevel: number,
+  sx: number,
+  sz: number,
+  gx: number,
+  gz: number,
+  agentId: number,
+  avoidVehicles: boolean,
+): PathResult | null {
   const candidateRamps = filterRampsForLevels(ramps, startLevel, goalLevel);
-
-  if (candidateRamps.length === 0) {
-    return { found: false, waypoints: [], totalCost: 0 };
-  }
+  if (candidateRamps.length === 0) return null;
 
   // Route-selection stability (#458 T6.1/D14): route1/route2's costs are A*
   // results from the agent's CURRENT (continuously-shifting, sub-cell)
@@ -448,17 +471,7 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
   let bestRampKey = Infinity;
 
   for (const ramp of candidateRamps) {
-    // Determine entrance (on start level) and exit (on goal level)
-    let entrance: { x: number; z: number };
-    let exit: { x: number; z: number };
-
-    if (ramp.upperLevel === startLevel) {
-      entrance = { x: ramp.upperX, z: ramp.upperZ };
-      exit = { x: ramp.lowerX, z: ramp.lowerZ };
-    } else {
-      entrance = { x: ramp.lowerX, z: ramp.lowerZ };
-      exit = { x: ramp.upperX, z: ramp.upperZ };
-    }
+    const { entrance, exit } = rampEndpoints(ramp, startLevel);
 
     // A* from start → entrance
     const route1 = findPath(grid, {
@@ -503,7 +516,137 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
     }
   }
 
-  return bestResult ?? { found: false, waypoints: [], totalCost: 0 };
+  return bestResult;
+}
+
+/** One level-graph hop: `ramp` connects `fromLevel` to `toLevel` (either direction). */
+interface LevelHop {
+  ramp: RampConnection;
+  fromLevel: number;
+  toLevel: number;
+}
+
+/**
+ * BFS over the full ramp graph (every ramp is an edge between the two bench
+ * levels it directly touches) for the shortest sequence of ramp hops from
+ * startLevel to goalLevel, for when no single ramp connects them directly
+ * (#1166 follow-up: #1151's finer-grained slope-based bench banding can put
+ * 3+ distinct levels between two points that used to sit one hop apart —
+ * e.g. a drill hole at benchLevel 0 and a living_quarters at benchLevel 2
+ * with a benchLevel-1 band genuinely walkable in between, confirmed live via
+ * tutorial-interactive-revolt.integration.test.ts's own #707 repro: a
+ * charge_hole action stranded forever, findPath((28,13),(22,20)) reporting
+ * found:false despite every intervening cell being walkable). Deterministic:
+ * ramps touching each level are visited in a fixed (rampX, rampZ) order, so
+ * the same level pair always resolves to the same hop sequence rather than
+ * depending on findRampConnections' own scan order or BFS traversal order.
+ * Returns null when the level graph itself has no route between the two
+ * levels at all (genuinely isolated bench levels, not merely un-adjacent).
+ */
+function findLevelHopSequence(ramps: RampConnection[], startLevel: number, goalLevel: number): LevelHop[] | null {
+  const sortedRamps = [...ramps].sort((a, b) => (a.rampX - b.rampX) || (a.rampZ - b.rampZ));
+  const visited = new Set<number>([startLevel]);
+  const queue: number[] = [startLevel];
+  const cameFrom = new Map<number, LevelHop>();
+
+  while (queue.length > 0) {
+    const level = queue.shift()!;
+    if (level === goalLevel) break;
+    for (const ramp of sortedRamps) {
+      if (ramp.upperLevel !== level && ramp.lowerLevel !== level) continue;
+      const other = ramp.upperLevel === level ? ramp.lowerLevel : ramp.upperLevel;
+      if (visited.has(other)) continue;
+      visited.add(other);
+      cameFrom.set(other, { ramp, fromLevel: level, toLevel: other });
+      queue.push(other);
+    }
+  }
+
+  if (!visited.has(goalLevel)) return null;
+
+  const hops: LevelHop[] = [];
+  let level = goalLevel;
+  while (level !== startLevel) {
+    const hop = cameFrom.get(level)!;
+    hops.push(hop);
+    level = hop.fromLevel;
+  }
+  hops.reverse();
+  return hops;
+}
+
+/**
+ * Chains a sequence of single-ramp hops (findLevelHopSequence's output) into
+ * one route: start → hop1 entrance → hop1 ramp → hop1 exit → hop2 entrance →
+ * … → goal. Each leg is its own ordinary findPath call within the hop's own
+ * (same-level) endpoints, so it never recurses back into multi-level routing.
+ */
+function findChainedRoute(
+  grid: NavGrid,
+  hopSequence: LevelHop[],
+  sx: number,
+  sz: number,
+  gx: number,
+  gz: number,
+  agentId: number,
+  avoidVehicles: boolean,
+): PathResult {
+  let cur = { x: sx, z: sz };
+  let waypoints: Array<{ x: number; z: number }> = [];
+  let totalCost = 0;
+
+  for (const hop of hopSequence) {
+    const { entrance, exit } = rampEndpoints(hop.ramp, hop.fromLevel);
+
+    const segment = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: entrance.x, toZ: entrance.z, avoidVehicles });
+    if (!segment.found) return { found: false, waypoints: [], totalCost: 0 };
+
+    waypoints = appendWaypoints(waypoints, segment.waypoints);
+    waypoints = appendWaypoints(waypoints, [{ x: hop.ramp.rampX, z: hop.ramp.rampZ }]);
+    totalCost += segment.totalCost
+      + getStepCost(grid, entrance.x, entrance.z, hop.ramp.rampX, hop.ramp.rampZ)
+      + getStepCost(grid, hop.ramp.rampX, hop.ramp.rampZ, exit.x, exit.z);
+
+    cur = exit;
+  }
+
+  const finalLeg = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: gx, toZ: gz, avoidVehicles });
+  if (!finalLeg.found) return { found: false, waypoints: [], totalCost: 0 };
+  waypoints = appendWaypoints(waypoints, finalLeg.waypoints);
+  totalCost += finalLeg.totalCost;
+
+  return { found: true, waypoints, totalCost };
+}
+
+function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
+  const start = clampToGrid(grid, request.fromX, request.fromZ);
+  const goal = clampToGrid(grid, request.toX, request.toZ);
+  const sx = start.x, sz = start.z, gx = goal.x, gz = goal.z;
+  const { avoidVehicles, agentId } = request;
+
+  const startLevel = getBenchLevel(grid, sx, sz);
+  const goalLevel = getBenchLevel(grid, gx, gz);
+
+  // If same level, delegate to normal pathfinding
+  if (startLevel === goalLevel) {
+    return findPath(grid, request);
+  }
+
+  const ramps = findRampConnections(grid);
+
+  const directRoute = findSingleHopRoute(grid, ramps, startLevel, goalLevel, sx, sz, gx, gz, agentId, avoidVehicles);
+  if (directRoute !== null) return directRoute;
+
+  // No single ramp connects startLevel and goalLevel directly (#1166
+  // follow-up) — chain through whatever intermediate levels the ramp graph
+  // actually offers, rather than reporting no path exists when a genuinely
+  // walkable multi-hop route does.
+  const hopSequence = findLevelHopSequence(ramps, startLevel, goalLevel);
+  if (hopSequence === null || hopSequence.length === 0) {
+    return { found: false, waypoints: [], totalCost: 0 };
+  }
+
+  return findChainedRoute(grid, hopSequence, sx, sz, gx, gz, agentId, avoidVehicles);
 }
 
 // Cost of a single step from a to b (must be neighbours, otherwise Infinity).
@@ -680,7 +823,7 @@ function findOrdinaryPath(
       const neighborCell = grid.cellAt(nx, nz);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.climbY, neighborCell.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

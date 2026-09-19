@@ -1116,3 +1116,28 @@ export function renormaliseCarvedColumns(
   }
   return maxY;
 }
+
+/**
+ * Resolve the palette composition index the newly exposed surface at column
+ * (x, z) should carry once cut down to `targetY` — the composition already
+ * present at (x, floor(targetY), z), so the carved-down surface exposes the
+ * rock that was actually sitting there rather than switching material. Falls
+ * back to the column's own topmost solid voxel's composition when that exact
+ * row reads as air (e.g. targetY lands inside a void/overhang).
+ *
+ * Lifted here from LevelGround.ts (#1151) once Ramp.ts's own continuous
+ * floor-banding (`bandRampFloor`) needed the identical lookup — a leaf
+ * VoxelGrid.ts helper both callers can import without LevelGround.ts and
+ * Ramp.ts importing from each other (LevelGround.ts already imports
+ * `computeRampSegmentDurationTicks` from Ramp.ts, so the reverse edge would
+ * cycle).
+ */
+export function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targetY: number): number {
+  const rowY = Math.floor(targetY);
+  let composition = grid.compositionAt(x, rowY, z);
+  if (composition.rocks.length === 0) {
+    const topY = computeVoxelColumnSurfaceY(grid, x, z);
+    if (topY >= 0) composition = grid.compositionAt(x, topY, z);
+  }
+  return grid.palette.intern(composition);
+}

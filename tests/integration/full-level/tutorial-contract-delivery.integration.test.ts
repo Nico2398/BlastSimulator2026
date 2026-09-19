@@ -125,6 +125,33 @@ describe('Tutorial Level — Contract Delivery', () => {
   }
 
   /**
+   * Accept a live rubble_disposal contract (materialId '', drawn from
+   * storedMassKg regardless of which ore the blast happened to yield) and
+   * return its id. NOT hardcoded to id 1 (#1166): the contract board is
+   * deterministic but timed off real elapsed ticks, and drilling/charging
+   * now take real, mechanics-driven time (#553/#554, and slower still under
+   * #1151's stricter slope-based traversal) — by the time
+   * executeTutorialBlast returns, tickCount has already run well past
+   * CONTRACT_REFRESH_INTERVAL (20) more than once, so the tutorial's very
+   * first contract (id 1) has long since rotated off the board. Mirrors
+   * tutorial.integration.test.ts's own step-16 fix for the identical
+   * staleness: ticking forward and re-rolling (up to 60 refreshes, 1200
+   * ticks) finds a genuine live rubble_disposal contract instead of
+   * gambling on a fixed id.
+   */
+  function acceptRubbleDisposalContract(): number {
+    const findOne = () => ctx.state!.contracts.available.find(c => c.type === 'rubble_disposal');
+    for (let attempt = 0; attempt < 60 && findOne() === undefined; attempt++) {
+      tickWithEvents(ctx, 20);
+    }
+    const contract = findOne();
+    expect(contract, 'no rubble_disposal contract ever appeared on the board').toBeDefined();
+    const acceptResult = contractCommand(ctx, ['accept', String(contract!.id)], {});
+    expect(acceptResult.success).toBe(true);
+    return contract!.id;
+  }
+
+  /**
    * Hire+skill a hauler driver, buy a debris_hauler, assign the driver, tick
    * until the driver has boarded the vehicle, and only then build the
    * freight_warehouse. Returns the vehicle and driver IDs.
@@ -245,15 +272,17 @@ describe('Tutorial Level — Contract Delivery', () => {
     executeTutorialBlast();
     tickWithEvents(ctx, 2);
 
+    // A rubble_disposal contract (materialId '') draws from storedMassKg,
+    // which is still 0 because nothing has been hauled into a warehouse yet
+    // — any live one on the board proves the same inventory gate. Ticks
+    // forward while searching for one, so cashBefore is captured after
+    // accepting (not before) — otherwise the payroll/upkeep drain from those
+    // extra ticks would fail this test's own untouched-cash assertion below
+    // for a reason unrelated to what it means to exercise.
+    const contractId = acceptRubbleDisposalContract();
     const cashBefore = ctx.state!.cash;
 
-    // Contract #1 in the tutorial's deterministic contract set is a
-    // rubble_disposal contract (materialId '') — draws from storedMassKg,
-    // which is still 0 because nothing has been hauled into a warehouse yet.
-    const acceptResult = contractCommand(ctx, ['accept', '1'], {});
-    expect(acceptResult.success).toBe(true);
-
-    const deliverResult = contractCommand(ctx, ['deliver', '1'], { amount: '200' });
+    const deliverResult = contractCommand(ctx, ['deliver', String(contractId)], { amount: '200' });
 
     expect(deliverResult.success).toBe(false);
     expect(deliverResult.output).not.toContain('Payment: $');
@@ -300,14 +329,18 @@ describe('Tutorial Level — Contract Delivery', () => {
   it('contract deliver after the haul-and-store cycle succeeds, decrements storage, and pays out', () => {
     executeTutorialBlast();
 
-    // Accept contract #1 right after the blast (#553), before the haul
-    // padding below — drilling plus a full haul-and-store cycle now spans
-    // well over a hundred ticks, long enough to run past contract #1's own
-    // deadlineTicks (30-100, Contract.ts's generateContracts) if accepted
-    // only afterward, same as the pre-#553 version of this test did.
-    // Accepting reserves the contract; it doesn't require inventory yet.
-    const acceptResult = contractCommand(ctx, ['accept', '1'], {});
-    expect(acceptResult.success).toBe(true);
+    // Accept a live rubble_disposal contract right after the blast (#553),
+    // before the haul padding below — drilling plus a full haul-and-store
+    // cycle now spans well over a hundred ticks, long enough to run past a
+    // freshly-accepted contract's own deadlineTicks (30-100, Contract.ts's
+    // generateContracts) if accepted only afterward, same as the pre-#553
+    // version of this test did. Accepting reserves the contract; it doesn't
+    // require inventory yet. Not hardcoded to id 1 (#1166): the tutorial's
+    // very first contract has long since rotated off the board by the time
+    // drilling/charging (now real, mechanics-driven time, slower still under
+    // #1151's stricter slope-based traversal) finish — see
+    // acceptRubbleDisposalContract's own doc comment.
+    const contractId = acceptRubbleDisposalContract();
 
     const { vehicleId } = setupHaulingFleet();
     // rubble_disposal (materialId '') doesn't care which fragment, only that
@@ -327,10 +360,10 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(storedBefore).toBeGreaterThan(0);
     const cashBefore = ctx.state!.cash;
 
-    // Contract #1 is rubble_disposal (materialId '') — deliver an amount well
-    // within what was actually hauled into storage.
+    // rubble_disposal (materialId '') — deliver an amount well within what
+    // was actually hauled into storage.
     const deliverAmount = Math.min(200, storedBefore);
-    const deliverResult = contractCommand(ctx, ['deliver', '1'], {
+    const deliverResult = contractCommand(ctx, ['deliver', String(contractId)], {
       amount: String(deliverAmount),
     });
 

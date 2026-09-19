@@ -168,6 +168,16 @@ export interface Employee {
   committedFromX?: number | null;
   committedFromZ?: number | null;
   /**
+   * The integer grid cell the committed waypoint was adopted as a single
+   * step FROM (#1166) — mirrors `RouteCommitment.originX`/`originZ`. Fixed
+   * for as long as the same waypoint stays committed, unlike
+   * `committedFromX`/`committedFromZ` above, which #1129's retrace guard
+   * needs rewritten every hop. Round-tripped by Locomotion.ts's
+   * readCommitted/writeCommitted the same way.
+   */
+  committedOriginX?: number | null;
+  committedOriginZ?: number | null;
+  /**
    * Own position 2 ticks back — cross-references AgentAdvance.ts's
    * shift-register invariant (moveHistoryX/Z == P(n-2), x/z == P(n-1) at the
    * start of tick n), which the stuck-detection oscillation fix (#1130)
@@ -176,6 +186,18 @@ export interface Employee {
    */
   moveHistoryX?: number | null;
   moveHistoryZ?: number | null;
+  /**
+   * Grid cell another vehicle was parked on when this employee's current
+   * drive leg last had to detour around it (#1166), or null when not
+   * detouring. A drive leg routes with `avoidVehicles: false` — it must be
+   * able to drive onto another vehicle's cell to interact with it — so
+   * without this latch the tick after a reroute repaths straight back at the
+   * blocker, and a blocker on a chokepoint livelocks the driver in front of
+   * it. Held only while that cell is genuinely still occupied; cleared by
+   * Locomotion.ts the moment it frees up or the leg completes.
+   */
+  vehicleDetourX?: number | null;
+  vehicleDetourZ?: number | null;
   /**
    * Rest duration (ticks) to start once the employee arrives at the rest
    * destination, or null when no rest arrival is pending. Set alongside

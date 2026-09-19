@@ -64,7 +64,7 @@ export function findRequestVehicleOfRole(
 /**
  * Nearest 'on_ground' fragment reachable from (originX, originZ) via NavGrid's
  * climb-aware reachable set (#953/#959) — same climb gate real pathfinding
- * applies, so a fragment across a wall taller than NAV_MAX_CLIMB_HEIGHT is
+ * applies, so a fragment across a slope steeper than NAV_MAX_SLOPE_DEGREES is
  * never picked as "nearest" only to have the vehicle freeze mid-drive when
  * findPath refuses the step. Among fragments `extraEligible` accepts — the
  * search and reachability check are identical between

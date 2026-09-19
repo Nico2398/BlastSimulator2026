@@ -578,7 +578,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     19: 'employee train 1 skill:driving.excavator',
     20: 'tick 25',
     21: 'vehicle buy rock_digger',
-    22: 'build_ramp start:16,19 end:16,31 depth:8',
+    22: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
     // #923 had inserted three new steps here (time speed:8, wait_until
     // orderedRampSegmentCount, time speed:1 — indices 23-25, each already
     // declaring its own timeout >= 90) between box-cut and drill_plan. #1015

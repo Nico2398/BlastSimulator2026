@@ -22,10 +22,10 @@ The `NavGrid` is 2D array of `NavCell` covering VoxelGrid's live X×Z **bounding
 1. `void` if no solid voxel below surface at that column
 2. `drill_hole` if a `DrillHole` exists at (x, z)
 3. `blocked` if building footprint covers it, or vehicle parked/stationary
-4. `ramp` if surface height delta to any cardinal neighbor is more than 1 voxel and at most `NAV_MAX_CLIMB_HEIGHT` (balance.ts) — a negotiable grade
+4. `ramp` if the slope to any cardinal neighbor exceeds `NAV_RAMP_MIN_SLOPE_DELTA` but stays within `NAV_MAX_SLOPE_DEGREES`/`NAV_MAX_SLOPE_RATIO` (balance.ts) — a negotiable grade, one measure for cardinal (1.0m run) and diagonal (√2m run) steps alike
 5. All remaining solid-surface cells = `walkable`
 
-A delta beyond `NAV_MAX_CLIMB_HEIGHT` is a **face**, not a ramp, and does not classify the cell at all: the same cell is often walkable from one neighbour and a wall relative to another, so the refusal belongs to the step, not to the cell. `findPath` applies it per step (`isStepClimbable`, NavGrid.ts) on both the A* neighbour expansion and the direct-line fallback, and the reachability helpers below mirror it. This is what makes a fresh blast crater an obstacle rather than a gentle slope (#953): a bench face is `NAV_BENCH_HEIGHT` and a crater a hole-depth deeper, so both are out of reach and are descended by a dug ramp, while ordinary terrain relief stays ordinary.
+A slope beyond `NAV_MAX_SLOPE_DEGREES` (30°) is a **face**, not a ramp, and does not classify the cell at all: the same cell is often walkable from one neighbour and a wall relative to another, so the refusal belongs to the step, not to the cell. `findPath` applies it per step (`isStepClimbable`, NavGrid.ts) on both the A* neighbour expansion and the direct-line fallback, and the reachability helpers below mirror it. This is what makes a fresh blast crater an obstacle rather than a gentle slope (#953): a bench face is `NAV_BENCH_HEIGHT` and a crater a hole-depth deeper, so both are out of reach and are descended by a dug ramp, while ordinary terrain relief stays ordinary.
 
 **Move costs:**
 

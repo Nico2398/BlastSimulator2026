@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
@@ -572,7 +571,9 @@ function makePeakAtOriginGrid(size: number, groundTopY: number, peakTopY: number
 describe('snapAgentsToNavigableGround', () => {
   it('moves an agent stranded on a peak onto ground it can actually walk', () => {
     const state = createGame({ seed: 42, staffed: true });
-    buildGameNavGrid(state, makePeakAtOriginGrid(12, 1, 1 + NAV_MAX_CLIMB_HEIGHT + 5), [], []);
+    // Peak sits 10m above the surrounding ground — far beyond NAV_MAX_SLOPE_RATIO
+    // (~0.577m per metre of run), so it is genuinely isolated.
+    buildGameNavGrid(state, makePeakAtOriginGrid(12, 1, 1 + 10), [], []);
     const stranded = state.employees.employees[0]!;
     expect([stranded.x, stranded.z]).toEqual([0, 0]);
 

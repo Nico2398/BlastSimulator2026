@@ -581,11 +581,14 @@
       }
     },
     {
-      "command": "tick 30",
+      "command": "wait_until field:collapsedCount equals:1 max_ticks:300",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 30"
+          "type": "waitUntil",
+          "field": "collapsedCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
@@ -595,7 +598,9 @@
           "orderedBuildingCount": 0
         },
         "note": "#700 follow-up: replenishment now applies its rate for a rest's own full duration, so a completed rest recovers much more than before -- keeping Stan continuously re-dispatched every 5 ticks (rather than the old single 20/30-tick gaps) closes the idle window an auto-claimed rest could otherwise slip into and recover him. Under this tighter cadence he still crosses the collapse threshold from continuous working-rate drain with no rest ever claimed (a real run confirms 'NEED: employee_collapsed' fires within this final batch). This is the collapsing-row visual checkpoint (see 'collapse-state' shot). #928 follow-up: the quarters order was moved earlier (see the hire+build steps above, right after the `tick 200` step) so Walter -- not the fresh hire -- doesn't grab the construction site while genuinely idle under the single-gauge fatigue model; the building now lands as a standing structure (orderedBuildingCount:0) before this checkpoint instead of still being a construction site, which the `wait_until` immediately below re-confirms rather than waiting out."
-      }
+      },
+      "timeout": 95,
+      "description": "#1151: was a fixed `tick 30` pad. Collapse is a state an employee passes through, not one they stay in: Stan drops below the threshold, is flagged COLLAPSING, and is then put to rest and recovers. Under the 30-degree slope gate he arrives at this checkpoint with more fatigue left, so the collapse lands 14 ticks in and has already cleared by tick 30 -- the pad stepped straight over the one beat this whole file exists to photograph, and read collapsedCount 0 on the far side of it. Traced tick by tick at this exact point. Waiting on the flag itself stops on the beat wherever it falls, and still fails loudly if the collapse never happens at all."
     },
     {
       "command": "wait_until field:buildingCount equals:1 max_ticks:400",

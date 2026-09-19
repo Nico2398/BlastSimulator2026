@@ -58,6 +58,28 @@ function buildCorridorState(sizeX: number): GameState {
   return state;
 }
 
+/**
+ * Two parallel 1-cell-wide corridors (z=1 and z=3) joined only at their two
+ * ends (x=0 and x=sizeX-1, via z=2). A blocker parked mid-way along z=1
+ * therefore still has a route around it — the long way through z=3 — but
+ * that route is several times longer than the direct one, so the
+ * unconstrained shortest path always prefers to go straight through the
+ * blocked cell. This is the chokepoint shape #1166's slope gate produces on
+ * real terrain, reduced to its minimum.
+ */
+function buildRingCorridorState(sizeX: number): GameState {
+  const state = createGame({ seed: SEED });
+  const vg = new VoxelGrid(sizeX, 2, 5);
+  for (let x = 0; x < sizeX; x++) {
+    vg.setVoxel(x, 0, 1, solidVoxel());
+    vg.setVoxel(x, 0, 3, solidVoxel());
+  }
+  vg.setVoxel(0, 0, 2, solidVoxel());
+  vg.setVoxel(sizeX - 1, 0, 2, solidVoxel());
+  state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+  return state;
+}
+
 /** Minimal 'general_work' PendingAction fixture, mirrors the `makeAction` shape used across the engine test suites. */
 function makeGeneralWorkAction(id: number): PendingAction {
   return {
@@ -186,6 +208,55 @@ describe('tickLocomotion', () => {
     tickLocomotion(state);
     expect(vehicle.x).toBe(stuckX);
     expect(vehicle.z).toBe(stuckZ);
+  });
+
+  // #1166: a parked vehicle sitting on a chokepoint — a cell the direct
+  // route must cross, with a legal but far longer way around — used to
+  // livelock the driver rather than send it the long way. handleOccupancyBlock
+  // took a single step of the avoiding route and then dropped it, so the very
+  // next tick's unconstrained findPath (drive legs pass avoidVehicles:false)
+  // routed straight back at the blocker, blocked again, waited out the
+  // threshold again, and stepped back onto the detour again, forever. Nothing
+  // escalated: every reroute resets isMoveStuck/moveConsecutiveFailures, and
+  // the intervening ticks are ordinary successful movement, so the
+  // stuck-abandon path never fired and no event was emitted.
+  it('drives the long way around a vehicle parked on a chokepoint instead of oscillating in front of it forever', () => {
+    const state = buildRingCorridorState(12);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 11, destZ: 1,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 11,
+      }],
+      goal: { kind: 'reposition', x: 11, z: 1 },
+      workTicks: 0,
+      estTotalTicks: 11,
+    } satisfies Itinerary;
+
+    // Stationary blocker mid-corridor on z=1. A route around it exists (out
+    // via x=0, along z=3, back in at x=11) but is ~3x longer, so every
+    // unconstrained repath prefers the cell it is parked on.
+    purchaseVehicle(state.vehicles, 'drill_rig', 5, 1);
+
+    // Generous ceiling: the detour is ~25 cells at rock_digger speed, plus
+    // the one VEHICLE_OCCUPANCY_REROUTE_THRESHOLD wait before it starts.
+    // Loop exits on arrival rather than running the budget out.
+    const MAX_TICKS = 600;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && driver.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    expect(driver.itinerary).toBeNull();
+    expect(vehicle.x).toBe(11);
+    expect(vehicle.z).toBe(1);
+    // The blocker was never asked to move — the driver went around it.
+    expect(state.vehicles.vehicles.find(v => v.id !== vehicle.id)!.x).toBe(5);
   });
 
   // #1103: an idle, driverless, unreserved vehicle squatting exactly on

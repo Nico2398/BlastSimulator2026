@@ -408,8 +408,8 @@
       "expect": {
         "equals": {
           "tickCount": 60,
-          "holeCount": 7,
-          "orderedHoleCount": 13,
+          "holeCount": 8,
+          "orderedHoleCount": 12,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -418,7 +418,8 @@
         "decreased": [
           "cash"
         ]
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- holeCount 7 -> 8; orderedHoleCount 13 -> 12. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -427,13 +428,13 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 7 -> 8; orderedHoleCount 13 -> 12. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "role": "player",
       "expect": {
         "equals": {
           "tickCount": 60,
-          "holeCount": 7,
-          "orderedHoleCount": 13,
+          "holeCount": 8,
+          "orderedHoleCount": 12,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -507,8 +508,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
+          "holeCount": 12,
+          "orderedHoleCount": 8,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -517,7 +518,8 @@
         "decreased": [
           "cash"
         ]
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- holeCount 11 -> 12; orderedHoleCount 9 -> 8. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -526,13 +528,13 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 11 -> 12; orderedHoleCount 9 -> 8. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "role": "player",
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
+          "holeCount": 12,
+          "orderedHoleCount": 8,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -605,8 +607,8 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "holeCount": 15,
-          "orderedHoleCount": 5,
+          "holeCount": 16,
+          "orderedHoleCount": 4,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -615,7 +617,8 @@
         "decreased": [
           "cash"
         ]
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- holeCount 15 -> 16; orderedHoleCount 5 -> 4. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -624,13 +627,13 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 15 -> 16; orderedHoleCount 5 -> 4. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "role": "player",
       "expect": {
         "equals": {
           "tickCount": 140,
-          "holeCount": 15,
-          "orderedHoleCount": 5,
+          "holeCount": 16,
+          "orderedHoleCount": 4,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -703,8 +706,8 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "holeCount": 19,
-          "orderedHoleCount": 1,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -713,7 +716,8 @@
         "decreased": [
           "cash"
         ]
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- holeCount 19 -> 20; orderedHoleCount 1 -> 0. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -722,13 +726,13 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 19 -> 20; orderedHoleCount 1 -> 0. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "role": "player",
       "expect": {
         "equals": {
           "tickCount": 180,
-          "holeCount": 19,
-          "orderedHoleCount": 1,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -1483,12 +1487,12 @@
         }
       ],
       "role": "observe",
-      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1090-followup (sandbox-measured): wellBeing 3.30 -> 2.86, safety 50.60 -> 50.55 -- one fewer death at the blast above (deathCount 11, not 12; see that step's own #1090-followup note) means computeAverageMorale averages in one more living-but-devastated employee's own near-zero morale, pulling this checkpoint's average down slightly rather than up, and the surviving rig (vehicleCount 1, not 0) shifts the safety decay accrued by this tick too. deathCount, employeeCount, ecology, and nuisance reproduce unchanged.",
+      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1090-followup (sandbox-measured): wellBeing 3.30 -> 2.86, safety 50.60 -> 50.55 -- one fewer death at the blast above (deathCount 11, not 12; see that step's own #1090-followup note) means computeAverageMorale averages in one more living-but-devastated employee's own near-zero morale, pulling this checkpoint's average down slightly rather than up, and the surviving rig (vehicleCount 1, not 0) shifts the safety decay accrued by this tick too. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "expect": {
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 2.855833333333325,
+          "wellBeing": 2.9091666666666565,
           "safety": 50.55000000000014,
           "ecology": 29.58,
           "nuisance": 0,
@@ -1665,12 +1669,12 @@
         }
       ],
       "role": "observe",
-      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
+      "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
       "expect": {
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 2.855833333333325,
+          "wellBeing": 2.9091666666666565,
           "safety": 50.55000000000014,
           "ecology": 29.58,
           "nuisance": 0,

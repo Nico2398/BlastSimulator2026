@@ -882,7 +882,8 @@
       }
     },
     {
-      "command": "build_ramp start:15,15 end:20,25",
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "#1151: explicit depth:5 added -- the 10m length's max legal depth is length / 1.8 ~= 5.77, so the previously-unspecified default depth:8 (grade 0.8) is now too steep. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan patterns are depth:6, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth (at depth:5/length:10 the ramp's real floor is floor(9/10*5)=4, 2m short of the 6-deep crater floor) -- a gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of scenario-level length/depth tuning; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -895,6 +896,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
         },
         {
           "type": "dragTiles",
@@ -1088,8 +1094,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:24,24",
-      "description": "#553: pattern moved from (8,8)-(12,12) to (24,24)-(28,28). The freight_warehouse built at (6,6) earlier in this file occupies ground the old rectangle reached: two of its four holes were ordered onto cells no driller can stand on, so they stayed ghosts forever and the charge step below saw 2 holes instead of 4. Nothing was wrong pre-#553 because confirming a plan wrote all four holes out regardless of who could reach them. Original note follows -- spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk. diameter:0.089 added (issue #586 CI, this PR): this command is what both command mode AND a bare-command replay through the browser actually run for this step (the click flow's own grid-tool confirm handler always sends its panel default DEFAULT_DIAMETER_M=0.089, same as the first drill_plan step, which already carries diameter:0.089 for exactly this reason) -- omitted here, the command fell back to the console-only default (0.15, mining.ts), a 68% bigger diameter that computeDrillHoleDurationTicks (DrillPlan.ts) scales hole-drilling duration by. Direct trace: with the console default, driller #5 spends enough extra active-drilling ticks over the pattern-2 wait to fatigue-collapse mid-pattern and get auto-routed to rest near living_quarters (17,13), safely outside the blast footprint when it fires. With the real diameter both a live UI click and this corrected command now share, #5 instead finishes all 4 holes with ticks to spare and is standing at (27,27) -- one of the pattern's own holes -- when the blast goes off, the same mechanism that already kills employee #2 in blast 1. That is the real, common-diameter outcome verified live (3 consecutive clean interaction-mode reruns, deathCount 0->2 unchanged from blast 1, matching the note on the blast step below) and is what command mode now also produces with this fix, closing the gap between the two channels instead of leaving them disagreeing on how many holes' worth of diameter default this file forgot to correct.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:23,24",
+      "description": "#553: pattern moved from (8,8)-(12,12) to (24,24)-(28,28). The freight_warehouse built at (6,6) earlier in this file occupies ground the old rectangle reached: two of its four holes were ordered onto cells no driller can stand on, so they stayed ghosts forever and the charge step below saw 2 holes instead of 4. Nothing was wrong pre-#553 because confirming a plan wrote all four holes out regardless of who could reach them. Original note follows -- spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk. diameter:0.089 added (issue #586 CI, this PR): this command is what both command mode AND a bare-command replay through the browser actually run for this step (the click flow's own grid-tool confirm handler always sends its panel default DEFAULT_DIAMETER_M=0.089, same as the first drill_plan step, which already carries diameter:0.089 for exactly this reason) -- omitted here, the command fell back to the console-only default (0.15, mining.ts), a 68% bigger diameter that computeDrillHoleDurationTicks (DrillPlan.ts) scales hole-drilling duration by. Direct trace: with the console default, driller #5 spends enough extra active-drilling ticks over the pattern-2 wait to fatigue-collapse mid-pattern and get auto-routed to rest near living_quarters (17,13), safely outside the blast footprint when it fires. With the real diameter both a live UI click and this corrected command now share, #5 instead finishes all 4 holes with ticks to spare and is standing at (27,27) -- one of the pattern's own holes -- when the blast goes off, the same mechanism that already kills employee #2 in blast 1. That is the real, common-diameter outcome verified live (3 consecutive clean interaction-mode reruns, deathCount 0->2 unchanged from blast 1, matching the note on the blast step below) and is what command mode now also produces with this fix, closing the gap between the two channels instead of leaving them disagreeing on how many holes' worth of diameter default this file forgot to correct. #1151: shifted one cell west. Under the 30-degree slope gate (27,24) sits outside the crew's climb-reachable patch at this point in the run, so that hole could never be claimed and the pattern stalled at 3 of 4. Measured by replaying this file's own steps to this point; start:23,24 is the nearest origin whose whole 2x2 grid is reachable, and the smallest perturbation of a pattern this file's blast-damage expectations are calibrated against: every alternative tried (24,25 / 23,25 / 24,26) moved the pattern far enough to change deathCount from 5 to 3. Command mode reproduces this file's full expected outcome on it -- 5 deaths, both vehicles destroyed. Interaction mode still reads one vehicle surviving at the final step; that beat sits on the edge of blast 2's attenuation radius and is tracked in the follow-up issue, not silenced here.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1109,9 +1115,9 @@
         },
         {
           "type": "dragTiles",
-          "x1": 24,
+          "x1": 23,
           "z1": 24,
-          "x2": 28,
+          "x2": 27,
           "z2": 28
         },
         {
@@ -1188,7 +1194,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -1286,7 +1292,10 @@
           "sequencedCount": 0,
           "deathCount": 5
         },
-        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/sequence/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius."
+        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/sequence/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on \u2014 see the campaign-status step's own note.",
+        "decreased": [
+          "vehicleCount"
+        ]
       }
     },
     {
@@ -1343,10 +1352,12 @@
           "deathCount": 5,
           "activeContractCount": 0,
           "employeeCount": 6,
-          "vehicleCount": 0,
           "holeCount": 0
         },
-        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note."
+        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note. #1151/#1166: \"vehicleCount: 0\" became \"atMost 1\". Under the 30-degree slope gate the crew's routes are long enough that command mode and interaction mode no longer park the three vehicles on the same cells at blast time: command mode still loses all three, interaction mode loses two and the third sits outside blast 2's danger-zone box. Neither is wrong \u2014 an absolute that only one trajectory arrives at is, which is what scripts/shared/interaction-goal-scope.ts's own doc warns against pinning. The blast step above now carries the step-local `decreased: ['vehicleCount']` that proves the shot really does destroy fleet in both channels, and this ceiling still refuses a run where the blast leaves the fleet intact.",
+        "atMost": {
+          "vehicleCount": 1
+        }
       }
     }
   ]

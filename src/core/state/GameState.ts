@@ -244,7 +244,7 @@ export interface PendingAction {
 export interface RampSegmentTracker {
   index: number;
   actionId: number;
-  cells: { x: number; y: number; z: number }[];
+  cells: { x: number; y: number; z: number; floorAdjustment?: number }[];
   region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
   done: boolean;
   /** Cells carved so far for this segment's progressive carving (#946) — undefined/0 before any tick has carved. */

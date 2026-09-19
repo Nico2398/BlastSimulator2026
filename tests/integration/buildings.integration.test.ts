@@ -781,10 +781,29 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
     // dense enough in total that 3 drivers cannot drain it within this
     // test's tick budget (verified empirically: draining ~225 of these at
     // this spacing takes ~2000+ ticks, an order of magnitude over budget).
+    //
+    // Excludes a small radius around the roster's own spawn cluster
+    // (#1151 fixer finding): the slope-based climb rule can legitimately
+    // place an un-climbable step (>NAV_MAX_SLOPE_RATIO) immediately next to
+    // a spawn cell on some seeds, and this fixture's checkerboard debris
+    // (every alternate cell, both axes) then blocks every avoid-occupancy
+    // detour around it — stranding whichever driver spawned there, not
+    // because of anything the #1000 fix under test governs. Real terrain, not
+    // fixture geometry, is what the test should be stressing.
+    const spawnPoints = [
+      ...ctx.state!.employees.employees.map(e => ({ x: e.x, z: e.z })),
+      ...ctx.state!.vehicles.vehicles.map(v => ({ x: v.x, z: v.z })),
+    ];
+    const SPAWN_EXCLUSION_RADIUS = 2;
+    const nearSpawn = (x: number, z: number): boolean => spawnPoints.some(
+      p => Math.max(Math.abs(p.x - x), Math.abs(p.z - z)) <= SPAWN_EXCLUSION_RADIUS,
+    );
+
     const fragments: FragmentData[] = [];
     let fragId = 1;
     for (let x = 1; x < 31; x += 2) {
       for (let z = 1; z < 31; z += 2) {
+        if (nearSpawn(x, z)) continue;
         fragments.push({
           id: fragId++,
           position: { x, y: 0, z },

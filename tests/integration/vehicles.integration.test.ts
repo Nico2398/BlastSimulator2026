@@ -39,7 +39,7 @@ import {
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import type { PendingAction } from '../../src/core/state/GameState.js';
-import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, setVoxelColumnSurfaceHeight, resolveExposedCompId, computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 // #922: driver-position invariant — no console command drives this directly,
 // so the assertions below read findDrivenVehicle, the core-level lookup
@@ -276,6 +276,29 @@ describe('Vehicle fleet', () => {
     // diagonal detour instead of the straight line this test means to check.
     const targetX = origX + 4;
     const targetZ = v.z;
+    // Flatten the straight strip the drive leg needs (#1151 fixer): the real
+    // generated terrain right at spawn is not reliably flat in any cardinal
+    // direction under the slope-based climb rule (a genuine >30° step can
+    // sit one or two cells out in every direction), which would silently
+    // reroute the drive onto a longer, non-straight-line path and break this
+    // test's exact per-tick distance assertion below for a reason that has
+    // nothing to do with tickLocomotion's own speed math. Re-grades every
+    // column on the route to the vehicle's own spawn height so the leg is
+    // guaranteed straight and climbable, then patches the NavGrid for that
+    // region so the cached cells reflect it.
+    const flattenHeight = ctx.grid ? computeVoxelColumnSurfaceHeight(ctx.grid, Math.floor(origX), Math.floor(targetZ)) : 0;
+    if (ctx.grid) {
+      for (let x = Math.floor(origX) - 1; x <= Math.floor(targetX) + 1; x++) {
+        const compId = resolveExposedCompId(ctx.grid, x, Math.floor(targetZ), flattenHeight);
+        setVoxelColumnSurfaceHeight(ctx.grid, x, Math.floor(targetZ), flattenHeight, compId);
+      }
+      if (ctx.state!.navGrid) {
+        NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, [], [], {
+          minX: Math.floor(origX) - 1, maxX: Math.floor(targetX) + 1,
+          minZ: Math.floor(targetZ) - 1, maxZ: Math.floor(targetZ) + 1,
+        });
+      }
+    }
     // #1089: a vehicle only ever moves through its occupant's own advance —
     // nobody aboard, nothing moves, everywhere in the game. Give it a real,
     // licensed, co-located driver (rather than a dangling fake employee id —
@@ -492,6 +515,37 @@ describe('Vehicle fleet', () => {
   });
 
   // ── vehicle buy — tier arg (#411) ──
+
+  describe('boarding walk ignores vehicle occupancy (#1166)', () => {
+    // buildBoardLeg used to decide its `avoidVehicles` flag by asking the
+    // NavGrid whether a vehicle stands on the destination — a question whose
+    // answer is true by construction here, since the destination IS the
+    // vehicle's own cell. It read false whenever occupancy was stale, which
+    // it routinely is for a vehicle that has never moved: NavGrid.build seeds
+    // `vehicleOccupied` from the vehicle list and Locomotion maintains it
+    // thereafter, so a vehicle bought into an already-built world is marked
+    // by neither until its first drive. The boarding walk then planned around
+    // every other parked vehicle, which under a slope gate is often no route.
+    it('can plan a boarding walk to a bought vehicle across a fleet-blocked row', () => {
+      const state = ctx.state!;
+      const rng = new Random(1);
+      const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+
+      const bought = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      expect(bought.success).toBe(true);
+      const v = state.vehicles.vehicles[state.vehicles.vehicles.length - 1]!;
+
+      // Wall off the row between the employee and the rest of the map with
+      // parked vehicles, so any route that avoids occupancy has to take the
+      // long way round — or, where the terrain gate forbids that, no route.
+      for (let x = 0; x < state.navGrid!.width; x++) {
+        const cell = state.navGrid!.cellAt(x, Math.round(employee.z) + 1);
+        if (cell) cell.vehicleOccupied = true;
+      }
+
+      expect(moveTo(state, employee.id, { vehicleId: v.id })).toEqual({ success: true });
+    });
+  });
 
   describe('vehicle buy — tier arg (#411)', () => {
     it('buy with tier:2 purchases a tier-2 vehicle', () => {

@@ -14,14 +14,18 @@ import {
 } from '../../../src/core/config/balance.js';
 
 describe('pathfindingNodeBudget (#458 T6.2/D14)', () => {
+  // The area divisor moved from 8 to 2 in #1166 — a 30°-gated map is maze-like
+  // enough that a legitimate route explores far more than an eighth of it — so
+  // the floor now covers grids up to ~31² rather than ~63², and the scaled
+  // figures below are four times what they were.
   it('stays at the floor for small grids', () => {
     expect(pathfindingNodeBudget(20, 20)).toBe(PATHFINDING_NODE_BUDGET_MIN);
-    expect(pathfindingNodeBudget(32, 32)).toBe(PATHFINDING_NODE_BUDGET_MIN);
+    expect(pathfindingNodeBudget(30, 30)).toBe(PATHFINDING_NODE_BUDGET_MIN);
   });
 
   it('scales with grid area past the floor', () => {
-    // 160×160 / 8 = 3200, well above the 500 floor.
-    expect(pathfindingNodeBudget(160, 160)).toBe(3200);
+    // 160×160 / 2 = 12800, well above the 500 floor.
+    expect(pathfindingNodeBudget(160, 160)).toBe(12800);
     expect(pathfindingNodeBudget(160, 160)).toBeGreaterThan(PATHFINDING_NODE_BUDGET_MIN);
   });
 

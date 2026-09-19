@@ -162,6 +162,37 @@ export const SPAWN_RING_SIZE = 3;
 export const SPAWN_TILE_SPACING = 3;
 
 /**
+ * Cells between two starting vehicles when `placeStartingCrew`
+ * (src/core/state/SpawnPlacement.ts) lays the fresh crew out on
+ * climb-connected ground (#1166). Same job as SPAWN_TILE_SPACING's gap in the
+ * old fixed row: at closer range two vehicles tie on octile cost and A* can
+ * resolve a route onto the cell the other one blocks (#591). Kept as its own
+ * constant because the two placements answer to different things — that one
+ * to mesh legibility around a depot, this one to routing between crew and
+ * fleet on natural ground.
+ */
+export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
+
+/**
+ * How much longer than a straight line the starting crew's route to the
+ * middle of the site may run before `placeStartingCrew` treats its authored
+ * spawn as walled in and moves it (#1166). Measured across desert seeds:
+ * ordinary ground comes out at 0.98 — routes are effectively straight — while
+ * a crew stuck behind a face measured 2.78 on average and 14.41 at worst. 1.5
+ * sits well clear of ordinary terrain relief and well under any real detour.
+ */
+export const CREW_SPAWN_MAX_ROUTE_INFLATION = 1.5;
+
+/**
+ * How far from its authored spawn `placeStartingCrew` will look for ground
+ * with an acceptable route (#1166). A level's spawn coordinates are a design
+ * decision — work sites are authored near where the crew starts — so a crew
+ * that must move moves as little as possible, and the search stays cheap
+ * enough to run once at game open.
+ */
+export const CREW_SPAWN_SEARCH_RADIUS = 16;
+
+/**
  * Render-only queue offsets for vehicles in the 'waiting' operational state
  * that share a contended target cell (#411 round 2). detectTrafficJam groups
  * waiting vehicles by exact targetX/targetZ, so the simulation intentionally
@@ -576,9 +607,32 @@ export const MAX_TOTAL_FRAGMENTS = 2000;
  * flat 500-node cap sized for the old ~64² levels falls back to direct-line
  * long before a legitimate cross-map route is found on D13's bigger levels
  * (up to 160×160).
+ *
+ * The divisor was 8 until #1166. That encoded "a legitimate route explores at
+ * most an eighth of the map", which held under the old whole-voxel climb rule
+ * (`NAV_MAX_CLIMB_HEIGHT = 3` admitted ~71° ground, so ordinary relief was
+ * open terrain and routes ran close to straight). #1151's 30° slope gate makes
+ * ordinary relief a maze of concave pockets instead, and the premise stops
+ * holding: measured on tutorial_pit, a driller at (18,21) reaching drill hole
+ * H3 at (21,15) — 6 cells away in a straight line — has only one legal route,
+ * a 24-step detour north-west up the ridge and back, and a same-gate BFS needs
+ * 1474 explored nodes to find it. Against a 64² grid's old cap of 512, A*
+ * exhausted its budget, fell through to the direct-line fallback (which the
+ * slope gate refuses), and reported `found: false` for a genuinely reachable
+ * goal. `computeClimbReachableSet`'s unbudgeted flood fill disagreed, so
+ * `selectBestActionForEmployee` admitted the candidate, spent a real pathfind
+ * on it, got nothing back, and left the action `queued` with `holderId: null`
+ * forever — one hole per drill grid that no one ever charges (#1166).
+ *
+ * 2 was chosen by measurement, not headroom: at 4 the H3 route resolves, and
+ * the full scenario suite scores identically at 2 and at 1 (an unbounded
+ * search over the whole grid), so half the grid is past the point where more
+ * budget buys anything. A* is bounded by the cell count regardless — it never
+ * expands a node twice — so the worst case this raises is O(area log area) on
+ * a search that genuinely has no answer.
  */
 export const PATHFINDING_NODE_BUDGET_MIN = 500;
-export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 8;
+export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 2;
 
 /** A* node-exploration budget for a grid of the given dimensions. */
 export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): number {
@@ -701,27 +755,49 @@ export const ACTION_STUCK_BACKOFF_TICKS = 60;
 export const NAV_BENCH_HEIGHT = 5;
 
 /**
- * Max height-difference, in metres (#1149), an agent can step between
- * adjacent NavGrid cells. Above this the step is a wall, not a grade:
- * `NavGrid` stops classifying it as a `ramp` and `Pathfinding` refuses it as
- * a move (#953). Numerically unchanged from the old voxel-index reading —
- * this grid's voxel pitch is 1m, so 3 voxels and 3 metres coincide.
+ * Max slope, in degrees, an agent can step between adjacent NavGrid cells —
+ * replaces `NAV_MAX_CLIMB_HEIGHT` (#1151). The old rule admitted a step of up
+ * to 3 metres over a 1-metre cardinal run — arctan(3/1) ≈ 71° — purely
+ * because 3 voxels happened to be shorter than that; nothing about 71° was a
+ * deliberate slope decision. 30° makes the rule legible on its own terms:
+ * gentler than this and a worker walks it, steeper and it has to be cut into
+ * a ramp. One constant, applied identically to every agent kind — workers
+ * and vehicles alike, no per-agent-kind variant.
  *
- * Sits deliberately between the two heights the world actually produces.
- * Natural relief on a generated level steps by up to three metres between
- * neighbouring columns — alpine slopes do it constantly — and that is
- * terrain a worker walks. A bench face is `NAV_BENCH_HEIGHT` (5) and a blast
- * crater is dug a hole-depth deeper still (6 in every level and tutorial
- * plan), so both stay firmly out of reach and are descended by a dug ramp,
- * which is the whole point of the issue.
- *
- * Two lowers this to the point where an ordinary mountainside becomes a maze
- * of one-cell detours: measured on `sandbox-mode`'s alpine_granite site, a
- * drill rig sent up that slope drilled one hole of four and spent the rest
- * of the scenario oscillating, because a legal route that zig-zags cell by
- * cell is one the per-tick replanner cannot follow.
+ * Measured reachability cost of the 30° cutoff (#1147 flood fill,
+ * NEIGHBOUR_OFFSETS_8, seed 42, 64m sites): desert_badlands 100%,
+ * volcanic_flats 100%, red_canyon 98.7%, green_foothills 96.7%,
+ * tropical_karst 66.1%, alpine_granite 48.2% — the last two accepted as
+ * designed mountain-level difficulty, not a regression to chase.
  */
-export const NAV_MAX_CLIMB_HEIGHT = 3;
+export const NAV_MAX_SLOPE_DEGREES = 30;
+
+/**
+ * Precomputed tan(NAV_MAX_SLOPE_DEGREES) ≈ 0.5774 — the max metres of rise
+ * legal per metre of horizontal run. Multiplied by a step's own run distance
+ * rather than calling `Math.tan` per step: 0.5774m of rise over a 1m
+ * cardinal step, 0.8165m over a √2m diagonal step.
+ */
+export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180);
+
+/**
+ * Anti-noise floor, in metres, below which a graded cardinal-neighbour
+ * height delta reads as flat rather than a ramp. Ramp classification uses
+ * the same slope measure step legality does; without a floor near the
+ * climbable ceiling, almost every non-identical neighbour pair on
+ * continuously-graded terrain (post-#1148) flags as a ramp — measured
+ * directly against a fresh 32x32 site (desert, seeds 1/2/42): a flat 0.05m
+ * floor still left 62-81% of every legally-climbable cardinal step
+ * classified 'ramp' (moveCost 1.8x), because ordinary graded ground alone
+ * commonly varies more than 5cm between adjacent cells — nowhere near "noise
+ * ignored", closer to "ramp is the default terrain type" (#1151 fixer
+ * finding). 95% of NAV_MAX_SLOPE_RATIO instead keeps only the steepest sliver
+ * of the legally-climbable range — genuinely near-cliff ground, or an actual
+ * built ramp's own grade, which is deliberately cut close to the ceiling
+ * (`length >= depth * 1.8`) — as 'ramp'; the same measurement gives 0.7-2.9%
+ * at this floor, in line with the pre-#1151 whole-voxel rule's ~0.15%.
+ */
+export const NAV_RAMP_MIN_SLOPE_DELTA = NAV_MAX_SLOPE_RATIO * 0.95;
 
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 

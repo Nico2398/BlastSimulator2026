@@ -6,7 +6,7 @@ import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice,
-  type RampDef, type RampDirection,
+  type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
@@ -68,9 +68,15 @@ describe('Ramp building', () => {
     expect(result.success).toBe(true);
     expect(result.voxelsCleared).toBeGreaterThan(0);
 
-    // Check that voxels along the ramp path are cleared, at the column's real surface.
+    // The origin (step 0) has zero continuous depth by design — a ramp
+    // starts flush with the existing surface, not a voxel below it — so its
+    // floor-row cell is re-banded back to that same continuous height
+    // (#1151) rather than left as a hard, fully-cleared voxel: exactly 0.5,
+    // the crossing density at an integer surface height
+    // (VoxelGrid.surfaceDensityAt). It is still "solid" by the >=0.5
+    // walkability threshold, correctly reproducing "no drop here".
     const startVoxel = grid.getVoxel(10, surfaceY, 10);
-    expect(startVoxel?.density).toBe(0);
+    expect(startVoxel?.density).toBe(0.5);
   });
 
   it('ramp connects surface level to a lower elevation', () => {
@@ -87,8 +93,11 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(true);
 
-    // At the start (step 0): should be cleared at the column's real surface.
-    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0);
+    // At the start (step 0): zero continuous depth by design, so the
+    // floor-row cell is re-banded back to the original surface height
+    // (#1151) rather than fully cleared — exactly 0.5, still "solid" by the
+    // >=0.5 walkability threshold.
+    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0.5);
 
     // At the end (step 14): should be cleared at y≈9 (depth 10 * 14/15 ≈ 9.3 → floor=9)
     expect(grid.getVoxel(10, 9, 19)?.density).toBe(0);
@@ -135,12 +144,15 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(true);
 
-    // Origin column (start of ramp, step 0) — should be measurably lower than
-    // the untouched surface once the ramp is actually an open cut, not buried rock.
+    // Origin column (start of ramp, step 0) has zero continuous depth by
+    // design — the ramp starts flush with the existing surface, not a voxel
+    // below it — so continuous banding (#1151) re-grades its floor-row cell
+    // back to that exact original height instead of leaving the hard,
+    // fully-cleared voxel step the pre-#1151 rule produced. No drop at all
+    // is the correct, un-buried outcome here.
     const originSurfaceAfter = localSurfaceY(grid, 10, 10);
     const originDrop = originSurfaceBefore - originSurfaceAfter;
-    expect(originDrop).toBeGreaterThan(0);
-    expect(originDrop).toBeLessThanOrEqual(targetDepth);
+    expect(originDrop).toBe(0);
 
     // End column (last carved step, z = originZ + length - 1) — should have
     // dropped substantially further than the origin, consistent with targetDepth.
@@ -246,10 +258,18 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
     for (const segment of carved) carveRampSegment(grid, segment);
 
-    // Every carved segment's own declared cells are now cleared.
+    // Every carved segment's own declared cells are now cleared — except a
+    // column's own floor-row cell (`floorAdjustment` set), which continuous
+    // banding (#1151) re-grades to the column's true continuous depth: a
+    // residual crossing density in (0, 0.5], never a hard 0.
     for (const segment of carved) {
       for (const cell of segment.cells) {
-        expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        if (cell.floorAdjustment !== undefined) {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeLessThanOrEqual(0.5);
+        } else {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        }
       }
     }
 
@@ -544,6 +564,66 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     }
     expect(segments.some(s => s.targetY >= 2 && s.targetY <= 7)).toBe(true);
     expect(segments.some(s => s.targetY >= 15 && s.targetY <= 22)).toBe(true);
+  });
+
+  // ── #1166: median3 rejects a single-column sub-voxel noise spike ────────
+  //
+  // Real terrain generation's own sub-voxel noise can nudge one column's
+  // discrete surface index down (or up) by a full voxel relative to two
+  // otherwise-flat neighbours, the instant it crosses the 0.5-density
+  // threshold on that one column but not its neighbours. Pre-fix, floorY was
+  // measured against each column's own raw surfaceY, so that lone-column
+  // outlier alone produced a non-monotonic, illegal-slope floor jump at
+  // carve time. `defineRampSegments` now measures floorY against a
+  // median-of-3 smoothing of the column's raw surfaceY and its two
+  // ramp-direction neighbours — a lone outlier's two neighbours agree with
+  // each other, so the median rejects it entirely.
+
+  /** Per-column solid-to-`surfaceY` grid, one column per z (ramp runs south, so
+   * every column along the ramp shares the same x band). */
+  function makeGridFromSurfaceFn(fn: (z: number) => number): VoxelGrid {
+    const grid = new VoxelGrid(40, 30, 40);
+    for (let z = 0; z < 40; z++) {
+      const s = fn(z);
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= s; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+
+  /** Maps each column's z to the y-row carrying that column's own
+   * `floorAdjustment` — i.e. the column's own carved floor row. */
+  function floorRowsByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const rows = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment !== undefined) rows.set(cell.z, cell.y);
+      }
+    }
+    return rows;
+  }
+
+  it('a single-column sub-voxel noise spike does not perturb the carved floor row at all, unlike a genuine multi-column terrain feature', () => {
+    const flatGrid = makeGridFromSurfaceFn(() => 20);
+    // One lone column (z=24, step 4) sits one voxel lower than its flat
+    // neighbours either side — the sub-voxel noise spike shape, not a
+    // genuine sustained terrain feature.
+    const spikedGrid = makeGridFromSurfaceFn(z => (z === 24 ? 19 : 20));
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const flatRows = floorRowsByZ(defineRampSegments(flatGrid, ramp));
+    const spikedRows = floorRowsByZ(defineRampSegments(spikedGrid, ramp));
+
+    // median3(prev=20, raw=19, next=20) === 20 — the spike is fully
+    // rejected, so the carved floor row is identical, column for column, to
+    // the noise-free flat grid's. No jump for the slope check to trip on.
+    expect(spikedRows.size).toBe(flatRows.size);
+    for (const [z, y] of flatRows) {
+      expect(spikedRows.get(z)).toBe(y);
+    }
   });
 });
 
@@ -844,11 +924,22 @@ describe('carveRampSegmentSlice (#946)', () => {
 
       // Every cell carved so far is actually cleared; every cell not yet
       // reached is still solid — carving proceeds in the segment's own
-      // (nearest-to-entrance-first) array order.
+      // (nearest-to-entrance-first) array order. A column's own floor-row
+      // cell (`floorAdjustment` set) is the one exception: continuous
+      // banding (#1151) re-grades it to the column's true continuous depth,
+      // a residual crossing density in (0, 0.5], never a hard 0.
       for (let i = 0; i < totalCells; i++) {
         const cell = segment.cells[i]!;
-        if (i < carvedSoFar) expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
-        else expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+        if (i < carvedSoFar) {
+          if (cell.floorAdjustment !== undefined) {
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeLessThanOrEqual(0.5);
+          } else {
+            expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+          }
+        } else {
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+        }
       }
     }
 

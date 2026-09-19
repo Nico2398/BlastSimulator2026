@@ -285,14 +285,14 @@
       "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently order every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on. #554: this orders 9 fresh charge_hole actions (one per hole, cancelling/replacing H1/H2/H3's already-landed entries with a new pending order and queuing H4-H9 for the first time) — none of the 9 lands the instant the button is clicked."
     },
     {
-      "command": "wait_until field:chargedCount equals:5 max_ticks:9000",
+      "command": "wait_until field:chargedCount equals:6 max_ticks:9000",
       "timeout": 305,
-      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (5 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead. #947 CI-fix follow-up: checkpoint moved from 6 to 5 — staffed:true's driller is also blasting-qualified and joins the blaster once drilling is done, so the Charge All drain lands two holes on the very same tick at this point in the sequence (deterministically confirmed: 3->4->5->7->9, tick 177 landing both the 6th and 7th charge together). 6 is never observed as a value chargedCount actually holds, so a wait_until pinned to it can only ever exhaust its budget waiting on a value the drain skips straight past. 5 sits on the same landing sequence.)",
+      "description": "#554/#590: the bulk Charge All order drains through the blaster pipeline. Screenshot taken at the mid-load point for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. #1151: checkpoint moved from 5 to 6. Both staffed workers hold the `blasting` qualification and charge_hole is on-foot (requiredVehicleRole: null), so two holes load in parallel; under the 30-degree slope gate their approach walks line up and chargedCount now advances 4 -> 6 -> 8 -> 9, stepping over 5 entirely, so the old checkpoint could never match and the wait burned its whole 9000-tick budget. Traced tick by tick against this exact seed. 6 of 9 is the same mixed state the screenshot wants, and is a count the run genuinely passes through.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
-          "equals": 5,
+          "equals": 6,
           "maxTicks": 9000,
           "timeoutMs": 300000
         },
@@ -303,9 +303,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 5
+          "chargedCount": 6
         },
-        "note": "5 of 9 holes loaded from the Charge All order; the remaining 4 are still ordered-but-unloaded"
+        "note": "6 of 9 holes loaded from the Charge All order; the remaining 3 are still ordered-but-unloaded"
       }
     },
     {

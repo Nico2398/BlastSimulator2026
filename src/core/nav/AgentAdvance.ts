@@ -7,7 +7,6 @@
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
 import { isImpassable } from './Pathfinding.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -107,12 +106,34 @@ export interface RouteCommitment {
    */
   fromX?: number | null;
   fromZ?: number | null;
+  /**
+   * The integer grid cell `waypointX`/`waypointZ` was adopted as a single
+   * step FROM — the fresh path's own predecessor waypoint at adoption time
+   * (#1166), fixed for as long as this commitment is held. Distinct from
+   * `fromX`/`fromZ`: that field is intentionally rewritten every hop (even a
+   * "kept" one) to the immediately-preceding continuous position, since
+   * #1129's retrace guard needs exactly that. Reusing it here for
+   * climb-legality re-validation reintroduced the same class of bug one
+   * level removed — a "kept" hop's `fromX`/`fromZ` drifts to the agent's
+   * current, continuously-advancing position over several ticks, and
+   * flooring that mid-multi-tick-hold position can land on a phantom cell
+   * that was never the edge's real origin (confirmed live on tutorial_pit's
+   * natural terrain: a drill_rig cycling forever between two cells whose
+   * true shared edge is a legal diagonal, re-validated tick after tick
+   * against a floored `fromX`/`fromZ` that drifted onto an adjacent cell the
+   * edge never touched). `originX`/`originZ` never changes while the same
+   * waypoint stays committed, so the climb check always re-tests the exact
+   * edge A* actually walked. Optional for the same fixture-compatibility
+   * reason as `fromX`/`fromZ`.
+   */
+  originX?: number | null;
+  originZ?: number | null;
 }
 
 /** The empty commitment — no in-flight waypoint yet. Default for a fresh journey/leg. */
 export const NULL_ROUTE_COMMITMENT: RouteCommitment = {
   waypointX: null, waypointZ: null, destX: null, destZ: null, remainingCost: null,
-  fromX: null, fromZ: null,
+  fromX: null, fromZ: null, originX: null, originZ: null,
 };
 
 // Tie tolerance for preferring the committed in-flight waypoint over a fresh
@@ -220,10 +241,18 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   const maxHops = input.path.waypoints.length + 1;
   for (let hop = 0; hop < maxHops && remaining > 0 && !isPathComplete; hop++) {
     const freshTarget = input.path.waypoints[pathIndex] ?? input.path.waypoints[input.path.waypoints.length - 1]!;
+    // The fresh path's own predecessor of `freshTarget` — the cell A*
+    // actually stepped FROM to reach it, and so the correct, non-drifting
+    // origin to record if this tick ends up adopting `freshTarget` fresh
+    // (#1166's `RouteCommitment.originX/originZ`). Null when `freshTarget`
+    // is the path's own first waypoint (no predecessor — the trivial
+    // already-there case), in which case adoptFresh falls back to the
+    // agent's own current cell.
+    const freshOrigin = pathIndex > 0 ? (input.path.waypoints[pathIndex - 1] ?? null) : null;
 
     const resolved = resolveTargetWaypoint(
       x, z,
-      freshTarget, input.path.totalCost,
+      freshTarget, freshOrigin, input.path.totalCost,
       input.destinationX, input.destinationZ,
       committed,
       input.navGrid ?? null,
@@ -307,6 +336,16 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // against the true immediately-preceding position (#1129).
       fromX: beforeX,
       fromZ: beforeZ,
+      // Carried from `resolved.committed`, NOT re-derived from `beforeX`/
+      // `beforeZ` the way `fromX`/`fromZ` above is (#1166): the edge's true
+      // origin is fixed at the moment this waypoint was freshly adopted and
+      // must stay fixed for as long as the SAME waypoint stays committed —
+      // overwriting it every hop the way `fromX`/`fromZ` intentionally does
+      // would drift it onto the agent's own continuously-advancing position
+      // again, recreating the phantom-cell bug `originX`/`originZ` exists to
+      // avoid, just gated to once-per-hop instead of continuous.
+      originX: resolved.committed.originX ?? null,
+      originZ: resolved.committed.originZ ?? null,
     };
 
     // Budget ran out mid-hop (partial move) — nothing left to spend on a
@@ -357,6 +396,7 @@ function resolveTargetWaypoint(
   x: number,
   z: number,
   freshTarget: { x: number; z: number },
+  freshOrigin: { x: number; z: number } | null,
   freshCost: number | undefined,
   destinationX: number,
   destinationZ: number,
@@ -372,6 +412,12 @@ function resolveTargetWaypoint(
       destX: destinationX,
       destZ: destinationZ,
       remainingCost: freshCost ?? null,
+      // The fresh path's own predecessor of `freshTarget` (#1166) — the
+      // edge A* actually validated — or, when there is none (the trivial
+      // already-there case), the agent's own current cell. Stays fixed for
+      // as long as this waypoint stays committed; see the field's own doc.
+      originX: navGrid ? navGrid.clampX(freshOrigin ? Math.floor(freshOrigin.x) : Math.floor(x)) : null,
+      originZ: navGrid ? navGrid.clampZ(freshOrigin ? Math.floor(freshOrigin.z) : Math.floor(z)) : null,
     },
   });
 
@@ -400,11 +446,39 @@ function resolveTargetWaypoint(
   // never held stale by this guard. Reuses this file's own climb check and
   // Pathfinding's own impassability check rather than inventing new ones.
   if (navGrid) {
-    const targetCell = navGrid.cellAt(navGrid.clampX(Math.floor(committed.waypointX)), navGrid.clampZ(Math.floor(committed.waypointZ)));
-    const standingCell = navGrid.cellAt(navGrid.clampX(Math.floor(x)), navGrid.clampZ(Math.floor(z)));
+    const targetCellX = navGrid.clampX(Math.floor(committed.waypointX));
+    const targetCellZ = navGrid.clampZ(Math.floor(committed.waypointZ));
+    // The step's origin cell is `committed.originX/originZ` — the fresh
+    // path's own predecessor waypoint recorded at the moment this
+    // commitment was adopted (#1166) — never wherever the agent's
+    // continuous position currently floors into, and never `fromX`/`fromZ`
+    // either: that field is intentionally rewritten every hop for #1129's
+    // retrace guard, so flooring it here drifts onto a phantom cell the
+    // pathfinder never actually stepped through, over exactly the same
+    // number of ticks it takes the agent to walk the hop (confirmed live on
+    // tutorial_pit's natural terrain: a drill_rig cycling forever between
+    // two cells whose true shared edge is a legal diagonal, re-validated
+    // every tick against a floored `fromX`/`fromZ` that had drifted onto an
+    // adjacent cell the edge never touched). `originX`/`originZ` stays fixed
+    // for as long as this waypoint stays committed, so the climb check
+    // always re-tests the exact edge A* validated when the path was built.
+    // Falls back to the live position's floor only for a fixture/caller
+    // predating the field (see its own doc).
+    const standingCellX = navGrid.clampX(Math.floor(committed.originX ?? x));
+    const standingCellZ = navGrid.clampZ(Math.floor(committed.originZ ?? z));
+    const targetCell = navGrid.cellAt(targetCellX, targetCellZ);
+    const standingCell = navGrid.cellAt(standingCellX, standingCellZ);
     const blocked = !targetCell || isImpassable(targetCell, avoidVehicles, false);
+    // `run` is the fixed inter-cell step distance between the standing and
+    // target grid cells (1.0 cardinal, sqrt(2) diagonal) — a property of the
+    // step being evaluated, not of how far along it the agent currently is
+    // (#1166: the agent's shrinking remaining distance to the waypoint made
+    // this check spuriously fail a few ticks before arrival, forcing a
+    // replan every tick and livelocking). Mirrors Pathfinding.ts's own
+    // neighbour-expansion call, which measures the same way from consecutive
+    // integer cell coordinates.
     const climbLegal = !!standingCell && !!targetCell
-      && isStepClimbable(standingCell.climbY, targetCell.climbY, NAV_MAX_CLIMB_HEIGHT);
+      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, Math.hypot(targetCellX - standingCellX, targetCellZ - standingCellZ));
     if (blocked || !climbLegal) return adoptFresh();
   }
 
@@ -524,6 +598,12 @@ function firstUnwalkedWaypoint(
 
   const target = navGrid.cellAt(afterNext.x, afterNext.z);
   if (!target || target.type === 'blocked' || target.type === 'void') return 1;
-  const standing = navGrid.cellAt(navGrid.clampX(x), navGrid.clampZ(z));
-  return isStepClimbable(standing?.climbY, target.climbY, NAV_MAX_CLIMB_HEIGHT) ? 2 : 1;
+  const standingX = navGrid.clampX(x);
+  const standingZ = navGrid.clampZ(z);
+  const standing = navGrid.cellAt(standingX, standingZ);
+  // `run` is the fixed inter-cell step distance between the standing cell
+  // and afterNext (1.0 cardinal, sqrt(2) diagonal), not the agent's raw
+  // continuous distance to afterNext — same fix as resolveTargetWaypoint's
+  // climb check above (#1166).
+  return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - standingX, afterNext.z - standingZ)) ? 2 : 1;
 }

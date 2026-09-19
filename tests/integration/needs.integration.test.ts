@@ -932,12 +932,40 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
   // boarding/segment-handoff timing this number depends on shifts with the
   // mechanism it measures, same as MAX_EXPECTED_BOARDINGS below. Remeasured
   // at 118 once the employeeWorkState fatigue-classification bug above was
-  // fixed. Ceiling set to measured + ~20% headroom, matching this file's own
-  // margin convention (see the travel-drain headroom comment near
-  // TRAVEL_SAMPLE_TICKS above) — high enough to absorb run-to-run scheduling
-  // noise, tight enough that a genuine stall or regression still fails
-  // loudly by name rather than exhausting a generous placeholder silently.
-  const MAX_TICKS = 142; // 118 measured × 1.2 headroom
+  // fixed.
+  //
+  // #1166 follow-up: #1151's slope-based traversal made the SINGLE initial
+  // approach drive to the box-cut site alone cost more ticks than a full
+  // fatigue charge affords, permanently livelocking this suite again
+  // (direct-traced: dig_ramp_segment count static at 10 for 5000+ real
+  // ticks, the rock_digger driver stuck oscillating between living_quarters
+  // and its own dig site, re-crossing forceShiftRestIfNeededByPolicy's
+  // threshold at the same fraction of the same route every time). Fixed by
+  // extending that guard's existing mid-execution protection
+  // (isMidVehicleGatedWork) to also cover the mid-drive-to-target phase
+  // while fatigue still has headroom above NEED_SOFT_THRESHOLDS.fatigue —
+  // see that guard's own doc comment (ForceShiftRest.ts) for why the drive
+  // phase needed protection too, and why it's gated rather than
+  // unconditional. Remeasured at 99 ticks / 2 boardings post-fix. Ceiling set
+  // to measured + ~20% headroom, matching this file's own margin convention
+  // (see the travel-drain headroom comment near TRAVEL_SAMPLE_TICKS above)
+  // — high enough to absorb run-to-run scheduling noise, tight enough that a
+  // genuine stall or regression still fails loudly by name rather than
+  // exhausting a generous placeholder silently.
+  //
+  // #1166 remeasurement: Ramp.ts's per-column floor-row carve used to gate
+  // on `densityAt(...) !== 1`, which silently skipped a floor-row cell
+  // whenever it landed inside natural terrain's own fractional marching-
+  // cubes surface crossing (indistinguishable by density value alone from
+  // an already-banded cell) — under-carving those columns rather than
+  // genuinely finishing them. Fixed to gate on the column's own continuous
+  // height against its intended target instead, which carves every column
+  // this suite's own depth:8 order actually calls for, genuinely more
+  // digging work than before. Remeasured at 132 ticks / 2 boardings
+  // post-fix (boarding count unaffected — same driver, same vehicle, just
+  // more segment-completion ticks). Ceiling set to measured + ~20%
+  // headroom, same convention as above.
+  const MAX_TICKS = 159; // 132 measured × 1.2 headroom (#1166)
   // History (each remeasurement superseded by the next, kept for context —
   // not the current number): 12 dismount/reboard cycles pre-#549-era fix,
   // then 3 once #549/#556/#867's continuity fixes landed (see git history on

@@ -82,9 +82,10 @@ const PICKER_CONFIRM = '#bs-tile-select-confirm';
  * are reachable for the whole picker stage. Without listing them here they
  * stayed `pointer-events: none` for this stage's entire duration, same as
  * Charge's amount/stemming steppers below: a player could drag a grid but
- * never actually retune spacing/depth off the tool's own defaults. Only the
- * drill picker passes any (survey/build/box-cut pickers have nothing to
- * tune, so they keep the empty default).
+ * never actually retune spacing/depth off the tool's own defaults. The drill
+ * picker passes both steppers and the box-cut picker passes depth (#1151 —
+ * see DEPTH_STEPPER); the survey and build pickers have nothing to tune, so
+ * they keep the empty default.
  *
  * `confirmSpent` (#1014): every picker-backed step's Confirm click issues an
  * order the simulation then owns (a survey, a building, a drill grid, a ramp)
@@ -111,13 +112,23 @@ function pickerStages(
   ];
 }
 
-// #949: grid tool's spacing/depth steppers, rendered on the shared ParamStrip
-// (`#bs-param-strip-bar`, ParamStrip.ts) once the grid tool is armed — same
-// `data-field`/`.bsx-stepper-btn` convention Charge.ts's amount/stemming
+// #949: the spacing/depth steppers, rendered on the shared ParamStrip
+// (`#bs-param-strip-bar`, ParamStrip.ts) once a placement tool is armed —
+// same `data-field`/`.bsx-stepper-btn` convention Charge.ts's amount/stemming
 // steppers use below. Both buttons (inc and dec) are allowlisted, not just
 // increment: a player over- or under-shooting a click needs the other one too.
+//
+// #1151: DEPTH_STEPPER is shared by the grid tool and the ramp tool, which
+// render depth on the same strip under the same data-field. The box-cut stage
+// needs it for the same reason the drill stage does — the value the step
+// teaches is not the tool's default. buildRampCommand defaults depth to 8,
+// but the box-cut's line is region-pinned to 12 tiles (REGION.boxcut) and the
+// slope gate caps a 12-long ramp at 6m of drop, so the default now cuts a
+// ramp too steep to walk. Left off the box-cut stage the stepper is inert
+// while placement is armed, and the tutorial asks for a ramp whose depth no
+// player could set.
 const GRID_SPACING_STEPPER = '#bs-param-strip-bar [data-field="spacing"] .bsx-stepper-btn';
-const GRID_DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn';
+const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn';
 
 /**
  * Where each guided placement belongs, in tiles on the tutorial map (#458
@@ -341,7 +352,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },
-    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, GRID_DEPTH_STEPPER], {
+    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, DEPTH_STEPPER], {
       spentWhen: (state) => state.plannedDrillHoles.length > 0,
       waitingKey: 'tutorial.waiting.drilling',
     }),
@@ -475,7 +486,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'box-cut': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
     { target: '#bs-build-panel .bs-build-ramp-btn', hintKey: 'tutorial.stage.ramp_tool' },
-    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut, [], {
+    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut, [DEPTH_STEPPER], {
       spentWhen: (state) => state.plannedRamps.length > 0,
       waitingKey: 'tutorial.waiting.excavating',
     }),

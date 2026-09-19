@@ -8,7 +8,6 @@
 
 import type { NavGrid } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied } from './NavGrid.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
@@ -113,12 +112,13 @@ export function findNearestTraversableCell(
  * (targetX, targetZ) unchanged if the anchor itself resolves to no
  * traversable cell, or if the connected component containing it is empty.
  *
- * Same-bench-level preference (#458 T6.1/D13): this flood fill is a flat
- * 8-directional walkable/ramp/drill_hole adjacency check with no notion of
- * bench level, so it happily calls a cell "reachable" that sits across a
- * bench-level boundary from the anchor — connected by grid adjacency, but
- * only actually walkable via Pathfinding.findMultiLevelPath's ramp-entrance/
- * exit routing, which re-picks the cheapest candidate ramp fresh every tick
+ * Same-bench-level preference (#458 T6.1/D13): the flood fill is climb-aware
+ * (#1166 — see the fill call's own doc comment below) but still has no
+ * notion of bench level as such, so it can still call a cell "reachable"
+ * that sits across a bench-level boundary from the anchor — connected by a
+ * chain of individually climb-legal steps, but only actually walkable via
+ * Pathfinding.findMultiLevelPath's ramp-entrance/exit routing, which
+ * re-picks the cheapest candidate ramp fresh every tick
  * from the agent's current (sub-cell, continuously moving) position. When
  * two ramps have close-enough cost, that fresh-every-tick re-pick flips
  * between them as the agent moves, producing a stable walk-forward/
@@ -146,13 +146,39 @@ export function findNearestReachableCell(
   targetZ: number,
   avoidOccupancy: boolean = false,
 ): { x: number; z: number } {
+  return reachableAnswer(navGrid, anchorX, anchorZ, targetX, targetZ, avoidOccupancy).cell;
+}
+
+/**
+ * `findNearestReachableCell`'s whole body, plus the size of the anchor's own
+ * connected region. `findNearestSpawnCell` needs that size to tell — exactly,
+ * not heuristically — whether the anchor sits in the grid's largest region,
+ * and getting it from this fill keeps that check free rather than paying for
+ * a second one (the hire benchmark's 200ms budget, #458 T6.2/D14).
+ */
+function reachableAnswer(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+  targetX: number,
+  targetZ: number,
+  avoidOccupancy: boolean,
+): { cell: { x: number; z: number }; count: number } {
   const anchor = findNearestTraversableCell(navGrid, anchorX, anchorZ, undefined, avoidOccupancy);
   if (!isTraversableCell(navGrid, anchor.x, anchor.z) || (avoidOccupancy && isOccupiedCell(navGrid, anchor.x, anchor.z))) {
-    return { x: targetX, z: targetZ };
+    return { cell: { x: targetX, z: targetZ }, count: 0 };
   }
 
-  // 8-directional flood fill from the anchor — same adjacency A* uses.
-  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z, false, avoidOccupancy);
+  // 8-directional, climb-aware flood fill from the anchor — same adjacency
+  // AND climb gate findPath's own neighbour expansion uses (#1166; was
+  // climb-UNaware — see this function's own doc comment above, "same
+  // adjacency A* uses", which stopped being true once a step steeper than
+  // NAV_MAX_SLOPE_RATIO became illegal, #1151). A flat fill could call a
+  // cell "reachable" that a real climb-gated findPath from the same anchor
+  // can never actually walk to — confirmed live: tutorial_pit's own driver
+  // hire landing on a climb-disconnected island this way, "No route to
+  // vehicle" on the very next driver-assign command.
+  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z, true, avoidOccupancy);
   const anchorLevel = navGrid.cellAt(anchor.x, anchor.z)?.benchLevel;
 
   let best = anchor;
@@ -177,7 +203,7 @@ export function findNearestReachableCell(
     }
   }
 
-  return bestSameLevel ?? best;
+  return { cell: bestSameLevel ?? best, count };
 }
 
 /**
@@ -262,8 +288,8 @@ function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, cl
 /**
  * Nearest cell to (targetX, targetZ) inside the grid's **largest
  * climb-connected region** — the main body of ground an agent standing
- * anywhere in it can walk across without scaling a face taller than
- * `NAV_MAX_CLIMB_HEIGHT` (#953).
+ * anywhere in it can walk across without scaling a face steeper than
+ * `NAV_MAX_SLOPE_RATIO` (#953, slope-based since #1151).
  *
  * Unlike `findNearestReachableCell`, it takes no anchor. That helper's
  * contract — "pass a world corner, it sits in the map's main connected
@@ -277,13 +303,27 @@ function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, cl
  * assumption: the answer is a cell the site's workforce, its vehicles and
  * its work area can all actually reach each other from.
  *
+ * avoidOccupancy (#1151, default false — every pre-existing caller's
+ * behaviour is unchanged): when true, a vehicle- or fragment-occupied cell is
+ * treated as unusable, exactly as in `findNearestTraversableCell`/
+ * `findNearestReachableCell`'s flag of the same name (#954 — see its doc
+ * comment for why entity-spawn placement needs it). Occupancy is applied to
+ * the *answer* only, not to the component scan: a parked vehicle does not
+ * split the ground it stands on into two regions, so letting it do so here
+ * would shrink the main region for no reason and could hand back a cell on a
+ * genuine island. Spawn placement is the caller that needs both properties at
+ * once — the main landmass and a free cell — and before this flag the only
+ * helper offering the occupancy guard was `findNearestReachableCell`, whose
+ * fixed-anchor contract is the very assumption this function exists to drop.
+ *
  * Returns (targetX, targetZ) unchanged when the grid holds no traversable
- * cell at all.
+ * cell at all, or no usable one under `avoidOccupancy`.
  */
 export function findNearestNavigableCell(
   navGrid: NavGrid,
   targetX: number,
   targetZ: number,
+  avoidOccupancy = false,
 ): { x: number; z: number } {
   const { width, height, originX, originZ } = navGrid;
   const componentOf = new Int32Array(width * height).fill(UNVISITED);
@@ -292,6 +332,8 @@ export function findNearestNavigableCell(
   let bestComponentSize = 0;
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
+  const usable = (x: number, z: number): boolean =>
+    !avoidOccupancy || !isOccupiedCell(navGrid, x, z);
 
   for (let startIdx = 0; startIdx < componentOf.length; startIdx++) {
     if (componentOf[startIdx] !== UNVISITED) continue;
@@ -304,8 +346,8 @@ export function findNearestNavigableCell(
     let count = 0;
     componentOf[startIdx] = startIdx;
     queue[count++] = startIdx;
-    let nearest = { x: sx, z: sz };
-    let nearestDistSq = (sx - targetX) ** 2 + (sz - targetZ) ** 2;
+    let nearest: { x: number; z: number } | null = usable(sx, sz) ? { x: sx, z: sz } : null;
+    let nearestDistSq = nearest ? (sx - targetX) ** 2 + (sz - targetZ) ** 2 : Infinity;
 
     for (let head = 0; head < count; head++) {
       const idx = queue[head]!;
@@ -315,33 +357,126 @@ export function findNearestNavigableCell(
       for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
         const nx = x + dx;
         const nz = z + dz;
-        if (!isTraversableCell(navGrid, nx, nz)) continue;
-        if (!isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+        if (nx < originX || nx >= originX + width || nz < originZ || nz >= originZ + height) continue;
+        // Label check first: in a dense region each cell is offered by up to
+        // eight neighbours but labelled once, so testing it before the cell
+        // lookups and the slope maths below skips that work on roughly seven
+        // of every eight edges. Behaviour is identical — everything past this
+        // point only ever ran for a newly-labelled cell anyway.
         const neighbourIdx = (nz - originZ) * width + (nx - originX);
         if (componentOf[neighbourIdx] !== UNVISITED) continue;
+        const neighbourCell = navGrid.cellAt(nx, nz);
+        if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+        if (!isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
         componentOf[neighbourIdx] = startIdx;
         queue[count++] = neighbourIdx;
         const distSq = (nx - targetX) ** 2 + (nz - targetZ) ** 2;
-        if (distSq < nearestDistSq) {
+        if (distSq < nearestDistSq && usable(nx, nz)) {
           nearestDistSq = distSq;
           nearest = { x: nx, z: nz };
         }
       }
     }
 
+    // A region every cell of which is occupied offers no answer, so it never
+    // displaces one — otherwise the largest region could win the comparison
+    // and then hand back nothing, dropping the caller onto a genuine island.
+    if (nearest === null) continue;
+    const answer = nearest;
+    const answerDistSq = nearestDistSq;
+
     // Strictly-greater keeps the scan deterministic: on a tie the region
     // whose first cell comes first in row-major order wins.
     if (count > bestComponentSize) {
       bestComponentSize = count;
-      best = nearest;
-      bestDistSq = nearestDistSq;
-    } else if (count === bestComponentSize && nearestDistSq < bestDistSq) {
-      best = nearest;
-      bestDistSq = nearestDistSq;
+      best = answer;
+      bestDistSq = answerDistSq;
+    } else if (count === bestComponentSize && answerDistSq < bestDistSq) {
+      best = answer;
+      bestDistSq = answerDistSq;
     }
   }
 
   return best ?? { x: targetX, z: targetZ };
+}
+
+/**
+ * Where a mid-game entity spawn (an `employee hire`, a `vehicle buy`) may
+ * actually be placed: the cell nearest (targetX, targetZ) that is on the
+ * site's main body of ground, free of vehicles and fragments, and genuinely
+ * walkable to from it.
+ *
+ * Both call sites used to ask `findNearestReachableCell` with a literal
+ * `(0, 0)` anchor, on the reasoning that "blast sites are never placed on
+ * the map edge" so a corner always sits in the main region. The slope gate
+ * (#1151) broke that: a corner can be walled off into a small island by
+ * nothing more than the craters the player's own blasts leave around it, and
+ * `findNearestReachableCell` then faithfully snaps every later spawn *into*
+ * that island. Measured on blast-execution-visual's 64x64 site, five blast
+ * cycles in: the corner region had shrunk to 24 of 4096 cells, and the hire
+ * and the drill rig bought for it both landed inside, unable to reach any
+ * work for the rest of the run.
+ *
+ * The corner is still tried first, exactly as before: the same anchor, the
+ * same fill, the same tie-breaks, so on a healthy site this returns the cell
+ * the two spawn paths always got. What is new is that the answer is checked
+ * rather than assumed. The fill reports how many cells the corner's own
+ * region holds; if that is more than half of the grid's usable cells, no
+ * other region can be bigger, so the corner IS the main region and the answer
+ * stands. Only when it is not does this pay for `findNearestNavigableCell`'s
+ * all-regions scan — the case where the old code was simply wrong, and where
+ * there is therefore no earlier answer worth reproducing.
+ *
+ * That case is not hypothetical: on treranium_depths, the campaign's biggest
+ * level, the corner's region is 16 cells of 25,600, so every hire and every
+ * vehicle bought there used to land on a 16-cell rock. It is also why the
+ * hire/buy benchmarks got faster as they got wronger — filling a 16-cell
+ * island costs nothing.
+ *
+ * The check is exact, not a heuristic, and costs one cell count rather than a
+ * second flood fill: two fills measured 277ms on treranium_depths' 160x160
+ * grid against the hire benchmark's 200ms budget (#458 T6.2/D14).
+ */
+export function findNearestSpawnCell(
+  navGrid: NavGrid,
+  targetX: number,
+  targetZ: number,
+): { x: number; z: number } {
+  const fromCorner = reachableAnswer(navGrid, 0, 0, targetX, targetZ, true);
+  // Usable cells can only ever be a subset of all cells, so clearing half of
+  // the whole grid clears half of the usable ones without counting them. That
+  // is the case on any ordinary site, and it keeps the common path free of
+  // even the sweep below.
+  if (fromCorner.count * 2 > navGrid.width * navGrid.height) return fromCorner.cell;
+  if (fromCorner.count * 2 > countUsableCells(navGrid)) return fromCorner.cell;
+  // The corner is on an island, so there is no prior behaviour worth
+  // reproducing here — answer from the largest region directly. One scan,
+  // not a scan plus a second fill: treranium_depths reaches this path on
+  // every spawn (its corner region is 16 cells of 25,600), so this is the
+  // path the hire and buy benchmarks actually measure.
+  return findNearestNavigableCell(navGrid, targetX, targetZ, true);
+}
+
+/**
+ * How many cells a spawn could stand on at all — traversable and unoccupied,
+ * the same predicate `reachableAnswer`'s fill counts under. A plain sweep, no
+ * BFS: this exists so the majority test above stays cheap.
+ */
+function countUsableCells(navGrid: NavGrid): number {
+  const { width, height, originX, originZ } = navGrid;
+  let n = 0;
+  for (let z = originZ; z < originZ + height; z++) {
+    for (let x = originX; x < originX + width; x++) {
+      // One cell lookup, not the two that `isTraversableCell` plus
+      // `isOccupiedCell` would each make separately — this sweep runs over
+      // every cell of the grid on every mid-game spawn.
+      const cell = navGrid.cellAt(x, z);
+      if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
+      if (isCellOccupied(cell)) continue;
+      n++;
+    }
+  }
+  return n;
 }
 
 /** Component label for a cell no component scan has claimed yet. */
@@ -386,8 +521,8 @@ function ensureReachabilityScratch(size: number): void {
  * callers must either consume it synchronously (findNearestReachableCell) or
  * copy what they need out of it (computeReachableSet).
  *
- * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_CLIMB_HEIGHT`
- * per step (#953), which is what makes the fill match `findPath`'s own
+ * `climbAware` additionally applies `isStepClimbable`/`NAV_MAX_SLOPE_RATIO`
+ * per step (#953, slope-based since #1151), which is what makes the fill match `findPath`'s own
  * neighbour expansion exactly rather than only its impassability check.
  *
  * `avoidOccupancy` (#954 follow-up fix, default false — every pre-existing
@@ -423,11 +558,16 @@ function floodFillReachable(
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
-      if (!isTraversableCell(navGrid, nx, nz)) continue;
-      if (avoidOccupancy && isOccupiedCell(navGrid, nx, nz)) continue;
-      if (climbAware && !isStepClimbable(cell?.climbY, navGrid.cellAt(nx, nz)?.climbY, NAV_MAX_CLIMB_HEIGHT)) continue;
+      if (!navGrid.containsCell(nx, nz)) continue;
+      // Visited check first — see the identical note in
+      // findNearestNavigableCell's own fill. Behaviour is unchanged; the
+      // checks below only ever mattered for a cell about to be enqueued.
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
+      const neighbourCell = navGrid.cellAt(nx, nz);
+      if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+      if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
+      if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }

@@ -156,7 +156,23 @@ export function buildBoardLeg(
   vehicle: Vehicle,
   fidelity: PlanFidelity,
 ): Leg | null {
-  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z, !isDestinationOccupied(state, vehicle.x, vehicle.z));
+  // Never avoid vehicle occupancy on the way to a vehicle we are going to
+  // board (#1166). `!isDestinationOccupied(...)` asked the NavGrid whether a
+  // vehicle is standing on the destination — but for this leg the answer is
+  // true by construction, since the destination IS `vehicle`'s own cell. It
+  // only ever read false when the grid's occupancy was stale, which it
+  // routinely is for a vehicle that has never moved: NavGrid.build seeds
+  // `vehicleOccupied` from the vehicle list and Locomotion maintains it
+  // thereafter, so a vehicle bought into an already-built world is marked by
+  // neither until its first drive.
+  //
+  // Read false, this planned `avoidVehicles: true` instead, and the walk to
+  // board had to dodge every OTHER parked vehicle. Under #1151's slope gate
+  // that is frequently no route at all — on seed 42 the starting fleet parks
+  // across z=2, the only climb-legal row off the crew's z=0 spawn strip, so
+  // `vehicle driver 5 3` was refused "No route to vehicle" for a vehicle
+  // whose cell findPath reaches in 37 waypoints with the flag off.
+  const footDist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, vehicle.x, vehicle.z, false);
   if (footDist === null) return null;
 
   return {

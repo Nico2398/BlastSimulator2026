@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
-import { NAV_MAX_CLIMB_HEIGHT } from '../../../src/core/config/balance.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -973,46 +973,119 @@ describe('findPath — multi-level routing', () => {
     // The stub returns [], but the real implementation should detect the ramp
     // For now we just verify the call doesn't crash and returns an array
   });
+
+  // ── #1166: chained multi-hop ramp routing across 3+ bench levels ──
+  //
+  // findMultiLevelPath used to try only a single direct ramp hop between
+  // startLevel and goalLevel (filterRampsForLevels required an exact match
+  // against a ramp's own upper/lower level pair). Two genuinely walkable
+  // points 2+ bench levels apart with no ramp bridging them directly (only
+  // 0<->1 and 1<->2 ramps exist, none spanning 0<->2 in one hop) then
+  // reported found:false even though a real route exists one hop at a time.
+  // findLevelHopSequence/findChainedRoute chain the two single-level hops
+  // together, falling back to this only when the direct single-hop search
+  // finds nothing.
+  it('chains two ramp hops across 3 bench levels when no ramp connects level 0 directly to level 2', () => {
+    // 10-wide × 14-tall grid: level 0 (z=0..3), void wall at z=4 except a
+    // ramp at (5,4) connecting level 0<->1, level 1 (z=5..8), void wall at
+    // z=9 except a ramp at (5,9) connecting level 1<->2, level 2 (z=10..13).
+    // No ramp anywhere connects level 0 directly to level 2.
+    //
+    // Every level cell sits at surfaceY=0 (flat), but both ramp cells sit at
+    // surfaceY=50 — a cliff on both sides ordinary A*'s own climb-legality
+    // gate (isStepClimbable) refuses to step onto or off of, so the plain
+    // "try ordinary A* first" path (findPath step 5) cannot cross either
+    // wall at all and must fall through to ramp-graph routing (step 6). The
+    // ramp graph itself (findRampConnections/rampEndpoints) never applies a
+    // climb check — a ramp cell is the sanctioned connector regardless of
+    // height — so multi-level routing can still legitimately cross.
+    const width = 10;
+    const height = 14;
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        if (z <= 3) {
+          row.push(makeCell('walkable', 0, 0));
+        } else if (z === 4) {
+          row.push(x === 5 ? makeCell('ramp', 0, 50) : makeCell('void', 0));
+        } else if (z <= 8) {
+          row.push(makeCell('walkable', 1, 0));
+        } else if (z === 9) {
+          row.push(x === 5 ? makeCell('ramp', 1, 50) : makeCell('void', 1));
+        } else {
+          row.push(makeCell('walkable', 2, 0));
+        }
+      }
+      cells.push(row);
+    }
+    const grid = new NavGrid(width, height, cells, 50);
+
+    expect(getBenchLevel(grid, 0, 0)).toBe(0);
+    expect(getBenchLevel(grid, 0, 13)).toBe(2);
+    // No single ramp directly spans level 0 <-> level 2.
+    expect(findRampConnections(grid).some(r =>
+      (r.upperLevel === 0 && r.lowerLevel === 2) || (r.upperLevel === 2 && r.lowerLevel === 0),
+    )).toBe(false);
+
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 0, toZ: 13, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    // The chained route walks through both ramps, one hop at a time.
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 4)).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 9)).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 12: isStepClimbable (#953)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('isStepClimbable', () => {
-  it('returns true when the surfaceY delta is under the climb limit', () => {
-    expect(isStepClimbable(10, 11, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(11, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+describe('isStepClimbable — slope-based (#1151)', () => {
+  it('returns true when the surfaceY delta is under the slope limit for a cardinal run (1.0m)', () => {
+    expect(isStepClimbable(10, 10.3, 1)).toBe(true);
+    expect(isStepClimbable(10.3, 10, 1)).toBe(true);
   });
 
-  it('returns true when the surfaceY delta is exactly the climb limit (boundary)', () => {
-    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+  it('returns true when the surfaceY delta is exactly at the slope limit for a cardinal run (boundary)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO, 1)).toBe(true);
+    expect(isStepClimbable(10 + NAV_MAX_SLOPE_RATIO, 10, 1)).toBe(true);
   });
 
-  it('returns false when the surfaceY delta exceeds the climb limit', () => {
-    expect(isStepClimbable(10, 10 + NAV_MAX_CLIMB_HEIGHT + 1, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
-    expect(isStepClimbable(10 + NAV_MAX_CLIMB_HEIGHT + 1, 10, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+  it('returns false when the surfaceY delta exceeds the slope limit for a cardinal run', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO + 0.01, 1)).toBe(false);
+    expect(isStepClimbable(10 + NAV_MAX_SLOPE_RATIO + 0.01, 10, 1)).toBe(false);
   });
 
   it('falls back to unconstrained (true) when either side is missing surfaceY', () => {
-    expect(isStepClimbable(undefined, 100, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(100, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(undefined, undefined, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(undefined, 100, 1)).toBe(true);
+    expect(isStepClimbable(100, undefined, 1)).toBe(true);
+    expect(isStepClimbable(undefined, undefined, 1)).toBe(true);
   });
 
-  // #1149: production surfaceY values are now the continuous marching-cubes
+  // #1149: production surfaceY values are the continuous marching-cubes
   // crossing height, so a real fromY/toY pair is typically fractional
-  // (e.g. 4.5, not 4). The gate itself is unchanged — it never rounds — but
-  // this pins that a fractional delta admits/refuses at exactly the same
-  // boundary an integer one does, verifying the gate genuinely needs no
-  // change for the representation switch.
+  // (e.g. 4.5, not 4). The gate itself never rounds — this pins that a
+  // fractional delta admits/refuses at exactly the same boundary an integer
+  // one does.
   it('admits and refuses fractional surfaceY deltas at the same boundary as integer ones', () => {
-    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
-    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_CLIMB_HEIGHT + 0.01, NAV_MAX_CLIMB_HEIGHT)).toBe(false);
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_SLOPE_RATIO, 1)).toBe(true);
+    expect(isStepClimbable(4.5, 4.5 + NAV_MAX_SLOPE_RATIO + 0.01, 1)).toBe(false);
     // A sub-voxel grade difference well inside the limit — exactly the kind
     // of delta the old integer-index representation rounded away entirely.
-    expect(isStepClimbable(4.3, 4.7, NAV_MAX_CLIMB_HEIGHT)).toBe(true);
+    expect(isStepClimbable(4.3, 4.7, 1)).toBe(true); // delta 0.4 < NAV_MAX_SLOPE_RATIO (~0.5774)
+  });
+
+  // #1151: the legal delta scales with the step's own run distance — a
+  // diagonal step (√2m) tolerates more rise than a cardinal one (1m) for the
+  // same 30° slope.
+  it('scales the legal delta with a diagonal run (√2m)', () => {
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO * Math.SQRT2, Math.SQRT2)).toBe(true);
+    expect(isStepClimbable(10, 10 + NAV_MAX_SLOPE_RATIO * Math.SQRT2 + 0.01, Math.SQRT2)).toBe(false);
+    // The identical absolute delta (0.6m) is illegal over a cardinal run but
+    // legal over a diagonal one.
+    expect(isStepClimbable(10, 10.6, 1)).toBe(false);
+    expect(isStepClimbable(10, 10.6, Math.SQRT2)).toBe(true);
   });
 });
 
@@ -1028,8 +1101,9 @@ describe('isStepClimbable', () => {
 
 /**
  * Build a flat plateau NavGrid with a rectangular "pit" whose surfaceY sits
- * far below the plateau — every pit-perimeter step exceeds NAV_MAX_CLIMB_HEIGHT.
- * All cells are 'walkable' by cell type; only surfaceY marks the pit.
+ * far below the plateau — every pit-perimeter step exceeds the slope limit
+ * (NAV_MAX_SLOPE_RATIO). All cells are 'walkable' by cell type; only
+ * surfaceY marks the pit.
  */
 function makePlateauWithPit(
   width: number,
@@ -1053,7 +1127,7 @@ function makePlateauWithPit(
 describe('findPath — climb-limit gating on surfaceY (#953)', () => {
   const PIT = { minX: 5, maxX: 9, minZ: 5, maxZ: 9 };
   const PLATEAU_Y = 20;
-  const PIT_Y = 5; // delta 15, well beyond NAV_MAX_CLIMB_HEIGHT
+  const PIT_Y = 5; // delta 15 over at most a √2m run — far beyond NAV_MAX_SLOPE_RATIO (~0.577/m)
 
   it('routes around a pit whose rim exceeds the climb limit — no waypoint enters the pit footprint', () => {
     const grid = makePlateauWithPit(15, 15, PIT, PLATEAU_Y, PIT_Y);
@@ -1071,15 +1145,58 @@ describe('findPath — climb-limit gating on surfaceY (#953)', () => {
     expect(result.found).toBe(false);
   });
 
-  it('refuses a diagonal step whose surfaceY delta exceeds the climb limit, same as a cardinal one', () => {
+  it('refuses a diagonal step whose surfaceY delta exceeds the slope limit, same as a cardinal one', () => {
     // 2×2 grid: only a diagonal step connects start to goal (both cardinal
     // neighbours are blocked), and that diagonal step's surfaceY delta is
-    // far beyond the climb limit.
+    // far beyond the slope limit.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
     setCell(grid, 1, 0, 'blocked');
     setCell(grid, 0, 1, 'blocked');
-    setCell(grid, 1, 1, 'walkable', { surfaceY: NAV_MAX_CLIMB_HEIGHT + 5 });
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 10 }); // 10m over a √2m diagonal run — far too steep
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+
+  it('finds a route across ground graded at 29° on the only path (cardinal-only fixture)', () => {
+    // Single row (height 1) — no diagonal step is ever possible, so the
+    // only route from (0,0) to (2,0) is two cardinal steps of 0.55m each,
+    // within the slope limit.
+    const grid = makeFlatGrid(3, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 0.55 });
+    setCell(grid, 2, 0, 'walkable', { surfaceY: 0.55 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 0, avoidVehicles: false });
+    expect(result.found).toBe(true);
+  });
+
+  it('refuses a route across ground graded at 31° on the only path (cardinal-only fixture)', () => {
+    const grid = makeFlatGrid(3, 1, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 0.6 });
+    setCell(grid, 2, 0, 'walkable', { surfaceY: 0.6 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 0, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+
+  it('finds a route across ground graded at ~29.6° on the only path (diagonal-only fixture)', () => {
+    // 2×2 grid, both cardinal neighbours blocked — the only route is the
+    // 0.80m diagonal step, within the (larger) diagonal slope limit.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 0.8 });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(true);
+  });
+
+  it('refuses a route across ground graded at ~31.3° on the only path (diagonal-only fixture)', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 1, 'walkable', { surfaceY: 0.83 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(false);
   });
@@ -1302,5 +1419,90 @@ describe('findExactPath', () => {
 
     const exact = findExactPath(grid, request);
     expect(exact).toEqual({ found: false, waypoints: [], totalCost: 0 });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 10: Budget vs. climb-aware reachability agreement (#1166)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Serpentine corridor cut into impassably steep ground: every cell is typed
+ * 'walkable', so nothing here is excluded by `isImpassable` — the corridor
+ * walls are high plateaus that only the slope gate refuses, exactly like the
+ * natural terrain #1151's 30° rule turned into a maze. The one legal route
+ * runs the full length of the snake, so A* has to expand roughly every
+ * corridor cell to find it.
+ */
+function makeSerpentineGrid(size: number, rowSpacing: number): NavGrid {
+  const WALL_Y = 100;
+  const FLOOR_Y = 0;
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < size; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < size; x++) row.push(makeCell('walkable', 0, WALL_Y));
+    cells.push(row);
+  }
+  const carve = (x: number, z: number): void => {
+    cells[z]![x] = makeCell('walkable', 0, FLOOR_Y);
+  };
+
+  const corridorRows: number[] = [];
+  for (let z = 1; z < size - 1; z += rowSpacing) corridorRows.push(z);
+
+  for (const z of corridorRows) {
+    for (let x = 1; x < size - 1; x++) carve(x, z);
+  }
+  // Link each corridor to the next, alternating ends, so the route snakes.
+  for (let i = 0; i < corridorRows.length - 1; i++) {
+    const linkX = i % 2 === 0 ? size - 2 : 1;
+    for (let z = corridorRows[i]! + 1; z < corridorRows[i + 1]!; z++) carve(linkX, z);
+  }
+
+  return new NavGrid(size, size, cells);
+}
+
+describe('findPath — agrees with climb-aware reachability on a long detour (#1166)', () => {
+  const SIZE = 64;
+  const ROW_SPACING = 4;
+
+  it('finds the route when the only legal one is a long detour through slope-gated terrain', () => {
+    const grid = makeSerpentineGrid(SIZE, ROW_SPACING);
+    const corridorRows: number[] = [];
+    for (let z = 1; z < SIZE - 1; z += ROW_SPACING) corridorRows.push(z);
+    const lastRow = corridorRows[corridorRows.length - 1]!;
+    // Far end of the last corridor — reachable only by walking the whole snake.
+    const goalX = corridorRows.length % 2 === 0 ? 1 : SIZE - 2;
+
+    const result = findPath(grid, {
+      agentId: 1, fromX: 1, fromZ: 1, toX: goalX, toZ: lastRow, avoidVehicles: false,
+    });
+
+    expect(result.found).toBe(true);
+    const last = result.waypoints[result.waypoints.length - 1]!;
+    expect(last).toEqual({ x: goalX, z: lastRow });
+    // The straight-line distance is a fraction of the real route: this is the
+    // detour A*'s old area/8 budget gave up on, not a near-direct walk.
+    expect(result.waypoints.length).toBeGreaterThan(SIZE);
+  });
+
+  it('never reports unreachable a goal computeClimbReachableSet reports reachable', () => {
+    const grid = makeSerpentineGrid(SIZE, ROW_SPACING);
+    const reachable = NavGrid.computeClimbReachableSet(grid, 1, 1);
+
+    // The two sets must agree cell for cell. A disagreement is the #1166
+    // livelock: ActionSelection screens candidates through the flood fill,
+    // then hands the survivors to findPath — a goal the first admits and the
+    // second refuses is an action that stays `queued` with no holder forever.
+    const disagreements: Array<{ x: number; z: number }> = [];
+    for (let z = 0; z < SIZE; z++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (!reachable.has(x, z)) continue;
+        const path = findPath(grid, { agentId: 1, fromX: 1, fromZ: 1, toX: x, toZ: z, avoidVehicles: false });
+        if (!path.found) disagreements.push({ x, z });
+      }
+    }
+
+    expect(disagreements).toEqual([]);
   });
 });

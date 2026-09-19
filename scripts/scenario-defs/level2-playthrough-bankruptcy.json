@@ -964,9 +964,10 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7127
+          "cash": -7109
         }
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -1124,7 +1125,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 66.6500000000001,
+          "safety": 65.3000000000001,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1134,7 +1135,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- safety 66.6500000000001 -> 65.3000000000001. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "tick 15",
@@ -1194,7 +1196,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -70397,
+          "cash": -70379,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1203,7 +1205,8 @@
           "levelEndReason": "bankruptcy"
         },
         "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform."
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "event choose 0",
@@ -1314,7 +1317,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 86.90000000000023,
+          "safety": 85.55000000000022,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1324,7 +1327,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "description": "#1151: re-baselined against a measured run -- safety 86.90000000000023 -> 85.55000000000022. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
     },
     {
       "command": "tick 15",

@@ -30,6 +30,12 @@ const ASSIGNMENT_ALLOWLIST: Readonly<Record<string, string>> = {
   // class of bug this test exists to catch. See snapAgentsToNavigableGround's
   // own doc comment.
   'src/core/state/GameState.ts': 'one-time spawn-snap onto navigable ground at world-gen, not per-tick movement',
+  // Same class as the snap above and run in the same breath (#1166): a fresh
+  // game's crew is laid out once, before any tick, when the terrain that only
+  // exists now leaves its authored spawn walled off from the site. Nothing
+  // here runs per tick, and nothing here moves a vehicle that has an
+  // occupant. See placeStartingCrew's own doc comment.
+  'src/core/state/SpawnPlacement.ts': 'one-time starting-crew layout at world-gen, not per-tick movement',
 };
 
 /** Identifier prefixes commonly used for a Vehicle-typed local/parameter in this codebase. */
