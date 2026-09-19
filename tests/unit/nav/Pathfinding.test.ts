@@ -1421,3 +1421,88 @@ describe('findExactPath', () => {
     expect(exact).toEqual({ found: false, waypoints: [], totalCost: 0 });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 10: Budget vs. climb-aware reachability agreement (#1166)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Serpentine corridor cut into impassably steep ground: every cell is typed
+ * 'walkable', so nothing here is excluded by `isImpassable` — the corridor
+ * walls are high plateaus that only the slope gate refuses, exactly like the
+ * natural terrain #1151's 30° rule turned into a maze. The one legal route
+ * runs the full length of the snake, so A* has to expand roughly every
+ * corridor cell to find it.
+ */
+function makeSerpentineGrid(size: number, rowSpacing: number): NavGrid {
+  const WALL_Y = 100;
+  const FLOOR_Y = 0;
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < size; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < size; x++) row.push(makeCell('walkable', 0, WALL_Y));
+    cells.push(row);
+  }
+  const carve = (x: number, z: number): void => {
+    cells[z]![x] = makeCell('walkable', 0, FLOOR_Y);
+  };
+
+  const corridorRows: number[] = [];
+  for (let z = 1; z < size - 1; z += rowSpacing) corridorRows.push(z);
+
+  for (const z of corridorRows) {
+    for (let x = 1; x < size - 1; x++) carve(x, z);
+  }
+  // Link each corridor to the next, alternating ends, so the route snakes.
+  for (let i = 0; i < corridorRows.length - 1; i++) {
+    const linkX = i % 2 === 0 ? size - 2 : 1;
+    for (let z = corridorRows[i]! + 1; z < corridorRows[i + 1]!; z++) carve(linkX, z);
+  }
+
+  return new NavGrid(size, size, cells);
+}
+
+describe('findPath — agrees with climb-aware reachability on a long detour (#1166)', () => {
+  const SIZE = 64;
+  const ROW_SPACING = 4;
+
+  it('finds the route when the only legal one is a long detour through slope-gated terrain', () => {
+    const grid = makeSerpentineGrid(SIZE, ROW_SPACING);
+    const corridorRows: number[] = [];
+    for (let z = 1; z < SIZE - 1; z += ROW_SPACING) corridorRows.push(z);
+    const lastRow = corridorRows[corridorRows.length - 1]!;
+    // Far end of the last corridor — reachable only by walking the whole snake.
+    const goalX = corridorRows.length % 2 === 0 ? 1 : SIZE - 2;
+
+    const result = findPath(grid, {
+      agentId: 1, fromX: 1, fromZ: 1, toX: goalX, toZ: lastRow, avoidVehicles: false,
+    });
+
+    expect(result.found).toBe(true);
+    const last = result.waypoints[result.waypoints.length - 1]!;
+    expect(last).toEqual({ x: goalX, z: lastRow });
+    // The straight-line distance is a fraction of the real route: this is the
+    // detour A*'s old area/8 budget gave up on, not a near-direct walk.
+    expect(result.waypoints.length).toBeGreaterThan(SIZE);
+  });
+
+  it('never reports unreachable a goal computeClimbReachableSet reports reachable', () => {
+    const grid = makeSerpentineGrid(SIZE, ROW_SPACING);
+    const reachable = NavGrid.computeClimbReachableSet(grid, 1, 1);
+
+    // The two sets must agree cell for cell. A disagreement is the #1166
+    // livelock: ActionSelection screens candidates through the flood fill,
+    // then hands the survivors to findPath — a goal the first admits and the
+    // second refuses is an action that stays `queued` with no holder forever.
+    const disagreements: Array<{ x: number; z: number }> = [];
+    for (let z = 0; z < SIZE; z++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (!reachable.has(x, z)) continue;
+        const path = findPath(grid, { agentId: 1, fromX: 1, fromZ: 1, toX: x, toZ: z, avoidVehicles: false });
+        if (!path.found) disagreements.push({ x, z });
+      }
+    }
+
+    expect(disagreements).toEqual([]);
+  });
+});

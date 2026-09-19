@@ -576,9 +576,32 @@ export const MAX_TOTAL_FRAGMENTS = 2000;
  * flat 500-node cap sized for the old ~64² levels falls back to direct-line
  * long before a legitimate cross-map route is found on D13's bigger levels
  * (up to 160×160).
+ *
+ * The divisor was 8 until #1166. That encoded "a legitimate route explores at
+ * most an eighth of the map", which held under the old whole-voxel climb rule
+ * (`NAV_MAX_CLIMB_HEIGHT = 3` admitted ~71° ground, so ordinary relief was
+ * open terrain and routes ran close to straight). #1151's 30° slope gate makes
+ * ordinary relief a maze of concave pockets instead, and the premise stops
+ * holding: measured on tutorial_pit, a driller at (18,21) reaching drill hole
+ * H3 at (21,15) — 6 cells away in a straight line — has only one legal route,
+ * a 24-step detour north-west up the ridge and back, and a same-gate BFS needs
+ * 1474 explored nodes to find it. Against a 64² grid's old cap of 512, A*
+ * exhausted its budget, fell through to the direct-line fallback (which the
+ * slope gate refuses), and reported `found: false` for a genuinely reachable
+ * goal. `computeClimbReachableSet`'s unbudgeted flood fill disagreed, so
+ * `selectBestActionForEmployee` admitted the candidate, spent a real pathfind
+ * on it, got nothing back, and left the action `queued` with `holderId: null`
+ * forever — one hole per drill grid that no one ever charges (#1166).
+ *
+ * 2 was chosen by measurement, not headroom: at 4 the H3 route resolves, and
+ * the full scenario suite scores identically at 2 and at 1 (an unbounded
+ * search over the whole grid), so half the grid is past the point where more
+ * budget buys anything. A* is bounded by the cell count regardless — it never
+ * expands a node twice — so the worst case this raises is O(area log area) on
+ * a search that genuinely has no answer.
  */
 export const PATHFINDING_NODE_BUDGET_MIN = 500;
-export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 8;
+export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 2;
 
 /** A* node-exploration budget for a grid of the given dimensions. */
 export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): number {
