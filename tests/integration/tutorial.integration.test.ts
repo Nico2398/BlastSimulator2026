@@ -905,9 +905,33 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
         // charging/hauling stretch above has spent well over
         // CONTRACT_REFRESH_INTERVAL ticks, so the offer pool has already
         // rotated past id 1 (#597/#635's own reason for preferring a
-        // type/material selector). Accept whichever offer genuinely leads
-        // the pool right now instead of trusting the stale hint literally.
-        const offer = state.contracts.available[0];
+        // type/material selector). Accept a real offer from the live pool
+        // instead of trusting the stale hint literally.
+        //
+        // Which offer matters, and taking the pool's leading one made this
+        // test's verdict depend on arbitrary timing. An offer's penalty is
+        // `quantityKg * basePricePerKg * 0.3` (Contract.ts) with no ceiling
+        // relative to the player's cash, so the pool routinely holds offers
+        // this tutorial's one debris_hauler cannot possibly deliver before
+        // the deadline. Taking `available[0]` accepted whichever of those
+        // happened to lead the pool at whatever tick the run reached this
+        // step: on `main` that was a 21k-penalty offer and the level ended
+        // `completed`; under #1151's slope gate the same step is reached
+        // ~180 ticks later, the pool has rotated, and the leading offer
+        // carried a 406,932 penalty against ~120k cash — one expiry
+        // bankrupting a run that is otherwise healthy and winnable. The old
+        // selection passed by luck of timing, not because the deck was
+        // sound, so any change to travel time could flip it either way.
+        //
+        // Take the smallest offer on the board instead: deterministic,
+        // deliverable by a single tier-1 hauler, and the same rule
+        // `sellCompletableContracts` already applies below ("never an
+        // oversized one that would strand the stock in an un-completable
+        // deal until it expires for a penalty", #959). A player who accepts
+        // a contract ten times their cash and goes bankrupt is the game
+        // working, not a defect — this test is about whether the tutorial
+        // deck can be *won* when played sensibly.
+        const offer = [...state.contracts.available].sort((a, b) => a.quantityKg - b.quantityKg)[0];
         expect(offer, 'no contract available to accept at all').toBeDefined();
         expect(run(`contract accept ${offer!.id}`).success).toBe(true);
         tickUntil(run, state, 500, () => step.isComplete(state, snapshot), stagnation);
