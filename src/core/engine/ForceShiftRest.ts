@@ -13,7 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
-import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
+import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
@@ -97,6 +97,15 @@ export function forceShiftRestIfNeeded(
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
+  // Resolve the rest destination (nearest living_quarters + approach cell)
+  // and whether the round trip there is worth its fatigue cost BEFORE any
+  // side effect (interruptActiveAction below) touches the employee's active
+  // work — a round trip that costs more fatigue than it recovers (#1170,
+  // slope-gated navmesh making real routes far longer than tile distance)
+  // must never partially interrupt real work.
+  const dest = resolveRestDestination(state, emp);
+  if (!dest.worthwhile) return;
+
   // Release the action this employee was actively working back to the pool
   // before handing activeActionId to the rest action below — mirrors
   // tickCollapse's and forceShiftRestIfNeededByPolicy's own interruptActiveAction
@@ -105,29 +114,16 @@ export function forceShiftRestIfNeeded(
   const priorActionId = emp.activeActionId;
   interruptActiveAction(state, emp, priorActionId);
 
-  // Find nearest living_quarters for target coordinates
-  const building = findNearestLivingQuarters(state, emp.x, emp.z);
-  let targetX = emp.x;
-  let targetZ = emp.z;
-  let buildingId: number | undefined;
-
-  if (building) {
-    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
-    targetX = approach.x;
-    targetZ = approach.z;
-    buildingId = building.id;
-  }
-
   // The rest timer itself does not start until ArrivalGate.tickArrivalGate
   // confirms the employee has walked to the bunkhouse (#437).
   emp.pendingRestDuration = SHIFT_SLEEP_DURATION_TICKS;
 
   // Immediately claimed — status/holderId reflect that from creation (#547).
   const restAction = createRestPendingAction(state, {
-    targetX,
-    targetZ,
+    targetX: dest.targetX,
+    targetZ: dest.targetZ,
     targetEmployeeId: emp.id,
-    payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
+    payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId: dest.buildingId },
   }, emp.id);
 
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
@@ -413,6 +409,13 @@ export function forceShiftRestIfNeededByPolicy(
   };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
+  // Resolve the rest destination and whether the round trip is worth its
+  // fatigue cost BEFORE any side effect (interruptActiveAction below) touches
+  // the employee's active work — see forceShiftRestIfNeeded's own comment on
+  // the identical ordering requirement (#1170).
+  const dest = resolveRestDestination(state, emp);
+  if (!dest.worthwhile) return;
+
   // #678 follow-up: release the action this employee was actively working
   // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
   // the pool before handing activeActionId to the rest action below — mirrors
@@ -437,20 +440,7 @@ export function forceShiftRestIfNeededByPolicy(
   // routes a rest for, whether the rest was need-triggered or shift-
   // duration-triggered.
   const needKey: NeedKey = 'fatigue';
-
-  // Find nearest living_quarters of any tier for target coordinates.
-  const building = findNearestLivingQuarters(state, emp.x, emp.z);
-  let targetX = emp.x;
-  let targetZ = emp.z;
-  let buildingId: number | undefined;
   const restDuration = NEED_REST_DURATIONS[needKey];
-
-  if (building) {
-    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
-    targetX = approach.x;
-    targetZ = approach.z;
-    buildingId = building.id;
-  }
   // #678 follow-up: unlike tickCollapse/autoInsertNeedTasks (which still
   // apply NEED_REST_NO_BUILDING_DURATION_MULTIPLIER when resting in place —
   // that multiplier is calibrated against genuine depletion, encouraging a
@@ -476,10 +466,10 @@ export function forceShiftRestIfNeededByPolicy(
 
   // Immediately claimed — status/holderId reflect that from creation (#547).
   const restAction = createRestPendingAction(state, {
-    targetX,
-    targetZ,
+    targetX: dest.targetX,
+    targetZ: dest.targetZ,
     targetEmployeeId: emp.id,
-    payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
+    payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId: dest.buildingId },
   }, emp.id);
 
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);

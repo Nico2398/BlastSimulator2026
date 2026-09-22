@@ -21,6 +21,8 @@ import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
+import type { NavGrid } from '../core/nav/NavGrid.js';
+import { findPath } from '../core/nav/Pathfinding.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -144,9 +146,21 @@ const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn
  * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES` (`tutorialHazards`,
  * `isTutorialSiteHazardClear`), mutually within
  * `TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES` of each other, and within
- * `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES` of the dig/drill area — see git
- * history on this block for the stranding-class postmortems (#1008,
- * #1008-followup) this rule superseded.
+ * `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` real pathfinding route cost
+ * (`routeDistanceToRect`, not straight-line Chebyshev tile distance) of the
+ * dig/drill area — see git history on this block for the stranding-class
+ * postmortems (#1008, #1008-followup) this rule superseded.
+ *
+ * #1170: the slope-based navmesh (#1151) made a real walking route far
+ * longer than the straight-line tile bound this cluster used to be measured
+ * against — the old (29,10)/(29,14)/(25,12) cluster, east of the box-cut
+ * corridor, sat within the old straight-line bound but far outside a real
+ * route's cost once slope gating made the only walkable path a long detour.
+ * Moved the whole cluster west of the box-cut corridor instead, to
+ * livingQuarters (8,15), drivingCenter (6,15), warehouse (8,18) — measured
+ * (via `routeDistanceToRect` against the tutorial's own seed-42 navGrid) at
+ * real route costs of ~16.9/~18.9/~15.6 to REGION.drill's own (22,20) corner,
+ * comfortably under the 24 bound with margin for future navmesh changes.
  */
 export const REGION = {
   // One tile, because a survey is a point pick. Sits inside the old 18→28
@@ -176,8 +190,10 @@ export const REGION = {
   drill: { x1: 22, z1: 20, x2: 30, z2: 28, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
-  // #1008-followup) this superseded.
-  warehouse: { x1: 25, z1: 12, x2: 25, z2: 12, exact: true },
+  // #1008-followup) this superseded. #1170: moved west of the box-cut
+  // corridor, alongside livingQuarters (8,15) and drivingCenter (6,15) — see
+  // this file's own REGION doc comment above for the full trace.
+  warehouse: { x1: 8, z1: 18, x2: 8, z2: 18, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
@@ -186,23 +202,22 @@ export const REGION = {
   boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
-  // #1008-followup) this superseded.
-  drivingCenter: { x1: 29, z1: 14, x2: 29, z2: 14, exact: true },
+  // #1008-followup) this superseded. #1170: moved west of the box-cut
+  // corridor, alongside livingQuarters (8,15) and warehouse (8,18) — see this
+  // file's own REGION doc comment above for the full trace.
+  drivingCenter: { x1: 6, z1: 15, x2: 6, z2: 15, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
-  // #1008-followup) this superseded. #1144 follow-up: z 11 -> 10 — a fresh
-  // building's own completion-carve now also levels the one lattice column
-  // past its footprint (#1144's widened skirt), and living_quarters' own
-  // high side (z13) sat exactly one tile from driving_center's footprint
-  // (z14, zero gap): the skirt carved that shared boundary down to
-  // living_quarters' own (lower) pad height before driving_center was ever
-  // ordered, so driving_center's own placement check then read a >1-level
-  // step between its own already-carved z14 and its still-natural z15 and
-  // refused as uneven. Moving living_quarters one tile north stops its own
-  // skirt reaching z14 at all (it now tops out at z13, one tile short of
-  // driving_center's footprint) — a free tile of buffer neither building's
-  // own true footprint claims, so the skirt has nowhere left to conflict.
-  livingQuarters: { x1: 29, z1: 10, x2: 29, z2: 10, exact: true },
+  // #1008-followup) this superseded. #1170: moved west of the box-cut
+  // corridor, alongside drivingCenter (6,15) and warehouse (8,18) — see this
+  // file's own REGION doc comment above for the full trace. Non-overlapping
+  // with drivingCenter's own 2x2 footprint at (6,15)-(7,16) and adjacent to
+  // (not overlapping) warehouse's 4x4 footprint one tile below at (8,18):
+  // checkFootprintPlacement refuses an actual overlap, so the pins are
+  // placed in the same order the tutorial rail orders them (living_quarters,
+  // then driving_center, then freight_warehouse) with each one checked
+  // against the prior pins already placed.
+  livingQuarters: { x1: 8, z1: 15, x2: 8, z2: 15, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** A single-tile hazard the tutorial's fixed building pins must clear. */
@@ -258,6 +273,23 @@ export function tutorialSiteFootprintRect(type: BuildingType, tier: BuildingTier
 /** Whether `rect` clears every `tutorialHazards()` entry by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. */
 export function isTutorialSiteHazardClear(rect: TileRegion): boolean {
   return tutorialHazards().every((h) => chebyshevRectDistance(rect, h) >= TUTORIAL_SITE_HAZARD_CLEARANCE_TILES);
+}
+
+/**
+ * Route distance (NavGrid pathfinding cost, not straight-line tiles) from the near corner
+ * of `from` to the near corner of `to`. Returns Infinity when no route exists.
+ */
+export function routeDistanceToRect(grid: NavGrid, from: TileRegion, to: TileRegion): number {
+  // Anchored on (x1, z1) — the same origin corner tutorialSiteFootprintRect
+  // pins a building's footprint from, rather than the two rects' mutual
+  // closest corners (chebyshevRectDistance's convention above).
+  const route = findPath(grid, {
+    agentId: 0,
+    fromX: from.x1, fromZ: from.z1,
+    toX: to.x1, toZ: to.z1,
+    avoidVehicles: false,
+  });
+  return route.found ? route.totalCost : Infinity;
 }
 
 /** Open the Crew panel, then hire one role. */

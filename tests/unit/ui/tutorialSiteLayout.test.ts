@@ -17,12 +17,17 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   tutorialHazards, chebyshevRectDistance, tutorialSiteFootprintRect, isTutorialSiteHazardClear,
-  REGION, type TutorialHazard,
+  routeDistanceToRect, REGION, type TutorialHazard,
 } from '../../../src/ui/tutorialStages.js';
 import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import {
   TUTORIAL_SITE_HAZARD_CLEARANCE_TILES, TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES,
-  TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES,
+  // #1170: the tutorial pins' round-trip bound moved from a straight-line
+  // Chebyshev tile count to a real NavGrid route-cost bound — #1151's
+  // slope-based navmesh made real walking routes much longer than straight-
+  // line tile distance, so the old TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES
+  // bound could pass while the real walk was far longer.
+  TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST,
 } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
@@ -31,6 +36,7 @@ import {
   type BuildingType, type BuildingTier, type FootprintOccupant,
 } from '../../../src/core/entities/Building.js';
 import { siteBounds } from '../../../src/console/commands/buildingHelpers.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 /**
  * The three tutorial pins, in the order the tutorial rail actually orders
@@ -177,6 +183,51 @@ describe('tutorial site layout rule (#1040)', () => {
     });
   });
 
+  describe('routeDistanceToRect (#1170)', () => {
+    /** Flat, fully walkable NavGrid of the given size — mirrors the identical
+     * helper in RestActionHelpers.test.ts/EmployeeDispatchSteps.test.ts. */
+    function makeFlatNavGrid(width: number, height: number): NavGrid {
+      const cells: NavCell[][] = [];
+      for (let z = 0; z < height; z++) {
+        const row: NavCell[] = [];
+        for (let x = 0; x < width; x++) {
+          row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+        }
+        cells.push(row);
+      }
+      return new NavGrid(width, height, cells);
+    }
+
+    /** Impassable vertical wall spanning every row at world x. */
+    function blockColumn(grid: NavGrid, x: number): void {
+      for (let z = 0; z < grid.height; z++) {
+        grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+      }
+    }
+
+    it('returns a finite cost roughly matching the known path length for a short reachable route', () => {
+      const grid = makeFlatNavGrid(20, 10);
+      const from: TileRegion = { x1: 0, z1: 5, x2: 0, z2: 5, exact: true };
+      const to: TileRegion = { x1: 8, z1: 5, x2: 8, z2: 5, exact: true };
+
+      const distance = routeDistanceToRect(grid, from, to);
+
+      expect(Number.isFinite(distance)).toBe(true);
+      expect(distance).toBeCloseTo(8, 0);
+    });
+
+    it('returns Infinity when no route connects the two regions', () => {
+      const grid = makeFlatNavGrid(20, 10);
+      blockColumn(grid, 10);
+      const from: TileRegion = { x1: 0, z1: 5, x2: 0, z2: 5, exact: true };
+      const to: TileRegion = { x1: 15, z1: 5, x2: 15, z2: 5, exact: true };
+
+      const distance = routeDistanceToRect(grid, from, to);
+
+      expect(distance).toBe(Infinity);
+    });
+  });
+
   // ── The actual layout rule, against the three real tutorial pins ───────
 
   describe('the three tutorial building pins', () => {
@@ -190,6 +241,7 @@ describe('tutorial site layout rule (#1040)', () => {
       expect(started.success).toBe(true);
       ctx = runner.ctx;
       expect(ctx.grid).not.toBeNull();
+      expect(ctx.state?.navGrid).not.toBeNull();
       bounds = siteBounds(ctx);
     });
 
@@ -233,18 +285,26 @@ describe('tutorial site layout rule (#1040)', () => {
       }
     });
 
+    // #1170: straight-line Chebyshev tile distance replaced with real NavGrid
+    // route cost — #1151's slope-based navmesh can make the actual walking
+    // route from a pin to the dig/drill area far longer than the tile-count
+    // bound this used to check, so a pin could pass the old check while still
+    // being a very long real walk. Compares the pin's own region (not its
+    // footprint rect — routeDistanceToRect measures from the region's near
+    // corner, the same "site" coordinate the pin is defined at) against the
+    // dig/drill hazard region, using the tutorial level's own real NavGrid.
     it.each(PINS)('$name: is within a short round trip of the dig/drill area', (pin) => {
-      const rect = tutorialSiteFootprintRect(pin.type, pin.tier, pin.region);
-      // tutorialHazards() returns [REGION.boxcut, REGION.drill] (source order,
-      // tutorialStages.ts) — the drill hazard is the wider of the two (the
-      // box-cut corridor is a single-tile-wide line), so picking it out by
-      // shape rather than by index survives a future hazard being added to
-      // the front or middle of that list.
-      const drillRect = tutorialHazards().find((h) => h.x1 !== h.x2 && h.z1 !== h.z2)!;
-      expect(drillRect).toBeDefined();
+      // tutorialHazards() returns [spawn, REGION.boxcut, REGION.drill]
+      // (source order, tutorialStages.ts) — the drill hazard is the widest of
+      // the three (the box-cut corridor is a single-tile-wide line, the spawn
+      // point a single tile), so picking it out by shape rather than by index
+      // survives a future hazard being added to the front or middle of that
+      // list.
+      const drillHazardRegion = tutorialHazards().find((h) => h.x1 !== h.x2 && h.z1 !== h.z2)!;
+      expect(drillHazardRegion).toBeDefined();
 
-      const distance = chebyshevRectDistance(rect, drillRect);
-      expect(distance).toBeLessThanOrEqual(TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES);
+      const distance = routeDistanceToRect(ctx.state!.navGrid!, pin.region, drillHazardRegion);
+      expect(distance).toBeLessThanOrEqual(TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST);
     });
   });
 

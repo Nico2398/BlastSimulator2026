@@ -27,11 +27,26 @@ import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActi
 import type { ActionType, PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, SHIFT_DURATIONS_TICKS,
 } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
+
+/** Flat, fully walkable NavGrid of the given size — mirrors the identical
+ * helper in RestActionHelpers.test.ts/EmployeeDispatchSteps.test.ts. */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
 
 /**
  * Push a claimed, in-progress action `employee` is actively working.
@@ -263,6 +278,59 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
     expect(driveLeg!.vehicleId).toBe(vehicle.id);
+  });
+
+  // NEW (#1170): a forced rest whose round trip costs more fatigue than the
+  // destination building can return must not happen — see
+  // RestActionHelpers.ts's restRoundTripWorthwhile. Nothing about the prior
+  // action or the employee's rest state may change.
+  it('does not force rest when the round trip costs more fatigue than the building can return', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // tier 1, speed 1
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 80, 5, 100, 100, 1); // far tier-1 building
+
+    const prior = pushHeldAction(state, employee.id, 1150);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1150);
+    const claim = state.pendingActions.find(a => a.id === 1150)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
+  });
+
+  // NEW (#1170): regression guard — a short, affordable round trip still
+  // forces the rest exactly as before.
+  it('still forces rest when the round trip is affordable', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50; // headroom to recover — isolates the short-trip affordability
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1); // short round trip
+
+    const prior = pushHeldAction(state, employee.id, 1151);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBe(SHIFT_SLEEP_DURATION_TICKS);
+    expect(employee.activeActionId).not.toBe(1151);
+    const released = state.pendingActions.find(a => a.id === 1151)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
   });
 });
 
@@ -712,6 +780,63 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
     expect(driveLeg!.vehicleId).toBe(vehicle.id);
+  });
+
+  // NEW (#1170): mirrors the legacy forceShiftRestIfNeeded's own #1170 test
+  // above — the policy-aware variant must skip a forced rest whose round trip
+  // costs more fatigue than the destination building can return.
+  it('does not force rest when the round trip costs more fatigue than the building can return', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // tier 1, speed 1
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 80, 5, 100, 100, 1); // far tier-1 building
+
+    const prior = pushHeldAction(state, employee.id, 1160);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 100;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.activeActionId).toBe(1160);
+    const claim = state.pendingActions.find(a => a.id === 1160)!;
+    expect(claim.status).toBe('in_progress');
+    expect(claim.holderId).toBe(employee.id);
+  });
+
+  // NEW (#1170): regression guard — a short, affordable round trip still
+  // forces the rest exactly as before.
+  it('still forces rest when the round trip is affordable', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1); // short round trip
+
+    const prior = pushHeldAction(state, employee.id, 1161);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 50; // headroom to recover — isolates the short-trip affordability
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.activeActionId).not.toBe(1161);
+    const released = state.pendingActions.find(a => a.id === 1161)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
   });
 });
 
