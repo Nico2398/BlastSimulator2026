@@ -1802,7 +1802,10 @@ describe('dig_ramp_segment work duration scales with live voxel count (#924)', (
     // tick count (confirmed against real seed:42/size:32 terrain: segment
     // cell counts run 0, 22, 24, 21, 18, 15, 12, 9, 6, 3, 3 across its 11
     // layers, topmost to deepest).
-    const RAMP_ARGS = 'origin:16,19 direction:south length:8 depth:8';
+    // depth:4 (was 8) — an 8m-long run stays within RAMP_CUT_SLOPE_RATIO only
+    // up to ~4.5m of depth (#1152); halving depth still leaves several
+    // layers, which is all this work-duration comparison needs.
+    const RAMP_ARGS = 'origin:16,19 direction:south length:8 depth:4';
     const SEGMENT_INDEX = 2;
 
     // Scenario A — baseline: every one of the segment's cells is still solid
@@ -1925,10 +1928,12 @@ describe('dig_ramp_segment — starvation override on the timer-driven completio
     const vehicle = ctx.state!.vehicles.vehicles[0]!;
 
     // Same ramp footprint #924's own suite already proved out against this
-    // exact seed/size/origin (11 segments, several with well over 10 cells
-    // each) — plenty of segment-to-segment continuity hops for the ramp to
-    // still be mid-chain by the time the override should fire.
-    const rampResult = buildRampCommand(ctx, [], { origin: '16,19', direction: 'south', length: '8', depth: '8' });
+    // exact seed/size/origin — several segments with well over 10 cells
+    // each — plenty of segment-to-segment continuity hops for the ramp to
+    // still be mid-chain by the time the override should fire. depth:4 (was
+    // 8) — an 8m-long run stays within RAMP_CUT_SLOPE_RATIO only up to
+    // ~4.5m of depth (#1152).
+    const rampResult = buildRampCommand(ctx, [], { origin: '16,19', direction: 'south', length: '8', depth: '4' });
     expect(rampResult.success, JSON.stringify(rampResult)).toBe(true);
     expect(ctx.state!.plannedRamps).toHaveLength(1);
     const rampId = ctx.state!.plannedRamps[0]!.id;

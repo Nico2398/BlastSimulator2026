@@ -5,10 +5,13 @@ import {
 import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
-  computeRampSegmentCarveTarget, carveRampSegmentSlice,
+  computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
-import { MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import {
+  MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_CUT_SLOPE_RATIO,
+  NAV_MAX_SLOPE_DEGREES,
+} from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
@@ -61,8 +64,11 @@ describe('Ramp building', () => {
     // actual surface (not y=0) is where carving starts (step 0 → currentDepth 0).
     const surfaceY = localSurfaceY(grid, 10, 10);
 
+    // length:15/targetDepth:8 (ratio 0.533) — must stay under RAMP_CUT_SLOPE_RATIO
+    // (#1152, ~0.566) or validateRampOrder now refuses the order before this
+    // test's carve-side assertions ever run.
     const result = buildRamp(grid, {
-      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+      originX: 10, originZ: 10, direction: 'south', length: 15, targetDepth: 8,
     }, 50000);
 
     expect(result.success).toBe(true);
@@ -87,8 +93,12 @@ describe('Ramp building', () => {
     // column's real surface (not y=0) is where carving starts (step 0 → currentDepth 0).
     const originSurfaceY = localSurfaceY(grid, 10, 5);
 
+    // length:18/targetDepth:10 (ratio 0.556) — must stay under
+    // RAMP_CUT_SLOPE_RATIO (#1152, ~0.566); length:15 (ratio 0.667) used to
+    // work only because validateRampOrder didn't check slope yet.
+    const length = 18;
     const result = buildRamp(grid, {
-      originX: 10, originZ: 5, direction: 'south', length: 15, targetDepth: 10,
+      originX: 10, originZ: 5, direction: 'south', length, targetDepth: 10,
     }, 50000);
 
     expect(result.success).toBe(true);
@@ -99,28 +109,35 @@ describe('Ramp building', () => {
     // >=0.5 walkability threshold.
     expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0.5);
 
-    // At the end (step 14): should be cleared at y≈9 (depth 10 * 14/15 ≈ 9.3 → floor=9)
-    expect(grid.getVoxel(10, 9, 19)?.density).toBe(0);
+    // At the last step (17 of 18): depth 10 * 17/18 ≈ 9.44, floor ≈
+    // originSurfaceY(14) - 9.44 ≈ 4.56 — well below y=9, so y=9 is cleared.
+    const endZ = 5 + length - 1;
+    expect(grid.getVoxel(10, 9, endZ)?.density).toBe(0);
   });
 
   it('ramp building deducts cost from finances', () => {
     const grid = new VoxelGrid(20, 15, 20);
     fillGrid(grid);
 
+    // length:15/targetDepth:8 (ratio 0.533) — see slope note on the first test above.
     const result = buildRamp(grid, {
-      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+      originX: 10, originZ: 10, direction: 'south', length: 15, targetDepth: 8,
     }, 50000);
 
     expect(result.success).toBe(true);
-    expect(result.cost).toBe(10 * RAMP_COST_PER_METER);
+    expect(result.cost).toBe(15 * RAMP_COST_PER_METER);
   });
 
   it('fails with insufficient funds', () => {
     const grid = new VoxelGrid(20, 15, 20);
     fillGrid(grid);
 
+    // length:15/targetDepth:8 (ratio 0.533, under RAMP_CUT_SLOPE_RATIO) — must
+    // stay under the slope cap so this order is refused for insufficient
+    // funds specifically, not for being too steep (#1152 checks slope before
+    // charging cash).
     const result = buildRamp(grid, {
-      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+      originX: 10, originZ: 10, direction: 'south', length: 15, targetDepth: 8,
     }, 50);
 
     expect(result.success).toBe(false);
@@ -168,8 +185,9 @@ describe('Ramp building', () => {
     const grid = makeElevatedGrid(20, 30, 30, 22);
     const farSurfaceBefore = localSurfaceY(grid, 2, 2);
 
+    // length:15/targetDepth:8 (ratio 0.533) — see slope note above.
     const result = buildRamp(grid, {
-      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+      originX: 10, originZ: 10, direction: 'south', length: 15, targetDepth: 8,
     }, 50000);
 
     expect(result.success).toBe(true);
@@ -189,8 +207,9 @@ describe('Ramp building', () => {
     const farBefore: number[] = [];
     for (let y = 0; y < grid.sizeY; y++) farBefore.push(grid.densityAt(2, y, 2));
 
+    // length:15/targetDepth:8 (ratio 0.533) — see slope note above.
     const result = buildRamp(grid, {
-      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+      originX: 10, originZ: 10, direction: 'south', length: 15, targetDepth: 8,
     }, 50000);
 
     expect(result.success).toBe(true);
@@ -215,7 +234,11 @@ describe('Ramp building', () => {
 const ALL_DIRECTIONS: RampDirection[] = ['north', 'south', 'east', 'west'];
 
 describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
-  const RAMP: Omit<RampDef, 'direction'> = { originX: 20, originZ: 20, length: 8, targetDepth: 6 };
+  // length:11/targetDepth:6 (ratio 0.545) — length:8 (ratio 0.75) exceeded
+  // RAMP_CUT_SLOPE_RATIO (#1152, ~0.566), so buildRamp's own validateRampOrder
+  // call below would refuse the order before this describe's
+  // defineRampSegments-vs-buildRamp comparisons ever ran.
+  const RAMP: Omit<RampDef, 'direction'> = { originX: 20, originZ: 20, length: 11, targetDepth: 6 };
 
   for (const direction of ALL_DIRECTIONS) {
     it(`sequentially carving every segment reaches an identical final grid to buildRamp — direction ${direction}`, () => {
@@ -489,7 +512,11 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   it('the total cell count summed across all segments equals buildRamp\'s own voxelsCleared count for the same RampDef (final geometry is unchanged by the regrouping)', () => {
     const gridDirect = makeElevatedGrid(40, 30, 40, 15);
     const gridSegmented = makeElevatedGrid(40, 30, 40, 15);
-    const ramp: RampDef = { ...RAMP, direction: 'south' };
+    // Deliberately not RAMP (length:8/targetDepth:6, ratio 0.75) — this test's
+    // buildRamp call goes through validateRampOrder's new slope check
+    // (#1152, cap ~0.566), unlike this describe's other, defineRampSegments-
+    // only tests above, which don't validate and can keep using RAMP as-is.
+    const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 11, targetDepth: 6 };
 
     const buildResult = buildRamp(gridDirect, ramp, 100000);
     expect(buildResult.success).toBe(true);
@@ -512,7 +539,18 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
 
   function surfaceYAt(z: number): number {
     const stepOffset = z - 20; // originZ = 20
-    return (stepOffset <= 1 || stepOffset >= 6) ? 20 : 5; // plateau(20) / canyon(5) / plateau(20)
+    // plateau(20) → canyon(0) → bench(15). Terrain that *descends* along the
+    // ramp is what forces the gap now (#1152): the floor is a straight line
+    // from the ramp's own start elevation, so it no longer dives with the
+    // terrain, while `ceilingY` still tracks each column's own local surface.
+    // A later column whose local surface — and so its ceiling — sits below an
+    // earlier column's floor contributes at no y the earlier ones do, and the
+    // band between them has zero contributing columns. Before #1152 the floor
+    // was read per column, so it followed the canyon down and the ranges
+    // always overlapped; a plateau/canyon/plateau fixture no longer gaps.
+    if (stepOffset <= 1) return 20;
+    if (stepOffset <= 4) return 0;
+    return 15;
   }
 
   function makeSteppedGrid(): VoxelGrid {
@@ -554,30 +592,34 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
 
     const segments = defineRampSegments(grid, ramp);
 
-    // Hand-traced (clearanceHeight=3, currentDepth(step)=floor((step/8)*6)):
-    // globalMinY=2, globalMaxY=22. Covered y = {2..7} ∪ {15..22}. The band
-    // y=8..14 (7 values) has zero contributing columns and must be skipped
-    // entirely, leaving 21 candidate y values - 7 skipped = 14 segments.
-    expect(segments.length).toBe(14);
+    // Hand-traced (clearanceHeight=3, RAMP length 8 / targetDepth 6, so the
+    // #1152 straight-line floor is f(step) = 20 - 0.75*step, and
+    // ceilingY = localSurface + 3):
+    //
+    //   step 0-1  floor 20.00/19.25  ceiling 23  → y 20,21,22
+    //   step 2-4  floor 18.50..17.00 ceiling  3  → floor above ceiling, none
+    //   step 5-7  floor 16.25..14.75 ceiling 18  → y 15,16,17
+    //
+    // globalMinY=14.75, globalMaxY=22 → candidate y = 22..15 (8 values).
+    // y=19 and y=18 have zero contributing columns and must be skipped
+    // entirely, leaving 6 segments with plenty on both sides of the gap.
+    expect(segments.length).toBe(6);
     for (const s of segments) {
-      expect(s.targetY < 8 || s.targetY > 14).toBe(true);
+      expect(s.targetY === 18 || s.targetY === 19).toBe(false);
     }
-    expect(segments.some(s => s.targetY >= 2 && s.targetY <= 7)).toBe(true);
-    expect(segments.some(s => s.targetY >= 15 && s.targetY <= 22)).toBe(true);
+    expect(segments.some(s => s.targetY >= 20 && s.targetY <= 22)).toBe(true);
+    expect(segments.some(s => s.targetY >= 15 && s.targetY <= 17)).toBe(true);
   });
 
-  // ── #1166: median3 rejects a single-column sub-voxel noise spike ────────
-  //
-  // Real terrain generation's own sub-voxel noise can nudge one column's
-  // discrete surface index down (or up) by a full voxel relative to two
-  // otherwise-flat neighbours, the instant it crosses the 0.5-density
-  // threshold on that one column but not its neighbours. Pre-fix, floorY was
-  // measured against each column's own raw surfaceY, so that lone-column
-  // outlier alone produced a non-monotonic, illegal-slope floor jump at
-  // carve time. `defineRampSegments` now measures floorY against a
-  // median-of-3 smoothing of the column's raw surfaceY and its two
-  // ramp-direction neighbours — a lone outlier's two neighbours agree with
-  // each other, so the median rejects it entirely.
+  // ── #1152: floor is a pure constant-slope line anchored to the ramp's own
+  // start elevation — it no longer reads local per-step terrain at all (not
+  // even smoothed), so a single-column terrain spike can perturb this
+  // column's headroom (ceilingY, which still tracks raw local surface) but
+  // never its floor. Supersedes the pre-#1152 #1166 median3-smoothing test
+  // that used to live here: median3 only rejected a single-column spike,
+  // leaving a genuine multi-column feature free to bend the floor — #1152
+  // removes local-terrain dependence entirely, so a floor line is imperturbed
+  // by terrain of any width.
 
   /** Per-column solid-to-`surfaceY` grid, one column per z (ramp runs south, so
    * every column along the ramp shares the same x band). */
@@ -606,23 +648,214 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     return rows;
   }
 
-  it('a single-column sub-voxel noise spike does not perturb the carved floor row at all, unlike a genuine multi-column terrain feature', () => {
+  /** Maps each column's z to the highest y it contributes any cell at across
+   * every segment — the column's own top included row, which tracks ceilingY
+   * (raw local surface + clearance), not the floor. */
+  function topRowsByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const rows = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        const current = rows.get(cell.z);
+        if (current === undefined || cell.y > current) rows.set(cell.z, cell.y);
+      }
+    }
+    return rows;
+  }
+
+  it('a single-column terrain spike shifts that column\'s headroom (ceilingY) but leaves its carved floor row untouched', () => {
     const flatGrid = makeGridFromSurfaceFn(() => 20);
     // One lone column (z=24, step 4) sits one voxel lower than its flat
-    // neighbours either side — the sub-voxel noise spike shape, not a
-    // genuine sustained terrain feature.
+    // neighbours either side.
     const spikedGrid = makeGridFromSurfaceFn(z => (z === 24 ? 19 : 20));
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
-    const flatRows = floorRowsByZ(defineRampSegments(flatGrid, ramp));
-    const spikedRows = floorRowsByZ(defineRampSegments(spikedGrid, ramp));
+    const flatSegments = defineRampSegments(flatGrid, ramp);
+    const spikedSegments = defineRampSegments(spikedGrid, ramp);
 
-    // median3(prev=20, raw=19, next=20) === 20 — the spike is fully
-    // rejected, so the carved floor row is identical, column for column, to
-    // the noise-free flat grid's. No jump for the slope check to trip on.
-    expect(spikedRows.size).toBe(flatRows.size);
-    for (const [z, y] of flatRows) {
-      expect(spikedRows.get(z)).toBe(y);
+    // Floor: identical, column for column — the floor no longer reads local
+    // terrain at all, so a spike in raw surface height cannot move it.
+    const flatFloors = floorRowsByZ(flatSegments);
+    const spikedFloors = floorRowsByZ(spikedSegments);
+    expect(spikedFloors.size).toBe(flatFloors.size);
+    for (const [z, y] of flatFloors) {
+      expect(spikedFloors.get(z)).toBe(y);
+    }
+
+    // Ceiling/headroom: the spiked column's own top included row does shift,
+    // by exactly the spike's own 1-voxel drop, because ceilingY still tracks
+    // that column's raw local surface.
+    const flatTops = topRowsByZ(flatSegments);
+    const spikedTops = topRowsByZ(spikedSegments);
+    expect(flatTops.get(24)).toBeDefined();
+    expect(spikedTops.get(24)).toBe(flatTops.get(24)! - 1);
+    // Every other column's top row is unaffected by the one-column spike.
+    for (const [z, y] of flatTops) {
+      if (z === 24) continue;
+      expect(spikedTops.get(z)).toBe(y);
+    }
+  });
+});
+
+// ── #1152: ramps are cut as a constant-slope road — floor descends by a
+// fixed rise per metre of run, anchored to the ramp's own start elevation,
+// regardless of local ground undulation along the way; level across the
+// 3-cell width; capped under RAMP_CUT_SLOPE_RATIO.
+
+describe('defineRampSegments — constant-slope floor geometry (#1152)', () => {
+  /** Column-by-z solid terrain, like the #1152 describe above's helper, kept
+   * local to this describe so a bump/dip shape can be authored per test. */
+  function makeGridFromSurfaceFn(fn: (z: number) => number): VoxelGrid {
+    const grid = new VoxelGrid(40, 30, 40);
+    for (let z = 0; z < 40; z++) {
+      const s = fn(z);
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= s; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+
+  /** Per-column continuous floor height: `(floorRowY - 1) + floorAdjustment`
+   * (the exact target `bandRampFloorColumn` grades that column's floor to),
+   * keyed by z. */
+  function floorHeightsByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const heights = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment !== undefined) {
+          heights.set(cell.z, (cell.y - 1) + cell.floorAdjustment);
+        }
+      }
+    }
+    return heights;
+  }
+
+  const ORIGIN_X = 20;
+  const ORIGIN_Z = 20;
+  const LENGTH = 20;
+  const TARGET_DEPTH = 10; // ratio 0.5, under RAMP_CUT_SLOPE_RATIO (~0.566)
+  const ORIGIN_SURFACE_Y = 20;
+
+  /** Straight-line floor target at `step`, anchored to the ramp's own start
+   * elevation (ORIGIN_SURFACE_Y) — the formula #1152 requires, independent of
+   * whatever the local column's own raw surface happens to read. */
+  function expectedFloorHeight(step: number): number {
+    return ORIGIN_SURFACE_Y - (step / LENGTH) * TARGET_DEPTH;
+  }
+
+  it('follows a straight line anchored to the ramp\'s start elevation across a mid-ramp bump, ignoring the bump\'s own local surface entirely', () => {
+    // A sustained 3-column-wide bump (steps 8-10) raised 5m above the
+    // surrounding flat terrain — wide enough that a per-column or
+    // median-of-3 smoothing scheme would still treat it as a genuine terrain
+    // feature and let it perturb the floor. #1152's floor formula must
+    // ignore it completely regardless of width.
+    const grid = makeGridFromSurfaceFn(z => {
+      const step = z - ORIGIN_Z;
+      return (step >= 8 && step <= 10) ? ORIGIN_SURFACE_Y + 5 : ORIGIN_SURFACE_Y;
+    });
+    const ramp: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: TARGET_DEPTH };
+
+    const floors = floorHeightsByZ(defineRampSegments(grid, ramp));
+
+    for (let step = 0; step < LENGTH; step++) {
+      const z = ORIGIN_Z + step;
+      const actual = floors.get(z);
+      expect(actual, `floor height missing for step ${step} (z=${z})`).toBeDefined();
+      expect(actual!).toBeCloseTo(expectedFloorHeight(step), 6);
+    }
+  });
+
+  it('follows the same straight line across a mid-ramp dip wherever there is rock to cut, and cuts nothing where the dip already sits below the line', () => {
+    // A sustained dip (steps 8-10) 5m below the surrounding flat terrain.
+    // The straight-line floor at those steps is 16.0 / 15.5 / 15.0 while the
+    // dip's own ground is 15 — so steps 8 and 9 are the one case a *cut*
+    // cannot serve: the road's line runs through open air above the ground,
+    // and reaching it would mean adding material, not removing it. A ramp
+    // order is a cut, so those two columns are left alone and the ramp
+    // inherits the dip. Every other column, dip floor (step 10) included,
+    // still grades to the line exactly, proving the line itself never bends
+    // toward local terrain.
+    //
+    // TODO(#1172): the notch that leaves in the road is its own defect —
+    // filling a ramp's line where terrain falls below it is not modelled.
+    const groundAt = (step: number): number =>
+      (step >= 8 && step <= 10) ? ORIGIN_SURFACE_Y - 5 : ORIGIN_SURFACE_Y;
+    const grid = makeGridFromSurfaceFn(z => groundAt(z - ORIGIN_Z));
+    const ramp: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: TARGET_DEPTH };
+
+    const floors = floorHeightsByZ(defineRampSegments(grid, ramp));
+
+    let cutColumns = 0;
+    for (let step = 0; step < LENGTH; step++) {
+      const z = ORIGIN_Z + step;
+      const actual = floors.get(z);
+
+      if (groundAt(step) < expectedFloorHeight(step)) {
+        expect(actual, `step ${step} (z=${z}) sits below the line — nothing to cut`).toBeUndefined();
+        continue;
+      }
+
+      expect(actual, `floor height missing for step ${step} (z=${z})`).toBeDefined();
+      expect(actual!).toBeCloseTo(expectedFloorHeight(step), 6);
+      cutColumns++;
+    }
+
+    // Guard the guard: if the fixture ever stopped producing a real cut, the
+    // loop above would pass vacuously.
+    expect(cutColumns).toBe(LENGTH - 2);
+  });
+
+  it('floor Y is identical across all 3 width columns at every step, even where terrain undulates', () => {
+    const grid = makeGridFromSurfaceFn(z => {
+      const step = z - ORIGIN_Z;
+      return (step >= 8 && step <= 10) ? ORIGIN_SURFACE_Y + 5 : ORIGIN_SURFACE_Y;
+    });
+    const ramp: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: TARGET_DEPTH };
+
+    const segments = defineRampSegments(grid, ramp);
+
+    // Group floor-row cells by z, then by x — every x at a given z must carry
+    // the identical continuous floor height (ramp runs 'south', so width
+    // varies in x).
+    const byZThenX = new Map<number, Map<number, number>>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment === undefined) continue;
+        const heights = byZThenX.get(cell.z) ?? new Map<number, number>();
+        heights.set(cell.x, (cell.y - 1) + cell.floorAdjustment);
+        byZThenX.set(cell.z, heights);
+      }
+    }
+
+    expect(byZThenX.size).toBeGreaterThan(0);
+    for (const [, heightsByX] of byZThenX) {
+      const values = [...heightsByX.values()];
+      expect(values.length).toBeGreaterThanOrEqual(1);
+      for (const v of values) expect(v).toBeCloseTo(values[0]!, 6);
+    }
+  });
+
+  it('the floor\'s overall slope never exceeds RAMP_CUT_SLOPE_RATIO, even at the steepest length/depth the order validator allows', () => {
+    // Steepest depth/length ratio validateRampOrder is expected to allow
+    // (fractionally above the minimum length's own boundary), computed
+    // directly from RAMP_CUT_SLOPE_RATIO rather than via computeMinimumRampLength
+    // (under test elsewhere), so if defineRampSegments' own floor line ever
+    // exceeded the cap, it would be exceeded right here.
+    const targetDepth = 10;
+    const length = Math.ceil(targetDepth / RAMP_CUT_SLOPE_RATIO) + 1;
+    const grid = makeGridFromSurfaceFn(() => ORIGIN_SURFACE_Y);
+    const ramp: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length, targetDepth };
+
+    const floors = floorHeightsByZ(defineRampSegments(grid, ramp));
+
+    for (let step = 0; step + 1 < length; step++) {
+      const a = floors.get(ORIGIN_Z + step);
+      const b = floors.get(ORIGIN_Z + step + 1);
+      if (a === undefined || b === undefined) continue;
+      const rise = a - b; // positive: descending downhill
+      expect(rise).toBeLessThanOrEqual(RAMP_CUT_SLOPE_RATIO + 1e-6);
     }
   });
 });
@@ -714,7 +947,11 @@ describe('computeRampSegmentDurationTicks — proficiency/need/lq scaling (#924)
 });
 
 describe('validateRampOrder (#555)', () => {
-  const BASE_RAMP: RampDef = { originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8 };
+  // length:10/targetDepth:5 (ratio 0.5) — targetDepth:8 (ratio 0.8) exceeded
+  // RAMP_CUT_SLOPE_RATIO (#1152, ~0.566), which would trip the new
+  // slope-too-steep rejection before any of these length/cash/depth-bound
+  // checks got a chance to run.
+  const BASE_RAMP: RampDef = { originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 5 };
 
   it('accepts a valid order without mutating any grid, cost = RAMP_COST_PER_METER * length', () => {
     const result = validateRampOrder(BASE_RAMP, 50000);
@@ -770,6 +1007,86 @@ describe('validateRampOrder (#555)', () => {
   it('accepts a length exactly at MAX_RAMP_LENGTH (boundary)', () => {
     const result = validateRampOrder({ ...BASE_RAMP, length: MAX_RAMP_LENGTH }, 50_000_000);
     expect(result.success).toBe(true);
+  });
+
+  // ── #1152: refuse an order whose length can't reach its depth within the
+  // slope cap, before charging cash ────────────────────────────────────────
+
+  describe('slope-too-steep rejection', () => {
+    const targetDepth = 8;
+    // Independent formula, not a call into the (stubbed) computeMinimumRampLength
+    // under test elsewhere — this is the source-of-truth minimum a ramp of
+    // this depth needs to stay under RAMP_CUT_SLOPE_RATIO.
+    const minLength = targetDepth / RAMP_CUT_SLOPE_RATIO;
+    // What the refusal *message* names, which is not the raw float above:
+    // a ramp's length is a whole number of tiles, so the shortest orderable
+    // length is the ceiling of the true minimum. `maxDegrees` names the
+    // walkability limit the player is being held to (NAV_MAX_SLOPE_DEGREES),
+    // not RAMP_CUT_SLOPE_RATIO's own 98% cut margin — the margin is internal
+    // headroom against float rounding, not a rule the player can read off
+    // the game's own slope limit.
+    const displayMinLength = Math.ceil(minLength);
+
+    it('rejects a length just under the minimum required for its depth, carrying a translation key + params, without charging cash', () => {
+      const tooShortLength = minLength - 0.5;
+      const result = validateRampOrder({ ...BASE_RAMP, targetDepth, length: tooShortLength }, 50_000_000);
+
+      expect(result.success).toBe(false);
+      expect(result.cost).toBe(0);
+      expect(result.messageKey).toBe('mining.build_ramp.slope_too_steep');
+      expect(result.messageParams?.depth).toBe(targetDepth);
+      expect(result.messageParams?.length).toBe(tooShortLength);
+      expect(result.messageParams?.minLength).toBe(displayMinLength);
+      expect(result.messageParams?.maxDegrees).toBe(NAV_MAX_SLOPE_DEGREES);
+    });
+
+    it('rejects a too-steep order even with cash far exceeding its cost — the refusal is about slope, not affordability', () => {
+      const tooShortLength = minLength - 0.5;
+      // Cost at this length would be trivially affordable; a plain cash check
+      // alone would accept this order, so success:false here proves the
+      // slope gate fires independently of (and ahead of) the cash check.
+      const result = validateRampOrder({ ...BASE_RAMP, targetDepth, length: tooShortLength }, 1_000_000_000);
+
+      expect(result.success).toBe(false);
+      expect(result.cost).toBe(0);
+      expect(result.messageKey).toBe('mining.build_ramp.slope_too_steep');
+    });
+
+    it('accepts a length exactly at (or fractionally above) the computed minimum for its depth', () => {
+      const result = validateRampOrder({ ...BASE_RAMP, targetDepth, length: minLength + 1e-6 }, 50_000_000);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts a length comfortably above the computed minimum for its depth', () => {
+      const result = validateRampOrder({ ...BASE_RAMP, targetDepth, length: minLength * 2 }, 50_000_000);
+      expect(result.success).toBe(true);
+    });
+  });
+});
+
+describe('computeMinimumRampLength (#1152)', () => {
+  it('returns targetDepth / RAMP_CUT_SLOPE_RATIO for a positive depth', () => {
+    const targetDepth = 12;
+    expect(computeMinimumRampLength(targetDepth)).toBeCloseTo(targetDepth / RAMP_CUT_SLOPE_RATIO, 10);
+  });
+
+  it('returns 0 for a zero depth', () => {
+    expect(computeMinimumRampLength(0)).toBe(0);
+  });
+
+  it('returns 0 for a negative depth', () => {
+    expect(computeMinimumRampLength(-5)).toBe(0);
+  });
+
+  it('scales linearly with depth: doubling targetDepth doubles the minimum length', () => {
+    const half = computeMinimumRampLength(10);
+    const full = computeMinimumRampLength(20);
+    expect(full).toBeCloseTo(2 * half, 10);
+  });
+
+  it('handles a large depth without overflow or precision loss', () => {
+    const targetDepth = 5000;
+    expect(computeMinimumRampLength(targetDepth)).toBeCloseTo(targetDepth / RAMP_CUT_SLOPE_RATIO, 6);
   });
 });
 

@@ -46,6 +46,7 @@ import {
   type Building,
 } from '../core/entities/Building.js';
 import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
+import { computeMinimumRampLength } from '../core/mining/Ramp.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
 
@@ -296,6 +297,8 @@ export class BuildMenu extends PanelBase {
       const sel = controller.selection;
       overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
       const tiles = sel ? Math.round(Math.hypot(sel.x2 - sel.x1, sel.z2 - sel.z1)) + 1 : 0;
+      const minLength = computeMinimumRampLength(this.rampDepth);
+      const tooShort = sel !== null && tiles < minLength;
       strip.show({
         icon: 'down',
         title: t('ui.build.ramp'),
@@ -304,8 +307,10 @@ export class BuildMenu extends PanelBase {
           { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
         ],
         result: sel ? `${tiles} ${t('ui.tile_select.tiles')}` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
+        confirmEnabled: controller.canConfirm && !tooShort,
+        confirmDisabledReason: tooShort
+          ? t('ui.build.ramp_needs_length', { min: Math.ceil(minLength) })
+          : placementRefusalReason(controller),
         instruction: t('ui.build.ramp_instruction'),
       });
     };

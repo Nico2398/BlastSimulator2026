@@ -806,7 +806,7 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
     expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
     expect(runCommand(engine, 'tick 25').success).toBe(true);
     expect(runCommand(engine, 'vehicle buy rock_digger').success).toBe(true);
-    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:6').success).toBe(true);
 
     const state = engine.ctx.state!;
 
@@ -1026,7 +1026,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
     expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
     expect(runCommand(engine, 'tick 25').success).toBe(true);
     expect(runCommand(engine, 'vehicle buy rock_digger').success).toBe(true);
-    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:8').success).toBe(true);
+    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:6').success).toBe(true);
 
     const state = engine.ctx.state!;
     const rockDigger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');

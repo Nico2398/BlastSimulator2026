@@ -196,10 +196,13 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     expect(ctx.grid).not.toBeNull();
 
     // Act: build ramp command from mining.ts
+    // depth:5 stays within RAMP_CUT_SLOPE_RATIO for a 10m run (#1152) — this
+    // test is about coordinate placement, not slope.
     const result: CommandResult = buildRampCommand(ctx as any, [], {
       origin: '10,16',
       direction: 'south',
       length: '10',
+      depth: '5',
     });
 
     // Assert: ramp order accepted at this position (#555 — ramp excavation is
