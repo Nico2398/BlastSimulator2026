@@ -2236,4 +2236,28 @@ describe('clearance field (#1154)', () => {
       expect(corner).toBe(interior);
     });
   });
+
+  describe('patchNavGrid — halo overwrite regression (#1154 code review)', () => {
+    it('an unrelated nearby patch does not change the clearance of a wall-adjacent cell outside the patch', () => {
+      // Permanent wall: void column at x=10.
+      const grid = makeSolidGrid(15, 10, 15, 4);
+      clearColumn(grid, 10, 7, 4);
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      // (9,7) sits directly adjacent to the wall — clearance must be 1.
+      expect(nav.cellAt(9, 7)!.clearance).toBe(1);
+
+      // Patch an unrelated single cell at (7,7) — distance 3 from the wall,
+      // far enough that it can't legitimately affect the wall's neighbourhood.
+      // Its write box {7,7} padded by NAV_CLEARANCE_MAX_CELLS=2 is [5,9]x[5,9],
+      // which includes (9,7) as a halo cell but excludes the wall at x=10 from
+      // the seed scan — the exact naive-overlap shape the bug exploited.
+      for (let y = 0; y <= 4; y++) grid.clearVoxel(7, y, 7);
+      const region: BlastRegion = { minX: 7, maxX: 7, minZ: 7, maxZ: 7 };
+      NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+      // The wall-adjacent cell must be unaffected by the unrelated patch.
+      expect(nav.cellAt(9, 7)!.clearance).toBe(1);
+    });
+  });
 });

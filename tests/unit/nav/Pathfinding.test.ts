@@ -1683,4 +1683,87 @@ describe('clearance-aware pathfinding (#1154)', () => {
     expect(atCap.found).toBe(true);
     expect(aboveCap).toEqual(atCap);
   });
+
+  describe('computeClearancePocket — start/goal cell itself in a clearance-insufficient ring', () => {
+    /**
+     * A 2-cell-wide dead-end alley (too narrow for NAV_CLEARANCE_VEHICLE_CELLS
+     * on either lane — unlike the 3-cell RAMP_WIDTH corridor elsewhere in this
+     * file, which always keeps a clear centre lane) walled on three sides:
+     * a back wall at z=backZ (x in [alleyMinX, alleyMaxX]) and two long side
+     * walls at x=alleyMinX-1 and x=alleyMaxX+1 running the full alley depth.
+     * Every non-blocked cell's `clearance` is hand-computed exactly the way
+     * NavGrid's own BFS derives it — min(Chebyshev distance to the nearest
+     * blocked cell, NAV_CLEARANCE_MAX_CELLS) — so the alley's interior reads
+     * clearance 1 for its *entire* depth (always within 1 of a side wall,
+     * never far enough from both to reach 2) and the field beyond the alley's
+     * mouth reads the full cap. A vehicle parked at the alley's dead end
+     * therefore sits inside a clearance-insufficient ring many cells deep,
+     * not just its own single cell — exactly the shape `computeClearancePocket`
+     * exists to let a vehicle out of (or into), as opposed to the single-step
+     * escape a single isolated obstacle cell would allow even without it.
+     */
+    function makeDeadEndAlleyGrid(
+      width: number,
+      height: number,
+      alleyMinX: number,
+      alleyMaxX: number,
+      backZ: number,
+      mouthZ: number,
+    ): NavGrid {
+      const blocked = new Set<string>();
+      for (let x = alleyMinX; x <= alleyMaxX; x++) blocked.add(`${x},${backZ}`);
+      for (let z = backZ; z <= mouthZ; z++) {
+        blocked.add(`${alleyMinX - 1},${z}`);
+        blocked.add(`${alleyMaxX + 1},${z}`);
+      }
+
+      const grid = makeFlatGrid(width, height, 'walkable');
+      for (let z = 0; z < height; z++) {
+        for (let x = 0; x < width; x++) {
+          if (blocked.has(`${x},${z}`)) {
+            setCell(grid, x, z, 'blocked');
+            continue;
+          }
+          let nearest = Infinity;
+          for (const key of blocked) {
+            const [bx, bz] = key.split(',').map(Number) as [number, number];
+            nearest = Math.min(nearest, Math.max(Math.abs(x - bx), Math.abs(z - bz)));
+          }
+          setCell(grid, x, z, 'walkable', { clearance: Math.min(nearest, NAV_CLEARANCE_MAX_CELLS) });
+        }
+      }
+      return grid;
+    }
+
+    it('a vehicle parked at a dead-end alley\'s clearance-insufficient back still finds a route out to open ground', () => {
+      const grid = makeDeadEndAlleyGrid(14, 16, 2, 3, 2, 9);
+
+      // Sanity: the fixture actually reproduces the insufficient-ring shape —
+      // the alley's deep end is below vehicle clearance on both lanes.
+      expect(grid.cellAt(2, 3)!.clearance).toBeLessThan(NAV_CLEARANCE_VEHICLE_CELLS);
+      expect(grid.cellAt(3, 3)!.clearance).toBeLessThan(NAV_CLEARANCE_VEHICLE_CELLS);
+
+      const result = findPath(grid, {
+        agentId: 1, fromX: 2, fromZ: 3, toX: 8, toZ: 13, avoidVehicles: false,
+        requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+      });
+
+      expect(result.found).toBe(true);
+      expect(result.waypoints[0]).toEqual({ x: 2, z: 3 });
+    });
+
+    it('a vehicle can still arrive at a dead-end alley\'s clearance-insufficient back as its goal', () => {
+      const grid = makeDeadEndAlleyGrid(14, 16, 2, 3, 2, 9);
+      expect(grid.cellAt(3, 3)!.clearance).toBeLessThan(NAV_CLEARANCE_VEHICLE_CELLS);
+
+      const result = findPath(grid, {
+        agentId: 1, fromX: 8, fromZ: 13, toX: 3, toZ: 3, avoidVehicles: false,
+        requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+      });
+
+      expect(result.found).toBe(true);
+      const last = result.waypoints[result.waypoints.length - 1];
+      expect(last).toEqual({ x: 3, z: 3 });
+    });
+  });
 });

@@ -284,6 +284,70 @@ describe('tickLocomotion', () => {
     expect(state.vehicles.vehicles.find(v => v.id !== vehicle.id)!.x).toBe(5);
   });
 
+  // #1154 fixer round: findPathAvoidingOtherVehicles' escalation search
+  // (avoidVehicles:true) shares isImpassable with ordinary foot pathfinding,
+  // which — since #954 — treats any fragment-occupied cell as impassable too,
+  // not just a vehicle-occupied one. That conflation is wrong for this
+  // vehicle-only escalation: left unguarded, a detour route that happens to
+  // cross ground fragments (exactly the shape of a debris_hauler driving
+  // into its own fresh blast crater to collect them) reads as fully blocked
+  // and the driver never reroutes at all — permanently stuck rather than
+  // merely slow. The fix temporarily zeroes fragment occupancy for the
+  // duration of this one escalation call, so a route through fragments (never
+  // through another live vehicle) still succeeds.
+  it('reroutes through a fragment-littered detour cell instead of getting stuck treating fragments as impassable', () => {
+    const state = buildRingCorridorState(12);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 11, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 11,
+      }],
+      goal: { kind: 'reposition', x: 11, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 11,
+    } satisfies Itinerary;
+
+    // Stationary blocker mid-corridor on the z=2 lane, exactly as the
+    // chokepoint test above — the only route avoiding it is the z=8 lane.
+    purchaseVehicle(state.vehicles, 'drill_rig', 5, 2);
+
+    // A fragment wall spanning the full width of the z=8 detour lane
+    // (z=7,8,9 at x=6) — ground debris, not a vehicle, but enough to close
+    // off the entire lane if fragment occupancy is (wrongly) treated as
+    // impassable by the vehicle-avoidance escalation.
+    for (const fz of [7, 8, 9]) {
+      state.navGrid!.addFragmentOccupant(6, fz);
+      state.logistics.fragments.push({
+        fragment: {
+          id: fz, position: { x: 6, y: 0, z: fz }, volume: 1, mass: 10,
+          rockId: 'cruite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 },
+          isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1,
+        },
+        state: 'on_ground',
+        vehicleId: null,
+      });
+    }
+
+    const MAX_TICKS = 600;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && driver.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    // Reached the destination via the fragment-littered detour rather than
+    // getting stuck waiting forever in front of the vehicle blocker.
+    expect(driver.itinerary).toBeNull();
+    expect(driver.isMoveStuck).toBe(false);
+    expect(vehicle.x).toBe(11);
+    expect(vehicle.z).toBe(2);
+  });
+
   // #1103: an idle, driverless, unreserved vehicle squatting exactly on
   // another vehicle's drive-leg destination has no task of its own to
   // interrupt — relocateDestinationBlocker must move it clear once the

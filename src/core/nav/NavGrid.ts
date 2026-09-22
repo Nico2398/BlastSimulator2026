@@ -595,22 +595,44 @@ export class NavGrid {
 
   /**
    * Recompute `NavCell.clearance` for every cell in `[minX, maxX] x [minZ,
-   * maxZ]` — called by `buildNavGrid` over the whole grid and by
-   * `patchNavGrid` over the patched region plus a halo (#1154), since a
-   * clearance value near the patch boundary can change even for cells
-   * outside the patch itself.
+   * maxZ]` plus a one-`NAV_CLEARANCE_MAX_CELLS` halo around it — called by
+   * `buildNavGrid` over the whole grid and by `patchNavGrid` over the patched
+   * region (#1154). The halo is WRITTEN, not just seeded from: a cell just
+   * outside the raw patch box can have its own clearance change too (a
+   * newly-blocked patch cell brings a nearer obstacle within range of a halo
+   * cell that itself wasn't touched), and writing only the unpadded patch box
+   * left every halo cell's clearance stale from whenever it was last inside
+   * some write box — silently drifting wrong as later patches touched
+   * neighbouring regions without ever revisiting it.
+   *
+   * Because the halo itself is written, its own correctness requires a
+   * SECOND round of padding purely for BFS seed-sourcing: a halo cell sitting
+   * at the far edge of the one-padded write region can have its own true
+   * nearest obstacle up to another full `NAV_CLEARANCE_MAX_CELLS` beyond that
+   * — measured from ITS position, not the original write box's edge — so the
+   * seed box pads the write region by `NAV_CLEARANCE_MAX_CELLS` a second time
+   * (#1154 code review repro: wall at x=10, unrelated patch at (7,7); a
+   * single-padded seed box of [5,9] excludes the wall while still
+   * overwriting halo cell (9,7), wrongly clearing it from 1 to 2 — the
+   * second padding brings x=10 into the seed scan so (9,7) reads correctly).
    */
   private static recomputeClearanceRegion(navGrid: NavGrid, minX: number, maxX: number, minZ: number, maxZ: number): void {
-    const writeMinX = navGrid.clampX(minX);
-    const writeMaxX = navGrid.clampX(maxX);
-    const writeMinZ = navGrid.clampZ(minZ);
-    const writeMaxZ = navGrid.clampZ(maxZ);
-    if (writeMinX > writeMaxX || writeMinZ > writeMaxZ) return;
+    const rawMinX = navGrid.clampX(minX);
+    const rawMaxX = navGrid.clampX(maxX);
+    const rawMinZ = navGrid.clampZ(minZ);
+    const rawMaxZ = navGrid.clampZ(maxZ);
+    if (rawMinX > rawMaxX || rawMinZ > rawMaxZ) return;
 
-    // Every write-box cell's true nearest non-traversable cell, if within
-    // NAV_CLEARANCE_MAX_CELLS, lies within this same padded box by
-    // definition of "within NAV_CLEARANCE_MAX_CELLS of a write-box cell" —
-    // one padding is sufficient, no double-padding needed.
+    // The region actually WRITTEN: the raw patch/build box plus one halo.
+    const writeMinX = navGrid.clampX(rawMinX - NAV_CLEARANCE_MAX_CELLS);
+    const writeMaxX = navGrid.clampX(rawMaxX + NAV_CLEARANCE_MAX_CELLS);
+    const writeMinZ = navGrid.clampZ(rawMinZ - NAV_CLEARANCE_MAX_CELLS);
+    const writeMaxZ = navGrid.clampZ(rawMaxZ + NAV_CLEARANCE_MAX_CELLS);
+
+    // The region BFS sources from: the write region plus a second halo, so
+    // every written cell (including one at the write region's own far edge)
+    // gets its true nearest obstacle within NAV_CLEARANCE_MAX_CELLS of ITS
+    // OWN position, not just of the raw patch box's edge.
     const seedMinX = navGrid.clampX(writeMinX - NAV_CLEARANCE_MAX_CELLS);
     const seedMaxX = navGrid.clampX(writeMaxX + NAV_CLEARANCE_MAX_CELLS);
     const seedMinZ = navGrid.clampZ(writeMinZ - NAV_CLEARANCE_MAX_CELLS);
@@ -651,16 +673,12 @@ export class NavGrid {
       }
     }
 
-    // Write the whole padded seed box, not just the raw patch box: a cell in
-    // the halo (up to NAV_CLEARANCE_MAX_CELLS outside the patch) can have its
-    // clearance change too — e.g. a newly-blocked patch cell brings a nearer
-    // obstacle within range of a halo cell that itself wasn't touched. Writing
-    // only the unpadded patch box left every halo cell's clearance stale from
-    // whenever it was last inside some write box (originally the full-grid
-    // buildNavGrid), silently drifting wrong as later patches touched
-    // neighbouring regions without ever revisiting it.
-    for (let z = seedMinZ; z <= seedMaxZ; z++) {
-      for (let x = seedMinX; x <= seedMaxX; x++) {
+    // Write the whole (once-padded) write region, including its halo — see
+    // this function's own doc comment for why the halo must be written at
+    // all, and why the seed box needed a second round of padding to make
+    // that write correct at the halo's own far edge.
+    for (let z = writeMinZ; z <= writeMaxZ; z++) {
+      for (let x = writeMinX; x <= writeMaxX; x++) {
         const cell = navGrid.cellAt(x, z);
         if (!cell) continue;
         const dist = distances.get(key(x, z));
