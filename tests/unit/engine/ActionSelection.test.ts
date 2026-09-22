@@ -1193,6 +1193,78 @@ describe('computeActionWorkTicks — dig_ramp_segment scaling (#924)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// computeActionWorkTicks — dig_ramp_segment fill-cell pending (#1172)
+//
+// The dig_ramp_segment branch above filters `cells` with a raw
+// `grid.densityAt(c.x, c.y, c.z) > 0` check to count remaining work. A
+// fillTarget cell (#1172) sits on bare air by design — there is nothing to
+// carve there yet, only something to raise — so that raw density check reads
+// it as "already done" from tick zero and undercounts the segment's real
+// remaining work. The fix is `isRampCellPending`, which recognises a
+// fillTarget cell as pending until its column's height actually reaches the
+// target.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('computeActionWorkTicks — dig_ramp_segment fill-cell pending (#1172)', () => {
+  it('a segment with an un-filled fillTarget cell reports full remaining work ticks — the fill cell counts as pending, not "already done" by a raw density check', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 1);
+
+    const cutCells = makeRampCells(5); // x=0..4, y=0, z=0 — solid rock, needs cutting
+    // Fill cells sit on bare air (x=10..14) — a raw densityAt(...) > 0 filter
+    // would wrongly treat these as already-cleared, since there's no rock
+    // there to detect in the first place.
+    const fillCells = Array.from({ length: 5 }, (_, i) => ({ x: 10 + i, y: 3, z: 0, fillTarget: 3 }));
+    const cells = [...cutCells, ...fillCells];
+    const action = makeWorkAction({
+      type: 'dig_ramp_segment',
+      requiredSkill: 'driving.excavator',
+      payload: { rampId: 1, segmentIndex: 0, cells, region: null, segmentCost: 0 },
+    });
+
+    const grid = makeSolidGridForCells(cutCells); // fill columns (x=10..14) stay entirely empty/air
+
+    const ticks = computeActionWorkTicks(state, employee, action, grid);
+
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    // All 10 cells (5 solid cut + 5 still-pending fill) count as outstanding work.
+    expect(ticks).toBe(computeRampSegmentDurationTicks(10, 1, 1, needMult, lqMult));
+    // Must fail against a raw densityAt(...) > 0 filter, which would see the
+    // 5 fillTarget cells (sitting on air) as already done and undercount to 5.
+    expect(ticks).not.toBe(computeRampSegmentDurationTicks(5, 1, 1, needMult, lqMult));
+  });
+
+  it('a segment whose fill columns have already reached their fillTarget reports work for the cut cells only', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'driving.excavator', 1);
+
+    const cutCells = makeRampCells(5);
+    const fillCells = Array.from({ length: 5 }, (_, i) => ({ x: 10 + i, y: 3, z: 0, fillTarget: 3 }));
+    const cells = [...cutCells, ...fillCells];
+    const action = makeWorkAction({
+      type: 'dig_ramp_segment',
+      requiredSkill: 'driving.excavator',
+      payload: { rampId: 1, segmentIndex: 0, cells, region: null, segmentCost: 0 },
+    });
+
+    const grid = makeSolidGridForCells(cutCells);
+    // Every fill column already raised to its own target height.
+    for (const cell of fillCells) {
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+      setVoxelColumnSurfaceHeight(grid, cell.x, cell.z, cell.fillTarget, compId);
+    }
+
+    const ticks = computeActionWorkTicks(state, employee, action, grid);
+
+    const needMult = getNeedMultiplier(employee);
+    const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
+    // Only the 5 still-solid cut cells count as outstanding work now.
+    expect(ticks).toBe(computeRampSegmentDurationTicks(5, 1, 1, needMult, lqMult));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // computeActionWorkTicks — level_ground duration scaling (#1144 review
 // finding 5)
 //

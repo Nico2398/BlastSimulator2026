@@ -20,7 +20,8 @@ export function formatTaskCompletion(
     lines.push(`[tick ${tickCount}] TASK: ${empName} completed task.`);
 
     if (report.rampSegment) {
-      lines.push(`[tick ${tickCount}] Ramp #${report.rampSegment.rampId} segment ${report.rampSegment.segmentIndex} excavated: ${report.rampSegment.voxelsCleared} voxels cleared.`);
+      const filledSuffix = report.rampSegment.voxelsFilled > 0 ? `, ${report.rampSegment.voxelsFilled} voxels filled` : '';
+      lines.push(`[tick ${tickCount}] Ramp #${report.rampSegment.rampId} segment ${report.rampSegment.segmentIndex} excavated: ${report.rampSegment.voxelsCleared} voxels cleared${filledSuffix}.`);
     }
 
     if (report.groundLevelled) {

@@ -132,7 +132,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
 
     expect(ramp.segments[0]!.done).toBe(true);
     expect(report.rampSegment).toEqual({
-      rampId: 1, segmentIndex: 0, voxelsCleared: 1, rampFullyDone: false,
+      rampId: 1, segmentIndex: 0, voxelsCleared: 1, voxelsFilled: 0, rampFullyDone: false,
     });
 
     // #1090: no continuity promotion — completeVehicleGatedAction only

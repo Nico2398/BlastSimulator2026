@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
+  VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
-  computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength,
+  computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
+import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_CUT_SLOPE_RATIO,
   NAV_MAX_SLOPE_DEGREES,
@@ -586,27 +587,30 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     }
   });
 
-  it('skips exactly the y-band with zero contributing columns instead of emitting an invalid segment for it, and emits segments on both sides of the gap', () => {
+  it('fills the canyon columns up to the floor line instead of leaving a gap y-band with zero contributing columns (#1172)', () => {
     const grid = makeSteppedGrid();
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
 
     // Hand-traced (clearanceHeight=3, RAMP length 8 / targetDepth 6, so the
-    // #1152 straight-line floor is f(step) = 20 - 0.75*step, and
-    // ceilingY = localSurface + 3):
+    // #1152 straight-line floor is f(step) = 20 - 0.75*step):
     //
-    //   step 0-1  floor 20.00/19.25  ceiling 23  → y 20,21,22
-    //   step 2-4  floor 18.50..17.00 ceiling  3  → floor above ceiling, none
-    //   step 5-7  floor 16.25..14.75 ceiling 18  → y 15,16,17
+    //   step 0-1  floor 20.00/19.25  local surface 20 → ceiling 23        → y 20,21,22
+    //   step 2-4  floor 18.50..17.00 local surface  0 → floor > surface+3,
+    //             a fill column (#1172): ceiling = max(surface, floor) + 3
+    //             → y up to floor+3, contributing at its own floorRowY
+    //             (19, 18 or 17) with a fillTarget cell instead of a gap.
+    //   step 5-7  floor 16.25..14.75 local surface 15 → ceiling 18        → y 15,16,17
     //
-    // globalMinY=14.75, globalMaxY=22 → candidate y = 22..15 (8 values).
-    // y=19 and y=18 have zero contributing columns and must be skipped
-    // entirely, leaving 6 segments with plenty on both sides of the gap.
-    expect(segments.length).toBe(6);
-    for (const s of segments) {
-      expect(s.targetY === 18 || s.targetY === 19).toBe(false);
-    }
+    // globalMinY=14.75, globalMaxY=22 → every candidate y in 22..15 (8
+    // values) now has a contributor — the canyon's own fill cells replace
+    // what used to be the zero-contributor gap at y=18,19 (#1172 FILL
+    // decision: a dip below the floor line is raised to it, not skipped).
+    expect(segments.length).toBe(8);
+    expect(segments.some(s => s.targetY === 18)).toBe(true);
+    expect(segments.some(s => s.targetY === 19)).toBe(true);
+    expect(segments.some(s => s.cells.some(c => c.fillTarget !== undefined))).toBe(true);
     expect(segments.some(s => s.targetY >= 20 && s.targetY <= 22)).toBe(true);
     expect(segments.some(s => s.targetY >= 15 && s.targetY <= 17)).toBe(true);
   });
@@ -767,45 +771,10 @@ describe('defineRampSegments — constant-slope floor geometry (#1152)', () => {
     }
   });
 
-  it('follows the same straight line across a mid-ramp dip wherever there is rock to cut, and cuts nothing where the dip already sits below the line', () => {
-    // A sustained dip (steps 8-10) 5m below the surrounding flat terrain.
-    // The straight-line floor at those steps is 16.0 / 15.5 / 15.0 while the
-    // dip's own ground is 15 — so steps 8 and 9 are the one case a *cut*
-    // cannot serve: the road's line runs through open air above the ground,
-    // and reaching it would mean adding material, not removing it. A ramp
-    // order is a cut, so those two columns are left alone and the ramp
-    // inherits the dip. Every other column, dip floor (step 10) included,
-    // still grades to the line exactly, proving the line itself never bends
-    // toward local terrain.
-    //
-    // TODO(#1172): the notch that leaves in the road is its own defect —
-    // filling a ramp's line where terrain falls below it is not modelled.
-    const groundAt = (step: number): number =>
-      (step >= 8 && step <= 10) ? ORIGIN_SURFACE_Y - 5 : ORIGIN_SURFACE_Y;
-    const grid = makeGridFromSurfaceFn(z => groundAt(z - ORIGIN_Z));
-    const ramp: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: TARGET_DEPTH };
-
-    const floors = floorHeightsByZ(defineRampSegments(grid, ramp));
-
-    let cutColumns = 0;
-    for (let step = 0; step < LENGTH; step++) {
-      const z = ORIGIN_Z + step;
-      const actual = floors.get(z);
-
-      if (groundAt(step) < expectedFloorHeight(step)) {
-        expect(actual, `step ${step} (z=${z}) sits below the line — nothing to cut`).toBeUndefined();
-        continue;
-      }
-
-      expect(actual, `floor height missing for step ${step} (z=${z})`).toBeDefined();
-      expect(actual!).toBeCloseTo(expectedFloorHeight(step), 6);
-      cutColumns++;
-    }
-
-    // Guard the guard: if the fixture ever stopped producing a real cut, the
-    // loop above would pass vacuously.
-    expect(cutColumns).toBe(LENGTH - 2);
-  });
+  // The mid-ramp-dip case (previously "cuts nothing where the dip already
+  // sits below the line") moved to the "Ramp — fill across terrain dips
+  // (#1172)" describe below: a dip below the line is now FILLED to reach it,
+  // not left as an unwalkable notch.
 
   it('floor Y is identical across all 3 width columns at every step, even where terrain undulates', () => {
     const grid = makeGridFromSurfaceFn(z => {
@@ -857,6 +826,303 @@ describe('defineRampSegments — constant-slope floor geometry (#1152)', () => {
       const rise = a - b; // positive: descending downhill
       expect(rise).toBeLessThanOrEqual(RAMP_CUT_SLOPE_RATIO + 1e-6);
     }
+  });
+});
+
+// ── #1172: a ramp's straight floor line must be reached everywhere, even
+// where existing terrain already dips below it. #1152 above only ever cuts
+// (clears solid rock down to the line); a column whose ground already sits
+// below the line emitted NO cell at all, leaving an unwalkable notch. This
+// change FILLS those columns up to the line instead — same fixture shape as
+// the #1152 dip test it replaces: a 3-column dip (steps 8-10) 5m below the
+// surrounding flat terrain, on a 20-step ramp descending 10m from
+// originSurfaceY 20. Steps 8 and 9 sit below the line (need fill); step 10's
+// dip floor lands exactly on the line (an ordinary cut, nothing to fill).
+
+describe('Ramp — fill across terrain dips (#1172)', () => {
+  const ORIGIN_X = 20;
+  const ORIGIN_Z = 20;
+  const LENGTH = 20;
+  const TARGET_DEPTH = 10; // ratio 0.5, under RAMP_CUT_SLOPE_RATIO (~0.566)
+  const ORIGIN_SURFACE_Y = 20;
+  /** Distinct from the ambient 'cruite' terrain, so a filled voxel's rock can
+   * be told apart from a default/hardcoded composition (item 9). */
+  const DIP_ROCK_ID = 'sandite';
+
+  function expectedFloorHeight(step: number): number {
+    return ORIGIN_SURFACE_Y - (step / LENGTH) * TARGET_DEPTH;
+  }
+
+  /** steps 8-10: 5m below the surrounding flat terrain. */
+  function groundAt(step: number): number {
+    return (step >= 8 && step <= 10) ? ORIGIN_SURFACE_Y - 5 : ORIGIN_SURFACE_Y;
+  }
+
+  /** Same per-column solid-to-surface shape as the #1152 describe's own
+   * makeGridFromSurfaceFn, but the dip columns (steps 8-10) carry a distinct
+   * rock composition from the ambient terrain (item 9). */
+  function makeDipGrid(): VoxelGrid {
+    const grid = new VoxelGrid(40, 30, 40);
+    const ambientCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    const dipCompId = grid.palette.intern({ rocks: [{ rockId: DIP_ROCK_ID, coefficient: 1.0 }] });
+    for (let z = 0; z < 40; z++) {
+      const step = z - ORIGIN_Z;
+      const isDip = step >= 8 && step <= 10;
+      const surface = groundAt(step);
+      const compId = isDip ? dipCompId : ambientCompId;
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= surface; y++) {
+          grid.fillVoxel(x, y, z, compId, undefined, 1.0);
+        }
+      }
+    }
+    return grid;
+  }
+
+  function makeDipRamp(): RampDef {
+    return { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: TARGET_DEPTH };
+  }
+
+  /** Every column's own floor-row contribution, whichever kind of cell it
+   * carries: a `floorAdjustment` cut cell's continuous height, or a
+   * `fillTarget` fill cell's target height. */
+  function combinedFloorByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const heights = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment !== undefined) heights.set(cell.z, (cell.y - 1) + cell.floorAdjustment);
+        else if (cell.fillTarget !== undefined) heights.set(cell.z, cell.fillTarget);
+      }
+    }
+    return heights;
+  }
+
+  /** Carries out a full carve via defineRampSegments + carveRampSegment, in
+   * declared segment order — the same pattern the "sequentially carving
+   * every segment reaches an identical final grid to buildRamp" test (#555
+   * describe above) uses. Returns totals summed across every segment. */
+  function carveWholeRamp(grid: VoxelGrid, segments: RampSegmentDef[]): { voxelsCleared: number; voxelsFilled: number } {
+    let voxelsCleared = 0;
+    let voxelsFilled = 0;
+    for (const segment of segments) {
+      const result = carveRampSegment(grid, segment);
+      voxelsCleared += result.voxelsCleared;
+      voxelsFilled += result.voxelsFilled;
+    }
+    return { voxelsCleared, voxelsFilled };
+  }
+
+  // ── item 1: every step emits a floor cell, dip included ──────────────────
+
+  it('emits a floor cell (floorAdjustment or fillTarget) for every step — no step is left with neither', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    const floors = combinedFloorByZ(segments);
+
+    for (let step = 0; step < LENGTH; step++) {
+      const z = ORIGIN_Z + step;
+      expect(floors.get(z), `step ${step} (z=${z}) has neither floorAdjustment nor fillTarget`).toBeDefined();
+      expect(floors.get(z)!).toBeCloseTo(expectedFloorHeight(step), 6);
+    }
+  });
+
+  it('steps 8 and 9 (below the line, previously MISSING) carry a fillTarget cell set to the line height, not a floorAdjustment cut cell', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+
+    for (const step of [8, 9]) {
+      const z = ORIGIN_Z + step;
+      const fillCells = segments.flatMap(s => s.cells).filter(c => c.z === z && c.fillTarget !== undefined);
+      expect(fillCells.length, `step ${step} (z=${z}) has no fillTarget cell`).toBeGreaterThan(0);
+      for (const cell of fillCells) {
+        expect(cell.floorAdjustment).toBeUndefined();
+        expect(cell.fillTarget!).toBeCloseTo(expectedFloorHeight(step), 6);
+      }
+    }
+  });
+
+  it('step 10 — dip ground exactly at the line — still gets an ordinary floorAdjustment cut cell, not a fillTarget', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    const z = ORIGIN_Z + 10;
+
+    const cutCell = segments.flatMap(s => s.cells).find(c => c.z === z && c.floorAdjustment !== undefined);
+    expect(cutCell).toBeDefined();
+    expect(cutCell!.fillTarget).toBeUndefined();
+  });
+
+  // ── item 4: columns already at/above the line are unaffected ─────────────
+
+  it('a column already at/above the line (outside the dip) is unaffected — ordinary floorAdjustment cut, no fillTarget', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    for (const step of [0, 4, 7, 11, 15, 19]) {
+      const z = ORIGIN_Z + step;
+      const cell = segments.flatMap(s => s.cells).find(c => c.z === z && c.floorAdjustment !== undefined);
+      expect(cell, `step ${step} missing floorAdjustment cell`).toBeDefined();
+      expect(cell!.fillTarget).toBeUndefined();
+    }
+  });
+
+  // ── item 2 + 3: post-carve line integrity and walkability ────────────────
+
+  it('after a full carve, every step\'s actual column height equals the straight line — including the dip, with no exception', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    carveWholeRamp(grid, segments);
+
+    for (let step = 0; step < LENGTH; step++) {
+      const z = ORIGIN_Z + step;
+      const actual = computeVoxelColumnSurfaceHeight(grid, ORIGIN_X, z);
+      expect(actual, `step ${step} (z=${z}) column height`).toBeCloseTo(expectedFloorHeight(step), 6);
+    }
+  });
+
+  it('after a full carve, the ramp is walkable end to end — every adjacent step pair satisfies the real navmesh slope check (isStepClimbable)', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    carveWholeRamp(grid, segments);
+
+    for (let step = 0; step + 1 < LENGTH; step++) {
+      const fromY = computeVoxelColumnSurfaceHeight(grid, ORIGIN_X, ORIGIN_Z + step);
+      const toY = computeVoxelColumnSurfaceHeight(grid, ORIGIN_X, ORIGIN_Z + step + 1);
+      expect(isStepClimbable(fromY, toY, 1), `step ${step} -> ${step + 1} (${fromY} -> ${toY}) not climbable`).toBe(true);
+    }
+  });
+
+  // ── item 5: no extra cash cost from filling ───────────────────────────────
+
+  it('validateRampOrder\'s cost for the dip-crossing ramp order equals RAMP_COST_PER_METER * length — priced by length, not terrain/volume', () => {
+    const ramp = makeDipRamp();
+    const result = validateRampOrder(ramp, 1_000_000);
+
+    expect(result.success).toBe(true);
+    expect(result.cost).toBe(LENGTH * RAMP_COST_PER_METER);
+
+    // Same order, different origin (well away from the dip, so — were cost
+    // ever terrain-derived — it would read flat ground instead): identical
+    // cost, confirming the price tracks length alone (#1172 decision: no new
+    // cash cost from filling).
+    const flatElsewhere: RampDef = { ...ramp, originZ: 200 };
+    const flatResult = validateRampOrder(flatElsewhere, 1_000_000);
+    expect(flatResult.cost).toBe(result.cost);
+  });
+
+  // ── item 6: filled cells count as ticked work ─────────────────────────────
+
+  it('carving the dip-crossing ramp reports voxelsFilled > 0 for the fill columns and voxelsCleared > 0 for the ordinary cut columns', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    const totals = carveWholeRamp(grid, segments);
+
+    expect(totals.voxelsFilled).toBeGreaterThan(0);
+    expect(totals.voxelsCleared).toBeGreaterThan(0);
+  });
+
+  // ── item 7: isRampCellPending direct unit tests ───────────────────────────
+
+  describe('isRampCellPending', () => {
+    it('a fillTarget cell whose column is still below the target reports pending (true)', () => {
+      const grid = new VoxelGrid(10, 10, 10); // column (3,3) is entirely empty -> height 0
+      const cell = { x: 3, y: 5, z: 3, fillTarget: 5 };
+      expect(isRampCellPending(grid, cell)).toBe(true);
+    });
+
+    it('a fillTarget cell whose column has already reached (or exceeded) the target reports not pending (false)', () => {
+      const grid = new VoxelGrid(10, 10, 10);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      setVoxelColumnSurfaceHeight(grid, 3, 3, 5, compId);
+
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, fillTarget: 5 })).toBe(false);
+
+      // Exceeding the target (filled higher than needed) is also "done".
+      setVoxelColumnSurfaceHeight(grid, 3, 3, 6, compId);
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, fillTarget: 5 })).toBe(false);
+    });
+
+    it('a plain cut cell (no fillTarget) with solid rock still at that exact voxel reports pending (true) — matches today\'s densityAt(...) > 0 check', () => {
+      const grid = new VoxelGrid(10, 10, 10);
+      grid.setVoxel(3, 5, 3, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3 })).toBe(true);
+    });
+
+    it('a plain cut cell (no fillTarget) already cleared reports not pending (false)', () => {
+      const grid = new VoxelGrid(10, 10, 10); // never filled -> density 0
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3 })).toBe(false);
+    });
+  });
+
+  // ── item 8: idempotency ────────────────────────────────────────────────
+
+  it('re-carving an already-filled dip segment reports voxelsFilled: 0 and voxelsCleared: 0 the second time — no double fill/charge', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+
+    const first = carveWholeRamp(grid, segments);
+    expect(first.voxelsFilled).toBeGreaterThan(0);
+
+    const second = carveWholeRamp(grid, segments);
+    expect(second.voxelsFilled).toBe(0);
+    expect(second.voxelsCleared).toBe(0);
+  });
+
+  // ── item 9: fill material matches natural rock ────────────────────────────
+
+  it('the filled voxels\' composition matches the dip column\'s own pre-existing rock, not a default/hardcoded composition', () => {
+    const grid = makeDipGrid();
+    const segments = defineRampSegments(grid, makeDipRamp());
+    carveWholeRamp(grid, segments);
+
+    for (const step of [8, 9]) {
+      const z = ORIGIN_Z + step;
+      const scanFrom = Math.floor(groundAt(step));
+      const scanTo = Math.ceil(expectedFloorHeight(step)) + 1;
+      const filledRocks: string[] = [];
+      for (let y = scanFrom; y <= scanTo; y++) {
+        if (grid.densityAt(ORIGIN_X, y, z) > 0) filledRocks.push(grid.dominantRockAt(ORIGIN_X, y, z));
+      }
+      expect(filledRocks.length, `step ${step} (z=${z}): no filled voxel found in [${scanFrom}, ${scanTo}]`).toBeGreaterThan(0);
+      for (const rock of filledRocks) expect(rock).toBe(DIP_ROCK_ID);
+    }
+  });
+
+  // ── item 11: stray-density sweep must not clip a fresh fill ──────────────
+
+  it('a fill deeper than the stray-density sweep\'s own clipping window (SURFACE_BAND_HALF) reaches its full fillTarget height, not clipped back down', () => {
+    // captureColumnTopsForCarve/renormaliseCarvedColumns (VoxelGrid.ts) sweep
+    // only [oldTopY+1, oldTopY+SURFACE_BAND_HALF] above a column's pre-carve
+    // top, an assumption that a carve only ever drops a column's top. A dip
+    // deep enough that its fillTarget sits well past that window proves the
+    // fill isn't silently clipped back down to near the old ground by that
+    // sweep.
+    const originSurfaceY = 30;
+    const length = 20;
+    const targetDepth = 4; // ratio 0.2, comfortably under RAMP_CUT_SLOPE_RATIO
+    const originX = 20;
+    const originZ = 20;
+    const deepDipStep = 10;
+    const lineAtDip = originSurfaceY - (deepDipStep / length) * targetDepth;
+    // 8m below the line — far past SURFACE_BAND_HALF (1 voxel).
+    const deepDipGround = lineAtDip - 8;
+
+    const grid = new VoxelGrid(40, 40, 40);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    for (let z = 0; z < 40; z++) {
+      const step = z - originZ;
+      const surface = step === deepDipStep ? deepDipGround : originSurfaceY;
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= Math.floor(surface); y++) {
+          grid.fillVoxel(x, y, z, compId, undefined, 1.0);
+        }
+      }
+    }
+
+    const ramp: RampDef = { originX, originZ, direction: 'south', length, targetDepth };
+    const segments = defineRampSegments(grid, ramp);
+    for (const segment of segments) carveRampSegment(grid, segment);
+
+    const finalHeight = computeVoxelColumnSurfaceHeight(grid, originX, originZ + deepDipStep);
+    expect(finalHeight).toBeCloseTo(lineAtDip, 6);
   });
 });
 

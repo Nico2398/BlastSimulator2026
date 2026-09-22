@@ -59,7 +59,7 @@ export interface FiredEventReport {
 /** What a single employee's just-completed task did to the world, by task type. */
 export interface TaskCompletionReport {
   completed: boolean;
-  rampSegment?: { rampId: number; segmentIndex: number; voxelsCleared: number; rampFullyDone: boolean };
+  rampSegment?: { rampId: number; segmentIndex: number; voxelsCleared: number; voxelsFilled: number; rampFullyDone: boolean };
   groundLevelled?: { voxelsCleared: number };
   survey?: { method: SurveyMethod; centerX: number; centerZ: number };
   drillHole?: { holeId: string; x: number; z: number };
