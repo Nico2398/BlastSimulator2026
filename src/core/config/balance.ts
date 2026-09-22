@@ -565,10 +565,15 @@ export const TUTORIAL_SITE_HAZARD_CLEARANCE_TILES = 5;
 export const TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES = 6;
 
 /**
- * Maximum tiles from the tutorial building cluster to the dig/drill area,
- * keeping the round trip an employee walks between site and workface short.
+ * Maximum real pathfinding route cost (tile-equivalent units, from
+ * `findPath`'s total cost — not straight-line Chebyshev tile distance) from
+ * the tutorial building cluster to the dig/drill area, keeping the round
+ * trip an employee walks between site and workface short. Renamed from
+ * `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES` (#1170): the slope-gated navmesh
+ * (#1151) makes a real walking route far longer than the straight-line tile
+ * bound this used to measure, so the bound itself now has to be a route cost.
  */
-export const TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES = 10;
+export const TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST = 24;
 
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 

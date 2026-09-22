@@ -13,9 +13,15 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
-import { NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE } from '../config/balance.js';
+import {
+  NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE,
+  AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
+} from '../config/balance.js';
 import { moveTo } from './MoveTo.js';
-import { isMounted } from '../entities/EmployeeLocomotion.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { getVehicleDefByTier } from '../entities/Vehicle.js';
+import { estimateLegDistance } from './PlanItinerary.js';
+import { cellsToTravelTicks } from './ActionSelection.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -109,7 +115,7 @@ export function findNearestBuildingOfType(
 }
 
 /** Find the nearest active living_quarters building to (empX, empZ). */
-export function findNearestLivingQuarters(
+function findNearestLivingQuarters(
   state: GameState,
   empX: number,
   empZ: number,
@@ -265,13 +271,36 @@ export function isMidCollapseOrForcedRest(employee: Employee): boolean {
  * routing failure another mechanism owns.
  */
 export function restRoundTripWorthwhile(
-  _state: GameState,
-  _emp: Employee,
-  _building: Building | null,
-  _targetX: number,
-  _targetZ: number,
+  state: GameState,
+  emp: Employee,
+  building: Building | null,
+  targetX: number,
+  targetZ: number,
 ): boolean {
-  throw new Error('not implemented');
+  if (building === null) return true;
+
+  // Mounted employees drive the round trip at their vehicle's speed rather
+  // than walking it — mirrors hasClaimableSameRoleFollowUp's own mounted-
+  // vehicle lookup above.
+  let speed: number = AGENT_WALK_SPEED;
+  if (isMounted(emp.locomotion)) {
+    const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(emp.locomotion));
+    if (vehicle) {
+      speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
+    }
+  }
+
+  const oneWay = estimateLegDistance(state, 'exact', emp.id, emp.x, emp.z, targetX, targetZ, false);
+  // Unreachable is another mechanism's problem (routing failure) — never
+  // block a forced rest on it here.
+  if (oneWay === null) return true;
+
+  const travelCost = 2 * cellsToTravelTicks(oneWay, speed) * NEED_DRAIN_RATES.fatigue.traveling;
+
+  const headroom = MAX_NEED_GAUGE - emp.fatigue;
+  const maxRecovery = Math.min(headroom, BUILDING_REPLENISH_RATES.fatigue[building.tier] * NEED_REST_DURATIONS.fatigue);
+
+  return travelCost <= maxRecovery;
 }
 
 /**
@@ -281,8 +310,18 @@ export function restRoundTripWorthwhile(
  * forced-rest entry points in ForceShiftRest.ts.
  */
 export function resolveRestDestination(
-  _state: GameState,
-  _emp: Employee,
+  state: GameState,
+  emp: Employee,
 ): { targetX: number; targetZ: number; buildingId: number | undefined; worthwhile: boolean } {
-  throw new Error('not implemented');
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  if (building === null) {
+    // No living_quarters exists at all — same fallback both forced-rest entry
+    // points already used (rest in place at the employee's own position),
+    // with nothing to weigh a round trip against.
+    return { targetX: emp.x, targetZ: emp.z, buildingId: undefined, worthwhile: true };
+  }
+
+  const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+  const worthwhile = restRoundTripWorthwhile(state, emp, building, approach.x, approach.z);
+  return { targetX: approach.x, targetZ: approach.z, buildingId: building.id, worthwhile };
 }
