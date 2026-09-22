@@ -1449,6 +1449,61 @@ describe('buildRampCommand', () => {
     expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
   });
 
+  // ── #1152: the slope gate is reachable from the console, and a refusal
+  // without a translation key still surfaces its message ───────────────────
+
+  it('refuses an order too short for its depth, translatably, without charging cash (#1152)', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    // depth 8 over a length-5 run is a grade of 1.6 — far past the 30° cap.
+    const result = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '5', depth: '8',
+    });
+
+    expect(result.success).toBe(false);
+    // Routed through t(messageKey, messageParams), so the output carries the
+    // rendered translation rather than the plain-English fallback: it names
+    // the depth, the minimum length the slope requires, and the cap.
+    expect(result.output).toContain('8');
+    expect(result.output).toContain('30');
+    expect(result.output).not.toContain('mining.build_ramp.slope_too_steep');
+    // Refused before any charge, and before any ramp was planned.
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps).toHaveLength(0);
+    expect(ctx.state!.pendingActions).toHaveLength(0);
+  });
+
+  it('refuses "build_ramp cancel" with no usable ramp id by printing its usage line', () => {
+    const ctx = makeMiningContext();
+
+    // Neither a positional id nor `id:` — `mining.build_ramp.cancel_usage` is
+    // a translated string nothing reached through the command itself.
+    const result = buildRampCommand(ctx, ['cancel'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('build_ramp cancel');
+    expect(result.output).not.toContain('mining.build_ramp.cancel_usage');
+  });
+
+  it('surfaces a refusal that carries no translation key via its plain message (#1152)', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    // `targetDepth <= 0` is refused ahead of the slope check and is one of the
+    // validations that has no messageKey yet, so this exercises the fallback
+    // arm of the command's `messageKey ? t(...) : message` choice — a keyless
+    // refusal must still reach the player, not come back blank.
+    const result = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '5', depth: '0',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Target depth must be positive');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps).toHaveLength(0);
+  });
+
   it('deducts the cost from finances.cash too, not just the flat cash field', () => {
     const ctx = makeMiningContext();
     const cashBefore = ctx.state!.cash;
