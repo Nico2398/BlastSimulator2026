@@ -106,6 +106,18 @@ const ASTAR_HEURISTIC_WEIGHT = 1.3;
  */
 const ASTAR_TIE_BREAK_EPSILON = 1e-7;
 
+/**
+ * Cap on `computeClearancePocket`'s own BFS (#1154 follow-up). A vehicle's
+ * clearance-insufficient "pocket" — the connected run of cells hugging a
+ * single obstacle it's parked next to or driving up to — is bounded in
+ * practice by how far `clearance` itself can read below the cap before a
+ * real gap opens up, not by grid size, so this is a safety ceiling against a
+ * pathological grid rather than a tuned value: 256 cells comfortably covers
+ * hugging an entire building perimeter (a T3 building's ring is well under
+ * 100 cells) with a wide margin left over.
+ */
+const CLEARANCE_POCKET_MAX_CELLS = 256;
+
 // ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
 // ---------------------------------------------------------------------------
@@ -175,6 +187,32 @@ class MinHeap<T extends { key: number }> {
  * (vehicleOccupied, fragmentOccupancy) can strand an agent unable to path out
  * of the cell it is already standing on.
  *
+ * `skipClearance` is true for a cell inside the route's start or goal
+ * "pocket" (#1154 follow-up, `computeClearancePocket`): `clearance` models
+ * the room a vehicle needs to actually *drive through* a cell — the gap
+ * between two obstacles — not the room it needs to come to a stop next to
+ * one, or to move off a cell it's already parked in. A building/fragment
+ * approach cell is *by construction* the walkable ring cell immediately
+ * touching the obstacle it borders (findBuildingApproachCell,
+ * FragmentApproach.ts), so its own clearance always reads exactly 1
+ * regardless of how open the approach actually is — the same way a real
+ * truck can dock flush against a loading bay it could never turn around
+ * inside, or pull away from one. Exempting only the exact start/goal cell is
+ * not enough on its own: every other cell on that same ring is *also*
+ * clearance 1 (equally adjacent to the same obstacle), and a diagonal step
+ * straight from open, clearance-2 ground onto the ring is not always
+ * climbable (a bench-level/slope edge can sit right at the ring boundary,
+ * #1151) — forcing the route to jog sideways through several more ring cells
+ * first before finding a climbable way out. Those cells are just as much
+ * "coming to a stop next to the obstacle" (or "moving off one") as the
+ * start/goal cell itself, so `computeClearancePocket` traces the whole
+ * connected run and grants them the same exemption. Still refuses
+ * blocked/void/occupied outright everywhere: only the clearance gate is
+ * skipped, so a vehicle can never arrive literally inside an obstacle or on
+ * top of another vehicle, only stop adjacent to one (or start adjacent to
+ * one, since that's exactly where a vehicle already parked next to a
+ * building sits before its very first move).
+ *
  * Exported (visibility only, no behaviour change) so
  * `tests/unit/nav/Pathfinding.test.ts` can exercise the isAgentCell
  * contract directly rather than only indirectly through findPath (#954).
@@ -184,12 +222,65 @@ export function isImpassable(
   avoidVehicles: boolean,
   isAgentCell: boolean = false,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  skipClearance: boolean = false,
 ): boolean {
   if (isAgentCell) return false;
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
-  if (!hasClearance(cell, requiredClearance)) return true;
+  if (!skipClearance && !hasClearance(cell, requiredClearance)) return true;
   return false;
+}
+
+/**
+ * The connected run of clearance-insufficient cells touching (`x`, `z`) —
+ * null when (`x`, `z`) already has sufficient clearance itself, so the
+ * overwhelmingly common case (an ordinary open cell) costs nothing beyond
+ * one `hasClearance` check. Otherwise a bounded BFS (`isImpassable`'s own
+ * doc comment explains why a route's start/goal pocket needs more than a
+ * single-cell exemption) through every reachable neighbour that is not
+ * itself 'blocked'/'void', stopping at (and not expanding past) the first
+ * clearance-*sufficient* cell in each direction — that cell needs no
+ * exemption of its own, it already passes `hasClearance` normally.
+ *
+ * Deliberately ignores occupancy and climbability: both are checked
+ * per-step by every caller already (`isImpassable`'s own occupancy check,
+ * `isStepClimbable` in `directLineWalk`/`findOrdinaryPath`), so folding them
+ * in here would either duplicate that work or silently exempt a cell from a
+ * check this function was never meant to touch. This purely traces which
+ * cells share the same clearance-insufficient island as (`x`, `z`) — capped
+ * at `CLEARANCE_POCKET_MAX_CELLS` so a pathological grid can't make a single
+ * `findPath` call unboundedly expensive.
+ */
+function computeClearancePocket(
+  grid: NavGrid,
+  x: number,
+  z: number,
+  requiredClearance: number,
+): Set<number> | null {
+  if (hasClearance(grid.cellAt(x, z), requiredClearance)) return null;
+
+  const pocket = new Set<number>();
+  const originIdx = cellIndex(grid, x, z);
+  pocket.add(originIdx);
+  const queue: number[] = [originIdx];
+
+  for (let head = 0; head < queue.length && pocket.size < CLEARANCE_POCKET_MAX_CELLS; head++) {
+    const { x: cx, z: cz } = cellCoords(grid, queue[head]!);
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
+      const nx = cx + dx;
+      const nz = cz + dz;
+      const neighbourCell = grid.cellAt(nx, nz);
+      if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+      if (hasClearance(neighbourCell, requiredClearance)) continue; // sufficient on its own — no exemption needed
+      const neighbourIdx = cellIndex(grid, nx, nz);
+      if (pocket.has(neighbourIdx)) continue;
+      pocket.add(neighbourIdx);
+      queue.push(neighbourIdx);
+      if (pocket.size >= CLEARANCE_POCKET_MAX_CELLS) break;
+    }
+  }
+
+  return pocket;
 }
 
 /** Octile distance heuristic. */
@@ -280,6 +371,8 @@ function directLineWalk(
   z1: number,
   avoidVehicles: boolean,
   requiredClearance: number,
+  startPocket: Set<number> | null,
+  goalPocket: Set<number> | null,
 ): PathResult | null {
   const dx = x1 - x0;
   const dz = z1 - z0;
@@ -304,7 +397,13 @@ function directLineWalk(
     const { x: clampedX, z: clampedZ } = clampToGrid(grid, cx, cz);
 
     const cell = grid.cellAt(clampedX, clampedZ)!;
-    if (isImpassable(cell, avoidVehicles, i === 0, requiredClearance)) return null;
+    // Clearance is skipped inside the start or goal pocket only — see
+    // isImpassable's/computeClearancePocket's own doc comments for why a
+    // route's first/last step(s) don't need the same driving-through
+    // clearance its in-transit cells do.
+    const idx = cellIndex(grid, clampedX, clampedZ);
+    const skipClearance = (startPocket?.has(idx) ?? false) || (goalPocket?.has(idx) ?? false);
+    if (isImpassable(cell, avoidVehicles, i === 0, requiredClearance, skipClearance)) return null;
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
     if (i > 0) {
@@ -694,6 +793,14 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const { avoidVehicles } = request;
   const requiredClearance = request.requiredClearance ?? NAV_CLEARANCE_EMPLOYEE_CELLS;
 
+  // Computed once per call and threaded through every clearance check below
+  // (start/goal pre-checks, the direct-line walk, and A*'s own neighbour
+  // expansion) — see computeClearancePocket's own doc comment. null (the
+  // overwhelmingly common case) when the start/goal cell already has
+  // sufficient clearance on its own.
+  const startPocket = computeClearancePocket(grid, sx, sz, requiredClearance);
+  const goalPocket = computeClearancePocket(grid, gx, gz, requiredClearance);
+
   // 2. Start impassable check (must precede start==goal check). isAgentCell:
   //    true — the agent is standing on this cell, so neither its base cell
   //    type/solidity nor its occupancy ever blocks it from pathing out.
@@ -704,9 +811,12 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
   // 3. Goal impassable check. isAgentCell only when the goal is the same
   //    cell as the start (the trivial already-there case below) — a distinct
-  //    goal cell's occupancy is a real obstacle.
+  //    goal cell's occupancy is a real obstacle. Clearance is always skipped
+  //    at the goal itself (skipClearance=true) — see isImpassable's own doc
+  //    comment: the destination is where a route is allowed to stop right
+  //    next to an obstacle, unlike every cell it drives through to get there.
   const goalCell = grid.cellAt(gx, gz)!;
-  if (isImpassable(goalCell, avoidVehicles, sx === gx && sz === gz, requiredClearance)) {
+  if (isImpassable(goalCell, avoidVehicles, sx === gx && sz === gz, requiredClearance, true)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
@@ -733,7 +843,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   //    cycling through the same handful of cells for 20+ ticks while
   //    findMultiLevelPath kept returning a *found* path every tick, just a
   //    detour nowhere near the goal.
-  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance);
+  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
   if (ordinary.found) return ordinary;
 
   // 6. Ordinary search found no connection at all — if start and goal sit on
@@ -782,11 +892,13 @@ function findOrdinaryPath(
   gz: number,
   avoidVehicles: boolean,
   requiredClearance: number,
+  startPocket: Set<number> | null,
+  goalPocket: Set<number> | null,
 ): PathResult {
   // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
-  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance);
+  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
   if (directLine !== null) {
     const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * MIN_WALKABLE_COST;
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
@@ -836,7 +948,11 @@ function findOrdinaryPath(
       const nz = cz + dz;
 
       const neighborCell = grid.cellAt(nx, nz);
-      if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance)) continue;
+      // Clearance is skipped inside the start or goal pocket only — see
+      // isImpassable's/computeClearancePocket's own doc comments.
+      const neighborIdxForPocket = cellIndex(grid, nx, nz);
+      const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
+      if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
       if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
 
@@ -860,7 +976,7 @@ function findOrdinaryPath(
   }
 
   // Budget exceeded or open set empty — try direct-line fallback
-  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance);
+  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
   if (fallback !== null) return fallback;
 
   return { found: false, waypoints: [], totalCost: 0 };

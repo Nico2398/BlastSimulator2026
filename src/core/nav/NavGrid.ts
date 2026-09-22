@@ -651,8 +651,16 @@ export class NavGrid {
       }
     }
 
-    for (let z = writeMinZ; z <= writeMaxZ; z++) {
-      for (let x = writeMinX; x <= writeMaxX; x++) {
+    // Write the whole padded seed box, not just the raw patch box: a cell in
+    // the halo (up to NAV_CLEARANCE_MAX_CELLS outside the patch) can have its
+    // clearance change too — e.g. a newly-blocked patch cell brings a nearer
+    // obstacle within range of a halo cell that itself wasn't touched. Writing
+    // only the unpadded patch box left every halo cell's clearance stale from
+    // whenever it was last inside some write box (originally the full-grid
+    // buildNavGrid), silently drifting wrong as later patches touched
+    // neighbouring regions without ever revisiting it.
+    for (let z = seedMinZ; z <= seedMaxZ; z++) {
+      for (let x = seedMinX; x <= seedMaxX; x++) {
         const cell = navGrid.cellAt(x, z);
         if (!cell) continue;
         const dist = distances.get(key(x, z));
