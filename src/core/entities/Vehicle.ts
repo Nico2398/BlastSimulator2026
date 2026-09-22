@@ -103,6 +103,13 @@ export function getAllVehicleRoles(): VehicleRole[] {
   return Object.keys(VEHICLE_DEFS) as VehicleRole[];
 }
 
+/** Required NavGrid cell clearance for `vehicle`'s role (#1154). */
+export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
+  // TODO: implement
+  void vehicle;
+  throw new Error('not implemented');
+}
+
 // ── Vehicle instance ──
 
 export interface Vehicle {

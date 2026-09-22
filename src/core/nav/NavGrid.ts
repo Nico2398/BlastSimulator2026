@@ -15,7 +15,12 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { isVehicleCurrentlyDriving } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
-import { NAV_BENCH_HEIGHT, NAV_MAX_SLOPE_RATIO, NAV_RAMP_MIN_SLOPE_DELTA } from '../config/balance.js';
+import {
+  NAV_BENCH_HEIGHT,
+  NAV_MAX_SLOPE_RATIO,
+  NAV_RAMP_MIN_SLOPE_DELTA,
+  NAV_CLEARANCE_EMPLOYEE_CELLS,
+} from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
@@ -103,6 +108,26 @@ export interface NavCell {
    * `surfaceY` (#953).
    */
   climbY?: number;
+  /**
+   * Chebyshev-cell distance to the nearest non-traversable ('blocked'/'void')
+   * cell, capped at `NAV_CLEARANCE_MAX_CELLS` — recomputed only over patched
+   * regions (plus a halo) by `buildNavGrid`/`patchNavGrid` (#1154). Optional,
+   * like `surfaceY`/`climbY`: `undefined` means unconstrained, for hand-built
+   * test fixtures that don't model clearance.
+   */
+  clearance?: number;
+}
+
+/**
+ * True when `cell` has clearance at least `requiredClearance` — a cell with
+ * no `clearance` recorded (hand-built test fixtures) is treated as
+ * unconstrained (#1154).
+ */
+export function hasClearance(cell: NavCell | undefined, requiredClearance: number): boolean {
+  // TODO: implement
+  void cell;
+  void requiredClearance;
+  throw new Error('not implemented');
 }
 
 /**
@@ -472,18 +497,30 @@ export class NavGrid {
   /**
    * Compute the set of all cells 8-directionally path-connected to
    * (anchorX, anchorZ). See NavGridReachability.computeReachableSet for the
-   * full doc.
+   * full doc. `requiredClearance` (#1154) defaults to
+   * `NAV_CLEARANCE_EMPLOYEE_CELLS`.
    */
-  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
-    return reachability.computeReachableSet(navGrid, anchorX, anchorZ);
+  static computeReachableSet(
+    navGrid: NavGrid,
+    anchorX: number,
+    anchorZ: number,
+    requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  ): reachability.ReachableSet {
+    return reachability.computeReachableSet(navGrid, anchorX, anchorZ, requiredClearance);
   }
 
   /**
    * `computeReachableSet` with findPath's own per-step climb gate applied.
    * See NavGridReachability.computeClimbReachableSet for the full doc.
+   * `requiredClearance` (#1154) defaults to `NAV_CLEARANCE_EMPLOYEE_CELLS`.
    */
-  static computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
-    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ);
+  static computeClimbReachableSet(
+    navGrid: NavGrid,
+    anchorX: number,
+    anchorZ: number,
+    requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  ): reachability.ReachableSet {
+    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ, requiredClearance);
   }
 
   /**
@@ -547,6 +584,30 @@ export class NavGrid {
       }
     }
     return 'walkable';
+  }
+
+  /**
+   * Recompute `NavCell.clearance` for every cell in `[minX, maxX] x [minZ,
+   * maxZ]` — called by `buildNavGrid` over the whole grid and by
+   * `patchNavGrid` over the patched region plus a halo (#1154), since a
+   * clearance value near the patch boundary can change even for cells
+   * outside the patch itself.
+   */
+  private static recomputeClearanceRegion(navGrid: NavGrid, minX: number, maxX: number, minZ: number, maxZ: number): void {
+    // TODO: implement
+    void navGrid;
+    void minX;
+    void maxX;
+    void minZ;
+    void maxZ;
+    throw new Error('not implemented');
+  }
+
+  // Not yet called from buildNavGrid/patchNavGrid (#1154 — implementer's
+  // job); referenced here only so the stub above isn't flagged as an unused
+  // private member under this project's strict tsconfig.
+  static {
+    void NavGrid.recomputeClearanceRegion;
   }
 
   /**
