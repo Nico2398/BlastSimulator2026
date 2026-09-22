@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, isStepClimbable, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, isStepClimbable, hasClearance, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   VoxelGrid,
   type VoxelData,
@@ -26,7 +26,11 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
-import { NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_DEGREES, NAV_RAMP_MIN_SLOPE_DELTA, NAV_BENCH_HEIGHT } from '../../../src/core/config/balance.js';
+import {
+  NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_DEGREES, NAV_RAMP_MIN_SLOPE_DELTA, NAV_BENCH_HEIGHT,
+  NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
+} from '../../../src/core/config/balance.js';
+import { RAMP_WIDTH } from '../../../src/core/mining/Ramp.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createVehicleState, purchaseVehicle, isVehicleCurrentlyDriving, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
@@ -90,6 +94,15 @@ function makeSingleColumnGrid(
     grid.setVoxel(cx, y, cz, solidVoxel());
   }
   return grid;
+}
+
+/**
+ * Clear every voxel in column (cx, cz) from y=0..maxY, turning the column
+ * void — the simplest way to place a single non-traversable obstacle cell
+ * without a building footprint, none of which are 1×1 (#1154).
+ */
+function clearColumn(grid: VoxelGrid, cx: number, cz: number, maxY: number): void {
+  for (let y = 0; y <= maxY; y++) grid.clearVoxel(cx, y, cz);
 }
 
 /** Convert a NavGrid to a flat map of (x,z) → type for easy inspection. */
@@ -2048,5 +2061,179 @@ describe('NavGrid.buildNavGrid — a currently-driving vehicle does not mark its
     const nav = NavGrid.buildNavGrid(grid, [], [], [], [vehicle], [driver]);
 
     expect(nav.cellAt(7, 7)!.vehicleOccupied).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 12: clearance field (#1154)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('clearance field (#1154)', () => {
+  describe('buildNavGrid — flat open grid', () => {
+    it('every walkable cell reads clearance === NAV_CLEARANCE_MAX_CELLS when nothing blocks the grid', () => {
+      const grid = makeSolidGrid(7, 10, 7, 4);
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+      for (let z = 0; z < 7; z++) {
+        for (let x = 0; x < 7; x++) {
+          expect(nav.cellAt(x, z)!.clearance).toBe(NAV_CLEARANCE_MAX_CELLS);
+        }
+      }
+    });
+  });
+
+  describe('buildNavGrid — single blocked cell surrounded by open cells', () => {
+    it('the blocked cell itself reads clearance === 0, its 8 immediate neighbours read 1, and a Chebyshev-distance-2 cell reads the capped value', () => {
+      const grid = makeSolidGrid(11, 10, 11, 4);
+      clearColumn(grid, 5, 5, 4); // (5,5) becomes void — the lone obstacle
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      expect(nav.cellAt(5, 5)!.clearance).toBe(0);
+
+      for (const [dx, dz] of [
+        [-1, -1], [0, -1], [1, -1],
+        [-1, 0], [1, 0],
+        [-1, 1], [0, 1], [1, 1],
+      ] as const) {
+        expect(nav.cellAt(5 + dx, 5 + dz)!.clearance).toBe(1);
+      }
+
+      // (7,5) sits at Chebyshev distance 2 from the obstacle.
+      expect(nav.cellAt(7, 5)!.clearance).toBe(Math.min(2, NAV_CLEARANCE_MAX_CELLS));
+    });
+  });
+
+  describe('buildNavGrid — 1-cell-wide corridor between two blocked walls', () => {
+    it('the corridor cell reads clearance === 1', () => {
+      // x=1 and x=3 are void walls; x=2 is the 1-cell-wide corridor between them.
+      const grid = makeSolidGrid(5, 10, 7, 4);
+      clearColumn(grid, 1, 3, 4);
+      clearColumn(grid, 3, 3, 4);
+      // Repeat the wall down every row so the interior corridor cell tested
+      // below is bounded on both sides, not just at z=3.
+      for (let z = 0; z < 7; z++) {
+        clearColumn(grid, 1, z, 4);
+        clearColumn(grid, 3, z, 4);
+      }
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      expect(nav.cellAt(2, 3)!.clearance).toBe(1);
+    });
+  });
+
+  describe('buildNavGrid — RAMP_WIDTH-wide (3-cell) corridor between two blocked walls', () => {
+    it('edge columns read 1, the centre column reads the capped value', () => {
+      expect(RAMP_WIDTH).toBe(3);
+      // x=1 and x=5 are void walls; x=2,3,4 (width RAMP_WIDTH) is the corridor.
+      const grid = makeSolidGrid(7, 10, 7, 4);
+      for (let z = 0; z < 7; z++) {
+        clearColumn(grid, 1, z, 4);
+        clearColumn(grid, 5, z, 4);
+      }
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      expect(nav.cellAt(2, 3)!.clearance).toBe(1);
+      expect(nav.cellAt(4, 3)!.clearance).toBe(1);
+      expect(nav.cellAt(3, 3)!.clearance).toBe(Math.min(2, NAV_CLEARANCE_MAX_CELLS));
+    });
+  });
+
+  describe('patchNavGrid — clearance recompute is local: patch region + halo, not the whole grid', () => {
+    it('updates clearance inside the patch, bleeds into the halo, and leaves cells beyond the halo untouched', () => {
+      const grid = makeSolidGrid(20, 10, 20, 4);
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      // Sanity: fully open grid, every cell at the cap.
+      expect(nav.cellAt(8, 7)!.clearance).toBe(NAV_CLEARANCE_MAX_CELLS);
+      expect(nav.cellAt(12, 7)!.clearance).toBe(NAV_CLEARANCE_MAX_CELLS);
+
+      // Plant an obviously-wrong sentinel on a cell far from the coming patch
+      // (Chebyshev distance 5 from (7,7), farther than the 2*NAV_CLEARANCE_MAX_CELLS
+      // halo) — if patchNavGrid ever touches it, the sentinel will be gone.
+      nav.cellAt(12, 7)!.clearance = -999;
+
+      // Newly block a previously-open column at (7,7).
+      clearColumn(grid, 7, 7, 4);
+      const region: BlastRegion = { minX: 7, maxX: 7, minZ: 7, maxZ: 7 };
+      NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+      // (a) Inside the patch region: the newly-blocked cell reads 0.
+      expect(nav.cellAt(7, 7)!.clearance).toBe(0);
+
+      // (b) Just outside the patch bounds but within the halo (Chebyshev
+      // distance 1 from the new obstacle): clearance drops from the cap to 1.
+      expect(nav.cellAt(8, 7)!.clearance).toBe(1);
+
+      // (c) Farther than the halo: the sentinel survives, proving the
+      // recompute never reached this cell.
+      expect(nav.cellAt(12, 7)!.clearance).toBe(-999);
+    });
+  });
+
+  describe('patchNavGrid — narrow-then-widen a corridor (blast narrows, then a later patch widens it back)', () => {
+    it('clearance at the choke drops to 1 when narrowed, then recovers to 2 when widened back', () => {
+      // x=1 and x=5 are void walls; x=2,3,4 is a RAMP_WIDTH-wide (3-cell) corridor.
+      const grid = makeSolidGrid(7, 10, 7, 4);
+      for (let z = 0; z < 7; z++) {
+        clearColumn(grid, 1, z, 4);
+        clearColumn(grid, 5, z, 4);
+      }
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+      expect(nav.cellAt(3, 3)!.clearance).toBe(Math.min(2, NAV_CLEARANCE_MAX_CELLS));
+
+      // Patch #1: block both edge columns of the corridor at z=3, narrowing
+      // it down to a 1-wide choke at (3,3).
+      clearColumn(grid, 2, 3, 4);
+      clearColumn(grid, 4, 3, 4);
+      const narrowRegion: BlastRegion = { minX: 2, maxX: 4, minZ: 3, maxZ: 3 };
+      NavGrid.patchNavGrid(nav, grid, [], [], narrowRegion);
+      expect(nav.cellAt(3, 3)!.clearance).toBe(1);
+
+      // Patch #2: restore the corridor to full RAMP_WIDTH by re-solidifying
+      // the two edge columns at z=3.
+      for (let y = 0; y <= 4; y++) {
+        grid.setVoxel(2, y, 3, solidVoxel());
+        grid.setVoxel(4, y, 3, solidVoxel());
+      }
+      NavGrid.patchNavGrid(nav, grid, [], [], narrowRegion);
+      expect(nav.cellAt(3, 3)!.clearance).toBe(Math.min(2, NAV_CLEARANCE_MAX_CELLS));
+    });
+  });
+
+  describe('hasClearance', () => {
+    const baseCell = (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+
+    it('returns false for an undefined cell', () => {
+      expect(hasClearance(undefined, NAV_CLEARANCE_EMPLOYEE_CELLS)).toBe(false);
+    });
+
+    it('returns true when cell.clearance is undefined (unconstrained hand-built fixture)', () => {
+      const cell = baseCell();
+      expect(cell.clearance).toBeUndefined();
+      expect(hasClearance(cell, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(true);
+    });
+
+    it('returns true when clearance exactly equals requiredClearance (inclusive boundary)', () => {
+      const cell = { ...baseCell(), clearance: NAV_CLEARANCE_VEHICLE_CELLS };
+      expect(hasClearance(cell, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(true);
+    });
+
+    it('returns false when clearance is exactly one below requiredClearance', () => {
+      const cell = { ...baseCell(), clearance: NAV_CLEARANCE_VEHICLE_CELLS - 1 };
+      expect(hasClearance(cell, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(false);
+    });
+  });
+
+  describe('boundary — grid-edge cell is not penalized by a missing off-grid neighbour', () => {
+    it('a corner cell of a fully open grid reads the same clearance cap as an interior cell', () => {
+      const grid = makeSolidGrid(5, 10, 5, 4);
+      const nav = NavGrid.buildNavGrid(grid, [], []);
+
+      const corner = nav.cellAt(0, 0)!.clearance;
+      const interior = nav.cellAt(2, 2)!.clearance;
+
+      expect(corner).toBe(NAV_CLEARANCE_MAX_CELLS);
+      expect(interior).toBe(NAV_CLEARANCE_MAX_CELLS);
+      expect(corner).toBe(interior);
+    });
   });
 });

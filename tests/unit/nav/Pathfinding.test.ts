@@ -15,7 +15,10 @@
 import { describe, it, expect } from 'vitest';
 import { findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
-import { NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
+import {
+  NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
+} from '../../../src/core/config/balance.js';
+import { RAMP_WIDTH } from '../../../src/core/mining/Ramp.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -1504,5 +1507,180 @@ describe('findPath — agrees with climb-aware reachability on a long detour (#1
     }
 
     expect(disagreements).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 17: clearance-aware pathfinding (#1154)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('clearance-aware pathfinding (#1154)', () => {
+  /**
+   * Builds a 5-row grid with a wall of 'blocked' cells at z=2 spanning
+   * [wallMinX, wallMaxX] (inclusive), leaving a single open cell at gapX
+   * whose clearance is hand-set to gapClearance. Columns outside
+   * [wallMinX, wallMaxX] at z=2 (if any) stay 'walkable', unconstrained
+   * (no clearance set) — a bypass route around the wall's own ends.
+   */
+  function makeGapWallGrid(
+    width: number,
+    wallMinX: number,
+    wallMaxX: number,
+    gapX: number,
+    gapClearance: number,
+  ): NavGrid {
+    const grid = makeFlatGrid(width, 5, 'walkable');
+    for (let x = wallMinX; x <= wallMaxX; x++) {
+      if (x === gapX) {
+        setCell(grid, x, 2, 'walkable', { clearance: gapClearance });
+      } else {
+        setCell(grid, x, 2, 'blocked');
+      }
+    }
+    return grid;
+  }
+
+  it('an employee (default/explicit NAV_CLEARANCE_EMPLOYEE_CELLS) finds a route straight through a 1-cell gap', () => {
+    // Wall spans the full grid width — the gap is the only way through.
+    const grid = makeGapWallGrid(7, 0, 6, 3, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    const result = findPath(grid, { agentId: 1, fromX: 3, fromZ: 0, toX: 3, toZ: 4, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 3 && wp.z === 2)).toBe(true);
+
+    const explicit = findPath(grid, {
+      agentId: 1, fromX: 3, fromZ: 0, toX: 3, toZ: 4, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_EMPLOYEE_CELLS,
+    });
+    expect(explicit.found).toBe(true);
+    expect(explicit.waypoints.some(wp => wp.x === 3 && wp.z === 2)).toBe(true);
+  });
+
+  it('a vehicle (NAV_CLEARANCE_VEHICLE_CELLS) refuses the too-narrow gap and takes the longer route around instead, when one exists', () => {
+    // Wall spans x=1..5 only — x=0 and x=6 stay open at z=2, giving a
+    // detour around the wall's own ends that the 1-cell gap at x=3 (too
+    // narrow for a vehicle) is not.
+    const grid = makeGapWallGrid(7, 1, 5, 3, 1);
+    const result = findPath(grid, {
+      agentId: 1, fromX: 3, fromZ: 0, toX: 3, toZ: 4, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+    });
+    expect(result.found).toBe(true);
+    // The narrow gap is never used...
+    expect(result.waypoints.some(wp => wp.x === 3 && wp.z === 2)).toBe(false);
+    // ...forcing a real detour, not the short 2-step crossing the gap would be.
+    expect(result.totalCost).toBeGreaterThan(2);
+  });
+
+  it('a vehicle (NAV_CLEARANCE_VEHICLE_CELLS) reports found: false when the gap is the only way through and too narrow', () => {
+    // Wall spans the full grid width this time — no bypass exists.
+    const grid = makeGapWallGrid(7, 0, 6, 3, 1);
+    const result = findPath(grid, {
+      agentId: 1, fromX: 3, fromZ: 0, toX: 3, toZ: 4, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+    });
+    expect(result.found).toBe(false);
+  });
+
+  it('a RAMP_WIDTH-wide (3-cell) gap forces a vehicle through the centre column, not either edge column', () => {
+    expect(RAMP_WIDTH).toBe(3);
+    // Wall at z=2 spans the full width except x=2,3,4 (RAMP_WIDTH cells).
+    // Edge columns (2 and 4) carry insufficient clearance for a vehicle;
+    // only the centre column (3) carries enough.
+    const grid = makeFlatGrid(7, 5, 'walkable');
+    for (let x = 0; x < 7; x++) {
+      if (x === 2 || x === 4) {
+        setCell(grid, x, 2, 'walkable', { clearance: NAV_CLEARANCE_VEHICLE_CELLS - 1 });
+      } else if (x === 3) {
+        setCell(grid, x, 2, 'walkable', { clearance: NAV_CLEARANCE_VEHICLE_CELLS });
+      } else {
+        setCell(grid, x, 2, 'blocked');
+      }
+    }
+
+    // Start/goal offset so the geometrically-shortest, clearance-blind route
+    // would cross the wall at x=2 (an edge column) — only the clearance gate
+    // forces the detour to x=3, the centre column.
+    const result = findPath(grid, {
+      agentId: 1, fromX: 1, fromZ: 0, toX: 2, toZ: 4, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+    });
+
+    expect(result.found).toBe(true);
+    const crossings = result.waypoints.filter(wp => wp.z === 2);
+    expect(crossings.length).toBeGreaterThan(0);
+    for (const crossing of crossings) {
+      expect(crossing.x).toBe(3);
+    }
+  });
+
+  describe('isImpassable — clearance gating (#1154)', () => {
+    it('a cell with insufficient clearance is impassable for a high requiredClearance and passable for a low one', () => {
+      const cell = makeCell('walkable');
+      cell.clearance = 1;
+      expect(isImpassable(cell, false, false, 2)).toBe(true);
+      expect(isImpassable(cell, false, false, 1)).toBe(false);
+    });
+
+    it('isAgentCell bypasses insufficient clearance, the same way it already bypasses blocked/void/occupancy', () => {
+      const cell = makeCell('walkable');
+      cell.clearance = 0;
+      expect(isImpassable(cell, false, true, 5)).toBe(false);
+    });
+
+    it('a cell with clearance exactly equal to requiredClearance is passable (inclusive boundary)', () => {
+      const cell = makeCell('walkable');
+      cell.clearance = NAV_CLEARANCE_VEHICLE_CELLS;
+      expect(isImpassable(cell, false, false, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(false);
+    });
+
+    it('a cell with no clearance recorded (undefined) is treated as unconstrained, passable at any requiredClearance', () => {
+      const cell = makeCell('walkable');
+      expect(cell.clearance).toBeUndefined();
+      expect(isImpassable(cell, false, false, NAV_CLEARANCE_VEHICLE_CELLS + 5)).toBe(false);
+    });
+  });
+
+  it('regression: a multi-level ramp crossing still resolves with NAV_CLEARANCE_VEHICLE_CELLS threaded through findSingleHopRoute/findChainedRoute', () => {
+    // Same fixture as "finds a path between different bench levels connected
+    // by a ramp" (Group 11) — none of these hand-built cells carry a
+    // `clearance` field, so they stay unconstrained regardless of the
+    // requested clearance; this proves the parameter threads through the
+    // multi-level machinery without breaking the existing route, not that
+    // clearance itself gates a ramp crossing (a real, buildNavGrid-derived
+    // grid's ramp cells getting an explicit clearance value is covered by
+    // NavGrid.test.ts).
+    const grid = makeTwoLevelGrid(10, 10, 4);
+    for (let x = 0; x < 10; x++) {
+      if (x !== 5) {
+        grid.cells[4]![x] = makeCell('void', 0);
+      }
+    }
+    grid.cells[4]![5] = makeCell('ramp', 0);
+    grid.cells[3]![5] = makeCell('walkable', 0);
+    grid.cells[5]![5] = makeCell('walkable', 1);
+
+    const result = findPath(grid, {
+      agentId: 1, fromX: 0, fromZ: 0, toX: 0, toZ: 9, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.waypoints.some(wp => wp.x === 5 && wp.z === 4)).toBe(true);
+  });
+
+  it('boundary: requiredClearance at exactly NAV_CLEARANCE_MAX_CELLS behaves identically to a request well above the cap, on a fixture that never records a clearance above it', () => {
+    // Same fixture as "routes around a single blocked cell" (Group 2) — no
+    // cell here carries a `clearance` field, so nothing in the grid can ever
+    // exceed the cap; the field never distinguishes a requiredClearance of
+    // exactly the cap from one further above it.
+    const grid = makeFlatGrid(10, 3, 'walkable');
+    setCell(grid, 5, 1, 'blocked');
+    const request = { agentId: 1, fromX: 0, fromZ: 1, toX: 9, toZ: 1, avoidVehicles: false };
+
+    const atCap = findPath(grid, { ...request, requiredClearance: NAV_CLEARANCE_MAX_CELLS });
+    const aboveCap = findPath(grid, { ...request, requiredClearance: NAV_CLEARANCE_MAX_CELLS + 5 });
+
+    expect(atCap.found).toBe(true);
+    expect(aboveCap).toEqual(atCap);
   });
 });

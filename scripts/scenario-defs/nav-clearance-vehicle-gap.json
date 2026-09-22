@@ -1,0 +1,215 @@
+{
+  "name": "nav-clearance-vehicle-gap",
+  "description": "#1154: NavGrid.NavCell.clearance gates a vehicle out of a 1-cell-wide gap an employee on foot can still use. Two management_office T1 buildings (2x2 footprint each) are placed at (20,20) and (23,20), leaving exactly one open column at x=22 between their east/west edges — a doorway wide enough for NAV_CLEARANCE_EMPLOYEE_CELLS (1) but narrower than NAV_CLEARANCE_VEHICLE_CELLS (2). An employee dispatched on foot from the west side (18,20) to the east side (25,20) crosses through that column. A second employee, dispatched the same way but mounted on a debris_hauler (`employee dispatch ... vehicle:debris_hauler`, which routes through Pathfinding.findPath with the vehicle's own requiredClearance via Vehicle.vehicleRequiredClearanceCells), must detour around one end of the building pair instead — the gap column itself is impassable to it. Every crossing is proven via `pendingActionCount` returning to 0 within a bounded `wait_until` (no per-entity x/z field exists in the state-dump schema to assert final position directly, so arrival is what `pendingActionCount` reaching 0 for a `general_work` dispatch already proves elsewhere in this suite, e.g. level-ground-then-build.json's identical pattern) — this file cannot yet assert the DETOUR itself, only that both crossings still complete; the exact route difference is what tests/unit/nav/Pathfinding.test.ts's own 'clearance-aware pathfinding (#1154)' suite proves against PathResult.waypoints directly, which this console-driven scenario has no equivalent field for. Before #1154 lands, requiredClearance is not gated at all, so both crossings simply take the short route and this file's own wait_until bounds all pass trivially; nothing here can fail red until the feature exists to narrow the gap.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true cash:200000",
+      "description": "cash:200000 (default staffed cash is $50,000): two management_office orders cost $16,000 combined, and the roster's staffed payroll (PAY_CYCLE_TICKS) drains steadily across the ~250+ ticks the two construction orders and four dispatch crossings below cost in total — a run that goes bankrupt mid-scenario is a defect in the fixture, not a legitimate outcome for a scenario that isn't testing bankruptcy.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true cash:200000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "employeeCount": 5,
+          "vehicleCount": 4,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build management_office at:20,20",
+      "description": "West wall of the doorway: management_office T1's 2x2 footprint covers (20,20)-(21,21). Real BuildMenu click flow — role: player, per level-ground-then-build.json's identical pattern.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "build management_office at:23,20",
+      "description": "East wall of the doorway: management_office T1's 2x2 footprint covers (23,20)-(24,21). Leaves exactly column x=22 (rows z=20-21) open between the two buildings — the 1-cell-wide gap.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 23,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:150",
+      "description": "Drain both queued construction orders — the staffed roster has no skill gate on place_building (requiredSkill: null), so whichever idle employee reaches each site first builds it.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 150,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee dispatch 1 x:18 z:20",
+      "description": "Pre-position driller #1 on the west side of the doorway, on foot — `employee dispatch` has no UI equivalent (BOOTSTRAP_COMMAND_ALLOWLIST), matching vehicle-traffic.json's `vehicle driver` bootstrap pattern.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:18 z:20"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:150",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 150,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee dispatch 1 x:25 z:20",
+      "description": "Employee case: cross the doorway on foot from (18,20) to (25,20) — requiredClearance defaults to NAV_CLEARANCE_EMPLOYEE_CELLS (1) inside findPath, which the x=22 gap column satisfies, so the short straight route through it stays legal.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:25 z:20"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:150",
+      "description": "Proves the foot crossing completes — the general_work action drains from pendingActionCount only once employee #1 has both arrived and finished the token work at the target. No per-entity x/z field exists in the state-dump schema (GAME_STATE_SCHEMA) to assert the final (25,20) position directly; this is the same proof-of-arrival level-ground-then-build.json's own wait_until step relies on for a dispatched worker.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 150,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee dispatch 3 x:18 z:21 vehicle:debris_hauler",
+      "description": "Pre-position driver #3 (driving.truck-qualified, per STARTING_SITE_STAFFED_COMPOSITION) on the west side, mounted on the staffed debris_hauler — `vehicle:debris_hauler` on `employee dispatch` routes the itinerary through boarding it first, no separate `vehicle driver` bootstrap needed (confirmed live: the console accepts this in one command).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:18 z:21 vehicle:debris_hauler"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:150",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 150,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee dispatch 3 x:25 z:21 vehicle:debris_hauler",
+      "description": "Vehicle case: cross from (18,21) to (25,21) mounted on the debris_hauler — requiredClearance is Vehicle.vehicleRequiredClearanceCells(vehicle) = NAV_CLEARANCE_VEHICLE_CELLS (2), which the x=22 gap column (clearance 1, one cell from each building wall) does not satisfy. Once #1154 gates isImpassable on clearance, this crossing can no longer use the gap and must detour around one end of the building pair instead.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:25 z:21 vehicle:debris_hauler"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:250",
+      "description": "Proves the mounted crossing still completes even though the direct gap is closed to it — a looser tick budget than the foot crossing's, since a real detour around the building pair is a longer route than the straight line through the doorway. Same proof-of-arrival limitation as the foot-crossing step above: no per-entity x/z field exists to assert (25,21) directly, or to assert the detour's shape — that belongs to tests/unit/nav/Pathfinding.test.ts's 'clearance-aware pathfinding (#1154)' suite, which reads PathResult.waypoints directly.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 250,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "state full",
+      "description": "Final state dump for inspection.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}
