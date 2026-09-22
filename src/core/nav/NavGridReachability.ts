@@ -7,8 +7,9 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid } from './NavGrid.js';
-import { isStepClimbable, isCellOccupied } from './NavGrid.js';
+import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
+import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -233,8 +234,13 @@ const EMPTY_REACHABLE_SET: ReachableSet = { has: () => false, size: 0 };
  * `{anchor}` — every other cell reached by the flood fill still passes the
  * ordinary per-neighbour traversability/occupancy checks unchanged.
  */
-export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
-  return reachableSetFrom(navGrid, anchorX, anchorZ, false);
+export function computeReachableSet(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): ReachableSet {
+  return reachableSetFrom(navGrid, anchorX, anchorZ, false, requiredClearance);
 }
 
 /**
@@ -250,22 +256,33 @@ export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: 
  * never spend the bounded real-pathfind attempts meant for candidates that
  * can actually resolve.
  */
-export function computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
+export function computeClimbReachableSet(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): ReachableSet {
   // Clamped, unlike computeReachableSet's raw anchor: callers pass a live
   // agent position, and an agent standing on the site's outer border rounds
   // to a coordinate one past the last cell. Left unclamped that reads as
   // "anchor not traversable" and returns the empty set — which, for the one
   // caller this exists for, silently filters out every candidate action and
   // leaves the agent idle for the rest of the game.
-  return reachableSetFrom(navGrid, navGrid.clampX(anchorX), navGrid.clampZ(anchorZ), true);
+  return reachableSetFrom(navGrid, navGrid.clampX(anchorX), navGrid.clampZ(anchorZ), true, requiredClearance);
 }
 
-function reachableSetFrom(navGrid: NavGrid, anchorX: number, anchorZ: number, climbAware: boolean): ReachableSet {
+function reachableSetFrom(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+  climbAware: boolean,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): ReachableSet {
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
   if (!navGrid.cellAt(ax, az)) return EMPTY_REACHABLE_SET;
 
-  const { width, height, count } = floodFillReachable(navGrid, ax, az, climbAware);
+  const { width, height, count } = floodFillReachable(navGrid, ax, az, climbAware, false, requiredClearance);
   const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
@@ -537,6 +554,7 @@ function floodFillReachable(
   anchorZ: number,
   climbAware: boolean = false,
   avoidOccupancy: boolean = false,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
@@ -568,6 +586,7 @@ function floodFillReachable(
       if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
       if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
+      if (!hasClearance(neighbourCell, requiredClearance)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }

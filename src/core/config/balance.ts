@@ -807,6 +807,15 @@ const RAMP_CUT_SLOPE_MARGIN = 0.98;
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;
 
+/** Required clearance, in cells, for an employee on foot (#1154). */
+export const NAV_CLEARANCE_EMPLOYEE_CELLS = 1;
+
+/** Required clearance, in cells, for a vehicle (#1154). */
+export const NAV_CLEARANCE_VEHICLE_CELLS = 2;
+
+/** Cap on `NavCell.clearance` — the widest clearance any consumer needs to distinguish (#1154). */
+export const NAV_CLEARANCE_MAX_CELLS = Math.max(NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS);
+
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 
 /** Productivity well-being multiplier from Living Quarters by tier (and absent). */

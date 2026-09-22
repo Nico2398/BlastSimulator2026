@@ -81,6 +81,28 @@ export function findNearestReachableFragment(
 ): number | null {
   if (!state.navGrid) return null;
 
+  // Plain (employee-clearance) connectivity, not the vehicle's own required
+  // clearance (#1154 follow-up): this is a cheap candidate pre-filter, not
+  // the correctness gate — the real drive route is validated for real by
+  // findPath (via planFragmentTaskItinerary -> estimateLegDistance ->
+  // findExactPath), which does thread the vehicle's requiredClearance
+  // through, exempted near its own specific goal cell (isImpassable's doc
+  // comment). Gating candidate selection on vehicle clearance too was tried
+  // and reverted: `hasClearance`'s Chebyshev-distance-to-nearest-obstacle
+  // metric can't tell "pinched between two obstacles" (a real bottleneck)
+  // apart from "running alongside a single wall/slope with open ground on
+  // every other side" (not a bottleneck at all) — and a fresh blast crater's
+  // debris routinely lands hugging a building or a bench-level edge for
+  // several cells at a stretch, not just the one cell nearest it. Filtering
+  // candidates on vehicle clearance here turned that ordinary, perfectly
+  // driveable hugging into almost every fragment reading entirely
+  // unreachable (confirmed live: 504 on-ground fragments, 3 of them
+  // clearance-reachable, on tutorial_pit's own post-blast crater). A
+  // genuinely too-narrow candidate is rarer and self-corrects for free: this
+  // pre-filter picking it just costs one wasted findPath attempt before the
+  // real gate refuses it and the task stays queued for a later retry, same
+  // "stays queued, retries next tick" contract PlanItinerary.ts already
+  // documents for every other planning failure.
   const reachable = NavGrid.computeClimbReachableSet(state.navGrid, originX, originZ);
   if (reachable.size === 0) return null;
 

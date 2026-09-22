@@ -13,12 +13,13 @@ import {
   getVehicleReservation,
   findVehicleReservedForAction,
   resolveVehicleDriver,
+  vehicleRequiredClearanceCells,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
-import { VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { board, alight } from '../../../src/core/engine/Mount.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
@@ -1738,5 +1739,49 @@ describe('findBestEvacuationDriver', () => {
     const best = findBestEvacuationDriver(vehicle, vs, es, [second.id, first.id], alwaysReach);
 
     expect(best?.id).toBe(first.id);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// vehicleRequiredClearanceCells (#1154)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('vehicleRequiredClearanceCells (#1154)', () => {
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for a debris_hauler', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+  });
+
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for a rock_digger', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_digger');
+    expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+  });
+
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for a drill_rig', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'drill_rig');
+    expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+  });
+
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for a building_destroyer', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'building_destroyer');
+    expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+  });
+
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for a rock_fragmenter', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
+    expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+  });
+
+  it('returns NAV_CLEARANCE_VEHICLE_CELLS for every registered role, exhaustively, regardless of tier', () => {
+    const vs = createVehicleState();
+    for (const role of ALL_ROLES) {
+      const { vehicle } = purchaseVehicle(vs, role, 0, 0, 3);
+      expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
+    }
   });
 });

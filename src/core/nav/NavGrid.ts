@@ -15,8 +15,15 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import { isVehicleCurrentlyDriving } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
-import { NAV_BENCH_HEIGHT, NAV_MAX_SLOPE_RATIO, NAV_RAMP_MIN_SLOPE_DELTA } from '../config/balance.js';
+import {
+  NAV_BENCH_HEIGHT,
+  NAV_MAX_SLOPE_RATIO,
+  NAV_RAMP_MIN_SLOPE_DELTA,
+  NAV_CLEARANCE_EMPLOYEE_CELLS,
+  NAV_CLEARANCE_MAX_CELLS,
+} from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
+import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -103,6 +110,25 @@ export interface NavCell {
    * `surfaceY` (#953).
    */
   climbY?: number;
+  /**
+   * Chebyshev-cell distance to the nearest non-traversable ('blocked'/'void')
+   * cell, capped at `NAV_CLEARANCE_MAX_CELLS` — recomputed only over patched
+   * regions (plus a halo) by `buildNavGrid`/`patchNavGrid` (#1154). Optional,
+   * like `surfaceY`/`climbY`: `undefined` means unconstrained, for hand-built
+   * test fixtures that don't model clearance.
+   */
+  clearance?: number;
+}
+
+/**
+ * True when `cell` has clearance at least `requiredClearance` — a cell with
+ * no `clearance` recorded (hand-built test fixtures) is treated as
+ * unconstrained (#1154).
+ */
+export function hasClearance(cell: NavCell | undefined, requiredClearance: number): boolean {
+  if (!cell) return false;
+  if (cell.clearance === undefined) return true;
+  return cell.clearance >= requiredClearance;
 }
 
 /**
@@ -360,6 +386,10 @@ export class NavGrid {
       if (cell) cell.vehicleOccupied = true;
     }
 
+    NavGrid.recomputeClearanceRegion(
+      navGrid, originX, originX + width - 1, originZ, originZ + height - 1,
+    );
+
     return navGrid;
   }
 
@@ -435,6 +465,8 @@ export class NavGrid {
         navGrid.maxClimbY = freshMaxVoxelY;
       }
     }
+
+    NavGrid.recomputeClearanceRegion(navGrid, minX, maxX, minZ, maxZ);
   }
 
   /**
@@ -472,18 +504,30 @@ export class NavGrid {
   /**
    * Compute the set of all cells 8-directionally path-connected to
    * (anchorX, anchorZ). See NavGridReachability.computeReachableSet for the
-   * full doc.
+   * full doc. `requiredClearance` (#1154) defaults to
+   * `NAV_CLEARANCE_EMPLOYEE_CELLS`.
    */
-  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
-    return reachability.computeReachableSet(navGrid, anchorX, anchorZ);
+  static computeReachableSet(
+    navGrid: NavGrid,
+    anchorX: number,
+    anchorZ: number,
+    requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  ): reachability.ReachableSet {
+    return reachability.computeReachableSet(navGrid, anchorX, anchorZ, requiredClearance);
   }
 
   /**
    * `computeReachableSet` with findPath's own per-step climb gate applied.
    * See NavGridReachability.computeClimbReachableSet for the full doc.
+   * `requiredClearance` (#1154) defaults to `NAV_CLEARANCE_EMPLOYEE_CELLS`.
    */
-  static computeClimbReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
-    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ);
+  static computeClimbReachableSet(
+    navGrid: NavGrid,
+    anchorX: number,
+    anchorZ: number,
+    requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  ): reachability.ReachableSet {
+    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ, requiredClearance);
   }
 
   /**
@@ -547,6 +591,100 @@ export class NavGrid {
       }
     }
     return 'walkable';
+  }
+
+  /**
+   * Recompute `NavCell.clearance` for every cell in `[minX, maxX] x [minZ,
+   * maxZ]` plus a one-`NAV_CLEARANCE_MAX_CELLS` halo around it — called by
+   * `buildNavGrid` over the whole grid and by `patchNavGrid` over the patched
+   * region (#1154). The halo is WRITTEN, not just seeded from: a cell just
+   * outside the raw patch box can have its own clearance change too (a
+   * newly-blocked patch cell brings a nearer obstacle within range of a halo
+   * cell that itself wasn't touched), and writing only the unpadded patch box
+   * left every halo cell's clearance stale from whenever it was last inside
+   * some write box — silently drifting wrong as later patches touched
+   * neighbouring regions without ever revisiting it.
+   *
+   * Because the halo itself is written, its own correctness requires a
+   * SECOND round of padding purely for BFS seed-sourcing: a halo cell sitting
+   * at the far edge of the one-padded write region can have its own true
+   * nearest obstacle up to another full `NAV_CLEARANCE_MAX_CELLS` beyond that
+   * — measured from ITS position, not the original write box's edge — so the
+   * seed box pads the write region by `NAV_CLEARANCE_MAX_CELLS` a second time
+   * (#1154 code review repro: wall at x=10, unrelated patch at (7,7); a
+   * single-padded seed box of [5,9] excludes the wall while still
+   * overwriting halo cell (9,7), wrongly clearing it from 1 to 2 — the
+   * second padding brings x=10 into the seed scan so (9,7) reads correctly).
+   */
+  private static recomputeClearanceRegion(navGrid: NavGrid, minX: number, maxX: number, minZ: number, maxZ: number): void {
+    const rawMinX = navGrid.clampX(minX);
+    const rawMaxX = navGrid.clampX(maxX);
+    const rawMinZ = navGrid.clampZ(minZ);
+    const rawMaxZ = navGrid.clampZ(maxZ);
+    if (rawMinX > rawMaxX || rawMinZ > rawMaxZ) return;
+
+    // The region actually WRITTEN: the raw patch/build box plus one halo.
+    const writeMinX = navGrid.clampX(rawMinX - NAV_CLEARANCE_MAX_CELLS);
+    const writeMaxX = navGrid.clampX(rawMaxX + NAV_CLEARANCE_MAX_CELLS);
+    const writeMinZ = navGrid.clampZ(rawMinZ - NAV_CLEARANCE_MAX_CELLS);
+    const writeMaxZ = navGrid.clampZ(rawMaxZ + NAV_CLEARANCE_MAX_CELLS);
+
+    // The region BFS sources from: the write region plus a second halo, so
+    // every written cell (including one at the write region's own far edge)
+    // gets its true nearest obstacle within NAV_CLEARANCE_MAX_CELLS of ITS
+    // OWN position, not just of the raw patch box's edge.
+    const seedMinX = navGrid.clampX(writeMinX - NAV_CLEARANCE_MAX_CELLS);
+    const seedMaxX = navGrid.clampX(writeMaxX + NAV_CLEARANCE_MAX_CELLS);
+    const seedMinZ = navGrid.clampZ(writeMinZ - NAV_CLEARANCE_MAX_CELLS);
+    const seedMaxZ = navGrid.clampZ(writeMaxZ + NAV_CLEARANCE_MAX_CELLS);
+
+    // Multi-source 8-directional BFS ("grassfire") from every non-traversable
+    // cell in the seed box. BFS explores in non-decreasing distance order, so
+    // the first time a cell is visited its distance is already the minimum
+    // over every seed — no relaxation needed.
+    const key = (x: number, z: number): number => (x - seedMinX) + (z - seedMinZ) * (seedMaxX - seedMinX + 1);
+    const distances = new Map<number, number>();
+    const queue: { x: number; z: number; dist: number }[] = [];
+    let head = 0;
+
+    for (let z = seedMinZ; z <= seedMaxZ; z++) {
+      for (let x = seedMinX; x <= seedMaxX; x++) {
+        const cell = navGrid.cellAt(x, z);
+        if (cell && (cell.type === 'blocked' || cell.type === 'void')) {
+          distances.set(key(x, z), 0);
+          queue.push({ x, z, dist: 0 });
+        }
+      }
+    }
+
+    while (head < queue.length) {
+      const current = queue[head++]!;
+      if (current.dist >= NAV_CLEARANCE_MAX_CELLS) continue; // cap reached — no further expansion needed
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const nx = current.x + dx;
+        const nz = current.z + dz;
+        if (nx < seedMinX || nx > seedMaxX || nz < seedMinZ || nz > seedMaxZ) continue;
+        const nKey = key(nx, nz);
+        if (distances.has(nKey)) continue;
+        if (!navGrid.cellAt(nx, nz)) continue; // off-grid — never a seed, never explored
+        const nDist = current.dist + 1;
+        distances.set(nKey, nDist);
+        queue.push({ x: nx, z: nz, dist: nDist });
+      }
+    }
+
+    // Write the whole (once-padded) write region, including its halo — see
+    // this function's own doc comment for why the halo must be written at
+    // all, and why the seed box needed a second round of padding to make
+    // that write correct at the halo's own far edge.
+    for (let z = writeMinZ; z <= writeMaxZ; z++) {
+      for (let x = writeMinX; x <= writeMaxX; x++) {
+        const cell = navGrid.cellAt(x, z);
+        if (!cell) continue;
+        const dist = distances.get(key(x, z));
+        cell.clearance = dist === undefined ? NAV_CLEARANCE_MAX_CELLS : Math.min(dist, NAV_CLEARANCE_MAX_CELLS);
+      }
+    }
   }
 
   /**
