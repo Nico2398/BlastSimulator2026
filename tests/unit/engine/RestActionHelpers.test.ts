@@ -11,9 +11,13 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
-  createRestPendingAction, isMidClaimedTaskExecution,
+  createRestPendingAction, isMidClaimedTaskExecution, restRoundTripWorthwhile, resolveRestDestination,
+  resolveBuildingApproach,
 } from '../../../src/core/engine/RestActionHelpers.js';
-import { NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE } from '../../../src/core/config/balance.js';
+import {
+  NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE,
+  BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS, AGENT_WALK_SPEED,
+} from '../../../src/core/config/balance.js';
 
 const DEDUCT_SEED = 42;
 
@@ -411,5 +415,197 @@ describe('beginRestTravel (#1118)', () => {
     expect(() => beginRestTravel(state, employee, 5, 5)).not.toThrow();
 
     expect(employee.pendingActionType).toBe('rest');
+  });
+});
+
+// #1170: a forced rest whose round trip costs more fatigue (as ticks
+// travelled, at whatever speed the employee makes the trip — NEED_DRAIN_RATES
+// .fatigue.traveling is 1/tick, so ticks and fatigue cost are numerically
+// identical today) than the destination building can recover is never worth
+// taking — see RestActionHelpers.ts's own doc comment on
+// restRoundTripWorthwhile. maxRecovery for a given tier is
+// BUILDING_REPLENISH_RATES.fatigue[tier] * NEED_REST_DURATIONS.fatigue: 64 at
+// tier 1, 160 at tier 3.
+describe('restRoundTripWorthwhile (#1170)', () => {
+  const SEED = 42;
+  const TIER1_MAX_RECOVERY = BUILDING_REPLENISH_RATES.fatigue[1] * NEED_REST_DURATIONS.fatigue;
+  const TIER3_MAX_RECOVERY = BUILDING_REPLENISH_RATES.fatigue[3] * NEED_REST_DURATIONS.fatigue;
+
+  it('happy path: a short reachable route to a tier-1 building is worthwhile', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(20, 10);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 90, 10, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 5, 5);
+
+    expect(result).toBe(true);
+  });
+
+  it('boundary: travelCost === maxRecovery exactly is still worthwhile (tie goes to taking the rest)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    // On foot at AGENT_WALK_SPEED (2 cells/tick): a straight 64-cell one-way
+    // route round-trips at 2*64/2 = 64 ticks == BUILDING_REPLENISH_RATES
+    // .fatigue[1] (8) * NEED_REST_DURATIONS.fatigue (8) = 64 exactly.
+    expect(AGENT_WALK_SPEED).toBe(2);
+    expect(TIER1_MAX_RECOVERY).toBe(64);
+    state.navGrid = makeFlatNavGrid(70, 10);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 64, 5);
+
+    expect(result).toBe(true);
+  });
+
+  it('rejection: a route long enough that travelCost exceeds maxRecovery is not worthwhile', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(50, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // tier 1, speed 1
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    // One-way 40 cells at speed 1: round trip = 2*40/1 = 80 > 64.
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 40, 5);
+
+    expect(result).toBe(false);
+  });
+
+  it('building === null is always worthwhile regardless of distance', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(200, 10);
+
+    const result = restRoundTripWorthwhile(state, employee, null, 199, 5);
+
+    expect(result).toBe(true);
+  });
+
+  it('mounted (speed 1) vs on-foot (speed 2) over the identical route distance: mounted is not worthwhile, on-foot is', () => {
+    const buildFixture = () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+      state.navGrid = makeFlatNavGrid(50, 10);
+      const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
+      expect(placed.success).toBe(true);
+      return { state, employee, building: placed.building! };
+    };
+
+    const mountedFixture = buildFixture();
+    const { vehicle } = purchaseVehicle(mountedFixture.state.vehicles, 'drill_rig', 0, 5);
+    vehicle.occupantIds = [mountedFixture.employee.id];
+    mountedFixture.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    expect(restRoundTripWorthwhile(mountedFixture.state, mountedFixture.employee, mountedFixture.building, 40, 5)).toBe(false);
+
+    const onFootFixture = buildFixture();
+    expect(onFootFixture.employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(restRoundTripWorthwhile(onFootFixture.state, onFootFixture.employee, onFootFixture.building, 40, 5)).toBe(true);
+  });
+
+  it('unreachable target (blocked route on a built NavGrid) is always worthwhile', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    const grid = makeFlatNavGrid(50, 10);
+    blockColumn(grid, 15);
+    state.navGrid = grid;
+    const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 40, 5);
+
+    expect(result).toBe(true);
+  });
+
+  it('no NavGrid at all (state.navGrid === null) is always worthwhile', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    expect(state.navGrid).toBeNull();
+    const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 200, 5);
+
+    expect(result).toBe(true);
+  });
+
+  it('tier boundary: an unaffordable round trip to a tier-1 building becomes affordable to a tier-3 building at the identical distance', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(50, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    // Round trip = 80 ticks (40 cells one-way at speed 1) — exceeds tier 1's
+    // 64 max recovery, but not tier 3's 160.
+    expect(TIER3_MAX_RECOVERY).toBeGreaterThan(80);
+
+    const tier1 = placeBuilding(state.buildings, 'living_quarters', 90, 5, 100, 100, 1);
+    expect(tier1.success).toBe(true);
+    expect(restRoundTripWorthwhile(state, employee, tier1.building!, 40, 5)).toBe(false);
+
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const tier3 = placeBuilding(state.buildings, 'living_quarters', 5, 90, 100, 100, 3);
+    expect(tier3.success).toBe(true);
+    expect(restRoundTripWorthwhile(state, employee, tier3.building!, 40, 5)).toBe(true);
+  });
+});
+
+// #1170: resolveRestDestination consolidates the nearest-living-quarters +
+// approach-cell + worthwhile-round-trip resolution shared by both
+// ForceShiftRest.ts entry points.
+describe('resolveRestDestination (#1170)', () => {
+  const SEED = 42;
+
+  it('a reachable, worthwhile living quarters resolves worthwhile: true with the matching approach coords/buildingId', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(30, 20);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const expectedApproach = resolveBuildingApproach(state, building, employee.x, employee.z);
+
+    const result = resolveRestDestination(state, employee);
+
+    expect(result.worthwhile).toBe(true);
+    expect(result.buildingId).toBe(building.id);
+    expect(result.targetX).toBe(expectedApproach.x);
+    expect(result.targetZ).toBe(expectedApproach.z);
+  });
+
+  it('the only living quarters is far enough that the round trip is not worthwhile', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 20);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // speed 1
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const placed = placeBuilding(state.buildings, 'living_quarters', 80, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const expectedApproach = resolveBuildingApproach(state, building, employee.x, employee.z);
+
+    const result = resolveRestDestination(state, employee);
+
+    expect(result.worthwhile).toBe(false);
+    expect(result.buildingId).toBe(building.id);
+    expect(result.targetX).toBe(expectedApproach.x);
+    expect(result.targetZ).toBe(expectedApproach.z);
   });
 });
