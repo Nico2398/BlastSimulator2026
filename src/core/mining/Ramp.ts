@@ -78,28 +78,34 @@ export function buildRamp(
   const segments = defineRampSegments(grid, ramp);
 
   let voxelsCleared = 0;
+  let voxelsFilled = 0;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
   for (const segment of segments) {
     const result = carveRampSegment(grid, segment);
     voxelsCleared += result.voxelsCleared;
-    if (segment.region && result.voxelsCleared > 0) {
+    voxelsFilled += result.voxelsFilled;
+    if (segment.region && (result.voxelsCleared > 0 || result.voxelsFilled > 0)) {
       minX = Math.min(minX, segment.region.minX); maxX = Math.max(maxX, segment.region.maxX);
       minY = Math.min(minY, segment.region.minY); maxY = Math.max(maxY, segment.region.maxY);
       minZ = Math.min(minZ, segment.region.minZ); maxZ = Math.max(maxZ, segment.region.maxZ);
     }
   }
 
-  if (voxelsCleared > 0) {
+  if (voxelsCleared > 0 || voxelsFilled > 0) {
     emitter?.emit('terrain:updated', { region: { minX, maxX, minY, maxY, minZ, maxZ } });
   }
 
+  const message = voxelsFilled > 0
+    ? `Ramp built: ${ramp.length}m ${ramp.direction}, ${voxelsCleared} voxels cleared, ${voxelsFilled} voxels filled`
+    : `Ramp built: ${ramp.length}m ${ramp.direction}, ${voxelsCleared} voxels cleared`;
+
   return {
     success: true,
-    message: `Ramp built: ${ramp.length}m ${ramp.direction}, ${voxelsCleared} voxels cleared`,
+    message,
     cost: validation.cost,
     voxelsCleared,
-    voxelsFilled: 0,
+    voxelsFilled,
   };
 }
 
@@ -208,6 +214,15 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
  * shortfall, and still validates (#1152).
  */
 const RAMP_MIN_LENGTH_EPSILON = 1e-6;
+
+/**
+ * Float tolerance for the fill-column decision in `defineRampSegments`'s
+ * Pass 1 (#1172) — same scale and purpose as `RAMP_MIN_LENGTH_EPSILON`
+ * above and `FLOOR_TARGET_EPSILON` below: a column whose surface sits within
+ * this of the straight `floorY` line is a cut column reading fractionally
+ * low from float noise, not a genuine dip needing a fill.
+ */
+const RAMP_FILL_EPSILON = 1e-6;
 
 /** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
 export interface RampSegmentDef {
@@ -356,11 +371,17 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     const surfaceY = rawSurfaceY[step]!;
 
     const floorY = originSurfaceY - currentDepth;
-    const ceilingY = surfaceY + clearanceHeight;
+    // Math.max(surfaceY, floorY): a column whose terrain dips below the
+    // straight floor line still needs ceilingY above floorY, or the dip's
+    // fill row (at/above floorY) falls outside [floorY, ceilingY) and Pass 2
+    // silently skips it (#1172). Existing (non-dip) columns always have
+    // surfaceY >= floorY, so this is a no-op there.
+    const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
+    const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
 
-    columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn: false });
+    columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn });
     globalMinY = Math.min(globalMinY, floorY);
     globalMaxY = Math.max(globalMaxY, ceilingY - 1);
   }
@@ -383,6 +404,20 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
       for (let w = -halfWidth; w <= halfWidth; w++) {
         const wx = col.cx + perpDx * w;
         const wz = col.cz + perpDz * w;
+
+        // Fill column, floor row: nothing solid to gate on by definition
+        // (this column's terrain dips below the straight floor line), so
+        // bypass the density gate entirely and push a fillTarget cell
+        // instead of the cut/floorAdjustment cell below (#1172).
+        if (col.isFillColumn && isFloorRow) {
+          if (grid.containsColumn(wx, wz)) {
+            cells.push({ x: wx, y, z: wz, fillTarget: col.floorY });
+            minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+            minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+          }
+          continue;
+        }
 
         if (grid.densityAt(wx, y, wz) > 0) {
           cells.push(isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz });
@@ -483,17 +518,30 @@ const FLOOR_TARGET_EPSILON = 1e-6;
  * filter, which only recognised the cut case (#1172).
  */
 export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
-  void grid; void cell;
-  // TODO: implement
-  throw new Error('not implemented');
+  if (cell.fillTarget !== undefined) {
+    const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+    return Number.isFinite(currentHeight) && currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
+  }
+  return grid.densityAt(cell.x, cell.y, cell.z) > 0;
 }
 
 function carveRampCell(
   grid: VoxelGrid,
-  cell: { x: number; y: number; z: number; floorAdjustment?: number },
-): { cleared: boolean; bandedMaxY: number } {
+  cell: { x: number; y: number; z: number; floorAdjustment?: number; fillTarget?: number },
+): { cleared: boolean; bandedMaxY: number; filled: boolean } {
+  if (cell.fillTarget !== undefined) {
+    // Fill column's floor row (#1172): nothing to clear, this column's
+    // terrain dips below the ramp's straight floor line — raise it to the
+    // line instead. Idempotent via isRampCellPending's own currentHeight
+    // check, so a re-armed slice doesn't re-fill an already-filled column.
+    if (!isRampCellPending(grid, cell)) return { cleared: false, bandedMaxY: -1, filled: false };
+    const compId = resolveExposedCompId(grid, cell.x, cell.z, cell.fillTarget);
+    const touchedMaxY = setVoxelColumnSurfaceHeight(grid, cell.x, cell.z, cell.fillTarget, compId);
+    return { cleared: false, bandedMaxY: touchedMaxY, filled: true };
+  }
+
   if (cell.floorAdjustment === undefined) {
-    return { cleared: carveCellIfSolid(grid, cell), bandedMaxY: -1 };
+    return { cleared: carveCellIfSolid(grid, cell), bandedMaxY: -1, filled: false };
   }
 
   // The absolute continuous target this floor-row cell bands to once
@@ -506,11 +554,11 @@ function carveRampCell(
   const intendedTarget = (cell.y - 1) + cell.floorAdjustment;
   const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
   if (Number.isFinite(currentHeight) && currentHeight <= intendedTarget + FLOOR_TARGET_EPSILON) {
-    return { cleared: false, bandedMaxY: -1 };
+    return { cleared: false, bandedMaxY: -1, filled: false };
   }
 
-  if (!carveCellIfSolid(grid, cell)) return { cleared: false, bandedMaxY: -1 };
-  return { cleared: true, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, intendedTarget) };
+  if (!carveCellIfSolid(grid, cell)) return { cleared: false, bandedMaxY: -1, filled: false };
+  return { cleared: true, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, intendedTarget), filled: false };
 }
 
 /**
@@ -522,13 +570,17 @@ function carveRampCell(
  */
 export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number; voxelsFilled: number } {
   let voxelsCleared = 0;
-  const voxelsFilled = 0;
+  let voxelsFilled = 0;
   let bandedMaxY = -1;
-  const carvedColumns = captureColumnTopsForCarve(grid, segment.cells);
+  // Fill cells excluded: captureColumnTopsForCarve/renormaliseCarvedColumns'
+  // sweep assumes a column's top only ever drops after a carve; a freshly
+  // filled column's top rises, and the sweep would clip it back down (#1172).
+  const carvedColumns = captureColumnTopsForCarve(grid, segment.cells.filter(c => c.fillTarget === undefined));
 
   for (const cell of segment.cells) {
     const result = carveRampCell(grid, cell);
     if (result.cleared) voxelsCleared++;
+    if (result.filled) voxelsFilled++;
     bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY);
   }
 
@@ -604,11 +656,12 @@ export function carveRampSegmentSlice(
   emitter?: EventEmitter,
 ): { voxelsCleared: number; voxelsFilled: number; region: RampSegmentDef['region'] } {
   let voxelsCleared = 0;
-  const voxelsFilled = 0;
+  let voxelsFilled = 0;
   let bandedMaxY = -1;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
-  const carvedColumns = captureColumnTopsForCarve(grid, cells.slice(fromIndex, toIndex));
+  // Fill cells excluded — see carveRampSegment's identical exclusion (#1172).
+  const carvedColumns = captureColumnTopsForCarve(grid, cells.slice(fromIndex, toIndex).filter(c => c.fillTarget === undefined));
 
   for (let i = fromIndex; i < toIndex; i++) {
     const cell = cells[i];
@@ -616,6 +669,7 @@ export function carveRampSegmentSlice(
     const result = carveRampCell(grid, cell);
     bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY);
     if (result.cleared) voxelsCleared++;
+    if (result.filled) voxelsFilled++;
     if (result.cleared || result.bandedMaxY >= 0) {
       minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
       minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);

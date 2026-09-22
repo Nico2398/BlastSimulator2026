@@ -587,27 +587,30 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     }
   });
 
-  it('skips exactly the y-band with zero contributing columns instead of emitting an invalid segment for it, and emits segments on both sides of the gap', () => {
+  it('fills the canyon columns up to the floor line instead of leaving a gap y-band with zero contributing columns (#1172)', () => {
     const grid = makeSteppedGrid();
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
 
     // Hand-traced (clearanceHeight=3, RAMP length 8 / targetDepth 6, so the
-    // #1152 straight-line floor is f(step) = 20 - 0.75*step, and
-    // ceilingY = localSurface + 3):
+    // #1152 straight-line floor is f(step) = 20 - 0.75*step):
     //
-    //   step 0-1  floor 20.00/19.25  ceiling 23  → y 20,21,22
-    //   step 2-4  floor 18.50..17.00 ceiling  3  → floor above ceiling, none
-    //   step 5-7  floor 16.25..14.75 ceiling 18  → y 15,16,17
+    //   step 0-1  floor 20.00/19.25  local surface 20 → ceiling 23        → y 20,21,22
+    //   step 2-4  floor 18.50..17.00 local surface  0 → floor > surface+3,
+    //             a fill column (#1172): ceiling = max(surface, floor) + 3
+    //             → y up to floor+3, contributing at its own floorRowY
+    //             (19, 18 or 17) with a fillTarget cell instead of a gap.
+    //   step 5-7  floor 16.25..14.75 local surface 15 → ceiling 18        → y 15,16,17
     //
-    // globalMinY=14.75, globalMaxY=22 → candidate y = 22..15 (8 values).
-    // y=19 and y=18 have zero contributing columns and must be skipped
-    // entirely, leaving 6 segments with plenty on both sides of the gap.
-    expect(segments.length).toBe(6);
-    for (const s of segments) {
-      expect(s.targetY === 18 || s.targetY === 19).toBe(false);
-    }
+    // globalMinY=14.75, globalMaxY=22 → every candidate y in 22..15 (8
+    // values) now has a contributor — the canyon's own fill cells replace
+    // what used to be the zero-contributor gap at y=18,19 (#1172 FILL
+    // decision: a dip below the floor line is raised to it, not skipped).
+    expect(segments.length).toBe(8);
+    expect(segments.some(s => s.targetY === 18)).toBe(true);
+    expect(segments.some(s => s.targetY === 19)).toBe(true);
+    expect(segments.some(s => s.cells.some(c => c.fillTarget !== undefined))).toBe(true);
     expect(segments.some(s => s.targetY >= 20 && s.targetY <= 22)).toBe(true);
     expect(segments.some(s => s.targetY >= 15 && s.targetY <= 17)).toBe(true);
   });

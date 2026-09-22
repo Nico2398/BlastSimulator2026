@@ -90,7 +90,9 @@ export function applyTaskCompletion(
           const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
           if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
         }
-        report.rampSegment = { rampId, segmentIndex, voxelsCleared: tracker.cells.length, voxelsFilled: 0, rampFullyDone };
+        const voxelsFilled = tracker.cells.filter(c => c.fillTarget !== undefined).length;
+        const voxelsCleared = tracker.cells.length - voxelsFilled;
+        report.rampSegment = { rampId, segmentIndex, voxelsCleared, voxelsFilled, rampFullyDone };
       }
     }
 

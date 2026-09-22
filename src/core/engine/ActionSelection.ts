@@ -12,7 +12,7 @@ import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
-import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
+import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
@@ -96,9 +96,9 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     // A shared duration formula (computeRampSegmentDurationTicks),
     // caller-neutral despite its ramp-flavoured name (#1009 review finding 1)
     // — 'level_ground' below feeds the same formula its own live re-estimate.
-    const cells = (action.payload['cells'] as { x: number; y: number; z: number }[] | undefined) ?? [];
+    const cells = (action.payload['cells'] as { x: number; y: number; z: number; fillTarget?: number }[] | undefined) ?? [];
     const voxelCount = grid !== undefined
-      ? cells.filter(c => grid.densityAt(c.x, c.y, c.z) > 0).length
+      ? cells.filter(c => isRampCellPending(grid, c)).length
       : cells.length;
     const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
     const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
