@@ -1478,6 +1478,37 @@ describe('buildRampCommand', () => {
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
   });
+
+  // The --start/--end inference (ramp.ts) picks a direction with two
+  // independent ternaries — dz >= 0 ? 'south' : 'north' and
+  // dx >= 0 ? 'east' : 'west' — and rampFootprint mirrors each with its own
+  // direction === 'north'/'west' checks. Every existing --start/--end test
+  // above moves south or east (positive delta), so the 'north'/'west' arms
+  // of all four ternaries went uncovered. These two exercise the negative
+  // side of each axis.
+  it('builds a ramp from start/end and infers "north" for a negative dz', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    const result = buildRampCommand(ctx, [], { start: '5,10', end: '5,5', depth: '2' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedRamps[0]!.def.direction).toBe('north');
+    expect(ctx.state!.plannedRamps[0]!.def.length).toBe(5);
+    expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
+  });
+
+  it('builds a ramp from start/end and infers "west" for a negative dx', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    const result = buildRampCommand(ctx, [], { start: '10,5', end: '5,5', depth: '2' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedRamps[0]!.def.direction).toBe('west');
+    expect(ctx.state!.plannedRamps[0]!.def.length).toBe(5);
+    expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
+  });
 });
 
 // ── build_ramp — length bounds (#572) ───────────────────────────────────────
@@ -1738,6 +1769,26 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     expect(ctx.state!.cash).toBe(cashBefore);
     expect(ctx.state!.plannedRamps).toHaveLength(rampsBefore);
     expect(ctx.state!.pendingActions).toHaveLength(actionsBefore);
+  });
+
+  it('build_ramp cancel <id> (the top-level command, not cancelRampCommand called directly) cancels a valid ramp', () => {
+    // mining-i18n-guards.test.ts's 'build_ramp cancel usage' case exercises
+    // buildRampCommand(ctx, ['cancel'], {}) only for its isNaN(rampId) usage
+    // error — every other cancel test in this file calls cancelRampCommand
+    // directly. That leaves buildRampCommand's own args[0] === 'cancel'
+    // dispatch with a *valid* id (the isNaN-false arm and its delegation to
+    // cancelRampCommand) uncovered. This drives it through the top-level
+    // command surface a player's console input actually reaches.
+    const ctx = makeMiningContext();
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
+    expect(buildResult.success).toBe(true);
+    const rampId = ctx.state!.plannedRamps[0]!.id;
+
+    const result = buildRampCommand(ctx, ['cancel', String(rampId)], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(`Ramp #${rampId} cancelled`);
+    expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
   });
 
   it('the generic "employee cancel <id>" path cancels only one segment of a multi-segment ramp, leaving the rest untouched', () => {
