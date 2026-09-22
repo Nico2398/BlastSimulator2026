@@ -592,4 +592,57 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     expect(driver.moveHistoryX).not.toBe(42);
     expect(driver.moveHistoryZ).not.toBe(42);
   });
+
+  // #1154 fixer round: nextGridStep's "am I already standing on the path's
+  // own first waypoint" check used Math.floor, but that waypoint (built from
+  // advanceLeg's driveFromX/driveFromZ, NavGrid.clampX/clampZ) is always the
+  // mover's ROUNDED cell. For any position whose fractional part is >= 0.5
+  // (round and floor disagree — about half of every tick spent driving), the
+  // mismatch misidentified the mover's own current cell as the "next step"
+  // still ahead of it. A live vehicle merely parked on that current cell —
+  // never actually in the way of the real next step — then read as
+  // isOccupiedByOtherVehicle and blocked the drive leg outright, escalating
+  // to a full reroute after VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks of
+  // phantom waiting. Reproduced live via hauling-gate.json: a drill_rig
+  // routed around a building's clearance-insufficient ring happened to round
+  // onto a parked debris_hauler's cell partway through, costing 20+ ticks to
+  // a detour the real next step never needed.
+  it('does not block on a live vehicle parked on its own current (rounded) cell when its continuous position floors to a different cell', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 10, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 10,
+      }],
+      goal: { kind: 'reposition', x: 10, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 10,
+    } satisfies Itinerary;
+
+    // Continuous position mid-cell, fractional part >= 0.5 — floors to 2,
+    // rounds to 3. Not itinerary-derived; set directly so the test isolates
+    // nextGridStep's own rounding convention from getVehicleDefByTier's
+    // exact per-tick step size.
+    driver.x = 2.6;
+    driver.z = 2;
+    vehicle.x = 2.6;
+    vehicle.z = 2;
+
+    // Another live vehicle parked exactly on the mover's own rounded cell
+    // (3, 2) — not a real obstacle on the route ahead, since the mover is
+    // already there.
+    purchaseVehicle(state.vehicles, 'drill_rig', 3, 2);
+
+    tickLocomotion(state);
+
+    // Genuine progress this tick — never treated as blocked by a vehicle
+    // sitting on the cell the mover itself already occupies.
+    expect(driver.isMoveStuck).toBe(false);
+    expect(vehicle.x).toBeGreaterThan(2.6);
+  });
 });

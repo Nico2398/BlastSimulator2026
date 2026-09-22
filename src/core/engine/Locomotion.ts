@@ -631,11 +631,35 @@ function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: 
   updateVehicleCellOccupancy(state, vehicle, true, false, prevX, prevZ);
 }
 
-/** The immediate next grid cell along a found path — the one occupancy is checked against. Mirrors the old nextGridStep. */
+/**
+ * The immediate next grid cell along a found path — the one occupancy is
+ * checked against. Mirrors the old nextGridStep.
+ *
+ * `waypoints[0]` is always the drive leg's own starting cell as `findPath`
+ * received it — `advanceLeg`'s `driveFromX`/`driveFromZ`, built via
+ * `NavGrid.clampX`/`clampZ`, which round to the nearest cell, not floor to
+ * it. Comparing against `Math.floor(x)`/`Math.floor(z)` here used a
+ * different convention than the one that produced `waypoints[0]`, so for any
+ * position whose fractional part is >= 0.5 (round and floor disagree —
+ * roughly half of every tick spent driving) `atFirst` read false even though
+ * the agent's rounded position already equalled the path's own first
+ * waypoint. That misidentified the agent's own current cell as the "next"
+ * step to occupancy-check, and a live vehicle parked exactly there (pure
+ * coincidence of position, nothing blocking the real route) read as
+ * `isOccupiedByOtherVehicle`, triggering `handleOccupancyBlock`'s stuck-wait
+ * and, past `VEHICLE_OCCUPANCY_REROUTE_THRESHOLD`, a full reroute away from
+ * every other vehicle's cell — a multi-tick detour for an obstacle that was
+ * never really in the way. Reproduced live: a drill_rig routed around a
+ * building's clearance-insufficient ring (#1154) happened to cross a parked
+ * debris_hauler's cell partway through, at a position whose fraction alone
+ * decided whether this function saw it as "already there" or "blocked
+ * ahead" — a 20+ tick detour on one seed, nothing on the next. Matching
+ * `clampX`/`clampZ`'s own rounding fixes the comparison at its source.
+ */
 function nextGridStep(x: number, z: number, waypoints: Array<{ x: number; z: number }>): { x: number; z: number } | null {
   if (waypoints.length === 0) return null;
   const first = waypoints[0]!;
-  const atFirst = Math.floor(x) === first.x && Math.floor(z) === first.z;
+  const atFirst = Math.round(x) === first.x && Math.round(z) === first.z;
   if (atFirst && waypoints.length > 1) return waypoints[1]!;
   return first;
 }
@@ -649,10 +673,36 @@ function isOccupiedByOtherVehicle(state: GameState, selfVehicleId: number, x: nu
  * marked vehicleOccupied, so avoidVehicles:true actually routes around them.
  * Marks are reverted before returning — no lasting mutation to state.navGrid.
  * Mirrors the old VehicleOccupancyReroute.ts's findPathAvoidingOtherVehicles.
+ *
+ * `avoidVehicles:true` on `findPath` gates on `isImpassable`'s shared
+ * `isCellOccupied` (NavGrid.ts), which — since #954 folded fragment
+ * occupancy into the same "occupied" predicate a foot leg avoids — treats a
+ * cell with any on-ground fragment on it as impassable too, not just a
+ * vehicle-occupied one. That is correct for the pedestrian sense the
+ * predicate was extended for, but wrong here: this function's whole purpose
+ * is a vehicle escalation avoiding *other vehicles specifically* (its name
+ * and its own doc above predate #954 and never meant fragments), and the one
+ * caller of it (`handleOccupancyBlock`) fires hardest exactly where fragments
+ * are thickest — a fresh blast crater a debris_hauler is driving into to
+ * collect them. Left unguarded, a reroute attempted from inside (or through)
+ * that crater finds every candidate route blocked by the very fragments it
+ * is trying to reach, `findPath` reports `found:false`, and the driver is
+ * left permanently stuck (isMoveStuck latched forever, since a failed
+ * reroute doesn't reset `vehicleWaitingTicks` and every following tick
+ * retries and fails the identical search) — reproduced live via
+ * rock-fragmenter-breaking.json once #1154's own nextGridStep fix (above)
+ * stopped silently skipping this escalation on a false-positive block and
+ * let it actually run into this pre-existing conflation for the first time.
+ * Fragment occupancy is temporarily zeroed for the duration of this call —
+ * the same revert-in-`finally` shape already used for the vehicle marks —
+ * rather than threading a vehicle-only occupancy variant through every
+ * `isImpassable` call site in Pathfinding.ts, which would touch far more
+ * than this one escalation path actually needs.
  */
 function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle: Vehicle, destX: number, destZ: number): PathResult {
   const grid = state.navGrid!;
   const marked: Array<{ x: number; z: number; prev: boolean }> = [];
+  const unmarkedFragments: Array<{ x: number; z: number; prev: number }> = [];
 
   try {
     for (const other of state.vehicles.vehicles) {
@@ -665,6 +715,16 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
       cell.vehicleOccupied = true;
     }
 
+    for (const tracked of state.logistics.fragments) {
+      if (tracked.state !== 'on_ground') continue;
+      const fx = Math.round(tracked.fragment.position.x);
+      const fz = Math.round(tracked.fragment.position.z);
+      const cell = grid.cellAt(fx, fz);
+      if (!cell || !cell.fragmentOccupancy) continue;
+      unmarkedFragments.push({ x: fx, z: fz, prev: cell.fragmentOccupancy });
+      cell.fragmentOccupancy = 0;
+    }
+
     return findPath(grid, {
       agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ, avoidVehicles: true,
       requiredClearance: vehicleRequiredClearanceCells(vehicle),
@@ -673,6 +733,10 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
     for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);
       if (cell) cell.vehicleOccupied = mark.prev;
+    }
+    for (const mark of unmarkedFragments) {
+      const cell = grid.cellAt(mark.x, mark.z);
+      if (cell) cell.fragmentOccupancy = mark.prev;
     }
   }
 }

@@ -102,12 +102,12 @@
       }
     },
     {
-      "command": "tick 100",
-      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 88).",
+      "command": "tick 130",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad. Bumped from tick 100 (sandbox-measured landing at tick 88) to tick 130 by #1154's fixer round: the drill_rig now needs vehicle clearance (NAV_CLEARANCE_VEHICLE_CELLS=2) to route to a hole, so it can no longer cut through the 1-cell-wide gap between the freight_warehouse's footprint and the map edge the way a clearance-blind point-agent used to — it correctly detours around the building's east side instead, and that detour route happens to pass near the other freshly-purchased fleet vehicles idling by the depot, costing a few more ticks waiting out real (not phantom) vehicle-occupancy contention before rerouting clear. Sandbox-measured new landing: tick 103 for the 4th hole (H3) — 130 keeps the same proportional margin the original tick-88/tick-100 pair had.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 100"
+          "command": "tick 130"
         }
       ],
       "role": "setup",
