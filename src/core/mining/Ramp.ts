@@ -405,26 +405,22 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
         const wx = col.cx + perpDx * w;
         const wz = col.cz + perpDz * w;
 
-        // Fill column, floor row: nothing solid to gate on by definition
-        // (this column's terrain dips below the straight floor line), so
-        // bypass the density gate entirely and push a fillTarget cell
-        // instead of the cut/floorAdjustment cell below (#1172).
+        let cell: RampSegmentDef['cells'][number] | undefined;
         if (col.isFillColumn && isFloorRow) {
-          if (grid.containsColumn(wx, wz)) {
-            cells.push({ x: wx, y, z: wz, fillTarget: col.floorY });
-            minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
-            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-            minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
-          }
-          continue;
+          // Fill column, floor row: nothing solid to gate on by definition
+          // (this column's terrain dips below the straight floor line), so
+          // bypass the density gate entirely and push a fillTarget cell
+          // instead of the cut/floorAdjustment cell below (#1172).
+          if (grid.containsColumn(wx, wz)) cell = { x: wx, y, z: wz, fillTarget: col.floorY };
+        } else if (grid.densityAt(wx, y, wz) > 0) {
+          cell = isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz };
         }
 
-        if (grid.densityAt(wx, y, wz) > 0) {
-          cells.push(isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz });
-          minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
-          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-          minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
-        }
+        if (!cell) continue;
+        cells.push(cell);
+        minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
       }
     }
 
@@ -485,6 +481,21 @@ function carveCellIfSolid(grid: VoxelGrid, cell: { x: number; y: number; z: numb
 const FLOOR_TARGET_EPSILON = 1e-6;
 
 /**
+ * Whether `cell` (a cut or fill cell of a ramp segment) still has work
+ * outstanding against `grid` — a cut cell pending while still solid, a fill
+ * cell pending while its column's floor is still below `fillTarget`. Direction-
+ * agnostic replacement for `ActionSelection.ts`'s inline `densityAt(...) > 0`
+ * filter, which only recognised the cut case (#1172).
+ */
+export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
+  if (cell.fillTarget !== undefined) {
+    const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+    return Number.isFinite(currentHeight) && currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
+  }
+  return grid.densityAt(cell.x, cell.y, cell.z) > 0;
+}
+
+/**
  * Carve one ramp cell, additionally banding its column's floor immediately
  * when this cell is that column's own final (lowest) row — carries a
  * `floorAdjustment` — to the ramp's true continuous depth (#1151), instead
@@ -510,21 +521,6 @@ const FLOOR_TARGET_EPSILON = 1e-6;
  * pristine natural terrain always reads *above* the ramp's intended floor
  * the first time a column is carved, whatever its density's exact value.
  */
-/**
- * Whether `cell` (a cut or fill cell of a ramp segment) still has work
- * outstanding against `grid` — a cut cell pending while still solid, a fill
- * cell pending while its column's floor is still below `fillTarget`. Direction-
- * agnostic replacement for `ActionSelection.ts`'s inline `densityAt(...) > 0`
- * filter, which only recognised the cut case (#1172).
- */
-export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
-  if (cell.fillTarget !== undefined) {
-    const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
-    return Number.isFinite(currentHeight) && currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
-  }
-  return grid.densityAt(cell.x, cell.y, cell.z) > 0;
-}
-
 function carveRampCell(
   grid: VoxelGrid,
   cell: { x: number; y: number; z: number; floorAdjustment?: number; fillTarget?: number },
@@ -541,7 +537,9 @@ function carveRampCell(
   }
 
   if (cell.floorAdjustment === undefined) {
-    return { cleared: carveCellIfSolid(grid, cell), bandedMaxY: -1, filled: false };
+    if (!isRampCellPending(grid, cell)) return { cleared: false, bandedMaxY: -1, filled: false };
+    grid.clearVoxel(cell.x, cell.y, cell.z);
+    return { cleared: true, bandedMaxY: -1, filled: false };
   }
 
   // The absolute continuous target this floor-row cell bands to once

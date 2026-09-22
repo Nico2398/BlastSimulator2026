@@ -23,6 +23,7 @@ import { RAMP_COST_PER_METER, carveRampSegment } from '../../../src/core/mining/
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import { formatTaskCompletion } from '../../../src/console/commands/tickTaskCompletion.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
@@ -1989,6 +1990,23 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     expect(nonZeroSegmentLine).toContain(
       `Ramp #${rampId} segment ${nonZeroSegment!.index} excavated: ${expectedVoxelCount} voxels cleared.`,
     );
+  });
+
+  // Coverage gap (#1172 review finding 3): the excavation line's
+  // `filledSuffix` (tickTaskCompletion.ts) only ever showed up blank above,
+  // since a naturally-generated ramp footprint in this file's terrain never
+  // dips below the straight floor line. Drive formatTaskCompletion directly
+  // with a report carrying voxelsFilled > 0 to prove the suffix itself
+  // renders, rather than only its absence.
+  it('renders the "N voxels filled" suffix in the excavation line when the report carries voxelsFilled > 0', () => {
+    const lines: string[] = [];
+    formatTaskCompletion(7, 'Alice', {
+      completed: true,
+      rampSegment: { rampId: 3, segmentIndex: 1, voxelsCleared: 4, voxelsFilled: 2, rampFullyDone: false },
+      levelUps: [],
+    }, lines);
+
+    expect(lines).toContain('[tick 7] Ramp #3 segment 1 excavated: 4 voxels cleared, 2 voxels filled.');
   });
 
   it('completing every segment of a multi-segment ramp patches the NavGrid so the excavated cells are no longer blocked/void', () => {
