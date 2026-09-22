@@ -256,3 +256,33 @@ export function isMidCollapseOrForcedRest(employee: Employee): boolean {
     || employee.restTicksRemaining !== null
     || employee.pendingRestDuration !== null;
 }
+
+/**
+ * Whether a forced-rest round trip to `building` at (targetX, targetZ) is worth taking:
+ * the fatigue it costs to travel there and back must not exceed the fatigue it can recover.
+ * `building === null` (resting in place, no travel) is always worthwhile.
+ * An unreachable target (no route) is always worthwhile — this guard never blocks on a
+ * routing failure another mechanism owns.
+ */
+export function restRoundTripWorthwhile(
+  _state: GameState,
+  _emp: Employee,
+  _building: Building | null,
+  _targetX: number,
+  _targetZ: number,
+): boolean {
+  throw new Error('not implemented');
+}
+
+/**
+ * Resolves where an employee should go to rest (nearest living quarters + approach cell),
+ * and whether that round trip is worth taking per `restRoundTripWorthwhile`.
+ * Consolidates the building/approach/worthwhile resolution sequence used by both
+ * forced-rest entry points in ForceShiftRest.ts.
+ */
+export function resolveRestDestination(
+  _state: GameState,
+  _emp: Employee,
+): { targetX: number; targetZ: number; buildingId: number | undefined; worthwhile: boolean } {
+  throw new Error('not implemented');
+}

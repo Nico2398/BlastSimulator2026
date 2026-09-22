@@ -21,6 +21,7 @@ import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
+import type { NavGrid } from '../core/nav/NavGrid.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -258,6 +259,14 @@ export function tutorialSiteFootprintRect(type: BuildingType, tier: BuildingTier
 /** Whether `rect` clears every `tutorialHazards()` entry by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. */
 export function isTutorialSiteHazardClear(rect: TileRegion): boolean {
   return tutorialHazards().every((h) => chebyshevRectDistance(rect, h) >= TUTORIAL_SITE_HAZARD_CLEARANCE_TILES);
+}
+
+/**
+ * Route distance (NavGrid pathfinding cost, not straight-line tiles) from the near corner
+ * of `from` to the near corner of `to`. Returns Infinity when no route exists.
+ */
+export function routeDistanceToRect(_grid: NavGrid, _from: TileRegion, _to: TileRegion): number {
+  throw new Error('not implemented');
 }
 
 /** Open the Crew panel, then hire one role. */
