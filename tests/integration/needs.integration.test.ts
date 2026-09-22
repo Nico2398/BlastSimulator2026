@@ -736,7 +736,8 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
 // staffed:true` + `build living_quarters at:12,15` repro: `staffed:true`
 // auto-staffs the roster, skipping every hire/train/licence step a real
 // player performs to reach this point, and (12,15) is not where the
-// tutorial's own script places living quarters (it's (29,10)) — no player
+// tutorial's own script places living quarters (it's (8,15) — #1170 moved the
+// whole cluster west of the box-cut corridor) — no player
 // ever reaches the old repro's conditions (issue #1094).
 //
 // Over a FIXED window of console ticks starting right after the box-cut
@@ -784,7 +785,7 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
     expect(runCommand(engine, 'employee assign_skill 1 skill:geology level:3').success).toBe(true);
     expect(runCommand(engine, 'survey seismic x:23 z:23').success).toBe(true);
     expect(runCommand(engine, 'employee hire role:driller').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:29,10').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:8,15').success).toBe(true);
     // poll instead of a fixed pad
     {
       let t = 0;
@@ -793,7 +794,7 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
       }
     }
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
-    expect(runCommand(engine, 'build driving_center at:29,14').success).toBe(true);
+    expect(runCommand(engine, 'build driving_center at:6,15').success).toBe(true);
     {
       let t = 0;
       while (t < 300 && engine.ctx.state!.plannedBuildings.length > 0) {
@@ -1004,7 +1005,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
     expect(runCommand(engine, 'employee assign_skill 1 skill:geology level:3').success).toBe(true);
     expect(runCommand(engine, 'survey seismic x:23 z:23').success).toBe(true);
     expect(runCommand(engine, 'employee hire role:driller').success).toBe(true);
-    expect(runCommand(engine, 'build living_quarters at:29,10').success).toBe(true);
+    expect(runCommand(engine, 'build living_quarters at:8,15').success).toBe(true);
     // poll instead of a fixed pad
     {
       let t = 0;
@@ -1013,7 +1014,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
       }
     }
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
-    expect(runCommand(engine, 'build driving_center at:29,14').success).toBe(true);
+    expect(runCommand(engine, 'build driving_center at:6,15').success).toBe(true);
     {
       let t = 0;
       while (t < 300 && engine.ctx.state!.plannedBuildings.length > 0) {

@@ -238,7 +238,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "build living_quarters at:29,10",
+      "command": "build living_quarters at:8,15",
       "timeout": 90,
       "interaction": [
         {
@@ -255,8 +255,8 @@
         },
         {
           "type": "pickTile",
-          "x": 29,
-          "z": 10
+          "x": 8,
+          "z": 15
         },
         {
           "type": "screenshot"
@@ -363,7 +363,7 @@
       }
     },
     {
-      "command": "build driving_center at:29,14",
+      "command": "build driving_center at:6,15",
       "timeout": 90,
       "interaction": [
         {
@@ -380,8 +380,8 @@
         },
         {
           "type": "pickTile",
-          "x": 29,
-          "z": 14
+          "x": 6,
+          "z": 15
         },
         {
           "type": "screenshot"
@@ -1348,7 +1348,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:25,12",
+      "command": "build freight_warehouse at:8,18",
       "timeout": 90,
       "interaction": [
         {
@@ -1369,8 +1369,8 @@
         },
         {
           "type": "pickTile",
-          "x": 25,
-          "z": 12
+          "x": 8,
+          "z": 18
         },
         {
           "type": "screenshot"

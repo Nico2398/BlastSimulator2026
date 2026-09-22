@@ -246,7 +246,7 @@
       }
     },
     {
-      "command": "build living_quarters at:29,10",
+      "command": "build living_quarters at:8,15",
       "timeout": 30,
       "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge/sequence stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem.",
       "role": "player",
@@ -265,8 +265,8 @@
         },
         {
           "type": "pickTile",
-          "x": 29,
-          "z": 10
+          "x": 8,
+          "z": 15
         },
         {
           "type": "screenshot"
@@ -363,7 +363,7 @@
       }
     },
     {
-      "command": "build driving_center at:29,14",
+      "command": "build driving_center at:6,15",
       "timeout": 30,
       "description": "#553: build-driving-center, click half: driving_center ordered through the Build panel -- drill_hole became a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), and hiring only grants the driller their 'blasting' qualification, never the driving.drill_rig licence a drill_rig needs. This step and the two after it (train-driller, buy-drill-rig-assign) close that gap, the same deadlock class #552 fixed for hauling. #556/#816: ordering a building queues a construction site instead of placing it instantly, and `employee train` requires a REAL driving_center (state.buildings, not a pending order) -- confirmed via direct trace that training was genuinely refused immediately after this step with no wait in between, independent of the place_building livelock #816 also found and fixed. The wait step right below drives the site to completion before training is attempted, matching build-living-quarters/build-storage above.",
       "role": "player",
@@ -382,8 +382,8 @@
         },
         {
           "type": "pickTile",
-          "x": 29,
-          "z": 14
+          "x": 6,
+          "z": 15
         },
         {
           "type": "screenshot"
