@@ -11,7 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
@@ -354,7 +354,10 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
 
   const path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = detourPath
     ?? (state.navGrid
-      ? findPath(state.navGrid, { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles })
+      ? findPath(state.navGrid, {
+          agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
+          ...(isDrive && { requiredClearance: vehicleRequiredClearanceCells(vehicle!) }),
+        })
       : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
 
   if (isDrive && state.navGrid && path.found) {
@@ -662,7 +665,10 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
       cell.vehicleOccupied = true;
     }
 
-    return findPath(grid, { agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ, avoidVehicles: true });
+    return findPath(grid, {
+      agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ, avoidVehicles: true,
+      requiredClearance: vehicleRequiredClearanceCells(vehicle),
+    });
   } finally {
     for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);

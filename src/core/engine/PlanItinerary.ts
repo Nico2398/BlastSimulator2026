@@ -9,11 +9,11 @@ import { isFootprintAction, type GameState, type PendingAction } from '../state/
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -134,12 +134,13 @@ export function estimateLegDistance(
   toX: number,
   toZ: number,
   avoidVehicles: boolean,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance });
   return path.found ? path.totalCost : null;
 }
 
@@ -323,7 +324,7 @@ function buildDriveLeg(
   def: ReturnType<typeof getVehicleDefByTier>,
   arrival: 'exact' | 'adjacent',
 ): Leg | null {
-  const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false);
+  const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false, vehicleRequiredClearanceCells(vehicle));
   if (dist === null) return null;
 
   return {
@@ -527,6 +528,7 @@ function resolveRideAlightPoint(
   fromZ: number,
   targetX: number,
   targetZ: number,
+  requiredClearance: number,
 ): { x: number; z: number } | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     const dx = targetX - fromX;
@@ -537,7 +539,7 @@ function resolveRideAlightPoint(
     return { x: fromX + dx * rideFraction, z: fromZ + dz * rideFraction };
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance });
   if (!path.found || path.waypoints.length <= TRANSPORT_ALIGHT_FINISH_WALK_CELLS + 1) return null;
 
   const wp = path.waypoints[path.waypoints.length - 1 - TRANSPORT_ALIGHT_FINISH_WALK_CELLS]!;
@@ -587,7 +589,10 @@ export function buildTransportRideItinerary(
   if (mount === null) return null;
   const { legs, driveFromX, driveFromZ, def } = mount;
 
-  const alight = resolveRideAlightPoint(state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ);
+  const alight = resolveRideAlightPoint(
+    state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
+    vehicleRequiredClearanceCells(vehicle),
+  );
   if (alight === null) return null;
 
   const driveLeg = buildDriveLeg(

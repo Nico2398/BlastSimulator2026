@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isStepClimbable, isCellOccupied } from './NavGrid.js';
+import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
@@ -185,11 +185,10 @@ export function isImpassable(
   isAgentCell: boolean = false,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): boolean {
-  // TODO: implement — not yet gating on clearance (#1154).
-  void requiredClearance;
   if (isAgentCell) return false;
   if (cell.type === 'blocked' || cell.type === 'void') return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
+  if (!hasClearance(cell, requiredClearance)) return true;
   return false;
 }
 

@@ -20,8 +20,10 @@ import {
   NAV_MAX_SLOPE_RATIO,
   NAV_RAMP_MIN_SLOPE_DELTA,
   NAV_CLEARANCE_EMPLOYEE_CELLS,
+  NAV_CLEARANCE_MAX_CELLS,
 } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
+import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -124,10 +126,9 @@ export interface NavCell {
  * unconstrained (#1154).
  */
 export function hasClearance(cell: NavCell | undefined, requiredClearance: number): boolean {
-  // TODO: implement
-  void cell;
-  void requiredClearance;
-  throw new Error('not implemented');
+  if (!cell) return false;
+  if (cell.clearance === undefined) return true;
+  return cell.clearance >= requiredClearance;
 }
 
 /**
@@ -385,6 +386,10 @@ export class NavGrid {
       if (cell) cell.vehicleOccupied = true;
     }
 
+    NavGrid.recomputeClearanceRegion(
+      navGrid, originX, originX + width - 1, originZ, originZ + height - 1,
+    );
+
     return navGrid;
   }
 
@@ -460,6 +465,8 @@ export class NavGrid {
         navGrid.maxClimbY = freshMaxVoxelY;
       }
     }
+
+    NavGrid.recomputeClearanceRegion(navGrid, minX, maxX, minZ, maxZ);
   }
 
   /**
@@ -594,20 +601,64 @@ export class NavGrid {
    * outside the patch itself.
    */
   private static recomputeClearanceRegion(navGrid: NavGrid, minX: number, maxX: number, minZ: number, maxZ: number): void {
-    // TODO: implement
-    void navGrid;
-    void minX;
-    void maxX;
-    void minZ;
-    void maxZ;
-    throw new Error('not implemented');
-  }
+    const writeMinX = navGrid.clampX(minX);
+    const writeMaxX = navGrid.clampX(maxX);
+    const writeMinZ = navGrid.clampZ(minZ);
+    const writeMaxZ = navGrid.clampZ(maxZ);
+    if (writeMinX > writeMaxX || writeMinZ > writeMaxZ) return;
 
-  // Not yet called from buildNavGrid/patchNavGrid (#1154 — implementer's
-  // job); referenced here only so the stub above isn't flagged as an unused
-  // private member under this project's strict tsconfig.
-  static {
-    void NavGrid.recomputeClearanceRegion;
+    // Every write-box cell's true nearest non-traversable cell, if within
+    // NAV_CLEARANCE_MAX_CELLS, lies within this same padded box by
+    // definition of "within NAV_CLEARANCE_MAX_CELLS of a write-box cell" —
+    // one padding is sufficient, no double-padding needed.
+    const seedMinX = navGrid.clampX(writeMinX - NAV_CLEARANCE_MAX_CELLS);
+    const seedMaxX = navGrid.clampX(writeMaxX + NAV_CLEARANCE_MAX_CELLS);
+    const seedMinZ = navGrid.clampZ(writeMinZ - NAV_CLEARANCE_MAX_CELLS);
+    const seedMaxZ = navGrid.clampZ(writeMaxZ + NAV_CLEARANCE_MAX_CELLS);
+
+    // Multi-source 8-directional BFS ("grassfire") from every non-traversable
+    // cell in the seed box. BFS explores in non-decreasing distance order, so
+    // the first time a cell is visited its distance is already the minimum
+    // over every seed — no relaxation needed.
+    const key = (x: number, z: number): number => (x - seedMinX) + (z - seedMinZ) * (seedMaxX - seedMinX + 1);
+    const distances = new Map<number, number>();
+    const queue: { x: number; z: number; dist: number }[] = [];
+    let head = 0;
+
+    for (let z = seedMinZ; z <= seedMaxZ; z++) {
+      for (let x = seedMinX; x <= seedMaxX; x++) {
+        const cell = navGrid.cellAt(x, z);
+        if (cell && (cell.type === 'blocked' || cell.type === 'void')) {
+          distances.set(key(x, z), 0);
+          queue.push({ x, z, dist: 0 });
+        }
+      }
+    }
+
+    while (head < queue.length) {
+      const current = queue[head++]!;
+      if (current.dist >= NAV_CLEARANCE_MAX_CELLS) continue; // cap reached — no further expansion needed
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const nx = current.x + dx;
+        const nz = current.z + dz;
+        if (nx < seedMinX || nx > seedMaxX || nz < seedMinZ || nz > seedMaxZ) continue;
+        const nKey = key(nx, nz);
+        if (distances.has(nKey)) continue;
+        if (!navGrid.cellAt(nx, nz)) continue; // off-grid — never a seed, never explored
+        const nDist = current.dist + 1;
+        distances.set(nKey, nDist);
+        queue.push({ x: nx, z: nz, dist: nDist });
+      }
+    }
+
+    for (let z = writeMinZ; z <= writeMaxZ; z++) {
+      for (let x = writeMinX; x <= writeMaxX; x++) {
+        const cell = navGrid.cellAt(x, z);
+        if (!cell) continue;
+        const dist = distances.get(key(x, z));
+        cell.clearance = dist === undefined ? NAV_CLEARANCE_MAX_CELLS : Math.min(dist, NAV_CLEARANCE_MAX_CELLS);
+      }
+    }
   }
 
   /**

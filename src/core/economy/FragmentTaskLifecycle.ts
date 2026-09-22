@@ -18,7 +18,7 @@
 
 import type { ActionType, GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
-import { resolveVehicleDriver } from '../entities/Vehicle.js';
+import { resolveVehicleDriver, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { NavGrid } from '../nav/NavGrid.js';
@@ -81,7 +81,12 @@ export function findNearestReachableFragment(
 ): number | null {
   if (!state.navGrid) return null;
 
-  const reachable = NavGrid.computeClimbReachableSet(state.navGrid, originX, originZ);
+  // Pre-filter with the same vehicle clearance findPath will later apply
+  // (#1154) — otherwise this could pick a fragment through a gap only wide
+  // enough for a person, then have the real drive route refuse it.
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  const requiredClearance = vehicle ? vehicleRequiredClearanceCells(vehicle) : undefined;
+  const reachable = NavGrid.computeClimbReachableSet(state.navGrid, originX, originZ, requiredClearance);
   if (reachable.size === 0) return null;
 
   let bestId: number | null = null;

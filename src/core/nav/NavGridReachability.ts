@@ -7,7 +7,7 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid } from './NavGrid.js';
-import { isStepClimbable, isCellOccupied } from './NavGrid.js';
+import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
@@ -556,8 +556,6 @@ function floodFillReachable(
   avoidOccupancy: boolean = false,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): { width: number; height: number; count: number } {
-  // TODO: implement — not yet gating the fill on clearance (#1154).
-  void requiredClearance;
   const width = navGrid.width;
   const height = navGrid.height;
   ensureReachabilityScratch(width * height);
@@ -588,6 +586,7 @@ function floodFillReachable(
       if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
       if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
+      if (!hasClearance(neighbourCell, requiredClearance)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }

@@ -2,7 +2,12 @@
 // Debris haulers, rock diggers, drill rigs, building destroyers, and rock fragmenters.
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
-import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
+import {
+  VEHICLE_BASE_STATS,
+  VEHICLE_TIER_MULTIPLIERS,
+  VEHICLE_SCRAP_RESIDUAL_FRACTION,
+  NAV_CLEARANCE_VEHICLE_CELLS,
+} from '../config/balance.js';
 import type { Employee } from './Employee.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
@@ -103,11 +108,15 @@ export function getAllVehicleRoles(): VehicleRole[] {
   return Object.keys(VEHICLE_DEFS) as VehicleRole[];
 }
 
-/** Required NavGrid cell clearance for `vehicle`'s role (#1154). */
+/**
+ * Required NavGrid cell clearance for `vehicle`'s role (#1154). Every
+ * current role needs the same envelope today — per-role turning-radius
+ * variance is out of scope for #1154 — so this is a flat constant rather
+ * than a per-role lookup table with one value repeated in every entry.
+ */
 export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
-  // TODO: implement
   void vehicle;
-  throw new Error('not implemented');
+  return NAV_CLEARANCE_VEHICLE_CELLS;
 }
 
 // ── Vehicle instance ──
