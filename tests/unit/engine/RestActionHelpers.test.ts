@@ -435,6 +435,7 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 0; // full headroom to recover — isolates the travel-cost/tier arithmetic
     state.navGrid = makeFlatNavGrid(20, 10);
     const placed = placeBuilding(state.buildings, 'living_quarters', 90, 10, 100, 100, 1);
     expect(placed.success).toBe(true);
@@ -448,6 +449,7 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 0; // full headroom — the tie is against the tier's own recovery cap, not headroom
     // On foot at AGENT_WALK_SPEED (2 cells/tick): a straight 64-cell one-way
     // route round-trips at 2*64/2 = 64 ticks == BUILDING_REPLENISH_RATES
     // .fatigue[1] (8) * NEED_REST_DURATIONS.fatigue (8) = 64 exactly.
@@ -495,6 +497,7 @@ describe('restRoundTripWorthwhile (#1170)', () => {
       const state = createGame({ seed: SEED });
       const rng = new Random(SEED);
       const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+      employee.fatigue = 0; // full headroom — this compares travel cost against the tier cap, not headroom
       state.navGrid = makeFlatNavGrid(50, 10);
       const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
       expect(placed.success).toBe(true);
@@ -544,13 +547,15 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 0; // full headroom (100) — enough to clear tier 3's cap for this distance
     state.navGrid = makeFlatNavGrid(50, 10);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
     // Round trip = 80 ticks (40 cells one-way at speed 1) — exceeds tier 1's
-    // 64 max recovery, but not tier 3's 160.
+    // 64 max recovery, but not tier 3's 160 (headroom, at MAX_NEED_GAUGE 100, is
+    // the binding cap here since it's below 160 — still comfortably above 80).
     expect(TIER3_MAX_RECOVERY).toBeGreaterThan(80);
 
     const tier1 = placeBuilding(state.buildings, 'living_quarters', 90, 5, 100, 100, 1);
@@ -574,6 +579,7 @@ describe('resolveRestDestination (#1170)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 0; // full headroom to recover
     state.navGrid = makeFlatNavGrid(30, 20);
     const placed = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, 1);
     expect(placed.success).toBe(true);

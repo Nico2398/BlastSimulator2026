@@ -268,7 +268,13 @@ export function isMidCollapseOrForcedRest(employee: Employee): boolean {
  * the fatigue it costs to travel there and back must not exceed the fatigue it can recover.
  * `building === null` (resting in place, no travel) is always worthwhile.
  * An unreachable target (no route) is always worthwhile — this guard never blocks on a
- * routing failure another mechanism owns.
+ * routing failure another mechanism owns. A world with no NavGrid built yet is the same
+ * case: `estimateLegDistance`'s own null-NavGrid convention is to fall back to the cheap
+ * octile heuristic (a real, non-null distance — the estimate every other planner caller
+ * needs before a NavGrid exists), not to report unreachable, so this guard can't rely on
+ * that fallback to reach the "unreachable -> true" branch below. Checked explicitly here
+ * instead: no NavGrid means no real routing exists to weigh a round trip against, so this
+ * guard must not block one on a heuristic distance it can't actually verify.
  */
 export function restRoundTripWorthwhile(
   state: GameState,
@@ -278,6 +284,7 @@ export function restRoundTripWorthwhile(
   targetZ: number,
 ): boolean {
   if (building === null) return true;
+  if (state.navGrid === null) return true;
 
   // Mounted employees drive the round trip at their vehicle's speed rather
   // than walking it — mirrors hasClaimableSameRoleFollowUp's own mounted-

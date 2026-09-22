@@ -313,6 +313,7 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50; // headroom to recover — isolates the short-trip affordability
     state.navGrid = makeFlatNavGrid(90, 10);
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [employee.id];
@@ -826,7 +827,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     const prior = pushHeldAction(state, employee.id, 1161);
     employee.activeActionId = prior.id;
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
-    employee.fatigue = 100;
+    employee.fatigue = 50; // headroom to recover — isolates the short-trip affordability
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
