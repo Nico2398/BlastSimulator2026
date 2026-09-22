@@ -41,6 +41,8 @@ export interface RampResult {
   message: string;
   cost: number;
   voxelsCleared: number;
+  /** Voxels raised (filled) to reach the straight floor line — see `RampSegmentDef.cells[i].fillTarget` (#1172). */
+  voxelsFilled: number;
 }
 
 // ── Direction offsets ──
@@ -70,7 +72,7 @@ export function buildRamp(
 ): RampResult {
   const validation = validateRampOrder(ramp, cash);
   if (!validation.success) {
-    return { success: false, message: validation.message, cost: 0, voxelsCleared: 0 };
+    return { success: false, message: validation.message, cost: 0, voxelsCleared: 0, voxelsFilled: 0 };
   }
 
   const segments = defineRampSegments(grid, ramp);
@@ -97,6 +99,7 @@ export function buildRamp(
     message: `Ramp built: ${ramp.length}m ${ramp.direction}, ${voxelsCleared} voxels cleared`,
     cost: validation.cost,
     voxelsCleared,
+    voxelsFilled: 0,
   };
 }
 
@@ -221,7 +224,18 @@ export interface RampSegmentDef {
    * which later carve calls (running against an already-partially-dug grid)
    * can no longer recover.
    */
-  cells: { x: number; y: number; z: number; floorAdjustment?: number }[];
+  cells: {
+    x: number; y: number; z: number; floorAdjustment?: number;
+    /**
+     * Present only on a fill column's floor-row cell (#1172) — the absolute
+     * continuous height that column's floor-row band must be raised to, to
+     * reach the ramp's straight `floorY` line where existing terrain dips
+     * below it. Mutually exclusive with `floorAdjustment`: a cell either
+     * carves down to the line (`floorAdjustment`) or fills up to it
+     * (`fillTarget`), never both.
+     */
+    fillTarget?: number;
+  }[];
   region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
   /** Anchor X for ghost/dispatch, valid even when `region` is null. */
   targetX: number;
@@ -241,6 +255,8 @@ interface RampColumn {
   floorRowY: number;
   /** `RampSegmentDef.cells[i].floorAdjustment` for this column's floor-row cell — see that field's doc. */
   floorAdjustment: number;
+  /** True when this column's existing terrain dips below the ramp's straight `floorY` line, requiring a fill rather than a cut (#1172). */
+  isFillColumn: boolean;
 }
 
 /**
@@ -344,7 +360,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
 
-    columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment });
+    columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn: false });
     globalMinY = Math.min(globalMinY, floorY);
     globalMaxY = Math.max(globalMaxY, ceilingY - 1);
   }
@@ -459,6 +475,19 @@ const FLOOR_TARGET_EPSILON = 1e-6;
  * pristine natural terrain always reads *above* the ramp's intended floor
  * the first time a column is carved, whatever its density's exact value.
  */
+/**
+ * Whether `cell` (a cut or fill cell of a ramp segment) still has work
+ * outstanding against `grid` — a cut cell pending while still solid, a fill
+ * cell pending while its column's floor is still below `fillTarget`. Direction-
+ * agnostic replacement for `ActionSelection.ts`'s inline `densityAt(...) > 0`
+ * filter, which only recognised the cut case (#1172).
+ */
+export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
+  void grid; void cell;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 function carveRampCell(
   grid: VoxelGrid,
   cell: { x: number; y: number; z: number; floorAdjustment?: number },
@@ -491,8 +520,9 @@ function carveRampCell(
  * `defineRampSegments` ran is silently skipped, not double-counted, not an
  * error.
  */
-export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number } {
+export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number; voxelsFilled: number } {
   let voxelsCleared = 0;
+  const voxelsFilled = 0;
   let bandedMaxY = -1;
   const carvedColumns = captureColumnTopsForCarve(grid, segment.cells);
 
@@ -511,7 +541,7 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
     emitter?.emit('terrain:updated', { region });
   }
 
-  return { voxelsCleared };
+  return { voxelsCleared, voxelsFilled };
 }
 
 /**
@@ -572,8 +602,9 @@ export function carveRampSegmentSlice(
   fromIndex: number,
   toIndex: number,
   emitter?: EventEmitter,
-): { voxelsCleared: number; region: RampSegmentDef['region'] } {
+): { voxelsCleared: number; voxelsFilled: number; region: RampSegmentDef['region'] } {
   let voxelsCleared = 0;
+  const voxelsFilled = 0;
   let bandedMaxY = -1;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
@@ -603,7 +634,7 @@ export function carveRampSegmentSlice(
     emitter?.emit('terrain:updated', { region });
   }
 
-  return { voxelsCleared, region };
+  return { voxelsCleared, voxelsFilled, region };
 }
 
 /**
