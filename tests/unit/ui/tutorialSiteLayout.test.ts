@@ -26,10 +26,7 @@ import {
   // Chebyshev tile count to a real NavGrid route-cost bound — #1151's
   // slope-based navmesh made real walking routes much longer than straight-
   // line tile distance, so the old TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES
-  // bound could pass while the real walk was far longer. This import does
-  // not exist yet on this branch (the implementer adds it alongside the
-  // renamed constant) — the whole file fails to compile until then, which is
-  // the expected red-phase state for this change.
+  // bound could pass while the real walk was far longer.
   TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST,
 } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
