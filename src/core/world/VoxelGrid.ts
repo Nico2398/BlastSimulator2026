@@ -774,6 +774,30 @@ export class VoxelGrid {
     return this.chunks.get(chunkKey(cx, cz))?.slabs.size ?? 0;
   }
 
+  /**
+   * Inclusive `[min, max]` cy of chunk (cx, cz)'s already-materialized slabs,
+   * or null when the column is unowned or has none allocated yet.
+   *
+   * A surface-height scan (`computeColumnRangeY`/`computeVoxelColumnSurfaceHeight`)
+   * only ever reports a column's topmost solid-to-air crossing — real ground
+   * genuinely disconnected from that top (a floating block written directly
+   * below an air gap, never swept through from the surface) has no effect on
+   * it at all. This is the other signal a caller like TerrainMesh's `buildAll`
+   * needs to still mesh that block: whatever has actually been written and
+   * allocated, independent of whether it is reachable from the topmost
+   * surface (#1188).
+   */
+  allocatedCyRange(cx: number, cz: number): { min: number; max: number } | null {
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk || chunk.slabs.size === 0) return null;
+    let min = Infinity, max = -Infinity;
+    for (const cy of chunk.slabs.keys()) {
+      if (cy < min) min = cy;
+      if (cy > max) max = cy;
+    }
+    return { min, max };
+  }
+
   // ── Dirty tracking — what a save has to store voxel-by-voxel (#473 D4) ──
 
   /** Chunk coordinates of every chunk written since it was last marked pristine. */

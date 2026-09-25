@@ -165,6 +165,35 @@ describe('GameRenderer — staged level load (#474)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     expect(() => renderer.finishLevelLoad(makeEmptyGameContext())).not.toThrow();
   });
+
+  it('after the world grows past its base size, buildLandscapeMesh rebuilds the landscape from the level\'s base size, not the live/expanded one (#1188)', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
+    const baseSizeX = ctx.state!.world!.baseSizeX;
+    const baseSizeZ = ctx.state!.world!.baseSizeZ;
+
+    // buildPlayableMesh requires terrain built first, and caches ctx.landscape
+    // at the correct (pre-expansion) size as a side effect of its own
+    // landscapeEdgeHeightSampler() call.
+    renderer.buildPlayableMesh(ctx);
+
+    // Simulate a post-expansion world whose landscape cache was invalidated
+    // (e.g. a campaign level swap, mirroring the "rebuildLandscapeMesh"
+    // test above): the live bounding box has grown, the level's original
+    // base size (the generation datum) has not. This isolates
+    // buildLandscapeMesh's OWN ensureLandscape() call — landscapeEdgeHeightSampler's
+    // is covered by GameRendererTerrain.test.ts.
+    ctx.state!.world!.sizeX = baseSizeX + 64;
+    ctx.state!.world!.sizeZ = baseSizeZ + 64;
+    ctx.landscape = null;
+
+    renderer.buildLandscapeMesh(ctx);
+
+    expect(ctx.landscape).not.toBeNull();
+    expect(ctx.landscape!.playableRect.maxX).toBe(baseSizeX);
+    expect(ctx.landscape!.playableRect.maxZ).toBe(baseSizeZ);
+  });
 });
 
 // ── Ghost/terrain resync dirty-check gating (#761) ──────────────────────────

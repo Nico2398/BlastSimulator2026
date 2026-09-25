@@ -12,8 +12,7 @@
 
 import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
-import { ensureLandscape } from '../console/commands/world.js';
-import { getBiome } from '../core/world/BiomeCatalog.js';
+import { ensureLandscape, terrainConfigOf } from '../console/commands/world.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceHeight, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import type { SceneManager } from './SceneManager.js';
 import { densityGradientNormal, type TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
@@ -164,10 +163,9 @@ export function playableCut(grid: VoxelGrid, edgeHeight?: (x: number, z: number)
  */
 export function landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: number) => number) | null {
   if (!ctx.state?.world || !ctx.grid) return null;
-  const biome = getBiome(ctx.state.mineType);
-  if (!biome) return null;
-  const { sizeX, sizeY, sizeZ } = ctx.state.world;
-  const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  const config = terrainConfigOf(ctx.state);
+  if (!config) return null;
+  const handle = ensureLandscape(ctx, config);
   if (!handle) return null;
   return (x, z) => handle.sampleColumn(x, z).height;
 }

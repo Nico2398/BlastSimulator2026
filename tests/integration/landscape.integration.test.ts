@@ -70,6 +70,25 @@ describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => 
     const after = runCommand(engine, 'terrain_info');
     expect(after.output).toBe(before.output);
   });
+
+  it('after the world grows past its base size, landscape_info still builds the landscape from the level\'s base size, not the live/expanded one (#1188)', () => {
+    runCommand(engine, 'new_game mine_type:desert_badlands seed:42 size:32');
+    const world = engine.ctx.state!.world!;
+    const baseSizeX = world.baseSizeX;
+    const baseSizeZ = world.baseSizeZ;
+
+    // Simulate a post-expansion site: the live bounding box grows (as a real
+    // chunk claim would grow it), but baseSizeX/baseSizeZ — the level's
+    // original generation datum — never change.
+    world.sizeX = baseSizeX + 64;
+    world.sizeZ = baseSizeZ + 64;
+
+    const result = runCommand(engine, 'landscape_info');
+    expect(result.success).toBe(true);
+    const rect = engine.ctx.landscape!.playableRect;
+    expect(rect.maxX).toBe(baseSizeX);
+    expect(rect.maxZ).toBe(baseSizeZ);
+  });
 });
 
 // ── The join, on a real level's world (#907) ────────────────────────────────

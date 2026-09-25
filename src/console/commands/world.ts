@@ -548,12 +548,11 @@ export function terrainInfoCommand(
 
 /**
  * Builds (or reports the already-built) landscape map for the current game
- * — the first real trigger for `ensureLandscape`'s lazy build. Resolves
- * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`,
- * and `mixedRockHardness` from `ctx.state.world` (#1181 fixed the same gap
- * for `regenerateGrid`'s own load-path callers, via `terrainConfigOf`/
- * `regenerateGridParams`; this command reads the field directly since it
- * only ever runs against an already-loaded game).
+ * — the first real trigger for `ensureLandscape`'s lazy build. Config comes
+ * from `terrainConfigOf`, the level's original base size (#1188) — not
+ * `ctx.state.world`'s live, possibly site-expanded size, which would cut the
+ * landscape against the wrong pit-mask rect if this command runs after an
+ * expansion.
  */
 export function landscapeInfoCommand(
   ctx: GameContext,
@@ -564,14 +563,10 @@ export function landscapeInfoCommand(
     return { success: false, output: t('console.no_game_loaded') };
   }
 
-  const biome = getBiome(ctx.state.mineType);
-  if (!biome) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
+  const config = terrainConfigOf(ctx.state);
+  if (!config) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
 
-  const { sizeX, sizeY, sizeZ, mixedRockHardness } = ctx.state.world;
-  const landscape = ensureLandscape(ctx, {
-    seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
-    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
-  });
+  const landscape = ensureLandscape(ctx, config);
   if (!landscape) return { success: false, output: t('world.landscape_build_failed') };
 
   const { map } = landscape;

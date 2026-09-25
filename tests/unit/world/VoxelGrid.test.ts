@@ -706,6 +706,26 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   });
 });
 
+describe('VoxelGrid.allocatedCyRange — inclusive cy range of chunk (cx,cz)\'s allocated slabs (#1188)', () => {
+  it('returns null for a column with no chunk allocated at all', () => {
+    const grid = new VoxelGrid(16, 8, 16); // only chunk (0,0) is claimed
+    expect(grid.allocatedCyRange(5, 5)).toBeNull(); // chunk (5,5) was never touched
+  });
+
+  it('returns null for an owned chunk with zero allocated slabs', () => {
+    const grid = new VoxelGrid(16, 8, 16); // chunk (0,0) exists, but nothing was ever written into it
+    expect(grid.allocatedCyRange(0, 0)).toBeNull();
+  });
+
+  it('returns the inclusive [min, max] cy range spanning exactly the allocated slabs, including a gap', () => {
+    const grid = new VoxelGrid(16, 48, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(2, 2, 2, compId, undefined, 1); // y=2 -> cy=0
+    grid.fillVoxel(3, 40, 3, compId, undefined, 1); // y=40 -> cy=2, leaving cy=1 unallocated
+    expect(grid.allocatedCyRange(0, 0)).toEqual({ min: 0, max: 2 });
+  });
+});
+
 describe('computeVoxelColumnSurfaceY', () => {
   it('finds the highest solid voxel in a column', () => {
     const grid = new VoxelGrid(16, 8, 16);

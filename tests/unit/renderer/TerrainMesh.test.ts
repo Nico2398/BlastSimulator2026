@@ -3,11 +3,13 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid, CHUNK_SIZE, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE, setVoxelColumnSurfaceHeight, computeColumnRangeY } from '../../../src/core/world/VoxelGrid.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
 import {
   TerrainMesh,
   SurveyConfidenceOverlay,
   virtualEdgeDensity,
+  gridHeightRange,
   SKIRT_VISIBILITY_MARGIN_M,
   type SurveyConfidencePoint,
   type SurveyConfidenceOverlayOptions,
@@ -1274,6 +1276,195 @@ describe('TerrainMesh', () => {
       }
       // No cutoff applied — full-depth fallback, same as no sampler installed at all.
       expect(minY).toBeLessThanOrEqual(0 + 1e-6);
+      tm.dispose();
+    });
+  });
+
+  // ─── #1188: vertical range no longer clamped to [0, ceil(sizeY/16)) ─────────
+  describe('meshing is no longer clamped to the fixed [0, ceil(sizeY/16)) chunk range (#1188)', () => {
+    it('a pit floor dug to y=-20 in an otherwise flat grid produces mesh vertices at that depth after buildAll', () => {
+      const grid = new VoxelGrid(16, 16, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, 4, compId);
+        }
+      }
+      for (let x = 4; x < 8; x++) {
+        for (let z = 4; z < 8; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, -20, compId);
+        }
+      }
+
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      tm.buildAll();
+
+      let minY = Infinity;
+      for (const mesh of tm.meshes) {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 1; i < pos.length; i += 3) minY = Math.min(minY, pos[i]!);
+      }
+      expect(minY).toBeLessThan(-19);
+      tm.dispose();
+    });
+
+    it('a spire built to y=40 above a sizeY=16 grid\'s old top produces mesh vertices at that height after buildAll', () => {
+      const grid = new VoxelGrid(16, 16, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, 4, compId);
+        }
+      }
+      for (let x = 4; x < 8; x++) {
+        for (let z = 4; z < 8; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, 40, compId);
+        }
+      }
+
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      tm.buildAll();
+
+      let maxY = -Infinity;
+      for (const mesh of tm.meshes) {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 1; i < pos.length; i += 3) maxY = Math.max(maxY, pos[i]!);
+      }
+      expect(maxY).toBeGreaterThan(39);
+      tm.dispose();
+    });
+
+    it('negative cy chunk keys stay distinct from positive ones for the same (cx, cz) column', () => {
+      // sizeY=32 keeps cy=1 (y=16..31) inside the OLD fixed [0, ncy) range too,
+      // isolating the failure to cy=-1 (y=-16..-1) specifically — negative
+      // chunks the old fixed-range loop never visits at all, whatever the key
+      // packing does with them.
+      const grid = new VoxelGrid(16, 32, 16);
+      for (let x = 0; x < 16; x++) {
+        for (let y = -16; y < -2; y++) {
+          for (let z = 0; z < 16; z++) grid.setVoxel(x, y, z, makeSolidVoxel());
+        }
+      }
+      for (let x = 0; x < 16; x++) {
+        for (let y = 16; y < 30; y++) {
+          for (let z = 0; z < 16; z++) grid.setVoxel(x, y, z, makeSolidVoxel());
+        }
+      }
+
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      tm.buildAll();
+
+      const meshNeg1 = tm.getChunkMesh(0, -1, 0);
+      const meshPos1 = tm.getChunkMesh(0, 1, 0);
+      expect(meshNeg1).not.toBeNull();
+      expect(meshPos1).not.toBeNull();
+      expect(meshNeg1).not.toBe(meshPos1);
+      tm.dispose();
+    });
+
+    it('buildAll on a real generateTerrain grid never materializes a buried below-ground slab far from the real ground extent', () => {
+      // A single 16x16 chunk (no neighbours on any side) with a declared
+      // sizeY much taller than the real ground needs. WorldGen centres real
+      // ground around ~55% of sizeY (computeGroundOffset), so most of the
+      // declared height below that is solid rock nothing ever sees — the
+      // "buried" chunks this guards against over-eagerly materializing.
+      const config = { sizeX: 16, sizeY: 128, sizeZ: 16, seed: 7, climateBias: [0, 0] as const };
+      const grid = generateTerrain(config);
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      tm.buildAll();
+
+      const range = computeColumnRangeY(grid, grid.minX, grid.maxX - 1, grid.minZ, grid.maxZ - 1);
+      expect(range).not.toBeNull();
+      const cyMin = Math.floor(range!.minY / CHUNK_SIZE);
+      const cyMax = Math.floor(range!.maxY / CHUNK_SIZE);
+      // Only the real ground band(s), plus a small halo for the +1 vertical
+      // read a topmost cube's far corner reaches into — never every declared
+      // cy from 0 up through the ground, most of it solid rock nobody sees.
+      const expectedMaxSlabs = (cyMax - cyMin + 1) + 2;
+
+      expect(grid.allocatedSlabCount).toBeGreaterThan(0);
+      expect(grid.allocatedSlabCount).toBeLessThanOrEqual(expectedMaxSlabs);
+      tm.dispose();
+    });
+
+    it('two grids sharing the same real ground extent but different declared sizeY produce the same TerrainMaterial altitude height-range uniform', () => {
+      function buildFlatGrid(sizeY: number): VoxelGrid {
+        const grid = new VoxelGrid(16, sizeY, 16);
+        const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+        for (let x = 0; x < 16; x++) {
+          for (let z = 0; z < 16; z++) {
+            setVoxelColumnSurfaceHeight(grid, x, z, 4, compId);
+          }
+        }
+        return grid;
+      }
+
+      const gridA = buildFlatGrid(16);
+      const gridB = buildFlatGrid(64); // same real ground, much taller declared bound
+
+      const tmA = new TerrainMesh(new THREE.Scene(), gridA);
+      tmA.buildAll();
+      const tmB = new TerrainMesh(new THREE.Scene(), gridB);
+      tmB.buildAll();
+
+      const rangeA = tmA.sharedMaterial.customUniforms['uHeightRange']!.value as THREE.Vector2;
+      const rangeB = tmB.sharedMaterial.customUniforms['uHeightRange']!.value as THREE.Vector2;
+      expect(rangeA.x).toBeCloseTo(rangeB.x, 3);
+      expect(rangeA.y).toBeCloseTo(rangeB.y, 3);
+
+      tmA.dispose();
+      tmB.dispose();
+    });
+  });
+
+  describe('gridHeightRange (#1188)', () => {
+    it('returns the real ground [minY, maxY] across the grid, not [0, sizeY]', () => {
+      const grid = new VoxelGrid(16, 16, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, 4, compId);
+        }
+      }
+      for (let x = 4; x < 8; x++) {
+        for (let z = 4; z < 8; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, -20, compId);
+        }
+      }
+
+      const [minY, maxY] = gridHeightRange(grid);
+      expect(minY).toBeLessThanOrEqual(-19);
+      expect(maxY).toBeGreaterThanOrEqual(4);
+    });
+
+    it('falls back to [0, 60] for a grid with no ground at all', () => {
+      const grid = new VoxelGrid(4, 4, 4);
+      expect(gridHeightRange(grid)).toEqual([0, 60]);
+    });
+  });
+
+  describe('chunkVerticalSlabRange (#1188)', () => {
+    it('returns the cy range covering the real ground extent within rect', () => {
+      const grid = new VoxelGrid(16, 16, 16);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          setVoxelColumnSurfaceHeight(grid, x, z, 4, compId);
+        }
+      }
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      const range = tm.chunkVerticalSlabRange({ minX: 0, maxX: 16, minZ: 0, maxZ: 16 });
+      expect(range).not.toBeNull();
+      expect(range!.cyMin).toBe(0);
+      expect(range!.cyMax).toBe(0);
+      tm.dispose();
+    });
+
+    it('returns null when rect has no ground at all', () => {
+      const grid = new VoxelGrid(16, 16, 16); // fully empty
+      const tm = new TerrainMesh(new THREE.Scene(), grid);
+      const range = tm.chunkVerticalSlabRange({ minX: 0, maxX: 16, minZ: 0, maxZ: 16 });
+      expect(range).toBeNull();
       tm.dispose();
     });
   });
