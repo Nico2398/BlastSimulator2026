@@ -301,6 +301,11 @@ describe('replayTerrainEdits — unit-level round trip', () => {
     // were ever made), built directly rather than depending on the mutators'
     // own (still-unimplemented) auto-recording.
     const fresh = new VoxelGrid(8, 8, 8);
+    // A real generator interns every composition it paints into the grid it
+    // is generating — mirror that here so `fresh`'s own palette assigns
+    // `rockCompId` the same index `live`'s did (both are fresh palettes, and
+    // this is the first composition either one interns).
+    fresh.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 4; y++) fresh.fillVoxel(2, y, 2, rockCompId, undefined, 1);
 
     const edits = TerrainEdits.empty();
