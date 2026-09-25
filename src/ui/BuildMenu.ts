@@ -46,7 +46,8 @@ import {
   type Building,
 } from '../core/entities/Building.js';
 import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
-import { computeMinimumRampLength } from '../core/mining/Ramp.js';
+import type { TileRegion } from './tutorialPickerRegion.js';
+import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
 
@@ -285,6 +286,23 @@ export class BuildMenu extends PanelBase {
     refresh();
   }
 
+  /**
+   * Arm-time only (#1210): when the step pins the drag to a fixed exact
+   * region, clamp the depth field DOWN (never up) to the deepest depth that
+   * region's own fixed line still geometrically validates for. Cash is
+   * forced to `Infinity` so only geometry (the slope/length gate), never
+   * affordability, drives the clamp. Purely geometric — works for any
+   * exact-pinned region, not just the tutorial's 12-tile box-cut strip.
+   */
+  private clampDepthToExactRegion(region: TileRegion): void {
+    const rampDef = rampDefFromEndpoints(region.x1, region.z1, region.x2, region.z2, this.rampDepth);
+    let depth = this.rampDepth;
+    while (depth > 1 && !validateRampOrder({ ...rampDef, targetDepth: depth }, Infinity).success) {
+      depth--;
+    }
+    this.rampDepth = depth;
+  }
+
   /** Ramps are a line drag (start → end), not a rectangle — the corridor width comes from the vehicle profile, not the drag. */
   private armRampTool(): void {
     const kit = this.placementKit;
@@ -296,9 +314,18 @@ export class BuildMenu extends PanelBase {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
       overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
-      const tiles = sel ? Math.round(Math.hypot(sel.x2 - sel.x1, sel.z2 - sel.z1)) + 1 : 0;
-      const minLength = computeMinimumRampLength(this.rampDepth);
-      const tooShort = sel !== null && tiles < minLength;
+      // One source of truth (#1210): the same RampDef + validateRampOrder call
+      // the console command runs decides the UI gate here, so the two can
+      // never disagree again about a length/depth/cash combination.
+      const rampDef = sel ? rampDefFromEndpoints(sel.x1, sel.z1, sel.x2, sel.z2, this.rampDepth) : null;
+      const validation = rampDef ? validateRampOrder(rampDef, this.lastState?.cash ?? 0) : null;
+      const confirmEnabled = controller.canConfirm && (validation?.success ?? false);
+      let confirmDisabledReason: string | undefined;
+      if (!controller.canConfirm) {
+        confirmDisabledReason = placementRefusalReason(controller);
+      } else if (validation && !validation.success) {
+        confirmDisabledReason = validation.messageKey ? t(validation.messageKey, validation.messageParams) : validation.message;
+      }
       strip.show({
         icon: 'down',
         title: t('ui.build.ramp'),
@@ -306,22 +333,26 @@ export class BuildMenu extends PanelBase {
         fields: [
           { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
         ],
-        result: sel ? `${tiles} ${t('ui.tile_select.tiles')}` : '—',
-        confirmEnabled: controller.canConfirm && !tooShort,
-        confirmDisabledReason: tooShort
-          ? t('ui.build.ramp_needs_length', { min: Math.ceil(minLength) })
-          : placementRefusalReason(controller),
+        result: rampDef ? `${rampDef.length} ${t('ui.tile_select.tiles')}` : '—',
+        confirmEnabled,
+        confirmDisabledReason,
         instruction: t('ui.build.ramp_instruction'),
       });
     };
 
     controller.setConfirmHandler((sel) => {
       const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth}`);
-      this.setStatus(cmd?.success ? t('ui.build.ramp_ordered') : (cmd?.output ?? ''));
+      if (!cmd?.success) {
+        this.setStatus(cmd?.output ?? '');
+        return false;
+      }
+      this.setStatus(t('ui.build.ramp_ordered'));
       overlay.flashConfirm();
+      return true;
     });
     controller.setChangeHandler(refresh);
     controller.arm({ shape: 'line' });
+    if (controller.activeRegion?.exact) this.clampDepthToExactRegion(controller.activeRegion);
     refresh();
   }
 

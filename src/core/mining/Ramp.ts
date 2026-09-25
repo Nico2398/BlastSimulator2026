@@ -60,9 +60,18 @@ export interface RampResult {
 export function rampDefFromEndpoints(
   originX: number, originZ: number, endX: number, endZ: number, targetDepth: number,
 ): RampDef {
-  void originX; void originZ; void endX; void endZ; void targetDepth;
-  // TODO: implement
-  return undefined as unknown as RampDef;
+  const dx = endX - originX;
+  const dz = endZ - originZ;
+  let direction: RampDirection;
+  let length: number;
+  if (Math.abs(dz) >= Math.abs(dx)) {
+    direction = dz >= 0 ? 'south' : 'north';
+    length = Math.abs(Math.round(dz));
+  } else {
+    direction = dx >= 0 ? 'east' : 'west';
+    length = Math.abs(Math.round(dx));
+  }
+  return { originX, originZ, direction, length, targetDepth };
 }
 
 // ── Direction offsets ──
@@ -223,7 +232,13 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
   if (cash < totalCost) {
-    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
+    return {
+      success: false,
+      message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`,
+      cost: 0,
+      messageKey: 'console.insufficient_funds',
+      messageParams: { need: formatMoney(totalCost), have: formatMoney(cash) },
+    };
   }
 
   return { success: true, message: '', cost: totalCost };
