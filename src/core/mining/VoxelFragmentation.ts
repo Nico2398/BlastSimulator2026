@@ -199,19 +199,37 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
   // (#1186) that padding can now land past where a fixture's (or a finite
   // backfill's) rock actually ends.
   //
-  // Falling back only when the *entire* row is empty (rather than per
-  // column, unconditionally) is what keeps this from mistaking a genuinely
-  // floating or detached fragment for an anchor: a lone unsupported voxel
-  // sitting by itself in its column is never the reason the whole face reads
-  // as empty — the rows that motivate the fallback are padding past a real,
-  // multi-column slab, not a single isolated speck — so as soon as any
-  // column touches the row for real, every column in that row is read at
-  // face value and the isolated speck gets no anchor at all.
+  // Falling back per column, unconditionally, whenever the whole row is
+  // empty is not enough on its own: the row can read empty because it is
+  // genuinely padding past a real, multi-column slab (the case this fallback
+  // exists for), but it can equally read empty because the box's face just
+  // does not reach anything at all, and the "nearest solid voxel" the
+  // per-column search then finds is whatever solid survivor happens to sit
+  // topmost/bottommost in that one column — including a voxel that is itself
+  // a genuinely isolated fragment with nothing connecting it to real support.
+  // Seeding that directly as an anchor would mark it "supported" without
+  // ever running it through the flood fill, defeating the one thing this
+  // function exists to catch.
+  //
+  // A real slab's per-column candidate always has at least one face-adjacent
+  // solid survivor of its own — the neighbouring column's slice of the same
+  // slab, at the same or an adjacent depth — because the slab is a connected
+  // mass, not a single voxel. A genuinely floating speck, by definition, has
+  // none. So the candidate only earns anchor status when it clears that
+  // check; otherwise it is left to the flood fill like any other voxel, and
+  // an isolated fragment with no real connection stays unreached and
+  // unsupported.
   const rowHasSolid = (y: number): boolean => {
     for (let z = box.minZ; z < box.maxZ; z++) {
       for (let x = box.minX; x < box.maxX; x++) {
         if (isSolidSurvivor(x, y, z)) return true;
       }
+    }
+    return false;
+  };
+  const hasSolidNeighbor = (x: number, y: number, z: number): boolean => {
+    for (const [dx, dy, dz] of FACE_OFFSETS) {
+      if (isSolidSurvivor(x + dx, y + dy, z + dz)) return true;
     }
     return false;
   };
@@ -223,14 +241,20 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
         seed(x, box.minY, z);
       } else {
         for (let y = box.minY; y < box.maxY; y++) {
-          if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+          if (isSolidSurvivor(x, y, z)) {
+            if (hasSolidNeighbor(x, y, z)) seed(x, y, z);
+            break;
+          }
         }
       }
       if (maxYRowGrounded) {
         seed(x, box.maxY - 1, z);
       } else {
         for (let y = box.maxY - 1; y >= box.minY; y--) {
-          if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+          if (isSolidSurvivor(x, y, z)) {
+            if (hasSolidNeighbor(x, y, z)) seed(x, y, z);
+            break;
+          }
         }
       }
     }

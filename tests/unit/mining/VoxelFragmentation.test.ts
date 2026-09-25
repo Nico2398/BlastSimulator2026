@@ -242,6 +242,34 @@ describe('VoxelFragmentation — unsupported rock', () => {
     expect(isFragmented(result, field, 2, 3, 3)).toBe(true);
     expect(result.detachedCount).toBeGreaterThan(0);
   });
+
+  it('a lone floating voxel found only by the Y-face fallback still reads as unsupported', () => {
+    // Thin slab covering the whole footprint at y=0..1, plus a genuinely
+    // isolated floating voxel far above it and unconnected to anything. The
+    // box's maxY is padded well past the real rock (#1186 unclamped
+    // blast-zone padding), so the maxY face row is empty in every column and
+    // collectUnsupported falls back to a per-column nearest-solid search —
+    // which must not mistake the floating voxel for an anchor just because
+    // it happens to be the nearest solid voxel in its own column.
+    const grid = new VoxelGrid(7, 20, 7);
+    for (let z = 0; z < 7; z++) {
+      for (let x = 0; x < 7; x++) {
+        grid.setVoxel(x, 0, z, rockVoxel('cruite'));
+        grid.setVoxel(x, 1, z, rockVoxel('cruite'));
+      }
+    }
+    grid.setVoxel(3, 8, 3, rockVoxel('cruite'));
+
+    const box: BlastBox = { minX: 0, minY: 0, minZ: 0, maxX: 7, maxY: 12, maxZ: 7 };
+    const field = createEnergyField(grid, box);
+    const result = identifyFragmentedVoxels(field, grid);
+
+    expect(isFragmented(result, field, 3, 8, 3)).toBe(true);
+    expect(result.detachedCount).toBe(1);
+    // The slab itself is genuinely anchored — via the literal minY row and
+    // lateral flood-fill, not the fallback — and must stay put.
+    expect(isFragmented(result, field, 0, 0, 0)).toBe(false);
+  });
 });
 
 // ── Post-carve renormalisation (#1148) ──────────────────────────────────────
