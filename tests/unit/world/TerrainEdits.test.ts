@@ -121,18 +121,26 @@ describe('an add landing inside an existing dug region', () => {
 });
 
 describe('fill-then-dig / dig-then-refill of the identical volume', () => {
-  it('recordAdd then recordDig of the same range on a previously unedited column returns to empty', () => {
+  it('recordAdd then recordDig of the same range on a previously unedited column ends in a plain dug segment, not two segments', () => {
+    // TerrainEdits cannot know the generated baseline's material, so it must
+    // not assume this pair cancels back to "no edit" — see #1180 review:
+    // collapsing here would silently misreplay when the baseline at this
+    // column was not air (e.g. a different rock than whatever was added).
     const edits = TerrainEdits.empty();
     edits.recordAdd(6, 6, 0, 5, 3);
     edits.recordDig(6, 6, 0, 5);
-    expect(edits.segmentsAt(6, 6)).toEqual([]);
+    expect(edits.segmentsAt(6, 6)).toEqual([{ yLo: 0, yHi: 5, kind: 'dug' }]);
   });
 
-  it('recordDig then recordAdd of the same range/material on a previously unedited column returns to empty', () => {
+  it('recordDig then recordAdd of the same range/material on a previously unedited column ends in a plain added segment, not two segments', () => {
+    // TerrainEdits cannot verify the caller's implicit claim that this add's
+    // compId equals the generated baseline's material, so it must not assume
+    // this pair cancels back to "no edit" — see #1180 review: collapsing here
+    // would silently misreplay when the baseline material differs.
     const edits = TerrainEdits.empty();
     edits.recordDig(7, 7, 0, 5);
     edits.recordAdd(7, 7, 0, 5, 4);
-    expect(edits.segmentsAt(7, 7)).toEqual([]);
+    expect(edits.segmentsAt(7, 7)).toEqual([{ yLo: 0, yHi: 5, kind: 'added', compId: 4 }]);
   });
 
   it('recordDig then recordAdd of the same range/material on a previously added column does not grow beyond the pre-edit segment count', () => {
@@ -230,13 +238,28 @@ describe('columns / fractureEntries / isEmpty', () => {
     expect(edits.isEmpty()).toBe(false);
   });
 
-  it('isEmpty is true again once every edit is undone back to the unedited state', () => {
+  it('isEmpty is true again once a fracture edit is undone back to the default modifier', () => {
+    // A fracture's "unmodified" state (modifier === 1) is a fixed constant,
+    // not generator-dependent, so recordFracture(..., 1) can safely delete
+    // its entry and genuinely return to empty. A dig/add pair on a column
+    // cannot make the same claim — see #1180 review: TerrainEdits has no way
+    // to know whether a dig-then-add (or add-then-dig) pair nets back to the
+    // generated baseline, since it never sees the generator's own material at
+    // that column, so it must not collapse column edits to `[]` on a guess.
     const edits = TerrainEdits.empty();
-    edits.recordAdd(1, 1, 0, 3, 5);
-    edits.recordDig(1, 1, 0, 3);
     edits.recordFracture(2, 2, 2, 0.5);
     edits.recordFracture(2, 2, 2, 1);
     expect(edits.isEmpty()).toBe(true);
+  });
+
+  it('isEmpty stays false after a dig/add pair on a previously unedited column, even though the pair looks self-cancelling', () => {
+    // Companion to the fracture case above: a dig-then-add (or add-then-dig)
+    // pair never proves it reconstructs the generated baseline, so the
+    // resulting single segment must remain recorded — see #1180 review.
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(1, 1, 0, 3, 5);
+    edits.recordDig(1, 1, 0, 3);
+    expect(edits.isEmpty()).toBe(false);
   });
 
   it('columns() lists one entry per edited column, with its segments', () => {
