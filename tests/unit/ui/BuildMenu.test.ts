@@ -253,7 +253,7 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     arm: (_config: PlacementArmConfig) => { armed = true; phase = 'armed'; },
     cancel: () => { armed = false; phase = 'idle'; selection = null; changeHandler?.(); },
     simulateSelect(sel: PlacementSelection) { selection = sel; phase = 'selected'; changeHandler?.(); },
-    simulateConfirm() { if (selection) confirmHandler?.(selection); },
+    simulateConfirm() { return selection ? confirmHandler?.(selection) : undefined; },
   };
   const overlay = { update: vi.fn(), clear: vi.fn(), flashConfirm: vi.fn() };
   const strip = { show: vi.fn(), hide: vi.fn(), setConfirmHandler: vi.fn(), setCancelHandler: vi.fn() };
@@ -389,6 +389,21 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(controller.isArmed).toBe(true);
     rampBtn.click();
     expect(controller.isArmed).toBe(false);
+  });
+
+  it('Ramp confirm handler returns false, keeping the tool armed, when build_ramp is refused despite confirmEnabled', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    gameConsole.mockReturnValue({ success: false, output: 'Ramp order refused' });
+
+    const rampBtn = container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!;
+    rampBtn.click();
+    controller.simulateSelect({ x1: 5, z1: 5, x2: 10, z2: 5 });
+
+    const result = controller.simulateConfirm();
+
+    expect(result).toBe(false);
+    expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('build_ramp start:5,5 end:10,5 depth:8'));
   });
 
   // ── #1210: BuildMenu's own confirmEnabled gate must never disagree with

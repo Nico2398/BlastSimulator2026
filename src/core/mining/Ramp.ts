@@ -168,11 +168,11 @@ export interface RampOrderValidation {
   message: string;
   cost: number;
   /**
-   * Translation key for `message`, present only on the length-bound
-   * failures — mirrors BlastPlan.ts's `ValidationError.issue` (#633): core
-   * carries the key, the console/UI layer resolves it with `t()`. Absent
-   * (falls back to `message`) for the cash/depth checks below, matching
-   * their pre-existing untranslated behavior.
+   * Translation key for `message`, present on the length-bound failures and
+   * the cash check below — mirrors BlastPlan.ts's `ValidationError.issue`
+   * (#633): core carries the key, the console/UI layer resolves it with
+   * `t()`. Absent (falls back to `message`) only for the depth check below,
+   * matching its pre-existing untranslated behavior.
    */
   messageKey?: string;
   messageParams?: Record<string, string | number>;
