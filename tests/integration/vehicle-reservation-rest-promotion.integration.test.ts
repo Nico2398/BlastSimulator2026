@@ -32,7 +32,6 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
@@ -166,19 +165,19 @@ describe('Vehicle reservation survives a forced-rest promotion (#1115)', () => {
       // that happens.
       expect(holder.restTicksRemaining !== null || holder.pendingRestDuration !== null).toBe(true);
 
-      // Pin the mechanism, not just the symptom: the reservation on vehicleB
-      // is still there, still naming actionB, even though its holder is no
-      // longer a valid driver of it — releaseUnboardedTaskQueueVehicleReservations
-      // should have released it back to the open pool before the rest began.
-      expect(getVehicleReservation(ctx.state!.vehicles, vehicleB.id)).toBe(actionB.id);
-      expect(holder.taskQueue).toContain(actionB.id);
+      // Pin the mechanism, not just the symptom: releaseUnboardedTaskQueueVehicleReservations
+      // (called from finishForceRest, synchronously inside forceShiftRestIfNeeded
+      // above) must have released the stale reservation on vehicleB back to the
+      // open pool, and dropped actionB from the holder's own taskQueue, before the
+      // rest began — the fixed guard only special-cases a vehicle boarded by
+      // `employee` themself, so `other`'s occupancy no longer counts as
+      // "already boarded, leave it".
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicleB.id)).toBeNull();
+      expect(holder.taskQueue).not.toContain(actionB.id);
 
-      // The symptom: assertWorldInvariants flags the now-invalid reservation.
-      const violations = assertWorldInvariants(ctx.state!);
-      const i5 = violations.filter(v => v.kind === 'I5_reservation_without_valid_holder' && v.vehicleId === vehicleB.id);
-      expect(i5.length).toBeGreaterThan(0);
-
-      // The acceptance shape: once fixed, no violations survive at all.
+      // The acceptance shape: no I5/I4 violations survive at all — the fix
+      // releases the reservation before the rest starts, so it never has a
+      // chance to sit stale through it.
       expectNoWorldInvariantViolations(ctx.state!);
     },
   );
