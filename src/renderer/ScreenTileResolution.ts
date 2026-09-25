@@ -44,7 +44,7 @@ export function resolveScreenPointForTile(
   let currentY = startY;
 
   for (let i = 0; i < maxIterations; i++) {
-    const ndc = project(targetX, currentY, targetZ);
+    const ndc = project(targetX + 0.5, currentY, targetZ + 0.5);
     const hit = raycastForTile(ndc.x, ndc.y);
 
     if (hit !== null) {
