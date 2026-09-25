@@ -11,7 +11,7 @@
 // instead of an implicit `this`.
 
 import type { MiningContext } from '../console/commands/mining.js';
-import { ensureLandscape, type LandscapeHandle } from '../console/commands/world.js';
+import { ensureLandscape, terrainConfigOf, type LandscapeHandle } from '../console/commands/world.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
@@ -210,8 +210,9 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
   const biome = getBiome(ctx.state.mineType);
   if (!biome) return;
 
-  const { sizeX, sizeY, sizeZ } = ctx.state.world;
-  const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  const config = terrainConfigOf(ctx.state);
+  if (!config) return;
+  const handle = ensureLandscape(ctx, config);
   if (!handle) return;
 
   if (!deps.landscape) {

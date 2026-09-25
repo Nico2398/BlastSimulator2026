@@ -509,9 +509,8 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
    * computed independently of `grid.sizeY` (#1188) — keeps altitude-based
    * cover shading scaled to that ground rather than a stale/fixed band.
    */
-  setHeightRange(_minY: number, _maxY: number): void {
-    // TODO: implement
-    throw new Error('not implemented');
+  setHeightRange(minY: number, maxY: number): void {
+    (this.customUniforms['uHeightRange']!.value as THREE.Vector2).set(minY, maxY);
   }
 
   /**

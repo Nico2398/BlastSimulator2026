@@ -12,7 +12,7 @@
 // (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
-import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
+import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, computeColumnRangeY, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import { surfaceDensityAt } from '../core/world/TerrainGen.js';
 import { haloSurfaceHeight, meshedCellRect } from './terrain/PlayableCoverage.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
@@ -203,9 +203,10 @@ function sampleCorner(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: num
  * which stopped tracking real ground once the grid could span negative Y or
  * outgrow a fixed vertical bound).
  */
-export function gridHeightRange(_grid: VoxelGrid): [number, number] {
-  // TODO: implement
-  throw new Error('not implemented');
+export function gridHeightRange(grid: VoxelGrid): [number, number] {
+  const range = computeColumnRangeY(grid, grid.minX, grid.maxX - 1, grid.minZ, grid.maxZ - 1);
+  if (!range) return [0, 60];
+  return [range.minY, range.maxY];
 }
 
 /** Dominant rock at the owned column nearest (x, z), same y — '' when that
@@ -256,8 +257,6 @@ export class TerrainMesh {
 
   /** Packed signed chunk coordinate -> its Mesh, or null for a built-but-empty chunk (no triangles). */
   private readonly chunks = new Map<number, THREE.Mesh | null>();
-  /** Vertical chunk count. x/z chunk coordinates come from the grid's own claimed set, and are signed. */
-  private ncy = 0;
   private edgeHeightSampler: EdgeHeightSampler | null = null;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
@@ -271,7 +270,7 @@ export class TerrainMesh {
       // Which surface covers this level can grow at all, and the band of
       // heights its altitude preferences are measured against.
       ...(biomeId !== undefined ? { biomeId } : {}),
-      heightRange: [0, grid.sizeY],
+      heightRange: gridHeightRange(grid),
     });
     this.material.side = THREE.DoubleSide;
     // Render the shadow map from BACK faces. The classic acne fix for closed
@@ -283,14 +282,13 @@ export class TerrainMesh {
     // since the material is shared; both are closed-enough surfaces for the
     // same reasoning to hold.
     this.material.shadowSide = THREE.BackSide;
-    this.updateChunkGridDims();
   }
 
   /** Replace the underlying grid reference (e.g. after campaign start regenerates terrain). Caller must follow with buildAll(). */
   setGrid(grid: VoxelGrid): void {
     console.log(`[TerrainMesh] setGrid: old=${this.grid.id} new=${grid.id}`);
     this.grid = grid;
-    this.updateChunkGridDims();
+    this.material.setHeightRange(...gridHeightRange(grid));
   }
 
   /** ID of the currently-bound VoxelGrid, for diagnostics. */
@@ -350,11 +348,14 @@ export class TerrainMesh {
   /** Build every chunk from scratch. Call once after grid is populated, or when the grid identity changes. */
   buildAll(): void {
     this.disposeAllChunks();
-    this.updateChunkGridDims();
 
     let totalVerts = 0;
     for (const { cx, cz } of this.grid.ownedChunks()) {
-      for (let cy = 0; cy < this.ncy; cy++) {
+      const rect = this.grid.chunkRect(cx, cz);
+      if (!rect) continue;
+      const cyRange = this.chunkVerticalSlabRange(rect);
+      if (!cyRange) continue;
+      for (let cy = cyRange.cyMin; cy <= cyRange.cyMax; cy++) {
         totalVerts += this.rebuildChunk(cx, cy, cz);
       }
     }
@@ -368,14 +369,10 @@ export class TerrainMesh {
    * side only.
    */
   remeshRegion(region: DirtyRegion): void {
-    // A claim can arrive with the region, so the vertical chunk count and the
-    // material's play rect both have to catch up before anything is marched.
-    this.updateChunkGridDims();
-
     const cxMin = chunkIndexOf(region.minX - 1);
     const cxMax = chunkIndexOf(region.maxX);
-    const cyMin = Math.max(0, Math.floor((region.minY - 1) / CHUNK_SIZE));
-    const cyMax = Math.min(this.ncy - 1, Math.floor(region.maxY / CHUNK_SIZE));
+    const cyMin = chunkIndexOf(region.minY - 1);
+    const cyMax = chunkIndexOf(region.maxY);
     const czMin = chunkIndexOf(region.minZ - 1);
     const czMax = chunkIndexOf(region.maxZ);
 
@@ -445,22 +442,28 @@ export class TerrainMesh {
    * may be any shape (#473).
    */
   get chunkGridDims(): { ncx: number; ncy: number; ncz: number } {
+    let ncy = 0;
+    if (this.chunks.size > 0) {
+      let min = Infinity, max = -Infinity;
+      for (const key of this.chunks.keys()) {
+        const cy = (key % 2048) - 1024;
+        if (cy < min) min = cy;
+        if (cy > max) max = cy;
+      }
+      ncy = max - min + 1;
+    }
     return {
       ncx: Math.ceil(this.grid.sizeX / CHUNK_SIZE),
-      ncy: this.ncy,
+      ncy,
       ncz: Math.ceil(this.grid.sizeZ / CHUNK_SIZE),
     };
   }
 
   // ---------- Internal ----------
 
-  private updateChunkGridDims(): void {
-    this.ncy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
-  }
-
-  /** Packs a signed (cx, cy, cz) triple into one collision-free key. Range +/-1024 chunks per horizontal axis. */
+  /** Packs a signed (cx, cy, cz) triple into one collision-free key. Range +/-1024 chunks per axis, cy included, since a chunk may now sit at any signed vertical slab (#1188). */
   private chunkKey(cx: number, cy: number, cz: number): number {
-    return ((cx + 1024) * 2048 + (cz + 1024)) * 1024 + cy;
+    return ((cx + 1024) * 2048 + (cz + 1024)) * 2048 + (cy + 1024);
   }
 
   /** Which horizontal neighbours of chunk (cx, cz) are owned — computed once per rebuild and shared by rebuildChunk/canSkipChunkMarch/boundarySkirtFloorY instead of each recomputing it (#560). */
@@ -480,13 +483,15 @@ export class TerrainMesh {
    *
    * Public rather than private, following this file's existing convention
    * for internals exposed for diagnostics/tests (`getChunkMesh`,
-   * `chunkGridDims`, `currentEdgeHeightSampler`) — a genuinely-unused
-   * private method fails `noUnusedLocals` until buildAll/remeshRegion call
-   * it during implementation, which this stub must not pre-empt.
+   * `chunkGridDims`, `currentEdgeHeightSampler`) — used by `buildAll` below.
    */
-  chunkVerticalSlabRange(_rect: { minX: number; maxX: number; minZ: number; maxZ: number }): { cyMin: number; cyMax: number } | null {
-    // TODO: implement
-    throw new Error('not implemented');
+  chunkVerticalSlabRange(rect: { minX: number; maxX: number; minZ: number; maxZ: number }): { cyMin: number; cyMax: number } | null {
+    const range = computeColumnRangeY(this.grid, rect.minX, rect.maxX - 1, rect.minZ, rect.maxZ - 1);
+    if (!range) return null;
+    return {
+      cyMin: chunkIndexOf(range.minY - CHUNK_SIZE),
+      cyMax: chunkIndexOf(range.maxY + CHUNK_SIZE),
+    };
   }
 
   private disposeAllChunks(): void {
@@ -536,7 +541,7 @@ export class TerrainMesh {
     const yStart = oy;
     const xEnd = meshed.maxX;
     const zEnd = meshed.maxZ;
-    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
+    const yEnd = oy + CHUNK_SIZE;
 
     // No per-cube skirt cutoff here any more (#907). #560 stopped the skirt at
     // a fixed margin below the neighbouring ground because the halo column read
@@ -643,17 +648,6 @@ export class TerrainMesh {
     if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
     if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
 
-    // #610: the grid's own topmost y-slab has no slab above it to worry
-    // about — chunkDensityRange(cx, cz, cy+1) returns null only for an
-    // unowned chunk, not for a slab index past the grid's declared height on
-    // an owned chunk (that reads back {min:0, max:0}, same as any all-air
-    // slab, since #1182). Out-of-bounds voxel reads (VoxelGrid.ownerOf/
-    // densityAt) always come back as air, so this slab's own top row of
-    // march cubes always samples a real solid/air crossing at y = sizeY,
-    // regardless of how solid or boxed-in the slab is. Never skippable.
-    const topmostSlabIndex = Math.ceil(this.grid.sizeY / CHUNK_SIZE) - 1;
-    if (cy === topmostSlabIndex) return false;
-
     // Uniformly solid. Unlike x/z, rebuildChunk's y-loop has no "-1" halo
     // start (yStart is always oy, never oy-1) — the only vertical read past
     // this chunk's own slab is its topmost cube's far corner, which lands
@@ -724,7 +718,7 @@ export class TerrainMesh {
       }
     }
 
-    const slabTop = Math.min((cy + 1) * CHUNK_SIZE, this.grid.sizeY);
+    const slabTop = (cy + 1) * CHUNK_SIZE;
     return slabTop < deepestFloor;
   }
 
