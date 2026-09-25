@@ -352,7 +352,25 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
 
     emp.x = outcome.x;
     emp.z = outcome.z;
-    if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z);
+
+    // A leg whose destination sits outside the NavGrid (an unreachable
+    // target moveTo installed anyway via allowUnreachable, #1178) has its
+    // route silently clamped by findPath — outcome.isPathComplete goes true
+    // once the agent exhausts that clamped route, but outcome.x/z then stops
+    // one cell short of leg.destX/destZ forever, and isLegArrived (this
+    // file's own exact-match test) never agrees the leg is done. Snap to the
+    // leg's own literal destination on path completion, mirroring the
+    // deleted legacy destinationX/Z walker's identical forced assignment —
+    // for a genuinely reachable target this changes nothing (the clamped
+    // route's last waypoint already IS destX/destZ), and for a clamped one it
+    // is what makes arrival — and so `beginRestTravel`'s and a claimed
+    // `general_work`'s own best-effort walk — resolve instead of stalling in
+    // 'traveling' forever (confirmed live via needs-drain-visual.json).
+    if (outcome.isPathComplete) {
+      emp.x = leg.destX;
+      emp.z = leg.destZ;
+    }
+    if (isDrive) writeVehiclePosition(state, vehicle!, emp.x, emp.z);
 
     // Position genuinely advanced this tick — record it regardless of
     // whether the isStuck-abandon branch below also fires (an oscillating

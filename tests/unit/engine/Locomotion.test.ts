@@ -661,6 +661,48 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     expect(employee.z).toBe(2);
   });
 
+  // #1178 follow-up (needs-drain-visual.json regression): a target outside
+  // the NavGrid entirely — not walled off, genuinely off-grid — is a
+  // DIFFERENT unreachable shape than the walled-off tests above.
+  // findPath.clampToGrid (Pathfinding.ts) silently clamps such a target to
+  // the nearest in-grid cell and returns pathFound: true for a route to that
+  // clamp, so the agent walks there without ever failing a replan — but
+  // isLegArrived's exact-match test against the leg's own (unclamped)
+  // destX/destZ never agrees the leg is done, and the old
+  // isMoveStuck/MOVE_STUCK_ABANDON_TICKS machinery only fires on a FAILED
+  // path, never on a genuinely-found-but-short one. Before the fix, this
+  // employee walked to the grid edge and then sat there forever: itinerary
+  // never null, employeeWorkState stuck reading 'traveling' (EmployeeDispatch.ts)
+  // for the rest of the run — confirmed live via needs-drain-visual.json's
+  // own general_work dispatch to (150, 150) on a 64-wide map.
+  it('#1178: moveTo(allowUnreachable) to a target outside the NavGrid entirely still arrives — snaps to the leg\'s own destination once its clamped route is exhausted', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+
+    const moveResult = moveTo(state, employee.id, { x: 150, z: 2 }, { allowUnreachable: true });
+    expect(moveResult.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    expect(employee.destinationX).toBe(150);
+    expect(employee.destinationZ).toBe(2);
+
+    const MAX_TICKS = 30;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && employee.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    // Arrives at the leg's own literal (unclamped) destination — never
+    // abandoned, never permanently parked at the grid edge (x=19).
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.x).toBe(150);
+    expect(employee.z).toBe(2);
+    expect(employee.isMoveStuck).toBe(false);
+  });
+
   it('itinerary drive leg: abandons and dismounts the driver exactly as a failed replan would, even though the route was genuinely found this tick', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);
