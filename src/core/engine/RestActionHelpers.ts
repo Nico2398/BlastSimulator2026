@@ -17,7 +17,7 @@ import {
   NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE,
   AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
 } from '../config/balance.js';
-import { moveTo } from './MoveTo.js';
+import { moveTo, alightOnArrival } from './MoveTo.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
@@ -203,11 +203,14 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * Start `emp` travelling to (x, z) as a rest destination, preserving mount
  * continuity: a MOUNTED employee is routed through moveTo/planItinerary like
  * any other journey, so they drive there instead of desyncing from their
- * vehicle (I2_mounted_position_mismatch, WorldInvariants.ts). An on-foot
- * employee, and a mounted employee moveTo fails to route (e.g. genuinely
- * unreachable target), get the legacy direct destinationX/Z write instead —
- * Locomotion.ts's legacy foot-walk fallback then takes over exactly as it
- * always has. Sets pendingActionType
+ * vehicle (I2_mounted_position_mismatch, WorldInvariants.ts). Continuity is
+ * travel-only: alightOnArrival marks the installed itinerary's final leg to
+ * alight once that travel completes, freeing the vehicle at arrival — same as
+ * any other arrival-gated action — rather than holding it for the whole rest.
+ * An on-foot employee, and a mounted employee moveTo fails to route (e.g.
+ * genuinely unreachable target), get the legacy direct destinationX/Z write
+ * instead — Locomotion.ts's legacy foot-walk fallback then takes over exactly
+ * as it always has. Sets pendingActionType
  * alongside the destination so the renderer distinguishes a walk-to-rest from
  * an ordinary task walk (#1013 pictograms) and computeEmployeeActivity
  * (EmployeeActivity.ts) reports actionType: 'rest' for the whole trip, not
@@ -218,9 +221,7 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
   if (isMounted(emp.locomotion) && moveTo(state, emp.id, { x, z }).success) {
-    // TODO(#1122): call alightOnArrival(emp) here so the installed
-    // itinerary's final leg alights on arrival, freeing the vehicle once
-    // travel completes instead of holding it for the whole rest.
+    alightOnArrival(emp);
     emp.pendingActionType = 'rest';
     return;
   }
