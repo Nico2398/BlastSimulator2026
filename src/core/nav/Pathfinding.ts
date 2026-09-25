@@ -283,6 +283,26 @@ function computeClearancePocket(
   return pocket;
 }
 
+/**
+ * True when a diagonal step from (ax,az) to (bx,bz) does not clip a
+ * blocked/void corner (#1197) — the two orthogonal cells it passes
+ * between, (bx,az) and (ax,bz), must both be passable. Cardinal steps
+ * (ax===bx or az===bz) are always legal. Checks solidity only — vehicle
+ * occupancy and clearance (#1154) play no part; an off-grid orthogonal
+ * cell counts as solid, matching isImpassable's own treatment of a
+ * missing neighbour. Exported so tests/unit/nav/Pathfinding.test.ts can
+ * exercise it directly.
+ */
+export function isDiagonalCornerClear(grid: NavGrid, ax: number, az: number, bx: number, bz: number): boolean {
+  if (ax === bx || az === bz) return true;
+  return isCornerCellSolidityPassable(grid.cellAt(bx, az)) && isCornerCellSolidityPassable(grid.cellAt(ax, bz));
+}
+
+/** Solidity-only check for isDiagonalCornerClear's two orthogonal corner cells — a missing cell counts as solid. */
+function isCornerCellSolidityPassable(cell: NavCell | undefined): boolean {
+  return cell !== undefined && cell.type !== 'blocked' && cell.type !== 'void';
+}
+
 /** Octile distance heuristic. */
 export function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(ax - bx);
@@ -363,7 +383,7 @@ function clampToGrid(grid: NavGrid, x: number, z: number): { x: number; z: numbe
  * Walk a straight line from (x0,z0) to (x1,z1) using a DDA approach.
  * Returns waypoints for every cell along the line if all are passable, else null.
  */
-function directLineWalk(
+export function directLineWalk(
   grid: NavGrid,
   x0: number,
   z0: number,
@@ -411,6 +431,12 @@ function directLineWalk(
       const stepDz = clampedZ - prevZ;
       if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz))) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
+      // Only a genuine single-cell diagonal move needs the corner check (#1197)
+      // — a DDA step that jumps more than one cell (rounding artifact) is out
+      // of scope.
+      if (Math.abs(stepDx) === 1 && Math.abs(stepDz) === 1 && !isDiagonalCornerClear(grid, prevX, prevZ, clampedX, clampedZ)) {
+        return null;
+      }
       totalCost += isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost;
     }
 
@@ -953,6 +979,7 @@ function findOrdinaryPath(
       const neighborIdxForPocket = cellIndex(grid, nx, nz);
       const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
+      if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
       if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
 

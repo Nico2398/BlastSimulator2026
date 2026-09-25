@@ -40,6 +40,14 @@ A slope beyond `NAV_MAX_SLOPE_DEGREES` (30°) is a **face**, not a ramp, and doe
 
 8-directional movement (cardinal + diagonal). Diagonal moves cost √2 × `moveCost`.
 
+**Diagonal corner rule (#1197):** a diagonal step from `(x, z)` to `(x+dx, z+dz)` is legal only
+when both orthogonal cells it passes between — `(x+dx, z)` and `(x, z+dz)` — are neither
+`blocked` nor `void`. Applied identically in A*'s neighbour expansion and in the direct-line
+fallback: a route never clips a solid corner even when the diagonal's own destination cell is
+walkable, so two buildings that touch only at a corner force a route around it, never between
+them. Checks solidity only — vehicle occupancy and clearance (#1154) play no part, and the
+agent's own start cell keeps its usual exemption.
+
 `src/core/nav/Pathfinding.ts` declares `PathRequest` (from/to in NavGrid cell space, plus `avoidVehicles`), `PathResult` (`found`, `waypoints`, `totalCost` — waypoints empty when `found` is false) and `RampConnection`. Read it before calling `findPath`.
 
 **Heuristic — octile distance (standard for 8-directional grids):**

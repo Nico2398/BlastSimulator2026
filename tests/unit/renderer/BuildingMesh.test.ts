@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Building } from '../../../src/core/entities/Building.js';
+import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
 import { BUILDING_RUIN_MODEL_ID } from '../../../src/renderer/models/ModelIds.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
@@ -39,9 +40,65 @@ describe('BuildingMesh', () => {
     const bm = new BuildingMesh(scene);
     bm.addBuilding(makeBuilding(1, 'management_office', 20, 30));
     const group = scene.children[0] as THREE.Group;
-    // management_office is 2x2; centre = (20+1, 0, 30+1) = (21, 0, 31)
-    expect(group.position.x).toBeCloseTo(21);
-    expect(group.position.z).toBeCloseTo(31);
+    // management_office is 2x2; footprint cells 20..21 x 30..31 span world
+    // [19.5, 21.5] x [29.5, 31.5] (#1198) — centre = (20.5, 0, 30.5).
+    expect(group.position.x).toBeCloseTo(20.5);
+    expect(group.position.z).toBeCloseTo(30.5);
+    bm.dispose();
+  });
+
+  it('the mesh group world bounds match the true footprint cells [x-0.5, x+sizeX-0.5] x [z-0.5, z+sizeZ-0.5], square building (#1198)', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    const x = 20, z = 30;
+    bm.addBuilding(makeBuilding(1, 'management_office', x, z)); // tier 1: 2x2
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef('management_office', 1));
+    const group = scene.children[0] as THREE.Group;
+    group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(group);
+
+    expect(box.min.x).toBeCloseTo(x - 0.5);
+    expect(box.max.x).toBeCloseTo(x + sizeX - 0.5);
+    expect(box.min.z).toBeCloseTo(z - 0.5);
+    expect(box.max.z).toBeCloseTo(z + sizeZ - 0.5);
+    bm.dispose();
+  });
+
+  it('the mesh group world bounds match the true footprint cells for a non-square building — management_office T2 is 2x3 (#1198)', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    const x = 5, z = 8;
+    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true };
+    bm.addBuilding(building);
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef('management_office', 2));
+    expect(sizeX).not.toBe(sizeZ); // 2x3 — proves the fix is not axis-symmetric by accident
+    const group = scene.children[0] as THREE.Group;
+    group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(group);
+
+    expect(box.min.x).toBeCloseTo(x - 0.5);
+    expect(box.max.x).toBeCloseTo(x + sizeX - 0.5);
+    expect(box.min.z).toBeCloseTo(z - 0.5);
+    expect(box.max.z).toBeCloseTo(z + sizeZ - 0.5);
+    bm.dispose();
+  });
+
+  it('a door marker\'s absolute world position equals building.x/z + def.entryPoint/exitPoint, unchanged marker-local math (#1198 regression)', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    const x = 5, z = 8;
+    // management_office T2 (2x3): exitPoint is [sizeX-1, 0] = [1, 0] — a
+    // non-trivial (non-[0,0]) door offset, so the absolute position actually
+    // depends on the footprint-centering fix rather than being 0 either way.
+    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true };
+    bm.addBuilding(building);
+    const def = getBuildingDef('management_office', 2);
+    const group = scene.children[0] as THREE.Group;
+    // markers = [entry, exit] — see BuildingMesh.ts's attachModel().
+    const exitMarker = group.children[2] as THREE.Mesh;
+
+    expect(group.position.x + exitMarker.position.x).toBeCloseTo(x + def.exitPoint[0]);
+    expect(group.position.z + exitMarker.position.z).toBeCloseTo(z + def.exitPoint[1]);
     bm.dispose();
   });
 
@@ -112,8 +169,9 @@ describe('BuildingMesh', () => {
       const bm = new BuildingMesh(scene);
       bm.addBuilding(makeBuilding(1, 'management_office', 20, 30));
       const pos = bm.getPosition(1);
-      expect(pos?.x).toBeCloseTo(21);
-      expect(pos?.z).toBeCloseTo(31);
+      // See "building group is positioned at grid location" above (#1198).
+      expect(pos?.x).toBeCloseTo(20.5);
+      expect(pos?.z).toBeCloseTo(30.5);
       bm.dispose();
     });
 

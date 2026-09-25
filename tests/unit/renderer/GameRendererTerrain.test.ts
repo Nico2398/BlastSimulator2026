@@ -12,7 +12,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid, computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../../src/core/world/VoxelGrid.js';
-import { getTerrainSurfaceY } from '../../../src/renderer/GameRendererTerrain.js';
+import { getTerrainSurfaceY, landscapeEdgeHeightSampler } from '../../../src/renderer/GameRendererTerrain.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 describe('getTerrainSurfaceY (#1007)', () => {
   it('returns the fractional marching-cubes crossing height, strictly below the old integer voxel-top height, for a clean solid-to-air column', () => {
@@ -63,5 +64,25 @@ describe('getTerrainSurfaceY (#1007)', () => {
 
   it('returns 0 for a null grid', () => {
     expect(getTerrainSurfaceY(null, 5, 5)).toBe(0);
+  });
+});
+
+describe('landscapeEdgeHeightSampler ensureLandscape base size (#1188)', () => {
+  it('builds the landscape from the level\'s base size, not a live/post-expansion size', () => {
+    const ctx = makeGameContext({ size: 32 });
+    const world = ctx.state!.world!;
+    const baseSizeX = world.baseSizeX;
+    const baseSizeZ = world.baseSizeZ;
+
+    // Simulate a post-expansion state: the live bounding box grows, the
+    // level's original base size does not.
+    world.sizeX = baseSizeX + 64;
+    world.sizeZ = baseSizeZ + 64;
+
+    const sampler = landscapeEdgeHeightSampler(ctx);
+    expect(sampler).not.toBeNull();
+    expect(ctx.landscape).not.toBeNull();
+    expect(ctx.landscape!.playableRect.maxX).toBe(baseSizeX);
+    expect(ctx.landscape!.playableRect.maxZ).toBe(baseSizeZ);
   });
 });

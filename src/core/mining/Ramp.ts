@@ -45,6 +45,35 @@ export interface RampResult {
   voxelsFilled: number;
 }
 
+// ── Endpoint-based construction (#1210) ──
+
+/**
+ * Derive a `RampDef` from a drag's start/end tile endpoints, picking the
+ * dominant axis (`abs(dz) >= abs(dx)` → north/south, else east/west) and a
+ * `length` of `abs(round(delta))` along that axis — no `+1`. This is the
+ * same dominant-axis math `buildRampCommand`'s `--start`/`--end` branch
+ * inlines today; the console command will be rewired to call this instead,
+ * so the UI's box-cut ramp tool and the console's `--start`/`--end` flag
+ * share one source of truth for turning two endpoints into a `RampDef`
+ * (#1210 — UI/core disagreement on the derived length/direction).
+ */
+export function rampDefFromEndpoints(
+  originX: number, originZ: number, endX: number, endZ: number, targetDepth: number,
+): RampDef {
+  const dx = endX - originX;
+  const dz = endZ - originZ;
+  let direction: RampDirection;
+  let length: number;
+  if (Math.abs(dz) >= Math.abs(dx)) {
+    direction = dz >= 0 ? 'south' : 'north';
+    length = Math.abs(Math.round(dz));
+  } else {
+    direction = dx >= 0 ? 'east' : 'west';
+    length = Math.abs(Math.round(dx));
+  }
+  return { originX, originZ, direction, length, targetDepth };
+}
+
 // ── Direction offsets ──
 
 const DIR_OFFSETS: Record<RampDirection, { dx: number; dz: number }> = {
@@ -139,11 +168,11 @@ export interface RampOrderValidation {
   message: string;
   cost: number;
   /**
-   * Translation key for `message`, present only on the length-bound
-   * failures — mirrors BlastPlan.ts's `ValidationError.issue` (#633): core
-   * carries the key, the console/UI layer resolves it with `t()`. Absent
-   * (falls back to `message`) for the cash/depth checks below, matching
-   * their pre-existing untranslated behavior.
+   * Translation key for `message`, present on the length-bound failures and
+   * the cash check below — mirrors BlastPlan.ts's `ValidationError.issue`
+   * (#633): core carries the key, the console/UI layer resolves it with
+   * `t()`. Absent (falls back to `message`) only for the depth check below,
+   * matching its pre-existing untranslated behavior.
    */
   messageKey?: string;
   messageParams?: Record<string, string | number>;
@@ -203,7 +232,13 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
   if (cash < totalCost) {
-    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
+    return {
+      success: false,
+      message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`,
+      cost: 0,
+      messageKey: 'console.insufficient_funds',
+      messageParams: { need: formatMoney(totalCost), have: formatMoney(cash) },
+    };
   }
 
   return { success: true, message: '', cost: totalCost };

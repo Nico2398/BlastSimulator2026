@@ -5,7 +5,7 @@
 
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
-import { getDominantRockId, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
+import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from '../world/VoxelGrid.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
 import { SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
@@ -82,9 +82,8 @@ export function predictFragmentation(intensity: number): { pieces: number; sizeM
 export function getHoleSurfaceYs(plan: BlastPlan, grid: VoxelGrid): Record<string, number> {
   const result: Record<string, number> = {};
   for (const hole of plan.holes) {
-    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
-    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
-    result[hole.id] = firstEmptyLayerAboveGround(grid, gx, gz);
+    const { cx, cz } = clampToGridColumn(grid, hole.x, hole.z);
+    result[hole.id] = firstEmptyLayerAboveGround(grid, cx, cz);
   }
   return result;
 }
@@ -126,7 +125,7 @@ export function forEachBBoxVoxel(
 export function getBlastBBox(plan: BlastPlan, ctx: HoleContext): BlastBBox {
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
-  let maxSurfaceY = 0;
+  let maxSurfaceY = -Infinity;
   let maxDepth = 0;
   for (const h of plan.holes) {
     minX = Math.min(minX, h.x);
@@ -139,7 +138,7 @@ export function getBlastBBox(plan: BlastPlan, ctx: HoleContext): BlastBBox {
   return {
     minX: Math.floor(minX - PREVIEW_RADIUS),
     maxX: Math.ceil(maxX + PREVIEW_RADIUS),
-    minY: Math.max(0, Math.floor(maxSurfaceY - maxDepth - PREVIEW_RADIUS)),
+    minY: Math.floor(maxSurfaceY - maxDepth - PREVIEW_RADIUS),
     maxY: Math.ceil(maxSurfaceY + PREVIEW_RADIUS),
     minZ: Math.floor(minZ - PREVIEW_RADIUS),
     maxZ: Math.ceil(maxZ + PREVIEW_RADIUS),

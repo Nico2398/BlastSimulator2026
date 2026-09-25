@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
+  requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
 import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
@@ -294,6 +295,42 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
 // under test, so the depth gate (`depth < depthMin || depth > depthMax`) is
 // the only thing that can suppress it — deterministic regardless of the
 // noise field's actual value at the sampled point.
+
+// ── requireValidGenDimension — shared save-corruption guard (#1218) ────────
+
+describe('requireValidGenDimension', () => {
+  it('returns the value unchanged for a valid positive integer within bounds', () => {
+    expect(requireValidGenDimension(160, 'sizeX')).toBe(160);
+  });
+
+  it('accepts the exact boundary value MAX_TERRAIN_GEN_DIMENSION (inclusive)', () => {
+    expect(requireValidGenDimension(MAX_TERRAIN_GEN_DIMENSION, 'sizeX')).toBe(MAX_TERRAIN_GEN_DIMENSION);
+  });
+
+  it('throws for MAX_TERRAIN_GEN_DIMENSION + 1', () => {
+    expect(() => requireValidGenDimension(MAX_TERRAIN_GEN_DIMENSION + 1, 'sizeX')).toThrow();
+  });
+
+  it('throws for zero', () => {
+    expect(() => requireValidGenDimension(0, 'sizeY')).toThrow();
+  });
+
+  it('throws for a negative number', () => {
+    expect(() => requireValidGenDimension(-5, 'sizeZ')).toThrow();
+  });
+
+  it('throws for a non-integer', () => {
+    expect(() => requireValidGenDimension(3.5, 'sizeX')).toThrow();
+  });
+
+  it('throws for NaN', () => {
+    expect(() => requireValidGenDimension(NaN, 'sizeX')).toThrow();
+  });
+
+  it('includes the label in the thrown error message', () => {
+    expect(() => requireValidGenDimension(-1, 'sizeZ')).toThrow(/sizeZ/);
+  });
+});
 
 describe('OreVeinSampler — depth gate at extreme depth (#1183)', () => {
   it('an ore whose depthMax the extreme depth exceeds never appears, even with 100% host-rock affinity', () => {

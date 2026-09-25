@@ -8,6 +8,7 @@ import { saveCommand, loadCommand } from '../../../src/console/commands/saveload
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
+import { requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION } from '../../../src/core/world/TerrainGen.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
@@ -276,5 +277,95 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     expect(corruptResult.output).not.toEqual(versionResult.output);
     expect(corruptResult.output).toContain('corrupt');
     expect(versionResult.output).not.toContain('corrupt');
+  });
+});
+
+// BlastSimulator2026 — loadGridForState's no-voxels fallback vs. a corrupted
+// world.baseSizeX/sizeY/baseSizeZ (#1218)
+//
+// Before this fix, the no-voxels fallback (`regenerateGridParams`, world.ts)
+// read `state.world.baseSizeX`/`sizeY`/`baseSizeZ` straight off untrusted
+// parsed save JSON with no bounds check, then fed them into
+// `generateTerrain`/`buildGameNavGrid` — an absurd value (e.g. `1e9`) drove
+// `NavGrid.buildNavGrid`'s `width * height` column loop unbounded, hanging
+// the process indefinitely rather than throwing. `requireValidGenDimension`
+// (TerrainGen.ts) now guards each field before it can reach generation, the
+// same guard `VoxelGridCodec.decodeVoxelGrid`'s embedded-voxels path already
+// had (#1181) — this is the sibling no-voxels path's regression coverage.
+//
+// Each rejection must be synchronous — `requireValidGenDimension` throws
+// before `generateTerrain`/`buildGameNavGrid` ever runs — so these tests
+// never need a hang timeout of their own: without the fix in place, the
+// process itself would not return in time for vitest's own per-test timeout
+// to save it, exactly reproducing the pre-#1218 hang.
+describe("loadGridForState — no-voxels fallback rejects a corrupted world size field (#1218)", () => {
+  /** Save a no-voxels state whose `world[field]` has been corrupted to `value`, under `slot`. */
+  function saveWithCorruptedWorldField(field: 'baseSizeX' | 'sizeY' | 'baseSizeZ', value: number, slot: string): void {
+    const buildCtx = makeCtx();
+    (buildCtx.state!.world as unknown as Record<string, number>)[field] = value;
+    buildCtx.grid = null; // no-voxels save — reproduces a pre-#1181-era save with no embedded voxels payload
+    expect(buildCtx.state!.world!.voxels).toBeUndefined();
+    const saveResult = saveCommand(buildCtx, [], { slot });
+    expect(saveResult.success).toBe(true);
+  }
+
+  /** Load `slot` into a fresh ctx and assert a clean refusal that leaves ctx untouched. */
+  function expectRefusedAndUnchanged(slot: string): void {
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const landscapeBefore = ctx.landscape;
+    const playableAreaBefore = ctx.playableArea;
+
+    const result = loadCommand(ctx, [], { slot });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('corrupt');
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+    expect(ctx.landscape).toBe(landscapeBefore);
+    expect(ctx.playableArea).toBe(playableAreaBefore);
+  }
+
+  it('refuses a no-voxels save with an absurdly large baseSizeX (1e9), leaving ctx unchanged', () => {
+    saveWithCorruptedWorldField('baseSizeX', 1e9, 'huge-baseSizeX');
+    expectRefusedAndUnchanged('huge-baseSizeX');
+  });
+
+  it('refuses a no-voxels save with an absurdly large sizeY (1e9), leaving ctx unchanged', () => {
+    saveWithCorruptedWorldField('sizeY', 1e9, 'huge-sizeY');
+    expectRefusedAndUnchanged('huge-sizeY');
+  });
+
+  it('refuses a no-voxels save with an absurdly large baseSizeZ (1e9), leaving ctx unchanged', () => {
+    saveWithCorruptedWorldField('baseSizeZ', 1e9, 'huge-baseSizeZ');
+    expectRefusedAndUnchanged('huge-baseSizeZ');
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -5],
+    ['non-integer', 3.5],
+    ['NaN', NaN],
+  ] as const)('refuses a no-voxels save with baseSizeX = %s (%p), leaving ctx unchanged', (label, value) => {
+    const slot = `edge-baseSizeX-${label}`;
+    saveWithCorruptedWorldField('baseSizeX', value, slot);
+    expectRefusedAndUnchanged(slot);
+  });
+
+  // Regression guard against over-rejection: the validator `regenerateGridParams`
+  // calls must still accept a value exactly at the ceiling. Exercising this
+  // through the full `loadCommand` pipeline (as the rejection tests above do)
+  // isn't practical here — `regenerateGrid` would build a real
+  // MAX_TERRAIN_GEN_DIMENSION x MAX_TERRAIN_GEN_DIMENSION (4096x4096) NavGrid,
+  // which does not complete in unit-test time (confirmed: >60s at this size,
+  // vs. milliseconds at the 16x16x16 sizes the rest of this file uses) — the
+  // same reason `VoxelGridCodec.test.ts`'s sibling suite for the
+  // embedded-voxels path tests `requireValidGenDimension`'s rejections
+  // directly rather than driving `decodeVoxelGrid`'s full pipeline at
+  // MAX_TERRAIN_GEN_DIMENSION. So this exercises the shared validator itself,
+  // at its exact ceiling.
+  it('accepts a value exactly at MAX_TERRAIN_GEN_DIMENSION (regression guard against over-rejection)', () => {
+    expect(requireValidGenDimension(MAX_TERRAIN_GEN_DIMENSION, 'world.baseSizeX')).toBe(MAX_TERRAIN_GEN_DIMENSION);
   });
 });

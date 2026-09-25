@@ -8,7 +8,7 @@
 
 import { VoxelGrid, clampAxis, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
-import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../world/TerrainGen.js';
+import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
  * The complete generator identity a save's terrain is regenerated from —
@@ -80,29 +80,6 @@ export function encodeVoxelGrid(grid: VoxelGrid, gen: SerializedTerrainGen): Ser
 const clampSavePosition = clampAxis;
 
 /**
- * A save's embedded generator identity must describe a grid `decodeVoxelGrid`
- * can actually build: `sizeY` directly becomes the upper bound every edit
- * segment's `yLo`/`yHi` is clamped against below, so an unvalidated,
- * enormous `sizeY` (e.g. `1e9`) makes that clamp a no-op and turns
- * `replayTerrainEdits`'s per-voxel loop into the same unbounded scan the
- * position clamps above exist to prevent; an even larger one (e.g. `1e15`)
- * crashes `VoxelGrid`'s `allocateChunk` with `RangeError: Invalid typed
- * array length` before any clamp runs at all (#1181 review, both
- * reproduced live). `sizeX`/`sizeZ` get the same check for the same reason —
- * they fix `TerrainConfig`'s pit-mask rect and vertical datum, so a
- * legitimate save can never carry a value outside what real play can reach.
- * Rejects outright (matching this file's existing corrupt-save throws)
- * rather than clamping: silently shrinking a save's declared world size
- * would regenerate a different terrain than the one that was actually saved.
- */
-function requireValidGenDimension(value: number, label: string): number {
-  if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0 || value > MAX_TERRAIN_GEN_DIMENSION) {
-    throw new Error(`corrupt save: gen.${label} (${value}) is not a valid terrain dimension`);
-  }
-  return value;
-}
-
-/**
  * True when `value` is a well-formed `VoxelRockComposition` — untrusted save
  * JSON must never reach `CompositionPalette.intern` (which dereferences
  * `.rocks` unconditionally) without this check, else a malformed
@@ -155,9 +132,9 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
   }
 
   const config: TerrainConfig = {
-    sizeX: requireValidGenDimension(payload.gen.sizeX, 'sizeX'),
-    sizeY: requireValidGenDimension(payload.gen.sizeY, 'sizeY'),
-    sizeZ: requireValidGenDimension(payload.gen.sizeZ, 'sizeZ'),
+    sizeX: requireValidGenDimension(payload.gen.sizeX, 'gen.sizeX'),
+    sizeY: requireValidGenDimension(payload.gen.sizeY, 'gen.sizeY'),
+    sizeZ: requireValidGenDimension(payload.gen.sizeZ, 'gen.sizeZ'),
     seed: payload.gen.seed,
     climateBias: payload.gen.climateBias,
     ...(payload.gen.mixedRockHardness !== undefined ? { mixedRockHardness: payload.gen.mixedRockHardness } : {}),

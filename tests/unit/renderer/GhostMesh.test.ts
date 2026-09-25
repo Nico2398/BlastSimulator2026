@@ -375,7 +375,7 @@ describe('GhostMesh', () => {
   // instead of a single fixed-size marker box.
 
   describe('footprint rendering — construction site ghost spans its full footprint (#556)', () => {
-    it('renders a mesh whose world-space extent covers every footprint cell, not the old fixed-size box', () => {
+    it('renders a mesh whose world-space extent covers exactly the footprint cells [x-0.5, x+sizeX-0.5] x [z-0.5, z+sizeZ-0.5] (#1198)', () => {
       const scene = new THREE.Scene();
       const gm = new GhostMesh(scene);
       // 3-wide (x) by 2-deep (z) footprint, offsets from targetX/targetZ.
@@ -383,18 +383,17 @@ describe('GhostMesh', () => {
         [0, 0], [1, 0], [2, 0],
         [0, 1], [1, 1], [2, 1],
       ];
-      gm.sync([makePreview(1, { type: 'place_building', targetX: 10, targetZ: 20, footprint })]);
+      const targetX = 10, targetZ = 20, sizeX = 3, sizeZ = 2;
+      gm.sync([makePreview(1, { type: 'place_building', targetX, targetZ, footprint })]);
 
       const mesh = scene.children[0] as THREE.Mesh;
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
-      const size = new THREE.Vector3();
-      box.getSize(size);
 
-      // The old fixed GHOST_SIZE box is 0.9m on a side — a footprint-aware
-      // ghost must be visibly larger, covering the full 3x2 cell area.
-      expect(size.x).toBeGreaterThanOrEqual(2.5);
-      expect(size.z).toBeGreaterThanOrEqual(1.5);
+      expect(box.min.x).toBeCloseTo(targetX - 0.5);
+      expect(box.max.x).toBeCloseTo(targetX + sizeX - 0.5);
+      expect(box.min.z).toBeCloseTo(targetZ - 0.5);
+      expect(box.max.z).toBeCloseTo(targetZ + sizeZ - 0.5);
       gm.dispose();
     });
 
@@ -432,24 +431,24 @@ describe('GhostMesh', () => {
       gm.dispose();
     });
 
-    it('a footprint ghost is positioned so it covers the footprint cells relative to targetX/targetZ, not centred purely on the target point', () => {
+    it('a footprint ghost world bounding box equals exactly [x-0.5, x+sizeX-0.5] x [z-0.5, z+sizeZ-0.5] (#1198)', () => {
       const scene = new THREE.Scene();
       const gm = new GhostMesh(scene);
       const footprint: ReadonlyArray<readonly [number, number]> = [
         [0, 0], [1, 0], [2, 0], [3, 0],
         [0, 1], [1, 1], [2, 1], [3, 1],
       ]; // 4-wide x 2-deep, matches freight_warehouse T1 scale
-      gm.sync([makePreview(1, { type: 'place_building', targetX: 0, targetZ: 0, footprint })]);
+      const targetX = 0, targetZ = 0, sizeX = 4, sizeZ = 2;
+      gm.sync([makePreview(1, { type: 'place_building', targetX, targetZ, footprint })]);
 
       const mesh = scene.children[0] as THREE.Mesh;
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
 
-      // The box must extend forward from the origin far enough to cover cell
-      // (3,1) — i.e. its max corner reaches at least x=3, z=1 (footprint
-      // cells are unit-size, matching the voxel grid).
-      expect(box.max.x).toBeGreaterThanOrEqual(3);
-      expect(box.max.z).toBeGreaterThanOrEqual(1);
+      expect(box.min.x).toBeCloseTo(targetX - 0.5);
+      expect(box.max.x).toBeCloseTo(targetX + sizeX - 0.5);
+      expect(box.min.z).toBeCloseTo(targetZ - 0.5);
+      expect(box.max.z).toBeCloseTo(targetZ + sizeZ - 0.5);
       gm.dispose();
     });
 

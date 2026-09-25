@@ -120,18 +120,44 @@ describe('EnergyPropagation — createEnergyField', () => {
 });
 
 describe('EnergyPropagation — clampBoxToGrid', () => {
-  it('clips a box that overhangs the owned region', () => {
+  it('clips X/Z to the owned region but passes Y through unclamped (#1186: no vertical cap)', () => {
     const grid = solidGrid(4);
     const clamped = clampBoxToGrid({ minX: -10, minY: -10, minZ: -10, maxX: 100, maxY: 100, maxZ: 100 }, grid);
     expect(clamped).toEqual({
-      minX: grid.minX, minY: 0, minZ: grid.minZ,
-      maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ,
+      minX: grid.minX, minY: -10, minZ: grid.minZ,
+      maxX: grid.maxX, maxY: 100, maxZ: grid.maxZ,
     });
   });
 
   it('returns null when the box misses the owned region entirely', () => {
     const grid = solidGrid(4);
     expect(clampBoxToGrid({ minX: 500, minY: 0, minZ: 500, maxX: 510, maxY: 4, maxZ: 510 }, grid)).toBeNull();
+  });
+
+  it('#1186: a box entirely below y=0 still clamps to a valid box, not null', () => {
+    const grid = solidGrid(4);
+    const box = { minX: grid.minX, minY: -30, minZ: grid.minZ, maxX: grid.maxX, maxY: -10, maxZ: grid.maxZ };
+    const clamped = clampBoxToGrid(box, grid);
+    expect(clamped).not.toBeNull();
+    expect(clamped).toEqual(box);
+  });
+
+  it('#1186: energy seeded into a field entirely below y=0 propagates normally', () => {
+    // Solid rock from y=-30..-11 (below the world's old y>=0 floor).
+    const grid = new VoxelGrid(7, 1, 7);
+    for (let z = 0; z < 7; z++) {
+      for (let y = -30; y < -10; y++) {
+        for (let x = 0; x < 7; x++) grid.setVoxel(x, y, z, rockVoxel('cruite'));
+      }
+    }
+    const box: BlastBox = { minX: 0, minY: -30, minZ: 0, maxX: 7, maxY: -10, maxZ: 7 };
+    const clamped = clampBoxToGrid(box, grid);
+    expect(clamped).not.toBeNull();
+
+    const field = createEnergyField(grid, clamped!);
+    seedEnergy(field, [{ x: 3, y: -15, z: 3, energy: CRUITE * 0.5 }]);
+
+    expect(effectiveAt(field, 3, -15, 3)).toBeGreaterThan(0);
   });
 });
 

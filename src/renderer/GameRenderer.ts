@@ -58,7 +58,7 @@ import {
 import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
-  raycastSurfaceY, raycastTerrainFromNDC, surfaceYAt, smoothSurfaceYAt, pickables,
+  raycastSurfaceY, surfaceYAt, smoothSurfaceYAt, pickables,
   resolveFragmentId, entityWorldPosition, type PickingDeps,
 } from './GameRendererPicking.js';
 
@@ -457,11 +457,6 @@ export class GameRenderer {
   /** Exact rendered-mesh height at (x, z) via a vertical raycast. Returns null off the terrain. See GameRendererPicking.ts. */
   raycastSurfaceY(x: number, z: number): number | null {
     return raycastSurfaceY(this.pickingDeps(), x, z);
-  }
-
-  /** Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the world-to-screen bridge's starting guess. See GameRendererPicking.ts. */
-  raycastTerrainFromNDC(ndcX: number, ndcY: number, camera: THREE.Camera): THREE.Vector3 | null {
-    return raycastTerrainFromNDC(this.pickingDeps(), ndcX, ndcY, camera);
   }
 
   /** Every entity root object raycastable for scene picking (P2/P4). See GameRendererPicking.ts. */

@@ -237,8 +237,20 @@ export class SelectionOverlay {
     const color = u.tone === 'survey' ? COLOR_SURVEY : COLOR_SELECTION;
     const cells = u.footprintCells ?? [[0, 0]] as const;
     const opacity = flashing ? 0.6 : CELL_FILL_OPACITY;
+    // `u.footprintCells` (as opposed to the default single-tile path, where
+    // it is undefined) is only ever passed from BuildMenu.ts, for a
+    // building-placement footprint preview. That footprint's mesh is now
+    // centred per-cell on `[x-0.5, x+0.5]` (footprintCenterCoord, #1198)
+    // rather than GroundTintLayer's default per-cell corner convention
+    // `[x, x+1]`, so each of its patches is shifted -0.5 on both axes to
+    // match. The default single-tile path keeps the corner convention
+    // unshifted. A future second caller of the footprintCells path with a
+    // different addressing intent (e.g. corner-based) would silently inherit
+    // this shift — keep it scoped to building-footprint previews only.
+    const shift = u.footprintCells !== undefined ? -0.5 : 0;
     const patches: GroundTintPatch[] = cells.map(
-      ([dx, dz]): GroundTintPatch => cellPatch(`${u.x + dx}:${u.z + dz}`, u.x + dx, u.z + dz, color, opacity),
+      ([dx, dz]): GroundTintPatch =>
+        cellPatch(`${u.x + dx}:${u.z + dz}`, u.x + dx + shift, u.z + dz + shift, color, opacity),
     );
     this.selectionTintLayer.replace(patches);
 

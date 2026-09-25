@@ -445,8 +445,8 @@ function findAndAbortReservedVehicle(state: GameState, actionId: number): Vehicl
  *
  * Marks the vehicle's own (possibly non-grid-aligned, mid-drive) resting
  * cell as `vehicleOccupied` via updateVehicleCellOccupancy — every OTHER
- * stop (a drive leg's own arrival, EntityMovementTick.ts) already does this
- * as part of writeVehiclePosition's transition out of 'moving', but a
+ * stop (a drive leg's own arrival, Locomotion.ts's writeVehiclePosition)
+ * already does this as part of its own arrival marking, but a
  * mid-drive dismount stops the vehicle without ever going through that
  * arrival path, so without this call its cell never gets flagged: the
  * NavGrid keeps reporting the tile "unoccupied" forever. `isDestinationOccupied`

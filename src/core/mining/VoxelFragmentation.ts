@@ -123,11 +123,14 @@ function liftUnderminedBurden(field: EnergyField, mask: Uint8Array): number {
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
       // Highest broken voxel in this column — the roof of the excavation.
-      let topBroken = -1;
+      // `null`, not a numeric sentinel: a box entirely below y=0 has every
+      // legitimate topBroken negative too, so `-1` would misread as "none
+      // found" and skip the lift on every such column (#1186).
+      let topBroken: number | null = null;
       for (let y = box.maxY - 1; y >= box.minY; y--) {
         if (mask[indexOf(field, x, y, z)] === 1) { topBroken = y; break; }
       }
-      if (topBroken < 0) continue;
+      if (topBroken === null) continue;
 
       // Walk the intact rock above it. It only lifts if it is thin enough and
       // actually reaches open air — a cap that runs to the top of the box might
@@ -185,6 +188,25 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
       seed(box.maxX - 1, y, z);
     }
   }
+  // The two Y faces anchor the box's literal edge row, same as the X/Z faces.
+  // No per-column "nearest solid voxel" fallback: that heuristic looked
+  // plausible (a real slab's candidate always has a face-adjacent solid
+  // neighbour of its own) but the same is true of a multi-voxel *disconnected*
+  // island sitting mid-crater — it has neighbours within itself, just none
+  // reaching the world outside the box. "Has any neighbour" cannot tell a
+  // slab's crust from a detached chunk sitting on nothing, and level1's own
+  // ordinary blast proved it: an entirely real, in-bounds blast (box.minY=10,
+  // nowhere near the below-y=0 case this row was written for) went from 10
+  // genuinely detached voxels to 0 the moment this fallback started running,
+  // because it happily anchored debris pockets the flood fill was supposed to
+  // catch. The literal row is enough — real confined rock (the
+  // blast-execution.test.ts molite slab, the below-y=0 crater case) is always
+  // reachable through the X/Z side walls, which already span the box's full
+  // Y range and seed every column's true surface via lateral connectivity
+  // through the contiguous mass; a Y face landing on padding past where the
+  // rock ends (BLAST_ZONE_RADIUS overshooting the real surface, unrelated to
+  // #1186) is exactly the ordinary case seed()'s own air check already no-ops
+  // on, same as it always has.
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
       seed(x, box.minY, z);

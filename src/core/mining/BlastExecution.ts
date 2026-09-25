@@ -233,7 +233,7 @@ export function executeBlast(
   const bbox = calculateBlastZone(plan.holes, holeSurfaceYs);
 
   const blastCenter = calculateBlastCenter(plan.holes);
-  const originY = Math.max(0, ...Object.values(holeSurfaceYs));
+  const originY = Math.max(...Object.values(holeSurfaceYs));
   emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
   // 3. Propagate the charge energy through the rock, then read off what broke.
@@ -558,7 +558,7 @@ function calculateBlastZone(
 } {
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
-  let maxSurfaceY = 0;
+  let maxSurfaceY = -Infinity;
   let maxDepth = 0;
 
   for (const hole of holes) {
@@ -574,7 +574,7 @@ function calculateBlastZone(
     minX: Math.floor(minX - BLAST_ZONE_RADIUS),
     maxX: Math.ceil(maxX + BLAST_ZONE_RADIUS),
     // Y range: from (surface - depth - radius) up to (surface + radius)
-    minY: Math.max(0, Math.floor(maxSurfaceY - maxDepth - BLAST_ZONE_RADIUS)),
+    minY: Math.floor(maxSurfaceY - maxDepth - BLAST_ZONE_RADIUS),
     maxY: Math.ceil(maxSurfaceY + BLAST_ZONE_RADIUS),
     minZ: Math.floor(minZ - BLAST_ZONE_RADIUS),
     maxZ: Math.ceil(maxZ + BLAST_ZONE_RADIUS),

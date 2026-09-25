@@ -116,10 +116,13 @@ export async function awaitPlacementArmed(page: Page, timeoutMs: number): Promis
  */
 export async function worldToScreenPoint(page: Page, x: number, z: number): Promise<PickerPoint> {
   const point = await page.evaluate((wx: number, wz: number) => (window as unknown as {
-    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
+    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean; tileConfirmed: boolean } | null;
   }).__worldToScreen(wx, wz), x, z);
   if (!point || !point.onScreen) {
     throw new Error(`world tile (${x}, ${z}) is not on screen — frame it with a camera move first`);
+  }
+  if (!point.tileConfirmed) {
+    throw new Error(`world tile (${x}, ${z}) does not resolve back to itself — an entity occludes it or the terrain is stepped/terraced here`);
   }
   return { px: point.px, py: point.py };
 }

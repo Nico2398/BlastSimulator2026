@@ -4,7 +4,7 @@
 
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { type VoxelGrid, clampToGridColumn } from '../world/VoxelGrid.js';
 import type { VillagePosition } from './BlastExecution.js';
 import { vec3, length } from '../math/Vec3.js';
 import {
@@ -262,9 +262,8 @@ export function previewHoleDetails(
     if (!charge) continue;
 
     const surfaceY = ctx.holeSurfaceYs[hole.id] ?? 0;
-    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
-    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
-    const gy = Math.max(0, Math.min(grid.sizeY - 1, surfaceY - 1));
+    const { cx: gx, cz: gz } = clampToGridColumn(grid, hole.x, hole.z);
+    const gy = surfaceY - 1;
     const voxel = grid.getVoxel(gx, gy, gz);
     if (!voxel || voxel.density <= 0) continue;
     const vet = readVoxelPrediction(field, voxel, gx, gy, gz);

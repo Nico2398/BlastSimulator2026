@@ -13,7 +13,10 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable } from '../../../src/core/nav/Pathfinding.js';
+import {
+  findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable,
+  isDiagonalCornerClear, directLineWalk,
+} from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
@@ -164,17 +167,36 @@ describe('findPath — obstacle avoidance', () => {
     expect(result.found).toBe(false);
   });
 
-  it('finds a diagonal path past blocked cells near the goal', () => {
-    // 5×5 grid, goal at (4,4), cells (3,4) and (4,3) are blocked.
-    // With 8-directional movement the goal is reachable diagonally from (3,3).
-    const grid = makeFlatGrid(5, 5, 'walkable');
+  it('routes around a corner instead of cutting it (#1197)', () => {
+    // 6×6 grid — widened from the old 5×5 fixture (#1197). Same blocked
+    // cells, (3,4) and (4,3), and the same goal, (4,4), but the old 5×5
+    // grid put (4,4) in the grid's own extreme corner: only 3 neighbours
+    // exist there at all, 2 of them the very cells just blocked, so once a
+    // diagonal corner-cut through two blocked orthogonal cells is refused
+    // (#1197) the goal becomes totally unreachable — every remaining
+    // approach (a diagonal via (3,3) or (5,5), or a cardinal via (4,5) or
+    // (5,4)) is either the illegal cut itself or routes through a cell this
+    // 5×5 grid simply doesn't have. Widening to 6×6 opens a real orthogonal
+    // detour: (5,5) is a legal diagonal entry into (4,4) (both its own
+    // orthogonal cells, (4,5) and (5,4), stay walkable), and cardinal entry
+    // via (4,5)/(5,4) is always legal regardless.
+    const grid = makeFlatGrid(6, 6, 'walkable');
     setCell(grid, 4, 4, 'walkable'); // goal is walkable
     setCell(grid, 3, 4, 'blocked');
     setCell(grid, 4, 3, 'blocked');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: false });
     expect(result.found).toBe(true);
-    // Optimal diagonal path: (0,0)→(1,1)→(2,2)→(3,3)→(4,4) = 4 diagonal steps × √2
-    expect(result.totalCost).toBeCloseTo(4 * Math.SQRT2, 4);
+    // The old, now-illegal clipped diagonal cost 4 * √2 (four diagonal
+    // steps straight through the corner) — a real detour around it must
+    // cost strictly more.
+    expect(result.totalCost).toBeGreaterThan(4 * Math.SQRT2);
+    // Every consecutive waypoint pair must be a legal step — in particular,
+    // never a diagonal cut through (3,4)/(4,3).
+    for (let i = 0; i < result.waypoints.length - 1; i++) {
+      const a = result.waypoints[i]!;
+      const b = result.waypoints[i + 1]!;
+      expect(isDiagonalCornerClear(grid, a.x, a.z, b.x, b.z)).toBe(true);
+    }
   });
 
   it('routes around a wall of blocked cells forming a corridor', () => {
@@ -1183,22 +1205,31 @@ describe('findPath — climb-limit gating on surfaceY (#953)', () => {
   });
 
   it('finds a route across ground graded at ~29.6° on the only path (diagonal-only fixture)', () => {
-    // 2×2 grid, both cardinal neighbours blocked — the only route is the
-    // 0.80m diagonal step, within the (larger) diagonal slope limit.
+    // 2×2 grid — both cardinal neighbours are 'walkable' (not 'blocked'), so
+    // isDiagonalCornerClear (#1197, solidity-only) never rejects the
+    // diagonal step as a corner-cut, but each is graded far steeper than the
+    // cardinal slope limit (~0.577/m) from either endpoint, so a cardinal
+    // step onto either one is climb-rejected — the only usable route is
+    // still the 0.80m diagonal step, within the (larger) diagonal slope
+    // limit.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
-    setCell(grid, 1, 0, 'blocked');
-    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
     setCell(grid, 1, 1, 'walkable', { surfaceY: 0.8 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(true);
   });
 
   it('refuses a route across ground graded at ~31.3° on the only path (diagonal-only fixture)', () => {
+    // Same corner-cut-avoiding shape as the ~29.6° case above: (1,0)/(0,1)
+    // stay 'walkable' but climb-unreachable by a cardinal step, so the
+    // diagonal (0,0)-(1,1) step is this fixture's only route, and its own
+    // slope is what gets refused here.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
-    setCell(grid, 1, 0, 'blocked');
-    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
     setCell(grid, 1, 1, 'walkable', { surfaceY: 0.83 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(false);
@@ -1765,5 +1796,165 @@ describe('clearance-aware pathfinding (#1154)', () => {
       const last = result.waypoints[result.waypoints.length - 1];
       expect(last).toEqual({ x: 3, z: 3 });
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 18: diagonal corner-cutting (#1197)
+//
+// A diagonal step from (ax,az) to (bx,bz) passes geometrically "between" the
+// two cells it does NOT touch orthogonally — (bx,az) and (ax,bz). Cutting
+// through that corner when either of those two cells is solid ('blocked' or
+// 'void') walks straight through a wall a real body could never fit past.
+// isDiagonalCornerClear is the single source of truth for that rule; this
+// group tests it directly, then proves it is actually wired into
+// directLineWalk and findPath (not just present but unused).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('isDiagonalCornerClear (#1197)', () => {
+  it('is always legal for a cardinal step, regardless of neighbouring cell types', () => {
+    // Every cell in the grid is 'blocked' except the two endpoints — proves
+    // the corner rule does not even look at neighbours for a cardinal step.
+    const grid = makeFlatGrid(3, 3, 'blocked');
+    setCell(grid, 0, 0, 'walkable');
+    setCell(grid, 1, 0, 'walkable');
+    setCell(grid, 0, 1, 'walkable');
+    expect(isDiagonalCornerClear(grid, 0, 0, 1, 0)).toBe(true);
+    expect(isDiagonalCornerClear(grid, 0, 0, 0, 1)).toBe(true);
+  });
+
+  it('is legal for a diagonal step when both orthogonal cells are walkable (happy path)', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    expect(isDiagonalCornerClear(grid, 0, 0, 1, 1)).toBe(true);
+  });
+
+  it('is illegal for a diagonal step when both orthogonal cells are blocked', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    expect(isDiagonalCornerClear(grid, 0, 0, 1, 1)).toBe(false);
+  });
+
+  it('is illegal for a diagonal step when both orthogonal cells are void', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 1, 0, 'void');
+    setCell(grid, 0, 1, 'void');
+    expect(isDiagonalCornerClear(grid, 0, 0, 1, 1)).toBe(false);
+  });
+
+  it('is illegal when one orthogonal cell is blocked and the other is void', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'void');
+    expect(isDiagonalCornerClear(grid, 0, 0, 1, 1)).toBe(false);
+  });
+
+  it('is illegal when only ONE orthogonal cell is blocked/void — both must be clear, not just "not both blocked" (rejection, the key non-OR case)', () => {
+    // A wrong implementation checking "illegal only if BOTH orthogonal cells
+    // are solid" would wrongly return true here in both cases below, since
+    // only one of the two is ever solid at a time.
+    const oneBlocked = makeFlatGrid(2, 2, 'walkable');
+    setCell(oneBlocked, 1, 0, 'blocked');
+    // (0,1) stays walkable.
+    expect(isDiagonalCornerClear(oneBlocked, 0, 0, 1, 1)).toBe(false);
+
+    const oneVoid = makeFlatGrid(2, 2, 'walkable');
+    setCell(oneVoid, 0, 1, 'void');
+    // (1,0) stays walkable.
+    expect(isDiagonalCornerClear(oneVoid, 0, 0, 1, 1)).toBe(false);
+  });
+
+  it('treats an off-grid orthogonal cell as impassable, refusing the diagonal step (boundary)', () => {
+    // 2×2 grid (x: 0-1, z: 0-1). Stepping diagonally from (0,1) to (1,2)
+    // leaves one of the two orthogonal cells, (0,2), entirely outside the
+    // grid (height=2, so z=2 does not exist) — must be treated exactly like
+    // a solid neighbour, matching isImpassable's own treatment of a missing
+    // cell.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    expect(isDiagonalCornerClear(grid, 0, 1, 1, 2)).toBe(false);
+  });
+});
+
+describe('directLineWalk — refuses a corner-clip directly, independent of findPath\'s own heuristics (#1197)', () => {
+  it('returns null when the only geometric route between two diagonal cells clips a corner both of whose orthogonal cells are blocked', () => {
+    // Minimal 2×2 grid: (0,0) and (1,1) walkable, (1,0) and (0,1) both
+    // blocked — the only way from start to goal is the diagonal step
+    // itself, which must now be refused outright.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    const result = directLineWalk(grid, 0, 0, 1, 1, false, 0, null, null);
+    expect(result).toBeNull();
+  });
+});
+
+describe('findPath — end to end refuses a corner-clip with no orthogonal detour available (#1197)', () => {
+  it('returns found:false on a 2×2 grid where the only route is an illegal diagonal corner-cut', () => {
+    // Same 2×2 shape as directLineWalk's own test above, exercised through
+    // the public findPath entry point instead — a 2×2 grid has no room for
+    // an orthogonal detour around the two blocked cells at all.
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 1, 0, 'blocked');
+    setCell(grid, 0, 1, 'blocked');
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+});
+
+describe('findPath — diagonal waypoints never cut a blocked/void corner, on this file\'s own existing obstacle-avoidance fixtures (#1197)', () => {
+  // Before adding this sweep: every existing obstacle-avoidance fixture in
+  // this file was inspected by hand against the new rule. None of the three
+  // reused below depends on a corner-cut for reachability —
+  //   - the corridor-wall fixture's start/goal share a z, so its route is
+  //     pure cardinal movement straight through the gap;
+  //   - the maze fixture's corridors are exactly 1 cell wide, so no two
+  //     diagonally-adjacent cells inside it are ever both walkable — a
+  //     diagonal step would always leave the corridor into a 'blocked' cell,
+  //     which is refused already, corner rule or not;
+  //   - the pit-rim fixture carves its pit purely via `surfaceY`, so every
+  //     cell in it is 'walkable' by type — no 'blocked'/'void' cell exists
+  //     anywhere on the grid for the corner rule to ever find.
+  // None needed widening; the sweep is still asserted directly on all three
+  // so a future change to any of them stays covered.
+
+  function assertNoCornerCut(grid: NavGrid, waypoints: Array<{ x: number; z: number }>): void {
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const a = waypoints[i]!;
+      const b = waypoints[i + 1]!;
+      expect(isDiagonalCornerClear(grid, a.x, a.z, b.x, b.z)).toBe(true);
+    }
+  }
+
+  it('corridor-wall detour (same fixture as "routes around a wall of blocked cells forming a corridor") never cuts a corner', () => {
+    const grid = makeFlatGrid(10, 5, 'walkable');
+    for (let z = 0; z < 5; z++) {
+      if (z !== 2) setCell(grid, 5, z, 'blocked');
+    }
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 2, toX: 9, toZ: 2, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    assertNoCornerCut(grid, result.waypoints);
+  });
+
+  it('S-shaped maze detour (same fixture as "handles a winding path through a maze-like grid") never cuts a corner', () => {
+    const grid = makeFlatGrid(10, 10, 'blocked');
+    for (let x = 0; x < 10; x++) {
+      setCell(grid, x, 2, 'walkable');
+      setCell(grid, x, 6, 'walkable');
+    }
+    for (let z = 2; z <= 6; z++) {
+      setCell(grid, 3, z, 'walkable');
+      setCell(grid, 7, z, 'walkable');
+    }
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 2, toX: 9, toZ: 6, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    assertNoCornerCut(grid, result.waypoints);
+  });
+
+  it('pit-rim detour (same fixture as "routes around a pit whose rim exceeds the climb limit") never cuts a corner', () => {
+    const PIT = { minX: 5, maxX: 9, minZ: 5, maxZ: 9 };
+    const grid = makePlateauWithPit(15, 15, PIT, 20, 5);
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 14, toZ: 14, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    assertNoCornerCut(grid, result.waypoints);
   });
 });

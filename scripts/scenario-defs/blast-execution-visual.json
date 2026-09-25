@@ -3321,6 +3321,41 @@
       }
     },
     {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
+      "description": "#1201 CI-fix (real interaction-mode finding): H21 was still mid-drill when the wildcard re-order above fired, so it never received a charge order at all — not stuck, never ordered (the wait immediately above only drains charge orders already placed; it has no way to notice a hole that finishes drilling later). `wait_until field:orderedHoleCount equals:0` was tried and rejected here: cycle 4's own 8x8/spacing:1 grid genuinely never finishes drilling in command mode — #682's own comment on this cycle's charging sequence above already documents the permanent floor (a real, direct-probe-confirmed pathing deadlock for a handful of holes, unrelated to #1201) — so that wait times out and hard-fails the `scenario` channel instead. Root cause of the H21 miss specifically is a real, correct pacing shift from #1201's own fix: a drill_rig now genuinely detours around another parked drill_rig's cell in this tight grid instead of driving straight through it (the #954 regression #1201 restores), the same class of shift level1-win-efficient.json/vibration-budget.json already absorbed via updated expected values in this same PR. A second wildcard resweep, mirroring the one above (#953) and H8's own single-hole retry (#947), catches whichever hole is still mid-drill when the first resweep fires — the real time already spent draining that first resweep's own charge orders (the wait immediately above) is what lets a late driller finish drilling in the meantime, exactly as H8's own retry already relied on. `commandOutcome: either`: a no-op, harmless redundant re-order on any run where nothing is left uncharged, including every command-mode run, where this simply repeats the no-op the first resweep already was.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "timeout": 120,
+      "description": "#1201 CI-fix: drains the second resweep above.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {

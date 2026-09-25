@@ -13,6 +13,7 @@ import { tagPickable } from './Pickable.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { buildingModelId, BUILDING_RUIN_MODEL_ID } from './models/ModelIds.js';
 import { createToonMaterial } from './models/CartoonMaterial.js';
+import { footprintCenterCoord } from './MeshUtils.js';
 
 // ---------- Stand-ins ----------
 
@@ -78,7 +79,11 @@ export class BuildingMesh {
     const { instance, markers } = this.attachModel(group, building);
 
     // Position: grid cell centre in world coords, resting on the terrain surface
-    group.position.set(building.x + sizeX / 2, surfaceY, building.z + sizeZ / 2);
+    group.position.set(
+      footprintCenterCoord(building.x, sizeX),
+      surfaceY,
+      footprintCenterCoord(building.z, sizeZ),
+    );
 
     tagPickable(group, 'building', building.id);
     this.scene.add(group);

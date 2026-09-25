@@ -163,17 +163,12 @@ export function buildCommand(
         // it can be bigger than the tier it replaces — so it reaches onto ground
         // the original construction never levelled. Cut it flat here, the same
         // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
-        // levelBuildingFootprint (BuildingTaskHelpers.ts) widens the carve one
-        // column past the footprint but derives the target height from the
-        // TRUE (unwidened) footprint alone (#1144 follow-up, same reasoning as
-        // TaskCompletionEffects.ts's fresh-build branch) — the new tier's own
-        // pad height comes from ground it actually occupies, not from whatever
-        // the one-column skirt past its high side happens to naturally sit at
-        // — and skips any widened column that falls on an already-standing
-        // neighbour's own true footprint (#1144 review finding 1).
+        // levelBuildingFootprint (BuildingTaskHelpers.ts) carves and derives the
+        // target height from the same true footprint — the building's mesh is
+        // centred on it exactly (#1198), so there is no skirt beyond it to
+        // widen the carve into or guard against a neighbour.
         levelBuildingFootprint(
-          ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ,
-          state.buildings.buildings, ctx.emitter,
+          ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ, ctx.emitter,
         );
         emitFootprintOccupancyChanged(ctx, x, z, maxX, maxZ);
       }
@@ -229,17 +224,12 @@ export function buildCommand(
         // new footprint gets the same cut a finished build does (#1008
         // refinement, tickTaskCompletion.ts). The vacated one is left as it is:
         // levelling is not undone by moving away from it.
-        // levelBuildingFootprint (BuildingTaskHelpers.ts) derives the target
-        // height from the TRUE (unwidened) footprint alone (#1144 follow-up,
-        // same reasoning as TaskCompletionEffects.ts's fresh-build branch) —
-        // the relocated building's own pad height comes from ground it
-        // actually occupies, not from whatever the skirt column past its high
-        // side naturally sits at — and skips any widened column that falls on
-        // an already-standing neighbour's own true footprint (#1144 review
-        // finding 1).
+        // levelBuildingFootprint (BuildingTaskHelpers.ts) carves and derives the
+        // target height from the same true footprint — the building's mesh is
+        // centred on it exactly (#1198), so there is no skirt beyond it to
+        // widen the carve into or guard against a neighbour.
         levelBuildingFootprint(
-          ctx.grid, toCoords[0]!, toCoords[1]!, sizeX, sizeZ,
-          state.buildings.buildings, ctx.emitter,
+          ctx.grid, toCoords[0]!, toCoords[1]!, sizeX, sizeZ, ctx.emitter,
         );
         emitFootprintOccupancyChanged(ctx, oldX, oldZ, sizeX, sizeZ);
         emitFootprintOccupancyChanged(ctx, toCoords[0]!, toCoords[1]!, sizeX, sizeZ);

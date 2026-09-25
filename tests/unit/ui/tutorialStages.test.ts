@@ -8,9 +8,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
-import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES, stagesFor, REGION } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
+import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
@@ -459,5 +460,30 @@ describe('stagesFor', () => {
     const stages = stagesFor('survey', '#ignored');
     expect(stages.length).toBeGreaterThan(1);
     expect(stages[0]!.target).not.toBe('#ignored');
+  });
+});
+
+// ── #1210: REGION.boxcut's fixed line must stay long enough for SOME depth ──
+//
+// The box-cut stage pins the ramp tool to REGION.boxcut (a 12-tile
+// north/south line) with a DEPTH_STEPPER the player can move — but the line
+// itself is fixed. If REGION.boxcut were ever edited shorter than
+// computeMinimumRampLength(depth) for every depth the stepper allows, the
+// step would become uncompletable: no depth the player picks could ever
+// validate. This is the regression guard against that — run through the same
+// rampDefFromEndpoints + validateRampOrder path the ramp tool itself uses,
+// not a hand-derived length check, so a change to either function's math is
+// covered too.
+
+describe('REGION.boxcut stays orderable at some depth (#1210)', () => {
+  it('rampDefFromEndpoints + validateRampOrder(..., Infinity) succeeds for at least one depth in 1..8', () => {
+    const region = REGION.boxcut;
+    let succeededAtLeastOnce = false;
+    for (let depth = 1; depth <= 8; depth++) {
+      const def = rampDefFromEndpoints(region.x1, region.z1, region.x2, region.z2, depth);
+      const result = validateRampOrder(def, Infinity);
+      if (result.success) succeededAtLeastOnce = true;
+    }
+    expect(succeededAtLeastOnce).toBe(true);
   });
 });
