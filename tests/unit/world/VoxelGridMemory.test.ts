@@ -61,11 +61,13 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
   const gridBase = generateTerrain(treraniumConfig(BASE_SIZE_Y));
   const gridTall = generateTerrain(treraniumConfig(BASE_SIZE_Y * 4));
   // #1183: generateTerrain no longer fills chunk content up front — it only
-  // attaches the generator as a lazy chunk source. Force materialization of
-  // every solid voxel once here, so allocatedSlabCount below measures real
-  // generated content rather than an untouched, all-lazy grid.
-  gridBase.forEachSolid(() => {});
-  gridTall.forEachSolid(() => {});
+  // attaches the generator as a lazy chunk source. Full materialization (via
+  // `forEachSolid`) is forced later, right before the first test that needs
+  // it (the sizeY-scaling ratio tests below) — NOT here at describe-body
+  // scope, which runs before every `it` in this file and would materialize
+  // both grids before the "nothing generated up front" tests ever got to
+  // observe the pre-materialization state (#1183 fixer: this ordering bug is
+  // exactly what made those two tests read 318 instead of 0).
 
   // ── Lazy materialization (#1183) — MUST run before any other test in this
   // describe block reads a voxel from gridBase/gridTall. A prior read would
@@ -131,6 +133,12 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
   // touches from the test above, which is an even sparser (and still
   // correct) demonstration of the same claim.
   it('raising the declared sizeY to 4x grows real allocation far less than 4x — the dense-model equivalent scales exactly with sizeY, the real allocation does not', () => {
+    // Force full materialization now — after the lazy/no-materialization
+    // tests above have already made their observations, and once, here,
+    // shared by every remaining test in this file (#1183 fixer).
+    gridBase.forEachSolid(() => {});
+    gridTall.forEachSolid(() => {});
+
     const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
     const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
     expect(denseModelEquivalentTall).toBe(denseModelEquivalentBase * 4); // a dense per-column array pays for declared height exactly

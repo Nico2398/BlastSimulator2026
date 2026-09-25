@@ -1389,7 +1389,10 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
     grid.compositionAt(4, -50, 4); // band A (chunkIndexOf(-50))
     expect(grid.slabCount(0, 0)).toBe(1);
 
-    grid.oresAt(4, -45, 4); // still band A — no further allocation
+    // chunkIndexOf(-45) is actually -3, a DIFFERENT band from chunkIndexOf(-50)
+    // (-4) — -55 is the coordinate that genuinely stays in band A.
+    expect(chunkIndexOf(-55)).toBe(chunkIndexOf(-50)); // sanity: really the same band
+    grid.oresAt(4, -55, 4); // still band A — no further allocation
     expect(grid.slabCount(0, 0)).toBe(1);
 
     grid.getVoxel(4, -10, 4); // band B (chunkIndexOf(-10) !== chunkIndexOf(-50))
