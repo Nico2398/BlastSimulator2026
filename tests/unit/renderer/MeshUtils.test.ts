@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { brightenColor, disposeGroup } from '../../../src/renderer/MeshUtils.js';
+import { brightenColor, disposeGroup, footprintCenterCoord } from '../../../src/renderer/MeshUtils.js';
 
 describe('disposeGroup', () => {
   it('disposes the geometry and material of every mesh and line child, array materials included', () => {
@@ -39,5 +39,23 @@ describe('brightenColor', () => {
     expect((half >> 16) & 0xff).toBe(Math.round(0x22 + (0xff - 0x22) * 0.5));
     expect((half >> 8) & 0xff).toBe(Math.round(0x66 + (0xff - 0x66) * 0.5));
     expect(half & 0xff).toBe(0xff);
+  });
+});
+
+// #1198: footprint cells `x..x+sizeX-1` span world `[x-0.5, x+sizeX-0.5]`, so
+// the world-space centre of that span is `x + (sizeX-1)/2` — not `x + sizeX/2`,
+// which is off by half a cell.
+describe('footprintCenterCoord', () => {
+  it('happy path: a 2-wide footprint at origin 20 centres at 20.5', () => {
+    expect(footprintCenterCoord(20, 2)).toBe(20.5);
+  });
+
+  it('boundary: a size-1 footprint centres exactly on its own origin', () => {
+    expect(footprintCenterCoord(20, 1)).toBe(20);
+  });
+
+  it('an odd size centres on a whole number, an even size on a half-integer', () => {
+    expect(footprintCenterCoord(0, 3)).toBe(1);
+    expect(footprintCenterCoord(0, 4)).toBe(1.5);
   });
 });

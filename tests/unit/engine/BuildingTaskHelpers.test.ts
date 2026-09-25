@@ -56,13 +56,14 @@ describe('refreshLogisticsCapacity', () => {
   });
 });
 
-// `levelBuildingFootprint`'s occupancy guard and self-exclusion (#1144
-// review findings 1/2) are only exercised indirectly today, through
-// TaskCompletionEffects.test.ts's place_building branch. Direct coverage
-// here per core-purity.md's "every exported function gets a unit test in
-// the mirrored tests/unit/ path" and dev-testing-strategy's cheaper-in-
-// isolation preference over the full integration path.
-describe('levelBuildingFootprint (#1144)', () => {
+// `levelBuildingFootprint`'s contract is simplified (#1198): the widened-
+// skirt carve region, the occupancy guard and the self-exclusion filter
+// (#1144 review findings 1/2) are all removed — the function now levels
+// EXACTLY the true footprint (x..x+sizeX-1, z..z+sizeZ-1) and nothing else,
+// so the `buildings` list it used to need for the guard is gone from its
+// signature. Direct coverage here per core-purity.md's "every exported
+// function gets a unit test in the mirrored tests/unit/ path" convention.
+describe('levelBuildingFootprint (#1198)', () => {
   const ROCK_COMPOSITION = { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] };
   const { sizeX: OWN_SIZE_X, sizeZ: OWN_SIZE_Z } = getDefSize(getBuildingDef('driving_center', 1));
 
@@ -76,59 +77,60 @@ describe('levelBuildingFootprint (#1144)', () => {
     return grid;
   }
 
-  it('carves the widened skirt column (one past the true footprint) when nothing else occupies it', () => {
+  it('happy path: carves exactly the true footprint (x..x+sizeX-1, z..z+sizeZ-1) — nothing beyond it', () => {
     const grid = flatGrid(10);
     const compId = grid.palette.intern(ROCK_COMPOSITION);
-    // (OWN_SIZE_X, 0) is outside the true footprint (x: 0..OWN_SIZE_X-1) but
-    // inside the widened carve region (makeLevelFootprintRegion) — needs carving.
+    // A column INSIDE the true footprint sits proud — must be carved.
+    setVoxelColumnSurfaceHeight(grid, OWN_SIZE_X - 1, OWN_SIZE_Z - 1, 15, compId);
+    // A column just OUTSIDE the true footprint (x = OWN_SIZE_X, the old
+    // widened-skirt column) also sits proud — must be left entirely
+    // untouched now that no widened region exists.
     setVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0, 15, compId);
 
-    const buildings = [{ type: 'driving_center' as const, tier: 1 as const, x: 0, z: 0 }];
-    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z, buildings);
+    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z);
 
     expect(result.targetY).toBeCloseTo(10, 6);
-    expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0)).toBeCloseTo(10, 6);
-    expect(result.region).not.toBeNull();
-    expect(result.region!.maxX).toBeGreaterThanOrEqual(OWN_SIZE_X);
-  });
-
-  it("skips carving a widened skirt column that falls inside another building's true footprint", () => {
-    const grid = flatGrid(10);
-    const compId = grid.palette.intern(ROCK_COMPOSITION);
-    // (OWN_SIZE_X, 0) is both this building's widened skirt column AND the
-    // origin of a second building placed touching it with zero gap.
-    setVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0, 15, compId);
-    // An unguarded skirt column on the other side — proves the skip is
-    // column-selective, not a blanket skip of the whole widened carve.
-    setVoxelColumnSurfaceHeight(grid, 0, OWN_SIZE_Z, 15, compId);
-
-    const buildings = [
-      { type: 'driving_center' as const, tier: 1 as const, x: 0, z: 0 },
-      { type: 'driving_center' as const, tier: 1 as const, x: OWN_SIZE_X, z: 0 },
-    ];
-    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z, buildings);
-
-    // Guarded: the neighbour's own true footprint is left untouched.
-    expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0)).toBeCloseTo(15, 6);
-    // Unguarded skirt column still carves down to targetY.
-    expect(computeVoxelColumnSurfaceHeight(grid, 0, OWN_SIZE_Z)).toBeCloseTo(10, 6);
-    expect(result.voxelsCleared).toBeGreaterThan(0);
-  });
-
-  it("self-exclusion: the building's own entry in `buildings` (matching x/z) does not block carving its own footprint", () => {
-    const grid = flatGrid(10);
-    const compId = grid.palette.intern(ROCK_COMPOSITION);
-    // A column INSIDE the true footprint sits proud — must still carve
-    // despite `buildings` carrying this same building's own entry. Without
-    // the self-exclusion filter, `others` would include this building and
-    // isInsideAnyFootprint would report every one of its own columns as
-    // "occupied", skipping the whole footprint from carving.
-    setVoxelColumnSurfaceHeight(grid, OWN_SIZE_X - 1, OWN_SIZE_Z - 1, 15, compId);
-
-    const buildings = [{ type: 'driving_center' as const, tier: 1 as const, x: 0, z: 0 }];
-    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z, buildings);
-
-    expect(result.voxelsCleared).toBeGreaterThan(0);
     expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X - 1, OWN_SIZE_Z - 1)).toBeCloseTo(10, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0)).toBeCloseTo(15, 6);
+    expect(result.region).not.toBeNull();
+    expect(result.region!.maxX).toBeLessThan(OWN_SIZE_X);
+    expect(result.region!.maxZ).toBeLessThan(OWN_SIZE_Z);
+  });
+
+  it('boundary: a 1x1 footprint carves only its own single column', () => {
+    const grid = flatGrid(10);
+    const compId = grid.palette.intern(ROCK_COMPOSITION);
+    setVoxelColumnSurfaceHeight(grid, 0, 0, 15, compId);
+    setVoxelColumnSurfaceHeight(grid, 1, 0, 15, compId); // just outside — must stay untouched
+
+    const result = levelBuildingFootprint(grid, 0, 0, 1, 1);
+
+    expect(result.targetY).toBeCloseTo(10, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, 0, 0)).toBeCloseTo(10, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, 1, 0)).toBeCloseTo(15, 6);
+  });
+
+  it('no-op: an already-level footprint clears 0 voxels', () => {
+    const grid = flatGrid(10);
+
+    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z);
+
+    expect(result.voxelsCleared).toBe(0);
+    expect(result.region).toBeNull();
+  });
+
+  it('two adjacent buildings, touching with zero gap: levelling one never carves into the true footprint of the other', () => {
+    const grid = flatGrid(10);
+    const compId = grid.palette.intern(ROCK_COMPOSITION);
+    // Second building's true footprint starts exactly where the first one's
+    // ends (touching, zero gap) — its origin column sits proud so a carve
+    // that spilled over would be observable. No guard mechanism is needed
+    // for this to hold — the carve simply never reaches past its own footprint.
+    setVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0, 15, compId);
+
+    const result = levelBuildingFootprint(grid, 0, 0, OWN_SIZE_X, OWN_SIZE_Z);
+
+    expect(result.voxelsCleared).toBe(0);
+    expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0)).toBeCloseTo(15, 6);
   });
 });
