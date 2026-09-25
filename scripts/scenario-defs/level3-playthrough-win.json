@@ -1709,8 +1709,8 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 0,
-          "tickCount": 0
+          "cash": -107,
+          "tickCount": 6
         },
         "equals": {
           "deathCount": 12,
@@ -1719,7 +1719,7 @@
           "surveyCount": 3
         }
       },
-      "description": "Sandbox-measured: a genuine pending EVENT (lucky_strike) is already queued the instant this tick call starts, so it advances 0 of the 6 requested ticks -- tickCount and cash are unchanged here, resolved by the event choose 0 step below.",
+      "description": "#1186: re-measured -- was 0/0 (a pending lucky_strike event froze this tick call at 0 of 6 requested ticks; see the next step's old description). SurveyCalc.ts's estimateSurveyResult now samples a bounded depth window below each column's own surface (SURVEY_DEPTH_BELOW_SURFACE) instead of scanning the whole declared column height, which is the actual, required fix (#1186: column storage has no floor/ceiling any more, so 'the whole column' is unbounded) -- but it also changes how many columns around this file's own seismic/core_sample surveys (step 21-22, x:25 z:25) carry a detectable ore, which changes how many rng.gaussian() noise draws each survey consumes. Same seed, same eventual outcome, different point in the shared PRNG stream from here on: lucky_strike no longer happens to be the very next draw the instant this tick call starts, so all 6 requested ticks actually run instead of 0. Nothing about the blast itself changed -- fragmentedCount/detachedCount/liftedCount/projectionCount for pattern 1's blast are byte-identical to origin/main, direct-verified via a debug trace comparing this branch against a clean origin/main worktree.",
       "commandOutcome": "either"
     },
     {
@@ -1733,7 +1733,7 @@
       "role": "guard",
       "expect": {
         "changedBy": {
-          "cash": 10000,
+          "cash": 0,
           "tickCount": 0
         },
         "equals": {
@@ -1744,7 +1744,7 @@
         },
         "blocked": "#bs-event-dialog .bs-event-choice"
       },
-      "description": "Resolves lucky_strike (+$10,000, a fixed cash bonus -- same event type noted in level1-win-efficient.json/level2-playthrough-win.json). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (271 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Every earlier 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the file where an event (lucky_strike) really is pending at the moment it runs, so it is the one step that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so the $10,000 still lands.",
+      "description": "#1186: re-measured -- was +$10,000 (lucky_strike). With the tick 6 step above now running all 6 real ticks instead of freezing at 0 (see its own description), no event is pending by the time this step runs -- resolveEventIfPending no-ops, same as every other 'event choose 0' step in this file's drilling wait, so cash is unchanged. Previously: resolves lucky_strike (+$10,000, a fixed cash bonus). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (271 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Converted to guard + expect.blocked; the command still runs directly either way.",
       "commandOutcome": "either"
     },
     {
@@ -1860,11 +1860,12 @@
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0,
-          "safety": 50,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         }
-      }
+      },
+      "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
     },
     {
       "command": "campaign status",
@@ -1877,14 +1878,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 461,
-          "cash": -428037,
+          "tickCount": 467,
+          "cash": -438144,
           "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0,
-          "safety": 50,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1893,7 +1894,7 @@
         },
         "note": "#1103 (mover rebuild, #1089): cash corrected again, -428,273 -> -428,483 -- same three genuine fixes as this file's own pattern-1 `tick 50` checkpoint's #1103 note above (PlanItinerary.ts's off-navmesh-target refusal, EmployeeDispatchSteps.ts/PlanItinerary.ts's alight-before-walking-away-mounted fix, and VehicleContinuity.ts's stale-reservation release), each shifting exactly which vehicle drives which trip and when across this file's own fleet; tickCount, deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, safety, ecology, nuisance, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win --report-drift`, command mode; the new number is exact and reproducible run to run. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): cash corrected again, -428,165 -> -428,237 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when across this file's own fleet; that nudges the fuel/payroll costs accumulated tick-by-tick. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, safety, ecology, nuisance, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win`, command mode; the new number is exact and reproducible run to run. #553/#554: this file's real conclusion, retimed by #596/#597 (idempotent event pool + cached cooldown threshold shift when the pending event becomes true) and again by #554 (charging is now real queued work, not instant). Named for an $800,000 win across 5 patterns (184 holes total) and all 10 hired employees dying; `campaign start level:treranium_depths` fails outright (tier-3, locked, unchanged from Findings #58/#59/#61/#62), so the run plays out on the substitute new_game world throughout. Under #553's queued, vehicle-gated drilling, staffed:true's free 5-person/4-vehicle composition stacked on this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total, $220,000 budget after $165,000 of that goes straight into the fleet) can no longer survive even the first drilling wait: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes (drilled for real by 2 concurrent driller/drill_rig pairs -- the free staffed rig plus a hand-hired driller licensed into this file's own idle drill_rig) finish landing at tick 410. Nothing halts a tick or a blast once levelEnded flips, so the mine keeps operating -- legally seized, crew still working. #554: charging is now real queued work too -- the same drillers load all 24 holes' charges over ticks 410-460 before the blast fires. Pattern 1 blasts for real anyway at tick 460: PERFECT rating, 1,507 m3 cleared, and kills 12 of the 15 employees on site -- all 10 of this file's own hand-hires (employees #6-15) plus employee #1 (the free staffed driller) and employee #2 (the free staffed blaster), both of whom worked the pattern through drilling and charging; only staffed:true's 3 drivers (#3-5) survive -- while destroying 6 of the 9 vehicles: the free staffed drill_rig and all 5 of this file's own hand-bought vehicles, all parked squarely inside the pattern's footprint. One real contract cycle follows (accept + a storage-empty delivery refusal, both via #597's `type:rubble_disposal` selector against contract #20 -- storedMassKg never leaves 0; every debris_hauler in play is either destroyed in the blast or, like the free staffed one, never driven). Patterns 2-5 (36+30+30+64 = 160 more holes, the remaining 4 explosive types) are dropped from this file entirely: narrating drill_plan cycles for a mine that is $428,440 in the hole, has 3 employees left, and no fleet capable of drilling or hauling anything would document nothing real -- same resolution level3-playthrough-ecology.json already used for its own unreachable patterns 3-6. cash is exact and reproducible (fixed seed, command-mode measured, no wall-clock dependency); bankrupt/levelEnded/levelEndReason are the file's real ending, not the named $800k target. #554: tickCount moved from 410 to 460 and cash from -377190 to -428440 -- the 50 extra ticks of real queued charge-loading (also killing employee #2, the staffed blaster, who was drilling-then-charging alongside employee #1 at blast time) add payroll/upkeep on top of #591's own -377412->-377190 drill-wait retiming, without changing the bankruptcy outcome. #680: tickCount re-measured 460->464 and cash -428440->-428646 -- tri-state needs-drain classification ('working'|'idle'|'resting') shifted forced-rest timing during the charge-loading window; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #922: tickCount re-measured 469->463 and cash -428821->-428725 -- a vehicle's driver-employee position now tracks the vehicle for real instead of freezing at its boarding cell for the whole drive, shifting exact vehicle-pathing/payroll timing across the fleet the same way #591/#680 above did; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #928: tickCount re-measured 463->465 and cash -428725->-428777 -- the single-gauge fatigue model shifts forced-rest/dispatch timing across the roster the same way #680 above did; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): cash re-measured -428237 -> -428273 -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break shift exactly when this file's own crew is mid-task versus mid-rest, nudging the fuel/payroll costs accumulated tick-by-tick; tickCount and every other field here reproduce unchanged -- direct-verified via `npm run scenario -- --scenario level3-playthrough-win`, command mode. #1107 (merge of main into #1089's branch): cash corrected again, -428,483 -> -428,297 (and the `tick 50` checkpoint above, -387,058 -> -386,872, by the same 186) -- tickCollapse's #1096 fix (PR #1107) returns a collapsing employee's unboarded taskQueue vehicle reservation to the pool instead of holding it through the collapse, which changes which vehicle drives which trip and when. Cash is the only field that moves on either checkpoint -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win --report-drift`, command mode, standalone and uncontended. #1090-followup (sandbox-measured): cash corrected again, -428,297 -> -428,183 (and the `tick 50` checkpoint above, -386,872 -> -386,758, by the same 114) -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost delegating to planItinerary) shifts exactly which vehicle drives which trip and when across this file's fleet, the same cash-only-recalibration shape as every fix above. Every other field here reproduces unchanged."
       },
-      "description": "#1151: re-baselined against a measured run -- cash -428043 -> -428037. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1186: tickCount 461 -> 467, cash -428037 -> -438144, safety 50 -> 0. Same root cause as the 'tick 6' and 'stats' steps above: SurveyCalc.ts's survey-depth-window fix (a required part of #1186 -- unbounded column storage means 'scan the whole column' no longer means anything) shifts the shared PRNG stream enough that the pending event which used to freeze the post-blast 'tick 6' call at 0-of-6 ticks no longer lands there, so all 6 ticks actually run: 6 more ticks of payroll/upkeep (the extra -$10,107 versus the old path, which also isn't offset by lucky_strike's +$10,000 any more) and 6 ticks of the recentAccidents safety penalty seeing pattern 1's own unchanged 12 deaths for the first time. The blast itself (pattern 1, tick 460, PERFECT rating, 1,507 m3 cleared, deathCount 12) is unaffected -- direct-verified byte-identical fragmentedCount/detachedCount/liftedCount/projectionCount against a clean origin/main worktree; only what happens during the ticks *after* it changed. #1151: re-baselined against a measured run -- cash -428043 -> -428037. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
     }
   ]
 }

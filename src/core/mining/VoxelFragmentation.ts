@@ -188,75 +188,29 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
       seed(box.maxX - 1, y, z);
     }
   }
-  // The two Y faces anchor the box's literal edge row, same as the X/Z faces
-  // — *unless* that whole row is padding past where the real rock ends. Real
-  // rock reaching the row means at least one column has a solid, unbroken
-  // voxel right at box.minY/box.maxY-1: trust that row across every column,
-  // same as before #1186. Only when the row is air everywhere (no column's
-  // rock actually reaches it) do we fall back, per column, to the nearest
-  // solid, unbroken voxel to that face — BLAST_ZONE_RADIUS pads the box a
-  // little past the deepest hole, and with no vertical clamp any more
-  // (#1186) that padding can now land past where a fixture's (or a finite
-  // backfill's) rock actually ends.
-  //
-  // Falling back per column, unconditionally, whenever the whole row is
-  // empty is not enough on its own: the row can read empty because it is
-  // genuinely padding past a real, multi-column slab (the case this fallback
-  // exists for), but it can equally read empty because the box's face just
-  // does not reach anything at all, and the "nearest solid voxel" the
-  // per-column search then finds is whatever solid survivor happens to sit
-  // topmost/bottommost in that one column — including a voxel that is itself
-  // a genuinely isolated fragment with nothing connecting it to real support.
-  // Seeding that directly as an anchor would mark it "supported" without
-  // ever running it through the flood fill, defeating the one thing this
-  // function exists to catch.
-  //
-  // A real slab's per-column candidate always has at least one face-adjacent
-  // solid survivor of its own — the neighbouring column's slice of the same
-  // slab, at the same or an adjacent depth — because the slab is a connected
-  // mass, not a single voxel. A genuinely floating speck, by definition, has
-  // none. So the candidate only earns anchor status when it clears that
-  // check; otherwise it is left to the flood fill like any other voxel, and
-  // an isolated fragment with no real connection stays unreached and
-  // unsupported.
-  const rowHasSolid = (y: number): boolean => {
-    for (let z = box.minZ; z < box.maxZ; z++) {
-      for (let x = box.minX; x < box.maxX; x++) {
-        if (isSolidSurvivor(x, y, z)) return true;
-      }
-    }
-    return false;
-  };
-  const hasSolidNeighbor = (x: number, y: number, z: number): boolean => {
-    for (const [dx, dy, dz] of FACE_OFFSETS) {
-      if (isSolidSurvivor(x + dx, y + dy, z + dz)) return true;
-    }
-    return false;
-  };
-  const minYRowGrounded = rowHasSolid(box.minY);
-  const maxYRowGrounded = rowHasSolid(box.maxY - 1);
+  // The two Y faces anchor the box's literal edge row, same as the X/Z faces.
+  // No per-column "nearest solid voxel" fallback: that heuristic looked
+  // plausible (a real slab's candidate always has a face-adjacent solid
+  // neighbour of its own) but the same is true of a multi-voxel *disconnected*
+  // island sitting mid-crater — it has neighbours within itself, just none
+  // reaching the world outside the box. "Has any neighbour" cannot tell a
+  // slab's crust from a detached chunk sitting on nothing, and level1's own
+  // ordinary blast proved it: an entirely real, in-bounds blast (box.minY=10,
+  // nowhere near the below-y=0 case this row was written for) went from 10
+  // genuinely detached voxels to 0 the moment this fallback started running,
+  // because it happily anchored debris pockets the flood fill was supposed to
+  // catch. The literal row is enough — real confined rock (the
+  // blast-execution.test.ts molite slab, the below-y=0 crater case) is always
+  // reachable through the X/Z side walls, which already span the box's full
+  // Y range and seed every column's true surface via lateral connectivity
+  // through the contiguous mass; a Y face landing on padding past where the
+  // rock ends (BLAST_ZONE_RADIUS overshooting the real surface, unrelated to
+  // #1186) is exactly the ordinary case seed()'s own air check already no-ops
+  // on, same as it always has.
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      if (minYRowGrounded) {
-        seed(x, box.minY, z);
-      } else {
-        for (let y = box.minY; y < box.maxY; y++) {
-          if (isSolidSurvivor(x, y, z)) {
-            if (hasSolidNeighbor(x, y, z)) seed(x, y, z);
-            break;
-          }
-        }
-      }
-      if (maxYRowGrounded) {
-        seed(x, box.maxY - 1, z);
-      } else {
-        for (let y = box.maxY - 1; y >= box.minY; y--) {
-          if (isSolidSurvivor(x, y, z)) {
-            if (hasSolidNeighbor(x, y, z)) seed(x, y, z);
-            break;
-          }
-        }
-      }
+      seed(x, box.minY, z);
+      seed(x, box.maxY - 1, z);
     }
   }
   for (let y = box.minY; y < box.maxY; y++) {
