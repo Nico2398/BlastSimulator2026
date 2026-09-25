@@ -66,20 +66,21 @@ export interface NavCell {
   benchLevel: number;
   /**
    * Per-cell vehicle-occupancy flag, checked by Pathfinding.findPath/
-   * AgentMovement.isPathBlocked when a caller requests avoidVehicles.
-   * tickVehicle/tickEmployeeMovement's own per-tick pathfinds both request
-   * avoidVehicles:false and instead do vehicle-vs-vehicle collision avoidance
-   * by comparing live x/z directly (see isCellOccupiedByOtherVehicle in
-   * EntityMovementTick.ts) — this field plays no part in that. The
-   * vehicle-occupancy-reroute escalation path (handleVehicleOccupancyBlock/
-   * findPathAvoidingOtherVehicles in VehicleOccupancyReroute.ts, #591) still
-   * sets it transiently the same way it always has. Since #954 it is also
-   * maintained persistently by EntityMovementTick's per-vehicle tick (set
-   * true on the vehicle's current cell while stationary, cleared when it
-   * starts/finishes moving) and seeded by buildNavGrid, so it doubles as a
-   * standing "a vehicle physically occupies this cell" flag that foot
-   * pathfinding (avoidVehicles:true, employees) treats as impassable via
-   * Pathfinding.isImpassable.
+   * AgentMovement.isPathBlocked when a caller requests avoidVehicles. A drive
+   * leg's own per-tick pathfind (Locomotion.ts's `advanceLeg`) requests
+   * avoidVehicles:false and instead does vehicle-vs-vehicle collision
+   * avoidance by comparing live x/z directly (see `isOccupiedByOtherVehicle`
+   * in Locomotion.ts) — this field plays no part in that. The
+   * vehicle-occupancy-reroute escalation path (`handleOccupancyBlock`/
+   * `findPathAvoidingOtherVehicles`, both Locomotion.ts, #591) still sets it
+   * transiently the same way it always has. Since #954 it is also maintained
+   * persistently by Locomotion.ts's `writeVehiclePosition` (set true on the
+   * cell a drive leg's own arrival test passes on this tick, cleared the next
+   * tick a new leg's `writeVehiclePosition` call finds the rounded cell
+   * changed, via `updateVehicleCellOccupancy` in EntityMovementTick.ts) and
+   * seeded by buildNavGrid, so it doubles as a standing "a vehicle physically
+   * occupies this cell" flag that foot pathfinding (avoidVehicles:true,
+   * employees) treats as impassable via Pathfinding.isImpassable.
    */
   vehicleOccupied: boolean;
   /**

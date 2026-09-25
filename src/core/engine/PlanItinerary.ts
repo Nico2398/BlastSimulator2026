@@ -163,9 +163,9 @@ export function buildBoardLeg(
   // true by construction, since the destination IS `vehicle`'s own cell. It
   // only ever read false when the grid's occupancy was stale, which it
   // routinely is for a vehicle that has never moved: NavGrid.build seeds
-  // `vehicleOccupied` from the vehicle list and Locomotion maintains it
-  // thereafter, so a vehicle bought into an already-built world is marked by
-  // neither until its first drive.
+  // `vehicleOccupied` from the vehicle list and Locomotion.ts's
+  // writeVehiclePosition maintains it thereafter, so a vehicle bought into an
+  // already-built world is marked by neither until its first drive.
   //
   // Read false, this planned `avoidVehicles: true` instead, and the walk to
   // board had to dodge every OTHER parked vehicle. Under #1151's slope gate
