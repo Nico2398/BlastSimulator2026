@@ -1460,6 +1460,33 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
 }
 
 /**
+ * Vertical span actually touched by ground across every column in
+ * `[minX, maxX] × [minZ, maxZ]` (inclusive), via
+ * `computeVoxelColumnSurfaceHeight`. No-ground (NaN) columns are skipped.
+ * Returns `{ minY: floor(lowest), maxY: ceil(highest) }` over the columns
+ * that do have ground, or `null` when no column in the rect has any (#1185)
+ * — used by change producers that currently report a full-grid `minY: 0,
+ * maxY: sizeY - 1` region, meaningless now the grid has no vertical cap.
+ */
+export function computeColumnRangeY(
+  grid: VoxelGrid,
+  minX: number, maxX: number, minZ: number, maxZ: number,
+): { minY: number; maxY: number } | null {
+  let lowest = Infinity;
+  let highest = -Infinity;
+  for (let z = minZ; z <= maxZ; z++) {
+    for (let x = minX; x <= maxX; x++) {
+      const height = computeVoxelColumnSurfaceHeight(grid, x, z);
+      if (Number.isNaN(height)) continue;
+      if (height < lowest) lowest = height;
+      if (height > highest) highest = height;
+    }
+  }
+  if (lowest === Infinity) return null;
+  return { minY: Math.floor(lowest), maxY: Math.ceil(highest) };
+}
+
+/**
  * Largest gap, in voxels, between a column's existing surface and a newly
  * written one that `setVoxelColumnSurfaceHeight` will still sweep-clear
  * between. Both ends are unclamped (#1184) — `existingTopY` comes from a

@@ -8,6 +8,7 @@ import { buildCommand, employeeCommand } from '../../src/console/commands/entiti
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import type { ProtectedStructures } from '../../src/core/world/Structures.js';
 import { SURVEY_COVERAGE_RADIUS } from '../../src/core/config/balance.js';
+import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
@@ -219,6 +220,39 @@ describe('site expansion — a footprint straddling protected ground is refused 
     expect(ctx.state!.drillHoles).toHaveLength(0);
     expect(ctx.grid!.chunkCount).toBe(before);
     expect(ctx.grid!.hasChunk(2, 0)).toBe(false);
+  });
+});
+
+describe('site expansion — terrain:updated region reflects real ground, not a full-height guess (#1185)', () => {
+  it('reports minY/maxY from the newly claimed columns\' own surface heights, not 0..sizeY-1', () => {
+    const ctx = makeCtx();
+    const regions: Array<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> = [];
+    ctx.emitter.on('terrain:updated', ({ region }) => regions.push(region));
+
+    const result = drillPlanCommand(ctx, ['add'], { x: '34', z: '10' });
+    expect(result.success).toBe(true);
+    expect(regions.length).toBeGreaterThan(0);
+
+    const region = regions[0]!;
+
+    // Compute the real column-height span across the emitted X/Z rect
+    // independently of the producer under test, straight off the grid's own
+    // terrain — the ground the newly claimed columns actually carry, not a
+    // full-height 0..sizeY-1 guess.
+    let expectedMinY = Infinity;
+    let expectedMaxY = -Infinity;
+    for (let z = region.minZ; z <= region.maxZ; z++) {
+      for (let x = region.minX; x <= region.maxX; x++) {
+        const h = computeVoxelColumnSurfaceHeight(ctx.grid!, x, z);
+        if (Number.isNaN(h)) continue;
+        expectedMinY = Math.min(expectedMinY, Math.floor(h));
+        expectedMaxY = Math.max(expectedMaxY, Math.ceil(h));
+      }
+    }
+
+    expect(Number.isFinite(expectedMinY)).toBe(true); // sanity: the newly claimed rect has real ground
+    expect(region.minY).toBe(expectedMinY);
+    expect(region.maxY).toBe(expectedMaxY);
   });
 });
 

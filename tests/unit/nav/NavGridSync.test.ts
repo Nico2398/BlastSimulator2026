@@ -9,12 +9,13 @@
 // in sequence each patch only their own area.
 
 import { describe, it, expect } from 'vitest';
-import { subscribeNavGridToUpdates, toFullHeightRegion } from '../../../src/core/nav/NavGridSync.js';
+import { subscribeNavGridToUpdates, regionForColumns } from '../../../src/core/nav/NavGridSync.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
+import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
 
 /** Create a solid voxel with optional overrides. */
 function solidVoxel(overrides?: Partial<VoxelData>): VoxelData {
@@ -38,6 +39,18 @@ function makeSolidGrid(sizeX: number, sizeY: number, sizeZ: number, solidTopY: n
     }
   }
   return grid;
+}
+
+/**
+ * Write column (x, z) solid across `[topY - depth + 1, topY]` — the fixture
+ * #1185's tests need to prove a column whose ground sits entirely below
+ * y = 0 is reported with a genuinely negative surface, not clamped to 0. A
+ * grid with no attached generator (every fixture below) has no natural fill,
+ * so the column is otherwise pure air — `topY` alone decides where the
+ * solid-to-air crossing sits.
+ */
+function writeSolidColumn(grid: VoxelGrid, x: number, z: number, topY: number, depth = 5): void {
+  for (let y = topY - depth + 1; y <= topY; y++) grid.setVoxel(x, y, z, solidVoxel());
 }
 
 /** Full-height `terrain:updated` region covering the given X/Z bounds. */
@@ -180,33 +193,59 @@ describe('subscribeNavGridToUpdates', () => {
     expect(nav.cells[1]![1]!.type).toBe('void');
     expect(nav.cells[8]![8]!.type).toBe('void');
   });
+
+  it('patches correctly from a region carrying negative/unusual minY-maxY — patchNavGrid only reads X/Z (#1185)', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
+    expect(nav.cells[3]![3]!.type).toBe('walkable');
+
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(3, y, 3);
+
+    const emitter = new EventEmitter();
+    subscribeNavGridToUpdates(emitter, () => ({
+      navGrid: nav, grid, buildings: NO_BUILDINGS, drillHoles: NO_HOLES,
+    }));
+
+    // minY/maxY are nonsense on purpose (negative, and maxY < minY) — the
+    // grid has no vertical cap any more (#1185), so a real producer can emit
+    // values like these, and patchNavGrid must still recompute the column
+    // correctly from X/Z alone.
+    emitter.emit('terrain:updated', { region: { minX: 3, maxX: 3, minY: -400, maxY: -350, minZ: 3, maxZ: 3 } });
+
+    expect(nav.cells[3]![3]!.type).toBe('void');
+    expect(nav.cells[3]![3]!.moveCost).toBe(Infinity);
+  });
 });
 
-describe('toFullHeightRegion (#1146)', () => {
-  it('widens a 4-field footprint region to the full column height, preserving X/Z bounds', () => {
-    const grid = new VoxelGrid(10, 20, 10);
-    const region = { minX: 2, maxX: 5, minZ: 3, maxZ: 6 };
+describe('regionForColumns (#1185)', () => {
+  it('derives minY/maxY from the real ground under the footprint, preserving the footprint X/Z bounds', () => {
+    const grid = new VoxelGrid(10, 30, 10);
+    writeSolidColumn(grid, 2, 2, 3); // surface height 3.5 -> floor 3, ceil 4
+    writeSolidColumn(grid, 7, 7, 8); // surface height 8.5 -> floor 8, ceil 9
 
-    const result = toFullHeightRegion(region, grid);
+    const footprint: BlastRegion = { minX: 0, maxX: 9, minZ: 0, maxZ: 9 };
+    const result = regionForColumns(footprint, grid);
 
-    expect(result).toEqual({ minX: 2, maxX: 5, minY: 0, maxY: grid.sizeY - 1, minZ: 3, maxZ: 6 });
+    expect(result).toEqual({ minX: 0, maxX: 9, minY: 3, maxY: 9, minZ: 0, maxZ: 9 });
   });
 
-  it('a single-cell footprint region widens the same way', () => {
-    const grid = new VoxelGrid(4, 8, 4);
-    const region = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  it('reports a negative minY/maxY when the footprint sits entirely below y = 0 (the case #1184 exists to enable)', () => {
+    const grid = new VoxelGrid(10, 30, 10);
+    writeSolidColumn(grid, 3, 3, -8); // surface height -7.5 -> floor -8, ceil -7
 
-    const result = toFullHeightRegion(region, grid);
+    const footprint: BlastRegion = { minX: 3, maxX: 3, minZ: 3, maxZ: 3 };
+    const result = regionForColumns(footprint, grid);
 
-    expect(result).toEqual({ minX: 0, maxX: 0, minY: 0, maxY: 7, minZ: 0, maxZ: 0 });
+    expect(result).toEqual({ minX: 3, maxX: 3, minY: -8, maxY: -7, minZ: 3, maxZ: 3 });
   });
 
-  it('uses the given grid own sizeY, not a hardcoded height', () => {
-    const shortGrid = new VoxelGrid(5, 3, 5);
-    const tallGrid = new VoxelGrid(5, 50, 5);
-    const region = { minX: 1, maxX: 1, minZ: 1, maxZ: 1 };
+  it('falls back to {minY:0, maxY:0} when the footprint rect has no ground anywhere', () => {
+    const grid = new VoxelGrid(10, 30, 10);
+    // No voxel ever written anywhere in the grid.
 
-    expect(toFullHeightRegion(region, shortGrid).maxY).toBe(2);
-    expect(toFullHeightRegion(region, tallGrid).maxY).toBe(49);
+    const footprint: BlastRegion = { minX: 4, maxX: 5, minZ: 4, maxZ: 5 };
+    const result = regionForColumns(footprint, grid);
+
+    expect(result).toEqual({ minX: 4, maxX: 5, minY: 0, maxY: 0, minZ: 4, maxZ: 5 });
   });
 });

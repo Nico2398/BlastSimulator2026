@@ -20,7 +20,7 @@ import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { toFullHeightRegion } from '../nav/NavGridSync.js';
+import { regionForColumns } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
@@ -269,7 +269,7 @@ export function applyTaskCompletion(
             // (isStepClimbable reads them) and not the pre-construction
             // ones. NavGridSync patches on nav:occupancy_changed; no direct
             // call here.
-            emitter.emit('nav:occupancy_changed', { region: toFullHeightRegion(levelRegion, grid) });
+            emitter.emit('nav:occupancy_changed', { region: regionForColumns(levelRegion, grid) });
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just

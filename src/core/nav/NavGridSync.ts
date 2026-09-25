@@ -12,7 +12,7 @@
 
 import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeColumnRangeY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
@@ -26,13 +26,21 @@ export interface NavGridSyncTarget {
 }
 
 /**
- * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the full-height
- * region shape `terrain:updated`'s payload carries (adds minY/maxY spanning
- * `grid`'s whole height), for building carves that emit the event directly
- * instead of going through `LevelGround`/`Ramp`/`BlastExecution`.
+ * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the
+ * region shape `terrain:updated`'s payload carries, for building carves that
+ * emit the event directly instead of going through
+ * `LevelGround`/`Ramp`/`BlastExecution`. The vertical span comes from the
+ * real ground under `footprint`'s columns (`computeColumnRangeY`), not a
+ * full-grid `0..sizeY-1` guess — the grid has no vertical cap (#1185).
+ * Falls back to `{ minY: 0, maxY: 0 }` when the rect has no ground anywhere.
  */
-export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
-  return { minX: region.minX, maxX: region.maxX, minZ: region.minZ, maxZ: region.maxZ, minY: 0, maxY: grid.sizeY - 1 };
+export function regionForColumns(footprint: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
+  const range = computeColumnRangeY(grid, footprint.minX, footprint.maxX, footprint.minZ, footprint.maxZ);
+  return {
+    minX: footprint.minX, maxX: footprint.maxX,
+    minZ: footprint.minZ, maxZ: footprint.maxZ,
+    minY: range ? range.minY : 0, maxY: range ? range.maxY : 0,
+  };
 }
 
 /**

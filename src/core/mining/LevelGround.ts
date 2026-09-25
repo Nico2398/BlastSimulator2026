@@ -200,6 +200,7 @@ export function carveLevelColumns(
 ): { voxelsCleared: number } {
   let totalDelta = 0;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  let regionMinY = Infinity, regionMaxY = -Infinity;
 
   for (const { x, z } of columns) {
     const liveHeight = getSmoothTerrainSurfaceY(grid, x, z);
@@ -211,11 +212,13 @@ export function carveLevelColumns(
     totalDelta += liveHeight - targetY;
     minX = Math.min(minX, x); maxX = Math.max(maxX, x);
     minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+    regionMinY = Math.min(regionMinY, targetY);
+    regionMaxY = Math.max(regionMaxY, liveHeight);
   }
 
   if (totalDelta > 0) {
     emitter?.emit('terrain:updated', {
-      region: { minX, maxX, minY: 0, maxY: grid.sizeY - 1, minZ, maxZ },
+      region: { minX, maxX, minY: Math.floor(regionMinY), maxY: Math.ceil(regionMaxY), minZ, maxZ },
     });
   }
 

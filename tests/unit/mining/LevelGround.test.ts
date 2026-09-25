@@ -351,6 +351,89 @@ describe('carveLevelColumns', () => {
     const second = carveLevelColumns(grid, columns, 10);
     expect(second.voxelsCleared).toBe(0);
   });
+
+  // ── #1185: the emitted terrain:updated region must span exactly the rows
+  // actually levelled — floor(targetY)..ceil(highest pre-carve column height)
+  // — not a full-grid 0..grid.sizeY-1 guess that means nothing now the grid
+  // has no vertical cap.
+
+  it('emits a region spanning exactly the levelled rows: minY = floor(targetY), maxY = ceil(highest pre-carve height carved) (#1185)', () => {
+    const grid = new VoxelGrid(20, 30, 20);
+    const compId = internRock(grid);
+    setVoxelColumnSurfaceHeight(grid, 5, 5, 18, compId);
+    setVoxelColumnSurfaceHeight(grid, 6, 5, 12, compId);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = carveLevelColumns(grid, [{ x: 5, z: 5 }, { x: 6, z: 5 }], 10, emitter);
+
+    expect(result.voxelsCleared).toBeGreaterThan(0);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const region = handler.mock.calls[0]![0]!.region;
+    expect(region).toEqual({ minX: 5, maxX: 6, minY: 10, maxY: 18, minZ: 5, maxZ: 5 });
+  });
+
+  it('rounds a fractional targetY and a fractional pre-carve height outward (floor for minY, ceil for maxY) (#1185)', () => {
+    const grid = new VoxelGrid(20, 30, 20);
+    const compId = internRock(grid);
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 18.2, compId);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    carveLevelColumns(grid, [{ x: 3, z: 3 }], 10.5, emitter);
+
+    const region = handler.mock.calls[0]![0]!.region;
+    expect(region.minY).toBe(10); // floor(10.5)
+    expect(region.maxY).toBe(19); // ceil(18.2)
+  });
+
+  it('a column already at target height (skipped by the staleness guard) does not widen the region\'s X/Z or Y bounds (#1185)', () => {
+    const grid = new VoxelGrid(20, 30, 20);
+    const compId = internRock(grid);
+    setVoxelColumnSurfaceHeight(grid, 5, 5, 18, compId);
+    setVoxelColumnSurfaceHeight(grid, 6, 5, 12, compId);
+    // Already at the target height and far outside the other two columns —
+    // the staleness guard skips it entirely, so it must not appear in the
+    // emitted region at all, on any axis.
+    setVoxelColumnSurfaceHeight(grid, 15, 15, 10, compId);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    const result = carveLevelColumns(grid, [{ x: 5, z: 5 }, { x: 6, z: 5 }, { x: 15, z: 15 }], 10, emitter);
+
+    expect(result.voxelsCleared).toBeGreaterThan(0);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const region = handler.mock.calls[0]![0]!.region;
+    expect(region).toEqual({ minX: 5, maxX: 6, minY: 10, maxY: 18, minZ: 5, maxZ: 5 });
+  });
+
+  it('reports a negative minY/maxY when levelling terrain whose ground sits entirely below y = 0 (#1185)', () => {
+    const grid = new VoxelGrid(20, 30, 20);
+    const compId = internRock(grid);
+    setVoxelColumnSurfaceHeight(grid, 2, 2, -5, compId);
+    setVoxelColumnSurfaceHeight(grid, 3, 2, -12, compId);
+
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    // Level both columns down to the lower one's height (-12): only (2,2) is
+    // actually carved, from -5 down to -12.
+    const result = carveLevelColumns(grid, [{ x: 2, z: 2 }, { x: 3, z: 2 }], -12, emitter);
+
+    expect(result.voxelsCleared).toBeGreaterThan(0);
+    const region = handler.mock.calls[0]![0]!.region;
+    expect(region.minY).toBe(-12);
+    expect(region.maxY).toBe(-5);
+    expect(region.minY).toBeLessThan(0);
+    expect(region.maxY).toBeLessThan(0);
+  });
 });
 
 describe('levelGroundRect', () => {

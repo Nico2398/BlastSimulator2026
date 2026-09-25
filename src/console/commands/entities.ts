@@ -26,7 +26,7 @@ import { evacuateZone } from '../../core/engine/Evacuation.js';
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity } from './buildingHelpers.js';
-import { toFullHeightRegion } from '../../core/nav/NavGridSync.js';
+import { regionForColumns } from '../../core/nav/NavGridSync.js';
 import { orderBuildingCommand } from './buildOrder.js';
 import { t } from '../../core/i18n/I18n.js';
 
@@ -44,7 +44,7 @@ function emitFootprintOccupancyChanged(
 ): void {
   if (!ctx.grid) return;
   ctx.emitter.emit('nav:occupancy_changed', {
-    region: toFullHeightRegion(makeFootprintRegion(x, z, sizeX, sizeZ), ctx.grid),
+    region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), ctx.grid),
   });
 }
 
