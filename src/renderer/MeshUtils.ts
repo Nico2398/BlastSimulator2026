@@ -17,6 +17,15 @@ export function disposeGroup(group: THREE.Group): void {
 }
 
 /**
+ * World-space center coordinate of a footprint span along one axis.
+ * Footprint cells `origin..origin+size-1` span world `[origin-0.5, origin+size-0.5]`.
+ */
+export function footprintCenterCoord(_origin: number, _size: number): number {
+  // TODO: implement
+  return 0;
+}
+
+/**
  * Linearly brighten a packed hex color toward white.
  * @param hex   - e.g. 0xff6600
  * @param shift - 0 = unchanged, 1 = white
