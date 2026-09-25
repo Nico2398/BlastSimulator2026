@@ -777,9 +777,15 @@ export class VoxelGrid {
     const prevFracture = existing ? existing.fracture[i]! : 1.0;
     const newOres = ores && Object.keys(ores).length > 0 ? ores : undefined;
 
-    // No-op write (identical to what's already there, or to the implicit air
-    // default in an unallocated slab): skip entirely, so a fillVoxel that
-    // changes nothing never allocates a slab.
+    // A write is always marked dirty, whether or not it actually changes the
+    // stored value — a save consumer treats "was written to" and "differs
+    // from generation" as the same signal, and callers rely on that (#1182
+    // regression: dirty tracking predates this issue and must not change).
+    this.touch(chunk);
+
+    // No-op value (identical to what's already there, or to the implicit air
+    // default in an unallocated slab): skip storage entirely, so a fillVoxel
+    // that changes nothing never allocates a slab.
     if (prevDensity === density && prevCompId === compId && prevFracture === 1.0 && oresDeepEqual(prevOres, newOres)) {
       return;
     }
@@ -790,7 +796,6 @@ export class VoxelGrid {
     slab.fracture[i] = 1.0;
     if (newOres) slab.ores.set(i, { ...newOres });
     else slab.ores.delete(i);
-    this.touch(chunk);
     this.touchDensity(slab, i, density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, density, compId, slab.ores.get(i));
     this.recordFractureWrite(x, y, z, prevFracture, 1.0);
@@ -801,10 +806,10 @@ export class VoxelGrid {
     if (!chunk) return;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
     const prev = existing ? existing.fracture[i]! : 1.0;
-    if (prev === value) return; // no-op: skip without allocating a slab
+    this.touch(chunk); // any write is dirty, whether or not the value actually changes
+    if (prev === value) return; // no-op value: skip without allocating a slab
     const slab = existing ?? this.getOrCreateSlab(chunk, cy);
     slab.fracture[i] = value;
-    this.touch(chunk);
     this.recordFractureWrite(x, y, z, prev, value);
   }
 
@@ -815,10 +820,10 @@ export class VoxelGrid {
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
     const prev = existing ? existing.fracture[i]! : 1.0;
     const next = prev * factor;
-    if (prev === next) return; // no-op: skip without allocating a slab
+    this.touch(chunk); // any write is dirty, whether or not the value actually changes
+    if (prev === next) return; // no-op value: skip without allocating a slab
     const slab = existing ?? this.getOrCreateSlab(chunk, cy);
     slab.fracture[i] = next;
-    this.touch(chunk);
     this.recordFractureWrite(x, y, z, prev, next);
   }
 
@@ -858,6 +863,8 @@ export class VoxelGrid {
     const prevOres = existing ? existing.ores.get(i) : undefined;
     const prevFracture = existing ? existing.fracture[i]! : 1.0;
 
+    this.touch(chunk); // any write is dirty, whether or not the value actually changes
+
     if (prevDensity === voxel.density && prevCompId === newCompId
         && prevFracture === voxel.fractureModifier && oresDeepEqual(prevOres, newOres)) {
       return;
@@ -869,7 +876,6 @@ export class VoxelGrid {
     slab.fracture[i] = voxel.fractureModifier;
     if (newOres) slab.ores.set(i, { ...newOres });
     else slab.ores.delete(i);
-    this.touch(chunk);
     this.touchDensity(slab, i, voxel.density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, voxel.density, newCompId, slab.ores.get(i));
     this.recordFractureWrite(x, y, z, prevFracture, voxel.fractureModifier);
@@ -884,7 +890,9 @@ export class VoxelGrid {
     const prevOres = existing ? existing.ores.get(i) : undefined;
     const prevFracture = existing ? existing.fracture[i]! : 1.0;
 
-    // Already air (explicitly, or by an unallocated slab's implicit default): no-op.
+    this.touch(chunk); // any write is dirty, whether or not the value actually changes
+
+    // Already air (explicitly, or by an unallocated slab's implicit default): no-op value.
     if (prevDensity === 0 && prevCompId === 0 && prevFracture === 1.0 && prevOres === undefined) {
       return;
     }
@@ -894,7 +902,6 @@ export class VoxelGrid {
     slab.compId[i] = 0;
     slab.fracture[i] = 1.0;
     slab.ores.delete(i);
-    this.touch(chunk);
     this.touchDensity(slab, i, 0);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, 0, 0, undefined);
     this.recordFractureWrite(x, y, z, prevFracture, 1.0);
