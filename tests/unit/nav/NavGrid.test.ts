@@ -658,6 +658,75 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
   });
 });
 
+// ── Ground at or below y = 0 is still ground, not void (#1184) ──────────────
+//
+// Since #1183/#1184, a column's surface can legitimately sit at 0 or below
+// (no more [0, sizeY) scan bound). The old `surfaceY === -1` void sentinel
+// used by classifyCellType/computeMaxSurfaceY can no longer double as both
+// "no ground" and a real height of -1, so a uniformly-below-zero site must
+// still classify and path exactly like any other ground.
+
+/**
+ * Build a VoxelGrid with a uniform, flat column height (same everywhere, so
+ * no cardinal neighbour reads a different surface — avoids spurious ramp
+ * classification) with its topmost solid voxel at `solidTopY`, which — unlike
+ * `makeSolidGrid` — may be zero or negative: rock fills the 5 voxels
+ * `[solidTopY - 4, solidTopY]`, not `[0, solidTopY]`.
+ */
+function makeUniformSolidGridAt(sizeX: number, sizeY: number, sizeZ: number, solidTopY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      for (let y = solidTopY - 4; y <= solidTopY; y++) {
+        grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+  }
+  return grid;
+}
+
+describe('NavGrid.buildNavGrid — ground at or below y = 0 (#1184)', () => {
+  it('a column whose surface sits below y = 0 classifies as ground (not void) and is reachable', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform rock y=-9..-5 across the whole site
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const cell = nav.cells[3]![3]!;
+
+    expect(cell.type).not.toBe('void');
+    expect(cell.moveCost).toBeLessThan(Infinity);
+    expect(cell.surfaceY).toBeCloseTo(-4.5, 6);
+
+    const reachable = NavGrid.computeReachableSet(nav, 3, 3);
+    expect(reachable.size).toBeGreaterThan(1);
+    expect(reachable.has(5, 5)).toBe(true);
+  });
+
+  it('a column whose surface sits exactly at y = 0 classifies as ground (not void) and is reachable', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, 0); // uniform rock y=-4..0 across the whole site
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const cell = nav.cells[3]![3]!;
+
+    expect(cell.type).not.toBe('void');
+    expect(cell.moveCost).toBeLessThan(Infinity);
+    expect(cell.surfaceY).toBeCloseTo(0.5, 6);
+
+    const reachable = NavGrid.computeReachableSet(nav, 3, 3);
+    expect(reachable.size).toBeGreaterThan(1);
+    expect(reachable.has(5, 5)).toBe(true);
+  });
+});
+
+describe('NavGrid.computeMaxSurfaceY — no-ground signal and unclamped negative max (#1184)', () => {
+  it('reports NaN (not -1) for an entirely off-site/empty grid, distinct from a real negative max', () => {
+    const emptyGrid = new VoxelGrid(0, 10, 0);
+    expect(Number.isNaN(NavGrid.computeMaxSurfaceY(emptyGrid))).toBe(true);
+  });
+
+  it('reports the true negative max surface Y for a site sitting entirely below y = 0, not clamped to -1', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform crossing at -4.5 everywhere
+    expect(NavGrid.computeMaxSurfaceY(grid)).toBeCloseTo(-4.5, 6);
+  });
+});
+
 describe('isStepClimbable — slope-based traversability (#1151)', () => {
   it('NAV_MAX_SLOPE_RATIO is exactly tan(NAV_MAX_SLOPE_DEGREES)', () => {
     expect(NAV_MAX_SLOPE_RATIO).toBeCloseTo(Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180), 10);

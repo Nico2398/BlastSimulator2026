@@ -7,7 +7,7 @@ import {
   PREVIEW_RADIUS,
 } from '../../../src/core/mining/SoftwarePreview.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
@@ -30,6 +30,28 @@ describe('SoftwarePreview — computeHoleContext', () => {
     const plan = assembleBlastPlan(holes, {}, {});
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(0);
+  });
+
+  // #1184: getHoleSurfaceYs must come from the shared column query
+  // (computeVoxelColumnSurfaceY / firstEmptyLayerAboveGround), not a scan
+  // fixed to [0, grid.sizeY) — a hole above a column whose surface sits
+  // below y = 0 must report the true (negative) surface, not the fallback 0
+  // a bounded scan would wrongly produce.
+  it('#1184: reports the true surface Y for a hole above a column whose surface sits below y = 0', () => {
+    const grid = new VoxelGrid(10, 5, 10);
+    grid.setVoxel(3, -5, 3, {
+      composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+    const holes = createGridPlan({ x: 3, z: 3 }, 1, 1, 3, 2, 0.1);
+    const plan = assembleBlastPlan(holes, {}, {});
+
+    const ctx = computeHoleContext(plan, grid);
+
+    expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(firstEmptyLayerAboveGround(grid, 3, 3));
+    expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(-4);
   });
 });
 

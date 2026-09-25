@@ -9,6 +9,8 @@ import {
   renormaliseVoxelColumnAfterCarve,
   captureColumnTopsForCarve,
   renormaliseCarvedColumns,
+  firstEmptyLayerAboveGround,
+  surfaceDensityAt,
   setVoxelBoundsReporter,
   chunkIndexOf,
   clampChunkRectToTile,
@@ -711,8 +713,11 @@ describe('computeVoxelColumnSurfaceY', () => {
     expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
   });
 
-  it('returns -1 for a column with nothing solid in it', () => {
-    expect(computeVoxelColumnSurfaceY(new VoxelGrid(16, 8, 16), 3, 3)).toBe(-1);
+  // #1184: "no ground" is now null, not -1 — a real surface can legitimately
+  // sit at 0 or below, so -1 can no longer double as both a sentinel and a
+  // real answer.
+  it('#1184: returns null (not -1) for a column with nothing solid in it', () => {
+    expect(computeVoxelColumnSurfaceY(new VoxelGrid(16, 8, 16), 3, 3)).toBeNull();
   });
 
   it('clamps to the site edge rather than the origin once the site has grown west', () => {
@@ -720,6 +725,15 @@ describe('computeVoxelColumnSurfaceY', () => {
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
     expect(computeVoxelColumnSurfaceY(grid, -99, 0)).toBe(2);
+  });
+
+  it('#1184: null (no ground anywhere) is distinct from a real height of exactly 0 on an owned column', () => {
+    const emptyGrid = new VoxelGrid(0, 8, 0);
+    expect(computeVoxelColumnSurfaceY(emptyGrid, 3, 3)).toBeNull();
+
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1); // a real, legitimate surface at y = 0
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(0);
   });
 });
 
@@ -768,8 +782,151 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
     expect(computeVoxelColumnSurfaceHeight(grid, 15, 15)).toBeCloseTo(4.5, 6);
   });
 
-  it('returns 0 for a column with no solid voxel at all', () => {
-    expect(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
+  // #1184: "no ground" is now NaN, not 0 — a real surface height can
+  // legitimately be exactly 0 (or negative), so 0 can no longer double as
+  // both the sentinel and a real answer.
+  it('#1184: returns NaN (not 0) for a column with no solid voxel at all', () => {
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3))).toBe(true);
+  });
+
+  it('#1184: NaN (no ground anywhere) is distinct from a real height of exactly 0 on an owned column', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1); // a real, legitimate surface height of 0
+    expect(computeVoxelColumnSurfaceHeight(grid, 5, 5)).toBeCloseTo(0.5, 6);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3))).toBe(true);
+  });
+});
+
+// ── Generator + edit record, no vertical cap (#1184) ────────────────────────
+//
+// computeVoxelColumnSurfaceY/computeVoxelColumnSurfaceHeight must resolve
+// column surfaces directly from the generator + edit record (O(edits in that
+// column)), not by scanning [0, sizeY) — so a natural surface below y = 0 or
+// far above the grid's declared sizeY resolves correctly, with no vertical
+// clamp either direction.
+
+/**
+ * A `VoxelChunkSource` test double whose columns all share one fixed,
+ * continuous surface height, generated via the same `surfaceDensityAt`
+ * crossing shape production code uses — so `surfaceHeightAt` and the density
+ * `materializeSlab` actually writes agree exactly, the same contract
+ * `TerrainGen.createChunkSource` honours for the real generator.
+ */
+class FlatChunkSource implements VoxelChunkSource {
+  constructor(private readonly compId: number, private readonly surfaceY: number) {}
+
+  surfaceHeightAt(_x: number, _z: number): number {
+    return this.surfaceY;
+  }
+
+  materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void {
+    const y0 = cy * CHUNK_SIZE;
+    const y1 = y0 + CHUNK_SIZE;
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        for (let y = y0; y < y1; y++) {
+          grid.writeGeneratedVoxel(x, y, z, this.compId, undefined, surfaceDensityAt(y, this.surfaceY));
+        }
+      }
+    }
+  }
+}
+
+describe('VoxelGrid.generatorSurfaceHeightAt (#1184)', () => {
+  it('delegates to the attached chunkSource.surfaceHeightAt', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 7));
+    expect(grid.generatorSurfaceHeightAt(3, 3)).toBe(7);
+  });
+
+  it('is undefined when no chunkSource is attached', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.generatorSurfaceHeightAt(3, 3)).toBeUndefined();
+  });
+});
+
+describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no vertical cap (#1184)', () => {
+  it('resolves a generator-only surface below y = 0, without scanning up from y = 0', () => {
+    const grid = new VoxelGrid(16, 8, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = -5
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, -5));
+
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(-5);
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5, 6);
+  });
+
+  it('resolves a generator-only surface far above the grid\'s declared sizeY, without an upper clamp', () => {
+    const grid = new VoxelGrid(16, 8, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = 1000
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 1000));
+
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(1000);
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(1000, 6);
+  });
+
+  it('an added island above the generator surface, with an untouched air gap between, is the topmost solid — not floor(generatorSurfaceHeightAt)', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 4));
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4); // sanity: natural surface really is at y=4
+
+    // y = 5..9 stay air (untouched) — a genuine gap, not a contiguous stack.
+    grid.fillVoxel(5, 10, 5, compId, undefined, 1);
+
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(10);
+    expect(Math.floor(grid.generatorSurfaceHeightAt(5, 5)!)).toBe(4); // generator's own answer is unchanged
+  });
+
+  it('digging out the generator\'s natural top exposes a lower top than generatorSurfaceHeightAt alone would suggest', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 4));
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4);
+
+    grid.clearVoxel(5, 4, 5); // dig away the natural top voxel
+
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(3); // next solid row down
+    expect(Math.floor(grid.generatorSurfaceHeightAt(5, 5)!)).toBe(4); // generator's own answer never changes
+  });
+
+  it('material added directly (contiguously) on top of generated rock reports the top of the added segment', () => {
+    const grid = new VoxelGrid(16, 20, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 4));
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4);
+
+    // Contiguous stack directly on top of the natural surface — no gap.
+    grid.fillVoxel(5, 5, 5, compId, undefined, 1);
+    grid.fillVoxel(5, 6, 5, compId, undefined, 1);
+
+    expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(6);
+  });
+
+  it('an off-site column reports null, distinct from a real height of exactly 0 elsewhere on the same grid', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, 0));
+
+    expect(computeVoxelColumnSurfaceY(new VoxelGrid(0, 8, 0), 3, 3)).toBeNull();
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(0);
+  });
+});
+
+describe('firstEmptyLayerAboveGround (#1184)', () => {
+  it('is one layer above a grounded column even when that surface sits below y = 0', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new FlatChunkSource(compId, -5));
+    expect(firstEmptyLayerAboveGround(grid, 3, 3)).toBe(-4);
+  });
+
+  it('returns the default fallbackY (0) for a no-ground column', () => {
+    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
+  });
+
+  it('returns a caller-supplied fallbackY for a no-ground column', () => {
+    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 8, 16), 3, 3, -1)).toBe(-1);
   });
 });
 
@@ -903,6 +1060,26 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 });
 
+describe('setVoxelColumnSurfaceHeight — no vertical clamp (#1184)', () => {
+  it('writes a negative target height without clamping it to 0', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, -5.3, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5.3, 6);
+  });
+
+  it('writes a target height far above the grid\'s declared sizeY without clamping it to sizeY - 1', () => {
+    const grid = new VoxelGrid(16, 16, 16); // sizeY = 16
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    setVoxelColumnSurfaceHeight(grid, 3, 3, 1000.2, compId);
+
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(1000.2, 6);
+  });
+});
+
 // ── Post-carve renormalisation primitives (#1148) ───────────────────────────
 //
 // Mirrored home for renormaliseVoxelColumnAfterCarve, captureColumnTopsForCarve
@@ -943,7 +1120,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
 
     const newTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
     expect(newTopY).toBe(5);
-    expect(grid.densityAt(3, newTopY, 3)).toBe(1);
+    expect(grid.densityAt(3, newTopY!, 3)).toBe(1);
     // No residue existed above the old top and the new top is plain solid rock,
     // so nothing needed clearing or regrading.
     expect(touched).toBeNull();
@@ -969,7 +1146,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
     const newTopY = computeVoxelColumnSurfaceY(grid, X, Z);
     expect(newTopY).toBe(4);
     // The newly exposed top is itself mid-band (a genuine crossing), not plain rock.
-    const newTopDensity = grid.densityAt(X, newTopY, Z);
+    const newTopDensity = grid.densityAt(X, newTopY!, Z);
     expect(newTopDensity).toBeGreaterThanOrEqual(0.5);
     expect(newTopDensity).toBeLessThan(1);
 
@@ -992,6 +1169,31 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
     expect(grid.containsColumn(99, 99)).toBe(false);
     expect(() => renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).not.toThrow();
     expect(renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).toBeNull();
+  });
+
+  it('#1184: REGRADE branch reconstructs a genuine mid-band crossing below y = 0, not clamped toward 0', () => {
+    const grid = new VoxelGrid(16, 16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    const X = 3, Z = 3;
+
+    // Author a genuine negative fractional crossing at height -5.7 by hand
+    // (not via setVoxelColumnSurfaceHeight, whose own clamp toward 0 is
+    // exactly the bug #1184 removes), using the same crossing shape
+    // surfaceDensityAt itself defines.
+    for (let y = -10; y <= -7; y++) grid.fillVoxel(X, y, Z, compId, undefined, 1);
+    grid.fillVoxel(X, -6, Z, compId, undefined, surfaceDensityAt(-6, -5.7));
+    grid.fillVoxel(X, -5, Z, compId, undefined, surfaceDensityAt(-5, -5.7));
+    // Stack a plain solid voxel above the crossing — what the carve below removes.
+    grid.fillVoxel(X, -3, Z, compId, undefined, 1);
+    const oldTopY = -3;
+
+    grid.clearVoxel(X, -3, Z); // mirrors the carve's clear loop
+
+    const touched = renormaliseVoxelColumnAfterCarve(grid, X, Z, oldTopY);
+
+    expect(computeVoxelColumnSurfaceY(grid, X, Z)).toBe(-6); // topmost solid (density >= 0.5) row of the authored crossing
+    expect(computeVoxelColumnSurfaceHeight(grid, X, Z)).toBeCloseTo(-5.7, 6); // not clamped toward 0
+    expect(touched).not.toBeNull();
   });
 });
 
