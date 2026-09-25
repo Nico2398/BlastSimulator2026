@@ -10,7 +10,10 @@ import {
   CREW_SPAWN_VEHICLE_SEPARATION,
   CREW_SPAWN_MAX_ROUTE_INFLATION,
   CREW_SPAWN_SEARCH_RADIUS,
+  CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION,
+  CREW_SPAWN_VEHICLE_ROUTE_SLACK,
 } from '../config/balance.js';
+import { isLicensedForRole } from '../engine/VehicleReservation.js';
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
@@ -128,7 +131,8 @@ function isRouteAcceptable(
   metric: (r: PathResult) => number = r => r.waypoints.length,
 ): boolean {
   const straight = Math.hypot(centre.x - from.x, centre.z - from.z);
-  const allowance = (straight * maxInflation + slack) / Math.max(straight, 1);
+  if (straight < 1e-9) return true; // same-cell / zero distance: trivially acceptable
+  const allowance = maxInflation + slack / straight;
   return routeInflation(navGrid, from, centre, metric) <= allowance;
 }
 
@@ -174,10 +178,7 @@ function selectAnchor(navGrid: NavGrid, authored: Cell, centre: Cell): Cell {
 
 /** Employees, in roster order, holding the licence a vehicle of `role` requires. */
 function findLicensedDrivers(employees: Employee[], role: VehicleRole): Employee[] {
-  // TODO: implement — reuse isLicensedForRole (VehicleReservation.ts)
-  void employees;
-  void role;
-  return [];
+  return employees.filter(employee => isLicensedForRole(employee, role));
 }
 
 /**
@@ -191,12 +192,32 @@ function relocateVehicleNearDriver(
   currentVehicleCell: Cell,
   occupied: Set<string>,
 ): Cell | null {
-  // TODO: implement
-  void navGrid;
-  void driverCell;
-  void currentVehicleCell;
-  void occupied;
-  return null;
+  const currentInflation = routeInflation(navGrid, driverCell, currentVehicleCell, r => r.totalCost);
+
+  let best: Cell | null = null;
+  let bestInflation = Number.POSITIVE_INFINITY;
+
+  for (let radius = 1; radius <= CREW_SPAWN_SEARCH_RADIUS; radius++) {
+    for (const candidate of ringCells(driverCell, radius)) {
+      if (occupied.has(key(candidate))) continue;
+      if (!isSpawnable(navGrid.cellAt(candidate.x, candidate.z))) continue;
+
+      const inflation = routeInflation(navGrid, driverCell, candidate, r => r.totalCost);
+      if (inflation < bestInflation) {
+        bestInflation = inflation;
+        best = candidate;
+      }
+      if (isRouteAcceptable(
+        navGrid, driverCell, candidate,
+        CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION, CREW_SPAWN_VEHICLE_ROUTE_SLACK,
+        r => r.totalCost,
+      )) {
+        return candidate;
+      }
+    }
+  }
+
+  return best !== null && bestInflation < currentInflation ? best : null;
 }
 
 /**
@@ -208,13 +229,54 @@ function relocateVehicleNearDriver(
  * `SingleVehicleMover.test.ts`'s allowlist.
  */
 function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicles: Vehicle[]): boolean {
-  // TODO: implement
-  void navGrid;
-  void employees;
-  void vehicles;
-  void findLicensedDrivers;
-  void relocateVehicleNearDriver;
-  return false;
+  const occupied = new Set<string>([
+    ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
+    ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
+  ]);
+
+  let vehicleMoved = false;
+
+  for (const vehicle of vehicles) {
+    const vehicleCell = { x: Math.round(vehicle.x), z: Math.round(vehicle.z) };
+    const drivers = findLicensedDrivers(employees, vehicle.type);
+    if (drivers.length === 0) continue;
+
+    let bestDriverCell: Cell | null = null;
+    let bestInflation = Number.POSITIVE_INFINITY;
+    let anyAcceptable = false;
+
+    for (const driver of drivers) {
+      const driverCell = { x: Math.round(driver.x), z: Math.round(driver.z) };
+      if (isRouteAcceptable(
+        navGrid, driverCell, vehicleCell,
+        CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION, CREW_SPAWN_VEHICLE_ROUTE_SLACK,
+        r => r.totalCost,
+      )) {
+        anyAcceptable = true;
+        break;
+      }
+      const inflation = routeInflation(navGrid, driverCell, vehicleCell, r => r.totalCost);
+      if (inflation < bestInflation) {
+        bestInflation = inflation;
+        bestDriverCell = driverCell;
+      }
+    }
+
+    if (anyAcceptable) continue;
+    if (bestDriverCell === null) continue;
+
+    const oldKey = key(vehicleCell);
+    const relocated = relocateVehicleNearDriver(navGrid, bestDriverCell, vehicleCell, occupied);
+    if (relocated === null) continue;
+
+    vehicle.x = relocated.x;
+    vehicle.z = relocated.z;
+    occupied.delete(oldKey);
+    occupied.add(key(relocated));
+    vehicleMoved = true;
+  }
+
+  return vehicleMoved;
 }
 
 /**
