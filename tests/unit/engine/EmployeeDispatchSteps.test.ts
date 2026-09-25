@@ -975,7 +975,7 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
     expect(employee.taskQueue).toEqual([]);
   });
 
-  it('leaves an already-boarded reservation untouched (defensive — should not occur in practice, a taskQueue-only entry is never boarded)', () => {
+  it('releases a reservation whose vehicle is already boarded by a DIFFERENT employee (#1115: stale/invalid, not a reason to leave it locked)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -994,11 +994,39 @@ describe('releaseUnboardedTaskQueueVehicleReservations (#1002)', () => {
 
     releaseUnboardedTaskQueueVehicleReservations(state, employee);
 
-    expect(employee.taskQueue).toContain(3);
+    expect(employee.taskQueue).not.toContain(3);
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
+    // The other employee's own occupancy is untouched — only the reservation
+    // (exclusively held by `employee`, not by whoever is actually driving) is
+    // released.
+    expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
+  });
+
+  it('leaves a reservation whose vehicle is already boarded by employee THEMSELF untouched (continuity — findFreeVehicleForRole\'s own driven-by-self case)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.occupantIds = [employee.id]; // already boarded, by the same employee
+
+    const action = makeAction({
+      id: 4, requiredVehicleRole: 'debris_hauler', targetX: 5, targetZ: 5,
+      status: 'assigned', holderId: employee.id,
+    });
+    state.pendingActions.push(action);
+    employee.taskQueue = [4];
+    reserveVehicle(state.vehicles, vehicle.id, 4);
+
+    releaseUnboardedTaskQueueVehicleReservations(state, employee);
+
+    expect(employee.taskQueue).toContain(4);
     expect(action.status).toBe('assigned');
     expect(action.holderId).toBe(employee.id);
-    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(3);
-    expect(vehicleDriverId(vehicle)).toBe(otherDriver.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(4);
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
   });
 
   it('releases every unboarded vehicle-gated entry among a mixed taskQueue, leaving the on-foot one alone', () => {

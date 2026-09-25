@@ -109,17 +109,38 @@ function checkI3OccupantCapacityViolation(state: GameState): Violation[] {
 }
 
 /**
- * I4: a vehicle whose x/z changed this tick must have had an occupant — a
- * vehicle only ever moves as a side effect of its occupant driver's own
- * locomotion (#1089). `vehiclePositionsAtTickStart`, when supplied, is the
- * snapshot TickPipeline.ts captures before locomotion runs this tick; when
- * omitted (a caller with no such snapshot to hand, e.g. a unit test), this
- * check is vacuously satisfied rather than requiring every caller to supply
- * one.
+ * I4: a vehicle whose x/z changed this tick must have been driven there by a
+ * genuine, occupant-validated drive leg — a vehicle only ever moves as a side
+ * effect of its occupant driver's own locomotion (#1089).
+ * `vehiclePositionsAtTickStart`, when supplied, is the position snapshot
+ * TickPipeline.ts captures before locomotion runs this tick; when omitted (a
+ * caller with no such snapshot to hand, e.g. a unit test), this check is
+ * vacuously satisfied rather than requiring every caller to supply one.
+ *
+ * `vehiclesDrivenThisTick`, when supplied, is `tickLocomotion`'s own
+ * `LocomotionResult.vehiclesMoved` (#1115 fix) — the authoritative set of
+ * vehicle ids `advanceLeg` (Locomotion.ts) actually wrote a position for this
+ * tick, which only ever happens after it has confirmed
+ * `vehicle.occupantIds[0] === emp.id`. This is checked INSTEAD of the
+ * vehicle's own tick-end `occupantIds` (which a driver who alights on arrival
+ * within that same tick — a mounted-rest arrival, RestActionHelpers.ts/
+ * NeedRestoration.ts, or a #1093 transport ride's own drop-off — empties out
+ * by the time this check runs, even though nothing about the move itself was
+ * unoccupied) and instead of a tick-START occupancy snapshot (which cannot
+ * tell a real "moved with nobody ever driving it" bug apart from a same-tick
+ * board-then-drive-then-alight cycle, unoccupied at both ends of the tick yet
+ * genuinely, briefly driven in between — confirmed live via
+ * tutorial-interactive-revolt.integration.test.ts's own #707 repro, a
+ * one-cell reposition drive that boards, drives, and alights within a single
+ * tick). Confirmed live via needs.integration.test.ts's own #1122
+ * mounted-rest-arrival case and vehicles.integration.test.ts's own #1093
+ * transport-ride cases too, both of which drive-then-alight in the arrival
+ * tick and, before this fix, tripped I4 the instant it became fatal.
  */
 function checkI4VehicleMovedWithoutOccupant(
   state: GameState,
   vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
+  vehiclesDrivenThisTick?: ReadonlySet<number>,
 ): Violation[] {
   if (!vehiclePositionsAtTickStart) return [];
 
@@ -128,7 +149,7 @@ function checkI4VehicleMovedWithoutOccupant(
     const before = vehiclePositionsAtTickStart.get(v.id);
     if (!before) continue; // created this tick — no baseline to compare against
     const moved = before.x !== v.x || before.z !== v.z;
-    if (moved && v.occupantIds.length === 0) {
+    if (moved && !(vehiclesDrivenThisTick?.has(v.id) ?? false)) {
       violations.push({ kind: 'I4_vehicle_moved_without_occupant', vehicleId: v.id });
     }
   }
@@ -249,20 +270,20 @@ function checkI8PayloadNotInTransit(state: GameState): Violation[] {
 
 /**
  * Violation kinds severe enough to abort the tick outright rather than
- * merely being collected and reported (#1091). Today, only I8: a desynced
+ * merely being collected and reported (#1091, #1115). I8: a desynced
  * payload/logistics pairing corrupts every later tick that computes against
- * it, so TickPipeline.ts's dev/test-only invariant check throws the instant
- * it finds one instead of letting the game keep running on bad state. Every
- * other violation kind keeps the existing collect-and-continue behavior.
- *
- * TODO(#1115): once the vehicle-reservation/rest-promotion ordering bug
- * behind I4_vehicle_moved_without_occupant and
- * I5_reservation_without_valid_holder is fixed at its root
- * (EmployeeDispatchSteps.ts's releaseUnboardedTaskQueueVehicleReservations
- * and/or VehicleReservation.ts's isPendingReserveAhead /
- * promoteVehicleGatedAction), add both kinds here to match I8's precedent.
+ * it. I4/I5 (#1115): a vehicle moved with no occupant, or a reservation with
+ * no valid holder, means the mount/reservation bookkeeping has already
+ * desynced from the itinerary that is supposed to drive it — every later
+ * dispatch/locomotion tick built on top of that state is unreliable in the
+ * same way an I8 desync is. TickPipeline.ts's dev/test-only invariant check
+ * throws the instant it finds one of these instead of letting the game keep
+ * running on bad state. Every other violation kind keeps the existing
+ * collect-and-continue behavior.
  */
 export const FATAL_VIOLATION_KINDS: ReadonlySet<ViolationKind> = new Set<ViolationKind>([
+  'I4_vehicle_moved_without_occupant',
+  'I5_reservation_without_valid_holder',
   'I8_payload_not_in_transit',
 ]);
 
@@ -285,17 +306,22 @@ function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
 
 export function assertWorldInvariants(
   state: GameState,
-  // #1089: vehicle x/z captured before this tick's locomotion step, so I4
-  // can tell "moved" from "stationary" without re-deriving it from
-  // vehicle.state. TickPipeline.ts's own runTick captures and passes this;
-  // a caller with no snapshot to hand gets I4 vacuously satisfied.
+  // #1089: vehicle x/z captured before this tick's locomotion step, so I4 can
+  // tell "moved" from "stationary" without re-deriving it from vehicle.state.
+  // TickPipeline.ts's own runTick captures and passes this; a caller with no
+  // snapshot to hand gets I4 vacuously satisfied.
   vehiclePositionsAtTickStart?: ReadonlyMap<number, { x: number; z: number }>,
+  // #1115: `tickLocomotion`'s own LocomotionResult.vehiclesMoved — the vehicle
+  // ids a genuine, occupant-validated drive leg actually wrote a position for
+  // this tick. See checkI4VehicleMovedWithoutOccupant's own doc comment for
+  // why I4 needs this rather than re-deriving occupancy from vehicle.state.
+  vehiclesDrivenThisTick?: ReadonlySet<number>,
 ): Violation[] {
   return [
     ...checkI1OccupantLocomotionMismatch(state),
     ...checkI2MountedPositionMismatch(state),
     ...checkI3OccupantCapacityViolation(state),
-    ...checkI4VehicleMovedWithoutOccupant(state, vehiclePositionsAtTickStart),
+    ...checkI4VehicleMovedWithoutOccupant(state, vehiclePositionsAtTickStart, vehiclesDrivenThisTick),
     ...checkI5ReservationWithoutValidHolder(state),
     ...checkI6EmptyItinerary(state),
     ...checkI7DriveLegWithoutMount(state),

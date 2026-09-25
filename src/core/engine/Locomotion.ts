@@ -12,7 +12,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
-import type { Leg } from './Itinerary.js';
+import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import {
@@ -117,6 +117,20 @@ interface LocomotionResult {
   arrived: number[];
   stuck: number[];
   abandoned: Array<{ employeeId: number; actionId: number | null }>;
+  /**
+   * Vehicle ids whose position was written this tick by a genuine,
+   * occupant-validated drive leg (#1115) — a strict subset of `moved`
+   * (which mixes employee AND vehicle ids together, so it cannot be used
+   * on its own to answer "which VEHICLES moved" without risking an id
+   * collision across the two entity kinds). WorldInvariants.ts's I4 check
+   * uses this as its authoritative "moved legitimately" signal instead of
+   * re-deriving it from before/after occupancy, which cannot tell a
+   * same-tick board-drive-alight cycle (occupantIds reads empty at both
+   * tick-start and tick-end, even though the vehicle was genuinely, briefly
+   * occupied while it moved) from a real "moved with nobody ever driving it"
+   * bug.
+   */
+  vehiclesMoved: number[];
 }
 
 /**
@@ -126,7 +140,7 @@ interface LocomotionResult {
  * vehicle's x/z from theirs. The only place a vehicle's position ever changes.
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
-  const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [] };
+  const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [] };
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
@@ -237,10 +251,39 @@ function isLegArrived(x: number, z: number, leg: Leg): boolean {
   return x === leg.destX && z === leg.destZ;
 }
 
-function clearItineraryOnFailure(emp: Employee): void {
+/**
+ * Clears a dead itinerary and, when it belonged to a still-claimed
+ * vehicle-gated action, releases that claim too (#1115). An itinerary that
+ * fails before reaching its own arrival step — a board leg `board()` refuses
+ * (seat taken, licence gone), or a drive leg whose vehicle was reassigned
+ * mid-route (`advanceLeg`'s own 'aborted' outcome) — otherwise leaves
+ * `emp.activeActionId` dangling: no itinerary, no destinationX/Z fallback
+ * (vehicle-gated claims have none — see promoteVehicleGatedAction's own
+ * identical #1115 fix for a claim that never even got an itinerary), with the
+ * vehicle reservation this claim took still exclusively held for a driver who
+ * will never reach it. `interruptActiveAction`'s own `forceOpenPool: true` is
+ * the same "confirmed, non-recoverable impasse" release the stuck-move-abandon
+ * path below already uses — releasing here, rather than leaving
+ * WorldInvariants.ts's I5 check to find the reservation stale on some later
+ * tick, lets the ordinary dispatch loop retry it (this employee or another)
+ * instead. A no-op when `activeActionId` is already null (already released by
+ * a caller further up, e.g. the stuck-move-abandon branch just below) or
+ * names an on-foot action (requiredVehicleRole === null) — an on-foot
+ * itinerary failure has its own recovery path (the legacy destinationX/Z
+ * walker's own stuck-abandon, or a retry next tick) and this release is
+ * scoped to the vehicle-reservation staleness I4/I5 exist to catch.
+ */
+function clearItineraryOnFailure(state: GameState, emp: Employee): void {
   emp.itinerary = null;
   clearVehicleDetour(emp);
   syncPendingDriverVehicleId(emp);
+
+  if (emp.activeActionId !== null) {
+    const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+    if (action !== undefined && action.requiredVehicleRole !== null) {
+      interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
+    }
+  }
 }
 
 /**
@@ -259,7 +302,7 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     if (itinerary.legs.length === 0) {
       // I6: an itinerary must never sit empty instead of being cleared to
       // null — defensive cleanup, should not occur if callers stay correct.
-      clearItineraryOnFailure(emp);
+      clearItineraryOnFailure(state, emp);
       break;
     }
 
@@ -274,24 +317,27 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
       // tick; do not fold them back into one boolean here.
       const outcome = advanceLeg(state, emp, leg, result, emitter);
       if (outcome === 'aborted') {
-        clearItineraryOnFailure(emp);
+        clearItineraryOnFailure(state, emp);
         break;
       }
       if (outcome === 'blocked') break;
       if (!isLegArrived(emp.x, emp.z, leg)) break;
     }
 
-    const ok = applyArrivalStep(state, emp, leg, emitter);
+    const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
 
     // A board arrival step's post-board handling (evacuation redrive,
     // fragment-work handoff) may itself have installed a brand-new
     // itinerary, or cleared this one — either way it supersedes what this
     // loop was walking, so stop here rather than mutate an object
-    // emp.itinerary no longer even points to.
+    // emp.itinerary no longer even points to. (An 'alight' step's own
+    // mid-itinerary side effect is restored by applyArrivalStep itself
+    // before returning — see its own #1115 doc comment — so this check no
+    // longer fires for that case.)
     if (emp.itinerary !== itinerary) break;
 
     if (!ok) {
-      clearItineraryOnFailure(emp);
+      clearItineraryOnFailure(state, emp);
       break;
     }
 
@@ -397,7 +443,10 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     // whether the isStuck-abandon branch below also fires (an oscillating
     // tick can be both "moved" and "abandoned" at once; they're independent).
     result.moved.push(emp.id);
-    if (isDrive) result.moved.push(vehicle!.id);
+    if (isDrive) {
+      result.moved.push(vehicle!.id);
+      result.vehiclesMoved.push(vehicle!.id);
+    }
   }
 
   if (!outcome.pathFound || outcome.isStuck) {
@@ -424,7 +473,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       // just alighted them.
       if (isDrive) {
         dismountVehicleDriver(state, vehicle!, emitter);
-        clearItineraryOnFailure(emp);
+        clearItineraryOnFailure(state, emp);
       }
       result.abandoned.push({ employeeId: emp.id, actionId });
       emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
@@ -498,6 +547,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     writeVehiclePosition(state, vehicle, outcome.x, outcome.z);
     result.moved.push(emp.id);
     result.moved.push(vehicle.id);
+    result.vehiclesMoved.push(vehicle.id);
     return 'moved';
   }
 
@@ -512,7 +562,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
   // via moveTo. Confirmed live: level1-lose-ecology.json's own H44 stalled
   // at holeCount 48/49 forever without this — an idle drill_rig from a
   // finished crew parked squarely on the one hole still left to drill.
-  if (relocateDestinationBlocker(state, leg.destX, leg.destZ, vehicle.id)) return 'blocked';
+  if (relocateDestinationBlocker(state, leg.destX, leg.destZ, vehicle.id, result)) return 'blocked';
 
   emp.isMoveStuck = true;
   if (!wasStuckBefore) emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
@@ -527,9 +577,14 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
  * Returns true when a relocation was attempted (already relocating, or just
  * started one) — the caller stays 'blocked' for this tick either way, and
  * the escalation-to-stuck fallback below only fires when this returns false
- * (no blocker, or one that cannot be relocated at all).
+ * (no blocker, or one that cannot be relocated at all). `result` is threaded
+ * through to `relocateDriverlessVehicle` (#1115) — see that function's own
+ * doc comment for why a third, legitimate, occupant-less mover needs to
+ * record itself into `vehiclesMoved` too.
  */
-function relocateDestinationBlocker(state: GameState, destX: number, destZ: number, requesterVehicleId: number): boolean {
+function relocateDestinationBlocker(
+  state: GameState, destX: number, destZ: number, requesterVehicleId: number, result: LocomotionResult,
+): boolean {
   const blocker = state.vehicles.vehicles.find(v => v.id !== requesterVehicleId && v.x === destX && v.z === destZ);
   if (!blocker) return false;
 
@@ -548,7 +603,7 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
   if (blockerDriverId !== null) {
     moveTo(state, blockerDriverId, { x: freeCell.x, z: freeCell.z });
   } else {
-    relocateDriverlessVehicle(state, blocker, freeCell.x, freeCell.z);
+    relocateDriverlessVehicle(state, blocker, freeCell.x, freeCell.z, result);
   }
   return true;
 }
@@ -561,13 +616,23 @@ function relocateDestinationBlocker(state: GameState, destX: number, destZ: numb
  * outright. Keeps NavCell.vehicleOccupied in sync via
  * updateVehicleCellOccupancy so foot/vehicle pathfinding immediately sees
  * the old cell as free and the new one as occupied.
+ *
+ * Records `blocker.id` into `result.vehiclesMoved` (#1115) — WorldInvariants.ts's
+ * I4 check treats that set as the whole authoritative "moved legitimately
+ * this tick" signal, and this is the one mover in the file that genuinely,
+ * deliberately moves a vehicle with no occupant at all: without recording it
+ * here too, every driverless-blocker relocation reads as I4's exact "moved
+ * with nobody ever driving it" violation the instant I4 becomes fatal —
+ * confirmed live via tutorial-interactive-revolt.integration.test.ts's own
+ * #707 repro.
  */
-function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number): void {
+function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number, result: LocomotionResult): void {
   const prevX = Math.floor(blocker.x);
   const prevZ = Math.floor(blocker.z);
 
   blocker.x = x;
   blocker.z = z;
+  result.vehiclesMoved.push(blocker.id);
 
   // A driverless blocker is stationary both before and after this instant
   // teleport (#1138) — there is no vehicle-native 'moving' state left to read.
@@ -743,8 +808,15 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
 
 // ── Arrival steps ──
 
-/** Applies `leg`'s arrival step. Returns false when the step fails (vehicle gone/taken) — the caller clears the itinerary and leaves the employee on foot where they stand. */
-function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: EventEmitter): boolean {
+/**
+ * Applies `leg`'s arrival step. Returns false when the step fails (vehicle
+ * gone/taken) — the caller clears the itinerary and leaves the employee on
+ * foot where they stand. `itinerary` is the live itinerary `leg` belongs to
+ * — needed (#1115) only by the 'alight' branch, to restore it after
+ * `alight()`'s own itinerary-clearing side effect when this step is a
+ * mid-itinerary alight rather than a standalone dismount.
+ */
+function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, itinerary: Itinerary, emitter?: EventEmitter): boolean {
   // A completed drive leg's vehicle always snaps back to idle first — mirrors
   // the pre-itinerary tickVehicleOnNavGrid's own unconditional arrival snap
   // (EntityMovementTick.ts, deleted: "if (vehicle.x === vehicle.targetX && ...)
@@ -806,6 +878,38 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, emitter?: E
   }
   const vehicleId = isMounted(emp.locomotion) ? mountedVehicleId(emp.locomotion) : null;
   if (vehicleId === null) return true; // already on foot — nothing to undo
-  return alight(state, vehicleId, emitter).success;
+
+  // #1115 fix: alight() (Mount.ts) unconditionally nulls `employee.itinerary`
+  // as its own side effect — correct for its out-of-band callers
+  // (dismountVehicleDriver, the console `vehicle driver none` command), which
+  // alight OUTSIDE of any itinerary walk and mean to discard whatever stale
+  // itinerary that employee still carried. Called from HERE, mid-walk, as
+  // THIS leg's own arrival step, the itinerary alight() just nulled is not
+  // stale at all — it is the live itinerary `advanceItinerary` is in the
+  // middle of, with further legs (a board leg onto the NEXT vehicle, then its
+  // own drive legs) still queued behind this one. Left unrestored,
+  // `advanceItinerary`'s own `emp.itinerary !== itinerary` check (its post-
+  // arrival-step guard for a genuine handoff, e.g. a board leg's own
+  // evacuation-redrive/fragment-work post-processing) reads this exactly like
+  // that legitimate case and stops the walk right here, silently truncating
+  // a cross-vehicle promotion's own alight-then-board itinerary after just
+  // its first (zero-length) leg — activeActionId stays pointed at the action,
+  // but nothing ever resumes walking it and the vehicle reservation this
+  // claim took sits stale for good (WorldInvariants.ts's I5 check flags
+  // exactly this — confirmed live via buildings.integration.test.ts's own
+  // starved-debris_hauler-backlog case, once I4/I5 became fatal: a driver's
+  // own alight-to-switch-vehicles leg, mid-promoteVehicleGatedAction, lost
+  // the rest of its itinerary this exact way). Restoring the reference right
+  // after a successful alight is safe for alight()'s OTHER, legitimate
+  // itinerary-ending use (an evacuation drive's own final leg, MoveTo.ts's
+  // alightOnArrival) too: that leg is always the LAST one, so the caller's
+  // own post-arrival-step `itinerary.legs.shift()` immediately empties it
+  // right back to null on its own — restoring here only changes anything for
+  // an alight leg with siblings still queued behind it.
+  const result = alight(state, vehicleId, emitter);
+  if (result.success && emp.itinerary === null) {
+    emp.itinerary = itinerary;
+  }
+  return result.success;
 }
 

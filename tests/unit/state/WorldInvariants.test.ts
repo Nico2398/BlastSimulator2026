@@ -225,14 +225,32 @@ describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', 
     expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('no violation when an occupied vehicle moved this tick', () => {
+  it('no violation when a vehicle in vehiclesDrivenThisTick moved this tick', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 15, z: 15 });
     const v = addVehicle(state, { x: 15, z: 15, occupantIds: [emp.id] });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    expect(assertWorldInvariants(state, snapshot)).toEqual([]);
+    expect(assertWorldInvariants(state, snapshot, new Set([v.id]))).toEqual([]);
+  });
+
+  // #1115: a driver who alights the instant their drive leg arrives (a
+  // mounted-rest arrival, or a #1093 transport ride's own drop-off) — or who
+  // boards, drives, and alights again all within one tick (a short reposition
+  // ride) — is a legitimate "drove it, then got off it": the vehicle was
+  // genuinely, occupant-validated driven for the whole move
+  // (`vehiclesDrivenThisTick`, tickLocomotion's own authoritative
+  // LocomotionResult.vehiclesMoved), even though `occupantIds` reads empty by
+  // the time this tick's own end-state is checked, and even if it also read
+  // empty at tick-start. Only a vehicle whose position changed WITHOUT ever
+  // appearing in `vehiclesDrivenThisTick` is a real violation.
+  it('no violation when a vehicle unoccupied at both tick start and tick end is in vehiclesDrivenThisTick', () => {
+    const state = makeState();
+    const v = addVehicle(state, { x: 15, z: 15, occupantIds: [] }); // already alighted by tick end
+    const snapshot = new Map([[v.id, { x: 10, z: 10 }]]); // unoccupied at tick start too
+
+    expect(assertWorldInvariants(state, snapshot, new Set([v.id]))).toEqual([]);
   });
 
   it('no violation for a vehicle with no baseline entry (created this tick)', () => {
@@ -243,12 +261,12 @@ describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', 
     expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('violation when an unoccupied vehicle\'s position differs from its tick-start snapshot', () => {
+  it('violation when a vehicle not in vehiclesDrivenThisTick has a position differing from its tick-start snapshot', () => {
     const state = makeState();
     const v = addVehicle(state, { x: 15, z: 15, occupantIds: [] });
     const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    const violations = assertWorldInvariants(state, snapshot);
+    const violations = assertWorldInvariants(state, snapshot, new Set());
 
     expect(violations).toHaveLength(1);
     expect(violations[0]!.kind).toBe('I4_vehicle_moved_without_occupant');
