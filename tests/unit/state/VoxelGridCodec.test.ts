@@ -7,9 +7,6 @@
 // generation. `decodeVoxelGrid` regenerates pristine terrain from the
 // generator identity, then replays the edit record on top — reproducing the
 // live grid voxel for voxel without ever storing every voxel's full state.
-//
-// RED phase: `encodeVoxelGrid`/`decodeVoxelGrid` are still
-// `throw new Error('not implemented')` stubs, so every test below fails.
 
 import { describe, it, expect } from 'vitest';
 import { generateTerrain, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';

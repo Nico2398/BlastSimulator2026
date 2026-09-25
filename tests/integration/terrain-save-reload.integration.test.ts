@@ -11,11 +11,6 @@
 // mixedRockHardness fix (#1181) reaches a real reload by checking that an
 // untouched column's strata still alternate rock ids with depth after the
 // round trip.
-//
-// RED phase: `encodeVoxelGrid`/`decodeVoxelGrid` are still
-// `throw new Error('not implemented')` stubs (`terrainGenDatum` too), so
-// `saveCommand` throws as soon as gameplay tries to save. This test is
-// expected to FAIL for that reason.
 
 import { describe, it, expect } from 'vitest';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';

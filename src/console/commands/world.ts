@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
@@ -81,6 +81,24 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
     : null;
 }
 
+/**
+ * The size + hardness fields `TerrainConfig` and `regenerateGrid`'s params
+ * share, read from a `WorldState`'s own base (level-original) size rather
+ * than its live, possibly site-expanded one — takes only the `WorldState`
+ * slice it reads, not the whole `GameState`, since neither caller below
+ * needs anything else off it (#1181 review — shared by `terrainConfigOf`
+ * and `regenerateGridParams`, which otherwise built this same shape from
+ * the same three fields independently).
+ */
+function worldSizeParams(world: WorldState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+  return {
+    sizeX: world.baseSizeX,
+    sizeY: world.sizeY,
+    sizeZ: world.baseSizeZ,
+    ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+  };
+}
+
 /** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
 export function terrainConfigOf(state: GameState): TerrainConfig | null {
   if (!state.world) return null;
@@ -89,10 +107,7 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
   return {
     seed: state.seed,
     climateBias: biome.climateCenter,
-    sizeX: state.world.baseSizeX,
-    sizeY: state.world.sizeY,
-    sizeZ: state.world.baseSizeZ,
-    ...(state.world.mixedRockHardness !== undefined ? { mixedRockHardness: state.world.mixedRockHardness } : {}),
+    ...worldSizeParams(state.world),
   };
 }
 
@@ -125,12 +140,7 @@ function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number;
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
   }
-  return {
-    sizeX: state.world.baseSizeX,
-    sizeY: state.world.sizeY,
-    sizeZ: state.world.baseSizeZ,
-    ...(state.world.mixedRockHardness !== undefined ? { mixedRockHardness: state.world.mixedRockHardness } : {}),
-  };
+  return worldSizeParams(state.world);
 }
 
 /**
