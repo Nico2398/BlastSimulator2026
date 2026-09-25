@@ -947,7 +947,14 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     expect(blocker.x).toBe(5);
     expect(blocker.z).toBe(2);
 
-    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 0, 3);
+    // Same row (z=2) as the parked blocker, not an adjacent one: with
+    // 8-directional movement a walker approaching diagonally has a full free
+    // row of lateral slack and can cross from z=3 to z=2 anywhere along x at
+    // identical cost, so it never actually needs to touch (5,2) — no detour
+    // is provable that way. Starting on the blocker's own row puts (5,2)
+    // squarely on the only straight-line path, so bypassing it is the sole
+    // way through.
+    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 0, 2);
     const moveResult = moveTo(state, walker.id, { x: 11, z: 2 });
     expect(moveResult.success).toBe(true);
 
@@ -961,7 +968,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     expect(walker.itinerary).toBeNull();
     expect(walker.x).toBe(11);
     expect(walker.z).toBe(2);
-    // Direct, unobstructed distance from (0,3) to (11,2) at AGENT_WALK_SPEED
+    // Direct, unobstructed distance from (0,2) to (11,2) at AGENT_WALK_SPEED
     // — a detour around a genuinely occupied blocker must cost strictly more
     // ticks than this floor.
     const directTicks = Math.ceil(11 / AGENT_WALK_SPEED);
