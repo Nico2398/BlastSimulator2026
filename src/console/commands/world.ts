@@ -153,8 +153,6 @@ function gridDirtyRegion(grid: VoxelGrid): {
   };
 }
 
-/** Re-exported so existing importers of `./world.js` keep working (#504 moved the source of truth to core/config/balance.js). */
-export { DEFAULT_GRID_SIZE };
 
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
