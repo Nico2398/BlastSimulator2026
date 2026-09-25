@@ -45,10 +45,10 @@ function lowerColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, 
 /**
  * Raise one column's surface by `rise` voxels above `fromHeight` — the
  * opposite of `lowerColumn`. Levelling only ever cuts down to a target, never
- * fills up to it, so proving a widened skirt column actually gets carved (as
- * opposed to a column that already reads at or below target, which a carve
- * would legitimately leave untouched) needs the column raised above the
- * target, not dropped below it (#1144 defect 2, target-decoupling follow-up).
+ * fills up to it, so proving a column just past a footprint stays untouched
+ * (as opposed to a column that already reads at or below target, which a
+ * carve would legitimately leave untouched either way) needs the column
+ * raised above the target, not dropped below it.
  */
 function raiseColumn(grid: VoxelGrid, x: number, z: number, fromHeight: number, rise: number): void {
   for (let y = fromHeight; y < fromHeight + rise; y++) grid.setVoxel(x, y, z, ROCK);
@@ -540,6 +540,36 @@ describe('level_ground — console round trip (#1009)', () => {
     // ever tracks.
     expect(nav.cellAt(building.x + sizeX, building.z)!.type).not.toBe('blocked');
     expect(nav.cellAt(building.x, building.z + sizeZ)!.type).not.toBe('blocked');
+  });
+
+  it('24. a column just past the true footprint, lowered well below it, does not drag the pad target down toward it', () => {
+    const engine = makeStaffedRunner();
+    const grid = engine.ctx.grid!;
+
+    // 4x4 flat pad at BASE_HEIGHT, true footprint (10,11)x(10,11) (management_
+    // office tier1's own 2x2 footprint) plus one column of margin on every side.
+    carveFlatRect(grid, 9, 13, 9, 13, BASE_HEIGHT);
+    // The column just past the true footprint's high side (x=12, i.e.
+    // x + sizeX) lowered well below BASE_HEIGHT. Since #1198 the carve and
+    // its target are both scoped to the true footprint alone, so this
+    // column can never influence the building's own pad target.
+    lowerColumn(grid, 12, 10, BASE_HEIGHT, 5);
+
+    expect(runCommand(engine, 'build management_office at:10,10').success).toBe(true);
+    for (let i = 0; i < 500 && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+      runCommand(engine, 'tick 1');
+    }
+    const building = engine.ctx.state!.buildings.buildings.find(b => b.x === 10 && b.z === 10)!;
+    expect(building).toBeDefined();
+
+    // The true footprint's own target stays pinned to its own (unlowered)
+    // height across the whole footprint — never dragged down toward the
+    // lowered neighbour column's.
+    for (let z = building.z; z <= building.z + 1; z++) {
+      for (let x = building.x; x <= building.x + 1; x++) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z)).toBe(BASE_HEIGHT);
+      }
+    }
   });
 
   it('25. two adjacent buildings, touching with zero gap: levelling one never carves into the true footprint of the other (#1198 simplified regression for removed #1144 occupancy guard)', () => {

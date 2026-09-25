@@ -169,6 +169,7 @@ describe('BuildingMesh', () => {
       const bm = new BuildingMesh(scene);
       bm.addBuilding(makeBuilding(1, 'management_office', 20, 30));
       const pos = bm.getPosition(1);
+      // See "building group is positioned at grid location" above (#1198).
       expect(pos?.x).toBeCloseTo(20.5);
       expect(pos?.z).toBeCloseTo(30.5);
       bm.dispose();

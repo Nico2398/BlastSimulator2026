@@ -20,9 +20,8 @@ export function disposeGroup(group: THREE.Group): void {
  * World-space center coordinate of a footprint span along one axis.
  * Footprint cells `origin..origin+size-1` span world `[origin-0.5, origin+size-0.5]`.
  */
-export function footprintCenterCoord(_origin: number, _size: number): number {
-  // TODO: implement
-  return 0;
+export function footprintCenterCoord(origin: number, size: number): number {
+  return origin + (size - 1) / 2;
 }
 
 /**
