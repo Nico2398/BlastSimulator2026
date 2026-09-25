@@ -136,6 +136,22 @@ function isRouteAcceptable(
   return routeInflation(navGrid, from, centre, metric) <= allowance;
 }
 
+/**
+ * The vehicle-reachability tolerance check (#1179), bound to
+ * `CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION` / `CREW_SPAWN_VEHICLE_ROUTE_SLACK`
+ * and `route.totalCost` as its metric. Every vehicle-reachability call site in
+ * this file shares this one formula rather than repeating the triplet.
+ * Exported narrowly so a test can call the real check instead of
+ * reimplementing it.
+ */
+export function isVehicleRouteAcceptable(navGrid: NavGrid, from: Cell, to: Cell): boolean {
+  return isRouteAcceptable(
+    navGrid, from, to,
+    CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION, CREW_SPAWN_VEHICLE_ROUTE_SLACK,
+    r => r.totalCost,
+  );
+}
+
 /** Cells at Chebyshev radius `r` from `origin`, in a fixed order — ring by ring, nearest first. */
 function* ringCells(origin: Cell, radius: number): Generator<Cell> {
   if (radius === 0) {
@@ -184,15 +200,22 @@ function findLicensedDrivers(employees: Employee[], role: VehicleRole): Employee
 /**
  * Ring search from `driverCell` for the nearest unoccupied, spawnable cell
  * whose route back to `driverCell` beats `currentVehicleCell`'s — null when
- * nothing strictly better is found (#1179).
+ * nothing strictly better is found (#1179). Rejects any candidate within
+ * `CREW_SPAWN_VEHICLE_SEPARATION` of another already-placed vehicle in
+ * `otherVehicleCells`, the same guard the crew-layout path above enforces —
+ * without it a relocated vehicle can land close enough to another to tie on
+ * octile cost and reintroduce #591.
  */
 function relocateVehicleNearDriver(
   navGrid: NavGrid,
   driverCell: Cell,
   currentVehicleCell: Cell,
   occupied: Set<string>,
+  otherVehicleCells: ReadonlyArray<Cell>,
 ): Cell | null {
   const currentInflation = routeInflation(navGrid, driverCell, currentVehicleCell, r => r.totalCost);
+  const tooCloseToAnotherVehicle = (candidate: Cell): boolean =>
+    otherVehicleCells.some(other => chebyshev(other, candidate) < CREW_SPAWN_VEHICLE_SEPARATION);
 
   let best: Cell | null = null;
   let bestInflation = Number.POSITIVE_INFINITY;
@@ -201,17 +224,14 @@ function relocateVehicleNearDriver(
     for (const candidate of ringCells(driverCell, radius)) {
       if (occupied.has(key(candidate))) continue;
       if (!isSpawnable(navGrid.cellAt(candidate.x, candidate.z))) continue;
+      if (tooCloseToAnotherVehicle(candidate)) continue;
 
       const inflation = routeInflation(navGrid, driverCell, candidate, r => r.totalCost);
       if (inflation < bestInflation) {
         bestInflation = inflation;
         best = candidate;
       }
-      if (isRouteAcceptable(
-        navGrid, driverCell, candidate,
-        CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION, CREW_SPAWN_VEHICLE_ROUTE_SLACK,
-        r => r.totalCost,
-      )) {
+      if (isVehicleRouteAcceptable(navGrid, driverCell, candidate)) {
         return candidate;
       }
     }
@@ -247,11 +267,7 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
 
     for (const driver of drivers) {
       const driverCell = { x: Math.round(driver.x), z: Math.round(driver.z) };
-      if (isRouteAcceptable(
-        navGrid, driverCell, vehicleCell,
-        CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION, CREW_SPAWN_VEHICLE_ROUTE_SLACK,
-        r => r.totalCost,
-      )) {
+      if (isVehicleRouteAcceptable(navGrid, driverCell, vehicleCell)) {
         anyAcceptable = true;
         break;
       }
@@ -266,7 +282,10 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
     if (bestDriverCell === null) continue;
 
     const oldKey = key(vehicleCell);
-    const relocated = relocateVehicleNearDriver(navGrid, bestDriverCell, vehicleCell, occupied);
+    const otherVehicleCells = vehicles
+      .filter(other => other !== vehicle)
+      .map(other => ({ x: Math.round(other.x), z: Math.round(other.z) }));
+    const relocated = relocateVehicleNearDriver(navGrid, bestDriverCell, vehicleCell, occupied, otherVehicleCells);
     if (relocated === null) continue;
 
     vehicle.x = relocated.x;
