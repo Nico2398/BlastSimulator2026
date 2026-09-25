@@ -123,11 +123,14 @@ function liftUnderminedBurden(field: EnergyField, mask: Uint8Array): number {
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
       // Highest broken voxel in this column — the roof of the excavation.
-      let topBroken = -1;
+      // `null`, not a numeric sentinel: a box entirely below y=0 has every
+      // legitimate topBroken negative too, so `-1` would misread as "none
+      // found" and skip the lift on every such column (#1186).
+      let topBroken: number | null = null;
       for (let y = box.maxY - 1; y >= box.minY; y--) {
         if (mask[indexOf(field, x, y, z)] === 1) { topBroken = y; break; }
       }
-      if (topBroken < 0) continue;
+      if (topBroken === null) continue;
 
       // Walk the intact rock above it. It only lifts if it is thin enough and
       // actually reaches open air — a cap that runs to the top of the box might
@@ -185,10 +188,23 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
       seed(box.maxX - 1, y, z);
     }
   }
+  // The two Y faces anchor the nearest solid, unbroken voxel to that face in
+  // each column, not literally the edge row: BLAST_ZONE_RADIUS pads the box a
+  // little past the deepest hole, and once that padding reaches past where a
+  // fixture's (or a finite backfill's) rock actually ends, seeding right at
+  // box.minY/box.maxY-1 lands on open air. With no vertical clamp any more
+  // (#1186), that is no longer the rare case it was when minY was floored at
+  // the world's y=0 — the column's real bottom layer then gets no anchor at
+  // all and reads as unsupported, over-fragmenting a pit that never reached
+  // that deep.
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      seed(x, box.minY, z);
-      seed(x, box.maxY - 1, z);
+      for (let y = box.minY; y < box.maxY; y++) {
+        if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+      }
+      for (let y = box.maxY - 1; y >= box.minY; y--) {
+        if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+      }
     }
   }
   for (let y = box.minY; y < box.maxY; y++) {

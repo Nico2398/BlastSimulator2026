@@ -44,8 +44,13 @@ beforeEach(() => resetHoleIds());
 describe('Blast execution — integration', () => {
   it('well-designed plan on soft rock → fragments, good/perfect rating', () => {
     const grid = new VoxelGrid(40, 20, 40);
-    // Fill with molite (tier 2, threshold=500) — medium rock
-    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    // Fill with molite (tier 2, threshold=500) — medium rock. Extends 10
+    // voxels below the drilled holes so the charge has real bedrock underneath
+    // rather than the open air the blast-zone box's own BLAST_ZONE_RADIUS
+    // padding now reaches into with no vertical clamp (#1186) — a slab ending
+    // exactly at the padding's depth reads as floating over void and breaks
+    // apart more than a well-designed plan on ordinary confined rock should.
+    fillRegion(grid, 'molite', 5, 25, -10, 10, 5, 25, 'blingite', 0.2);
 
     // Boomite 8kg (max): 340×8=2720E. Stemming 2m, depth 8: downward ≈ 2494E.
     // At hole pos (EPSILON=4): 2494/4 = 624. Ratio = 624/500 = 1.25 → good frag.
