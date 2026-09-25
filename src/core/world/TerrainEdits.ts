@@ -255,6 +255,20 @@ export class TerrainEdits {
  * live grid the edits were recorded from, voxel for voxel. Writes through
  * `grid.withoutEditRecording` so replay never re-records itself.
  */
+/**
+ * Apply `segments` (a slice of one column's edit segments, e.g. from
+ * `TerrainEdits.segmentsAt`) onto `grid` restricted to `[yLo, yHi]` — the
+ * narrow-range counterpart to `replayTerrainEdits`'s whole-grid replay, for
+ * replaying only the y-band a chunk source just generator-filled (#1183:
+ * `VoxelGrid.replayEditsForBand`). Writes through `grid.withoutEditRecording`,
+ * same as `replayTerrainEdits`.
+ */
+export function replaySegmentsInRange(
+  _grid: VoxelGrid, _segments: readonly EditSegment[], _x: number, _z: number, _yLo: number, _yHi: number,
+): void {
+  // TODO: implement
+}
+
 export function replayTerrainEdits(grid: VoxelGrid, edits: TerrainEdits): void {
   grid.withoutEditRecording(() => {
     for (const { x, z, segments } of edits.columns()) {

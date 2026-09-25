@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid, surfaceDensityAt, SURFACE_BAND_HALF } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, SURFACE_BAND_HALF, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -189,6 +189,17 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
   for (const { cx, cz } of grid.ownedChunks()) grid.markChunkPristine(cx, cz);
 
   return grid;
+}
+
+/**
+ * Build a `VoxelChunkSource` that materializes chunk slabs from `terrain`
+ * (the same sampling context `generateColumn` uses) via
+ * `VoxelGrid.writeGeneratedVoxel`, rather than filling a whole grid up front
+ * (#1183). `config` must be the level's original config, same requirement as
+ * `generateTerrainRegion`.
+ */
+export function createChunkSource(_terrain: TerrainContext, _config: TerrainConfig): VoxelChunkSource {
+  throw new Error('not implemented');
 }
 
 /** Check if a position is in the neutral border zone. */

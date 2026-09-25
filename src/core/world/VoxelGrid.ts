@@ -256,6 +256,22 @@ export function setVoxelBoundsReporter(reporter: OutOfBoundsReporter | null): Ou
  * unaffected by the storage change; callers that iterate need to walk
  * `minX..maxX` rather than `0..sizeX`.
  */
+/**
+ * Materializes a chunk's terrain on first read, so a chunk is a cache of the
+ * generator's output rather than the sole authority on it (#1183). A grid
+ * with no attached source behaves exactly as before — every column reads
+ * whatever was directly written to it, nothing more.
+ */
+export interface VoxelChunkSource {
+  /** Continuous surface height at column (x, z), same datum as `computeVoxelColumnSurfaceHeight`. */
+  surfaceHeightAt(x: number, z: number): number;
+  /**
+   * Fill `grid`'s voxels in `[x0, x1) × [z0, z1)` at y-band `cy`
+   * (`chunkIndexOf(y) === cy`) from the generator, via `writeGeneratedVoxel`.
+   */
+  materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void;
+}
+
 export class VoxelGrid {
   /** Size (in metres) of one voxel cell along each axis. Always 1.0 m. */
   static readonly CELL_SIZE = 1.0;
@@ -275,6 +291,15 @@ export class VoxelGrid {
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
   private readonly dirty = new Set<number>();
+  /**
+   * Generator + edit-record backing this grid's chunks, or null when nothing
+   * is attached (#1183). `protected`, not `private`: until the materialize-on-
+   * read helpers below are wired into `ensureSlab`'s dispatch (implementation
+   * phase), nothing in this file reads it, which `private` would make a
+   * strict-mode compile error (TS6133) on a skeleton-phase field with no
+   * logic yet to read it.
+   */
+  protected chunkSource: VoxelChunkSource | null = null;
 
   /** Live bounding box of the owned region, max exclusive. Empty grid reports a zero-size box at the origin. */
   private bMinX = 0;
@@ -454,6 +479,18 @@ export class VoxelGrid {
     return chunk;
   }
 
+  // ── Chunk source (materialize-on-read) (#1183) ──
+
+  /** Attach the generator + edit-record source new/dropped chunk slabs materialize from. */
+  attachChunkSource(_source: VoxelChunkSource): void {
+    // TODO: implement
+  }
+
+  /** Discard chunk (cx, cz)'s materialized slabs, so its next read re-materializes from `chunkSource`. */
+  dropChunk(_cx: number, _cz: number): void {
+    // TODO: implement
+  }
+
   private recomputeBounds(): void {
     if (this.chunks.size === 0) {
       this.bMinX = this.bMinZ = this.bMaxX = this.bMaxZ = 0;
@@ -494,6 +531,16 @@ export class VoxelGrid {
     // Still some untouched positions in this slab — they're honestly air (0),
     // so fold that baseline in (density is always >= 0, so it never affects max).
     return { min: Math.min(0, slab.minDensity), max: Math.max(0, slab.maxDensity) };
+  }
+
+  /**
+   * `chunkDensityRange`'s answer for a y-band with no allocated slab and an
+   * attached `chunkSource` — a conservative [min, max] read straight from the
+   * generator/edits without materializing the band into a slab (#1183).
+   */
+  protected cheapChunkDensityRange(_chunk: VoxelChunk, _cy: number): { min: number; max: number } {
+    // TODO: implement
+    return { min: 0, max: 0 };
   }
 
   // ── Cubic 16×16×16 slab storage (#1182) ──
@@ -548,6 +595,28 @@ export class VoxelGrid {
     this.slabCacheKey = key;
     this.slabCacheSlab = slab;
     return slab;
+  }
+
+  /**
+   * The slab covering world y in `chunk`, materializing it from `chunkSource`
+   * (generator fill + replayed edits) on first read when a source is
+   * attached and none exists yet — the read-side counterpart to `slabAt`,
+   * which never allocates (#1183). Returns undefined when no source is
+   * attached and no slab has been written directly.
+   */
+  protected ensureSlab(_chunk: VoxelChunk, _y: number): VoxelSlab | undefined {
+    // TODO: implement
+    return undefined;
+  }
+
+  /** Materialize chunk `chunk`'s y-band `cy` from `chunkSource`'s generator fill, then `replayEditsForBand` on top (#1183). */
+  protected materializeSlabFromSource(_chunk: VoxelChunk, _cy: number): VoxelSlab {
+    throw new Error('not implemented');
+  }
+
+  /** Replay this grid's own `TerrainEdits` falling within y-band `cy` of `chunk`, on top of a freshly generator-filled slab (#1183). */
+  protected replayEditsForBand(_chunk: VoxelChunk, _cy: number): void {
+    // TODO: implement
   }
 
   /**
@@ -742,6 +811,22 @@ export class VoxelGrid {
     return this.densityAt(x, y, z) >= 0.5;
   }
 
+  /**
+   * Density at (x, y, z) from `chunkSource`/edits alone, without materializing
+   * a slab — for a read that only needs one voxel's answer, not a whole
+   * 16×16×16 band written into storage (#1183).
+   */
+  protected cheapDensityAt(_x: number, _y: number, _z: number): number {
+    // TODO: implement
+    return 0;
+  }
+
+  /** Density at (x, y, z) as recorded in `this.edits`, or undefined when this voxel carries no edit (#1183). */
+  protected editedDensityAt(_x: number, _y: number, _z: number): number | undefined {
+    // TODO: implement
+    return undefined;
+  }
+
   /** Fracture modifier (1.0 = normal, < 1.0 = pre-cracked). Unowned coordinates, or an unallocated slab, read as 1.0. */
   fractureAt(x: number, y: number, z: number): number {
     const chunk = this.ownerOfRead(x, y, z);
@@ -850,6 +935,20 @@ export class VoxelGrid {
     const slab = existing ?? this.getOrCreateSlab(chunk, cy);
     slab.fracture[i] = next;
     this.recordFractureWrite(x, y, z, prev, next);
+  }
+
+  /**
+   * Write a generator-produced voxel at (x, y, z) during slab materialization
+   * (#1183) — called only from a `VoxelChunkSource.materializeSlab`
+   * implementation, never from gameplay code. Unlike `fillVoxel`, does not
+   * record an edit: this is generation filling in the baseline, not play
+   * changing it.
+   */
+  writeGeneratedVoxel(
+    _x: number, _y: number, _z: number,
+    _compId: number, _ores: Record<string, number> | undefined, _density: number,
+  ): void {
+    // TODO: implement
   }
 
   // ── Compatibility API — materializes a VoxelData-shaped object per call ──
