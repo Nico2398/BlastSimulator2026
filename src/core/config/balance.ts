@@ -193,6 +193,23 @@ export const CREW_SPAWN_MAX_ROUTE_INFLATION = 1.5;
 export const CREW_SPAWN_SEARCH_RADIUS = 16;
 
 /**
+ * How much longer than a straight line a vehicle's route from its nearest
+ * licensed driver may run before `placeStartingCrew`'s vehicle-reachability
+ * fixup treats it as unreachable and relocates it near a licensed driver
+ * (#1179). Paired with `CREW_SPAWN_VEHICLE_ROUTE_SLACK`:
+ * `tolerance = CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION + CREW_SPAWN_VEHICLE_ROUTE_SLACK / straightLineDistance`.
+ */
+export const CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION = 1.5;
+
+/**
+ * Slack term in the same tolerance formula (#1179) — see
+ * `CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION`'s own doc comment. Keeps a vehicle
+ * spawned close to its driver from reading as unreachable purely because a
+ * near-zero straight-line distance makes any ratio at all look catastrophic.
+ */
+export const CREW_SPAWN_VEHICLE_ROUTE_SLACK = 2;
+
+/**
  * Render-only queue offsets for vehicles in the 'waiting' operational state
  * that share a contended target cell (#411 round 2). detectTrafficJam groups
  * waiting vehicles by exact targetX/targetZ, so the simulation intentionally

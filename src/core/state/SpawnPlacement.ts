@@ -5,13 +5,15 @@
 
 import { NavGrid, isStepClimbable, type NavCell } from '../nav/NavGrid.js';
 import { findNearestNavigableCell } from '../nav/NavGridReachability.js';
-import { findPath } from '../nav/Pathfinding.js';
+import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
   CREW_SPAWN_MAX_ROUTE_INFLATION,
   CREW_SPAWN_SEARCH_RADIUS,
 } from '../config/balance.js';
 import type { GameState } from './GameState.js';
+import type { Employee } from '../entities/Employee.js';
+import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 
 /** 8-directional neighbour order — fixed, so a placement is reproducible rather than seed-dependent. */
 const NEIGHBOUR_OFFSETS: ReadonlyArray<readonly [number, number]> = [
@@ -99,7 +101,12 @@ function climbConnectedCells(
  * from the spawn corner and the crew still could not work, because the routes
  * out of that corner ran 2.78x long on average and 14x at worst.
  */
-function routeInflation(navGrid: NavGrid, from: Cell, centre: Cell): number {
+function routeInflation(
+  navGrid: NavGrid,
+  from: Cell,
+  centre: Cell,
+  metric: (r: PathResult) => number = r => r.waypoints.length,
+): number {
   const straight = Math.hypot(centre.x - from.x, centre.z - from.z);
   if (straight < 1) return 1;
   const route = findPath(navGrid, {
@@ -109,13 +116,20 @@ function routeInflation(navGrid: NavGrid, from: Cell, centre: Cell): number {
     avoidVehicles: false,
   });
   if (!route.found) return Number.POSITIVE_INFINITY;
-  return route.waypoints.length / straight;
+  return metric(route) / straight;
 }
 
-function isRouteAcceptable(navGrid: NavGrid, from: Cell, centre: Cell): boolean {
+function isRouteAcceptable(
+  navGrid: NavGrid,
+  from: Cell,
+  centre: Cell,
+  maxInflation = CREW_SPAWN_MAX_ROUTE_INFLATION,
+  slack = ROUTE_ALLOWANCE_SLACK,
+  metric: (r: PathResult) => number = r => r.waypoints.length,
+): boolean {
   const straight = Math.hypot(centre.x - from.x, centre.z - from.z);
-  const allowance = (straight * CREW_SPAWN_MAX_ROUTE_INFLATION + ROUTE_ALLOWANCE_SLACK) / Math.max(straight, 1);
-  return routeInflation(navGrid, from, centre) <= allowance;
+  const allowance = (straight * maxInflation + slack) / Math.max(straight, 1);
+  return routeInflation(navGrid, from, centre, metric) <= allowance;
 }
 
 /** Cells at Chebyshev radius `r` from `origin`, in a fixed order — ring by ring, nearest first. */
@@ -156,6 +170,51 @@ function selectAnchor(navGrid: NavGrid, authored: Cell, centre: Cell): Cell {
   }
 
   return best ?? findNearestNavigableCell(navGrid, centre.x, centre.z);
+}
+
+/** Employees, in roster order, holding the licence a vehicle of `role` requires. */
+function findLicensedDrivers(employees: Employee[], role: VehicleRole): Employee[] {
+  // TODO: implement — reuse isLicensedForRole (VehicleReservation.ts)
+  void employees;
+  void role;
+  return [];
+}
+
+/**
+ * Ring search from `driverCell` for the nearest unoccupied, spawnable cell
+ * whose route back to `driverCell` beats `currentVehicleCell`'s — null when
+ * nothing strictly better is found (#1179).
+ */
+function relocateVehicleNearDriver(
+  navGrid: NavGrid,
+  driverCell: Cell,
+  currentVehicleCell: Cell,
+  occupied: Set<string>,
+): Cell | null {
+  // TODO: implement
+  void navGrid;
+  void driverCell;
+  void currentVehicleCell;
+  void occupied;
+  return null;
+}
+
+/**
+ * One-time fixup (#1179): for each vehicle in roster order, relocate it near
+ * a licensed driver when no licensed driver can reach it within tolerance
+ * (CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION / CREW_SPAWN_VEHICLE_ROUTE_SLACK,
+ * using route.totalCost as the metric). Returns whether anything moved.
+ * Deliberately run once at spawn placement, not per tick — see
+ * `SingleVehicleMover.test.ts`'s allowlist.
+ */
+function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicles: Vehicle[]): boolean {
+  // TODO: implement
+  void navGrid;
+  void employees;
+  void vehicles;
+  void findLicensedDrivers;
+  void relocateVehicleNearDriver;
+  return false;
 }
 
 /**
@@ -214,41 +273,47 @@ export function placeStartingCrew(state: GameState): boolean {
   // ordinary ground is left exactly as authored, even where a local step
   // separates two of its rows. What is not survivable, and what this moves,
   // is a crew walled off from the site it was hired to work.
+  let crewMoved = false;
   const authoredAnchor = findNearestNavigableCell(navGrid, authored.x, authored.z);
-  if (isRouteAcceptable(navGrid, authoredAnchor, centre)) return false;
+  if (!isRouteAcceptable(navGrid, authoredAnchor, centre)) {
+    const anchor = selectAnchor(navGrid, authored, centre);
+    const candidates = climbConnectedCells(navGrid, anchor, searchLimit);
 
-  const anchor = selectAnchor(navGrid, authored, centre);
-  const candidates = climbConnectedCells(navGrid, anchor, searchLimit);
+    const vehicleCells: Cell[] = [];
+    for (const candidate of candidates) {
+      if (vehicleCells.length === vehicles.length) break;
+      if (vehicleCells.every(taken => chebyshev(taken, candidate) >= CREW_SPAWN_VEHICLE_SEPARATION)) {
+        vehicleCells.push(candidate);
+      }
+    }
 
-  const vehicleCells: Cell[] = [];
-  for (const candidate of candidates) {
-    if (vehicleCells.length === vehicles.length) break;
-    if (vehicleCells.every(taken => chebyshev(taken, candidate) >= CREW_SPAWN_VEHICLE_SEPARATION)) {
-      vehicleCells.push(candidate);
+    if (vehicleCells.length >= vehicles.length) {
+      const taken = new Set(vehicleCells.map(key));
+      const employeeCells: Cell[] = [];
+      for (const candidate of candidates) {
+        if (employeeCells.length === employees.length) break;
+        if (taken.has(key(candidate))) continue;
+        taken.add(key(candidate));
+        employeeCells.push(candidate);
+      }
+
+      if (employeeCells.length >= employees.length) {
+        employees.forEach((employee, i) => {
+          const cell = employeeCells[i] as Cell;
+          employee.x = cell.x;
+          employee.z = cell.z;
+        });
+        vehicles.forEach((vehicle, i) => {
+          const cell = vehicleCells[i] as Cell;
+          vehicle.x = cell.x;
+          vehicle.z = cell.z;
+        });
+        crewMoved = true;
+      }
     }
   }
-  if (vehicleCells.length < vehicles.length) return false;
 
-  const taken = new Set(vehicleCells.map(key));
-  const employeeCells: Cell[] = [];
-  for (const candidate of candidates) {
-    if (employeeCells.length === employees.length) break;
-    if (taken.has(key(candidate))) continue;
-    taken.add(key(candidate));
-    employeeCells.push(candidate);
-  }
-  if (employeeCells.length < employees.length) return false;
+  const vehicleMoved = fixUnreachableVehicles(navGrid, employees, vehicles);
 
-  employees.forEach((employee, i) => {
-    const cell = employeeCells[i] as Cell;
-    employee.x = cell.x;
-    employee.z = cell.z;
-  });
-  vehicles.forEach((vehicle, i) => {
-    const cell = vehicleCells[i] as Cell;
-    vehicle.x = cell.x;
-    vehicle.z = cell.z;
-  });
-
-  return true;
+  return crewMoved || vehicleMoved;
 }
