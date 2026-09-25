@@ -1318,8 +1318,8 @@ export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: 
 
 /**
  * Resolve the surface Y for column (x, z) — the highest voxel with density
- * >= 0.5. Returns -1 if the column is entirely void. Out-of-bounds (x, z)
- * coordinates are clamped to the grid limits.
+ * >= 0.5. Returns null if the column is entirely void (or off-site).
+ * Out-of-bounds (x, z) coordinates are clamped to the grid limits.
  *
  * Shared by NavGrid.computeSurfaceY and Ramp.ts's local column-surface
  * resolution — both need this exact scan and previously kept independent
@@ -1336,37 +1336,61 @@ export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: 
  * than this function's clamp-to-edge-column behaviour in that case.
  */
 export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number | null {
-  // TODO(#1184): scan-based body is a placeholder — implementer replaces
-  // with resolveColumnTopY (generator + edit record, O(edits in column)),
-  // returning null (not -1) for "no ground".
-  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
+  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return null;
 
   const { cx, cz } = clampToGridColumn(grid, x, z);
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    if (grid.isSolidAt(cx, y, cz)) return y;
-  }
-  return -1;
+  return resolveColumnTopY(grid, cx, cz);
 }
 
 /**
  * Resolve column (x, z)'s topmost "ground" Y from the generator + edit
  * record directly — O(edit segments in that column), not O(scanned height) —
  * supporting negative and arbitrarily-high surfaces with no vertical clamp.
- * Returns null for a column with no ground at all (#1184).
+ * Returns null for a column with no ground at all (#1184): off-site, or (for
+ * an owned column) no material anywhere.
+ *
+ * The generator's natural fill is a solid half-space from -Infinity up to
+ * `Math.floor(generatorSurfaceHeightAt(x, z))` inclusive. Recorded edit
+ * segments (`grid.edits.segmentsAt`) override that natural fill within their
+ * own `[yLo, yHi]` range — a 'dug' segment is never solid, an 'added'
+ * segment is always solid (both are recorded relative to
+ * `SOLID_VOXEL_DENSITY_THRESHOLD`, the same threshold `isSolidAt` uses, so
+ * the segment's kind alone decides without re-reading its boundary density).
+ * Walking the (few) recorded segments from the top down, checking the
+ * natural-fill gap above/between each one before the segment itself, finds
+ * the topmost solid row in O(segments in this column) — never a scan over a
+ * height range.
  *
  * Not exported: internal detail of `computeVoxelColumnSurfaceY`/
  * `computeVoxelColumnSurfaceHeight`, same as `resolveCell` above.
  */
 function resolveColumnTopY(grid: VoxelGrid, x: number, z: number): number | null {
-  // TODO(#1184): implementer resolves via grid.edits.segmentsAt(x, z) and
-  // grid.generatorSurfaceHeightAt(x, z) instead of scanning [0, sizeY),
-  // then wires this into computeVoxelColumnSurfaceY's body below.
-  void grid; void x; void z; // keep params referenced until the real body lands
-  throw new Error('not implemented');
+  if (!grid.containsColumn(x, z)) return null;
+
+  const segments = grid.edits.segmentsAt(x, z);
+  const naturalSurface = grid.generatorSurfaceHeightAt(x, z);
+  const naturalFloor = naturalSurface !== undefined ? Math.floor(naturalSurface) : undefined;
+
+  // `upperBound` is the exclusive top of the natural-fill gap currently under
+  // consideration — Infinity above the topmost segment, then each rejected
+  // ('dug') segment's own yLo as we walk downward past it. The gap's own top
+  // is `upperBound - 1` (capped there even when `naturalFloor` reaches
+  // higher, since anything from `upperBound` up is already claimed by the
+  // segment above, already checked and rejected).
+  let upperBound = Infinity;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i]!;
+    if (naturalFloor !== undefined) {
+      const gapTop = Math.min(naturalFloor, upperBound - 1);
+      if (gapTop > seg.yHi) return gapTop;
+    }
+    if (seg.kind === 'added') return seg.yHi;
+    upperBound = seg.yLo;
+  }
+
+  if (naturalFloor !== undefined) return Math.min(naturalFloor, upperBound - 1);
+  return null;
 }
-// Referenced (not yet called) so `noUnusedLocals` stays green until the
-// implementer wires `resolveColumnTopY` into `computeVoxelColumnSurfaceY`.
-void resolveColumnTopY;
 
 /**
  * Half-width, in voxels, of the band over which density falls from solid to
@@ -1409,10 +1433,9 @@ export function surfaceDensityAt(y: number, surfaceH: number): number {
  * claim edge, since the claim itself moves; a silent clamp there produced
  * the seam this function's fix closes.
  *
- * TODO(#1184): the "no ground in this owned column" case returns NaN once
- * the implementer replaces the scan below — not 0, since a real surface can
- * now legitimately sit at 0 or below. Return type stays plain `number`;
- * NaN is the sentinel, not a widened union.
+ * The "no ground in this owned column" case also returns NaN (#1184) — not
+ * 0, since a real surface can now legitimately sit at 0 or below. Return
+ * type stays plain `number`; NaN is the sentinel, not a widened union.
  */
 export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
@@ -1420,23 +1443,21 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
 
   const cx = Math.floor(x);
   const cz = Math.floor(z);
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const density0 = grid.densityAt(cx, y, cz);
-    if (density0 >= 0.5) {
-      // Same crossing interpolation as TerrainMesh's emitVertex: the voxel
-      // above a topmost-solid voxel is air-side (density < 0.5, or 0 past
-      // the grid's own top), and the fractional height along that edge is
-      // where density == 0.5. Matches marching cubes exactly.
-      const density1 = grid.densityAt(cx, y + 1, cz);
-      let t = 0.5;
-      if (Math.abs(density1 - density0) > 1e-6) {
-        t = (0.5 - density0) / (density1 - density0);
-      }
-      t = Math.max(0, Math.min(1, t));
-      return y + t;
-    }
+  const topY = resolveColumnTopY(grid, cx, cz);
+  if (topY === null) return NaN;
+
+  // Same crossing interpolation as TerrainMesh's emitVertex: the voxel above
+  // the topmost-solid voxel is air-side (density < 0.5), and the fractional
+  // height along that edge is where density == 0.5. Matches marching cubes
+  // exactly.
+  const density0 = grid.densityAt(cx, topY, cz);
+  const density1 = grid.densityAt(cx, topY + 1, cz);
+  let t = 0.5;
+  if (Math.abs(density1 - density0) > 1e-6) {
+    t = (0.5 - density0) / (density1 - density0);
   }
-  return 0;
+  t = Math.max(0, Math.min(1, t));
+  return topY + t;
 }
 
 /**
@@ -1456,12 +1477,11 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
  * clearVoxel's own silent-no-op convention for unowned coordinates. A
  * non-finite `height` (NaN, Infinity, -Infinity) is likewise a silent no-op.
  *
- * A `height` outside [0, grid.sizeY - 1] is not rejected or reported — it is
- * silently clamped into the grid's representable vertical range before the
- * write, so a caller passing an out-of-range value gets a clamped result
- * rather than a signal that anything was off.
+ * `height` is written as given, with no clamp toward `[0, grid.sizeY - 1]`
+ * (#1184) — a column is writable at any height, negative included, since
+ * rock now extends to every depth.
  *
- * Returns the highest Y index written or cleared by this call, or -1 for a
+ * Returns the highest Y index written or cleared by this call, or null for a
  * no-op (unowned column or non-finite height) — for a caller tracking a
  * dirty-region bound (`renormaliseVoxelColumnAfterCarve`).
  */
@@ -1473,30 +1493,26 @@ export function setVoxelColumnSurfaceHeight(
   compId: number,
   ores?: Record<string, number>,
 ): number | null {
-  if (!grid.containsColumn(x, z)) return -1;
-  if (!Number.isFinite(height)) return -1;
+  if (!grid.containsColumn(x, z)) return null;
+  if (!Number.isFinite(height)) return null;
 
-  // Read the OLD surface before clamping `height`. `containsColumn` above
-  // already guarantees (x, z) is in bounds, so clampToGridColumn (inside
-  // computeVoxelColumnSurfaceY) is a no-op here either way — this ordering
-  // is simply the natural "read old, then compute new" sequence, not a
-  // correctness requirement.
-  // TODO(#1184): existingTopY can be null (no-ground column) once
-  // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
-  // placeholder shim, not the final "no ground" handling.
-  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
-  const clampedHeight = Math.max(0, Math.min(grid.sizeY - 1, height));
+  // Read the OLD surface before writing the new one.
+  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z);
 
   // Union of "what used to be filled that must now clear" and "what the new
   // crossing band needs" — never reaches below either surface, so an
-  // overhang or cavity buried deeper in the column is left untouched.
-  const lowY = Math.max(0, Math.min(existingTopY + 1, Math.floor(clampedHeight) - SURFACE_BAND_HALF + 1));
-  const highY = Math.min(grid.sizeY - 1, Math.max(existingTopY, Math.ceil(clampedHeight) + SURFACE_BAND_HALF - 1));
+  // overhang or cavity buried deeper in the column is left untouched. With
+  // no existing ground, only the new target's own band applies — there is no
+  // old surface to sweep down from.
+  const targetLowY = Math.floor(height) - SURFACE_BAND_HALF + 1;
+  const targetHighY = Math.ceil(height) + SURFACE_BAND_HALF - 1;
+  const lowY = existingTopY === null ? targetLowY : Math.min(existingTopY + 1, targetLowY);
+  const highY = existingTopY === null ? targetHighY : Math.max(existingTopY, targetHighY);
 
   const cx = Math.floor(x);
   const cz = Math.floor(z);
   for (let y = lowY; y <= highY; y++) {
-    const density = surfaceDensityAt(y, clampedHeight);
+    const density = surfaceDensityAt(y, height);
     if (density > 0) grid.fillVoxel(cx, y, cz, compId, ores, density);
     else grid.clearVoxel(cx, y, cz);
   }
@@ -1569,12 +1585,8 @@ export function renormaliseVoxelColumnAfterCarve(
 ): number | null {
   if (!grid.containsColumn(x, z)) return null;
 
-  // TODO(#1184): oldTopY/newTopY both go null-aware once
-  // computeVoxelColumnSurfaceY's real body lands — this `?? -1` pair is the
-  // placeholder shim, not the final "no ground" handling.
-  const resolvedOldTopY = oldTopY ?? -1;
-  const newTopY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
-  if (newTopY === resolvedOldTopY) return null;
+  const newTopY = computeVoxelColumnSurfaceY(grid, x, z);
+  if (newTopY === oldTopY) return null;
 
   const cx = Math.floor(x);
   const cz = Math.floor(z);
@@ -1582,17 +1594,20 @@ export function renormaliseVoxelColumnAfterCarve(
   // Bounded sweep: the only place a legitimate pre-existing crossing band
   // above the old top could have been sitting. Never reaches further than
   // SURFACE_BAND_HALF above oldTopY, so this is O(SURFACE_BAND_HALF), not a
-  // column-wide scan.
+  // column-wide scan. With no old top at all, there is nothing above it to
+  // sweep — skip entirely.
   let touchedMaxY: number | null = null;
-  const sweepHigh = Math.min(grid.sizeY - 1, resolvedOldTopY + SURFACE_BAND_HALF);
-  for (let y = resolvedOldTopY + 1; y <= sweepHigh; y++) {
-    if (grid.densityAt(cx, y, cz) !== 0) {
-      grid.clearVoxel(cx, y, cz);
-      touchedMaxY = touchedMaxY === null ? y : Math.max(touchedMaxY, y);
+  if (oldTopY !== null) {
+    const sweepHigh = oldTopY + SURFACE_BAND_HALF;
+    for (let y = oldTopY + 1; y <= sweepHigh; y++) {
+      if (grid.densityAt(cx, y, cz) !== 0) {
+        grid.clearVoxel(cx, y, cz);
+        touchedMaxY = touchedMaxY === null ? y : Math.max(touchedMaxY, y);
+      }
     }
   }
 
-  if (newTopY < 0) return touchedMaxY;
+  if (newTopY === null) return touchedMaxY;
 
   // A fully solid new top has no genuine crossing to reconstruct — carving
   // through plain rock exposes more plain rock, and manufacturing a band
@@ -1604,12 +1619,11 @@ export function renormaliseVoxelColumnAfterCarve(
   const compId = grid.palette.intern(grid.compositionAt(cx, newTopY, cz));
   const ores = grid.oresAt(cx, newTopY, cz);
   const height = computeVoxelColumnSurfaceHeight(grid, cx, cz);
-  // TODO(#1184): bandTop can be null once setVoxelColumnSurfaceHeight's real
-  // body lands — this `?? -1` is the placeholder shim, not the final
-  // "no ground" handling.
-  const bandTop = setVoxelColumnSurfaceHeight(grid, cx, cz, height, compId, ores) ?? -1;
+  const bandTop = setVoxelColumnSurfaceHeight(grid, cx, cz, height, compId, ores);
 
-  return touchedMaxY === null ? bandTop : Math.max(touchedMaxY, bandTop);
+  if (touchedMaxY === null) return bandTop;
+  if (bandTop === null) return touchedMaxY;
+  return Math.max(touchedMaxY, bandTop);
 }
 
 /**
@@ -1671,11 +1685,8 @@ export function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targ
   const rowY = Math.floor(targetY);
   let composition = grid.compositionAt(x, rowY, z);
   if (composition.rocks.length === 0) {
-    // TODO(#1184): topY can be null (no-ground column) once
-    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
-    // placeholder shim, not the final "no ground" handling.
-    const topY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
-    if (topY >= 0) composition = grid.compositionAt(x, topY, z);
+    const topY = computeVoxelColumnSurfaceY(grid, x, z);
+    if (topY !== null) composition = grid.compositionAt(x, topY, z);
   }
   return grid.palette.intern(composition);
 }

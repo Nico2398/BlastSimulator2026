@@ -139,7 +139,7 @@ export function digVoxel(
 ): DigVoxelResult {
   const fail = (error: string): DigVoxelResult => ({
     success: false,
-    newSurfaceY: -1,
+    newSurfaceY: null,
     affectedCell: { x, z },
     error,
   });

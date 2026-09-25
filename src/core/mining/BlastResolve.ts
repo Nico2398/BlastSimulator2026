@@ -13,7 +13,7 @@
 // See the gameplay-blast-system skill, "Step 4 — Throw, Flight and the Muck Pile" (landing and the muck pile).
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import { firstEmptyLayerAboveGround, type VoxelGrid } from '../world/VoxelGrid.js';
 import {
   GRAVITY,
   BALLISTIC_SAMPLE_DT,
@@ -120,12 +120,8 @@ class PileHeights {
     if (piled !== undefined) return piled;
     const cached = this.terrainBase.get(key);
     if (cached !== undefined) return cached;
-    // computeVoxelColumnSurfaceY returns the topmost solid voxel; rock rests on
-    // top of it.
-    // TODO(#1184): swap for firstEmptyLayerAboveGround(this.grid, x, z) once
-    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
-    // placeholder shim, not the final "no ground" handling.
-    const base = (computeVoxelColumnSurfaceY(this.grid, x, z) ?? -1) + 1;
+    // Rock rests on top of the first empty layer above ground.
+    const base = firstEmptyLayerAboveGround(this.grid, x, z);
     this.terrainBase.set(key, base);
     return base;
   }

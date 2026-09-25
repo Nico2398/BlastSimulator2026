@@ -4,7 +4,7 @@
 // the already-built scene" step shared by syncFromContext() and finishLevelLoad().
 
 import type { GameState } from '../core/state/GameState.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../core/world/VoxelGrid.js';
+import { firstEmptyLayerAboveGround, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherCycleState, WeatherState } from '../core/weather/WeatherCycle.js';
 import type { ZoneBounds } from '../core/entities/Zone.js';
 import { isInZone, isZoneStillBlastThreatened } from '../core/entities/Zone.js';
@@ -219,15 +219,13 @@ export function buildSurveyOverlayOptions(
       const x = parts[0]!;
       const z = parts[1]!;
 
-      // Surface Y = topmost solid voxel + 1. Delegates to the canonical scan
-      // (VoxelGrid.computeVoxelColumnSurfaceY) instead of duplicating it with
-      // a different, stale threshold — the overlay uses the same "solid
-      // enough to stand on" bar (density >= 0.5 / isSolidAt) as gameplay,
-      // navmesh, and every other surface-height call site (#770).
-      // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, x, z) once
-      // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
-      // placeholder shim, not the final "no ground" handling.
-      const surfaceY = (computeVoxelColumnSurfaceY(grid, x, z) ?? -1) + 1;
+      // Surface Y = first empty layer above ground. Delegates to the
+      // canonical scan (VoxelGrid.firstEmptyLayerAboveGround) instead of
+      // duplicating it with a different, stale threshold — the overlay uses
+      // the same "solid enough to stand on" bar (density >= 0.5 / isSolidAt)
+      // as gameplay, navmesh, and every other surface-height call site
+      // (#770). Handles a surface at or below y=0 correctly (#1184).
+      const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
 
       points.push({
         x,

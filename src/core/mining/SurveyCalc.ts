@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Survey types and noise-scaled estimation logic
 
-import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
 import {
   SURVEY_BASE_ERROR,
@@ -159,10 +159,7 @@ export function estimateSurveyResult(
       // Determine which Y levels to sample
       let yLevels: number[];
       if (method === 'aerial') {
-        // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, x, z) once
-        // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is
-        // the placeholder shim, not the final "no ground" handling.
-        const surfaceY = (computeVoxelColumnSurfaceY(grid, x, z) ?? -1) + 1;
+        const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
         yLevels = [surfaceY, surfaceY - 1].filter(y => y >= 0 && y < grid.sizeY);
       } else {
         yLevels = [];
