@@ -9,6 +9,8 @@
 // Voxel cell size: 1 m × 1 m × 1 m (SI units throughout). All grid
 // coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
+import { TerrainEdits } from './TerrainEdits';
+
 export interface VoxelRockComposition {
   /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
   rocks: Array<{ rockId: string; coefficient: number }>;
@@ -251,6 +253,8 @@ export class VoxelGrid {
 
   readonly sizeY: number;
   readonly palette = new CompositionPalette();
+  /** Log of edits made to this grid since generation — see `TerrainEdits`. */
+  readonly edits: TerrainEdits;
 
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
@@ -275,6 +279,7 @@ export class VoxelGrid {
    */
   constructor(sizeX: number, sizeY: number, sizeZ: number) {
     this.sizeY = sizeY;
+    this.edits = new TerrainEdits();
     if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) return;
 
     for (let cz = 0; cz < Math.ceil(sizeZ / CHUNK_SIZE); cz++) {
@@ -539,6 +544,15 @@ export class VoxelGrid {
 
   private touch(chunk: VoxelChunk): void {
     this.dirty.add(chunkKey(chunk.cx, chunk.cz));
+  }
+
+  /**
+   * Run `fn` with edit recording suspended — mutators called inside `fn` do
+   * not append to `this.edits`. For `replayTerrainEdits` and generation,
+   * neither of which should re-record what they are themselves replaying.
+   */
+  withoutEditRecording<T>(_fn: () => T): T {
+    throw new Error('not implemented');
   }
 
   // ── Direct field accessors — no allocation, hot-path callers should prefer these ──
