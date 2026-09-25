@@ -253,7 +253,11 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
     }
     const range = Math.max(...heights) - Math.min(...heights);
     // Not a tight bound — just confirms the mask is doing real compression
-    // work near the centre of a small grid rather than leaving raw relief.
-    expect(range).toBeLessThan(20);
+    // work near the centre of a small grid rather than leaving raw relief
+    // (this fixture's raw, unmasked range is ~30). #1189 removed the
+    // [1, sizeY - 1] clamp that used to additionally flatten this figure by
+    // flooring the low outliers, so the masked-only range is a bit wider
+    // than before but still well short of raw.
+    expect(range).toBeLessThan(25);
   });
 });
