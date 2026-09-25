@@ -362,12 +362,13 @@ describe('en.json / fr.json — key-set parity', () => {
     // mining.build_ramp.slope_too_steep (validateRampOrder's new slope-cap
     // rejection) and ui.build.ramp_needs_length (the ramp tool's ghost-preview
     // hint) — both locales.
-    // Baseline is now 3513 (up from 3512): #1181 adds
+    // Baseline is now 3514 (up from 3512): #1181 adds
     // world.terrain_version_mismatch (the save-load refusal when a save's
-    // embedded terrain generator version doesn't match this build's) — both
-    // locales.
+    // embedded terrain generator version doesn't match this build's) and
+    // world.terrain_save_corrupt (the save-load refusal when a save's
+    // embedded terrain data is corrupt) — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3513);
+    expect(Object.keys(en).length).toBe(3514);
   });
 });
 
