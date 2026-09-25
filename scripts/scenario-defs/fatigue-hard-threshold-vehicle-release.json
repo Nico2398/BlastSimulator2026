@@ -167,6 +167,11 @@
           "value": 8
         },
         {
+          "type": "focusTile",
+          "x": 14,
+          "z": 14
+        },
+        {
           "type": "pickTile",
           "x": 14,
           "z": 14

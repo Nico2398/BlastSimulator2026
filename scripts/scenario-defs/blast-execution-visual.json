@@ -173,6 +173,11 @@
           "value": 2
         },
         {
+          "type": "focusTile",
+          "x": 20,
+          "z": 20
+        },
+        {
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,

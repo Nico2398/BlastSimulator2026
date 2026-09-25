@@ -200,6 +200,11 @@
           "value": 6
         },
         {
+          "type": "focusTile",
+          "x": 30,
+          "z": 20
+        },
+        {
           "type": "dragTiles",
           "x1": 30,
           "z1": 20,
