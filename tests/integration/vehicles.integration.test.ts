@@ -252,6 +252,37 @@ describe('Vehicle fleet', () => {
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
+  // ── Spawn-time vehicle reachability (#1179) ──
+  // Old behaviour, measured on the console repro this issue was filed from:
+  // `campaign start level:tutorial_pit staffed:true` spawns the debris_hauler
+  // at (3,2) on a ridge flank with its only truck-licensed driver at (4,0) —
+  // straight-line distance ~2.24 cells — yet the driver's only legal route
+  // loops through a ramp cluster and takes ~19-20 ticks to board (reproduced
+  // here against the pre-fix code: 20). Once `placeStartingCrew`'s new
+  // vehicle-fixup phase (#1179) keeps every starting vehicle within a
+  // route-cost tolerance of a licensed driver, the same repro should board
+  // within a handful of ticks instead.
+  it('a staffed tutorial_pit debris_hauler reposition boards its driver within a small tick budget, not the ~19-20 it took looping around a ridge (#1179)', () => {
+    const engine = createRunner();
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    const debrisHauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+
+    const reposition = runCommand(engine, `vehicle reposition ${debrisHauler.id} 13 2`);
+    expect(reposition.success).toBe(true);
+
+    const TICK_BUDGET = 5;
+    let boardedWithinBudget = false;
+    for (let i = 0; i < TICK_BUDGET; i++) {
+      runCommand(engine, 'tick 1');
+      if (vehicleDriverId(debrisHauler) !== null) { boardedWithinBudget = true; break; }
+    }
+
+    expect(boardedWithinBudget).toBe(true);
+    expectNoWorldInvariantViolations(state);
+  });
+
   // ── Task assignment (#1138 — assignVehicle deleted along with Vehicle.task) ──
   // #1092 already removed the `vehicle assign` console subcommand — a
   // display-only field mutation with no player-facing meaning.
