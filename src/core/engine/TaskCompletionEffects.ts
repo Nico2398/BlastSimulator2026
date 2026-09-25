@@ -24,7 +24,7 @@ import { regionForColumns } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
-  makeFootprintRegion, makeLevelFootprintRegion, levelBuildingFootprint,
+  makeFootprintRegion, levelBuildingFootprint,
   siteBoundsForGrid, refreshLogisticsCapacity,
 } from './BuildingTaskHelpers.js';
 
@@ -232,44 +232,20 @@ export function applyTaskCompletion(
             // wrecked mid-construction, which is exactly what it exists to
             // catch. A footprint already level carves nothing.
             //
-            // The CARVE region is `makeLevelFootprintRegion` — widened by one
-            // column on the maxX/maxZ sides — because the building's mesh
-            // spans one column further than its occupancy footprint (#1144).
-            // The TARGET height, though, is computed from the narrower TRUE
-            // footprint only (`levelGroundRect`'s `targetRect` param, #1144
-            // follow-up): the building's own pad height must come from ground
-            // this building actually occupies, never from whatever the extra
-            // skirt column's untouched natural terrain happens to be. Coupling
-            // them — deriving targetY from the widened rect too — was the
-            // actual bug the previous fix (reverting the widen outright)
-            // papered over: a low skirt column dragged targetY down further
-            // than this building's own footprint required, over-cutting the
-            // skirt and exaggerating the height step against whatever gets
-            // placed next door onto that same skirt column (the tutorial's
-            // living_quarters-then-driving_center placement, #945/#928) or
-            // onto the row a later tier upgrade of this same building grows
-            // onto (buildings.integration.test.ts). With the target pinned to
-            // the true footprint, the widened carve only ever cuts the skirt
-            // down to a height this building's own footprint already settled
-            // on — never further.
-            //
-            // `levelBuildingFootprint` (BuildingTaskHelpers.ts) also guards the
-            // widened skirt against an ALREADY-STANDING neighbour: two
-            // buildings placed touching with zero gap can put this building's
-            // widened skirt column exactly on the neighbour's own TRUE
-            // footprint, and carving it would silently lower an edge row of
-            // that neighbour's pad (#1144 review finding 1).
-            const levelRegion = makeLevelFootprintRegion(order.x, order.z, sizeX, sizeZ);
-            const levelled = levelBuildingFootprint(grid, order.x, order.z, sizeX, sizeZ, state.buildings.buildings, emitter);
+            // The building's mesh is now centred on its TRUE footprint
+            // (`footprintCenterCoord`, #1198) rather than overhanging it by
+            // half a cell, so there is no wider "skirt" beyond the occupancy
+            // footprint left to carve or guard against a neighbour — carve
+            // and target both use `footprintRegion` unchanged.
+            const levelled = levelBuildingFootprint(grid, order.x, order.z, sizeX, sizeZ, emitter);
             footprintLevelled = levelled.voxelsCleared;
             // Emitted after the carve (unconditionally — even a footprint
             // already flat still needs its occupancy reflected), so the
-            // NavGrid cells around the site (including the widened skirt
-            // column the carve just touched) carry their new surface heights
+            // NavGrid cells around the site carry their new surface heights
             // (isStepClimbable reads them) and not the pre-construction
             // ones. NavGridSync patches on nav:occupancy_changed; no direct
             // call here.
-            emitter.emit('nav:occupancy_changed', { region: regionForColumns(levelRegion, grid) });
+            emitter.emit('nav:occupancy_changed', { region: regionForColumns(footprintRegion, grid) });
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just

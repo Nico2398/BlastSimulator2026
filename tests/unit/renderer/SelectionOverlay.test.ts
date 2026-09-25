@@ -47,6 +47,26 @@ function allPositionYs(): number[] {
   return ys;
 }
 
+/** World-space X/Z bounds across every Mesh's vertices in the scene — used to check where a footprint-cell tint patch actually sits, not just how it conforms to slope. */
+function positionXZBounds(): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  scene.updateMatrixWorld(true);
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const v = new THREE.Vector3();
+  scene.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      const pos = o.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!pos) return;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        v.applyMatrix4(o.matrixWorld);
+        minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+        minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+      }
+    }
+  });
+  return { minX, maxX, minZ, maxZ };
+}
+
 /** World-space Y spread across every LineLoop (radius ring) in the scene — rings are built from world-space points with no extra transform, but matrixWorld is applied anyway for robustness. */
 function ringYSpread(): number {
   scene.updateMatrixWorld(true);
@@ -96,6 +116,34 @@ describe('SelectionOverlay — point/footprint tint conforms to terrain (#1006)'
     const overlay = new SelectionOverlay(scene, () => 0, slopedSampler);
     overlay.update({ shape: 'point', x: 10, z: 10 });
     expect(allPositionYs().length).toBeGreaterThan(0);
+  });
+
+  it('a footprintCells patch is shifted -0.5/-0.5 to center on the building footprint mesh, unlike the default single-tile corner convention (#1198)', () => {
+    // Flat terrain isolates the X/Z placement question from the Y-conforming
+    // behaviour the rest of this describe block already covers.
+    const overlay = new SelectionOverlay(scene, () => 0, () => 5);
+    overlay.update({ shape: 'point', x: 5, z: 5, footprintCells: [[0, 0]] });
+
+    const bounds = positionXZBounds();
+    // footprintCells present: cell (0,0) at building (5,5) covers
+    // [4.5, 5.5] x [4.5, 5.5] — centered on the building position.
+    expect(bounds.minX).toBeCloseTo(4.5);
+    expect(bounds.maxX).toBeCloseTo(5.5);
+    expect(bounds.minZ).toBeCloseTo(4.5);
+    expect(bounds.maxZ).toBeCloseTo(5.5);
+  });
+
+  it('sanity: without footprintCells the default single-tile patch keeps the unshifted corner convention (#1198)', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 5);
+    overlay.update({ shape: 'point', x: 5, z: 5 });
+
+    const bounds = positionXZBounds();
+    // No footprintCells: cell (0,0) at (5,5) covers [5, 6] x [5, 6] —
+    // GroundTintLayer's default per-cell corner convention, NOT centered.
+    expect(bounds.minX).toBeCloseTo(5);
+    expect(bounds.maxX).toBeCloseTo(6);
+    expect(bounds.minZ).toBeCloseTo(5);
+    expect(bounds.maxZ).toBeCloseTo(6);
   });
 });
 

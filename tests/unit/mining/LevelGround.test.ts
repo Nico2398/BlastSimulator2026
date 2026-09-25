@@ -28,7 +28,6 @@ import {
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, NAV_BENCH_HEIGHT,
 } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { makeFootprintRegion, makeLevelFootprintRegion } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 const ROCK_COMPOSITION = { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] };
 
@@ -506,23 +505,6 @@ describe('levelGroundRect', () => {
     expect(first.voxelsCleared).toBeGreaterThan(0);
     expect(second.voxelsCleared).toBe(0);
     expect(second.targetY).toBe(first.targetY);
-  });
-});
-
-describe('makeLevelFootprintRegion (#1144)', () => {
-  it('widens makeFootprintRegion by exactly one column on maxX/maxZ only, leaving minX/minZ identical', () => {
-    const base = makeFootprintRegion(10, 20, 3, 4);
-    const widened = makeLevelFootprintRegion(10, 20, 3, 4);
-
-    expect(widened.minX).toBe(base.minX);
-    expect(widened.minZ).toBe(base.minZ);
-    expect(widened.maxX).toBe(base.maxX + 1);
-    expect(widened.maxZ).toBe(base.maxZ + 1);
-  });
-
-  it('boundary: a 1x1 footprint at the origin widens to a 2x2 region', () => {
-    const widened = makeLevelFootprintRegion(0, 0, 1, 1);
-    expect(widened).toEqual({ minX: 0, maxX: 1, minZ: 0, maxZ: 1 });
   });
 });
 
