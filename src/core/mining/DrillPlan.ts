@@ -122,8 +122,8 @@ export function computeDrillHoleDurationTicks(depth: number, diameter: number): 
 
 export interface DigVoxelResult {
   success: boolean;
-  /** Highest solid Y in the column after digging; -1 if the column is now empty. */
-  newSurfaceY: number;
+  /** Highest solid Y in the column after digging; null if the column is now empty. */
+  newSurfaceY: number | null;
   /** Column (x, z) containing the dug voxel. */
   affectedCell: { x: number; z: number };
   error?: string;

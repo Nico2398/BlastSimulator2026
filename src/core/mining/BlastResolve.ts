@@ -122,7 +122,10 @@ class PileHeights {
     if (cached !== undefined) return cached;
     // computeVoxelColumnSurfaceY returns the topmost solid voxel; rock rests on
     // top of it.
-    const base = computeVoxelColumnSurfaceY(this.grid, x, z) + 1;
+    // TODO(#1184): swap for firstEmptyLayerAboveGround(this.grid, x, z) once
+    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+    // placeholder shim, not the final "no ground" handling.
+    const base = (computeVoxelColumnSurfaceY(this.grid, x, z) ?? -1) + 1;
     this.terrainBase.set(key, base);
     return base;
   }

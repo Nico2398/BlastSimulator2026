@@ -224,7 +224,10 @@ export function buildSurveyOverlayOptions(
       // a different, stale threshold — the overlay uses the same "solid
       // enough to stand on" bar (density >= 0.5 / isSolidAt) as gameplay,
       // navmesh, and every other surface-height call site (#770).
-      const surfaceY = computeVoxelColumnSurfaceY(grid, x, z) + 1;
+      // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, x, z) once
+      // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+      // placeholder shim, not the final "no ground" handling.
+      const surfaceY = (computeVoxelColumnSurfaceY(grid, x, z) ?? -1) + 1;
 
       points.push({
         x,

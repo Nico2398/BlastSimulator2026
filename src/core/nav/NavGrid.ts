@@ -258,7 +258,10 @@ export class NavGrid {
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
     const { cx, cz } = clampToGridColumn(voxelGrid, x, z);
-    return NavGrid.surfaceHeightFromVoxelY(voxelGrid, cx, cz, computeVoxelColumnSurfaceY(voxelGrid, cx, cz));
+    // TODO(#1184): computeVoxelColumnSurfaceY can return null (no-ground
+    // column) once its real body lands — this `?? -1` is the placeholder
+    // shim, not the final "no ground" handling.
+    return NavGrid.surfaceHeightFromVoxelY(voxelGrid, cx, cz, computeVoxelColumnSurfaceY(voxelGrid, cx, cz) ?? -1);
   }
 
   /**
@@ -287,7 +290,10 @@ export class NavGrid {
     buildings: Building[],
     drillHoles: DrillHole[],
   ): { voxelY: number; surfaceY: number; cellType: NavCellType } {
-    const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
+    // TODO(#1184): voxelY can be null (no-ground column) once
+    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+    // placeholder shim, not the final "no ground" handling.
+    const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z) ?? -1;
     const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
     const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
     return { voxelY, surfaceY, cellType };

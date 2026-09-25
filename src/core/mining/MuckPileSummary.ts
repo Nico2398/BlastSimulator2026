@@ -72,7 +72,10 @@ export function fragmentClearances(
   const clearances: number[] = [];
   for (const [key, column] of byColumn) {
     const [x, z] = key.split(',').map(Number) as [number, number];
-    let pileTop = grid.containsColumn(x, z) ? computeVoxelColumnSurfaceY(grid, x, z) + 1 : 0;
+    // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, x, z) once
+    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+    // placeholder shim, not the final "no ground" handling.
+    let pileTop = grid.containsColumn(x, z) ? (computeVoxelColumnSurfaceY(grid, x, z) ?? -1) + 1 : 0;
 
     column.sort((a, b) => (a.position.y - a.halfExtents.y) - (b.position.y - b.halfExtents.y));
     for (const fragment of column) {

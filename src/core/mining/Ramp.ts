@@ -123,7 +123,10 @@ export function buildRamp(
  * reverse edge would cycle). Returns -1 if the column is entirely void.
  */
 function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  return computeVoxelColumnSurfaceY(grid, x, z);
+  // TODO(#1184): computeVoxelColumnSurfaceY can return null (no-ground
+  // column) once its real body lands — this `?? -1` is the placeholder
+  // shim, not the final "no ground" handling.
+  return computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
 }
 
 export { RAMP_COST_PER_METER, RAMP_WIDTH };
@@ -524,7 +527,7 @@ export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells']
 function carveRampCell(
   grid: VoxelGrid,
   cell: { x: number; y: number; z: number; floorAdjustment?: number; fillTarget?: number },
-): { cleared: boolean; bandedMaxY: number; filled: boolean } {
+): { cleared: boolean; bandedMaxY: number | null; filled: boolean } {
   if (cell.fillTarget !== undefined) {
     // Fill column's floor row (#1172): nothing to clear, this column's
     // terrain dips below the ramp's straight floor line — raise it to the
@@ -579,7 +582,9 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
     const result = carveRampCell(grid, cell);
     if (result.cleared) voxelsCleared++;
     if (result.filled) voxelsFilled++;
-    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY);
+    // TODO(#1184): result.bandedMaxY can be null (no-ground column) once
+    // the real bodies land — this `?? -1` is the placeholder shim.
+    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY ?? -1);
   }
 
   if ((voxelsCleared > 0 || bandedMaxY >= 0) && segment.region) {
@@ -619,8 +624,11 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
  * Returns the highest Y touched (for the caller's own `terrain:updated`
  * region), or -1 when the column carved to nothing.
  */
-function bandRampFloorColumn(grid: VoxelGrid, x: number, z: number, target: number): number {
-  if (computeVoxelColumnSurfaceY(grid, x, z) < 0) return -1;
+function bandRampFloorColumn(grid: VoxelGrid, x: number, z: number, target: number): number | null {
+  // TODO(#1184): computeVoxelColumnSurfaceY can return null (no-ground
+  // column) once its real body lands — this `?? -1` is the placeholder
+  // shim, not the final "no ground" handling.
+  if ((computeVoxelColumnSurfaceY(grid, x, z) ?? -1) < 0) return -1;
 
   const compId = resolveExposedCompId(grid, x, z, target);
   return setVoxelColumnSurfaceHeight(grid, x, z, target, compId);
@@ -665,10 +673,12 @@ export function carveRampSegmentSlice(
     const cell = cells[i];
     if (!cell) continue;
     const result = carveRampCell(grid, cell);
-    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY);
+    // TODO(#1184): result.bandedMaxY can be null (no-ground column) once
+    // the real bodies land — this `?? -1` is the placeholder shim.
+    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY ?? -1);
     if (result.cleared) voxelsCleared++;
     if (result.filled) voxelsFilled++;
-    if (result.cleared || result.bandedMaxY >= 0) {
+    if (result.cleared || (result.bandedMaxY ?? -1) >= 0) {
       minX = Math.min(minX, cell.x); maxX = Math.max(maxX, cell.x);
       minY = Math.min(minY, cell.y); maxY = Math.max(maxY, cell.y);
       minZ = Math.min(minZ, cell.z); maxZ = Math.max(maxZ, cell.z);

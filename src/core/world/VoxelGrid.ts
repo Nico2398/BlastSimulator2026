@@ -490,6 +490,15 @@ export class VoxelGrid {
     this.chunkSource = source;
   }
 
+  /**
+   * Generator-only surface height at column (x, z) — `chunkSource`'s own
+   * `surfaceHeightAt`, with no edit record applied. Undefined when no source
+   * is attached (#1184).
+   */
+  generatorSurfaceHeightAt(x: number, z: number): number | undefined {
+    return this.chunkSource?.surfaceHeightAt(x, z);
+  }
+
   /** Discard chunk (cx, cz)'s materialized slabs, so its next read re-materializes from `chunkSource`. */
   dropChunk(cx: number, cz: number): void {
     const chunk = this.chunks.get(chunkKey(cx, cz));
@@ -1326,7 +1335,10 @@ export function clampToGridColumn(grid: VoxelGrid, x: number, z: number): { cx: 
  * can be outside grid bounds mid-flight, and needs "no ground" (-1) rather
  * than this function's clamp-to-edge-column behaviour in that case.
  */
-export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number | null {
+  // TODO(#1184): scan-based body is a placeholder — implementer replaces
+  // with resolveColumnTopY (generator + edit record, O(edits in column)),
+  // returning null (not -1) for "no ground".
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
 
   const { cx, cz } = clampToGridColumn(grid, x, z);
@@ -1335,6 +1347,26 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
   }
   return -1;
 }
+
+/**
+ * Resolve column (x, z)'s topmost "ground" Y from the generator + edit
+ * record directly — O(edit segments in that column), not O(scanned height) —
+ * supporting negative and arbitrarily-high surfaces with no vertical clamp.
+ * Returns null for a column with no ground at all (#1184).
+ *
+ * Not exported: internal detail of `computeVoxelColumnSurfaceY`/
+ * `computeVoxelColumnSurfaceHeight`, same as `resolveCell` above.
+ */
+function resolveColumnTopY(grid: VoxelGrid, x: number, z: number): number | null {
+  // TODO(#1184): implementer resolves via grid.edits.segmentsAt(x, z) and
+  // grid.generatorSurfaceHeightAt(x, z) instead of scanning [0, sizeY),
+  // then wires this into computeVoxelColumnSurfaceY's body below.
+  void grid; void x; void z; // keep params referenced until the real body lands
+  throw new Error('not implemented');
+}
+// Referenced (not yet called) so `noUnusedLocals` stays green until the
+// implementer wires `resolveColumnTopY` into `computeVoxelColumnSurfaceY`.
+void resolveColumnTopY;
 
 /**
  * Half-width, in voxels, of the band over which density falls from solid to
@@ -1376,6 +1408,11 @@ export function surfaceDensityAt(y: number, surfaceH: number): number {
  * boundary-height sampling needs an honest "no live data here" signal at the
  * claim edge, since the claim itself moves; a silent clamp there produced
  * the seam this function's fix closes.
+ *
+ * TODO(#1184): the "no ground in this owned column" case returns NaN once
+ * the implementer replaces the scan below — not 0, since a real surface can
+ * now legitimately sit at 0 or below. Return type stays plain `number`;
+ * NaN is the sentinel, not a widened union.
  */
 export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
@@ -1435,7 +1472,7 @@ export function setVoxelColumnSurfaceHeight(
   height: number,
   compId: number,
   ores?: Record<string, number>,
-): number {
+): number | null {
   if (!grid.containsColumn(x, z)) return -1;
   if (!Number.isFinite(height)) return -1;
 
@@ -1444,7 +1481,10 @@ export function setVoxelColumnSurfaceHeight(
   // computeVoxelColumnSurfaceY) is a no-op here either way — this ordering
   // is simply the natural "read old, then compute new" sequence, not a
   // correctness requirement.
-  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z);
+  // TODO(#1184): existingTopY can be null (no-ground column) once
+  // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+  // placeholder shim, not the final "no ground" handling.
+  const existingTopY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
   const clampedHeight = Math.max(0, Math.min(grid.sizeY - 1, height));
 
   // Union of "what used to be filled that must now clear" and "what the new
@@ -1525,12 +1565,16 @@ export function renormaliseVoxelColumnAfterCarve(
   grid: VoxelGrid,
   x: number,
   z: number,
-  oldTopY: number,
+  oldTopY: number | null,
 ): number | null {
   if (!grid.containsColumn(x, z)) return null;
 
-  const newTopY = computeVoxelColumnSurfaceY(grid, x, z);
-  if (newTopY === oldTopY) return null;
+  // TODO(#1184): oldTopY/newTopY both go null-aware once
+  // computeVoxelColumnSurfaceY's real body lands — this `?? -1` pair is the
+  // placeholder shim, not the final "no ground" handling.
+  const resolvedOldTopY = oldTopY ?? -1;
+  const newTopY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
+  if (newTopY === resolvedOldTopY) return null;
 
   const cx = Math.floor(x);
   const cz = Math.floor(z);
@@ -1540,8 +1584,8 @@ export function renormaliseVoxelColumnAfterCarve(
   // SURFACE_BAND_HALF above oldTopY, so this is O(SURFACE_BAND_HALF), not a
   // column-wide scan.
   let touchedMaxY: number | null = null;
-  const sweepHigh = Math.min(grid.sizeY - 1, oldTopY + SURFACE_BAND_HALF);
-  for (let y = oldTopY + 1; y <= sweepHigh; y++) {
+  const sweepHigh = Math.min(grid.sizeY - 1, resolvedOldTopY + SURFACE_BAND_HALF);
+  for (let y = resolvedOldTopY + 1; y <= sweepHigh; y++) {
     if (grid.densityAt(cx, y, cz) !== 0) {
       grid.clearVoxel(cx, y, cz);
       touchedMaxY = touchedMaxY === null ? y : Math.max(touchedMaxY, y);
@@ -1560,7 +1604,10 @@ export function renormaliseVoxelColumnAfterCarve(
   const compId = grid.palette.intern(grid.compositionAt(cx, newTopY, cz));
   const ores = grid.oresAt(cx, newTopY, cz);
   const height = computeVoxelColumnSurfaceHeight(grid, cx, cz);
-  const bandTop = setVoxelColumnSurfaceHeight(grid, cx, cz, height, compId, ores);
+  // TODO(#1184): bandTop can be null once setVoxelColumnSurfaceHeight's real
+  // body lands — this `?? -1` is the placeholder shim, not the final
+  // "no ground" handling.
+  const bandTop = setVoxelColumnSurfaceHeight(grid, cx, cz, height, compId, ores) ?? -1;
 
   return touchedMaxY === null ? bandTop : Math.max(touchedMaxY, bandTop);
 }
@@ -1577,8 +1624,8 @@ export function renormaliseVoxelColumnAfterCarve(
 export function captureColumnTopsForCarve(
   grid: VoxelGrid,
   cells: ReadonlyArray<{ x: number; z: number }>,
-): Map<string, { x: number; z: number; oldTopY: number }> {
-  const columns = new Map<string, { x: number; z: number; oldTopY: number }>();
+): Map<string, { x: number; z: number; oldTopY: number | null }> {
+  const columns = new Map<string, { x: number; z: number; oldTopY: number | null }>();
   for (const cell of cells) {
     const key = `${cell.x},${cell.z}`;
     if (!columns.has(key)) {
@@ -1595,7 +1642,7 @@ export function captureColumnTopsForCarve(
  */
 export function renormaliseCarvedColumns(
   grid: VoxelGrid,
-  columns: ReadonlyMap<string, { x: number; z: number; oldTopY: number }>,
+  columns: ReadonlyMap<string, { x: number; z: number; oldTopY: number | null }>,
 ): number | null {
   let maxY: number | null = null;
   for (const { x, z, oldTopY } of columns.values()) {
@@ -1624,8 +1671,20 @@ export function resolveExposedCompId(grid: VoxelGrid, x: number, z: number, targ
   const rowY = Math.floor(targetY);
   let composition = grid.compositionAt(x, rowY, z);
   if (composition.rocks.length === 0) {
-    const topY = computeVoxelColumnSurfaceY(grid, x, z);
+    // TODO(#1184): topY can be null (no-ground column) once
+    // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+    // placeholder shim, not the final "no ground" handling.
+    const topY = computeVoxelColumnSurfaceY(grid, x, z) ?? -1;
     if (topY >= 0) composition = grid.compositionAt(x, topY, z);
   }
   return grid.palette.intern(composition);
+}
+
+/**
+ * First empty layer directly above ground at column (x, z). fallbackY
+ * (default 0) is returned for a no-ground column.
+ */
+export function firstEmptyLayerAboveGround(grid: VoxelGrid, x: number, z: number, fallbackY = 0): number {
+  const surface = computeVoxelColumnSurfaceY(grid, x, z);
+  return surface === null ? fallbackY : surface + 1;
 }

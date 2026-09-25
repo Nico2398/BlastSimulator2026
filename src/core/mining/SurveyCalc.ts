@@ -159,7 +159,10 @@ export function estimateSurveyResult(
       // Determine which Y levels to sample
       let yLevels: number[];
       if (method === 'aerial') {
-        const surfaceY = computeVoxelColumnSurfaceY(grid, x, z) + 1;
+        // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, x, z) once
+        // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is
+        // the placeholder shim, not the final "no ground" handling.
+        const surfaceY = (computeVoxelColumnSurfaceY(grid, x, z) ?? -1) + 1;
         yLevels = [surfaceY, surfaceY - 1].filter(y => y >= 0 && y < grid.sizeY);
       } else {
         yLevels = [];

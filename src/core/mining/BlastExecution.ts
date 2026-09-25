@@ -226,7 +226,10 @@ export function executeBlast(
   //     are anchored at the actual surface, not hardcoded y=0.
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
-    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+    // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, hole.x, hole.z)
+    // once computeVoxelColumnSurfaceY's real body lands — this `?? -1` is
+    // the placeholder shim, not the final "no ground" handling.
+    holeSurfaceYs[hole.id] = (computeVoxelColumnSurfaceY(grid, hole.x, hole.z) ?? -1) + 1;
   }
 
   // 2b. Calculate blast zone bounding box anchored at the surface
@@ -506,7 +509,10 @@ function throwFractionAt(origin: Vec3, plan: BlastPlan): number {
 export function buildPlanEnergyField(plan: BlastPlan, grid: VoxelGrid): EnergyField | null {
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
-    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+    // TODO(#1184): swap for firstEmptyLayerAboveGround(grid, hole.x, hole.z)
+    // once computeVoxelColumnSurfaceY's real body lands — this `?? -1` is
+    // the placeholder shim, not the final "no ground" handling.
+    holeSurfaceYs[hole.id] = (computeVoxelColumnSurfaceY(grid, hole.x, hole.z) ?? -1) + 1;
   }
   return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
 }

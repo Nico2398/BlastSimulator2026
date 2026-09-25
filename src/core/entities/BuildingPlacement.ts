@@ -16,7 +16,10 @@ export type { VoxelGrid };
  * voxel in column (x, z), or 0 if the entire column is empty.
  */
 export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
-  return computeVoxelColumnSurfaceY(voxelGrid, x, z) + 1;
+  // TODO(#1184): swap for firstEmptyLayerAboveGround(voxelGrid, x, z) once
+  // computeVoxelColumnSurfaceY's real body lands — this `?? -1` is the
+  // placeholder shim, not the final "no ground" handling.
+  return (computeVoxelColumnSurfaceY(voxelGrid, x, z) ?? -1) + 1;
 }
 
 /**
