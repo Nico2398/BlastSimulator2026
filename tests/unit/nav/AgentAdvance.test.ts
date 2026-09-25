@@ -704,3 +704,112 @@ describe('advanceAlongPath — off-grid destination still completes the leg (#11
     expect(result.isPathComplete).toBe(true);
   });
 });
+
+// ── #1197: retrace recovery must never cross an unvalidated cell ───────────
+//
+// `resolveTargetWaypoint`'s own `isRetrace` branch (the #1129 oscillation
+// recovery) sets its resolved target straight to the raw
+// `destinationX`/`destinationZ` for one hop, bypassing the ordinary
+// adjacent-cell resolution entirely. `advanceAgent` then walks the agent
+// toward that far-off point by pure geometry — it never consults the
+// NavGrid at all — so nothing validates whether the straight line between
+// the agent and the raw destination actually crosses a real obstacle (a
+// building footprint, a blocked column) sitting on it. `directLineWalk` was
+// exported so this recovery (in AgentAdvance.ts) can and does validate that
+// line before adopting it, falling through to `adoptFresh()` whenever the
+// line can't be proven safe — the cases below exercise that validation.
+
+describe('advanceAlongPath — retrace recovery never crosses an unvalidated cell (#1197)', () => {
+  /** Single-row NavGrid, `width` cells wide, every cell walkable except
+   * `blockedX` — standing in for a building footprint sitting on the
+   * straight line between the agent and its destination. */
+  function makeRowGridWithBlock(width: number, blockedX: number): NavGrid {
+    const cells: NavCell[][] = [[]];
+    for (let x = 0; x < width; x++) {
+      cells[0]!.push({
+        type: x === blockedX ? 'blocked' : 'walkable',
+        moveCost: x === blockedX ? Infinity : 1.0,
+        benchLevel: 0,
+        vehicleOccupied: false,
+        surfaceY: 0,
+        climbY: 0,
+      });
+    }
+    return new NavGrid(width, 1, cells);
+  }
+
+  it('never lets the agent land on or cross the blocked column while a retrace-triggered "hold toward destination" is in effect', () => {
+    // 11-cell-wide row, (5,0) blocked. destinationX=10 sits on the far side
+    // of it — the only way to reach it directly is straight through.
+    const grid = makeRowGridWithBlock(11, 5);
+    const destinationX = 10;
+    const destinationZ = 0;
+
+    // tick 1: ordinary forward progress. The fresh path carries a third
+    // point beyond the immediate hop target (2,0) so the hop does not
+    // exhaust the whole fresh path (which would otherwise mark the leg
+    // complete and discard the commitment before tick 2 ever runs).
+    const tick1 = advanceAlongPath({
+      x: 0, z: 0,
+      walkSpeed: AGENT_WALK_SPEED, // 2
+      destinationX, destinationZ,
+      consecutiveFailures: 0, isStuck: false,
+      path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 4, z: 0 }], totalCost: 4 },
+      committed: NULL_ROUTE_COMMITMENT,
+      navGrid: grid,
+    });
+    expect(tick1.x).toBe(2);
+    expect(tick1.z).toBe(0);
+
+    // tick 2: the fresh replan retraces tick 1's own start, (0,0) — the
+    // #1129 oscillation signature — at a cost (1) that is NOT a clear
+    // improvement over the committed baseline (2): 1 is not
+    // < 2 - ROUTE_COMMIT_TIE_EPSILON(1) = 1, an actual tie. This is exactly
+    // the shape that triggers the isRetrace recovery.
+    const tick2 = advanceAlongPath({
+      x: tick1.x, z: tick1.z,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX, destinationZ,
+      consecutiveFailures: tick1.consecutiveFailures, isStuck: tick1.isStuck,
+      path: { found: true, waypoints: [{ x: 2, z: 0 }, { x: 0, z: 0 }, { x: -2, z: 0 }], totalCost: 1 },
+      committed: tick1.committed,
+      navGrid: grid,
+    });
+
+    // A correct recovery must never adopt the raw, far-off destination as a
+    // single unvalidated hop when the straight line to it is blocked, and
+    // must never let the agent's position reach or pass the blocked column.
+    expect(tick2.x).toBeLessThan(5);
+    expect(tick2.committed.waypointX).not.toBe(destinationX);
+    expect(tick2.x).not.toBe(destinationX);
+
+    // Extend a further 3 ticks feeding the same alternating retrace shape —
+    // the buggy "hold toward the raw destination" recovery keeps advancing
+    // the agent AGENT_WALK_SPEED per tick regardless of the blocked column,
+    // eventually landing on or past it.
+    let x = tick2.x;
+    const z = tick2.z;
+    let committed = tick2.committed;
+    let consecutiveFailures = tick2.consecutiveFailures;
+    let isStuck = tick2.isStuck;
+
+    for (let i = 0; i < 3; i++) {
+      const next = advanceAlongPath({
+        x, z,
+        walkSpeed: AGENT_WALK_SPEED,
+        destinationX, destinationZ,
+        consecutiveFailures, isStuck,
+        path: { found: true, waypoints: [{ x, z }, { x: x - 2, z }, { x: x - 4, z }], totalCost: 1 },
+        committed,
+        navGrid: grid,
+      });
+
+      expect(next.x).toBeLessThan(5);
+
+      x = next.x;
+      committed = next.committed;
+      consecutiveFailures = next.consecutiveFailures;
+      isStuck = next.isStuck;
+    }
+  });
+});
