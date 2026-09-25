@@ -14,6 +14,7 @@ import {
   clampChunkRectToTile,
   CHUNK_SIZE,
 } from '../../../src/core/world/VoxelGrid.js';
+import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 
 describe('VoxelGrid', () => {
   describe('CELL_SIZE', () => {
@@ -1058,5 +1059,141 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
     let calls = 0;
     grid.forEachSolidInRegion({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, () => { calls++; });
     expect(calls).toBe(0);
+  });
+});
+
+// ── Edit recording (#1180) ───────────────────────────────────────────────
+//
+// `grid.edits` (TerrainEdits) is a compact, replayable log of gameplay
+// dig/add/fracture writes recorded next to the dense grid — see
+// tests/unit/world/TerrainEdits.test.ts for TerrainEdits' own exhaustive
+// unit coverage. The tests below cover the OTHER side of the contract:
+// that VoxelGrid's mutators actually feed it, and that generation does not.
+// TerrainEdits' instance methods are still `throw new Error('not
+// implemented')` stubs, so every test that reaches into `grid.edits` is
+// expected to FAIL in this RED phase.
+
+function smallTerrainConfig(seed: number): TerrainConfig {
+  return { sizeX: 16, sizeY: 16, sizeZ: 16, seed, climateBias: [0, 0] };
+}
+
+function totalRecordedSegments(grid: VoxelGrid): number {
+  return grid.edits.columns().reduce((n, c) => n + c.segments.length, 0);
+}
+
+describe('VoxelGrid — edit recording (#1180)', () => {
+  it('clearVoxel on generated terrain records a dug segment covering the cleared voxel', () => {
+    const grid = generateTerrain(smallTerrainConfig(7));
+
+    let sx = -1, sy = -1, sz = -1;
+    outer:
+    for (let z = 0; z < 16; z++) {
+      for (let x = 0; x < 16; x++) {
+        for (let y = 15; y >= 0; y--) {
+          if (grid.isSolidAt(x, y, z)) { sx = x; sy = y; sz = z; break outer; }
+        }
+      }
+    }
+    expect(sx, 'expected at least one solid voxel in the generated grid').toBeGreaterThanOrEqual(0);
+
+    grid.clearVoxel(sx, sy, sz);
+
+    const segs = grid.edits.segmentsAt(sx, sz);
+    expect(segs.some(s => s.kind === 'dug' && sy >= s.yLo && sy <= s.yHi)).toBe(true);
+  });
+
+  it('fillVoxel with a solid density and compId records an added segment carrying that compId', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    grid.fillVoxel(3, 3, 3, compId, undefined, 1.0);
+
+    const segs = grid.edits.segmentsAt(3, 3);
+    expect(segs.some(s => s.kind === 'added' && s.compId === compId && 3 >= s.yLo && 3 <= s.yHi)).toBe(true);
+  });
+
+  it('setFractureAt updates grid.edits.fractureAt to the new modifier', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    grid.setFractureAt(1, 1, 1, 0.42);
+    expect(grid.edits.fractureAt(1, 1, 1)).toBe(0.42);
+  });
+
+  it('scaleFractureAt updates grid.edits.fractureAt to the scaled modifier', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    grid.setFractureAt(1, 1, 1, 1.0);
+    grid.scaleFractureAt(1, 1, 1, 0.5);
+    expect(grid.edits.fractureAt(1, 1, 1)).toBeCloseTo(0.5, 10);
+  });
+
+  it('a no-op rewrite of the same fillVoxel value does not grow the edit record', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
+    const before = totalRecordedSegments(grid);
+
+    grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
+
+    expect(totalRecordedSegments(grid)).toBe(before);
+  });
+
+  it('a no-op rewrite of the same clearVoxel value does not grow the edit record', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
+    grid.clearVoxel(2, 2, 2);
+    const before = totalRecordedSegments(grid);
+
+    grid.clearVoxel(2, 2, 2);
+
+    expect(totalRecordedSegments(grid)).toBe(before);
+  });
+
+  it('generation leaves grid.edits empty — generateTerrain records nothing of its own writes', () => {
+    const grid = generateTerrain(smallTerrainConfig(11));
+    expect(grid.edits.isEmpty()).toBe(true);
+  });
+
+  it('fillVoxel\'s fracture-reset-to-1 side effect purges the stale grid.edits fracture entry, not just the live field', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(4, 4, 4, compId, undefined, 1.0);
+    grid.scaleFractureAt(4, 4, 4, 0.5);
+    expect(grid.edits.fractureAt(4, 4, 4)).toBeCloseTo(0.5, 10);
+
+    grid.fillVoxel(4, 4, 4, compId, undefined, 1.0); // fillVoxel resets the live fracture field to 1.0
+
+    expect(grid.fractureAt(4, 4, 4)).toBe(1.0);
+    expect(grid.edits.fractureAt(4, 4, 4)).toBeUndefined();
+  });
+
+  it('withoutEditRecording suspends edit recording for mutators called inside the callback, but the writes themselves still happen', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    grid.withoutEditRecording(() => {
+      grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
+      grid.setFractureAt(2, 2, 2, 0.3);
+    });
+
+    expect(grid.densityAt(2, 2, 2)).toBe(1.0);
+    expect(grid.fractureAt(2, 2, 2)).toBe(0.3);
+    expect(grid.edits.isEmpty()).toBe(true);
+  });
+
+  it('withoutEditRecording returns the callback\'s own return value', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const result = grid.withoutEditRecording(() => 42);
+    expect(result).toBe(42);
+  });
+
+  it('edit recording resumes normally once withoutEditRecording returns', () => {
+    const grid = new VoxelGrid(8, 8, 8);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    grid.withoutEditRecording(() => { grid.fillVoxel(2, 2, 2, compId, undefined, 1.0); });
+    grid.fillVoxel(5, 5, 5, compId, undefined, 1.0);
+
+    expect(grid.edits.segmentsAt(2, 2)).toEqual([]);
+    expect(grid.edits.segmentsAt(5, 5).length).toBeGreaterThan(0);
   });
 });
