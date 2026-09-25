@@ -4,17 +4,23 @@
 // generated grid reproduces the live grid voxel for voxel, without saving
 // every voxel's full state.
 
-import type { VoxelGrid } from './VoxelGrid';
+import type { VoxelGrid, VoxelRockComposition } from './VoxelGrid';
 
 export type EditKind = 'dug' | 'added';
 
 /** Exact voxel state at a segment's boundary row, when the edit's true bound
  *  falls mid-voxel there. Stored verbatim (not re-derived from a formula at
  *  replay time) because which compId/ores a boundary row carries varies by
- *  call site. */
+ *  call site.
+ *
+ *  `compId` carries the actual composition data (`VoxelRockComposition`),
+ *  NOT a raw `CompositionPalette` index — a palette index is local to the
+ *  grid instance that recorded it and has no guaranteed meaning on another
+ *  instance's independently-built palette (#1180). Replay re-interns this
+ *  value into the target grid's own palette to get a locally valid index. */
 export interface EditBoundary {
   density: number;
-  compId: number;
+  compId: VoxelRockComposition;
   ores?: Record<string, number>;
 }
 
@@ -22,7 +28,7 @@ export interface EditSegment {
   yLo: number;  // inclusive voxel row
   yHi: number;  // inclusive voxel row
   kind: EditKind;
-  compId?: number;   // 'added' only — material for every fully-covered interior/boundary row without its own override
+  compId?: VoxelRockComposition;   // 'added' only — portable composition data for every fully-covered interior/boundary row without its own override
   ores?: Record<string, number>;
   bottomBoundary?: EditBoundary;  // present only when yLo's true edge is fractional
   topBoundary?: EditBoundary;     // present only when yHi's true edge is fractional
@@ -50,6 +56,28 @@ export function oresDeepEqual(a: Record<string, number> | undefined, b: Record<s
   if (aKeys.length !== bKeys.length) return false;
   for (const key of aKeys) {
     if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+/**
+ * Structural equality of two optional compositions, for adjacency-merge
+ * eligibility (`canMerge`). Every composition reaching this module comes
+ * from `CompositionPalette.get(...).comp` (via `VoxelGrid`'s recorder),
+ * which already quantizes coefficients and sorts by `rockId` — so array
+ * order is canonical and a positional comparison is sufficient without
+ * re-sorting here.
+ */
+export function compositionDeepEqual(
+  a: VoxelRockComposition | undefined,
+  b: VoxelRockComposition | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.rocks.length !== b.rocks.length) return false;
+  for (let i = 0; i < a.rocks.length; i++) {
+    if (a.rocks[i]!.rockId !== b.rocks[i]!.rockId) return false;
+    if (a.rocks[i]!.coefficient !== b.rocks[i]!.coefficient) return false;
   }
   return true;
 }
@@ -88,7 +116,7 @@ export class TerrainEdits {
     z: number,
     yLo: number,
     yHi: number,
-    compId: number,
+    compId: VoxelRockComposition,
     ores?: Record<string, number>,
     bottomBoundary?: EditBoundary,
     topBoundary?: EditBoundary,
@@ -139,7 +167,7 @@ export class TerrainEdits {
     yLo: number,
     yHi: number,
     kind: EditKind,
-    compId: number | undefined,
+    compId: VoxelRockComposition | undefined,
     ores: Record<string, number> | undefined,
     bottomBoundary: EditBoundary | undefined,
     topBoundary: EditBoundary | undefined,
@@ -218,7 +246,7 @@ export class TerrainEdits {
     if (a.yHi + 1 !== b.yLo) return false;
     if (a.kind !== b.kind) return false;
     if (a.kind === 'added') {
-      if (a.compId !== b.compId) return false;
+      if (!compositionDeepEqual(a.compId, b.compId)) return false;
       if (!oresDeepEqual(a.ores, b.ores)) return false;
     }
     if (a.topBoundary || b.bottomBoundary) return false;
@@ -240,9 +268,14 @@ export function replayTerrainEdits(grid: VoxelGrid, edits: TerrainEdits): void {
             : y === seg.yHi && seg.topBoundary ? seg.topBoundary
             : undefined;
           if (boundary) {
-            grid.fillVoxel(x, y, z, boundary.compId, boundary.ores, boundary.density);
+            // `boundary.compId` is portable composition data, not a palette
+            // index — re-intern it into the TARGET grid's own palette to get
+            // a locally valid index before writing dense storage (#1180).
+            const localCompId = grid.palette.intern(boundary.compId);
+            grid.fillVoxel(x, y, z, localCompId, boundary.ores, boundary.density);
           } else if (seg.kind === 'added') {
-            grid.fillVoxel(x, y, z, seg.compId!, seg.ores);
+            const localCompId = grid.palette.intern(seg.compId!);
+            grid.fillVoxel(x, y, z, localCompId, seg.ores);
           } else {
             grid.clearVoxel(x, y, z);
           }

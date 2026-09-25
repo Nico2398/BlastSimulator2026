@@ -575,6 +575,14 @@ export class VoxelGrid {
    * replay reproduces it exactly. The `SOLID_VOXEL_DENSITY_THRESHOLD` this
    * file already uses for "solid" (`isSolidAt`) decides which side of that
    * fractional band counts as dug vs added.
+   *
+   * `prevCompId`/`newCompId` are this grid's own local `CompositionPalette`
+   * indices, used only for the no-op equality check above — cheap and valid
+   * since both come from the same instance. What actually reaches
+   * `TerrainEdits` is the portable composition value (`this.palette.get(...)
+   * .comp`), never the raw index: an `EditSegment`/`EditBoundary` may be
+   * replayed onto a different `VoxelGrid` instance whose palette assigns
+   * that same composition a different index (#1180).
    */
   private recordVoxelWrite(
     x: number, y: number, z: number,
@@ -584,12 +592,14 @@ export class VoxelGrid {
     if (this.editingSuppressed) return;
     if (prevDensity === newDensity && prevCompId === newCompId && oresDeepEqual(prevOres, newOres)) return;
 
+    const newComposition = this.palette.get(newCompId).comp;
+
     if (newDensity > 0 && newDensity < 1) {
       const boundary: EditBoundary = newOres !== undefined
-        ? { density: newDensity, compId: newCompId, ores: newOres }
-        : { density: newDensity, compId: newCompId };
+        ? { density: newDensity, compId: newComposition, ores: newOres }
+        : { density: newDensity, compId: newComposition };
       if (newDensity >= SOLID_VOXEL_DENSITY_THRESHOLD) {
-        this.edits.recordAdd(x, z, y, y, newCompId, newOres, boundary, boundary);
+        this.edits.recordAdd(x, z, y, y, newComposition, newOres, boundary, boundary);
       } else {
         this.edits.recordDig(x, z, y, y, boundary, boundary);
       }
@@ -597,7 +607,7 @@ export class VoxelGrid {
     }
 
     if (newDensity >= SOLID_VOXEL_DENSITY_THRESHOLD) {
-      this.edits.recordAdd(x, z, y, y, newCompId, newOres);
+      this.edits.recordAdd(x, z, y, y, newComposition, newOres);
     } else {
       this.edits.recordDig(x, z, y, y);
     }
