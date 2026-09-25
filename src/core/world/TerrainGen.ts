@@ -126,11 +126,13 @@ export function generateTerrainRegion(
   config: TerrainConfig,
   rect: { minX: number; minZ: number; maxX: number; maxZ: number },
 ): void {
-  for (let z = rect.minZ; z < rect.maxZ; z++) {
-    for (let x = rect.minX; x < rect.maxX; x++) {
-      generateColumn(grid, terrain, config, x, z);
+  grid.withoutEditRecording(() => {
+    for (let z = rect.minZ; z < rect.maxZ; z++) {
+      for (let x = rect.minX; x < rect.maxX; x++) {
+        generateColumn(grid, terrain, config, x, z);
+      }
     }
-  }
+  });
 }
 
 /**
