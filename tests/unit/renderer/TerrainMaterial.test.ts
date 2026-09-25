@@ -70,6 +70,27 @@ describe('TerrainMaterial', () => {
     expect(offset.y).toBe(0);
   });
 
+  describe('height range (#1188)', () => {
+    it('constructing with heightRange: [-30, 40] sets uHeightRange to (-30, 40)', () => {
+      const mat = new TerrainMaterial({ playRect: PLAY_RECT, heightRange: [-30, 40] });
+      const range = mat.customUniforms['uHeightRange']!.value as THREE.Vector2;
+      expect(range.x).toBe(-30);
+      expect(range.y).toBe(40);
+    });
+
+    it('setHeightRange(-30, 40) mutates the existing uHeightRange.value object in place, without a shader recompile', () => {
+      const mat = makeMaterial();
+      const range = mat.customUniforms['uHeightRange']!.value as THREE.Vector2;
+      mat.setHeightRange(-30, 40);
+      // Same Vector2 instance — proves the uniform is mutated, not replaced,
+      // which is what lets an existing compiled shader pick the change up
+      // without a recompile.
+      expect(mat.customUniforms['uHeightRange']!.value).toBe(range);
+      expect(range.x).toBe(-30);
+      expect(range.y).toBe(40);
+    });
+  });
+
   it('no longer darkens the ground at the site edge — WorldBorderWall marks it', () => {
     // The band shaded a 5m strip of terrain, which read as a smudge rather
     // than a boundary and was on screen whether or not the player cared.
