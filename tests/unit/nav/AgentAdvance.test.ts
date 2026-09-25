@@ -715,10 +715,9 @@ describe('advanceAlongPath — off-grid destination still completes the leg (#11
 // NavGrid at all — so nothing validates whether the straight line between
 // the agent and the raw destination actually crosses a real obstacle (a
 // building footprint, a blocked column) sitting on it. `directLineWalk` was
-// exported specifically so this recovery can validate that line before
-// committing to it (see the `TODO(#1197)` in AgentAdvance.ts's own import
-// block) — every case below fails against the unmodified pass-through until
-// the implementer wires that validation in.
+// exported so this recovery (in AgentAdvance.ts) can and does validate that
+// line before adopting it, falling through to `adoptFresh()` whenever the
+// line can't be proven safe — the cases below exercise that validation.
 
 describe('advanceAlongPath — retrace recovery never crosses an unvalidated cell (#1197)', () => {
   /** Single-row NavGrid, `width` cells wide, every cell walkable except
