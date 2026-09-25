@@ -120,6 +120,9 @@ export class CompositionPalette {
  */
 export const CHUNK_SIZE = 16;
 
+/** Voxels in one cubic CHUNK_SIZE**3 slab (#1182) — shared by every `VoxelSlab` typed-array allocation below. */
+const SLAB_VOLUME = CHUNK_SIZE ** 3;
+
 /** Chunk index of a world coordinate. `>> 4` floors toward -inf, which is what signed coordinates need. */
 export function chunkIndexOf(worldCoord: number): number {
   return Math.floor(worldCoord) >> 4;
@@ -200,7 +203,7 @@ interface VoxelChunk {
  * itself.
  */
 interface VoxelSlab {
-  density: Float64Array;   // CHUNK_SIZE**3 = 4096
+  density: Float64Array;   // SLAB_VOLUME entries
   compId: Uint16Array;
   fracture: Float64Array;  // filled 1.0 on allocation
   ores: Map<number, Record<string, number>>;
@@ -257,7 +260,7 @@ export class VoxelGrid {
   /** Size (in metres) of one voxel cell along each axis. Always 1.0 m. */
   static readonly CELL_SIZE = 1.0;
 
-  /** Voxels per chunk side on x and z. Chunks are full-height on y. */
+  /** Voxels per chunk side on x and z. Vertically, a chunk is a column of lazily-allocated CHUNK_SIZE-tall slabs (#1182), not full-height on y. */
   static readonly CHUNK_SIZE = CHUNK_SIZE;
 
   /** Unique ID for this grid instance — useful for debugging reference tracking. */
@@ -501,14 +504,14 @@ export class VoxelGrid {
   // — repeated access to the same slab, as every hot-path scan exhibits — at
   // one `Map.get` instead of two.
 
-  /** Allocate a fresh, all-air `VoxelSlab` (CHUNK_SIZE**3 = 4096 voxels). */
+  /** Allocate a fresh, all-air `VoxelSlab` (SLAB_VOLUME voxels). */
   private allocateSlab(): VoxelSlab {
     return {
-      density: new Float64Array(4096),
-      compId: new Uint16Array(4096),
-      fracture: new Float64Array(4096).fill(1.0),
+      density: new Float64Array(SLAB_VOLUME),
+      compId: new Uint16Array(SLAB_VOLUME),
+      fracture: new Float64Array(SLAB_VOLUME).fill(1.0),
       ores: new Map(),
-      touched: new Uint8Array(4096),
+      touched: new Uint8Array(SLAB_VOLUME),
       touchedCount: 0,
       minDensity: Infinity,
       maxDensity: -Infinity,
@@ -519,7 +522,7 @@ export class VoxelGrid {
   private slabCacheKey = -1;
   private slabCacheSlab: VoxelSlab | undefined = undefined;
 
-  /** Packs a chunk's coordinates and a y-band index into one collision-free numeric key for the slab cache. */
+  /** Packs a chunk's coordinates and a y-band index into one collision-free numeric key for the slab cache. Valid for |cy| < 524288. */
   private static slabCacheKeyFor(chunk: VoxelChunk, cy: number): number {
     return chunkKey(chunk.cx, chunk.cz) * 1048576 + (cy + 524288);
   }
@@ -560,6 +563,23 @@ export class VoxelGrid {
     return { slab: this.slabAt(chunk, y), cy, i };
   }
 
+  /**
+   * The "previous value" every mutator (`fillVoxel`, `setVoxel`, `clearVoxel`,
+   * `setFractureAt`, `scaleFractureAt`) reads before deciding whether a write
+   * is a no-op: an absent slab (nothing allocated here yet) reads as the
+   * implicit air default on every field, same as the accessors above.
+   */
+  private readCellDefaults(existing: VoxelSlab | undefined, i: number): {
+    density: number; compId: number; ores: Record<string, number> | undefined; fracture: number;
+  } {
+    return {
+      density: existing ? existing.density[i]! : 0,
+      compId: existing ? existing.compId[i]! : 0,
+      ores: existing ? existing.ores.get(i) : undefined,
+      fracture: existing ? existing.fracture[i]! : 1.0,
+    };
+  }
+
   /** Slab-local flat index (0..4095) of (x, y, z) within the slab at chunk-local y-band `cy`. */
   private static localIndex(chunk: VoxelChunk, cy: number, x: number, y: number, z: number): number {
     const lx = x - chunk.cx * CHUNK_SIZE;
@@ -590,7 +610,7 @@ export class VoxelGrid {
   }
 
   /** Total number of allocated 16×16×16 slabs across every owned column. */
-  get allocatedChunkCount(): number {
+  get allocatedSlabCount(): number {
     let sum = 0;
     for (const chunk of this.chunks.values()) sum += chunk.slabs.size;
     return sum;
@@ -771,10 +791,7 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
-    const prevDensity = existing ? existing.density[i]! : 0;
-    const prevCompId = existing ? existing.compId[i]! : 0;
-    const prevOres = existing ? existing.ores.get(i) : undefined;
-    const prevFracture = existing ? existing.fracture[i]! : 1.0;
+    const { density: prevDensity, compId: prevCompId, ores: prevOres, fracture: prevFracture } = this.readCellDefaults(existing, i);
     const newOres = ores && Object.keys(ores).length > 0 ? ores : undefined;
 
     // A write is always marked dirty, whether or not it actually changes the
@@ -805,12 +822,8 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
-    const prev = existing ? existing.fracture[i]! : 1.0;
-    this.touch(chunk); // any write is dirty, whether or not the value actually changes
-    if (prev === value) return; // no-op value: skip without allocating a slab
-    const slab = existing ?? this.getOrCreateSlab(chunk, cy);
-    slab.fracture[i] = value;
-    this.recordFractureWrite(x, y, z, prev, value);
+    const { fracture: prev } = this.readCellDefaults(existing, i);
+    this.writeFractureValue(chunk, existing, cy, i, x, y, z, prev, value);
   }
 
   /** Multiply the fracture modifier in place (e.g. cracking a voxel that didn't fully fracture). */
@@ -818,8 +831,20 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
-    const prev = existing ? existing.fracture[i]! : 1.0;
-    const next = prev * factor;
+    const { fracture: prev } = this.readCellDefaults(existing, i);
+    this.writeFractureValue(chunk, existing, cy, i, x, y, z, prev, prev * factor);
+  }
+
+  /**
+   * Shared write path for `setFractureAt`/`scaleFractureAt`, which differ only
+   * in how `next` is computed: marks the chunk dirty unconditionally, no-ops
+   * (without allocating a slab) when `next` doesn't actually differ from
+   * `prev`, and otherwise allocates on demand and records the edit.
+   */
+  private writeFractureValue(
+    chunk: VoxelChunk, existing: VoxelSlab | undefined, cy: number, i: number,
+    x: number, y: number, z: number, prev: number, next: number,
+  ): void {
     this.touch(chunk); // any write is dirty, whether or not the value actually changes
     if (prev === next) return; // no-op value: skip without allocating a slab
     const slab = existing ?? this.getOrCreateSlab(chunk, cy);
@@ -858,10 +883,7 @@ export class VoxelGrid {
     const newCompId = this.palette.intern(voxel.composition);
     const newOres = Object.keys(voxel.oreDensities).length > 0 ? voxel.oreDensities : undefined;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
-    const prevDensity = existing ? existing.density[i]! : 0;
-    const prevCompId = existing ? existing.compId[i]! : 0;
-    const prevOres = existing ? existing.ores.get(i) : undefined;
-    const prevFracture = existing ? existing.fracture[i]! : 1.0;
+    const { density: prevDensity, compId: prevCompId, ores: prevOres, fracture: prevFracture } = this.readCellDefaults(existing, i);
 
     this.touch(chunk); // any write is dirty, whether or not the value actually changes
 
@@ -885,10 +907,7 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const { slab: existing, cy, i } = this.resolveCell(chunk, x, y, z);
-    const prevDensity = existing ? existing.density[i]! : 0;
-    const prevCompId = existing ? existing.compId[i]! : 0;
-    const prevOres = existing ? existing.ores.get(i) : undefined;
-    const prevFracture = existing ? existing.fracture[i]! : 1.0;
+    const { density: prevDensity, compId: prevCompId, ores: prevOres, fracture: prevFracture } = this.readCellDefaults(existing, i);
 
     this.touch(chunk); // any write is dirty, whether or not the value actually changes
 

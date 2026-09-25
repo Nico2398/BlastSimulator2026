@@ -39,7 +39,7 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182)', (
   const gridTall = generateTerrain(treraniumConfig(BASE_SIZE_Y * 4));
 
   // NOTE (#1182, @fixer): the three tests below were rewritten. Their
-  // original assertions assumed allocatedChunkCount would be IDENTICAL
+  // original assertions assumed allocatedSlabCount would be IDENTICAL
   // between gridBase and gridTall — measured instead: 318 vs 972 slabs, a
   // genuine ~3.06x growth, not zero. Root cause, confirmed by reading
   // TerrainGen.ts's generateColumn and WorldGen.ts's createWorldGenContext:
@@ -60,21 +60,21 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182)', (
     const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
     const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
     expect(denseModelEquivalentTall).toBe(denseModelEquivalentBase * 4); // a dense per-column array pays for declared height exactly
-    expect(gridTall.allocatedChunkCount).toBeLessThan(gridBase.allocatedChunkCount * 4); // sparse storage does not
+    expect(gridTall.allocatedSlabCount).toBeLessThan(gridBase.allocatedSlabCount * 4); // sparse storage does not
   });
 
-  it('allocatedChunkCount is materially smaller than the old dense-model equivalent (genuine sparsity, not a tautology)', () => {
+  it('allocatedSlabCount is materially smaller than the old dense-model equivalent (genuine sparsity, not a tautology)', () => {
     const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
     const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
-    expect(gridBase.allocatedChunkCount).toBeLessThan(denseModelEquivalentBase);
-    expect(gridTall.allocatedChunkCount).toBeLessThan(denseModelEquivalentTall);
+    expect(gridBase.allocatedSlabCount).toBeLessThan(denseModelEquivalentBase);
+    expect(gridTall.allocatedSlabCount).toBeLessThan(denseModelEquivalentTall);
   });
 
   it("the sparsity gap between real allocation and the dense-model equivalent widens as declared sizeY grows, rather than staying fixed or vanishing", () => {
     const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
     const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
-    const wastedFractionBase = 1 - gridBase.allocatedChunkCount / denseModelEquivalentBase;
-    const wastedFractionTall = 1 - gridTall.allocatedChunkCount / denseModelEquivalentTall;
+    const wastedFractionBase = 1 - gridBase.allocatedSlabCount / denseModelEquivalentBase;
+    const wastedFractionTall = 1 - gridTall.allocatedSlabCount / denseModelEquivalentTall;
     expect(wastedFractionBase).toBeGreaterThan(0); // even the shorter grid has unused declared headroom a dense model would still pay for
     expect(wastedFractionTall).toBeGreaterThan(wastedFractionBase); // the taller grid's unused headroom is proportionally larger, and sparse storage still pays nothing for it
   });
