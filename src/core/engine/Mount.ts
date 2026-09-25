@@ -99,26 +99,31 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
     // #1089 regression fix: any itinerary this employee was mid-flight on
     // named THIS vehicle (a drive leg, or a board leg for it) — now stale
     // the instant they alight, since they no longer occupy it. Locomotion.ts
-    // always advances a non-null `itinerary` before ever falling back to
-    // destinationX/Z, so a caller that alights an employee and then, this
-    // same tick, sets a fresh legacy walk target (beginRestTravel, a
-    // reassigned foot task) had that walk silently ignored: Locomotion still
-    // takes the itinerary branch, spends the whole tick self-healing the now
+    // always advances a non-null `itinerary`, so a caller that alights an
+    // employee and then, this same tick, starts a fresh walk (beginRestTravel,
+    // a reassigned foot task) had that walk silently ignored: Locomotion still
+    // took the itinerary branch, spending the whole tick self-healing the now
     // impossible drive leg (advanceLeg's own occupant-mismatch check aborts
-    // it) instead of ever looking at destinationX/Z, and the walk doesn't
-    // actually start until the NEXT tick — one tick later than it should
-    // every single time an employee is dismounted with a stale itinerary
-    // still attached. Confirmed live: a `set_policy mode:continuous` forced
-    // rest interrupting a driller mid-drive (ForceShiftRest.ts) lost exactly
-    // one tick per rest this way, compounding into vibration-budget.json's
-    // own 22-tick-slower drift and level2/3-playthrough-win.json's cash
-    // drift over a run with many such cycles. Clearing it here, the one
-    // place an employee ever stops being mounted, fixes every caller
-    // (dismountVehicleDriver, the console `vehicle driver <id> none`
-    // command, and any future one) at its root instead of each one
-    // separately remembering to.
+    // it) instead of picking up the fresh one, so the new walk didn't actually
+    // start until the NEXT tick — one tick later than it should every single
+    // time an employee is dismounted with a stale itinerary still attached.
+    // Confirmed live: a `set_policy mode:continuous` forced rest interrupting
+    // a driller mid-drive (ForceShiftRest.ts) lost exactly one tick per rest
+    // this way, compounding into vibration-budget.json's own 22-tick-slower
+    // drift and level2/3-playthrough-win.json's cash drift over a run with
+    // many such cycles. Clearing it here, the one place an employee ever
+    // stops being mounted, fixes every caller (dismountVehicleDriver, the
+    // console `vehicle driver <id> none` command, and any future one) at its
+    // root instead of each one separately remembering to.
     employee.itinerary = null;
     employee.pendingDriverVehicleId = null;
+    // #1178: destinationX/Z is a read-only mirror of the itinerary's current
+    // leg (MoveTo.ts's syncItineraryMirrors) — nulled here too so a mount
+    // ending mid-itinerary doesn't leave it stale, which would otherwise read
+    // as "still walking" to isMidEvacuationWalk (Evacuation.ts) and
+    // isIdleForReposition (VehicleDriverAssignment.ts).
+    employee.destinationX = null;
+    employee.destinationZ = null;
   }
 
   emitter?.emit('employee:alighted', { employeeId, vehicleId });

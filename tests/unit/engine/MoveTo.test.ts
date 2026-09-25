@@ -18,8 +18,29 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { moveTo, alightOnArrival } from '../../../src/core/engine/MoveTo.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 const SEED = 42;
+
+/** A directly-editable flat, fully-walkable NavGrid (mirrors the identical helper used throughout the engine test suites). */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
+
+/** Impassable vertical wall spanning every row at world x. */
+function blockColumn(grid: NavGrid, x: number): void {
+  for (let z = 0; z < grid.height; z++) {
+    grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+}
 
 describe('moveTo — coordinate destination', () => {
   it('moveTo(x, z) produces an itinerary whose last leg ends at (x, z)', () => {
@@ -52,6 +73,77 @@ describe('moveTo — coordinate destination', () => {
     expect(() => moveTo(state, 999999, { x: 1, z: 1 })).not.toThrow();
     const result = moveTo(state, 999999, { x: 1, z: 1 });
     expect(result.success).toBe(false);
+  });
+});
+
+// #1178 (single-mover unification): opt-in `allowUnreachable` — when the
+// target is unreachable RIGHT NOW (exact reachability check fails), moveTo
+// installs a retrying itinerary anyway instead of refusing, using the
+// octile-heuristic distance for the leg's estTicks since an exact path can't
+// be computed yet. That itinerary retries every tick through Locomotion.ts's
+// ordinary stuck/abandon machinery (Locomotion.test.ts covers the retry
+// itself in depth) — this file only asserts the SHAPE moveTo installs.
+describe('moveTo — allowUnreachable (#1178)', () => {
+  it('to a genuinely unreachable target (walled off on a built NavGrid), allowUnreachable:true still returns success:true and installs an itinerary whose final leg targets it', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10);
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+
+    const result = moveTo(state, employee.id, { x: 15, z: 2 }, { allowUnreachable: true });
+
+    expect(result.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.destX).toBe(15);
+    expect(lastLeg.destZ).toBe(2);
+    // destinationX/Z mirror the installed itinerary's current leg.
+    expect(employee.destinationX).toBe(legs[0]!.destX);
+    expect(employee.destinationZ).toBe(legs[0]!.destZ);
+  });
+
+  it('the SAME call WITHOUT allowUnreachable (default false) still returns success:false for the identical unreachable target — the flag is genuinely opt-in', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10);
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+
+    const result = moveTo(state, employee.id, { x: 15, z: 2 });
+
+    expect(result.success).toBe(false);
+    expect(employee.itinerary).toBeNull();
+  });
+
+  it('a mounted employee calling moveTo(allowUnreachable) to an unreachable target installs a retrying DRIVE leg (continuity), not a foot leg', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10);
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    const result = moveTo(state, employee.id, { x: 15, z: 2 }, { allowUnreachable: true });
+
+    expect(result.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    // Mount continuity: already mounted in `vehicle` -> straight to a drive
+    // leg, no board/foot leg prefix at all (mirrors moveTo's own already-
+    // mounted continuity for a reachable target).
+    expect(legs.every(l => l.mode === 'drive')).toBe(true);
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.vehicleId).toBe(vehicle.id);
+    expect(lastLeg.destX).toBe(15);
+    expect(lastLeg.destZ).toBe(2);
   });
 });
 

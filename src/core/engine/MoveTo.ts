@@ -15,7 +15,10 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number },
-  opts?: { via?: number },
+  // `allowUnreachable` (#1178, single-mover unification): forwarded straight
+  // to planItinerary's own opts — a best-effort route instead of a refusal
+  // when the target is unreachable right now.
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
 export function moveTo(
@@ -36,13 +39,13 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { actionId: number },
-  opts?: { via?: number },
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
 export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number } | { vehicleId: number } | { actionId: number },
-  opts?: { via?: number },
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee) return { success: false, error: t('move_to.employee_not_found') };
@@ -61,7 +64,7 @@ export function moveTo(
       workTicks: 0,
       estTotalTicks: leg.estTicks,
     };
-    syncPendingDriverVehicleId(employee);
+    syncItineraryMirrors(employee);
     return { success: true };
   }
 
@@ -69,11 +72,11 @@ export function moveTo(
     const action = state.pendingActions.find(a => a.id === target.actionId);
     if (!action) return { success: false, error: t('move_to.no_route_available') };
 
-    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), action });
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), ...(opts?.allowUnreachable !== undefined ? { allowUnreachable: opts.allowUnreachable } : {}), action });
     if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
     employee.itinerary = itinerary;
-    syncPendingDriverVehicleId(employee);
+    syncItineraryMirrors(employee);
     return { success: true };
   }
 
@@ -81,7 +84,7 @@ export function moveTo(
   if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
   employee.itinerary = itinerary;
-  syncPendingDriverVehicleId(employee);
+  syncItineraryMirrors(employee);
   return { success: true };
 }
 
@@ -108,18 +111,32 @@ export function alightOnArrival(employee: Employee | undefined): void {
 }
 
 /**
- * Keeps `employee.pendingDriverVehicleId` — the read-only mirror
- * ForceShiftRest.ts/TaskCancellation.ts/tutorialGuide.ts/FleetPanel.ts read to
- * mean "currently walking to board a vehicle" — in agreement with the
- * itinerary's own current leg: set while that leg's arrival step is a board
- * naming a vehicle, null otherwise (no itinerary, or a foot/drive leg that
- * isn't a board). Called from every point this module and Locomotion.ts
- * mutate `employee.itinerary`, so the mirror never drifts from what the
- * employee is actually walking toward.
+ * Keeps `employee.pendingDriverVehicleId` and `employee.destinationX/Z` — the
+ * read-only mirrors of the itinerary's current leg — in agreement with it.
+ * `pendingDriverVehicleId` (ForceShiftRest.ts/TaskCancellation.ts/
+ * tutorialGuide.ts/FleetPanel.ts) is set while that leg's arrival step is a
+ * board naming a vehicle, null otherwise (no itinerary, or a foot/drive leg
+ * that isn't a board). `destinationX/Z` (#1178, single-mover unification) is
+ * set from that same leg's own destX/destZ regardless of mode — foot or
+ * drive — null only when there is no current leg at all (RestActionHelpers.ts's
+ * `beginRestTravel` tests, #1178: a mounted employee's own rest-travel drive
+ * leg mirrors here exactly like a foot leg would). Every call site that needs
+ * to distinguish "walking on foot" from "driving a vehicle" reads the
+ * itinerary's own current leg mode directly instead (e.g.
+ * `isMidEvacuationDrive`, EvacuationHold.ts) rather than relying on this
+ * mirror to encode that distinction on its own.
+ * `isMidEvacuationWalk` (Evacuation.ts) and `isIdleForReposition`
+ * (VehicleDriverAssignment.ts) read it to mean "still travelling toward
+ * something" (an itinerary check already guards both ahead of it). Called
+ * from every point this module and Locomotion.ts mutate `employee.itinerary`,
+ * so neither mirror ever drifts from what the employee is actually en route
+ * to.
  */
-export function syncPendingDriverVehicleId(employee: Employee): void {
+export function syncItineraryMirrors(employee: Employee): void {
   const leg = employee.itinerary?.legs[0];
   employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board'
     ? leg.onArrive.vehicleId
     : null;
+  employee.destinationX = leg !== undefined ? leg.destX : null;
+  employee.destinationZ = leg !== undefined ? leg.destZ : null;
 }

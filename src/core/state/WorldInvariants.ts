@@ -292,10 +292,11 @@ export const FATAL_VIOLATION_KINDS: ReadonlySet<ViolationKind> = new Set<Violati
 ]);
 
 /**
- * I9: an executing task's employee should not still be travelling —
- * neither via the legacy destinationX/Z walk fields nor (#1090) via an
- * unconsumed itinerary. A task shouldn't be running (taskTicksRemaining set)
- * while the employee still has movement left to do by either mechanism.
+ * I9: an executing task's employee should not still be travelling — via
+ * (#1090) an unconsumed itinerary, whose destinationX/Z fields are a pure
+ * derived mirror of it (#1178) and so are checked as the same mechanism.
+ * A task shouldn't be running (taskTicksRemaining set) while the employee
+ * still has movement left to do.
  */
 function checkI9ExecutingTaskStillTravelling(state: GameState): Violation[] {
   const violations: Violation[] = [];

@@ -19,10 +19,11 @@ import type { GameState, PendingAction } from '../../../src/core/state/GameState
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
-import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
@@ -102,6 +103,38 @@ function buildRingCorridorState(sizeX: number): GameState {
   return state;
 }
 
+/**
+ * A directly-editable flat, fully-walkable NavGrid (mirrors the identical
+ * helper in EmployeeDispatchSteps.test.ts/RestActionHelpers.test.ts) — unlike
+ * buildFlatNavGridState above (VoxelGrid-derived), its cells can be walled
+ * off and later reopened in place, which the #1178 retry tests below need.
+ */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
+
+/** Impassable vertical wall spanning every row at world x. */
+function blockColumn(grid: NavGrid, x: number): void {
+  for (let z = 0; z < grid.height; z++) {
+    grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+}
+
+/** Reopens a column blockColumn previously sealed — the same cell shape makeFlatNavGrid seeds every other cell with. */
+function openColumn(grid: NavGrid, x: number): void {
+  for (let z = 0; z < grid.height; z++) {
+    grid.cells[z]![x] = { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false };
+  }
+}
+
 /** Minimal 'general_work' PendingAction fixture, mirrors the `makeAction` shape used across the engine test suites. */
 function makeGeneralWorkAction(id: number): PendingAction {
   return {
@@ -169,7 +202,12 @@ describe('tickLocomotion', () => {
     expect(employee.z).toBe(0);
   });
 
-  it('advances an on-foot employee with no itinerary but destinationX/Z set (legacy single foot leg) at AGENT_WALK_SPEED', () => {
+  // #1178 (single-mover unification): advanceLegacyFootWalk is deleted —
+  // tickLocomotion has exactly one branch (`if (emp.itinerary !== null)`).
+  // destinationX/destinationZ are now a READ-ONLY MIRROR of the itinerary's
+  // current leg, written only by MoveTo.ts/Locomotion.ts/Mount.ts's alight()
+  // — setting them alone, with no itinerary, is inert.
+  it('never advances an employee with destinationX/Z set but itinerary === null — the legacy single foot leg is gone (#1178)', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -179,8 +217,12 @@ describe('tickLocomotion', () => {
 
     tickLocomotion(state);
 
-    expect(employee.x).toBe(AGENT_WALK_SPEED);
+    expect(employee.x).toBe(0);
     expect(employee.z).toBe(0);
+    // The mirror fields themselves are untouched by this no-op tick — they
+    // simply have no effect on movement any more.
+    expect(employee.destinationX).toBe(12);
+    expect(employee.destinationZ).toBe(0);
   });
 
   it('never changes an unoccupied vehicle\'s x/z across 10 ticks', () => {
@@ -453,7 +495,11 @@ describe('tickLocomotion', () => {
     expect(employee.itinerary).toBeNull();
   });
 
-  it('is a no-op for an employee with no itinerary and no legacy destination (boundary)', () => {
+  // #1178: with destinationX/Z now a read-only mirror rather than a second
+  // movement source, "no itinerary" alone (regardless of destinationX/Z)
+  // is the whole no-op condition — this boundary case (both null too) still
+  // holds under the new contract.
+  it('is a no-op for an employee with no itinerary at all (boundary)', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 3, 4);
@@ -512,39 +558,149 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     };
   }
 
-  it('legacy foot-walk leg (destinationX/Z, no itinerary): abandons the active action and applies the morale penalty exactly as a failed replan would', () => {
-    const state = buildFlatNavGridState(20, 5);
+  // #1178 (single-mover unification): advanceLegacyFootWalk is deleted, so
+  // the old "legacy foot-walk leg (destinationX/Z, no itinerary)" abandon
+  // case no longer exists as such — beginRestTravel/clearZone/
+  // promoteActionToActive now all route an unreachable-at-claim-time target
+  // through moveTo(..., { allowUnreachable: true }), which installs a
+  // RETRYING itinerary instead of refusing. Unlike the #1130 oscillation
+  // cases below (mocked at the advanceAlongPath boundary), this drives a
+  // real, genuinely walled-off NavGrid end to end: the itinerary's own leg
+  // re-resolves findPath every tick, gets pathFound: false every time the
+  // wall stands, and the exact same stuck/abandon machinery
+  // (MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY) fires as it always has.
+  it('#1178: moveTo(allowUnreachable) to a genuinely walled-off target installs a retrying itinerary that abandons at MOVE_STUCK_ABANDON_TICKS, with STUCK_MORALE_PENALTY applied per stuck tick', () => {
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10); // seals off x>=10 from the employee's spawn at x=0
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid;
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    employee.itinerary = null;
-    employee.destinationX = 12;
-    employee.destinationZ = 0;
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
     employee.activeActionId = 77;
     const action = { ...makeGeneralWorkAction(77), holderId: employee.id, status: 'assigned' as const };
     state.pendingActions.push(action);
     const startingMorale = employee.morale;
 
-    const spy = vi.spyOn(AgentAdvanceModule, 'advanceAlongPath').mockReturnValue(oscillatingStuckOutcome(0, 0));
+    const moveResult = moveTo(state, employee.id, { x: 15, z: 2 }, { allowUnreachable: true });
+    expect(moveResult.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    // destinationX/Z mirror the installed itinerary's current leg (#1178).
+    expect(employee.destinationX).toBe(employee.itinerary!.legs[0]!.destX);
+    expect(employee.destinationZ).toBe(employee.itinerary!.legs[0]!.destZ);
 
-    const result = tickLocomotion(state);
+    const ticksBeforeAbandon = MOVE_STUCK_ABANDON_TICKS - 1;
+    for (let i = 0; i < ticksBeforeAbandon; i++) {
+      tickLocomotion(state);
+    }
+    // isMoveStuck flips true well before the abandon threshold (STUCK_THRESHOLD
+    // is far smaller than MOVE_STUCK_ABANDON_TICKS), and STUCK_MORALE_PENALTY
+    // is applied on every one of those failed ticks, not just once.
+    expect(employee.isMoveStuck).toBe(true);
+    expect(employee.morale).toBe(Math.max(0, startingMorale - ticksBeforeAbandon * STUCK_MORALE_PENALTY));
+    // Never moved — the wall never opened.
+    expect(employee.x).toBe(0);
+    expect(employee.z).toBe(2);
 
-    spy.mockRestore();
+    const result = tickLocomotion(state); // the MOVE_STUCK_ABANDON_TICKS-th failed tick
 
-    // The oscillation genuinely tripped isStuck this tick — that's what
-    // pushed this into the abandon branch at all (proven by the morale
-    // penalty and the abandon below). But abandon runs through
-    // interruptActiveAction, whose clearHolderWalkFields (TaskCancellation.ts)
-    // unconditionally resets isMoveStuck/moveConsecutiveFailures to their
-    // idle defaults on every abandon — mirrors the identical vehicle-side
-    // reset a few lines below in Locomotion.ts's own drive-leg abandon path,
-    // and vehicles.integration.test.ts's own "released, back to idle" check.
-    // A freshly-released employee is idle, not walking-stuck.
+    // Abandon runs through interruptActiveAction, whose clearHolderWalkFields
+    // (TaskCancellation.ts) unconditionally resets isMoveStuck/
+    // moveConsecutiveFailures to their idle defaults — a freshly-released
+    // employee is idle, not walking-stuck, exactly as the old legacy-walker
+    // abandon path left them.
     expect(employee.isMoveStuck).toBe(false);
-    expect(employee.morale).toBe(Math.max(0, startingMorale - STUCK_MORALE_PENALTY));
     expect(result.abandoned).toEqual(expect.arrayContaining([{ employeeId: employee.id, actionId: 77 }]));
     expect(employee.activeActionId).toBeNull();
     const stored = state.pendingActions.find(a => a.id === 77)!;
     expect(stored.status).toBe('queued');
+    // The itinerary is cleared on abandon — the mirror follows it to null.
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+  });
+
+  // #1178: the retry mechanic's whole point — a target unreachable AT CLAIM
+  // TIME becomes reachable once the obstacle clears, and the SAME installed
+  // itinerary (never replaced, never abandoned) walks it the rest of the way,
+  // instead of the employee being permanently refused the journey up front.
+  it('#1178: opening the wall before the abandon threshold lets the SAME itinerary complete instead of abandoning', () => {
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10);
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+
+    const moveResult = moveTo(state, employee.id, { x: 15, z: 2 }, { allowUnreachable: true });
+    expect(moveResult.success).toBe(true);
+    const installedItinerary = employee.itinerary;
+    expect(installedItinerary).not.toBeNull();
+    expect(employee.destinationX).toBe(installedItinerary!.legs[0]!.destX);
+    expect(employee.destinationZ).toBe(installedItinerary!.legs[0]!.destZ);
+
+    // Well short of the abandon threshold — the wall is still up the whole time.
+    for (let i = 0; i < 10; i++) {
+      tickLocomotion(state);
+    }
+    // Same itinerary object — never abandoned/replaced while merely blocked.
+    expect(employee.itinerary).toBe(installedItinerary);
+    expect(employee.moveConsecutiveFailures).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
+    expect(employee.x).toBe(0);
+
+    openColumn(grid, 10); // the way opens
+
+    const MAX_TICKS = 60;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && employee.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    expect(employee.itinerary).toBeNull();
+    expect(employee.x).toBe(15);
+    expect(employee.z).toBe(2);
+  });
+
+  // #1178 follow-up (needs-drain-visual.json regression): a target outside
+  // the NavGrid entirely — not walled off, genuinely off-grid — is a
+  // DIFFERENT unreachable shape than the walled-off tests above.
+  // findPath.clampToGrid (Pathfinding.ts) silently clamps such a target to
+  // the nearest in-grid cell and returns pathFound: true for a route to that
+  // clamp, so the agent walks there without ever failing a replan — but
+  // isLegArrived's exact-match test against the leg's own (unclamped)
+  // destX/destZ never agrees the leg is done, and the old
+  // isMoveStuck/MOVE_STUCK_ABANDON_TICKS machinery only fires on a FAILED
+  // path, never on a genuinely-found-but-short one. Before the fix, this
+  // employee walked to the grid edge and then sat there forever: itinerary
+  // never null, employeeWorkState stuck reading 'traveling' (EmployeeDispatch.ts)
+  // for the rest of the run — confirmed live via needs-drain-visual.json's
+  // own general_work dispatch to (150, 150) on a 64-wide map.
+  it('#1178: moveTo(allowUnreachable) to a target outside the NavGrid entirely still arrives — snaps to the leg\'s own destination once its clamped route is exhausted', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+
+    const moveResult = moveTo(state, employee.id, { x: 150, z: 2 }, { allowUnreachable: true });
+    expect(moveResult.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    expect(employee.destinationX).toBe(150);
+    expect(employee.destinationZ).toBe(2);
+
+    const MAX_TICKS = 30;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && employee.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    // Arrives at the leg's own literal (unclamped) destination — never
+    // abandoned, never permanently parked at the grid edge (x=19).
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.x).toBe(150);
+    expect(employee.z).toBe(2);
+    expect(employee.isMoveStuck).toBe(false);
   });
 
   it('itinerary drive leg: abandons and dismounts the driver exactly as a failed replan would, even though the route was genuinely found this tick', () => {

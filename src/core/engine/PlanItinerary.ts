@@ -293,6 +293,27 @@ function buildMountLegs(
 }
 
 /**
+ * Shared unreachable-target gate for `buildDriveLeg` and
+ * `buildFootOnlyItinerary` (#1178): `dist` is the real estimate from
+ * `estimateLegDistance`, or null when the target isn't reachable right now.
+ * A plain call must still fail fast on that (returns null, same "stays
+ * queued, retries next tick" contract as every other null return in this
+ * file) — but a caller that opted into `allowUnreachable` wants a
+ * best-effort route anyway, so it falls back to the octile heuristic for
+ * the distance and still gets a leg installed. advanceLeg/advanceItinerary's
+ * existing stuck/abandon tracking (Locomotion.ts) takes it from here if the
+ * route genuinely never resolves.
+ */
+function resolveEffectiveDistance(
+  dist: number | null,
+  allowUnreachable: boolean,
+  fromX: number, fromZ: number, toX: number, toZ: number,
+): number | null {
+  if (dist === null && !allowUnreachable) return null;
+  return dist ?? octileHeuristic(fromX, fromZ, toX, toZ);
+}
+
+/**
  * A drive leg from (`fromX`, `fromZ`) to (`toX`, `toZ`), timed at
  * `def.speed`, ending in `onArrive` — the shape four sites in this file
  * build: the resumed-cargo depot leg, the fresh drive-to-fragment leg, the
@@ -323,9 +344,14 @@ function buildDriveLeg(
   onArrive: Leg['onArrive'],
   def: ReturnType<typeof getVehicleDefByTier>,
   arrival: 'exact' | 'adjacent',
+  // #1178: when true, an unreachable-right-now target still installs a leg
+  // (octile-heuristic estTicks) instead of refusing the plan — see this
+  // function's own doc comment above `dist`.
+  allowUnreachable: boolean,
 ): Leg | null {
   const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false, vehicleRequiredClearanceCells(vehicle));
-  if (dist === null) return null;
+  const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
+  if (effectiveDist === null) return null;
 
   return {
     mode: 'drive',
@@ -334,7 +360,7 @@ function buildDriveLeg(
     destZ: toZ,
     arrival,
     onArrive,
-    estTicks: cellsToTravelTicks(dist, def.speed),
+    estTicks: cellsToTravelTicks(effectiveDist, def.speed),
   };
 }
 
@@ -344,9 +370,15 @@ function buildDriveLeg(
  * there. Shared by planItinerary's own no-vehicle-role branch and its
  * no-vehicle-available fallback for a vehicle-gated goal (see that call
  * site's own doc comment) — both plan the identical single-leg itinerary,
- * differing only in why no vehicle enters the route. Returns null when the
- * target is unreachable, same "stays queued, retries next tick" contract as
- * planItinerary itself.
+ * differing only in why no vehicle enters the route. Refuses (returns null)
+ * for a target unreachable right now UNLESS the caller opts in via
+ * `allowUnreachable` (#1178, single-mover unification, mirroring
+ * `buildDriveLeg`'s identical gate) — an unreachable-right-now target then
+ * still gets a leg, timed off the octile heuristic instead of a real path —
+ * see the `dist` fallback below. Default `false`: a plain reposition/claim
+ * call must still fail fast for a genuinely-unreachable target (e.g. #1109's
+ * out-of-bounds case, or an employee boxed in on every neighbour cell) —
+ * only `beginRestTravel` and Zone.ts's foot-evacuee branch opt in.
  */
 function buildFootOnlyItinerary(
   state: GameState,
@@ -356,9 +388,11 @@ function buildFootOnlyItinerary(
   targetX: number,
   targetZ: number,
   workTicks: number,
+  allowUnreachable: boolean,
 ): Itinerary | null {
   const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ));
-  if (dist === null) return null;
+  const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, employee.x, employee.z, targetX, targetZ);
+  if (effectiveDist === null) return null;
 
   const footLeg: Leg = {
     mode: 'foot',
@@ -367,7 +401,7 @@ function buildFootOnlyItinerary(
     destZ: targetZ,
     arrival: 'exact',
     onArrive: { kind: 'none' },
-    estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED),
+    estTicks: cellsToTravelTicks(effectiveDist, AGENT_WALK_SPEED),
   };
 
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
@@ -415,7 +449,7 @@ function planFragmentTaskItinerary(
     const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
     if (depotApproach === null) return null;
 
-    const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact');
+    const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
     if (depotLeg === null) return null;
     legs.push(depotLeg);
 
@@ -433,7 +467,7 @@ function planFragmentTaskItinerary(
   if (action.type === 'haul_debris' && isOversized(tracked.fragment.volume)) return null;
 
   const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
-  const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def, 'exact');
+  const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def, 'exact', false);
   if (toFragmentLeg === null) return null;
   legs.push(toFragmentLeg);
 
@@ -447,7 +481,7 @@ function planFragmentTaskItinerary(
   const depotApproach = findHaulDepotApproach(state, approach.x, approach.z);
   if (depotApproach === null) return null;
 
-  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact');
+  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
   if (toDepotLeg === null) return null;
   legs.push(toDepotLeg);
 
@@ -597,7 +631,7 @@ export function buildTransportRideItinerary(
 
   const driveLeg = buildDriveLeg(
     state, fidelity, vehicle, driveFromX, driveFromZ, alight.x, alight.z,
-    { kind: 'alight', releaseVehicleForActionId: resolved.actionId }, def, 'exact',
+    { kind: 'alight', releaseVehicleForActionId: resolved.actionId }, def, 'exact', false,
   );
   if (driveLeg === null) return null;
   legs.push(driveLeg);
@@ -669,7 +703,10 @@ export function planItinerary(
   // in one place rather than being special-cased per goal kind.
   // `action`, for a 'work' goal, is a perf-only hint — see resolveGoal's own
   // doc comment (#1090).
-  opts?: { via?: number; action?: PendingAction },
+  // `allowUnreachable` (#1178, single-mover unification): threaded through to
+  // buildDriveLeg's vehicle-gated drive leg below — a best-effort route
+  // instead of a refusal when the target is unreachable right now.
+  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean },
 ): Itinerary | null {
   // haul_debris/fragment_debris (#1091): these two action types need more
   // than the generic single-drive-leg-then-work shape the rest of this
@@ -700,9 +737,10 @@ export function planItinerary(
   );
 
   if (role === null && via === undefined) {
-    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
+    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false);
+    if (footItinerary === null) return null;
 
-    if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null && footItinerary !== null) {
+    if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null) {
       // Same hint-with-fallback convention as resolveGoal's own actionHint
       // (#1090) — every current caller already supplies opts.action, this
       // just keeps a caller that doesn't from silently losing the footprint
@@ -733,7 +771,7 @@ export function planItinerary(
   if (mount === null) return null;
   const { legs, driveFromX, driveFromZ, def } = mount;
 
-  const driveLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, { kind: 'none' }, def, 'exact');
+  const driveLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ, { kind: 'none' }, def, 'exact', opts?.allowUnreachable ?? false);
   if (driveLeg === null) return null;
   legs.push(driveLeg);
 

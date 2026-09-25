@@ -1362,4 +1362,34 @@ describe('promoteActionToActive', () => {
     expect(lastLeg.destX).toBe(5);
     expect(lastLeg.destZ).toBe(7);
   });
+
+  // #1178 (single-mover unification): the legacy-destination fallback
+  // (`if (!moveResult.success) { employee.destinationX = ...; ... }`) is
+  // deleted outright — a foot-only claim's moveTo call can no longer fail at
+  // all, since buildFootOnlyItinerary (PlanItinerary.ts) is now unconditional
+  // (never returns null). A target genuinely unreachable at claim time still
+  // gets a real installed itinerary, not a direct destinationX/Z write.
+  it('#1178: a foot-only claim whose target is genuinely unreachable at claim time still installs an itinerary via moveTo, never the legacy destinationX/Z fallback', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(20, 5);
+    blockColumn(grid, 10); // seals off x>=10 from the employee's spawn at x=0
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 2); // has 'blasting'
+
+    const action = makeAction({ id: 10, targetX: 15, targetZ: 2, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.activeActionId).toBe(10);
+    expect(employee.itinerary).not.toBeNull();
+    const lastLeg = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(lastLeg.destX).toBe(15);
+    expect(lastLeg.destZ).toBe(2);
+    // The mirror reflects the installed itinerary's current leg — never an
+    // independent legacy write of its own.
+    expect(employee.destinationX).toBe(employee.itinerary!.legs[0]!.destX);
+    expect(employee.destinationZ).toBe(employee.itinerary!.legs[0]!.destZ);
+  });
 });

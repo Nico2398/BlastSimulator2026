@@ -236,6 +236,41 @@ describe('alight', () => {
     expect(alighted).toEqual([{ employeeId: employee.id, vehicleId: vehicle.id }]);
   });
 
+  // #1178 (single-mover unification): destinationX/destinationZ are now a
+  // READ-ONLY MIRROR of employee.itinerary's current leg. alight() already
+  // nulls `itinerary` as its own side effect (the stale-itinerary #1089
+  // regression fix above) — it must additionally null destinationX/
+  // destinationZ alongside it, or a dismounted employee's stale mirror would
+  // be misread as "still walking" by isMidEvacuationWalk (Evacuation.ts) and
+  // isIdleForReposition (VehicleDriverAssignment.ts).
+  it('#1178: nulls destinationX/destinationZ alongside itinerary on a successful alight', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    // A stale itinerary/mirror from before the alight — must be cleared, not
+    // merely left for the next tick to catch up to.
+    employee.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 20, destZ: 20,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      }],
+      goal: { kind: 'reposition', x: 20, z: 20 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    };
+    employee.destinationX = 20;
+    employee.destinationZ = 20;
+
+    const result = alight(state, vehicle.id);
+
+    expect(result.success).toBe(true);
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+  });
+
   it('places the employee on the sole free walkable neighbour cell when exactly one of the 8 is free', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);

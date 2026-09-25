@@ -134,14 +134,16 @@ export interface Employee {
    */
   restNeedKey: NeedKey | null;
   /**
-   * Grid position the employee is currently walking toward (set from a claimed
-   * PendingAction's targetX/targetZ, or a self-claimed rest action's building
-   * location), or null when the employee has nowhere to walk. Consumed by
-   * tickEmployeeMovement in EntityMovementTick.ts — cleared on arrival.
+   * Read-only mirror of `itinerary.legs[0]`'s destination (#1178, single-mover
+   * unification) — null when there is no current leg. Written only by
+   * MoveTo.ts's `syncItineraryMirrors`, Locomotion.ts (via the same helper),
+   * and Mount.ts's `alight()`. Nothing reads this to drive movement; it
+   * exists for callers (`isMidEvacuationWalk`, `isIdleForReposition`, etc.)
+   * that only need to know whether — and where — the employee is walking.
    */
   destinationX: number | null;
   destinationZ: number | null;
-  /** Consecutive ticks tickEmployeeMovement failed to find a path to destinationX/Z. */
+  /** Consecutive ticks advanceLeg/advanceItinerary (Locomotion.ts) failed to find a path along the current leg. */
   moveConsecutiveFailures: number;
   /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle, morale −2/tick until the path clears. */
   isMoveStuck: boolean;
@@ -200,10 +202,9 @@ export interface Employee {
   vehicleDetourZ?: number | null;
   /**
    * Rest duration (ticks) to start once the employee arrives at the rest
-   * destination, or null when no rest arrival is pending. Set alongside
-   * destinationX/destinationZ by the claim step; consumed by
-   * ArrivalGate.tickArrivalGate on arrival, which moves it into
-   * restTicksRemaining.
+   * destination, or null when no rest arrival is pending. Set alongside the
+   * rest itinerary by the claim step; consumed by ArrivalGate.tickArrivalGate
+   * on arrival, which moves it into restTicksRemaining.
    */
   pendingRestDuration: number | null;
   /** Need gauge the pending rest (above) will restore, or null. */
@@ -243,9 +244,8 @@ export interface Employee {
   /**
    * The employee's current planned journey (produced by planItinerary,
    * walked by tickLocomotion — #1089), or null when they have no itinerary
-   * in flight. Null for every employee still driven by the legacy
-   * destinationX/Z single foot leg until the implementer phase migrates
-   * each caller over.
+   * in flight — and so not moving (#1178, single-mover unification: `moveTo`
+   * + this itinerary is the only way an employee ever walks).
    */
   itinerary: Itinerary | null;
   /**

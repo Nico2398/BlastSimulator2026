@@ -349,7 +349,7 @@ describe('isMidClaimedTaskExecution (#1062)', () => {
 describe('beginRestTravel (#1118)', () => {
   const SEED = 42;
 
-  it('mounted employee, reachable target: installs an itinerary drive leg to (x, z), stays mounted, sets pendingActionType "rest", and does NOT touch legacy destinationX/Z', () => {
+  it('mounted employee, reachable target: installs an itinerary drive leg to (x, z), stays mounted, sets pendingActionType "rest", and destinationX/Z mirror the installed itinerary\'s current leg', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -369,9 +369,12 @@ describe('beginRestTravel (#1118)', () => {
     expect(driveLeg.destX).toBe(12);
     expect(driveLeg.destZ).toBe(34);
     expect(employee.pendingActionType).toBe('rest');
-    // moveTo succeeded — no fallback to the legacy destination fields.
-    expect(employee.destinationX).toBeNull();
-    expect(employee.destinationZ).toBeNull();
+    // #1178: destinationX/Z are a READ-ONLY MIRROR of the itinerary's current
+    // leg (never a second, independently-writable movement source) — moveTo
+    // succeeded, so no legacy fallback write ever ran, but the mirror itself
+    // now reflects legs[0], not null.
+    expect(employee.destinationX).toBe(legs[0]!.destX);
+    expect(employee.destinationZ).toBe(legs[0]!.destZ);
   });
 
   // #1122: resting is an action like any other (building, drilling, ...) —
@@ -401,7 +404,13 @@ describe('beginRestTravel (#1118)', () => {
     expect(finalLeg.onArrive).toEqual({ kind: 'alight' });
   });
 
-  it('mounted employee, unreachable target (no route on a built navGrid): falls back to legacy destinationX/Z, sets pendingActionType "rest"', () => {
+  // #1178 (single-mover unification): beginRestTravel now calls
+  // moveTo(state, emp.id, {x, z}, { allowUnreachable: true }) unconditionally
+  // for both on-foot AND mounted employees — no more separate legacy branch.
+  // A mounted employee whose rest target is unreachable right now retries
+  // through the drive leg's own continuity (same vehicle they're already in)
+  // instead of falling back to a direct destinationX/Z write.
+  it('mounted employee, unreachable target (no route on a built navGrid): installs a retrying DRIVE itinerary (continuity), not a legacy destinationX/Z write; pendingActionType "rest"', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -415,12 +424,25 @@ describe('beginRestTravel (#1118)', () => {
 
     beginRestTravel(state, employee, 20, 5);
 
-    expect(employee.destinationX).toBe(20);
-    expect(employee.destinationZ).toBe(5);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.every(l => l.mode === 'drive')).toBe(true);
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.vehicleId).toBe(vehicle.id);
+    expect(lastLeg.destX).toBe(20);
+    expect(lastLeg.destZ).toBe(5);
+    expect(employee.destinationX).toBe(legs[0]!.destX);
+    expect(employee.destinationZ).toBe(legs[0]!.destZ);
     expect(employee.pendingActionType).toBe('rest');
   });
 
-  it('on-foot employee, reachable target: keeps the legacy direct destinationX/Z write (moveTo/itinerary continuity is mounted-only), pendingActionType "rest"', () => {
+  // #1178: on-foot rest now installs a foot itinerary via moveTo, exactly
+  // like the mounted case above — no more legacy destinationX/Z write for
+  // either mount state. beginRestTravel always passes allowUnreachable: true,
+  // and under that option buildFootOnlyItinerary never returns null, so this
+  // always succeeds even before a NavGrid exists.
+  it('on-foot employee, reachable target: installs a foot itinerary via moveTo, not a legacy direct destinationX/Z write; pendingActionType "rest"', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -429,8 +451,15 @@ describe('beginRestTravel (#1118)', () => {
     beginRestTravel(state, employee, 8, 9);
 
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
-    expect(employee.destinationX).toBe(8);
-    expect(employee.destinationZ).toBe(9);
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.mode).toBe('foot');
+    expect(lastLeg.destX).toBe(8);
+    expect(lastLeg.destZ).toBe(9);
+    expect(employee.destinationX).toBe(legs[0]!.destX);
+    expect(employee.destinationZ).toBe(legs[0]!.destZ);
     expect(employee.pendingActionType).toBe('rest');
   });
 

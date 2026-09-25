@@ -31,10 +31,7 @@ model, cost formula, and the numbered invariant list: `gameplay-vehicle-fleet` s
 
 ## Movement and cost go through the planner
 
-`moveTo` is the only entry point that starts movement. Three legacy writers of
-`Employee.destinationX/Z` remain — on-foot rest, on-foot evacuation, and the fallback for a claim
-unreachable when promoted — until #1178 routes them through `moveTo`; add no fourth.
-`planItinerary` is the only thing that
+`moveTo` is the only entry point that starts movement. `planItinerary` is the only thing that
 decides a route, and the action-cost estimator sums the itinerary it returns rather than measuring
 a journey of its own — a vehicle-gated action costs the walk to the vehicle at walking speed, plus
 the drive to the site at vehicle speed, plus the work.

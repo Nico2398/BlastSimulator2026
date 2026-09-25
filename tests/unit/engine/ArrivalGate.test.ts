@@ -467,7 +467,7 @@ function makeVehicleGatedAction(overrides: Partial<PendingAction> & { id: number
 }
 
 describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the employee, toward the target (#550)', () => {
-  it("sets the vehicle's destination to the action's target on boarding, leaving the employee's own destination null (aboard, not walking)", () => {
+  it("sets the vehicle's destination to the action's target on boarding, mirrored onto the employee's own destinationX/Z via their itinerary's current (drive) leg", () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -497,8 +497,15 @@ describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the 
     // targetX/targetZ (deleted).
     expect(employee.itinerary?.legs[0]?.destX).toBe(20);
     expect(employee.itinerary?.legs[0]?.destZ).toBe(20);
-    expect(employee.destinationX).toBeNull();
-    expect(employee.destinationZ).toBeNull();
+    // #1178: destinationX/Z is an unconditional mirror of the itinerary's own
+    // current leg — once boarding completes and the drive leg becomes
+    // current, the mirror follows it exactly like RestActionHelpers.test.ts's
+    // mounted beginRestTravel case proves for a drive leg. "Aboard, not
+    // walking" is still true in the mode-of-travel sense, but the mirror
+    // itself does not encode that distinction (isMidEvacuationDrive,
+    // EvacuationHold.ts, reads the itinerary leg's own mode for that).
+    expect(employee.destinationX).toBe(employee.itinerary?.legs[0]?.destX);
+    expect(employee.destinationZ).toBe(employee.itinerary?.legs[0]?.destZ);
   });
 
   it('holds taskTicksRemaining at null while the vehicle is still driving toward the target, and only seeds it the tick the vehicle itself arrives', () => {

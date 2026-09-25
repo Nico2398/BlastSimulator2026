@@ -436,7 +436,7 @@ function resolveTargetWaypoint(
   // Arrived at (or, since advanceAgent only ever snaps exactly onto a single
   // committed waypoint, never overshoots) the committed waypoint — same
   // exact-cell arrival test this file's own leg/destination checks already
-  // use (Locomotion.ts's isLegArrived, advanceLegacyFootWalk's x===destX).
+  // use (Locomotion.ts's isLegArrived).
   // Checked here but acted on below the obstacle/cost checks: arrival alone
   // isn't sufficient to trust a fresh replan unconditionally (see below).
   const arrived = x === committed.waypointX && z === committed.waypointZ;
