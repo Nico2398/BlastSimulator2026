@@ -36,7 +36,8 @@ import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer } from './core/economy/Contract.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
-import { ScenePicking } from './ui/scene/ScenePicking.js';
+import { ScenePicking, pickScene } from './ui/scene/ScenePicking.js';
+import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
@@ -854,32 +855,27 @@ window.__worldToScreen = (x, z) => {
   // diverge from the rendered mesh enough to throw the projected pixel off
   // the tile — the click raycast then misses the terrain entirely.
   const startY = gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz);
-  let candidate = scene.cameraController.projectToNDC(cx, startY, cz);
-  // The camera ray through a pixel is never vertical, so on sloped ground —
-  // and this game's default camera is ground-level, i.e. steeply angled —
-  // the point directly above/below (cx, cz) isn't always the point the
-  // camera's own ray would hit when aimed at that pixel. Converge on a pixel
-  // that truly round-trips: re-derive the height from what a click here would
-  // actually hit, and reproject. Tracks the best candidate seen rather than
-  // trusting the last iteration outright — a fixed-point sequence like this
-  // one isn't guaranteed to improve monotonically, and landing on a worse
-  // guess than the vertical-raycast starting point would be a regression.
-  let best = candidate;
-  let bestError = Infinity;
-  for (let i = 0; i < 5; i++) {
-    const hit = gameRenderer.raycastTerrainFromNDC(candidate.x, candidate.y, scene.camera);
-    if (!hit) break;
-    const error = Math.hypot(hit.x - cx, hit.z - cz);
-    if (error < bestError) { bestError = error; best = candidate; }
-    if (error < 0.05) break;
-    candidate = scene.cameraController.projectToNDC(cx, hit.y, cz);
+  // Accept-on-tile-match: reproduce the same combined entity+terrain pick a
+  // real click resolves through (pickScene/PlacementController), so an
+  // occluding entity or a terraced/stepped tile is never accepted as a
+  // best-guess nearest point — see ScreenTileResolution.ts.
+  const project: ProjectToNDC = (px, py, pz) => scene.cameraController.projectToNDC(px, py, pz);
+  const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
+    const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer);
+    if (!pick.terrain) return null; // entity occlusion or a miss — honestly a miss, never silently ignored
+    return { x: pick.terrain.point.x, y: pick.terrain.point.y, z: pick.terrain.point.z };
+  };
+  const result: ScreenTileResolution = resolveScreenPointForTile(project, raycastForTile, x, z, startY);
+  if (!result.resolved) {
+    return { px: 0, py: 0, onScreen: false, tileConfirmed: false };
   }
-  const ndc = best;
+  const ndc = result.ndc;
   const rect = canvas.getBoundingClientRect();
   return {
     px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
     py: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height,
     onScreen: ndc.z < 1,
+    tileConfirmed: true,
   };
 };
 // Put the collapse straight on its resting place, for shots of the settled muck

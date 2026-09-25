@@ -40,29 +40,9 @@ export function raycastSurfaceY(deps: PickingDeps, x: number, z: number): number
 }
 
 /**
- * Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the same
- * raycast a real pointer click resolves via ScenePicking/PlacementController,
- * without pulling in their entity/hover machinery.
- */
-export function raycastTerrainFromNDC(
-  deps: PickingDeps,
-  ndcX: number,
-  ndcY: number,
-  camera: THREE.Camera,
-): THREE.Vector3 | null {
-  if (!deps.terrain) return null;
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-  const hit = raycastTerrainOrLandscape(deps, raycaster);
-  return hit ? hit.point.clone() : null;
-}
-
-/**
  * First hit against the terrain meshes, falling back to the landscape
- * meshes past the site's claimed edge (#558) when terrain misses. Shared
- * by raycastSurfaceY (vertical ray) and raycastTerrainFromNDC (camera ray)
- * — both need the same terrain-then-landscape fallback, only the ray
- * differs.
+ * meshes past the site's claimed edge (#558) when terrain misses. Used by
+ * raycastSurfaceY's vertical ray.
  */
 export function raycastTerrainOrLandscape(
   deps: PickingDeps,

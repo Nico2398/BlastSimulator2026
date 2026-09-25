@@ -34,13 +34,28 @@ export const TILE_RESOLUTION_MAX_ITERATIONS = 5;
  * to the tile centre without checking it actually picks that tile.
  */
 export function resolveScreenPointForTile(
-  _project: ProjectToNDC,
-  _raycastForTile: RaycastForTile,
-  _targetX: number,
-  _targetZ: number,
-  _startY: number,
-  _maxIterations: number = TILE_RESOLUTION_MAX_ITERATIONS,
+  project: ProjectToNDC,
+  raycastForTile: RaycastForTile,
+  targetX: number,
+  targetZ: number,
+  startY: number,
+  maxIterations: number = TILE_RESOLUTION_MAX_ITERATIONS,
 ): ScreenTileResolution {
-  // TODO: implement
-  throw new Error('not implemented');
+  let currentY = startY;
+
+  for (let i = 0; i < maxIterations; i++) {
+    const ndc = project(targetX, currentY, targetZ);
+    const hit = raycastForTile(ndc.x, ndc.y);
+
+    if (hit !== null) {
+      if (Math.floor(hit.x) === targetX && Math.floor(hit.z) === targetZ) {
+        return { resolved: true, ndc };
+      }
+      currentY = hit.y;
+    }
+    // A null hit (occlusion/miss) is never accepted as success; retry with the
+    // same height in case a later projection clears the occlusion.
+  }
+
+  return { resolved: false };
 }
