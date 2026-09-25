@@ -27,6 +27,7 @@ import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
+import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
 
 const SEED = 42;
 
@@ -268,6 +269,59 @@ describe('tickLocomotion', () => {
     expect(vehicle.x).toBe(1);
     expect(vehicle.z).toBe(2);
 
+    const stuckX = vehicle.x;
+    const stuckZ = vehicle.z;
+    tickLocomotion(state);
+    expect(vehicle.x).toBe(stuckX);
+    expect(vehicle.z).toBe(stuckZ);
+  });
+
+  // #1201 follow-up: a blocker that never sits on the leg's own destination
+  // cell — only somewhere else along the route — has no relocation path at
+  // all (relocateDestinationBlocker only ever checks the destination cell
+  // itself). Once a reroute keeps failing too (this corridor has no bypass,
+  // same fixture as the test just above), nothing in handleOccupancyBlock
+  // used to ever unstick the driver: every one of its returns is a straight
+  // 'blocked' that bypasses advanceLeg's own MOVE_STUCK_ABANDON_TICKS check
+  // entirely (that check lives in advanceLeg's tail, which handleOccupancyBlock
+  // is called in place of), so isMoveStuck latched true forever with the
+  // action never abandoned and the vehicle never freed — reproduced live via
+  // blast-execution-visual.json, where a driller's drill_rig stalled this
+  // exact way for the rest of the file.
+  it('eventually abandons the action instead of latching isMoveStuck forever when neither a reroute nor a destination-cell relocation ever resolves the block', () => {
+    const state = buildCorridorState(6);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 5, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      }],
+      goal: { kind: 'reposition', x: 5, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } satisfies Itinerary;
+
+    // Stationary, unoccupied blocker sitting on cell (2,2) — an intermediate
+    // step along the route, never the leg's own destination (5,2) — so
+    // relocateDestinationBlocker can never touch it, and this single-lane
+    // corridor has no bypass a reroute could ever find either.
+    purchaseVehicle(state.vehicles, 'drill_rig', 2, 2);
+
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + MOVE_STUCK_ABANDON_TICKS + 5; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+    }
+
+    expect(driver.itinerary).toBeNull();
+    expect(isMounted(driver.locomotion)).toBe(false);
+    expect(everAbandoned.some(a => a.employeeId === driver.id)).toBe(true);
+
+    // Once abandoned, the driver stays put rather than re-triggering the
+    // same dead-end block tick after tick.
     const stuckX = vehicle.x;
     const stuckZ = vehicle.z;
     tickLocomotion(state);

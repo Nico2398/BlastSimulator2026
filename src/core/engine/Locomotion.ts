@@ -431,7 +431,16 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
  * outcome immediately (same tick); a failed one falls back to relocating
  * whatever blocks the destination cell itself (#689, restored below) before
  * finally escalating the employee (not the vehicle) to stuck, once, on the
- * rising edge. Absorbed from the old VehicleOccupancyReroute.ts.
+ * rising edge. Once neither a reroute nor a destination-cell relocation ever
+ * resolves the block — the blocker sits on some OTHER cell along the route,
+ * which relocateDestinationBlocker cannot touch — `vehicleWaitingTicks`
+ * keeps climbing past this function's own returns until it reaches
+ * MOVE_STUCK_ABANDON_TICKS, at which point the action is abandoned exactly
+ * as advanceLeg's own stuck-abandon tail would (#1201 follow-up: this
+ * function's every branch returns straight out of advanceLeg, bypassing that
+ * tail entirely, so without this the employee/vehicle would latch
+ * isMoveStuck forever with nothing ever freeing them). Absorbed from the old
+ * VehicleOccupancyReroute.ts.
  */
 function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle, leg: Leg, blockedStep: { x: number; z: number }, result: LocomotionResult, emitter?: EventEmitter): LegMoveOutcome {
   const wasStuckBefore = emp.isMoveStuck;
@@ -499,6 +508,44 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
 
   emp.isMoveStuck = true;
   if (!wasStuckBefore) emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
+
+  // #1201 follow-up: a blocker sitting on some OTHER cell along the route —
+  // not the leg's own destination, which is all relocateDestinationBlocker
+  // above ever checks — has no relocation path at all. Before #1201 corrected
+  // isOccupiedByOtherVehicle/relocateDestinationBlocker to compare rounded
+  // cells instead of exact floats, a live vehicle stopped mid-route at a
+  // fractional position (e.g. one whose own driver was abandoned by this same
+  // stuck-abandon path, below, and left wherever it stood) essentially never
+  // exact-matched an integer waypoint, so this branch was reachable only in
+  // the rarer case the doc comment above already describes. Rounding now
+  // finds that same stray vehicle correctly, which is the right fix for
+  // *detecting* the collision — but detecting it is not enough: with no
+  // relocation target and a reroute that keeps failing (a dense grid where no
+  // route avoids every other live vehicle, confirmed live via this scenario's
+  // own 8x8, 1m-spacing hole grid), `vehicleWaitingTicks` above is the only
+  // thing still climbing, and every earlier return in this function is a
+  // straight 'blocked' with no path back into advanceLeg's own
+  // MOVE_STUCK_ABANDON_TICKS check — that check lives in advanceLeg's tail,
+  // which this whole function is called in place of (the nextGridStep guard
+  // at this file's own call site returns handleOccupancyBlock's result
+  // directly). Left this way, `emp.isMoveStuck` latches true forever with
+  // nothing ever abandoning the action or freeing the vehicle reservation —
+  // reproduced live via blast-execution-visual.json, where a driller's
+  // drill_rig stalled on a stray blocker for the rest of the file, its target
+  // hole never drilled and a different hole (drilled late by everyone else's
+  // own, unrelated slowdown) missing its charge window at blast time.
+  // Escalating here, on the same VEHICLE_OCCUPANCY_REROUTE_THRESHOLD-gated
+  // tick cadence `vehicleWaitingTicks` already counts in ticks (not a
+  // separate counter), mirrors advanceLeg's own abandon branch exactly.
+  if (emp.vehicleWaitingTicks >= MOVE_STUCK_ABANDON_TICKS) {
+    const actionId = emp.activeActionId;
+    interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
+    dismountVehicleDriver(state, vehicle, emitter);
+    clearItineraryOnFailure(state, emp);
+    result.abandoned.push({ employeeId: emp.id, actionId });
+    emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
+  }
+
   return 'blocked';
 }
 
