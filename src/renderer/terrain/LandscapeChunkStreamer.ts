@@ -47,6 +47,33 @@ export interface LandscapeChunkStreamer {
   update(dt: number, cameraX: number, cameraZ: number, handle: LandscapeHandle, palette: CompositionPalette, cut: PlayableCut): void;
   invalidateNear(dirtyRect: Rect): void;
   reset(): void;
+  /**
+   * Chunks the last `update()` wanted resident and could not build within its
+   * budget — 0 once the ladder has converged, and 0 before the first update.
+   *
+   * Exists for the browser-driven harnesses. Streaming is budgeted against a
+   * live 60 fps loop, where the ~56 calls a full ladder needs cost under a
+   * second and nobody sees the gap. A screenshot is the opposite case: it
+   * captures one instant a fraction of a second after a camera move, so the
+   * chunks still queued render as sky, and the props standing on them float
+   * in it.
+   */
+  pendingChunkCount(): number;
+  /**
+   * Build every chunk the last `update()` still owes, ignoring the per-frame
+   * budget, and return how many were built. A no-op (returning 0) before the
+   * first update, or once streaming has converged.
+   *
+   * The budget exists to protect a live loop's frame pacing. A screenshot has
+   * no pacing to protect and cannot wait the queue out either: without a GPU
+   * a drawn frame costs seconds, so the ~56 frames a full ladder needs are
+   * minutes, and the capture harness renders frames one at a time on demand.
+   * Draining in one call costs the sampling and meshing once —
+   * `captureFrame` (scripts/shared/puppeteer-utils.ts) calls this through
+   * `window.__landscapeFlush` so the image shows ground everywhere the camera
+   * can see, not sky with the scenery hanging in it.
+   */
+  flush(): number;
 }
 
 /** `mesh` is the LandscapeMesh instance the streamer builds/disposes chunks against — one streamer per mesh. */
@@ -58,6 +85,12 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
   let lastHandle: LandscapeHandle | null = null;
   let lastPalette: CompositionPalette | null = null;
   let lastCut: PlayableCut | null = null;
+  /** Desired-but-not-resident chunks left after the last update()'s budgeted builds — see pendingChunkCount(). */
+  let pending = 0;
+  // Last camera position update() streamed against, so flush() can finish
+  // that same residency set rather than needing its own camera argument.
+  let lastCameraX = 0;
+  let lastCameraZ = 0;
 
   /**
    * `footprint`'s four sides' real neighbour step, read geometrically against
@@ -82,44 +115,72 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     };
   };
 
+  /**
+   * Bring residency in line with (cameraX, cameraZ): dispose what is no
+   * longer wanted, then build at most `maxBuilds` of what is missing,
+   * nearest-first. Updates `pending` to what is still owed afterwards and
+   * returns how many chunks were built. Shared by the per-frame `update()`
+   * (budgeted) and `flush()` (unbounded).
+   */
+  const stream = (
+    cameraX: number, cameraZ: number,
+    handle: LandscapeHandle, palette: CompositionPalette, cut: PlayableCut,
+    maxBuilds: number,
+  ): number => {
+    const desiredIds = selectLandscapeChunks(cameraX, cameraZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+    const desiredKeys = new Set(desiredIds.map(chunkKey));
+
+    // Dispose every resident chunk no longer desired — cheap, unbudgeted, every call.
+    for (const [key, id] of built) {
+      if (desiredKeys.has(key)) continue;
+      mesh.disposeChunk(id);
+      built.delete(key);
+    }
+
+    const missingIds = desiredIds.filter(id => !built.has(chunkKey(id)));
+    pending = missingIds.length;
+    if (missingIds.length === 0) return 0;
+
+    const footprints = footprintsOf(desiredIds, handle.map.centerX, handle.map.centerZ);
+    const footprintById = new Map(footprints.map(f => [chunkKey(f.id), f]));
+
+    const distSqToCamera = (id: LandscapeChunkId): number => {
+      const f = footprintById.get(chunkKey(id))!;
+      const dx = f.originX + f.span / 2 - cameraX;
+      const dz = f.originZ + f.span / 2 - cameraZ;
+      return dx * dx + dz * dz;
+    };
+    missingIds.sort((a, b) => distSqToCamera(a) - distSqToCamera(b));
+
+    const budget = Math.min(maxBuilds, missingIds.length);
+    for (let i = 0; i < budget; i++) {
+      const id = missingIds[i]!;
+      const footprint = footprintById.get(chunkKey(id))!;
+      const neighbourSteps = neighbourStepsFor(footprint, footprints);
+      mesh.buildChunk(id, handle, palette, neighbourSteps, cut);
+      built.set(chunkKey(id), id);
+    }
+    pending = missingIds.length - budget;
+    return budget;
+  };
+
   return {
     update(_dt, cameraX, cameraZ, handle, palette, cut) {
       lastHandle = handle;
       lastPalette = palette;
       lastCut = cut;
+      lastCameraX = cameraX;
+      lastCameraZ = cameraZ;
+      stream(cameraX, cameraZ, handle, palette, cut, MAX_CHUNK_BUILDS_PER_FRAME);
+    },
 
-      const desiredIds = selectLandscapeChunks(cameraX, cameraZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
-      const desiredKeys = new Set(desiredIds.map(chunkKey));
+    pendingChunkCount() {
+      return pending;
+    },
 
-      // Dispose every resident chunk no longer desired — cheap, unbudgeted, every call.
-      for (const [key, id] of built) {
-        if (desiredKeys.has(key)) continue;
-        mesh.disposeChunk(id);
-        built.delete(key);
-      }
-
-      const missingIds = desiredIds.filter(id => !built.has(chunkKey(id)));
-      if (missingIds.length === 0) return;
-
-      const footprints = footprintsOf(desiredIds, handle.map.centerX, handle.map.centerZ);
-      const footprintById = new Map(footprints.map(f => [chunkKey(f.id), f]));
-
-      const distSqToCamera = (id: LandscapeChunkId): number => {
-        const f = footprintById.get(chunkKey(id))!;
-        const dx = f.originX + f.span / 2 - cameraX;
-        const dz = f.originZ + f.span / 2 - cameraZ;
-        return dx * dx + dz * dz;
-      };
-      missingIds.sort((a, b) => distSqToCamera(a) - distSqToCamera(b));
-
-      const budget = Math.min(MAX_CHUNK_BUILDS_PER_FRAME, missingIds.length);
-      for (let i = 0; i < budget; i++) {
-        const id = missingIds[i]!;
-        const footprint = footprintById.get(chunkKey(id))!;
-        const neighbourSteps = neighbourStepsFor(footprint, footprints);
-        mesh.buildChunk(id, handle, palette, neighbourSteps, cut);
-        built.set(chunkKey(id), id);
-      }
+    flush() {
+      if (!lastHandle || !lastPalette || !lastCut) return 0;
+      return stream(lastCameraX, lastCameraZ, lastHandle, lastPalette, lastCut, Infinity);
     },
 
     invalidateNear(dirtyRect) {
@@ -145,6 +206,11 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
       lastHandle = null;
       lastPalette = null;
       lastCut = null;
+      // Nothing is desired again until the next update() names a camera
+      // position, so a reset streamer owes no chunks — reporting the old
+      // level's backlog would make a capture wait for builds nobody asked
+      // for.
+      pending = 0;
     },
   };
 }
