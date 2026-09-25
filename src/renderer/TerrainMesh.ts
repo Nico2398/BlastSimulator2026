@@ -196,6 +196,18 @@ function sampleCorner(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: num
   return { density, rockId, oreId, oreAmt };
 }
 
+/**
+ * Real ground altitude range `[minY, maxY]` across `grid`, for the terrain
+ * material's altitude-based cover shading — falls back to `[0, 60]` when the
+ * grid has no ground yet (#1188, replacing the old `[0, grid.sizeY]` band,
+ * which stopped tracking real ground once the grid could span negative Y or
+ * outgrow a fixed vertical bound).
+ */
+export function gridHeightRange(_grid: VoxelGrid): [number, number] {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 /** Dominant rock at the owned column nearest (x, z), same y — '' when that
  *  column is air there or the site owns nothing at all. */
 function nearestOwnedRock(grid: VoxelGrid, x: number, y: number, z: number): string {
@@ -459,6 +471,22 @@ export class TerrainMesh {
       hasNorth: this.grid.hasChunk(cx, cz - 1),
       hasSouth: this.grid.hasChunk(cx, cz + 1),
     };
+  }
+
+  /**
+   * The vertical chunk-index range `[cyMin, cyMax]` covering `rect`'s real
+   * ground extent, or null when `rect` has no ground at all (#1188,
+   * replacing chunk loops that assumed a fixed `[0, ncy)` vertical band).
+   *
+   * Public rather than private, following this file's existing convention
+   * for internals exposed for diagnostics/tests (`getChunkMesh`,
+   * `chunkGridDims`, `currentEdgeHeightSampler`) — a genuinely-unused
+   * private method fails `noUnusedLocals` until buildAll/remeshRegion call
+   * it during implementation, which this stub must not pre-empt.
+   */
+  chunkVerticalSlabRange(_rect: { minX: number; maxX: number; minZ: number; maxZ: number }): { cyMin: number; cyMax: number } | null {
+    // TODO: implement
+    throw new Error('not implemented');
   }
 
   private disposeAllChunks(): void {

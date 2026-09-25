@@ -504,6 +504,17 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
   }
 
   /**
+   * Update the site height range altitude preferences are measured against
+   * (`uHeightRange`), so a grid whose real ground extent changes — or is
+   * computed independently of `grid.sizeY` (#1188) — keeps altitude-based
+   * cover shading scaled to that ground rather than a stale/fixed band.
+   */
+  setHeightRange(_minY: number, _maxY: number): void {
+    // TODO: implement
+    throw new Error('not implemented');
+  }
+
+  /**
    * Wires this material into a CSM instance for cascaded shadow sampling
    * (#458 T5.1/D11). `CSM.setupMaterial()` sets `material.onBeforeCompile`
    * itself — calling it directly would clobber the A19 shader above
