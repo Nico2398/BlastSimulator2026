@@ -140,6 +140,10 @@ moveTo(state, employeeId, { actionId }, opts?: { via?: number }) // the journey 
 `planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
 foot leg to the vehicle and the board step that physically must happen.
 
+The coordinate-target overload also accepts an `allowUnreachable` option: when true, a target
+unreachable right now still gets an itinerary installed (retrying every tick, abandoning at the
+usual stuck threshold) instead of the call failing.
+
 A `reposition` goal moves a vehicle with no work attached: parking the fleet clear of a blast is
 `moveTo(driverId, safeCell, { via: vehicleId })`.
 

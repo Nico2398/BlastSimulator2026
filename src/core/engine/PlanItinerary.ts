@@ -293,6 +293,27 @@ function buildMountLegs(
 }
 
 /**
+ * Shared unreachable-target gate for `buildDriveLeg` and
+ * `buildFootOnlyItinerary` (#1178): `dist` is the real estimate from
+ * `estimateLegDistance`, or null when the target isn't reachable right now.
+ * A plain call must still fail fast on that (returns null, same "stays
+ * queued, retries next tick" contract as every other null return in this
+ * file) — but a caller that opted into `allowUnreachable` wants a
+ * best-effort route anyway, so it falls back to the octile heuristic for
+ * the distance and still gets a leg installed. advanceLeg/advanceItinerary's
+ * existing stuck/abandon tracking (Locomotion.ts) takes it from here if the
+ * route genuinely never resolves.
+ */
+function resolveEffectiveDistance(
+  dist: number | null,
+  allowUnreachable: boolean,
+  fromX: number, fromZ: number, toX: number, toZ: number,
+): number | null {
+  if (dist === null && !allowUnreachable) return null;
+  return dist ?? octileHeuristic(fromX, fromZ, toX, toZ);
+}
+
+/**
  * A drive leg from (`fromX`, `fromZ`) to (`toX`, `toZ`), timed at
  * `def.speed`, ending in `onArrive` — the shape four sites in this file
  * build: the resumed-cargo depot leg, the fresh drive-to-fragment leg, the
@@ -329,13 +350,8 @@ function buildDriveLeg(
   allowUnreachable: boolean,
 ): Leg | null {
   const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false, vehicleRequiredClearanceCells(vehicle));
-  if (dist === null && !allowUnreachable) return null;
-  // Target unreachable right now, but the caller wants a best-effort route
-  // anyway (#1178): fall back to the octile heuristic for estTicks and still
-  // install the leg. advanceLeg/advanceItinerary's existing stuck/abandon
-  // tracking (Locomotion.ts) takes it from here if the route genuinely never
-  // resolves.
-  const effectiveDist = dist ?? octileHeuristic(fromX, fromZ, toX, toZ);
+  const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
+  if (effectiveDist === null) return null;
 
   return {
     mode: 'drive',
@@ -375,13 +391,8 @@ function buildFootOnlyItinerary(
   allowUnreachable: boolean,
 ): Itinerary | null {
   const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ));
-  if (dist === null && !allowUnreachable) return null;
-  // Target unreachable right now, but the caller wants a best-effort route
-  // anyway (#1178): fall back to the octile heuristic for estTicks and still
-  // install the leg. advanceLeg/advanceItinerary's existing stuck/abandon
-  // tracking (Locomotion.ts) takes it from here if the route genuinely never
-  // resolves.
-  const effectiveDist = dist ?? octileHeuristic(employee.x, employee.z, targetX, targetZ);
+  const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, employee.x, employee.z, targetX, targetZ);
+  if (effectiveDist === null) return null;
 
   const footLeg: Leg = {
     mode: 'foot',

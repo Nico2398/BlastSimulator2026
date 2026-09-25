@@ -1692,7 +1692,7 @@ describe('employeeWorkState (#680, #928)', () => {
   // loop: seedTaskTimerFields followed in the same tick, same block, by
   // taskTicksRemaining = duration; pendingTaskDuration = null — never
   // observably left non-null across a tick boundary for this action family).
-  // With no itinerary and no legacy destinationX/Z set either (the synthetic
+  // With no itinerary and destinationX/Z left unset either (the synthetic
   // case below — not a state a real employee reaches, since boarding and
   // mid-drive both run through moveTo/itinerary, see the next test), this
   // still falls through to 'working' with no other signal to read.
@@ -1733,7 +1733,13 @@ describe('employeeWorkState (#680, #928)', () => {
     expect(employeeWorkState(employee)).toBe('traveling');
   });
 
-  it('returns "traveling" for a mid-drive employee falling back to the legacy destinationX/Z write', () => {
+  // Synthetic construction, not a real code path: destinationX/Z are a
+  // read-only derived mirror of itinerary (#1178), with no production writer
+  // of their own (enforced by tests/unit/lint/SingleMovementEntry.test.ts).
+  // Setting them directly here exercises employeeWorkState's read of that
+  // mirror in isolation, the same way the itinerary-set test above exercises
+  // the itinerary side.
+  it('returns "traveling" when destinationX/Z are set directly on a synthetic employee (mirror read path, no itinerary)', () => {
     const state = createGame({ seed: SEED });
     const employee = makeIdleEmployee(state);
     employee.activeActionId = 9;

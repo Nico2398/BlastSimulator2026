@@ -439,8 +439,9 @@ describe('beginRestTravel (#1118)', () => {
 
   // #1178: on-foot rest now installs a foot itinerary via moveTo, exactly
   // like the mounted case above — no more legacy destinationX/Z write for
-  // either mount state. buildFootOnlyItinerary is unconditional (never
-  // returns null), so this always succeeds even before a NavGrid exists.
+  // either mount state. beginRestTravel always passes allowUnreachable: true,
+  // and under that option buildFootOnlyItinerary never returns null, so this
+  // always succeeds even before a NavGrid exists.
   it('on-foot employee, reachable target: installs a foot itinerary via moveTo, not a legacy direct destinationX/Z write; pendingActionType "rest"', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

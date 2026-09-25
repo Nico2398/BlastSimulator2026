@@ -257,9 +257,9 @@ export function runTick(
   }
 
   // 8f. Locomotion (#1089) — the only mover: walks every alive employee's
-  // itinerary (or, absent one, their legacy destinationX/Z single foot leg)
-  // one tick's worth of movement, and writes a mounted employee's vehicle's
-  // x/z from theirs — the only place a vehicle's position ever changes.
+  // itinerary one tick's worth of movement, and writes a mounted employee's
+  // vehicle's x/z from theirs — the only place a vehicle's position ever
+  // changes.
   // Snapshot every vehicle's position first, before this step (or anything
   // else this tick) can move one, so assertWorldInvariants' I4 check below
   // can tell "moved this tick" from "already here" without re-deriving it
