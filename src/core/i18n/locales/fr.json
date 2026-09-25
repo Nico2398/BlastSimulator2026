@@ -3426,7 +3426,7 @@
   "world.terrain_save_corrupt": "Les données de terrain de cette sauvegarde sont corrompues et ne peuvent pas être chargées.",
   "world.new_game_success": "Partie créée. Terrain {size}x{sizeY}x{size}, biome {mineType}, graine {seed}.{staffedSuffix}",
   "world.inspect_usage": "Utilisation : inspect x,y,z",
-  "world.inspect_off_site": "Hors site : ({x},{y},{z}). Le site s'étend de ({minX},{minZ}) à ({maxX},{maxZ}), hauteur {sizeY}.",
+  "world.inspect_off_site": "Hors site : ({x},{y},{z}). Le site s'étend de ({minX},{minZ}) à ({maxX},{maxZ}).",
   "world.inspect_air": "({x},{y},{z}) : Air (vide)",
   "world.inspect_result": "({x},{y},{z}) : {rockName} | composition : {compStr} | densité : {density} | mod. de fracture : {fractureModifier}{oreStr}",
   "world.landscape_unknown_mine_type": "Type de mine inconnu : \"{mineType}\".",

@@ -3426,7 +3426,7 @@
   "world.terrain_save_corrupt": "This save's terrain data is corrupt and can't be loaded.",
   "world.new_game_success": "Game created. {size}x{sizeY}x{size} terrain, {mineType} biome, seed {seed}.{staffedSuffix}",
   "world.inspect_usage": "Usage: inspect x,y,z",
-  "world.inspect_off_site": "Off site: ({x},{y},{z}). The site spans ({minX},{minZ}) to ({maxX},{maxZ}), height {sizeY}.",
+  "world.inspect_off_site": "Off site: ({x},{y},{z}). The site spans ({minX},{minZ}) to ({maxX},{maxZ}).",
   "world.inspect_air": "({x},{y},{z}): Air (empty)",
   "world.inspect_result": "({x},{y},{z}): {rockName} | composition: {compStr} | density: {density} | fracture mod: {fractureModifier}{oreStr}",
   "world.landscape_unknown_mine_type": "Unknown mine type: \"{mineType}\".",

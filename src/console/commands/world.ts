@@ -11,7 +11,7 @@ import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyL
 import type { Rect } from '../../core/world/WorldGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
-import { getDominantRockId } from '../../core/world/VoxelGrid.js';
+import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
@@ -448,14 +448,13 @@ export function inspectCommand(
   }
   const [x, y, z] = coords as [number, number, number];
 
-  if (!ctx.grid.isInBounds(x, y, z)) {
+  if (!ctx.grid.containsColumn(x, z)) {
     return {
       success: false,
       output: t('world.inspect_off_site', {
         x, y, z,
         minX: ctx.grid.minX, minZ: ctx.grid.minZ,
         maxX: ctx.grid.maxX - 1, maxZ: ctx.grid.maxZ - 1,
-        sizeY: ctx.grid.sizeY,
       }),
     };
   }
@@ -491,6 +490,16 @@ export function inspectCommand(
   };
 }
 
+/**
+ * Format `computeColumnRangeY`'s result as the `terrain_info` "Vertical
+ * extent" report line — `null` (no column in the site has ground) reports
+ * "no ground" rather than a bogus `minY to maxY` (#1187).
+ */
+export function formatVerticalExtent(range: { minY: number; maxY: number } | null): string {
+  if (!range) return 'Vertical extent: no ground';
+  return `Vertical extent: ${range.minY} to ${range.maxY}`;
+}
+
 export function terrainInfoCommand(
   ctx: GameContext,
   _args: string[],
@@ -504,15 +513,20 @@ export function terrainInfoCommand(
   const grid = ctx.grid;
   let solidCount = 0;
   let airCount = 0;
-  // Walks the live bounding box, not 0..size: the site starts wherever play
-  // has taken it, and columns inside the box it does not own are skipped
-  // rather than counted as air (#473).
-  for (let x = grid.minX; x < grid.maxX; x++) {
-    for (let z = grid.minZ; z < grid.maxZ; z++) {
-      if (!grid.containsColumn(x, z)) continue;
-      for (let y = 0; y < grid.sizeY; y++) {
-        if (grid.densityAt(x, y, z) > 0) solidCount++;
-        else airCount++;
+  // Real vertical extent of ground across the site, not 0..sizeY — the grid
+  // has no vertical cap (#1187). Null (no ground anywhere) means no scan.
+  const range = computeColumnRangeY(grid, grid.minX, grid.maxX - 1, grid.minZ, grid.maxZ - 1);
+  if (range) {
+    // Walks the live bounding box, not 0..size: the site starts wherever play
+    // has taken it, and columns inside the box it does not own are skipped
+    // rather than counted as air (#473).
+    for (let x = grid.minX; x < grid.maxX; x++) {
+      for (let z = grid.minZ; z < grid.maxZ; z++) {
+        if (!grid.containsColumn(x, z)) continue;
+        for (let y = range.minY; y <= range.maxY; y++) {
+          if (grid.densityAt(x, y, z) > 0) solidCount++;
+          else airCount++;
+        }
       }
     }
   }
@@ -527,6 +541,7 @@ export function terrainInfoCommand(
       `Seed: ${ctx.state.seed}`,
       `Solid voxels: ${solidCount}`,
       `Air voxels: ${airCount}`,
+      formatVerticalExtent(range),
     ].join('\n'),
   };
 }
@@ -590,16 +605,11 @@ export function surveyCommand(
     };
   }
 
-  // Find surface (topmost solid voxel)
-  let surfaceY = -1;
-  for (let y = ctx.grid.sizeY - 1; y >= 0; y--) {
-    if (ctx.grid.densityAt(x, y, z) > 0) {
-      surfaceY = y;
-      break;
-    }
-  }
+  // Find surface (topmost solid voxel) — the grid has no vertical cap, so
+  // this is not a bounded scan (#1187).
+  const surfaceY = computeVoxelColumnSurfaceY(ctx.grid, x, z);
 
-  if (surfaceY < 0) {
+  if (surfaceY === null) {
     return { success: true, output: `Survey at (${x},${z}): No solid ground.` };
   }
 
