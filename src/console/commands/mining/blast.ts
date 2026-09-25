@@ -16,7 +16,7 @@ import { recordBlastResult, snapshotStats } from '../../../core/campaign/Success
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
-import { toFullHeightRegion } from '../../../core/nav/NavGridSync.js';
+import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
@@ -192,7 +192,7 @@ export function blastCommand(
   // means the renderer (subscribed only to `terrain:updated`) does not
   // double-remesh for what carves zero further voxels.
   if (result.clearedVoxels > 0) {
-    ctx.emitter.emit('nav:occupancy_changed', { region: toFullHeightRegion(result.clearedRegion, ctx.grid!) });
+    ctx.emitter.emit('nav:occupancy_changed', { region: regionForColumns(result.clearedRegion, ctx.grid!) });
   }
 
   return {

@@ -26,13 +26,18 @@ export interface NavGridSyncTarget {
 }
 
 /**
- * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the full-height
- * region shape `terrain:updated`'s payload carries (adds minY/maxY spanning
- * `grid`'s whole height), for building carves that emit the event directly
- * instead of going through `LevelGround`/`Ramp`/`BlastExecution`.
+ * Widen a 2D `BlastRegion` (minX/maxX/minZ/maxZ, no height) to the
+ * region shape `terrain:updated`'s payload carries, for building carves that
+ * emit the event directly instead of going through
+ * `LevelGround`/`Ramp`/`BlastExecution`. The vertical span comes from the
+ * real ground under `footprint`'s columns (`computeColumnRangeY`), not a
+ * full-grid `0..sizeY-1` guess — the grid has no vertical cap (#1185).
+ * Falls back to `{ minY: 0, maxY: 0 }` when the rect has no ground anywhere.
  */
-export function toFullHeightRegion(region: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
-  return { minX: region.minX, maxX: region.maxX, minZ: region.minZ, maxZ: region.maxZ, minY: 0, maxY: grid.sizeY - 1 };
+export function regionForColumns(footprint: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
+  void footprint; void grid;
+  // TODO: implement (#1185)
+  throw new Error('not implemented');
 }
 
 /**
