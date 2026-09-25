@@ -275,24 +275,18 @@ describe('clampChunkRectToTile', () => {
   });
 });
 
-// #609: restoreChunkRaw and addChunkWithRect are the two entry points
-// untrusted save data reaches VoxelGrid through -- both must route their
-// `rect` argument through clampChunkRectToTile before assigning it onto the
-// chunk, so a corrupted save rect can never leave chunk.x0/z0/x1/z1 wider
-// than the chunk's own CHUNK_SIZE tile.
-describe('VoxelGrid — clamps untrusted rects reaching restoreChunkRaw / addChunkWithRect (#609)', () => {
-  it('restoreChunkRaw clamps a corrupted rect (matching the issue\'s repro) into the chunk\'s own tile', () => {
-    const grid = new VoxelGrid(16, 4, 16);
-    const n = CHUNK_SIZE * grid.sizeY * CHUNK_SIZE;
-    const density = new Float64Array(n);
-    const compId = new Uint16Array(n);
-    const fracture = new Float64Array(n).fill(1.0);
-
-    grid.restoreChunkRaw(0, 0, { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 }, density, compId, fracture, new Map());
-
-    expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
-  });
-
+// #609: addChunkWithRect is the one entry point untrusted save data reaches
+// VoxelGrid through (decodeVoxelGrid calls it directly, never a raw dense
+// restore) -- it must route its `rect` argument through clampChunkRectToTile
+// before assigning it onto the chunk, so a corrupted save rect can never
+// leave chunk.x0/z0/x1/z1 wider than the chunk's own CHUNK_SIZE tile.
+// A third entry point, restoreChunkRaw (the dense v6/v7 chunk-restore path),
+// carried the same clamp and its own repro of this invariant, but was
+// deleted as dead code once #1181 replaced dense chunk saves with the
+// generator-identity + edit-record scheme -- addChunkWithRect's own coverage
+// below (both first-allocation and already-owned cases) is the sole
+// remaining, and fully equivalent, guard.
+describe('VoxelGrid — clamps untrusted rects reaching addChunkWithRect (#609)', () => {
   it('addChunkWithRect clamps a corrupted rect into the chunk\'s own tile', () => {
     const grid = new VoxelGrid(0, 4, 0); // empty shell, same starting point decodeVoxelGrid builds
     grid.addChunkWithRect(0, 0, { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 });
@@ -594,25 +588,21 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
     expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
   });
 
-  it('restoreChunkRaw fully rescans the density summary rather than leaving it stale', () => {
-    const grid = new VoxelGrid(16, 8, 16); // 1 chunk, nSlabs=1
-    const n = CHUNK_SIZE * grid.sizeY * CHUNK_SIZE;
-    // Every restored voxel counts toward the rescan (even the ones left at
-    // their default), so the array must be filled throughout: a mostly-zero
-    // array's true minimum really is 0, not whatever floor value a couple of
-    // cells happen to poke — that would be asserting a bound the input data
-    // doesn't actually have.
-    const density = new Float64Array(n).fill(0.15);
-    const compId = new Uint16Array(n);
-    const fracture = new Float64Array(n).fill(1.0);
-    // Local index formula mirrors VoxelGrid's own: lx + y*CHUNK_SIZE + lz*CHUNK_SIZE*sizeY.
-    const idx = (lx: number, y: number, lz: number): number => lx + y * CHUNK_SIZE + lz * CHUNK_SIZE * grid.sizeY;
-    density[idx(1, 1, 1)] = 0.85;
-
-    grid.restoreChunkRaw(0, 0, { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE }, density, compId, fracture, new Map());
-
-    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0.15, max: 0.85 });
-  });
+  // A prior version of this suite covered "restoreChunkRaw fully rescans the
+  // density summary rather than leaving it stale": restoreChunkRaw accepted
+  // a whole dense density/compId/fracture array wholesale (the v6/v7 chunk
+  // save format), so it had to rebuild slabMinDensity/slabMaxDensity/
+  // slabTouchedCount from that array itself rather than trust whatever the
+  // chunk's summary already said. #1181 deleted that dense-restore format
+  // (and restoreChunkRaw with it) in favour of regenerate-then-replay-edits;
+  // decodeVoxelGrid's surviving path (addChunkWithRect, then
+  // generateTerrainRegion + replayTerrainEdits) writes every voxel through
+  // fillVoxel/setVoxel, and both unconditionally call touchDensity (#560) on
+  // every write. There is no entry point left that can populate density data
+  // while bypassing touchDensity, so the "stale summary" failure mode this
+  // test guarded against is no longer reachable — the invariant is now a
+  // structural guarantee of fillVoxel/setVoxel rather than a runtime case to
+  // exercise through a since-deleted bulk-restore method.
 
   it("returns null for an unowned chunk, and for a slab index past the grid's height", () => {
     const grid = new VoxelGrid(16, 8, 16); // nSlabs = ceil(8/16) = 1 -> only slab 0 exists

@@ -126,6 +126,19 @@ export function chunkIndexOf(worldCoord: number): number {
 }
 
 /**
+ * Clamp an untrusted save-JSON numeric value into `[lo, hi]`, rounding to the
+ * nearest integer and falling back to `fallback` for non-finite input.
+ * Shared by `clampChunkRectToTile` below (a chunk's owned rect) and
+ * `VoxelGridCodec.ts`'s `clampSavePosition` (edit-segment positions) — both
+ * clamp a save-JSON position field the same way, so this lives once rather
+ * than twice (#1181 review).
+ */
+export function clampAxis(value: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(lo, Math.min(hi, Math.round(value)));
+}
+
+/**
  * Clamp a chunk's owned sub-rect to the chunk's own tile bounds — i.e. to
  * `[cx*CHUNK_SIZE, cx*CHUNK_SIZE + CHUNK_SIZE) × [cz*CHUNK_SIZE, cz*CHUNK_SIZE + CHUNK_SIZE)`.
  *
@@ -144,11 +157,6 @@ export function clampChunkRectToTile(
   const tileX1 = tileX0 + CHUNK_SIZE;
   const tileZ0 = cz * CHUNK_SIZE;
   const tileZ1 = tileZ0 + CHUNK_SIZE;
-
-  const clampAxis = (value: number, lo: number, hi: number, fallback: number): number => {
-    if (!Number.isFinite(value)) return fallback;
-    return Math.max(lo, Math.min(hi, Math.round(value)));
-  };
 
   let minX = clampAxis(rect.minX, tileX0, tileX1, tileX0);
   let maxX = clampAxis(rect.maxX, tileX0, tileX1, tileX1);
@@ -766,82 +774,6 @@ export class VoxelGrid {
     this.touchDensity(chunk, i, y, 0);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, 0, 0, undefined);
     this.recordFractureWrite(x, y, z, prevFracture, 1.0);
-  }
-
-  // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──
-  // Treat the returned arrays as read-only; use the mutators above to write.
-  // Exposed as the live arrays/map (no copy) since encoding immediately reads them.
-
-  rawChunk(cx: number, cz: number): {
-    rect: { minX: number; minZ: number; maxX: number; maxZ: number };
-    density: Float64Array;
-    compId: Uint16Array;
-    fracture: Float64Array;
-    oreEntries: Array<[number, Record<string, number>]>;
-  } | null {
-    const chunk = this.chunks.get(chunkKey(cx, cz));
-    if (!chunk) return null;
-    return {
-      rect: { minX: chunk.x0, minZ: chunk.z0, maxX: chunk.x1, maxZ: chunk.z1 },
-      density: chunk.density,
-      compId: chunk.compId,
-      fracture: chunk.fracture,
-      oreEntries: [...chunk.ores.entries()],
-    };
-  }
-
-  /** Overwrite one chunk's raw storage from a decoded save payload. For VoxelGridCodec only. */
-  restoreChunkRaw(
-    cx: number, cz: number,
-    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
-    density: Float64Array, compId: Uint16Array, fracture: Float64Array,
-    ores: ReadonlyMap<number, Record<string, number>>,
-  ): void {
-    let chunk = this.chunks.get(chunkKey(cx, cz));
-    if (!chunk) chunk = this.allocateChunk(cx, cz);
-    const clamped = clampChunkRectToTile(cx, cz, rect);
-    chunk.x0 = clamped.minX; chunk.z0 = clamped.minZ; chunk.x1 = clamped.maxX; chunk.z1 = clamped.maxZ;
-    chunk.density.set(density);
-    chunk.compId.set(compId);
-    chunk.fracture.set(fracture);
-    chunk.ores.clear();
-    for (const [i, rec] of ores) chunk.ores.set(i, rec);
-    this.recomputeBounds();
-
-    // Exact rescan (#560): this bulk path bypasses the per-voxel mutators
-    // that maintain the conservative widening summary, and a save/load
-    // shouldn't carry forward stale bounds from before the save — an O(n)
-    // rescan is cheap here since restoring the chunk's arrays already was.
-    //
-    // Every owned (x, z) column is scanned across the full y range, so each
-    // touched position is marked and counted exactly once — chunkDensityRange
-    // reports the exact restored min/max for a fully-scanned slab, and
-    // honestly falls back to {min:0, max:0} for one no owned column reaches.
-    //
-    // `rect` (and therefore chunk.x0/x1/z0/z1, just assigned above) comes
-    // straight from deserialized save JSON — `clampChunkRectToTile` above is
-    // the load-bearing guard against an absurd rect (e.g. maxX/maxZ ~1e12)
-    // reaching chunk.x0/x1/z0/z1 at all (#609). This extra clamp to the
-    // chunk's actual storage span is now harmless defense-in-depth left over
-    // from before that guard existed, matching forEachInRegion's own
-    // defensive clamping elsewhere in this file.
-    const zLo = Math.max(chunk.z0, chunk.cz * CHUNK_SIZE);
-    const zHi = Math.min(chunk.z1, chunk.cz * CHUNK_SIZE + CHUNK_SIZE);
-    const xLo = Math.max(chunk.x0, chunk.cx * CHUNK_SIZE);
-    const xHi = Math.min(chunk.x1, chunk.cx * CHUNK_SIZE + CHUNK_SIZE);
-
-    chunk.slabMinDensity.fill(Infinity);
-    chunk.slabMaxDensity.fill(-Infinity);
-    chunk.slabTouchedCount.fill(0);
-    chunk.touched.fill(0);
-    for (let z = zLo; z < zHi; z++) {
-      for (let y = 0; y < this.sizeY; y++) {
-        for (let x = xLo; x < xHi; x++) {
-          const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
-          this.touchDensity(chunk, i, y, chunk.density[i]!);
-        }
-      }
-    }
   }
 
   /** Get all voxels within a bounding box (inclusive on both ends). Unowned columns are skipped. */

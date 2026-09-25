@@ -27,9 +27,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
-import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
-import { getBiome } from './core/world/BiomeCatalog.js';
+import { terrainConfigOf, ensureLandscape, loadGridForState, embedVoxelsForSave } from './console/commands/world.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -171,7 +169,7 @@ savesModal.setGetState(() => {
   // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
+    ctx.state.world = embedVoxelsForSave(ctx, ctx.state);
   }
   return ctx.state;
 });
@@ -1037,28 +1035,27 @@ selectionBar.setActionHandler((action, entity) => {
 });
 
 savesModal.setOnLoad((state) => {
-  // Restore loaded state into the runner context. A v6+ save carries its
-  // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
-  // it preserves blast craters/ramps instead of discarding them. A save
-  // without that payload (pre-v6, or one taken with no grid) falls back to
-  // regenerating pristine terrain from seed, same as the console `load`
-  // command and this codebase's whole prior history here (#408).
-  ctx.state = state;
-  const biome = getBiome(state.mineType);
-  if (state.world?.voxels) {
-    restoreGrid(ctx, state.world.voxels);
-  } else if (biome) {
-    const { sizeX, sizeY, sizeZ } = state.world ?? {
-      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-    };
-    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  // Restore loaded state into the runner context via the shared
+  // version-check + restore/regenerate branch (`loadGridForState`,
+  // world.ts, #1181) — the same one the console `load` command uses, so the
+  // two can't drift out of sync the way `regenerateGrid`'s own doc comment
+  // warns about (#408). A save with no embedded voxels at all falls back to
+  // regenerating pristine terrain from seed; a present payload whose
+  // generator version doesn't match this build is refused outright instead.
+  const refusal = loadGridForState(ctx, state);
+  if (refusal) {
+    uiManager.notify({ severity: 'warn', title: t('ui.saves.title'), body: refusal });
+    return;
   }
   // Close any overlay whose visibility is a stale carry-over from the
   // previous session's ended state (e.g. BlastReportModal left open from an
   // earlier blast) — same fixup runGameCommand's enteredNewLevel branch does
   // for the console `load` command; this is the Saves modal's Load button,
   // the only other real path that swaps ctx.state (#571).
-  uiManager.closeStaleLevelOverlays(ctx.state);
+  // `state`, not `ctx.state` — `loadGridForState` just assigned `ctx.state =
+  // state` on this success path, but TS can't see that mutation through the
+  // call, and `state` here is already known non-null.
+  uiManager.closeStaleLevelOverlays(state);
   gameRenderer.syncFromContext(ctx);
 });
 

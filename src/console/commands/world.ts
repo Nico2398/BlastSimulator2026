@@ -1,10 +1,10 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -14,7 +14,7 @@ import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
-import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
+import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -81,6 +81,24 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
     : null;
 }
 
+/**
+ * The size + hardness fields `TerrainConfig` and `regenerateGrid`'s params
+ * share, read from a `WorldState`'s own base (level-original) size rather
+ * than its live, possibly site-expanded one — takes only the `WorldState`
+ * slice it reads, not the whole `GameState`, since neither caller below
+ * needs anything else off it (#1181 review — shared by `terrainConfigOf`
+ * and `regenerateGridParams`, which otherwise built this same shape from
+ * the same three fields independently).
+ */
+function worldSizeParams(world: WorldState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+  return {
+    sizeX: world.baseSizeX,
+    sizeY: world.sizeY,
+    sizeZ: world.baseSizeZ,
+    ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+  };
+}
+
 /** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
 export function terrainConfigOf(state: GameState): TerrainConfig | null {
   if (!state.world) return null;
@@ -89,28 +107,62 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
   return {
     seed: state.seed,
     climateBias: biome.climateCenter,
-    sizeX: state.world.baseSizeX,
-    sizeY: state.world.sizeY,
-    sizeZ: state.world.baseSizeZ,
+    ...worldSizeParams(state.world),
   };
 }
 
 /**
- * The generation datum to embed in a save, so pristine chunks regenerate on
- * load instead of being stored (#473 D4). Undefined when the state carries no
- * world or an unknown mine type, which makes `encodeVoxelGrid` fall back to
- * storing every chunk.
+ * The generation datum to embed in a save (#1181) — the complete generator
+ * identity `decodeVoxelGrid` regenerates pristine terrain from. Undefined
+ * when the state carries no world or an unknown mine type.
  */
-export function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
+function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
   const config = terrainConfigOf(state);
   if (!config) return undefined;
   return {
+    version: TERRAIN_GENERATOR_VERSION,
     seed: config.seed,
-    climateBias: [config.climateBias[0], config.climateBias[1]],
+    climateBias: config.climateBias as [number, number],
     sizeX: config.sizeX,
     sizeY: config.sizeY,
     sizeZ: config.sizeZ,
+    ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
   };
+}
+
+/**
+ * The params `regenerateGrid`'s size/hardness fields should carry for a
+ * no-voxels load fallback — the level's ORIGINAL base size (#1181, fixing a
+ * pre-#1181 defect where that fallback regenerated at the live, possibly
+ * site-expanded size instead).
+ */
+function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+  if (!state.world) {
+    return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
+  }
+  return worldSizeParams(state.world);
+}
+
+/**
+ * A player-facing refusal message when `voxels` can't be loaded — either its
+ * embedded generator version doesn't match this build's
+ * `TERRAIN_GENERATOR_VERSION`, or the payload itself is malformed (missing
+ * `gen`, wrong `v`) — or null when the version matches and the save may load.
+ *
+ * `voxels` is `deserialize`'s cast of parsed save JSON — untrusted, despite
+ * the `SerializedVoxels` type — so `voxels.v`/`voxels.gen` are checked
+ * before ever touching `.gen.version`. The malformed-payload branch gets its
+ * own `world.terrain_save_corrupt` copy rather than reusing
+ * `world.terrain_version_mismatch` with a placeholder `saved: -1` — that
+ * reuse read as a real (bogus) generator version ("v-1") instead of "this
+ * file is corrupt" (#1181 review).
+ */
+function terrainVersionMismatch(voxels: SerializedVoxels): string | null {
+  if (voxels.v !== 8 || !voxels.gen || typeof voxels.gen.version !== 'number') {
+    return t('world.terrain_save_corrupt');
+  }
+  if (voxels.gen.version === TERRAIN_GENERATOR_VERSION) return null;
+  return t('world.terrain_version_mismatch', { saved: voxels.gen.version, current: TERRAIN_GENERATOR_VERSION });
 }
 
 /** The whole site, as a terrain:updated region. */
@@ -122,9 +174,6 @@ function gridDirtyRegion(grid: VoxelGrid): {
     maxX: grid.maxX - 1, maxY: grid.sizeY - 1, maxZ: grid.maxZ - 1,
   };
 }
-
-/** Re-exported so existing importers of `./world.js` keep working (#504 moved the source of truth to core/config/balance.js). */
-export { DEFAULT_GRID_SIZE };
 
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
@@ -157,6 +206,9 @@ export function regenerateGrid(
     sizeX, sizeY, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
   };
+  if (ctx.state.world && mixedRockHardness !== undefined) {
+    ctx.state.world.mixedRockHardness = mixedRockHardness;
+  }
   ctx.grid = generateTerrain(config);
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   ctx.playableArea = new PlayableArea(ctx.grid, config);
@@ -210,21 +262,119 @@ export function ensureLandscape(
 }
 
 /**
- * Restore `ctx.grid` from a save's embedded voxel payload (v6+), preserving
- * actual terrain mutations — blast craters, ramps — instead of discarding
- * them the way `regenerateGrid`'s from-seed path does. Mirrors
- * `regenerateGrid`'s navgrid-build and event-emission steps exactly; only
- * the grid's origin (decoded vs. freshly generated) differs (#458 T0.3).
+ * Restore `ctx.grid` from an already-decoded voxel grid, preserving actual
+ * terrain mutations — blast craters, ramps — instead of discarding them the
+ * way `regenerateGrid`'s from-seed path does. Mirrors `regenerateGrid`'s
+ * navgrid-build and event-emission steps exactly; only the grid's origin
+ * (decoded vs. freshly generated) differs (#458 T0.3).
+ *
+ * Takes an already-decoded `VoxelGrid` rather than the raw
+ * `SerializedVoxels` payload: `loadGridForState` below decodes (and
+ * validates) the payload *before* touching `ctx` at all, so nothing this
+ * function does can throw partway through an already-mutated `ctx` (#1181
+ * review — `decodeVoxelGrid` throws on malformed edit/composition/size data,
+ * and that used to happen here, after `ctx.state` was already swapped).
  */
-export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
+function restoreGrid(ctx: GameContext, grid: VoxelGrid): void {
   if (!ctx.state) return;
-  ctx.grid = decodeVoxelGrid(voxels);
+  ctx.grid = grid;
   ctx.landscape = null; // stale for the restored grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   const config = terrainConfigOf(ctx.state);
   ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
   syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
+}
+
+/**
+ * Load `state`'s grid into `ctx`, sharing the version-check +
+ * restore/regenerate branch every load path needs — `regenerateGrid`'s own
+ * doc comment already warns this branch "must stay in sync" across call
+ * sites (#408); `loadCommand` (saveload.ts) and the Saves modal's load
+ * handler (main.ts) previously each wrote it out independently, which is
+ * exactly the drift that comment warns about (#1181 review). Returns a
+ * player-facing refusal message and leaves `ctx.state` untouched when the
+ * save can't load (unknown mine type, or a terrain-generator version
+ * mismatch); returns null and assigns `ctx.state = state` on success. Each
+ * call site only differs in how it reports a non-null result (command-result
+ * output vs. a UI notify toast).
+ *
+ * `ctx.state`/`ctx.grid`/`ctx.playableArea`/`ctx.landscape` are left exactly
+ * as they were on every refusal path, including one only `decodeVoxelGrid`
+ * (or the restore/regenerate step itself) can detect — a malformed edit
+ * segment, an invalid composition, or a generator identity outside
+ * `MAX_TERRAIN_GEN_DIMENSION`. `decodeVoxelGrid` runs *before* `ctx.state` is
+ * touched so its own throws never see a mutated `ctx`; the assign +
+ * restore/regenerate step that follows is still wrapped in try/catch and
+ * rolls `ctx` back on any other failure, so a corrupt save can never leave a
+ * half-swapped `GameContext` — new `state` with the old `grid`/`playableArea`
+ * still pointing at the previous game (#1181 review).
+ */
+export function loadGridForState(ctx: GameContext, state: GameState): string | null {
+  const biome = getBiome(state.mineType);
+  if (!biome) {
+    // Plain dev string, not `world.unknown_mine_type` (which is
+    // `newGameCommand`'s i18n'd validation of a player-*typed* mine_type
+    // argument) — a saved state whose own `mineType` fails `getBiome` means
+    // the save itself is corrupt, the same low-probability edge
+    // `terrainVersionMismatch` reuses non-i18n copy for elsewhere in this
+    // file (#1181 review).
+    return `Save has unknown mine type "${state.mineType}".`;
+  }
+
+  if (state.world?.voxels) {
+    const mismatch = terrainVersionMismatch(state.world.voxels);
+    if (mismatch) return mismatch;
+  }
+
+  let decodedGrid: VoxelGrid | null = null;
+  if (state.world?.voxels) {
+    try {
+      decodedGrid = decodeVoxelGrid(state.world.voxels);
+    } catch {
+      return t('world.terrain_save_corrupt');
+    }
+  }
+
+  const prevState = ctx.state;
+  const prevGrid = ctx.grid;
+  const prevLandscape = ctx.landscape;
+  const prevPlayableArea = ctx.playableArea;
+  try {
+    ctx.state = state;
+    if (decodedGrid) {
+      restoreGrid(ctx, decodedGrid);
+    } else {
+      const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+      regenerateGrid(ctx, {
+        seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+        ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+      });
+    }
+  } catch {
+    ctx.state = prevState;
+    ctx.grid = prevGrid;
+    ctx.landscape = prevLandscape;
+    ctx.playableArea = prevPlayableArea;
+    return t('world.terrain_save_corrupt');
+  }
+  return null;
+}
+
+/**
+ * The generation datum + encoded voxel payload to embed into `state.world`
+ * right before a save is taken (#1181 review) — `saveCommand` (saveload.ts)
+ * and `main.ts`'s `savesModal.setGetState` each independently computed this
+ * (`terrainGenDatum` + the `ctx.grid && state.world && gen` guard +
+ * `encodeVoxelGrid`'s spread), the save-side mirror of the exact duplication
+ * `loadGridForState` above was extracted to fix on the load side. Returns
+ * `state.world` unchanged when there is no grid, no world, or no resolvable
+ * generator identity to embed.
+ */
+export function embedVoxelsForSave(ctx: GameContext, state: GameState): GameState['world'] {
+  const gen = terrainGenDatum(state);
+  if (!ctx.grid || !state.world || !gen) return state.world;
+  return { ...state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
 }
 
 export function newGameCommand(
@@ -369,10 +519,11 @@ export function terrainInfoCommand(
 /**
  * Builds (or reports the already-built) landscape map for the current game
  * — the first real trigger for `ensureLandscape`'s lazy build. Resolves
- * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`;
- * `mixedRockHardness` isn't persisted on GameState, so this always builds
- * the normal (non-mixed) strata profile even for a mixedRockHardness level —
- * a known limitation shared with `regenerateGrid`'s own load-path callers.
+ * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`,
+ * and `mixedRockHardness` from `ctx.state.world` (#1181 fixed the same gap
+ * for `regenerateGrid`'s own load-path callers, via `terrainConfigOf`/
+ * `regenerateGridParams`; this command reads the field directly since it
+ * only ever runs against an already-loaded game).
  */
 export function landscapeInfoCommand(
   ctx: GameContext,
@@ -386,8 +537,11 @@ export function landscapeInfoCommand(
   const biome = getBiome(ctx.state.mineType);
   if (!biome) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
 
-  const { sizeX, sizeY, sizeZ } = ctx.state.world;
-  const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  const { sizeX, sizeY, sizeZ, mixedRockHardness } = ctx.state.world;
+  const landscape = ensureLandscape(ctx, {
+    seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+  });
   if (!landscape) return { success: false, output: t('world.landscape_build_failed') };
 
   const { map } = landscape;

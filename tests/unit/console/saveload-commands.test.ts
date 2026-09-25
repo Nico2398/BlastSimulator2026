@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
@@ -110,5 +111,168 @@ describe('loadCommand', () => {
     const result = loadCommand(ctx, [], {});
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).not.toBe(-1);
+  });
+});
+
+// BlastSimulator2026 — terrain save identity + edit-record round trip (#1181)
+//
+// A save no longer embeds dense chunk data (#458/#473's v6/v7 format). It
+// embeds the generator identity (`terrainGenDatum`) plus the edit record
+// (#1180's `grid.edits`) — so a save/load round trip must reproduce a dig
+// through *replay*, not through a stored dense voxel array, and the
+// no-voxels fallback must regenerate at the level's original base size, not
+// whatever size a site-expanded live grid currently reports.
+describe('save/load — terrain generator identity + edit record (#1181)', () => {
+  it('replays a dig through the edit record on load, not dense storage', () => {
+    const ctx = makeCtx();
+    const digX = 2, digZ = 2;
+    const digY = computeVoxelColumnSurfaceY(ctx.grid!, digX, digZ);
+    expect(digY, 'expected solid ground at the dig column').toBeGreaterThanOrEqual(0);
+    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBeGreaterThan(0);
+
+    const dugComposition = ctx.grid!.compositionAt(digX, digY - 1, digZ); // the voxel below survives — sanity reference
+    ctx.grid!.clearVoxel(digX, digY, digZ);
+    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBe(0);
+
+    saveCommand(ctx, [], { slot: 'dig-replay' });
+
+    ctx.grid = null;
+    const result = loadCommand(ctx, [], { slot: 'dig-replay' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.grid).not.toBeNull();
+    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBe(0);
+    // Everything below the dig is untouched — generation alone reproduces it, unaffected by the edit record.
+    expect(ctx.grid!.compositionAt(digX, digY - 1, digZ).rocks).toEqual(dugComposition.rocks);
+  });
+
+  it('the no-voxels fallback regenerates at the level base size, not the live (possibly site-expanded) size', () => {
+    const ctx = makeCtx(); // 16x16x16, baseSizeX/baseSizeZ === 16
+    expect(ctx.state!.world!.baseSizeX).toBe(16);
+    expect(ctx.state!.world!.baseSizeZ).toBe(16);
+
+    // Simulate a site that expanded past its original footprint (#473):
+    // the live bounding box grows, but baseSizeX/baseSizeZ never change.
+    ctx.state!.world!.sizeX = 24;
+    ctx.state!.world!.sizeZ = 24;
+
+    // Save with no grid attached, so saveCommand never re-embeds a voxels
+    // payload — reproducing a pre-#1181-era "no voxels" save.
+    ctx.grid = null;
+    expect(ctx.state!.world!.voxels).toBeUndefined();
+    const saveResult = saveCommand(ctx, [], { slot: 'no-voxels-fallback' });
+    expect(saveResult.success).toBe(true);
+
+    const result = loadCommand(ctx, [], { slot: 'no-voxels-fallback' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.grid).not.toBeNull();
+    expect(ctx.grid!.sizeX).toBe(16);
+    expect(ctx.grid!.sizeZ).toBe(16);
+  });
+
+  it('refuses to load a save whose terrain generator version does not match, leaving ctx.state/ctx.grid unchanged', () => {
+    // Build a save whose embedded voxels payload carries a tampered generator version.
+    const buildCtx = makeCtx();
+    saveCommand(buildCtx, [], { slot: 'version-mismatch' });
+    loadCommand(buildCtx, [], { slot: 'version-mismatch' }); // materializes ctx.state.world.voxels with a real gen
+    expect(buildCtx.state!.world!.voxels).toBeDefined();
+    buildCtx.state!.world!.voxels!.gen.version += 1;
+    buildCtx.grid = null; // saveCommand only re-embeds voxels when ctx.grid is set — keep our tampered payload intact
+    saveCommand(buildCtx, [], { slot: 'version-mismatch' });
+
+    // Attempt to load that tampered save into a different, already-running context.
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+
+    const result = loadCommand(ctx, [], { slot: 'version-mismatch' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+  });
+
+  // #1181 review: decodeVoxelGrid now runs (and can throw) *before* ctx.state
+  // is touched, so a malformed voxels payload — as opposed to a genuine
+  // version mismatch — must fail loadCommand cleanly with the distinct
+  // world.terrain_save_corrupt copy, leaving ctx entirely untouched.
+  it('refuses to load a save whose voxels payload is malformed (gen.sizeY absurd), leaving ctx.state/ctx.grid/ctx.playableArea unchanged', () => {
+    const buildCtx = makeCtx();
+    saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
+    loadCommand(buildCtx, [], { slot: 'corrupt-dimension' }); // materializes ctx.state.world.voxels with a real gen
+    expect(buildCtx.state!.world!.voxels).toBeDefined();
+    buildCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    buildCtx.grid = null; // keep the tampered payload — saveCommand only re-embeds voxels when ctx.grid is set
+    saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
+
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const playableAreaBefore = ctx.playableArea;
+
+    const result = loadCommand(ctx, [], { slot: 'corrupt-dimension' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+    expect(ctx.playableArea).toBe(playableAreaBefore);
+  });
+
+  it('refuses to load a save whose voxels payload has a malformed "added" edit segment (no composition), leaving ctx unchanged', () => {
+    const buildCtx = makeCtx();
+    const addX = 2, addZ = 2;
+    const addY = computeVoxelColumnSurfaceY(buildCtx.grid!, addX, addZ);
+    expect(addY, 'expected solid ground at the add column').toBeGreaterThanOrEqual(0);
+    saveCommand(buildCtx, [], { slot: 'corrupt-composition' });
+    loadCommand(buildCtx, [], { slot: 'corrupt-composition' }); // materializes ctx.state.world.voxels
+    expect(buildCtx.state!.world!.voxels).toBeDefined();
+    // Inject a malformed 'added' edit segment with no composition at all.
+    buildCtx.state!.world!.voxels!.editColumns.push({
+      x: addX, z: addZ,
+      segments: [{ yLo: addY, yHi: addY, kind: 'added' }],
+    });
+    buildCtx.grid = null;
+    saveCommand(buildCtx, [], { slot: 'corrupt-composition' });
+
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const playableAreaBefore = ctx.playableArea;
+
+    const result = loadCommand(ctx, [], { slot: 'corrupt-composition' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+    expect(ctx.playableArea).toBe(playableAreaBefore);
+  });
+
+  it('a malformed-payload failure carries the distinct corrupt-save message, not the version-mismatch message', () => {
+    // Genuine version mismatch, for comparison.
+    const versionCtx = makeCtx();
+    saveCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    loadCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    versionCtx.state!.world!.voxels!.gen.version += 1;
+    versionCtx.grid = null;
+    saveCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    const versionResult = loadCommand(makeCtx(), [], { slot: 'msg-version-mismatch' });
+    expect(versionResult.success).toBe(false);
+
+    // Malformed payload (corrupt-save), not a version mismatch.
+    const corruptCtx = makeCtx();
+    saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    loadCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    corruptCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    corruptCtx.grid = null;
+    saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    const corruptResult = loadCommand(makeCtx(), [], { slot: 'msg-corrupt' });
+    expect(corruptResult.success).toBe(false);
+
+    // The two refusal messages are distinct — the corrupt-save copy never
+    // mentions a generator version, unlike the version-mismatch copy.
+    expect(corruptResult.output).not.toEqual(versionResult.output);
+    expect(corruptResult.output).toContain('corrupt');
+    expect(versionResult.output).not.toContain('corrupt');
   });
 });

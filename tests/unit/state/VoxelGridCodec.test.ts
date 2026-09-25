@@ -1,244 +1,258 @@
+// BlastSimulator2026 — VoxelGridCodec unit tests (#1181)
+//
+// A save no longer embeds dense chunk data. It embeds the complete generator
+// identity terrain was produced from (`SerializedTerrainGen` — seed,
+// climateBias, base size, mixedRockHardness, TERRAIN_GENERATOR_VERSION) plus
+// the edit record (#1180's `grid.edits`) of everything play changed since
+// generation. `decodeVoxelGrid` regenerates pristine terrain from the
+// generator identity, then replays the edit record on top — reproducing the
+// live grid voxel for voxel without ever storing every voxel's full state.
+
 import { describe, it, expect } from 'vitest';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
-import { bytesToBase64 } from '../../../src/core/state/Base64.js';
+import { generateTerrain, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
-  rleEncode, rleDecode, encodeVoxelGrid, decodeVoxelGrid,
-  type SerializedVoxels, type SerializedVoxelsV6,
+  encodeVoxelGrid, decodeVoxelGrid, TerrainGenVersionMismatchError,
+  type SerializedTerrainGen, type SerializedVoxels,
 } from '../../../src/core/state/VoxelGridCodec.js';
+import type { EditSegment } from '../../../src/core/world/TerrainEdits.js';
 
-describe('rleEncode / rleDecode', () => {
-  it('round-trips an empty stream', () => {
-    const src = new Uint8Array(0);
-    expect(rleDecode(rleEncode(src), 0)).toEqual(src);
-  });
+/** A small, fast-to-generate generator identity, overridable per test. */
+function makeGen(overrides: Partial<SerializedTerrainGen> = {}): SerializedTerrainGen {
+  return {
+    version: TERRAIN_GENERATOR_VERSION,
+    seed: 42,
+    climateBias: [0, 0],
+    sizeX: 32,
+    sizeY: 16,
+    sizeZ: 32,
+    ...overrides,
+  };
+}
 
-  it('round-trips a uniform run', () => {
-    const src = new Uint8Array(50).fill(7);
-    expect(rleDecode(rleEncode(src), 50)).toEqual(src);
-  });
+/** The `TerrainConfig` `generateTerrain` expects, built from a `SerializedTerrainGen`. */
+function genToConfig(gen: SerializedTerrainGen): TerrainConfig {
+  return {
+    seed: gen.seed,
+    climateBias: gen.climateBias,
+    sizeX: gen.sizeX,
+    sizeY: gen.sizeY,
+    sizeZ: gen.sizeZ,
+    ...(gen.mixedRockHardness !== undefined ? { mixedRockHardness: gen.mixedRockHardness } : {}),
+  };
+}
 
-  it('splits runs longer than 255 into multiple pairs', () => {
-    const src = new Uint8Array(600).fill(3);
-    const encoded = rleEncode(src);
-    // 600 = 255 + 255 + 90 -> 3 (count, value) pairs -> 6 output bytes.
-    expect(encoded.length).toBe(6);
-    expect(rleDecode(encoded, 600)).toEqual(src);
-  });
+/** Walks every voxel of `gen`'s footprint and compares `a` against `b` — density, dominant rock, ores, fracture. Fails on the first mismatch, naming the voxel. */
+function assertGridsMatchVoxelForVoxel(a: VoxelGrid, b: VoxelGrid, gen: SerializedTerrainGen): void {
+  for (let x = 0; x < gen.sizeX; x++) {
+    for (let z = 0; z < gen.sizeZ; z++) {
+      for (let y = 0; y < gen.sizeY; y++) {
+        const aDensity = a.densityAt(x, y, z);
+        const bDensity = b.densityAt(x, y, z);
+        expect(aDensity, `density mismatch at (${x},${y},${z}): a=${aDensity} b=${bDensity}`).toBe(bDensity);
 
-  it('round-trips mixed non-uniform bytes', () => {
-    const src = new Uint8Array([1, 1, 1, 2, 3, 3, 0, 255, 255, 255, 255]);
-    expect(rleDecode(rleEncode(src), src.length)).toEqual(src);
-  });
+        const aRock = a.dominantRockAt(x, y, z);
+        const bRock = b.dominantRockAt(x, y, z);
+        expect(aRock, `dominant rock mismatch at (${x},${y},${z}): a=${aRock} b=${bRock}`).toBe(bRock);
 
-  it('throws when the encoded stream is longer than expected (corrupt save)', () => {
-    const encoded = rleEncode(new Uint8Array(20).fill(1));
-    expect(() => rleDecode(encoded, 5)).toThrow(/corrupt save/i);
-  });
+        const aOres = a.oresAt(x, y, z);
+        const bOres = b.oresAt(x, y, z);
+        expect(aOres, `ore mismatch at (${x},${y},${z}): a=${JSON.stringify(aOres)} b=${JSON.stringify(bOres)}`).toEqual(bOres);
 
-  it('throws when the encoded stream is shorter than expected (corrupt save)', () => {
-    const encoded = rleEncode(new Uint8Array(5).fill(1));
-    expect(() => rleDecode(encoded, 20)).toThrow(/corrupt save/i);
-  });
-});
-
-describe('encodeVoxelGrid / decodeVoxelGrid', () => {
-  it('round-trips an all-air grid', () => {
-    const grid = new VoxelGrid(4, 4, 4);
-    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid));
-    expect(decoded.sizeX).toBe(4);
-    expect(decoded.densityAt(1, 1, 1)).toBe(0);
-    expect(decoded.dominantRockAt(1, 1, 1)).toBe('');
-  });
-
-  it('round-trips density, composition, fracture, and ore data exactly', () => {
-    const grid = new VoxelGrid(6, 6, 6);
-    grid.setVoxel(2, 2, 2, {
-      composition: { rocks: [{ rockId: 'cruite', coefficient: 0.6 }, { rockId: 'sandite', coefficient: 0.4 }] },
-      density: 1.0,
-      oreDensities: { dirtite: 0.35 },
-      fractureModifier: 0.49,
-    });
-    grid.setVoxel(3, 3, 3, {
-      composition: { rocks: [{ rockId: 'titanite', coefficient: 1.0 }] },
-      density: 1.0,
-      oreDensities: {},
-      fractureModifier: 1.0,
-    });
-
-    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid));
-
-    expect(decoded.densityAt(2, 2, 2)).toBe(1.0);
-    expect(decoded.fractureAt(2, 2, 2)).toBeCloseTo(0.49, 10);
-    expect(decoded.dominantRockAt(2, 2, 2)).toBe('cruite');
-    expect(decoded.oresAt(2, 2, 2)).toEqual({ dirtite: 0.35 });
-
-    expect(decoded.dominantRockAt(3, 3, 3)).toBe('titanite');
-    expect(decoded.oresAt(3, 3, 3)).toBeUndefined();
-
-    expect(decoded.densityAt(0, 0, 0)).toBe(0);
-  });
-
-  it('preserves palette deduplication across many identical compositions', () => {
-    const grid = new VoxelGrid(8, 8, 8);
-    for (let x = 0; x < 8; x++) {
-      for (let z = 0; z < 8; z++) {
-        grid.setVoxel(x, 0, z, {
-          composition: { rocks: [{ rockId: 'grumpite', coefficient: 1.0 }] },
-          density: 1.0,
-          oreDensities: {},
-          fractureModifier: 1.0,
-        });
+        const aFracture = a.fractureAt(x, y, z);
+        const bFracture = b.fractureAt(x, y, z);
+        expect(aFracture, `fracture mismatch at (${x},${y},${z}): a=${aFracture} b=${bFracture}`).toBeCloseTo(bFracture, 10);
       }
     }
-    const payload = encodeVoxelGrid(grid);
-    // air (reserved) + one distinct blend
-    expect(payload.palette.length).toBe(2);
+  }
+}
+
+describe('encodeVoxelGrid / decodeVoxelGrid — untouched grid', () => {
+  it('round-trips claimed chunks and the generator identity for a freshly generated, never-edited grid', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+
+    const payload = encodeVoxelGrid(grid, gen);
+
+    expect(payload.gen.version).toBe(TERRAIN_GENERATOR_VERSION);
+    expect(payload.gen.seed).toBe(gen.seed);
+    expect(payload.gen.climateBias).toEqual(gen.climateBias);
+    expect(payload.gen.sizeX).toBe(gen.sizeX);
+    expect(payload.gen.sizeY).toBe(gen.sizeY);
+    expect(payload.gen.sizeZ).toBe(gen.sizeZ);
+
+    const payloadChunks = payload.claimed.map(([cx, cz]) => `${cx},${cz}`).sort();
+    const gridChunks = grid.ownedChunks().map(({ cx, cz }) => `${cx},${cz}`).sort();
+    expect(payloadChunks).toEqual(gridChunks);
 
     const decoded = decodeVoxelGrid(payload);
-    for (let x = 0; x < 8; x++) {
-      for (let z = 0; z < 8; z++) {
-        expect(decoded.dominantRockAt(x, 0, z)).toBe('grumpite');
-      }
-    }
+    assertGridsMatchVoxelForVoxel(decoded, grid, gen);
   });
 
-  it('round-trips a blast-carved grid (mixed solid/air after clearVoxel)', () => {
-    const grid = new VoxelGrid(5, 5, 5);
-    for (let y = 0; y < 5; y++) {
-      grid.setVoxel(2, y, 2, {
-        composition: { rocks: [{ rockId: 'obstiite', coefficient: 1.0 }] },
-        density: 1.0,
-        oreDensities: {},
-        fractureModifier: 1.0,
-      });
-    }
-    grid.clearVoxel(2, 4, 2); // simulate a blast crater at the top
+  it('carries no voxel edit data at all for a freshly generated, never-edited grid', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
 
-    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid));
-    expect(decoded.densityAt(2, 4, 2)).toBe(0);
-    expect(decoded.densityAt(2, 3, 2)).toBe(1.0);
-    expect(decoded.dominantRockAt(2, 3, 2)).toBe('obstiite');
-  });
+    const payload = encodeVoxelGrid(grid, gen);
 
-  it('rejects a payload whose encoded chunk length does not match CHUNK_SIZE*sizeY*CHUNK_SIZE', () => {
-    const grid = new VoxelGrid(2, 2, 2);
-    const payload = encodeVoxelGrid(grid);
-    const corrupt = { ...payload, sizeY: 100 };
-    expect(() => decodeVoxelGrid(corrupt)).toThrow(/corrupt save/i);
-  });
-
-  it('preserves an edge chunk clipped to a site whose size is not a multiple of CHUNK_SIZE', () => {
-    const grid = new VoxelGrid(24, 8, 24);
-    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid));
-    expect(decoded.sizeX).toBe(24);
-    expect(decoded.sizeZ).toBe(24);
-    expect(decoded.isInBounds(23, 0, 23)).toBe(true);
-    expect(decoded.isInBounds(24, 0, 0)).toBe(false);
-  });
-
-  it('rejects a payload claiming pristine chunks with no generation datum', () => {
-    const payload: SerializedVoxels = {
-      v: 7, sizeY: 8, palette: [{ rocks: [] }], pristine: [[0, 0, 0, 0, 16, 16]], chunks: [],
-    };
-    expect(() => decodeVoxelGrid(payload)).toThrow(/generation datum/i);
+    expect(payload.editColumns).toHaveLength(0);
+    expect(payload.editFractures).toHaveLength(0);
   });
 });
 
-describe('encodeVoxelGrid dirty-chunk selection (#473 D4)', () => {
-  const gen = { seed: 42, climateBias: [0, 0] as [number, number], sizeX: 32, sizeY: 16, sizeZ: 32 };
+describe('encodeVoxelGrid / decodeVoxelGrid — edited grid', () => {
+  it('round-trips a dig, an add with ore composition, and a fracture write exactly', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
 
-  it('stores no voxel data at all for a freshly generated, untouched site', () => {
-    const grid = generateTerrain({ ...gen });
-    const payload = encodeVoxelGrid(grid, gen);
-    expect(payload.chunks).toHaveLength(0);
-    expect(payload.pristine).toHaveLength(4); // 32x32 m over 16 m chunks
-  });
+    // ── Dig ──
+    const digX = 5, digZ = 5;
+    const digY = computeVoxelColumnSurfaceY(grid, digX, digZ);
+    expect(digY, 'expected solid ground at the dig column').toBeGreaterThanOrEqual(0);
+    expect(grid.densityAt(digX, digY, digZ)).toBeGreaterThan(0);
+    grid.clearVoxel(digX, digY, digZ);
+    expect(grid.densityAt(digX, digY, digZ)).toBe(0);
 
-  it('stores only the chunk a blast actually carved', () => {
-    const grid = generateTerrain({ ...gen });
-    grid.clearVoxel(20, 8, 20); // chunk (1, 1)
-    const payload = encodeVoxelGrid(grid, gen);
-    expect(payload.chunks.map(c => [c.cx, c.cz])).toEqual([[1, 1]]);
-    expect(payload.pristine).toHaveLength(3);
-  });
+    // ── Add, with an ore composition distinct from anything generation produced here ──
+    const addX = 10, addZ = 10;
+    const addSurfaceY = computeVoxelColumnSurfaceY(grid, addX, addZ);
+    expect(addSurfaceY, 'expected solid ground at the add column').toBeGreaterThanOrEqual(0);
+    const addY = Math.min(gen.sizeY - 1, addSurfaceY + 2); // above the natural surface — genuinely "added"
+    const addedComposition = { rocks: [{ rockId: 'cruite', coefficient: 0.7 }, { rockId: 'sandite', coefficient: 0.3 }] };
+    const addedOres = { dirtite: 0.42 };
+    const addedCompId = grid.palette.intern(addedComposition);
+    grid.fillVoxel(addX, addY, addZ, addedCompId, addedOres, 1.0);
+    expect(grid.densityAt(addX, addY, addZ)).toBe(1.0);
+    expect(grid.oresAt(addX, addY, addZ)).toEqual(addedOres);
 
-  it('regenerates pristine chunks byte-identically on load', () => {
-    const grid = generateTerrain({ ...gen });
-    grid.clearVoxel(20, 8, 20);
+    // ── Fracture ──
+    const fractureX = 15, fractureZ = 15;
+    const fractureY = computeVoxelColumnSurfaceY(grid, fractureX, fractureZ);
+    expect(fractureY, 'expected solid ground at the fracture column').toBeGreaterThanOrEqual(0);
+    grid.setFractureAt(fractureX, fractureY, fractureZ, 0.37);
+    expect(grid.fractureAt(fractureX, fractureY, fractureZ)).toBeCloseTo(0.37, 10);
+
     const decoded = decodeVoxelGrid(encodeVoxelGrid(grid, gen));
 
-    expect(decoded.densityAt(20, 8, 20)).toBe(0);
-    for (let x = 0; x < 32; x += 3) {
-      for (let z = 0; z < 32; z += 3) {
-        for (let y = 0; y < 16; y += 2) {
-          expect(decoded.densityAt(x, y, z)).toBe(grid.densityAt(x, y, z));
-          expect(decoded.dominantRockAt(x, y, z)).toBe(grid.dominantRockAt(x, y, z));
-        }
+    // Every touched voxel matches exactly, not just "close enough".
+    expect(decoded.densityAt(digX, digY, digZ)).toBe(0);
+
+    expect(decoded.densityAt(addX, addY, addZ)).toBe(1.0);
+    expect(decoded.compositionAt(addX, addY, addZ).rocks).toEqual(addedComposition.rocks);
+    expect(decoded.oresAt(addX, addY, addZ)).toEqual(addedOres);
+
+    expect(decoded.fractureAt(fractureX, fractureY, fractureZ)).toBeCloseTo(0.37, 10);
+
+    // And the whole footprint reproduces the live grid voxel for voxel — the
+    // edits above plus everything generation alone produced.
+    assertGridsMatchVoxelForVoxel(decoded, grid, gen);
+  });
+});
+
+describe('encodeVoxelGrid / decodeVoxelGrid — mixedRockHardness', () => {
+  it('round-trips mixedRockHardness through gen and reproduces the interleaved strata exactly', () => {
+    const baseParams = { seed: 99, climateBias: [0.6, 0.7] as [number, number], sizeX: 32, sizeY: 24, sizeZ: 32 };
+    const mixedGen = makeGen({ ...baseParams, mixedRockHardness: true });
+    const mixedGrid = generateTerrain(genToConfig(mixedGen));
+
+    const payload = encodeVoxelGrid(mixedGrid, mixedGen);
+    expect(payload.gen.mixedRockHardness).toBe(true);
+
+    const decoded = decodeVoxelGrid(payload);
+
+    // Sanity: the mixed-hardness profile genuinely differs from the normal
+    // (non-mixed) profile somewhere along depth at this seed/column — proving
+    // mixedRockHardness actually reached generation through the codec, rather
+    // than the codec silently falling back to the default strata (which would
+    // also happen to "round-trip" against a grid built the same wrong way).
+    const normalGrid = generateTerrain(baseParams);
+    let differsSomewhere = false;
+    for (let y = 0; y < baseParams.sizeY; y++) {
+      if (decoded.dominantRockAt(10, y, 10) !== normalGrid.dominantRockAt(10, y, 10)) {
+        differsSomewhere = true;
+        break;
       }
     }
-  });
+    expect(differsSomewhere, 'expected mixedRockHardness to produce a different strata profile than the default at this seed/column').toBe(true);
 
-  it('stores every chunk when no generation datum is supplied', () => {
-    const grid = generateTerrain({ ...gen });
-    const payload = encodeVoxelGrid(grid);
-    expect(payload.pristine).toHaveLength(0);
-    expect(payload.chunks).toHaveLength(4);
+    // And matches an independently-built mixed-hardness grid at the same config exactly.
+    assertGridsMatchVoxelForVoxel(decoded, mixedGrid, mixedGen);
   });
 });
 
-// #609: a corrupted/hand-edited save (e.g. r: [0, 0, 1e12, 1e12]) must not
-// reach TerrainMesh's chunk-iteration loops unclamped -- VoxelGrid clamps at
-// its own two save-facing entry points (restoreChunkRaw / addChunkWithRect),
-// so decodeVoxelGrid ends up with a grid whose chunk rects are always sane
-// regardless of what the JSON claimed.
-describe('decodeVoxelGrid — corrupted chunk rects are clamped, not trusted verbatim (#609)', () => {
-  it('a corrupted chunks[].r (matching the issue\'s literal repro) is clamped to the chunk\'s real tile', () => {
-    const grid = new VoxelGrid(16, 4, 16);
-    const payload = encodeVoxelGrid(grid); // no `gen` -> every owned chunk stored dirty, with a real r
-    expect(payload.chunks).toHaveLength(1);
-
-    const corrupted: SerializedVoxels = {
-      ...payload,
-      chunks: [{ ...payload.chunks[0]!, r: [0, 0, 1e12, 1e12] }],
-    };
-
-    // decodeChunkInto's own arrays are sized from sizeY alone (unrelated to
-    // `r`), and restoreChunkRaw's internal rescan is already bounded against
-    // the chunk's real storage span independently of this fix -- so this
-    // path was never actually at hang risk; what was wrong is that the
-    // corrupted rect survived into the grid's own x0/z0/x1/z1 state
-    // unclamped, which is what TerrainMesh iterates directly over.
-    const decoded = decodeVoxelGrid(corrupted);
-
-    expect(decoded.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: 16, maxZ: 16 });
-  });
-
-  // Planner note (#609): decodeVoxelGrid's pristine loop below calls
-  // `generateTerrainRegion(grid, terrain, config, { minX, minZ, maxX, maxZ })`
-  // with the RAW tuple values it just destructured from `payload.pristine` --
-  // not with the rect VoxelGrid.addChunkWithRect actually clamped internally
-  // (addChunkWithRect returns void, so the clamped rect never comes back to
-  // this caller). The planned fix only touches VoxelGrid.ts, so that
-  // `generateTerrainRegion` call keeps walking the *unclamped* range
-  // regardless of this fix -- a magnitude anywhere near the issue's literal
-  // 1e12 repro would make that synchronous, single-threaded column loop
-  // genuinely un-interruptible (no vitest timeout preempts a running
-  // for-loop). This test therefore uses a much smaller out-of-tile
-  // magnitude: large enough to prove the corruption reached the pristine
-  // path and that VoxelGrid's own state (chunkRect) ends up clamped either
-  // way, small enough to never risk hanging the suite regardless of whether
-  // decodeVoxelGrid itself is ever also updated to clamp before calling
-  // generateTerrainRegion.
-  it('a corrupted pristine tuple is clamped for the grid\'s own state via addChunkWithRect, proving that entry point is covered too', () => {
-    const gen = { seed: 42, climateBias: [0, 0] as [number, number], sizeX: 16, sizeY: 4, sizeZ: 16 };
-    const grid = generateTerrain({ ...gen });
+describe('decodeVoxelGrid — generator version mismatch', () => {
+  it('throws TerrainGenVersionMismatchError when the payload\'s generator version does not match the current build', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
     const payload = encodeVoxelGrid(grid, gen);
-    expect(payload.pristine).toEqual([[0, 0, 0, 0, 16, 16]]);
 
+    const mismatchedVersion = gen.version + 1;
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, version: mismatchedVersion } };
+
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(TerrainGenVersionMismatchError);
+
+    let caught: unknown;
+    try {
+      decodeVoxelGrid(corrupted);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(TerrainGenVersionMismatchError);
+    const err = caught as TerrainGenVersionMismatchError;
+    expect(err.savedVersion).toBe(mismatchedVersion);
+    expect(err.currentVersion).toBe(TERRAIN_GENERATOR_VERSION);
+  });
+});
+
+describe('encodeVoxelGrid — payload size tracks edited volume, not chunk/voxel count', () => {
+  it('editColumns has exactly one entry per distinct edited column, and one extra fracture write adds exactly one editFractures entry', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+
+    const digColumns: Array<[number, number]> = [[3, 3], [9, 9], [21, 5]];
+    for (const [x, z] of digColumns) {
+      const y = computeVoxelColumnSurfaceY(grid, x, z);
+      expect(y, `expected solid ground at (${x}, ${z})`).toBeGreaterThanOrEqual(0);
+      grid.clearVoxel(x, y, z);
+    }
+
+    const payloadBeforeFracture = encodeVoxelGrid(grid, gen);
+    expect(payloadBeforeFracture.editColumns).toHaveLength(digColumns.length);
+    expect(payloadBeforeFracture.editFractures).toHaveLength(0);
+
+    const fractureX = 25, fractureZ = 25;
+    const fractureY = computeVoxelColumnSurfaceY(grid, fractureX, fractureZ);
+    expect(fractureY, 'expected solid ground at the fracture column').toBeGreaterThanOrEqual(0);
+    grid.setFractureAt(fractureX, fractureY, fractureZ, 0.3);
+
+    const payloadAfterFracture = encodeVoxelGrid(grid, gen);
+    expect(payloadAfterFracture.editFractures).toHaveLength(1);
+    // The fracture write alone must not fabricate a new edited column entry.
+    expect(payloadAfterFracture.editColumns).toHaveLength(digColumns.length);
+  });
+});
+
+// #609: a corrupted/hand-edited save must not reach chunk-iteration loops
+// unclamped. Under the pre-#1181 dense format this was `chunks[].r`; under
+// #1181's generator-identity format the equivalent corruptible rect data is
+// `claimed` — decodeVoxelGrid must clamp it to the chunk's real tile via
+// VoxelGrid's own save-facing entry point rather than trusting it verbatim.
+describe('decodeVoxelGrid — corrupted claimed rects are clamped, not trusted verbatim (#609)', () => {
+  it('a corrupted claimed rect is clamped to the chunk\'s real tile', () => {
+    const gen = makeGen({ sizeX: 16, sizeY: 4, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.claimed).toEqual([[0, 0, 0, 0, 16, 16]]);
+
+    // Bounded out-of-tile magnitude, not the issue's literal 1e12 — a
+    // magnitude anywhere near that would make decodeVoxelGrid's pristine
+    // column loop genuinely un-interruptible (no vitest timeout preempts a
+    // running for-loop). Large enough to prove the corruption reached the
+    // pristine path and that VoxelGrid's own state ends up clamped either
+    // way, small enough to never risk hanging the suite.
     const corrupted: SerializedVoxels = {
       ...payload,
-      pristine: [[0, 0, 0, 0, 40, 40]], // well outside (0,0)'s real [0,16) tile, but bounded (see note above)
+      claimed: [[0, 0, 0, 0, 40, 40]],
     };
 
     const decoded = decodeVoxelGrid(corrupted);
@@ -247,56 +261,194 @@ describe('decodeVoxelGrid — corrupted chunk rects are clamped, not trusted ver
   });
 });
 
-describe('decodeVoxelGrid — v6 upgrade path (#473 P3)', () => {
-  it('loads a v6 dense payload at the same coordinates, mutations intact', () => {
-    const v6: SerializedVoxelsV6 = {
-      v: 6,
-      sizeX: 4, sizeY: 4, sizeZ: 4,
-      palette: [{ rocks: [] }, { rocks: [{ rockId: 'cruite', coefficient: 1 }] }],
-      density: bytesToBase64(rleEncode(new Uint8Array(denseBytes(4, 4, 4, 8)))),
-      compId: bytesToBase64(rleEncode(new Uint8Array(denseBytes(4, 4, 4, 2)))),
-      fracture: bytesToBase64(rleEncode(fractureOnes(4 * 4 * 4))),
-      ores: [],
-    };
-    const grid = decodeVoxelGrid(v6);
-    expect(grid.sizeX).toBe(4);
-    expect(grid.sizeY).toBe(4);
-    expect(grid.sizeZ).toBe(4);
-    expect(grid.isInBounds(3, 3, 3)).toBe(true);
-    expect(grid.isInBounds(4, 0, 0)).toBe(false);
-    expect(grid.densityAt(1, 1, 1)).toBe(0);
-    expect(grid.fractureAt(1, 1, 1)).toBe(1);
+// #1181 review: an unvalidated, enormous `gen.sizeY`/`sizeX`/`sizeZ` either
+// makes the yLo/yHi clamp below a no-op (turning `replayTerrainEdits`'s loop
+// unbounded) or crashes `VoxelGrid`'s `allocateChunk` with a raw
+// `RangeError: Invalid typed array length` before any clamp even runs.
+// `requireValidGenDimension` rejects outright instead, with a clean `Error`.
+describe('decodeVoxelGrid — requireValidGenDimension rejects a malformed gen.size* (#1181 review)', () => {
+  it('rejects a sizeY far past MAX_TERRAIN_GEN_DIMENSION with a clean Error, not a RangeError from allocateChunk', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+
+    // Safely over MAX_TERRAIN_GEN_DIMENSION (4096) — large enough to be
+    // rejected, nowhere near large enough to risk actually allocating.
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 1e9 } };
+
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+    // Never a bare RangeError escaping from VoxelGrid's typed-array allocation.
+    let caught: unknown;
+    try {
+      decodeVoxelGrid(corrupted);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(RangeError);
   });
 
-  it('carries a v6 blast crater through to the chunked grid', () => {
-    const n = 4 * 4 * 4;
-    const density = new Float64Array(n).fill(1);
-    density[1 + 1 * 4 + 1 * 16] = 0; // the crater
-    const compId = new Uint16Array(n).fill(1);
-    const fracture = new Float64Array(n).fill(1);
+  it('rejects a sizeX far past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeX: 1e9 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeX/);
+  });
 
-    const v6: SerializedVoxelsV6 = {
-      v: 6,
-      sizeX: 4, sizeY: 4, sizeZ: 4,
-      palette: [{ rocks: [] }, { rocks: [{ rockId: 'cruite', coefficient: 1 }] }],
-      density: bytesToBase64(rleEncode(new Uint8Array(density.buffer))),
-      compId: bytesToBase64(rleEncode(new Uint8Array(compId.buffer))),
-      fracture: bytesToBase64(rleEncode(new Uint8Array(fracture.buffer))),
-      ores: [],
+  it('rejects a sizeZ far past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeZ: 1e9 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeZ/);
+  });
+
+  it('rejects a value exactly one past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      gen: { ...payload.gen, sizeY: MAX_TERRAIN_GEN_DIMENSION + 1 },
     };
-    const grid = decodeVoxelGrid(v6);
-    expect(grid.densityAt(1, 1, 1)).toBe(0);
-    expect(grid.densityAt(2, 1, 1)).toBe(1);
-    expect(grid.dominantRockAt(2, 1, 1)).toBe('cruite');
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a non-integer sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 3.7 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects NaN sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: NaN } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects Infinity sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: Infinity } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a zero sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 0 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a negative sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: -16 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
   });
 });
 
-/** All-zero raw bytes for a dense sizeX*sizeY*sizeZ array of `bytesPerValue`-wide values. */
-function denseBytes(sizeX: number, sizeY: number, sizeZ: number, bytesPerValue: number): number[] {
-  return new Array(sizeX * sizeY * sizeZ * bytesPerValue).fill(0);
-}
+// #1181 review: `CompositionPalette.intern` dereferences `.rocks`
+// unconditionally, so a malformed `'added'` segment's composition (or a
+// malformed boundary's composition) must never reach it — `isValidComposition`
+// / `requireValidBoundary` must turn that into a clean `Error` refusal instead
+// of a raw `TypeError`.
+describe('decodeVoxelGrid — isValidComposition / requireValidBoundary reject malformed edit data (#1181 review)', () => {
+  const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
 
-/** Raw bytes of a Float64Array filled with 1.0. */
-function fractureOnes(count: number): Uint8Array {
-  return new Uint8Array(new Float64Array(count).fill(1).buffer);
-}
+  function payloadWithSegment(segment: EditSegment): SerializedVoxels {
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    return { ...payload, editColumns: [{ x: 5, z: 5, segments: [segment] }] };
+  }
+
+  it('rejects an "added" segment with no composition field at all, with a clean Error not a TypeError', () => {
+    const payload = payloadWithSegment({ yLo: 0, yHi: 0, kind: 'added' });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: added edit segment/);
+    let caught: unknown;
+    try {
+      decodeVoxelGrid(payload);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(TypeError);
+  });
+
+  it('rejects an "added" segment whose composition.rocks is not an array', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'added',
+      composition: { rocks: 'not-an-array' },
+    } as unknown as EditSegment);
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: added edit segment/);
+  });
+
+  it('rejects a bottomBoundary with a non-finite density', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'dug',
+      bottomBoundary: { density: NaN, composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] } },
+    });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: bottom boundary/);
+  });
+
+  it('rejects a topBoundary with a missing/malformed composition', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'dug',
+      topBoundary: { density: 1, composition: { rocks: undefined } },
+    } as unknown as EditSegment);
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: top boundary/);
+  });
+});
+
+// #1181 review: an unclamped `yLo`/`yHi` from a tampered/corrupted save (e.g.
+// `1e15`) would turn `replayTerrainEdits`'s per-voxel loop into an unbounded
+// scan. `clampSavePosition`/`clampAxis` must clamp both into `[0, sizeY-1]`
+// instead — proven here by asserting on the RESULT (the decode completes and
+// the decoded grid's edited range sits inside real bounds), not by trusting
+// that a bad value merely "didn't hang".
+describe('decodeVoxelGrid — clampSavePosition clamps a corrupted yLo/yHi into [0, sizeY-1] (#1181 review)', () => {
+  it('clamps a NaN yLo/yHi pair to the fallback row 0, rather than leaving them unbounded', () => {
+    const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      editColumns: [{ x: 5, z: 5, segments: [{ yLo: NaN, yHi: NaN, kind: 'dug' }] }],
+    };
+
+    const decoded = decodeVoxelGrid(corrupted);
+
+    // Clamped to row 0 only — not every row, not a crash.
+    expect(decoded.densityAt(5, 0, 5)).toBe(0);
+  });
+
+  it('clamps a wildly out-of-range yHi (1e15) into sizeY-1, completing the decode instead of scanning to 1e15', () => {
+    const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      editColumns: [{ x: 6, z: 6, segments: [{ yLo: 0, yHi: 1e15, kind: 'dug' }] }],
+    };
+
+    const decoded = decodeVoxelGrid(corrupted);
+
+    // The whole real column (0..sizeY-1) is dug — the clamp bounded yHi to
+    // sizeY-1 rather than the raw 1e15, and the decode actually completed.
+    for (let y = 0; y < gen.sizeY; y++) {
+      expect(decoded.densityAt(6, y, 6), `expected row ${y} of column (6,6) to be dug (clamped)`).toBe(0);
+    }
+  });
+});

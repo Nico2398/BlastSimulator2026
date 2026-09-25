@@ -10,6 +10,32 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
+/**
+ * Version of the terrain generator's algorithm — stamped into every save's
+ * embedded terrain identity (`SerializedTerrainGen.version`) and checked on
+ * load. The game is unreleased: this stays 1 and is never incremented for a
+ * pre-release generator change (project owner policy, #1181). A save whose
+ * terrain generator version does not match this constant is refused, never
+ * migrated.
+ */
+export const TERRAIN_GENERATOR_VERSION = 1;
+
+/**
+ * Largest `sizeX`/`sizeY`/`sizeZ` a `TerrainConfig` may legitimately carry
+ * (#1181 review). Nothing in this codebase names an authoritative "biggest a
+ * site can get" — site expansion (`PlayableArea`'s `claim`) is deliberately
+ * unbounded in total extent, and `MAX_CLAIM_BRIDGE_CHUNKS` only limits how
+ * far a single claim may bridge, not the site's eventual size — so this is a
+ * defaulted, generous-but-bounded ceiling rather than a reused constant: the
+ * biggest campaign level today is 160×160 (#458 D13), so 4096 leaves 25x
+ * headroom for growth while still keeping `allocateChunk`'s
+ * `CHUNK_SIZE * sizeY * CHUNK_SIZE` allocation and any `yLo..yHi` replay loop
+ * bounded to a sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects
+ * a save whose embedded generator identity exceeds this rather than
+ * regenerating or clamping it, since a legitimate save can never carry one.
+ */
+export const MAX_TERRAIN_GEN_DIMENSION = 4096;
+
 export interface TerrainConfig {
   sizeX: number;
   sizeY: number;
