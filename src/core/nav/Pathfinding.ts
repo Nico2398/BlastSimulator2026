@@ -283,6 +283,21 @@ function computeClearancePocket(
   return pocket;
 }
 
+/**
+ * True when a diagonal step from (ax,az) to (bx,bz) does not clip a
+ * blocked/void corner (#1197) — the two orthogonal cells it passes
+ * between, (bx,az) and (ax,bz), must both be passable. Cardinal steps
+ * (ax===bx or az===bz) are always legal. Checks solidity only — vehicle
+ * occupancy and clearance (#1154) play no part; an off-grid orthogonal
+ * cell counts as solid, matching isImpassable's own treatment of a
+ * missing neighbour. Exported so tests/unit/nav/Pathfinding.test.ts can
+ * exercise it directly.
+ */
+export function isDiagonalCornerClear(grid: NavGrid, ax: number, az: number, bx: number, bz: number): boolean {
+  void grid; void ax; void az; void bx; void bz; // TODO: implement
+  throw new Error('not implemented');
+}
+
 /** Octile distance heuristic. */
 export function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(ax - bx);
@@ -363,7 +378,7 @@ function clampToGrid(grid: NavGrid, x: number, z: number): { x: number; z: numbe
  * Walk a straight line from (x0,z0) to (x1,z1) using a DDA approach.
  * Returns waypoints for every cell along the line if all are passable, else null.
  */
-function directLineWalk(
+export function directLineWalk(
   grid: NavGrid,
   x0: number,
   z0: number,

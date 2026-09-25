@@ -6,7 +6,10 @@
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
-import { isImpassable } from './Pathfinding.js';
+import { isImpassable, directLineWalk } from './Pathfinding.js';
+
+// TODO(#1197): directLineWalk will be reused here to fix diagonal corner-cutting.
+void directLineWalk;
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
