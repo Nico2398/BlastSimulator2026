@@ -126,6 +126,19 @@ export function chunkIndexOf(worldCoord: number): number {
 }
 
 /**
+ * Clamp an untrusted save-JSON numeric value into `[lo, hi]`, rounding to the
+ * nearest integer and falling back to `fallback` for non-finite input.
+ * Shared by `clampChunkRectToTile` below (a chunk's owned rect) and
+ * `VoxelGridCodec.ts`'s `clampSavePosition` (edit-segment positions) — both
+ * clamp a save-JSON position field the same way, so this lives once rather
+ * than twice (#1181 review).
+ */
+export function clampAxis(value: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(lo, Math.min(hi, Math.round(value)));
+}
+
+/**
  * Clamp a chunk's owned sub-rect to the chunk's own tile bounds — i.e. to
  * `[cx*CHUNK_SIZE, cx*CHUNK_SIZE + CHUNK_SIZE) × [cz*CHUNK_SIZE, cz*CHUNK_SIZE + CHUNK_SIZE)`.
  *
@@ -144,11 +157,6 @@ export function clampChunkRectToTile(
   const tileX1 = tileX0 + CHUNK_SIZE;
   const tileZ0 = cz * CHUNK_SIZE;
   const tileZ1 = tileZ0 + CHUNK_SIZE;
-
-  const clampAxis = (value: number, lo: number, hi: number, fallback: number): number => {
-    if (!Number.isFinite(value)) return fallback;
-    return Math.max(lo, Math.min(hi, Math.round(value)));
-  };
 
   let minX = clampAxis(rect.minX, tileX0, tileX1, tileX0);
   let maxX = clampAxis(rect.maxX, tileX0, tileX1, tileX1);

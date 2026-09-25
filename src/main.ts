@@ -27,8 +27,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { terrainGenDatum, terrainConfigOf, ensureLandscape, loadGridForState } from './console/commands/world.js';
-import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
+import { terrainConfigOf, ensureLandscape, loadGridForState, embedVoxelsForSave } from './console/commands/world.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -170,10 +169,7 @@ savesModal.setGetState(() => {
   // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
-    const gen = terrainGenDatum(ctx.state);
-    if (gen) {
-      ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
-    }
+    ctx.state.world = embedVoxelsForSave(ctx, ctx.state);
   }
   return ctx.state;
 });

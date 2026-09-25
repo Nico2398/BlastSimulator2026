@@ -3424,6 +3424,7 @@
   "sandbox.start_success": "Bac à sable démarré. {gridX}x{gridY}x{gridZ} {biome}, difficulté {difficulty}, graine {seed}, trésorerie {cash} $.{staffedSuffix}",
   "world.unknown_mine_type": "Type de mine inconnu : \"{mineType}\". Valides : {valid}",
   "world.terrain_version_mismatch": "Le terrain de cette sauvegarde (générateur v{saved}) ne correspond pas au générateur de cette version (v{current}) et ne peut pas être chargé.",
+  "world.terrain_save_corrupt": "Les données de terrain de cette sauvegarde sont corrompues et ne peuvent pas être chargées.",
   "world.new_game_success": "Partie créée. Terrain {size}x{sizeY}x{size}, biome {mineType}, graine {seed}.{staffedSuffix}",
   "world.inspect_usage": "Utilisation : inspect x,y,z",
   "world.inspect_off_site": "Hors site : ({x},{y},{z}). Le site s'étend de ({minX},{minZ}) à ({maxX},{maxZ}), hauteur {sizeY}.",

@@ -17,10 +17,9 @@
 // (`loadGridForState`, world.ts, #1181) — it is never silently regenerated.
 
 import type { GameContext } from './world.js';
-import { terrainGenDatum, loadGridForState } from './world.js';
+import { embedVoxelsForSave, loadGridForState } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
-import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
 import { requireGame } from './commandUtils.js';
 
 const DEFAULT_SLOT = 'quicksave';
@@ -37,10 +36,7 @@ export function saveCommand(
   if (err) return err;
   const state = ctx.state!;
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
-  const gen = terrainGenDatum(state);
-  if (ctx.grid && state.world && gen) {
-    state.world = { ...state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
-  }
+  state.world = embedVoxelsForSave(ctx, state);
   quickSaveSlots.set(slot, serialize(state));
   return { success: true, output: `Saved to slot "${slot}".` };
 }

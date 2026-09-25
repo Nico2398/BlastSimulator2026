@@ -3424,6 +3424,7 @@
   "sandbox.start_success": "Sandbox started. {gridX}x{gridY}x{gridZ} {biome}, difficulty {difficulty}, seed {seed}, cash ${cash}.{staffedSuffix}",
   "world.unknown_mine_type": "Unknown mine type: \"{mineType}\". Valid: {valid}",
   "world.terrain_version_mismatch": "This save's terrain (generator v{saved}) doesn't match this build's terrain generator (v{current}) and can't be loaded.",
+  "world.terrain_save_corrupt": "This save's terrain data is corrupt and can't be loaded.",
   "world.new_game_success": "Game created. {size}x{sizeY}x{size} terrain, {mineType} biome, seed {seed}.{staffedSuffix}",
   "world.inspect_usage": "Usage: inspect x,y,z",
   "world.inspect_off_site": "Off site: ({x},{y},{z}). The site spans ({minX},{minZ}) to ({maxX},{maxZ}), height {sizeY}.",
