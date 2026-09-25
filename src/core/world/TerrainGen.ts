@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid, surfaceDensityAt, SURFACE_BAND_HALF } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -101,27 +101,33 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
 
 export { surfaceDensityAt };
 
-/** Fill one column (x, z) of `grid` from the sampling context. Pure in (config, x, z) — see #473 D3. */
-function generateColumn(
+/**
+ * Fill one column (x, z) of `grid` within `[yLo, yHi]` (inclusive) from the
+ * sampling context, via `VoxelGrid.writeGeneratedVoxel` — this is generator
+ * output, not a gameplay edit (#1183). Pure in (config, x, z, yLo, yHi) —
+ * see #473 D3. Depth-unbounded: `strata.compositionAt`/`oreVeins.densitiesAt`
+ * are well-defined for any `y`, including deeply negative, so this never
+ * needs a "top of the world" bound the way the pre-#1183 whole-column fill
+ * did.
+ */
+function generateColumnRange(
   grid: VoxelGrid,
   terrain: TerrainContext,
   config: TerrainConfig,
   x: number,
   z: number,
+  yLo: number,
+  yHi: number,
 ): void {
   const { worldGen, biome, strata, oreVeins } = terrain;
-  const { sizeX, sizeY, sizeZ } = config;
+  const { sizeX, sizeZ } = config;
 
   const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
   const surfaceY = Math.round(surfaceH);
   const boundaries = strata.boundariesAt(x, z);
   const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
 
-  // Every voxel the surface band reaches, which is one higher than the
-  // last fully solid one — that voxel carries the fractional density
-  // marching cubes interpolates against.
-  const topY = Math.min(sizeY - 1, Math.ceil(surfaceH + SURFACE_BAND_HALF) - 1);
-  for (let y = 0; y <= topY; y++) {
+  for (let y = yLo; y <= yHi; y++) {
     const density = surfaceDensityAt(y, surfaceH);
     if (density <= 0) continue;
 
@@ -132,33 +138,8 @@ function generateColumn(
     const compId = grid.palette.intern(composition);
     const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
-    grid.fillVoxel(x, y, z, compId, oreDensities, density);
+    grid.writeGeneratedVoxel(x, y, z, compId, oreDensities, density);
   }
-}
-
-/**
- * Fill every column of `rect` (max exclusive) into an already-owned region of
- * `grid` (#473 D3). `config` must be the level's ORIGINAL config — its
- * sizeX/sizeZ fix the pit mask's rect and the vertical datum, so a chunk
- * claimed hours into a game generates against the same world the level
- * started from. `terrain` must be `buildTerrainContext(config)`.
- *
- * Callers are responsible for `markChunkPristine` afterwards: the fill writes
- * through the ordinary mutators, which mark the chunk dirty.
- */
-export function generateTerrainRegion(
-  grid: VoxelGrid,
-  terrain: TerrainContext,
-  config: TerrainConfig,
-  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
-): void {
-  grid.withoutEditRecording(() => {
-    for (let z = rect.minZ; z < rect.maxZ; z++) {
-      for (let x = rect.minX; x < rect.maxX; x++) {
-        generateColumn(grid, terrain, config, x, z);
-      }
-    }
-  });
 }
 
 /**
@@ -179,16 +160,43 @@ export function generateTerrainRegion(
  * blending per column — full per-column biome-blended strata is out of
  * scope for T1.3 (no accept criterion calls for it) and would belong to a
  * future landscape-blending task if ever needed.
+ *
+ * Registers ownership of `[0, sizeX) × [0, sizeZ)` and attaches this config's
+ * `VoxelChunkSource`, but does NOT fill any voxel content up front (#1183) —
+ * only chunks a caller actually reads get materialized, lazily, from the
+ * attached source.
  */
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const { sizeX, sizeY, sizeZ } = config;
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
   const terrain = buildTerrainContext(config);
-
-  generateTerrainRegion(grid, terrain, config, { minX: 0, minZ: 0, maxX: sizeX, maxZ: sizeZ });
-  for (const { cx, cz } of grid.ownedChunks()) grid.markChunkPristine(cx, cz);
-
+  grid.attachChunkSource(createChunkSource(terrain, config));
   return grid;
+}
+
+/**
+ * Build a `VoxelChunkSource` that materializes chunk slabs from `terrain`
+ * (the same sampling context `generateColumnRange` uses) via
+ * `VoxelGrid.writeGeneratedVoxel`, rather than filling a whole grid up front
+ * (#1183). `config` must be the level's original config — its sizeX/sizeZ fix
+ * the pit mask's rect and the vertical datum, so a chunk claimed hours into a
+ * game generates against the same world the level started from.
+ */
+export function createChunkSource(terrain: TerrainContext, config: TerrainConfig): VoxelChunkSource {
+  return {
+    surfaceHeightAt(x: number, z: number): number {
+      return sampleSurfaceHeightY(terrain.worldGen, x, z);
+    },
+    materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void {
+      const yLo = cy * VoxelGrid.CHUNK_SIZE;
+      const yHi = yLo + VoxelGrid.CHUNK_SIZE - 1;
+      for (let z = z0; z < z1; z++) {
+        for (let x = x0; x < x1; x++) {
+          generateColumnRange(grid, terrain, config, x, z, yLo, yHi);
+        }
+      }
+    },
+  };
 }
 
 /** Check if a position is in the neutral border zone. */

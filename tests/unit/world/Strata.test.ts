@@ -166,3 +166,49 @@ describe('StrataSampler.compositionAt', () => {
     expect(a.compositionAt(6, 4, 6, 12, boundariesA)).toEqual(b.compositionAt(6, 4, 6, 12, boundariesB));
   });
 });
+
+describe('StrataSampler.compositionAt — composition below the deepest defined layer (#1183)', () => {
+  it('depth just past the last boundary and depth vastly past it both resolve to the deepest layer, identically', () => {
+    const profile: StratumDef[] = [
+      { blend: [{ rockId: 'cruite', coefficient: 1 }], meanThickness: 10, thicknessVariance: 0 },
+      { blend: [{ rockId: 'titanite', coefficient: 1 }], meanThickness: 10, thicknessVariance: 0 },
+    ];
+    const sampler = new StrataSampler(11, profile);
+    const boundaries = sampler.boundariesAt(4, 6); // exactly [10, 20], no tilt
+    const lastBoundary = boundaries[boundaries.length - 1]!;
+
+    // Comfortably past the +-0.75m boundary-blend window and the +-1.5m warp,
+    // so both samples land solidly inside the deepest layer with no blending.
+    const justPast = sampler.compositionAt(4, 0, 6, lastBoundary + 10, boundaries);
+    const farPast = sampler.compositionAt(4, 0, 6, lastBoundary + 10000, boundaries);
+
+    expect(justPast).toEqual({ rocks: [{ rockId: 'titanite', coefficient: 1 }] });
+    expect(farPast).toEqual({ rocks: [{ rockId: 'titanite', coefficient: 1 }] });
+    expect(farPast).toEqual(justPast);
+  });
+
+  it('stays deterministic and stable across repeated calls at extreme depth', () => {
+    const profile: StratumDef[] = [
+      { blend: [{ rockId: 'cruite', coefficient: 1 }], meanThickness: 10, thicknessVariance: 0 },
+      { blend: [{ rockId: 'titanite', coefficient: 1 }], meanThickness: 10, thicknessVariance: 0 },
+    ];
+    const sampler = new StrataSampler(11, profile);
+    const boundaries = sampler.boundariesAt(4, 6);
+    const extreme = boundaries[boundaries.length - 1]! + 50000;
+
+    const first = sampler.compositionAt(4, 0, 6, extreme, boundaries);
+    const second = sampler.compositionAt(4, 0, 6, extreme, boundaries);
+    expect(second).toEqual(first);
+  });
+
+  it('a single-layer profile at extreme depth still returns that one layer, unchanged (no boundary to fall past at all)', () => {
+    const profile: StratumDef[] = [
+      { blend: [{ rockId: 'cruite', coefficient: 1 }], meanThickness: 10, thicknessVariance: 2 },
+    ];
+    const sampler = new StrataSampler(3, profile);
+    const boundaries = sampler.boundariesAt(0, 0);
+    expect(sampler.compositionAt(0, 0, 0, 100000, boundaries)).toEqual({
+      rocks: [{ rockId: 'cruite', coefficient: 1 }],
+    });
+  });
+});

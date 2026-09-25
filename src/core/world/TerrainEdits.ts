@@ -251,6 +251,56 @@ export class TerrainEdits {
 }
 
 /**
+ * The boundary override, if any, that applies to row `y` within `seg` —
+ * `y === seg.yLo` and `seg.bottomBoundary`, or `y === seg.yHi` and
+ * `seg.topBoundary`. Shared by `VoxelGrid.editedDensityAt` and
+ * `replaySegmentsInRange`, which both need to answer "is this row a
+ * boundary edge, and if so with what value" for the same segment shape —
+ * extracted so the two paths can't disagree on which rows carry an override
+ * (#1183 review).
+ */
+export function boundaryAt(seg: EditSegment, y: number): EditBoundary | undefined {
+  if (y === seg.yLo && seg.bottomBoundary) return seg.bottomBoundary;
+  if (y === seg.yHi && seg.topBoundary) return seg.topBoundary;
+  return undefined;
+}
+
+/**
+ * Apply `segments` (a slice of one column's edit segments, e.g. from
+ * `TerrainEdits.segmentsAt`) onto `grid` restricted to `[yLo, yHi]` — the
+ * narrow-range counterpart to `replayTerrainEdits`'s whole-grid replay, for
+ * replaying only the y-band a chunk source just generator-filled (#1183:
+ * `VoxelGrid.replayEditsForBand`). Writes through `grid.withoutEditRecording`,
+ * same as `replayTerrainEdits`.
+ */
+export function replaySegmentsInRange(
+  grid: VoxelGrid, segments: readonly EditSegment[], x: number, z: number, yLo: number, yHi: number,
+): void {
+  grid.withoutEditRecording(() => {
+    for (const seg of segments) {
+      const loY = Math.max(seg.yLo, yLo);
+      const hiY = Math.min(seg.yHi, yHi);
+      for (let y = loY; y <= hiY; y++) {
+        const boundary = boundaryAt(seg, y);
+        if (boundary) {
+          // `boundary.composition` is portable composition data, not a
+          // palette index — re-intern it into the TARGET grid's own
+          // palette to get a locally valid index before writing dense
+          // storage (#1180).
+          const localCompId = grid.palette.intern(boundary.composition);
+          grid.fillVoxel(x, y, z, localCompId, boundary.ores, boundary.density);
+        } else if (seg.kind === 'added') {
+          const localCompId = grid.palette.intern(seg.composition!);
+          grid.fillVoxel(x, y, z, localCompId, seg.ores);
+        } else {
+          grid.clearVoxel(x, y, z);
+        }
+      }
+    }
+  });
+}
+
+/**
  * Apply `edits` onto `grid` (assumed freshly generated) so it reproduces the
  * live grid the edits were recorded from, voxel for voxel. Writes through
  * `grid.withoutEditRecording` so replay never re-records itself.
@@ -258,26 +308,7 @@ export class TerrainEdits {
 export function replayTerrainEdits(grid: VoxelGrid, edits: TerrainEdits): void {
   grid.withoutEditRecording(() => {
     for (const { x, z, segments } of edits.columns()) {
-      for (const seg of segments) {
-        for (let y = seg.yLo; y <= seg.yHi; y++) {
-          const boundary = y === seg.yLo && seg.bottomBoundary ? seg.bottomBoundary
-            : y === seg.yHi && seg.topBoundary ? seg.topBoundary
-            : undefined;
-          if (boundary) {
-            // `boundary.composition` is portable composition data, not a
-            // palette index — re-intern it into the TARGET grid's own
-            // palette to get a locally valid index before writing dense
-            // storage (#1180).
-            const localCompId = grid.palette.intern(boundary.composition);
-            grid.fillVoxel(x, y, z, localCompId, boundary.ores, boundary.density);
-          } else if (seg.kind === 'added') {
-            const localCompId = grid.palette.intern(seg.composition!);
-            grid.fillVoxel(x, y, z, localCompId, seg.ores);
-          } else {
-            grid.clearVoxel(x, y, z);
-          }
-        }
-      }
+      replaySegmentsInRange(grid, segments, x, z, -Infinity, Infinity);
     }
     for (const { x, y, z, modifier } of edits.fractureEntries()) {
       grid.setFractureAt(x, y, z, modifier);

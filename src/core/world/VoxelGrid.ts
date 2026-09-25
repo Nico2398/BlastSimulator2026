@@ -9,7 +9,7 @@
 // Voxel cell size: 1 m × 1 m × 1 m (SI units throughout). All grid
 // coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
-import { TerrainEdits, oresDeepEqual, type EditBoundary } from './TerrainEdits';
+import { TerrainEdits, oresDeepEqual, replaySegmentsInRange, boundaryAt, type EditBoundary } from './TerrainEdits';
 import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance';
 
 export interface VoxelRockComposition {
@@ -192,6 +192,17 @@ interface VoxelChunk {
   readonly cz: number;
   x0: number; z0: number; x1: number; z1: number;
   readonly slabs: Map<number, VoxelSlab>;
+  /**
+   * Ephemeral, per-column cache of `chunkSource`-only (no edits applied)
+   * density, keyed by `cheapColumnKey(lx, lz, cy)` — backs `densityAt`'s
+   * cheap dispatch so repeated cheap reads in the same column don't re-run
+   * `VoxelChunkSource.materializeSlab` on a throwaway scratch grid every call
+   * (#1183 fixer). Deliberately NOT part of `slabs`: never counted by
+   * `allocatedSlabCount`/`slabCount`, and cleared (not preserved) by
+   * `dropChunk` — it holds no gameplay state, only a memo of pure generator
+   * output.
+   */
+  cheapDensity?: Map<number, Float64Array>;
 }
 
 /**
@@ -256,6 +267,22 @@ export function setVoxelBoundsReporter(reporter: OutOfBoundsReporter | null): Ou
  * unaffected by the storage change; callers that iterate need to walk
  * `minX..maxX` rather than `0..sizeX`.
  */
+/**
+ * Materializes a chunk's terrain on first read, so a chunk is a cache of the
+ * generator's output rather than the sole authority on it (#1183). A grid
+ * with no attached source behaves exactly as before — every column reads
+ * whatever was directly written to it, nothing more.
+ */
+export interface VoxelChunkSource {
+  /** Continuous surface height at column (x, z), same datum as `computeVoxelColumnSurfaceHeight`. */
+  surfaceHeightAt(x: number, z: number): number;
+  /**
+   * Fill `grid`'s voxels in `[x0, x1) × [z0, z1)` at y-band `cy`
+   * (`chunkIndexOf(y) === cy`) from the generator, via `writeGeneratedVoxel`.
+   */
+  materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void;
+}
+
 export class VoxelGrid {
   /** Size (in metres) of one voxel cell along each axis. Always 1.0 m. */
   static readonly CELL_SIZE = 1.0;
@@ -275,6 +302,8 @@ export class VoxelGrid {
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
   private readonly dirty = new Set<number>();
+  /** Generator + edit-record backing this grid's chunks, or null when nothing is attached (#1183). */
+  private chunkSource: VoxelChunkSource | null = null;
 
   /** Live bounding box of the owned region, max exclusive. Empty grid reports a zero-size box at the origin. */
   private bMinX = 0;
@@ -454,6 +483,24 @@ export class VoxelGrid {
     return chunk;
   }
 
+  // ── Chunk source (materialize-on-read) (#1183) ──
+
+  /** Attach the generator + edit-record source new/dropped chunk slabs materialize from. */
+  attachChunkSource(source: VoxelChunkSource): void {
+    this.chunkSource = source;
+  }
+
+  /** Discard chunk (cx, cz)'s materialized slabs, so its next read re-materializes from `chunkSource`. */
+  dropChunk(cx: number, cz: number): void {
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk) return;
+    chunk.slabs.clear();
+    chunk.cheapDensity?.clear();
+    // The single-entry slab cache may point at a slab this just discarded.
+    this.slabCacheKey = -1;
+    this.slabCacheSlab = undefined;
+  }
+
   private recomputeBounds(): void {
     if (this.chunks.size === 0) {
       this.bMinX = this.bMinZ = this.bMaxX = this.bMaxZ = 0;
@@ -485,7 +532,12 @@ export class VoxelGrid {
     const chunk = this.chunks.get(chunkKey(cx, cz));
     if (!chunk) return null;
     const slab = chunk.slabs.get(slabIndex);
-    if (!slab) return { min: 0, max: 0 }; // owned column, unallocated slab — honestly all air
+    if (!slab) {
+      // Owned column, no resident slab — with a source attached, answer from
+      // the cheap formula instead of the honest-but-wrong "all air" default
+      // (#1183); with no source, unallocated genuinely means air, as before.
+      return this.chunkSource ? this.cheapChunkDensityRange(chunk, slabIndex) : { min: 0, max: 0 };
+    }
     if (slab.touchedCount >= VoxelGrid.slabVolume(chunk)) {
       // Every voxel in this slab has an explicit written value — no implicit
       // air left unaccounted for, so the true written min/max is exact.
@@ -494,6 +546,45 @@ export class VoxelGrid {
     // Still some untouched positions in this slab — they're honestly air (0),
     // so fold that baseline in (density is always >= 0, so it never affects max).
     return { min: Math.min(0, slab.minDensity), max: Math.max(0, slab.maxDensity) };
+  }
+
+  /**
+   * `chunkDensityRange`'s answer for a y-band with no allocated slab and an
+   * attached `chunkSource` — a conservative [min, max] read straight from the
+   * generator/edits without materializing the band into a slab (#1183).
+   */
+  private cheapChunkDensityRange(chunk: VoxelChunk, cy: number): { min: number; max: number } {
+    const bandY0 = cy * CHUNK_SIZE;
+    if (bandY0 >= this.sizeY) return { min: 0, max: 0 }; // entirely past the grid's declared vertical extent
+
+    const bandY1 = bandY0 + CHUNK_SIZE - 1;
+
+    // Any recorded edit anywhere in this band, for any column this chunk
+    // owns, means the true content can't be answered from the generator
+    // formula alone — never claim a false uniform result in that case.
+    for (let z = chunk.z0; z < chunk.z1; z++) {
+      for (let x = chunk.x0; x < chunk.x1; x++) {
+        for (const seg of this.edits.segmentsAt(x, z)) {
+          if (seg.yLo <= bandY1 && seg.yHi >= bandY0) return { min: 0, max: 1 };
+        }
+      }
+    }
+
+    if (!this.chunkSource) return { min: 0, max: 0 };
+
+    let minSurface = Infinity;
+    let maxSurface = -Infinity;
+    for (let z = chunk.z0; z < chunk.z1; z++) {
+      for (let x = chunk.x0; x < chunk.x1; x++) {
+        const surfaceH = this.chunkSource.surfaceHeightAt(x, z);
+        if (surfaceH < minSurface) minSurface = surfaceH;
+        if (surfaceH > maxSurface) maxSurface = surfaceH;
+      }
+    }
+
+    if (surfaceDensityAt(bandY1, minSurface) >= 1) return { min: 1, max: 1 }; // entirely solid
+    if (surfaceDensityAt(bandY0, maxSurface) <= 0) return { min: 0, max: 0 }; // entirely air
+    return { min: 0, max: 1 }; // straddles the surface somewhere in the band
   }
 
   // ── Cubic 16×16×16 slab storage (#1182) ──
@@ -551,16 +642,69 @@ export class VoxelGrid {
   }
 
   /**
-   * Resolve the slab covering (x, y, z) in `chunk` (may be absent — never
-   * allocates), its chunk-local y-band `cy`, and the slab-local flat index
-   * `i` — the local index is pure coordinate arithmetic, valid whether or not
-   * a slab is actually allocated there, so every accessor and mutator shares
-   * this one lookup instead of re-deriving cy/i itself.
+   * The slab covering world y in `chunk`, materializing it from `chunkSource`
+   * (generator fill + replayed edits) on first read when a source is
+   * attached and none exists yet — the read-side counterpart to `slabAt`,
+   * which never allocates (#1183). Returns undefined when no source is
+   * attached and no slab has been written directly.
+   */
+  private ensureSlab(chunk: VoxelChunk, y: number): VoxelSlab | undefined {
+    const existing = this.slabAt(chunk, y);
+    if (existing) return existing;
+    if (!this.chunkSource) return undefined;
+    return this.materializeSlabFromSource(chunk, chunkIndexOf(y));
+  }
+
+  /** Materialize chunk `chunk`'s y-band `cy` from `chunkSource`'s generator fill, then `replayEditsForBand` on top (#1183). */
+  private materializeSlabFromSource(chunk: VoxelChunk, cy: number): VoxelSlab {
+    // Allocate/register the (blank) slab FIRST — the generator fill below
+    // writes into it via `writeGeneratedVoxel`, which requires the slab to
+    // already be resident, and edit replay's own mutators resolve their
+    // previous value through `ensureSlab`/`resolveCell`, which must see this
+    // slab as already resident rather than recursing back into materialization.
+    const slab = this.getOrCreateSlab(chunk, cy);
+    const source = this.chunkSource;
+    if (source) source.materializeSlab(this, chunk.x0, chunk.x1, chunk.z0, chunk.z1, cy);
+    this.replayEditsForBand(chunk, cy);
+    return slab;
+  }
+
+  /** Replay this grid's own `TerrainEdits` falling within y-band `cy` of `chunk`, on top of a freshly generator-filled slab (#1183). */
+  private replayEditsForBand(chunk: VoxelChunk, cy: number): void {
+    const yLo = cy * CHUNK_SIZE;
+    const yHi = yLo + CHUNK_SIZE - 1;
+    this.withoutEditRecording(() => {
+      for (let z = chunk.z0; z < chunk.z1; z++) {
+        for (let x = chunk.x0; x < chunk.x1; x++) {
+          const segments = this.edits.segmentsAt(x, z);
+          if (segments.length > 0) replaySegmentsInRange(this, segments, x, z, yLo, yHi);
+          for (let y = yLo; y <= yHi; y++) {
+            const modifier = this.edits.fractureAt(x, y, z);
+            if (modifier !== undefined) this.setFractureAt(x, y, z, modifier);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Resolve the slab covering (x, y, z) in `chunk`, its chunk-local y-band
+   * `cy`, and the slab-local flat index `i` — the local index is pure
+   * coordinate arithmetic, valid whether or not a slab is actually allocated
+   * there, so every accessor and mutator that needs real rock/ore/previous-
+   * value data shares this one lookup instead of re-deriving cy/i itself.
+   *
+   * The single choke point (#1183) for "give me a resident slab covering
+   * (x, y, z)": routes through `ensureSlab`, which materializes from
+   * `chunkSource` (generator fill + replayed edits) on first touch when one
+   * is attached, or falls back to the pre-#1183 "no slab here" answer when
+   * none is. A cheap read that must NOT materialize (`densityAt`,
+   * `fractureAt`) does not use this — see `cheapDensityAt`/`editedDensityAt`.
    */
   private resolveCell(chunk: VoxelChunk, x: number, y: number, z: number): { slab: VoxelSlab | undefined; cy: number; i: number } {
     const cy = chunkIndexOf(y);
     const i = VoxelGrid.localIndex(chunk, cy, x, y, z);
-    return { slab: this.slabAt(chunk, y), cy, i };
+    return { slab: this.ensureSlab(chunk, y), cy, i };
   }
 
   /**
@@ -729,12 +873,20 @@ export class VoxelGrid {
 
   // ── Direct field accessors — no allocation, hot-path callers should prefer these ──
 
-  /** Density in [0, 1]. Coordinates the site does not own, or an unallocated slab, read as 0 (air). */
+  /**
+   * Density in [0, 1]. Coordinates the site does not own read as 0 (air). An
+   * unallocated slab with no `chunkSource` attached also reads as 0, same as
+   * before #1183; with a source attached it answers from `cheapDensityAt`
+   * (edit record, else the source's cheap formula) WITHOUT materializing —
+   * this is a hot-path accessor and must not allocate a slab just to answer
+   * one voxel's density.
+   */
   densityAt(x: number, y: number, z: number): number {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return 0;
-    const { slab, i } = this.resolveCell(chunk, x, y, z);
-    return slab ? slab.density[i]! : 0;
+    const slab = this.slabAt(chunk, y);
+    if (slab) return slab.density[VoxelGrid.localIndex(chunk, chunkIndexOf(y), x, y, z)]!;
+    return this.chunkSource ? this.cheapDensityAt(chunk, x, y, z) : 0;
   }
 
   /** True when density >= 0.5 — the shared "solid for meshing/physics" threshold. */
@@ -742,12 +894,93 @@ export class VoxelGrid {
     return this.densityAt(x, y, z) >= 0.5;
   }
 
-  /** Fracture modifier (1.0 = normal, < 1.0 = pre-cracked). Unowned coordinates, or an unallocated slab, read as 1.0. */
+  /**
+   * Density at (x, y, z) from `chunkSource`/edits alone, without materializing
+   * a slab in THIS grid — for a read that only needs one voxel's answer, not
+   * a whole 16×16×16 band written into storage (#1183).
+   *
+   * Deliberately exact, not an approximation: `VoxelChunkSource` exposes no
+   * per-voxel density hook narrower than `materializeSlab` itself (its only
+   * other member, `surfaceHeightAt`, is a hint for mesh/nav code, not a
+   * promise that density is some simple function of it — a generator's real
+   * per-voxel density can depend on strata/noise same as composition does),
+   * so the only way to answer exactly is to run the real contract, via
+   * `sourceColumnDensity` below, on a column not backed by this grid's own
+   * storage.
+   */
+  private cheapDensityAt(chunk: VoxelChunk, x: number, y: number, z: number): number {
+    const edited = this.editedDensityAt(x, y, z);
+    if (edited !== undefined) return edited;
+    if (!this.chunkSource) return 0;
+    return this.sourceColumnDensity(chunk, x, y, z);
+  }
+
+  /** Packs a chunk-local (lx, lz) column and a y-band index into one collision-free key for `VoxelChunk.cheapDensity`. */
+  private static cheapColumnKey(lx: number, lz: number, cy: number): number {
+    return (lx * CHUNK_SIZE + lz) * 1048576 + (cy + 524288);
+  }
+
+  /**
+   * Generator-only density (no edits — `cheapDensityAt` already checked
+   * those) at (x, y, z), memoized per column so repeated cheap reads in the
+   * same 1×1×16 column cost one `materializeSlab` call, not one per voxel.
+   * The memo lives on `chunk.cheapDensity`, never on `chunk.slabs`, so it is
+   * invisible to `allocatedSlabCount`/`slabCount` — a chunk nothing has done
+   * a real (materializing) read on still reports zero allocated slabs.
+   */
+  private sourceColumnDensity(chunk: VoxelChunk, x: number, y: number, z: number): number {
+    const cy = chunkIndexOf(y);
+    const lx = x - chunk.cx * CHUNK_SIZE;
+    const lz = z - chunk.cz * CHUNK_SIZE;
+    const key = VoxelGrid.cheapColumnKey(lx, lz, cy);
+    let column = chunk.cheapDensity?.get(key);
+    if (!column) {
+      column = this.materializeScratchColumn(chunk, x, z, cy);
+      if (!chunk.cheapDensity) chunk.cheapDensity = new Map();
+      chunk.cheapDensity.set(key, column);
+    }
+    return column[y - cy * CHUNK_SIZE]!;
+  }
+
+  /**
+   * Runs `chunkSource.materializeSlab` for the single column (x, z) at
+   * y-band `cy` against a throwaway scratch `VoxelGrid` that owns only that
+   * one chunk — never `this` grid — so the real generator contract answers
+   * exactly, without allocating a slab this grid would ever report owning.
+   */
+  private materializeScratchColumn(chunk: VoxelChunk, x: number, z: number, cy: number): Float64Array {
+    const scratch = new VoxelGrid(0, this.sizeY, 0);
+    scratch.addChunk(chunk.cx, chunk.cz);
+    this.chunkSource!.materializeSlab(scratch, x, x + 1, z, z + 1, cy);
+    const y0 = cy * CHUNK_SIZE;
+    const out = new Float64Array(CHUNK_SIZE);
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) out[ly] = scratch.densityAt(x, y0 + ly, z);
+    return out;
+  }
+
+  /** Density at (x, y, z) as recorded in `this.edits`, or undefined when this voxel carries no edit (#1183). */
+  private editedDensityAt(x: number, y: number, z: number): number | undefined {
+    for (const seg of this.edits.segmentsAt(x, z)) {
+      if (y < seg.yLo || y > seg.yHi) continue;
+      const boundary = boundaryAt(seg, y);
+      if (boundary) return boundary.density;
+      return seg.kind === 'added' ? 1 : 0;
+    }
+    return undefined;
+  }
+
+  /**
+   * Fracture modifier (1.0 = normal, < 1.0 = pre-cracked). Unowned
+   * coordinates read as 1.0. An unallocated slab reads a recorded fracture
+   * edit if one exists (there is no cheap generator formula for fracture —
+   * generation itself never produces one), else 1.0 — without materializing.
+   */
   fractureAt(x: number, y: number, z: number): number {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return 1.0;
-    const { slab, i } = this.resolveCell(chunk, x, y, z);
-    return slab ? slab.fracture[i]! : 1.0;
+    const slab = this.slabAt(chunk, y);
+    if (slab) return slab.fracture[VoxelGrid.localIndex(chunk, chunkIndexOf(y), x, y, z)]!;
+    return this.edits.fractureAt(x, y, z) ?? 1.0;
   }
 
   /** The shared, frozen composition object for this voxel. Treat as immutable. */
@@ -850,6 +1083,43 @@ export class VoxelGrid {
     const slab = existing ?? this.getOrCreateSlab(chunk, cy);
     slab.fracture[i] = next;
     this.recordFractureWrite(x, y, z, prev, next);
+  }
+
+  /**
+   * Write a generator-produced voxel at (x, y, z) during slab materialization
+   * (#1183) — called only from a `VoxelChunkSource.materializeSlab`
+   * implementation, never from gameplay code. Unlike `fillVoxel`, does not
+   * record an edit: this is generation filling in the baseline, not play
+   * changing it.
+   */
+  writeGeneratedVoxel(
+    x: number, y: number, z: number,
+    compId: number, ores: Record<string, number> | undefined, density: number,
+  ): void {
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    const cy = chunkIndexOf(y);
+    // `materializeSlabFromSource` (the normal materialize-on-read path)
+    // always allocates the slab before calling into `chunkSource.
+    // materializeSlab`, so the common case finds it already resident here.
+    // But `VoxelChunkSource.materializeSlab` is itself a public contract
+    // (TerrainGen.test.ts's "createChunkSource" tests call it directly on a
+    // bare `VoxelGrid`, independent of VoxelGrid's own dispatch, per #1183)
+    // — allocating on demand via `getOrCreateSlab` here, same as every other
+    // mutator in this file, is what makes that contract self-sufficient
+    // rather than silently dropping every write when nothing pre-allocated
+    // the slab (#1183 fixer).
+    const slab = chunk.slabs.get(cy) ?? this.getOrCreateSlab(chunk, cy);
+    const i = VoxelGrid.localIndex(chunk, cy, x, y, z);
+    slab.density[i] = density;
+    slab.compId[i] = compId;
+    if (ores && Object.keys(ores).length > 0) slab.ores.set(i, { ...ores });
+    else slab.ores.delete(i);
+    this.touchDensity(slab, i, density);
+    // Deliberately no `this.touch(chunk)` (generation output is not a
+    // gameplay edit — the chunk isn't dirty just because it was materialized)
+    // and no `recordVoxelWrite` (nothing to record: this IS the baseline
+    // `recordVoxelWrite` compares future edits against).
   }
 
   // ── Compatibility API — materializes a VoxelData-shaped object per call ──
@@ -963,14 +1233,25 @@ export class VoxelGrid {
   }
 
   /**
-   * Visits only solid (density > 0) voxels, chunk by chunk, slab by allocated
-   * slab — an unallocated slab (all-air) is skipped entirely without a scan.
-   * Each slab's y-band is clamped to `[0, sizeY - 1]`, today's visible bound,
-   * before walking it.
+   * Visits only solid (density > 0) voxels across the grid's whole declared
+   * height `[0, sizeY - 1]`, chunk by chunk, band by band. A band with no
+   * resident slab is skipped without materializing when either no
+   * `chunkSource` is attached (unallocated genuinely means air, as before
+   * #1183) or `cheapChunkDensityRange` reports it entirely air; a band that
+   * might hold solid content (mixed or entirely solid) is materialized via
+   * `ensureSlab` so the compId reported is the real one, not skipped.
    */
   forEachSolid(cb: (x: number, y: number, z: number, compId: number) => void): void {
+    const bandCount = Math.ceil(this.sizeY / CHUNK_SIZE);
     for (const chunk of this.chunks.values()) {
-      for (const [cy, slab] of chunk.slabs) {
+      for (let cy = 0; cy < bandCount; cy++) {
+        let slab = chunk.slabs.get(cy);
+        if (!slab) {
+          if (!this.chunkSource) continue;
+          if (this.cheapChunkDensityRange(chunk, cy).max <= 0) continue;
+          slab = this.ensureSlab(chunk, cy * CHUNK_SIZE);
+          if (!slab) continue;
+        }
         const y0 = Math.max(0, cy * CHUNK_SIZE);
         const y1 = Math.min(this.sizeY - 1, cy * CHUNK_SIZE + CHUNK_SIZE - 1);
         if (y0 > y1) continue;
@@ -986,6 +1267,13 @@ export class VoxelGrid {
     }
   }
 
+  /**
+   * Visits only solid (density > 0) voxels in the given region. A voxel whose
+   * slab isn't resident is checked cheaply first (`cheapDensityAt`, no
+   * allocation) and only materialized — via `ensureSlab` — once that cheap
+   * check says it's actually solid, so a genuinely rocky never-before-read
+   * voxel is never silently reported as air (#1183).
+   */
   forEachSolidInRegion(
     min: { x: number; y: number; z: number },
     max: { x: number; y: number; z: number },
@@ -993,8 +1281,13 @@ export class VoxelGrid {
   ): void {
     this.forEachInRegion(min, max, (x, y, z) => {
       const chunk = this.ownerOf(x, y, z)!;
-      const slab = this.slabAt(chunk, y);
-      if (!slab) return;
+      let slab = this.slabAt(chunk, y);
+      if (!slab) {
+        if (!this.chunkSource) return;
+        if (this.cheapDensityAt(chunk, x, y, z) <= 0) return; // cheap formula says air — skip without materializing
+        slab = this.ensureSlab(chunk, y);
+        if (!slab) return;
+      }
       const i = VoxelGrid.localIndex(chunk, chunkIndexOf(y), x, y, z);
       if (slab.density[i]! > 0) cb(x, y, z, slab.compId[i]!);
     });

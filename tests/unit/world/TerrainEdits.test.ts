@@ -7,7 +7,7 @@
 // phase — that failure is the point.
 
 import { describe, it, expect } from 'vitest';
-import { TerrainEdits, replayTerrainEdits, type EditBoundary } from '../../../src/core/world/TerrainEdits.js';
+import { TerrainEdits, replayTerrainEdits, replaySegmentsInRange, type EditBoundary } from '../../../src/core/world/TerrainEdits.js';
 import { VoxelGrid, type VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
 
 /** Distinct, deterministic composition per numeric id — same id always
@@ -370,5 +370,99 @@ describe('replayTerrainEdits — unit-level round trip', () => {
     replayTerrainEdits(fresh, TerrainEdits.empty());
 
     expect(fresh.densityAt(1, 1, 1)).toBe(live.densityAt(1, 1, 1));
+  });
+});
+
+describe('replaySegmentsInRange — narrow-range replay of one column\'s edit segments (#1183)', () => {
+  it('replaying a column\'s entire [yLo, yHi] span reproduces the same voxel values replayTerrainEdits produces for that column', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(2, 2, 0, 3, cruiteComp);
+    edits.recordDig(2, 2, 4, 4);
+    edits.recordAdd(2, 2, 5, 7, cruiteComp, { blingite: 0.3 });
+
+    const viaFullReplay = new VoxelGrid(8, 8, 8);
+    replayTerrainEdits(viaFullReplay, edits);
+
+    const viaRangeReplay = new VoxelGrid(8, 8, 8);
+    replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(2, 2), 2, 2, 0, 7);
+
+    for (let y = 0; y <= 7; y++) {
+      expect(viaRangeReplay.densityAt(2, y, 2), `density mismatch at y=${y}`).toBe(viaFullReplay.densityAt(2, y, 2));
+      expect(viaRangeReplay.dominantRockAt(2, y, 2), `rock mismatch at y=${y}`).toBe(viaFullReplay.dominantRockAt(2, y, 2));
+      expect(viaRangeReplay.oresAt(2, y, 2), `ore mismatch at y=${y}`).toEqual(viaFullReplay.oresAt(2, y, 2));
+    }
+  });
+
+  it('replaying a true sub-range reproduces the same voxel values a full-column replay would produce inside that same sub-range', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(3, 3, 0, 9, cruiteComp);
+
+    const viaFullReplay = new VoxelGrid(10, 10, 10);
+    replayTerrainEdits(viaFullReplay, edits);
+
+    const viaRangeReplay = new VoxelGrid(10, 10, 10);
+    replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(3, 3), 3, 3, 4, 6);
+
+    for (let y = 4; y <= 6; y++) {
+      expect(viaRangeReplay.densityAt(3, y, 3), `density mismatch at y=${y}`).toBe(viaFullReplay.densityAt(3, y, 3));
+      expect(viaRangeReplay.dominantRockAt(3, y, 3), `rock mismatch at y=${y}`).toBe(viaFullReplay.dominantRockAt(3, y, 3));
+    }
+  });
+
+  it('a sub-range spanning a fractional boundary crossing reproduces the same values as a full replay for that sub-range', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+    const bottomBoundary: EditBoundary = { density: 0.4, composition: cruiteComp };
+    const topBoundary: EditBoundary = { density: 0.6, composition: cruiteComp, ores: { sparkium: 0.2 } };
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(5, 5, 2, 6, cruiteComp, undefined, bottomBoundary, topBoundary);
+
+    const viaFullReplay = new VoxelGrid(8, 8, 8);
+    replayTerrainEdits(viaFullReplay, edits);
+
+    const viaRangeReplay = new VoxelGrid(8, 8, 8);
+    replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(5, 5), 5, 5, 2, 6);
+
+    for (let y = 2; y <= 6; y++) {
+      expect(viaRangeReplay.densityAt(5, y, 5), `density mismatch at y=${y}`).toBe(viaFullReplay.densityAt(5, y, 5));
+      expect(viaRangeReplay.oresAt(5, y, 5), `ore mismatch at y=${y}`).toEqual(viaFullReplay.oresAt(5, y, 5));
+    }
+  });
+
+  it('segments outside [yLo, yHi] are not applied — voxels outside the requested range are left exactly as they were before the call', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(4, 4, 0, 9, cruiteComp);
+
+    const grid = new VoxelGrid(10, 10, 10);
+    // Pre-existing state the [4, 6] call must not disturb.
+    const preCompId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1 }] });
+    grid.fillVoxel(4, 0, 4, preCompId, undefined, 1.0);
+    grid.fillVoxel(4, 8, 4, preCompId, undefined, 1.0);
+
+    replaySegmentsInRange(grid, edits.segmentsAt(4, 4), 4, 4, 4, 6);
+
+    // Inside the requested range: the add segment was applied.
+    for (let y = 4; y <= 6; y++) {
+      expect(grid.dominantRockAt(4, y, 4), `expected the add segment applied at y=${y}`).toBe('cruite');
+    }
+    // Outside the requested range: untouched, still whatever the grid had
+    // before this call — even though the segment itself covers [0, 9].
+    expect(grid.dominantRockAt(4, 0, 4)).toBe('molite');
+    expect(grid.dominantRockAt(4, 8, 4)).toBe('molite');
+  });
+
+  it('a range with no overlapping segments leaves the grid untouched', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+    const edits = TerrainEdits.empty();
+    edits.recordAdd(6, 6, 0, 2, cruiteComp);
+
+    const grid = new VoxelGrid(10, 10, 10);
+    replaySegmentsInRange(grid, edits.segmentsAt(6, 6), 6, 6, 5, 9); // segment is [0,2], range is [5,9] — no overlap
+
+    for (let y = 5; y <= 9; y++) {
+      expect(grid.densityAt(6, y, 6)).toBe(0);
+    }
   });
 });

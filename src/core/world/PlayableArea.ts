@@ -11,7 +11,7 @@
 // indistinguishable from a bug, which is exactly what the old dense grid did.
 
 import { VoxelGrid, CHUNK_SIZE, chunkIndexOf } from './VoxelGrid.js';
-import { buildTerrainContext, generateTerrainRegion, type TerrainConfig, type TerrainContext } from './TerrainGen.js';
+import { buildTerrainContext, type TerrainConfig, type TerrainContext } from './TerrainGen.js';
 import {
   buildProtectedStructures,
   rectTouchesProtectedStructure,
@@ -196,8 +196,8 @@ export class PlayableArea {
     }
 
     // `contains` said no, so the chunk was either absent or partially owned;
-    // either way materializeChunk reports the rect that just became ours.
-    const rect = this.materializeChunk(cx, cz);
+    // either way claimChunk reports the rect that just became ours.
+    const rect = this.claimChunk(cx, cz);
 
     return { claimed: true, chunk: { cx, cz }, rect, alreadyOwned: false };
   }
@@ -275,7 +275,7 @@ export class PlayableArea {
     for (const chunk of required.values()) {
       claimedChunks.push(chunk);
       if (this.isFullyOwned(chunk.cx, chunk.cz)) continue;
-      const rect = this.materializeChunk(chunk.cx, chunk.cz);
+      const rect = this.claimChunk(chunk.cx, chunk.cz);
       minX = Math.min(minX, rect.minX);
       minZ = Math.min(minZ, rect.minZ);
       maxX = Math.max(maxX, rect.maxX);
@@ -426,23 +426,17 @@ export class PlayableArea {
   }
 
   /**
-   * Bring chunk (cx, cz) into the grid and generate terrain into whatever
-   * rect it now spans — the materialization step `claim` and `claimArea`
-   * both need once a chunk has cleared their own refusal checks. Returns the
-   * rect that became owned, since `addChunk` reports it when the chunk grows
-   * an existing partial edge chunk rather than adding a fresh one.
+   * Register ownership of chunk (cx, cz) — the step `claim` and `claimArea`
+   * both need once a chunk has cleared their own refusal checks. Registers
+   * ownership only (#1183): content comes from the grid's attached
+   * `VoxelChunkSource` lazily, on whatever a caller actually reads, not from
+   * an eager fill here. Returns the rect that became owned, since `addChunk`
+   * reports it when the chunk grows an existing partial edge chunk rather
+   * than adding a fresh one.
    */
-  private materializeChunk(cx: number, cz: number): Rect {
+  private claimChunk(cx: number, cz: number): Rect {
     const grown = this.grid.addChunk(cx, cz);
-    const rect = grown ?? PlayableArea.chunkRect(cx, cz);
-    this.generateInto(rect);
-    this.grid.markChunkPristine(cx, cz);
-    return rect;
-  }
-
-  private generateInto(rect: Rect): void {
-    if (!this.terrain) this.terrain = buildTerrainContext(this.config);
-    generateTerrainRegion(this.grid, this.terrain, this.config, rect);
+    return grown ?? PlayableArea.chunkRect(cx, cz);
   }
 
   private structures(): ProtectedStructures {

@@ -13,6 +13,7 @@ import {
   chunkIndexOf,
   clampChunkRectToTile,
   CHUNK_SIZE,
+  type VoxelChunkSource,
 } from '../../../src/core/world/VoxelGrid.js';
 import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 
@@ -654,10 +655,11 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   // slabTouchedCount from that array itself rather than trust whatever the
   // chunk's summary already said. #1181 deleted that dense-restore format
   // (and restoreChunkRaw with it) in favour of regenerate-then-replay-edits;
-  // decodeVoxelGrid's surviving path (addChunkWithRect, then
-  // generateTerrainRegion + replayTerrainEdits) writes every voxel through
-  // fillVoxel/setVoxel, and both unconditionally call touchDensity (#560) on
-  // every write. There is no entry point left that can populate density data
+  // decodeVoxelGrid's surviving path (addChunkWithRect, then lazy
+  // materialization from the attached chunk source + edit record, #1183)
+  // still writes every generated/edited voxel through writeGeneratedVoxel or
+  // fillVoxel/setVoxel, all of which unconditionally call touchDensity (#560)
+  // on every write. There is no entry point left that can populate density data
   // while bypassing touchDensity, so the "stale summary" failure mode this
   // test guarded against is no longer reachable — the invariant is now a
   // structural guarantee of fillVoxel/setVoxel rather than a runtime case to
@@ -1286,5 +1288,221 @@ describe('VoxelGrid — edit recording (#1180)', () => {
 
     expect(grid.edits.segmentsAt(2, 2)).toEqual([]);
     expect(grid.edits.segmentsAt(5, 5).length).toBeGreaterThan(0);
+  });
+});
+
+// ── Chunk source: materialize-on-read (#1183) ───────────────────────────────
+//
+// Chunks are a CACHE of a generator's output, not the sole authority on it.
+// `attachChunkSource`/`dropChunk`/`writeGeneratedVoxel` let a grid materialize
+// a 16x16x16 slab lazily, from a `VoxelChunkSource`, the first time something
+// actually reads it — including at negative y, which nothing before #1183
+// could generate into at all. These tests use a small, deterministic stub
+// source (not TerrainGen's real one — that gets its own coverage in
+// TerrainGen.test.ts) so every expected value is a pure function of (x, y, z)
+// the test can recompute independently of the grid under test.
+
+/**
+ * Deterministic pure density function of (x, y, z) for `DeterministicChunkSource`
+ * below — spans [0, 1] in steps of 0.1 so both solid (>= 0.5) and non-solid
+ * results occur across a modest coordinate range.
+ */
+function stubDensity(x: number, y: number, z: number): number {
+  const n = (((x * 7 + y * 13 + z * 17) % 11) + 11) % 11;
+  return n / 10;
+}
+
+/** Deterministic pure ore function: `{ stubore: 0.5 }` on 1 in 4 voxels, undefined otherwise. */
+function stubOres(x: number, y: number, z: number): Record<string, number> | undefined {
+  return (((x + y + z) % 4) + 4) % 4 === 0 ? { stubore: 0.5 } : undefined;
+}
+
+/**
+ * Minimal deterministic `VoxelChunkSource` test double: fills every voxel in
+ * the requested band from the pure functions above via `writeGeneratedVoxel`,
+ * using one fixed composition palette index for every voxel it writes.
+ */
+class DeterministicChunkSource implements VoxelChunkSource {
+  constructor(private readonly compId: number, private readonly surfaceY = 0) {}
+
+  surfaceHeightAt(_x: number, _z: number): number {
+    return this.surfaceY;
+  }
+
+  materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void {
+    const y0 = cy * CHUNK_SIZE;
+    const y1 = y0 + CHUNK_SIZE;
+    for (let z = z0; z < z1; z++) {
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          grid.writeGeneratedVoxel(x, y, z, this.compId, stubOres(x, y, z), stubDensity(x, y, z));
+        }
+      }
+    }
+  }
+}
+
+describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
+  it('a chunk nothing has ever read is never materialized, even once a source is attached', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+    expect(grid.allocatedSlabCount).toBe(0);
+  });
+
+  it('densityAt/isSolidAt/compositionAt/oresAt/fractureAt at a negative depth on an owned column read stub-source values with no prior write', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+
+    const [x, y, z] = [5, -50, 6];
+    const expectedDensity = stubDensity(x, y, z);
+    const expectedOres = stubOres(x, y, z);
+
+    expect(grid.densityAt(x, y, z)).toBe(expectedDensity);
+    expect(grid.isSolidAt(x, y, z)).toBe(expectedDensity >= 0.5);
+    expect(grid.compositionAt(x, y, z).rocks[0]!.rockId).toBe('cruite');
+    expect(grid.oresAt(x, y, z)).toEqual(expectedOres);
+    expect(grid.fractureAt(x, y, z)).toBe(1.0); // generation never pre-fractures a voxel
+  });
+
+  it('densityAt/isSolidAt/fractureAt never materialize a slab just to answer', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+
+    const before = grid.allocatedSlabCount;
+    grid.densityAt(5, -50, 6);
+    grid.isSolidAt(5, -50, 6);
+    grid.fractureAt(5, -50, 6);
+    grid.densityAt(9, -80, 12);
+    expect(grid.allocatedSlabCount).toBe(before);
+  });
+
+  it('compositionAt/oresAt/getVoxel DO materialize — slab count grows by exactly the distinct y-bands touched', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+
+    expect(grid.slabCount(0, 0)).toBe(0);
+
+    grid.compositionAt(4, -50, 4); // band A (chunkIndexOf(-50))
+    expect(grid.slabCount(0, 0)).toBe(1);
+
+    // chunkIndexOf(-45) is actually -3, a DIFFERENT band from chunkIndexOf(-50)
+    // (-4) — -55 is the coordinate that genuinely stays in band A.
+    expect(chunkIndexOf(-55)).toBe(chunkIndexOf(-50)); // sanity: really the same band
+    grid.oresAt(4, -55, 4); // still band A — no further allocation
+    expect(grid.slabCount(0, 0)).toBe(1);
+
+    grid.getVoxel(4, -10, 4); // band B (chunkIndexOf(-10) !== chunkIndexOf(-50))
+    expect(chunkIndexOf(-10)).not.toBe(chunkIndexOf(-50)); // sanity: these really are distinct bands
+    expect(grid.slabCount(0, 0)).toBe(2);
+  });
+
+  it('dropChunk followed by a read reproduces identical values, including at a voxel that carries a recorded edit', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+
+    const probes: Array<{ x: number; y: number; z: number }> = [
+      { x: 2, y: -20, z: 3 },
+      { x: 9, y: -20, z: 11 },
+      { x: 2, y: -25, z: 3 }, // this one gets edited below
+    ];
+
+    // Materialize the baseline (unedited) values for every probe first.
+    for (const p of probes) grid.compositionAt(p.x, p.y, p.z);
+
+    // The edited voxel's generated baseline really is non-air — otherwise
+    // digging it would be a no-op and this test would never exercise a real
+    // edit surviving a drop+reread at all.
+    const preEditBaseline = grid.densityAt(2, -25, 3);
+    expect(preEditBaseline).toBe(stubDensity(2, -25, 3));
+    expect(preEditBaseline).toBeGreaterThan(0);
+
+    // A gameplay edit (dig) on top of the generated baseline, in the same chunk.
+    grid.clearVoxel(2, -25, 3);
+
+    const before = probes.map(p => ({
+      density: grid.densityAt(p.x, p.y, p.z),
+      rockId: grid.dominantRockAt(p.x, p.y, p.z),
+      ores: grid.oresAt(p.x, p.y, p.z),
+      fracture: grid.fractureAt(p.x, p.y, p.z),
+    }));
+
+    grid.dropChunk(0, 0);
+
+    const after = probes.map(p => ({
+      density: grid.densityAt(p.x, p.y, p.z),
+      rockId: grid.dominantRockAt(p.x, p.y, p.z),
+      ores: grid.oresAt(p.x, p.y, p.z),
+      fracture: grid.fractureAt(p.x, p.y, p.z),
+    }));
+
+    expect(after).toEqual(before);
+    // The dig really did override the generated baseline back to air.
+    expect(before[2]!.density).toBe(0);
+  });
+
+  it('produces the same values regardless of the order columns/chunks are first read in', () => {
+    // Each grid interns the same single rock composition into its own fresh
+    // palette, which deterministically assigns it the same index (1) in
+    // both — the shared numeric compId `DeterministicChunkSource` needs.
+    const gridA = new VoxelGrid(32, 8, 16); // owns chunks (0,0) and (1,0)
+    const compIdA = gridA.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    gridA.attachChunkSource(new DeterministicChunkSource(compIdA));
+
+    const gridB = new VoxelGrid(32, 8, 16);
+    const compIdB = gridB.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    gridB.attachChunkSource(new DeterministicChunkSource(compIdB));
+    expect(compIdB).toBe(compIdA); // sanity: both fresh palettes assign the same index
+
+    // gridA reads chunk (0,0)'s column first, then chunk (1,0)'s.
+    gridA.densityAt(2, -30, 5);
+    gridA.compositionAt(2, -30, 5);
+    gridA.densityAt(18, -30, 5);
+    gridA.compositionAt(18, -30, 5);
+
+    // gridB reads the same two columns in the opposite order.
+    gridB.densityAt(18, -30, 5);
+    gridB.compositionAt(18, -30, 5);
+    gridB.densityAt(2, -30, 5);
+    gridB.compositionAt(2, -30, 5);
+
+    for (const [x, z] of [[2, 5], [18, 5]] as const) {
+      // Cross-grid agreement, regardless of read order...
+      expect(gridB.densityAt(x, -30, z)).toBe(gridA.densityAt(x, -30, z));
+      expect(gridB.compositionAt(x, -30, z)).toEqual(gridA.compositionAt(x, -30, z));
+      expect(gridB.oresAt(x, -30, z)).toEqual(gridA.oresAt(x, -30, z));
+      // ...and both actually equal to the stub source's own values, so this
+      // test cannot pass vacuously on two grids that both merely stayed air.
+      expect(gridA.densityAt(x, -30, z)).toBe(stubDensity(x, -30, z));
+      expect(gridA.oresAt(x, -30, z)).toEqual(stubOres(x, -30, z));
+    }
+  });
+
+  it('a grid with no chunk source attached behaves exactly as before #1183 — unwritten voxels read as plain air/default, nothing throws', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.densityAt(4, -50, 4)).toBe(0);
+    expect(grid.isSolidAt(4, -50, 4)).toBe(false);
+    expect(grid.compositionAt(4, -50, 4).rocks.length).toBe(0);
+    expect(grid.oresAt(4, -50, 4)).toBeUndefined();
+    expect(grid.fractureAt(4, -50, 4)).toBe(1.0);
+    expect(grid.allocatedSlabCount).toBe(0);
+  });
+
+  it('negative chunk-y (cy) arithmetic resolves the correct band at very negative y (e.g. y = -200)', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+
+    const [x, y, z] = [7, -200, 3];
+    expect(grid.densityAt(x, y, z)).toBe(stubDensity(x, y, z));
+    expect(grid.oresAt(x, y, z)).toEqual(stubOres(x, y, z));
+    // A neighbouring row one band over must NOT collide with this one.
+    const neighborY = y - CHUNK_SIZE;
+    expect(chunkIndexOf(neighborY)).not.toBe(chunkIndexOf(y));
+    expect(grid.densityAt(x, neighborY, z)).toBe(stubDensity(x, neighborY, z));
   });
 });

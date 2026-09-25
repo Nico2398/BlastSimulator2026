@@ -100,6 +100,12 @@ export function buildMixedHardnessStrata(dominantRockIds: readonly string[]): St
   return layers;
 }
 
+/**
+ * Intentionally depth-unbounded (#1183): for any `d` past the last boundary
+ * — arbitrarily deep, since generation now materializes rock at any y,
+ * including deeply negative — this clamps to the deepest defined layer
+ * rather than falling off the end of `boundaries`. No cutoff, no NaN.
+ */
 function layerIndexFor(d: number, boundaries: readonly number[]): number {
   for (let i = 0; i < boundaries.length; i++) {
     if (d < boundaries[i]!) return i;

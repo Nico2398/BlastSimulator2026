@@ -1,4 +1,8 @@
 // #1182 — cubic 16×16×16 slab storage: memory proof.
+// #1183 — lazy chunk-source materialization: chunks are a CACHE of the
+// generator's output now, not the sole authority. generateTerrain no longer
+// eagerly fills every column up front; a chunk source attached to the grid
+// materializes each 16x16x16 slab only when something actually reads it.
 //
 // A dense sizeY-tall array per owned (cx,cz) column allocates storage
 // proportional to the grid's DECLARED height, even when only a thin surface
@@ -9,7 +13,11 @@
 // synthetic small grid.
 //
 // Keep this file's runtime bounded: exactly the two generateTerrain calls
-// described below, nothing more (a 160x160 generation is not free).
+// described below (plus, since #1183 made chunk content lazy, one full-grid
+// `forEachSolid` walk per grid to actually materialize what generateTerrain
+// itself no longer fills up front — the same total generation cost as
+// before, just paid here instead of inside generateTerrain), nothing more (a
+// 160x160 generation is not free).
 
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
@@ -34,18 +42,84 @@ function treraniumConfig(sizeY: number): TerrainConfig {
   };
 }
 
-describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182)', () => {
+/**
+ * Touch every CHUNK_SIZE/2-spaced column's surface composition — coarse
+ * enough to stay bounded (~20x20 columns at 160x160), fine enough to reach
+ * every one of the grid's ~100 chunks at least once (#1183).
+ */
+function touchEveryColumnSurfaceComposition(grid: VoxelGrid): void {
+  const step = VoxelGrid.CHUNK_SIZE / 2;
+  for (let z = grid.minZ; z < grid.maxZ; z += step) {
+    for (let x = grid.minX; x < grid.maxX; x += step) {
+      const y = computeVoxelColumnSurfaceY(grid, x, z);
+      if (y >= 0) grid.compositionAt(x, y, z);
+    }
+  }
+}
+
+describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #1183)', () => {
   const gridBase = generateTerrain(treraniumConfig(BASE_SIZE_Y));
   const gridTall = generateTerrain(treraniumConfig(BASE_SIZE_Y * 4));
+  // #1183: generateTerrain no longer fills chunk content up front — it only
+  // attaches the generator as a lazy chunk source. Full materialization (via
+  // `forEachSolid`) is forced later, right before the first test that needs
+  // it (the sizeY-scaling ratio tests below) — NOT here at describe-body
+  // scope, which runs before every `it` in this file and would materialize
+  // both grids before the "nothing generated up front" tests ever got to
+  // observe the pre-materialization state (#1183 fixer: this ordering bug is
+  // exactly what made those two tests read 318 instead of 0).
+
+  // ── Lazy materialization (#1183) — MUST run before any other test in this
+  // describe block reads a voxel from gridBase/gridTall. A prior read would
+  // materialize slabs, and this assertion would then observe stale
+  // (non-zero) state instead of the "nothing generated yet" moment it is
+  // about proving.
+  it('allocatedSlabCount is 0 immediately after generateTerrain — nothing is generated up front', () => {
+    expect(gridBase.allocatedSlabCount).toBe(0);
+    expect(gridTall.allocatedSlabCount).toBe(0);
+  });
+
+  it('scanning every column\'s surface Y via the pure-density top-down scan does not materialize any slab', () => {
+    const step = VoxelGrid.CHUNK_SIZE / 2;
+    for (let z = gridBase.minZ; z < gridBase.maxZ; z += step) {
+      for (let x = gridBase.minX; x < gridBase.maxX; x += step) {
+        computeVoxelColumnSurfaceY(gridBase, x, z);
+      }
+    }
+    expect(gridBase.allocatedSlabCount).toBe(0);
+  });
+
+  it('only reading actual composition at each column\'s surface grows allocatedSlabCount, bounded by chunk count rather than declared vertical extent', () => {
+    touchEveryColumnSurfaceComposition(gridBase);
+    touchEveryColumnSurfaceComposition(gridTall);
+
+    // Something was genuinely materialized for both grids.
+    expect(gridBase.allocatedSlabCount).toBeGreaterThan(0);
+    expect(gridTall.allocatedSlabCount).toBeGreaterThan(0);
+
+    // Bounded by the number of chunks actually touched, not by how many
+    // 16-row slabs the declared sizeY divides into (a dense per-column array
+    // would pay for the latter). At most 2 slabs per touched chunk (the
+    // surface can straddle a slab boundary) — nowhere near
+    // ceil(sizeY / CHUNK_SIZE) per chunk, which is what a dense model pays.
+    expect(gridBase.allocatedSlabCount).toBeLessThanOrEqual(gridBase.chunkCount * 2);
+    expect(gridTall.allocatedSlabCount).toBeLessThanOrEqual(gridTall.chunkCount * 2);
+
+    // gridBase and gridTall share the exact same x/z footprint (only sizeY
+    // differs), so touching the same columns' surfaces materializes roughly
+    // the same number of slabs in both — proving allocation tracks how many
+    // COLUMNS were read, not the grid's declared height.
+    expect(gridTall.allocatedSlabCount).toBeLessThan(gridBase.allocatedSlabCount * 4);
+  });
 
   // NOTE (#1182, @fixer): the three tests below were rewritten. Their
   // original assertions assumed allocatedSlabCount would be IDENTICAL
   // between gridBase and gridTall — measured instead: 318 vs 972 slabs, a
   // genuine ~3.06x growth, not zero. Root cause, confirmed by reading
-  // TerrainGen.ts's generateColumn and WorldGen.ts's createWorldGenContext:
+  // TerrainGen.ts's generateColumnRange and WorldGen.ts's createWorldGenContext:
   // `groundOffset = floor(sizeY * 0.55) - centerHeight` shifts the whole
   // generated crust's vertical DATUM by a fixed fraction of the declared
-  // sizeY, and generateColumn fills solid rock from y=0 up to that shifted
+  // sizeY, and generateColumnRange fills solid rock from y=0 up to that shifted
   // surface — an absolute volume, not just a repositioned fixed-thickness
   // band. So a taller declared grid legitimately generates a deeper crust:
   // this is pre-existing WorldGen/TerrainGen behaviour, unrelated to #1182's
@@ -55,8 +129,16 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182)', (
   // how deep generation reached, not the declared sizeY itself — so raising
   // sizeY 4x does not cost storage anywhere close to 4x, and the height
   // added above wherever the (legitimately shifted) crust lands still costs
-  // nothing.
+  // nothing. Under #1183's lazy model these figures are the surface-only
+  // touches from the test above, which is an even sparser (and still
+  // correct) demonstration of the same claim.
   it('raising the declared sizeY to 4x grows real allocation far less than 4x — the dense-model equivalent scales exactly with sizeY, the real allocation does not', () => {
+    // Force full materialization now — after the lazy/no-materialization
+    // tests above have already made their observations, and once, here,
+    // shared by every remaining test in this file (#1183 fixer).
+    gridBase.forEachSolid(() => {});
+    gridTall.forEachSolid(() => {});
+
     const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
     const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
     expect(denseModelEquivalentTall).toBe(denseModelEquivalentBase * 4); // a dense per-column array pays for declared height exactly

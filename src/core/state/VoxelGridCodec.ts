@@ -7,8 +7,8 @@
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
 import { VoxelGrid, clampAxis, type VoxelRockComposition } from '../world/VoxelGrid.js';
-import { replayTerrainEdits, type EditSegment, type EditBoundary } from '../world/TerrainEdits.js';
-import { generateTerrainRegion, buildTerrainContext, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../world/TerrainGen.js';
+import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
+import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
  * The complete generator identity a save's terrain is regenerated from —
@@ -136,8 +136,12 @@ function requireValidBoundary(boundary: EditBoundary | undefined, label: string)
 }
 
 /**
- * Regenerate a grid from `payload.gen`'s generator identity, then replay
- * `payload.editColumns`/`payload.editFractures` onto it. Throws
+ * Rebuild a grid from `payload.gen`'s generator identity: register ownership
+ * of every claimed chunk and load `payload.editColumns`/`payload.editFractures`
+ * into the grid's own edit record, then attach a `VoxelChunkSource` built
+ * from that same identity (#1183) — no chunk's content is filled up front;
+ * a claimed chunk's voxels materialize lazily, from the generator plus this
+ * edit record, on whatever a caller actually reads. Throws
  * `TerrainGenVersionMismatchError` when `payload.gen.version` doesn't match
  * the running build's generator, or a plain `Error` when the payload's edit
  * data is malformed beyond what clamping can repair.
@@ -159,25 +163,25 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
     ...(payload.gen.mixedRockHardness !== undefined ? { mixedRockHardness: payload.gen.mixedRockHardness } : {}),
   };
 
-  // Empty at construction — every claimed chunk below is added and
-  // generated explicitly, from the claimed rects the save recorded, not
-  // from config.sizeX/sizeZ (a site-expanded save owns chunks past them).
+  // Empty at construction — every claimed chunk below is registered
+  // explicitly, from the claimed rects the save recorded, not from
+  // config.sizeX/sizeZ (a site-expanded save owns chunks past them). No
+  // content is filled here (#1183): the attached chunk source materializes
+  // each chunk lazily, from generation plus the edit record loaded below, on
+  // whatever a caller actually reads.
   const grid = new VoxelGrid(0, config.sizeY, 0);
   const terrain = buildTerrainContext(config);
+  grid.attachChunkSource(createChunkSource(terrain, config));
 
   for (const [cx, cz, minX, minZ, maxX, maxZ] of payload.claimed) {
     grid.addChunkWithRect(cx, cz, { minX, minZ, maxX, maxZ });
-    const rect = grid.chunkRect(cx, cz);
-    if (!rect) continue;
-    generateTerrainRegion(grid, terrain, config, rect);
-    grid.markChunkPristine(cx, cz);
   }
 
   // `grid.minX/maxX/minZ/maxZ` are set by the claimed-chunk loop above —
   // every position field below is clamped against them (and against
-  // `sizeY` for `y`), so a tampered/corrupted save can't drive the replay
-  // loop past the grid's real bounds (#1181 review; matches #609's
-  // `clampChunkRectToTile` precedent for `claimed` rects).
+  // `sizeY` for `y`), so a tampered/corrupted save can't drive the (lazy,
+  // per-band) edit replay past the grid's real bounds (#1181 review; matches
+  // #609's `clampChunkRectToTile` precedent for `claimed` rects).
   for (const { x, z, segments } of payload.editColumns) {
     const cx = clampSavePosition(x, grid.minX, grid.maxX - 1, grid.minX);
     const cz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
@@ -205,8 +209,6 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
     const fz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
     grid.edits.recordFracture(fx, fy, fz, modifier);
   }
-
-  replayTerrainEdits(grid, grid.edits);
 
   return grid;
 }
