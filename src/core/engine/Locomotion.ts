@@ -370,7 +370,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       emp.x = leg.destX;
       emp.z = leg.destZ;
     }
-    if (isDrive) writeVehiclePosition(state, vehicle!, emp.x, emp.z);
+    if (isDrive) writeVehiclePosition(state, vehicle!, emp.x, emp.z, isLegArrived(emp.x, emp.z, leg));
 
     // Position genuinely advanced this tick — record it regardless of
     // whether the isStuck-abandon branch below also fires (an oscillating
@@ -477,7 +477,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     // this exact way).
     emp.x = outcome.x;
     emp.z = outcome.z;
-    writeVehiclePosition(state, vehicle, outcome.x, outcome.z);
+    writeVehiclePosition(state, vehicle, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
     result.moved.push(emp.id);
     result.moved.push(vehicle.id);
     result.vehiclesMoved.push(vehicle.id);
@@ -518,7 +518,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
 function relocateDestinationBlocker(
   state: GameState, destX: number, destZ: number, requesterVehicleId: number, result: LocomotionResult,
 ): boolean {
-  const blocker = state.vehicles.vehicles.find(v => v.id !== requesterVehicleId && v.x === destX && v.z === destZ);
+  const blocker = state.vehicles.vehicles.find(v => v.id !== requesterVehicleId && Math.round(v.x) === destX && Math.round(v.z) === destZ);
   if (!blocker) return false;
 
   // Already relocating — this trigger or a prior tick's — give it time to
@@ -611,22 +611,25 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
   return best;
 }
 
-/** Writes a driving employee's advance onto their vehicle — the only place a vehicle's x/z ever changes. */
-function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number): void {
+/**
+ * Writes a driving employee's advance onto their vehicle — the only place a
+ * vehicle's x/z ever changes — and keeps NavCell.vehicleOccupied in step:
+ * `isStationaryNow` is the calling leg's own arrival test (`isLegArrived`)
+ * passing this tick, so a leg that just arrived marks the cell it stopped on,
+ * and a leg still mid-route leaves it unmarked. The cell is freed the next
+ * tick a new leg's `writeVehiclePosition` call finds the rounded cell has
+ * changed (`updateVehicleCellOccupancy`'s own `cellChanged` check) — driving
+ * away from a stopped, occupied cell frees it without this function needing
+ * to know that on its own.
+ */
+function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, isStationaryNow: boolean): void {
   const prevX = Math.round(vehicle.x);
   const prevZ = Math.round(vehicle.z);
 
   vehicle.x = x;
   vehicle.z = z;
 
-  // TODO(#1138): wasStationary/isStationaryNow used to read the deleted
-  // Vehicle.state field (true only on the very first tick a stationary
-  // vehicle starts driving). Hardcoded here to "was, isn't now" — always
-  // clears the old cell, never marks the new one occupied while actively
-  // driving, which matches every steady-state driving tick; only the exact
-  // "already on the destination cell the instant driving starts" edge case
-  // differs from the old behaviour.
-  updateVehicleCellOccupancy(state, vehicle, true, false, prevX, prevZ);
+  updateVehicleCellOccupancy(state, vehicle, true, isStationaryNow, prevX, prevZ);
 }
 
 /**
@@ -663,7 +666,7 @@ function nextGridStep(x: number, z: number, waypoints: Array<{ x: number; z: num
 }
 
 function isOccupiedByOtherVehicle(state: GameState, selfVehicleId: number, x: number, z: number): boolean {
-  return state.vehicles.vehicles.some(v => v.id !== selfVehicleId && v.x === x && v.z === z);
+  return state.vehicles.vehicles.some(v => v.id !== selfVehicleId && Math.round(v.x) === x && Math.round(v.z) === z);
 }
 
 /**
