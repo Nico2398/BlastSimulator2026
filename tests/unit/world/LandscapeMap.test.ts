@@ -84,20 +84,24 @@ describe('sampleLandscapeColumn', () => {
   });
 });
 
-describe('sampleLandscapeColumn — a grid too short for the relief it stands in (#1077)', () => {
-  // The suite below deliberately gives itself a 200 m grid so nothing clamps.
-  // Every real level is the opposite case: alpine_granite's relief runs tens of
-  // metres through a 20 m grid, the tutorial's own north-east corner dips 1.2 m
-  // below its floor, and TerrainGen answers by clamping every column into
-  // [1, sizeY - 1]. The landscape used to be the one sheet that did not, so the
-  // site rendered a flat-topped rectangle wherever the world left the band —
-  // the square a player sees drawn on untouched ground.
+describe('sampleLandscapeColumn — no clamp, on either side, once relief exceeds a short grid (#1189)', () => {
+  // #1077's `applyPlayableBand` pulled the world into the same [1, sizeY - 1]
+  // band TerrainGen's own clamp filled every column through, so site and
+  // landscape agreed — but both were lossy wherever a level's real relief
+  // (alpine_granite here) leaves a 20 m grid. #1189 deletes the band and the
+  // clamp it matched: this suite proves BOTH samplers now land on the raw,
+  // fully unclamped height, not merely that they still agree with each other
+  // (they always did — even the pre-#1189 band matched the clamp exactly).
   const config: TerrainConfig = { sizeX: 40, sizeY: 20, sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
   const { worldGen, biome } = buildTerrainContext(config);
   const strata = new StrataSampler(config.seed, buildStrataProfile(biome.dominantRocks));
   const palette = new CompositionPalette();
   const landscapeHeightAt = (x: number, z: number): number =>
     sampleLandscapeColumn(worldGen, config.climateBias, EMPTY_STRUCTURES, strata, palette, x, z).height;
+  /** The raw target formula: masked world height + the datum shift, with no
+   *  rounding and no clamp at all — what both samplers must produce post-#1189. */
+  const freeHeightAt = (x: number, z: number): number =>
+    applyPitMask(sampleBaseHeight(worldGen.fields, x, z, worldGen.shapingAt(x, z)), worldGen.centerHeight, worldGen.playableRect, x, z) + worldGen.groundOffset;
 
   /** The site's rectangle, its halo ring, and its corners. */
   const boundaryColumns: Array<[number, number]> = [
@@ -105,22 +109,34 @@ describe('sampleLandscapeColumn — a grid too short for the relief it stands in
     [-1, 20], [20, -1], [-1, -1], [41, 41], [10, 10], [30, 5],
   ];
 
-  it('clamps somewhere, or it is testing nothing', () => {
-    const unclamped = boundaryColumns.some(([x, z]) => {
-      const free = applyPitMask(sampleBaseHeight(worldGen.fields, x, z, worldGen.shapingAt(x, z)), worldGen.centerHeight, worldGen.playableRect, x, z) + worldGen.groundOffset;
+  it('the fixture genuinely leaves the old [1, sizeY - 1] band somewhere, or this suite proves nothing', () => {
+    const exceeds = boundaryColumns.some(([x, z]) => {
+      const free = freeHeightAt(x, z);
       return free < 1 || free > config.sizeY - 1;
     });
-    expect(unclamped).toBe(true);
+    expect(exceeds).toBe(true);
   });
 
-  it('puts the landscape on exactly the height the grid fills, boundary, halo ring and interior alike', () => {
+  it('the landscape sample equals the raw unclamped formula exactly, boundary, halo ring and interior alike (#1189)', () => {
+    for (const [x, z] of boundaryColumns) {
+      expect(landscapeHeightAt(x, z)).toBeCloseTo(freeHeightAt(x, z), 9);
+    }
+  });
+
+  it('the site\'s own sampleSurfaceHeightY equals the same raw unclamped formula — no clamp on that side either (#1189)', () => {
+    for (const [x, z] of boundaryColumns) {
+      expect(sampleSurfaceHeightY(worldGen, x, z)).toBeCloseTo(freeHeightAt(x, z), 9);
+    }
+  });
+
+  it('site and landscape still agree with each other at every column, now unclamped', () => {
     for (const [x, z] of boundaryColumns) {
       expect(landscapeHeightAt(x, z)).toBeCloseTo(sampleSurfaceHeightY(worldGen, x, z), 9);
     }
   });
 
   it('hands the world back its own relief out in the open, where nothing else is drawing', () => {
-    const free = applyPitMask(sampleBaseHeight(worldGen.fields, 400, -300, worldGen.shapingAt(400, -300)), worldGen.centerHeight, worldGen.playableRect, 400, -300) + worldGen.groundOffset;
+    const free = freeHeightAt(400, -300);
     expect(landscapeHeightAt(400, -300)).toBeCloseTo(free, 9);
   });
 });
