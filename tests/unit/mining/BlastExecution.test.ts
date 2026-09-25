@@ -118,6 +118,31 @@ describe('executeBlast — crater', () => {
     expect(farVoxel?.density).toBe(1.0);
   });
 
+  it('#1186: breaks through to the surface when the whole pit sits below y=0', () => {
+    // Same 2×3 grid/plan as the plain crater test, just shifted 30 voxels
+    // down so the surface and every hole resolve to negative Y — proving the
+    // blast zone and energy field are no longer floored at y=0.
+    const grid = new VoxelGrid(40, 20, 40);
+    fillRegion(grid, 'molite', 5, 25, -30, -20, 5, 25, 'blingite', 0.2);
+
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const delays = autoVPattern(holes, 25);
+    const plan = assembleBlastPlan(holes, charges, delays);
+
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+    expect(result!.clearedVoxels).toBeGreaterThan(0);
+
+    // The crater breaks through the (negative-Y) surface, same as the
+    // above-ground case.
+    expect(grid.densityAt(12, -20, 12)).toBe(0);
+  });
+
   it('returns null and leaves terrain untouched for an invalid blast plan', () => {
     const grid = new VoxelGrid(20, 10, 20);
     const holes = createGridPlan({ x: 5, z: 5 }, 1, 1, 3, 6, 0.15);

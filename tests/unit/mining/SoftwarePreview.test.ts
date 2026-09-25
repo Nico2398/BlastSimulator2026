@@ -4,11 +4,14 @@ import {
   readVoxelPrediction,
   predictFragmentation,
   getBlastBBox,
+  forEachBBoxVoxel,
   PREVIEW_RADIUS,
 } from '../../../src/core/mining/SoftwarePreview.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -108,6 +111,66 @@ describe('SoftwarePreview — getBlastBBox', () => {
     }
     const xs = plan.holes.map(h => h.x);
     expect(bbox.minX).toBeLessThanOrEqual(Math.min(...xs) - PREVIEW_RADIUS + 1);
-    expect(bbox.minY).toBeGreaterThanOrEqual(0);
+    // #1186: makeTestPlan's surface (y=9) minus its max hole depth (6) minus
+    // PREVIEW_RADIUS (5) is -2 — genuinely below y=0 once the floor is
+    // removed, so this must no longer be clamped to >= 0.
+    expect(bbox.minY).toBe(-2);
+  });
+
+  it('#1186: a hole whose surface sits below y=0 gets a bbox that actually covers it, not pulled back toward y=0', () => {
+    const grid = new VoxelGrid(20, 5, 20);
+    for (let z = 5; z <= 15; z++) {
+      for (let y = -14; y <= -8; y++) {
+        for (let x = 5; x <= 15; x++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+
+    const holes = createGridPlan({ x: 10, z: 10 }, 1, 1, 3, 4, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
+    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+
+    const ctx = computeHoleContext(plan, grid);
+    // Sanity: the surface really does sit below y=0.
+    expect(ctx.holeSurfaceYs[holes[0]!.id]).toBeLessThan(0);
+
+    const bbox = getBlastBBox(plan, ctx);
+    // The old `maxSurfaceY = 0` seed and the `Math.max(0, ...)` minY floor
+    // both wrongly pull this bbox back up toward y=0 even though the whole
+    // hole sits well below it.
+    expect(bbox.maxY).toBeLessThan(0);
+
+    let solidFound = 0;
+    forEachBBoxVoxel(grid, bbox, () => { solidFound++; });
+    expect(solidFound).toBeGreaterThan(0);
+  });
+
+  it('#1186: a hole at negative x on a westward-expanded site resolves via clampToGridColumn, not snapped to x=0', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(-1, 0);
+    // Rock only at the negative-x column the hole is actually drilled at —
+    // column x=0 (where the old hand-rolled clamp would wrongly snap to)
+    // stays empty, so a wrong resolution reads it as bare ground (surfaceY=0).
+    grid.setVoxel(-5, 0, 5, {
+      composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+
+    const holes = createGridPlan({ x: -5, z: 5 }, 1, 1, 3, 4, 0.15);
+    const plan = assembleBlastPlan(holes, {}, {});
+
+    const ctx = computeHoleContext(plan, grid);
+    expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(1);
   });
 });

@@ -144,7 +144,6 @@
     "src/core/mining/Tubing.ts:TubingResult",
     "src/core/scores/ScoreManager.ts:ScoreId",
     "src/core/weather/WeatherAdvisory.ts:WeatherAdvisoryKind",
-    "src/core/weather/WeatherEffects.ts:getHolePorosity",
     "src/core/world/OreCatalog.ts:OreType",
     "src/core/world/PlayableArea.ts:ClaimAreaRefusal",
     "src/core/world/PlayableArea.ts:ClaimAreaResult",

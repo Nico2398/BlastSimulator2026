@@ -9,7 +9,11 @@ import {
   MAX_SOFTWARE_TIER,
 } from '../../../src/core/mining/Software.js';
 import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { autoVPattern } from '../../../src/core/mining/Sequence.js';
+import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -110,5 +114,29 @@ describe('Software — previewHoleDetails', () => {
     const { grid, plan } = makeTestPlan();
     const uncharged = { ...plan, charges: {} };
     expect(previewHoleDetails(uncharged, grid, 3)).toEqual({});
+  });
+
+  it('#1186: still returns a detail entry when the hole surface sits below y=0', () => {
+    // Same 2x2 hole pattern/plan as makeTestPlan, just shifted 15 voxels down
+    // so the surface (and every charge column) resolves to negative Y.
+    const grid = new VoxelGrid(30, 15, 30);
+    for (let z = 5; z <= 20; z++)
+      for (let y = -15; y <= -7; y++)
+        for (let x = 5; x <= 20; x++)
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+
+    const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
+    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+
+    const details = previewHoleDetails(plan, grid, 2);
+    expect(holeIds.length).toBeGreaterThan(0);
+    for (const id of holeIds) {
+      expect(details[id]).toBeDefined();
+      expect(details[id]!.fragSizeCm).toBeGreaterThan(0);
+    }
   });
 });
