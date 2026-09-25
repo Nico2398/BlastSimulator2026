@@ -42,7 +42,7 @@ interface FractureEntry {
 }
 
 /** Shallow equality of two optional ore-density records. */
-function oresDeepEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
+export function oresDeepEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
   const aKeys = Object.keys(a);
@@ -147,19 +147,6 @@ export class TerrainEdits {
     const key = `${x},${z}`;
     const existing = this.columnMap.get(key)?.segments ?? [];
 
-    // A paint that exactly and solely reproduces the boundaries of a single
-    // pre-existing opposite-kind segment is a full undo of that segment: the
-    // column returns to whatever it was before that segment was recorded
-    // (unedited, if it was the only edit there), not to a same-extent segment
-    // of the new kind. A paint that only partially overlaps an opposite-kind
-    // segment (a sub-range or a superset with extra on either side) is a
-    // genuine new edit and gets recorded as such, same as always.
-    const overlapping = existing.filter(seg => seg.yHi >= yLo && seg.yLo <= yHi);
-    const cancelsExactly = overlapping.length === 1
-      && overlapping[0]!.yLo === yLo
-      && overlapping[0]!.yHi === yHi
-      && overlapping[0]!.kind !== kind;
-
     const next: EditSegment[] = [];
     for (const seg of existing) {
       if (seg.yHi < yLo || seg.yLo > yHi) {
@@ -182,16 +169,14 @@ export class TerrainEdits {
       // Otherwise the segment is fully inside [yLo, yHi] — dropped entirely.
     }
 
-    if (!cancelsExactly) {
-      const inserted: EditSegment = { yLo, yHi, kind };
-      if (kind === 'added' && compId !== undefined) {
-        inserted.compId = compId;
-        if (ores && Object.keys(ores).length > 0) inserted.ores = { ...ores };
-      }
-      if (bottomBoundary) inserted.bottomBoundary = cloneBoundary(bottomBoundary);
-      if (topBoundary) inserted.topBoundary = cloneBoundary(topBoundary);
-      next.push(inserted);
+    const inserted: EditSegment = { yLo, yHi, kind };
+    if (kind === 'added' && compId !== undefined) {
+      inserted.compId = compId;
+      if (ores && Object.keys(ores).length > 0) inserted.ores = { ...ores };
     }
+    if (bottomBoundary) inserted.bottomBoundary = cloneBoundary(bottomBoundary);
+    if (topBoundary) inserted.topBoundary = cloneBoundary(topBoundary);
+    next.push(inserted);
 
     next.sort((a, b) => a.yLo - b.yLo);
 

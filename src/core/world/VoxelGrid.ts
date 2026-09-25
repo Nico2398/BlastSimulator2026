@@ -9,21 +9,8 @@
 // Voxel cell size: 1 m × 1 m × 1 m (SI units throughout). All grid
 // coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
-import { TerrainEdits, type EditBoundary } from './TerrainEdits';
+import { TerrainEdits, oresDeepEqual, type EditBoundary } from './TerrainEdits';
 import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance';
-
-/** Shallow equality of two optional ore-density records — used to skip recording a no-op write. */
-function oresEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) return false;
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) return false;
-  }
-  return true;
-}
 
 export interface VoxelRockComposition {
   /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
@@ -595,7 +582,7 @@ export class VoxelGrid {
     newDensity: number, newCompId: number, newOres: Record<string, number> | undefined,
   ): void {
     if (this.editingSuppressed) return;
-    if (prevDensity === newDensity && prevCompId === newCompId && oresEqual(prevOres, newOres)) return;
+    if (prevDensity === newDensity && prevCompId === newCompId && oresDeepEqual(prevOres, newOres)) return;
 
     if (newDensity > 0 && newDensity < 1) {
       const boundary: EditBoundary = newOres !== undefined
@@ -614,6 +601,11 @@ export class VoxelGrid {
     } else {
       this.edits.recordDig(x, z, y, y);
     }
+  }
+
+  /** Record a fracture-modifier change at (x, y, z) when it actually changed and recording isn't suppressed — shared by every mutator that writes `chunk.fracture`. */
+  private recordFractureWrite(x: number, y: number, z: number, prev: number, next: number): void {
+    if (!this.editingSuppressed && prev !== next) this.edits.recordFracture(x, y, z, next);
   }
 
   // ── Direct field accessors — no allocation, hot-path callers should prefer these ──
@@ -682,7 +674,7 @@ export class VoxelGrid {
     this.touch(chunk);
     this.touchDensity(chunk, i, y, density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, density, compId, chunk.ores.get(i));
-    if (!this.editingSuppressed && prevFracture !== 1.0) this.edits.recordFracture(x, y, z, 1);
+    this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
@@ -692,7 +684,7 @@ export class VoxelGrid {
     const prev = chunk.fracture[i]!;
     chunk.fracture[i] = value;
     this.touch(chunk);
-    if (!this.editingSuppressed && prev !== value) this.edits.recordFracture(x, y, z, value);
+    this.recordFractureWrite(x, y, z, prev, value);
   }
 
   /** Multiply the fracture modifier in place (e.g. cracking a voxel that didn't fully fracture). */
@@ -704,7 +696,7 @@ export class VoxelGrid {
     const next = prev * factor;
     chunk.fracture[i] = next;
     this.touch(chunk);
-    if (!this.editingSuppressed && prev !== next) this.edits.recordFracture(x, y, z, next);
+    this.recordFractureWrite(x, y, z, prev, next);
   }
 
   // ── Compatibility API — materializes a VoxelData-shaped object per call ──
@@ -745,9 +737,7 @@ export class VoxelGrid {
     this.touch(chunk);
     this.touchDensity(chunk, i, y, voxel.density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, voxel.density, chunk.compId[i]!, chunk.ores.get(i));
-    if (!this.editingSuppressed && prevFracture !== voxel.fractureModifier) {
-      this.edits.recordFracture(x, y, z, voxel.fractureModifier);
-    }
+    this.recordFractureWrite(x, y, z, prevFracture, voxel.fractureModifier);
   }
 
   clearVoxel(x: number, y: number, z: number): void {
@@ -764,10 +754,8 @@ export class VoxelGrid {
     chunk.ores.delete(i);
     this.touch(chunk);
     this.touchDensity(chunk, i, y, 0);
-    if (!this.editingSuppressed && (prevDensity !== 0 || prevCompId !== 0 || prevOres !== undefined)) {
-      this.edits.recordDig(x, z, y, y);
-    }
-    if (!this.editingSuppressed && prevFracture !== 1.0) this.edits.recordFracture(x, y, z, 1);
+    this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, 0, 0, undefined);
+    this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
 
   // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──
