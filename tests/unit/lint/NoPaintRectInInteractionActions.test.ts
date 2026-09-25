@@ -16,11 +16,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-export const ROOT = join(import.meta.dirname, '../../..');
-export const SCANNED_DIR = 'scripts';
+const ROOT = join(import.meta.dirname, '../../..');
+const SCANNED_DIR = 'scripts';
 
 /** Files allowed to call `__placement.paintRect` directly, each with the reason. */
-export const ALLOWLIST: Readonly<Record<string, string>> = {
+const ALLOWLIST: Readonly<Record<string, string>> = {
   // Populated only if a genuine command-mode-only caller under scripts/ needs
   // an exemption; investigation for issue #1209 found none — command mode's
   // own paintRect caller in src/main.ts sits outside SCANNED_DIR.
