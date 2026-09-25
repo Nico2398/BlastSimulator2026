@@ -3,7 +3,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
-import { findPath, findRampConnections, getBenchLevel, octileHeuristic } from '../../src/core/nav/Pathfinding.js';
+import {
+  findPath, findRampConnections, getBenchLevel, octileHeuristic, isDiagonalCornerClear,
+} from '../../src/core/nav/Pathfinding.js';
+import { advanceAlongPath, NULL_ROUTE_COMMITMENT } from '../../src/core/nav/AgentAdvance.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import {
@@ -11,7 +14,7 @@ import {
   computeRampSegmentCarveTarget, carveRampSegmentSlice,
   type RampDef,
 } from '../../src/core/mining/Ramp.js';
-import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+import { NAV_MAX_SLOPE_RATIO, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 import { createLogisticsState, addBlastFragments } from '../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
@@ -867,6 +870,118 @@ describe('NavMesh and pathfinding', () => {
       });
       expect(restored.found).toBe(true);
       expect(restored.waypoints.some(wp => wp.x === 5 && wp.z === 5)).toBe(true);
+    });
+  });
+
+  // ── #1197: diagonal corner-cutting and retrace recovery, on a real
+  // buildNavGrid/placeBuilding-derived grid rather than the hand-built
+  // NavCell fixtures Pathfinding.test.ts/AgentAdvance.test.ts use. ──────────
+
+  describe('employees never cross a footprint cell while walking (#1197)', () => {
+    /**
+     * Two 2×2 buildings whose footprints touch only at a shared corner —
+     * building A's own corner cell, (3,3), sits diagonally adjacent to
+     * building B's own corner cell, (4,4), with no edge in common — plus a
+     * larger (4×4) building squarely on the straight line between the
+     * "behind the building" start/goal pair the tests below use.
+     */
+    function buildFixture(): NavGrid {
+      const vg = new VoxelGrid(30, 10, 20);
+      fillSolid(vg, 4);
+
+      const state = createBuildingState();
+      const a = placeBuilding(state, 'management_office', 2, 2, vg.sizeX, vg.sizeZ, 1);
+      expect(a.success).toBe(true);
+      const b = placeBuilding(state, 'management_office', 4, 4, vg.sizeX, vg.sizeZ, 1);
+      expect(b.success).toBe(true);
+      const c = placeBuilding(state, 'freight_warehouse', 10, 8, vg.sizeX, vg.sizeZ, 1);
+      expect(c.success).toBe(true);
+
+      return NavGrid.buildNavGrid(vg, state.buildings, []);
+    }
+
+    function assertLegalRoute(nav: NavGrid, waypoints: Array<{ x: number; z: number }>): void {
+      for (const wp of waypoints) {
+        expect(nav.cellAt(wp.x, wp.z)!.type).not.toBe('blocked');
+      }
+      for (let i = 0; i < waypoints.length - 1; i++) {
+        const a = waypoints[i]!;
+        const b = waypoints[i + 1]!;
+        expect(isDiagonalCornerClear(nav, a.x, a.z, b.x, b.z)).toBe(true);
+      }
+    }
+
+    it('findPath past the two corner-touching buildings never cuts their shared corner', () => {
+      const nav = buildFixture();
+      const result = findPath(nav, { agentId: 1, fromX: 0, fromZ: 3, toX: 8, toZ: 4, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      assertLegalRoute(nav, result.waypoints);
+    });
+
+    it('findPath toward a destination behind the larger rectangular building detours around its footprint legally', () => {
+      const nav = buildFixture();
+      const result = findPath(nav, { agentId: 1, fromX: 8, fromZ: 9, toX: 16, toZ: 9, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      assertLegalRoute(nav, result.waypoints);
+    });
+
+    it('advanceAlongPath\'s retrace recovery never walks the agent into the warehouse\'s real footprint while holding toward the raw destination', () => {
+      const nav = buildFixture();
+      const destinationX = 16;
+      const destinationZ = 9;
+
+      // Sanity: the straight line at z=9 really does run through the
+      // warehouse's own footprint (x=10..13).
+      expect(nav.cellAt(11, 9)!.type).toBe('blocked');
+
+      const tick1 = advanceAlongPath({
+        x: 6, z: 9,
+        walkSpeed: AGENT_WALK_SPEED,
+        destinationX, destinationZ,
+        consecutiveFailures: 0, isStuck: false,
+        path: { found: true, waypoints: [{ x: 6, z: 9 }, { x: 8, z: 9 }, { x: 10, z: 9 }], totalCost: 4 },
+        committed: NULL_ROUTE_COMMITMENT,
+        navGrid: nav,
+      });
+      expect(tick1.x).toBe(8);
+      expect(tick1.z).toBe(9);
+
+      // Fresh replan retraces tick 1's own start (6,9) — the #1129
+      // oscillation signature — at a near-tied cost, triggering the
+      // isRetrace recovery.
+      const tick2 = advanceAlongPath({
+        x: tick1.x, z: tick1.z,
+        walkSpeed: AGENT_WALK_SPEED,
+        destinationX, destinationZ,
+        consecutiveFailures: tick1.consecutiveFailures, isStuck: tick1.isStuck,
+        path: { found: true, waypoints: [{ x: 8, z: 9 }, { x: 6, z: 9 }, { x: 4, z: 9 }], totalCost: 1 },
+        committed: tick1.committed,
+        navGrid: nav,
+      });
+      expect(nav.cellAt(Math.floor(tick2.x), Math.floor(tick2.z))!.type).not.toBe('blocked');
+
+      let x = tick2.x;
+      const z = tick2.z;
+      let committed = tick2.committed;
+      let consecutiveFailures = tick2.consecutiveFailures;
+      let isStuck = tick2.isStuck;
+
+      for (let i = 0; i < 3; i++) {
+        const next = advanceAlongPath({
+          x, z,
+          walkSpeed: AGENT_WALK_SPEED,
+          destinationX, destinationZ,
+          consecutiveFailures, isStuck,
+          path: { found: true, waypoints: [{ x, z }, { x: x - 2, z }, { x: x - 4, z }], totalCost: 1 },
+          committed,
+          navGrid: nav,
+        });
+        expect(nav.cellAt(Math.floor(next.x), Math.floor(next.z))!.type).not.toBe('blocked');
+        x = next.x;
+        committed = next.committed;
+        consecutiveFailures = next.consecutiveFailures;
+        isStuck = next.isStuck;
+      }
     });
   });
 
