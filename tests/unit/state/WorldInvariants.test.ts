@@ -14,7 +14,7 @@
 // fail against that stub, not against a syntax/import error.
 
 import { describe, it, expect } from 'vitest';
-import { assertWorldInvariants } from '../../../src/core/state/WorldInvariants.js';
+import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../../../src/core/state/WorldInvariants.js';
 import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
@@ -316,6 +316,27 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     expect(violations).toHaveLength(1);
     expect(violations[0]!.kind).toBe('I5_reservation_without_valid_holder');
     expect(violations[0]!.vehicleId).toBe(v.id);
+  });
+});
+
+// #1115: I4/I5 are framed throughout WorldInvariants.ts's own doc comments as
+// violations that "should never occur if the mount/itinerary/task machinery
+// is correct" — the same standard I8 is already held to via
+// FATAL_VIOLATION_KINDS (aborting the tick outright rather than merely being
+// collected and reported). Once the vehicle-reservation/rest-promotion
+// ordering bug behind I4/I5 is fixed at its root, both join I8 in that set —
+// today only I8 is a member, so this fails until that lands.
+describe('FATAL_VIOLATION_KINDS — I4/I5 fatality (#1115)', () => {
+  it('includes I4_vehicle_moved_without_occupant, matching I8\'s existing precedent', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I4_vehicle_moved_without_occupant')).toBe(true);
+  });
+
+  it('includes I5_reservation_without_valid_holder, matching I8\'s existing precedent', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I5_reservation_without_valid_holder')).toBe(true);
+  });
+
+  it('still includes I8_payload_not_in_transit (pre-existing, must not regress)', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I8_payload_not_in_transit')).toBe(true);
   });
 });
 
