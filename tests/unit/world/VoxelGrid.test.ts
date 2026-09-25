@@ -1109,7 +1109,9 @@ describe('VoxelGrid — edit recording (#1180)', () => {
     grid.fillVoxel(3, 3, 3, compId, undefined, 1.0);
 
     const segs = grid.edits.segmentsAt(3, 3);
-    expect(segs.some(s => s.kind === 'added' && s.compId === compId && 3 >= s.yLo && 3 <= s.yHi)).toBe(true);
+    const match = segs.find(s => s.kind === 'added' && 3 >= s.yLo && 3 <= s.yHi);
+    expect(match, 'expected an added segment covering y=3').toBeDefined();
+    expect(match!.compId).toEqual(grid.palette.get(compId).comp);
   });
 
   it('setFractureAt updates grid.edits.fractureAt to the new modifier', () => {

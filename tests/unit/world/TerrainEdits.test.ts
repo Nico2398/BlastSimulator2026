@@ -8,7 +8,15 @@
 
 import { describe, it, expect } from 'vitest';
 import { TerrainEdits, replayTerrainEdits, type EditBoundary } from '../../../src/core/world/TerrainEdits.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, type VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
+
+/** Distinct, deterministic composition per numeric id — same id always
+ *  produces a deep-equal (but not reference-equal) composition object, so
+ *  tests can compare "same material" vs "different material" the way they
+ *  did with raw palette-index numbers before #1180's retype. */
+function comp(id: number): VoxelRockComposition {
+  return { rocks: [{ rockId: `rock${id}`, coefficient: 1 }] };
+}
 
 describe('TerrainEdits.empty', () => {
   it('creates an edit record with no segments and no fracture entries', () => {
@@ -30,10 +38,10 @@ describe('recordDig / recordAdd — basic segment creation', () => {
 
   it('recordAdd creates a single added segment carrying the given compId/ores', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(1, 1, 0, 3, 7, { blingite: 0.4 });
+    edits.recordAdd(1, 1, 0, 3, comp(7), { blingite: 0.4 });
     const segs = edits.segmentsAt(1, 1);
     expect(segs.length).toBe(1);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: 7, ores: { blingite: 0.4 } });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: comp(7), ores: { blingite: 0.4 } });
   });
 
   it('segmentsAt an unedited column returns empty', () => {
@@ -45,11 +53,11 @@ describe('recordDig / recordAdd — basic segment creation', () => {
 describe('adjacent segment merging on insert', () => {
   it('merges two adjacent recordAdd calls with the same compId/ores into one segment', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(2, 2, 0, 2, 5, { dirtite: 0.1 });
-    edits.recordAdd(2, 2, 3, 5, 5, { dirtite: 0.1 });
+    edits.recordAdd(2, 2, 0, 2, comp(5), { dirtite: 0.1 });
+    edits.recordAdd(2, 2, 3, 5, comp(5), { dirtite: 0.1 });
     const segs = edits.segmentsAt(2, 2);
     expect(segs.length).toBe(1);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 5, compId: 5 });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 5, compId: comp(5) });
   });
 
   it('merges two adjacent recordDig calls into one segment (dug carries no material to distinguish)', () => {
@@ -63,16 +71,16 @@ describe('adjacent segment merging on insert', () => {
 
   it('does NOT merge two adjacent added segments with different compId, even though kind matches', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(2, 2, 0, 2, 5);
-    edits.recordAdd(2, 2, 3, 5, 6);
+    edits.recordAdd(2, 2, 0, 2, comp(5));
+    edits.recordAdd(2, 2, 3, 5, comp(6));
     const segs = edits.segmentsAt(2, 2);
     expect(segs.length).toBe(2);
   });
 
   it('does NOT merge two adjacent added segments with the same compId but different ores', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(2, 2, 0, 2, 5, { blingite: 0.4 });
-    edits.recordAdd(2, 2, 3, 5, 5, { blingite: 0.5 });
+    edits.recordAdd(2, 2, 0, 2, comp(5), { blingite: 0.4 });
+    edits.recordAdd(2, 2, 3, 5, comp(5), { blingite: 0.5 });
     const segs = edits.segmentsAt(2, 2);
     expect(segs.length).toBe(2);
   });
@@ -81,7 +89,7 @@ describe('adjacent segment merging on insert', () => {
 describe('a dig punching a hole in an existing added segment', () => {
   it('fully overlapping the added segment removes it entirely', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(4, 4, 2, 8, 3);
+    edits.recordAdd(4, 4, 2, 8, comp(3));
     edits.recordDig(4, 4, 0, 10);
     const segs = edits.segmentsAt(4, 4);
     expect(segs.some(s => s.kind === 'added')).toBe(false);
@@ -89,13 +97,13 @@ describe('a dig punching a hole in an existing added segment', () => {
 
   it('punching a hole in the middle splits the added segment into two shorter added segments either side', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(4, 4, 0, 10, 3);
+    edits.recordAdd(4, 4, 0, 10, comp(3));
     edits.recordDig(4, 4, 4, 6);
     const segs = [...edits.segmentsAt(4, 4)].sort((a, b) => a.yLo - b.yLo);
     expect(segs.length).toBe(3);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: 3 });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: comp(3) });
     expect(segs[1]).toMatchObject({ kind: 'dug', yLo: 4, yHi: 6 });
-    expect(segs[2]).toMatchObject({ kind: 'added', yLo: 7, yHi: 10, compId: 3 });
+    expect(segs[2]).toMatchObject({ kind: 'added', yLo: 7, yHi: 10, compId: comp(3) });
   });
 });
 
@@ -103,18 +111,18 @@ describe('an add landing inside an existing dug region', () => {
   it('landing fully inside splits the dug segment into two shorter dug segments either side', () => {
     const edits = TerrainEdits.empty();
     edits.recordDig(4, 4, 0, 10);
-    edits.recordAdd(4, 4, 4, 6, 9);
+    edits.recordAdd(4, 4, 4, 6, comp(9));
     const segs = [...edits.segmentsAt(4, 4)].sort((a, b) => a.yLo - b.yLo);
     expect(segs.length).toBe(3);
     expect(segs[0]).toMatchObject({ kind: 'dug', yLo: 0, yHi: 3 });
-    expect(segs[1]).toMatchObject({ kind: 'added', yLo: 4, yHi: 6, compId: 9 });
+    expect(segs[1]).toMatchObject({ kind: 'added', yLo: 4, yHi: 6, compId: comp(9) });
     expect(segs[2]).toMatchObject({ kind: 'dug', yLo: 7, yHi: 10 });
   });
 
   it('fully covering the dug segment removes it entirely', () => {
     const edits = TerrainEdits.empty();
     edits.recordDig(4, 4, 2, 8);
-    edits.recordAdd(4, 4, 0, 10, 9);
+    edits.recordAdd(4, 4, 0, 10, comp(9));
     const segs = edits.segmentsAt(4, 4);
     expect(segs.some(s => s.kind === 'dug')).toBe(false);
   });
@@ -127,7 +135,7 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
     // collapsing here would silently misreplay when the baseline at this
     // column was not air (e.g. a different rock than whatever was added).
     const edits = TerrainEdits.empty();
-    edits.recordAdd(6, 6, 0, 5, 3);
+    edits.recordAdd(6, 6, 0, 5, comp(3));
     edits.recordDig(6, 6, 0, 5);
     expect(edits.segmentsAt(6, 6)).toEqual([{ yLo: 0, yHi: 5, kind: 'dug' }]);
   });
@@ -139,16 +147,16 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
     // would silently misreplay when the baseline material differs.
     const edits = TerrainEdits.empty();
     edits.recordDig(7, 7, 0, 5);
-    edits.recordAdd(7, 7, 0, 5, 4);
-    expect(edits.segmentsAt(7, 7)).toEqual([{ yLo: 0, yHi: 5, kind: 'added', compId: 4 }]);
+    edits.recordAdd(7, 7, 0, 5, comp(4));
+    expect(edits.segmentsAt(7, 7)).toEqual([{ yLo: 0, yHi: 5, kind: 'added', compId: comp(4) }]);
   });
 
   it('recordDig then recordAdd of the same range/material on a previously added column does not grow beyond the pre-edit segment count', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(6, 6, 0, 5, 3);
+    edits.recordAdd(6, 6, 0, 5, comp(3));
     const before = edits.segmentsAt(6, 6).length;
     edits.recordDig(6, 6, 0, 5);
-    edits.recordAdd(6, 6, 0, 5, 3);
+    edits.recordAdd(6, 6, 0, 5, comp(3));
     expect(edits.segmentsAt(6, 6).length).toBeLessThanOrEqual(before);
   });
 
@@ -156,7 +164,7 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
     const edits = TerrainEdits.empty();
     edits.recordDig(8, 8, 0, 5);
     const before = edits.segmentsAt(8, 8).length;
-    edits.recordAdd(8, 8, 0, 5, 3);
+    edits.recordAdd(8, 8, 0, 5, comp(3));
     edits.recordDig(8, 8, 0, 5);
     expect(edits.segmentsAt(8, 8).length).toBeLessThanOrEqual(before);
   });
@@ -165,19 +173,19 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
 describe('continuous / fractional boundaries', () => {
   it('recordAdd with bottomBoundary/topBoundary preserves the boundary\'s own density/compId/ores, distinct from the segment\'s interior compId', () => {
     const edits = TerrainEdits.empty();
-    const bottomBoundary: EditBoundary = { density: 0.3, compId: 11 };
-    const topBoundary: EditBoundary = { density: 0.6, compId: 12, ores: { sparkium: 0.2 } };
-    edits.recordAdd(5, 5, 2, 6, 9, undefined, bottomBoundary, topBoundary);
+    const bottomBoundary: EditBoundary = { density: 0.3, compId: comp(11) };
+    const topBoundary: EditBoundary = { density: 0.6, compId: comp(12), ores: { sparkium: 0.2 } };
+    edits.recordAdd(5, 5, 2, 6, comp(9), undefined, bottomBoundary, topBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);
-    expect(segs[0]!.compId).toBe(9);
+    expect(segs[0]!.compId).toEqual(comp(9));
     expect(segs[0]!.bottomBoundary).toEqual(bottomBoundary);
     expect(segs[0]!.topBoundary).toEqual(topBoundary);
   });
 
   it('recordDig with a bottomBoundary preserves the boundary on the resulting dug segment', () => {
     const edits = TerrainEdits.empty();
-    const bottomBoundary: EditBoundary = { density: 0.4, compId: 2 };
+    const bottomBoundary: EditBoundary = { density: 0.4, compId: comp(2) };
     edits.recordDig(5, 5, 2, 6, bottomBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);
@@ -187,7 +195,7 @@ describe('continuous / fractional boundaries', () => {
 
   it('recordDig with a topBoundary preserves the boundary on the resulting dug segment', () => {
     const edits = TerrainEdits.empty();
-    const topBoundary: EditBoundary = { density: 0.7, compId: 6, ores: { rustite: 0.1 } };
+    const topBoundary: EditBoundary = { density: 0.7, compId: comp(6), ores: { rustite: 0.1 } };
     edits.recordDig(5, 5, 2, 6, undefined, topBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);
@@ -228,7 +236,7 @@ describe('columns / fractureEntries / isEmpty', () => {
 
   it('isEmpty is false after a recordAdd call', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(1, 1, 0, 1, 3);
+    edits.recordAdd(1, 1, 0, 1, comp(3));
     expect(edits.isEmpty()).toBe(false);
   });
 
@@ -257,7 +265,7 @@ describe('columns / fractureEntries / isEmpty', () => {
     // pair never proves it reconstructs the generated baseline, so the
     // resulting single segment must remain recorded — see #1180 review.
     const edits = TerrainEdits.empty();
-    edits.recordAdd(1, 1, 0, 3, 5);
+    edits.recordAdd(1, 1, 0, 3, comp(5));
     edits.recordDig(1, 1, 0, 3);
     expect(edits.isEmpty()).toBe(false);
   });
@@ -265,7 +273,7 @@ describe('columns / fractureEntries / isEmpty', () => {
   it('columns() lists one entry per edited column, with its segments', () => {
     const edits = TerrainEdits.empty();
     edits.recordDig(1, 1, 0, 2);
-    edits.recordAdd(5, 5, 0, 2, 4);
+    edits.recordAdd(5, 5, 0, 2, comp(4));
     const cols = edits.columns();
     expect(cols.length).toBe(2);
     const byKey = new Map(cols.map(c => [`${c.x},${c.z}`, c]));
@@ -295,9 +303,9 @@ describe('idempotency — repeating an identical record call does not grow the r
 
   it('repeating an identical recordAdd call twice leaves the segment count unchanged', () => {
     const edits = TerrainEdits.empty();
-    edits.recordAdd(3, 3, 1, 4, 8, { blingite: 0.2 });
+    edits.recordAdd(3, 3, 1, 4, comp(8), { blingite: 0.2 });
     const before = edits.segmentsAt(3, 3).length;
-    edits.recordAdd(3, 3, 1, 4, 8, { blingite: 0.2 });
+    edits.recordAdd(3, 3, 1, 4, comp(8), { blingite: 0.2 });
     expect(edits.segmentsAt(3, 3).length).toBe(before);
   });
 
@@ -312,8 +320,10 @@ describe('idempotency — repeating an identical record call does not grow the r
 
 describe('replayTerrainEdits — unit-level round trip', () => {
   it('replays a dig + add + fracture edit record onto a fresh grid to match the live grid voxel for voxel', () => {
+    const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+
     const live = new VoxelGrid(8, 8, 8);
-    const rockCompId = live.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    const rockCompId = live.palette.intern(cruiteComp);
     for (let y = 0; y <= 4; y++) live.fillVoxel(2, y, 2, rockCompId, undefined, 1);
     live.clearVoxel(2, 4, 2);
     live.fillVoxel(2, 5, 2, rockCompId, { blingite: 0.3 }, 1);
@@ -327,13 +337,16 @@ describe('replayTerrainEdits — unit-level round trip', () => {
     // A real generator interns every composition it paints into the grid it
     // is generating — mirror that here so `fresh`'s own palette assigns
     // `rockCompId` the same index `live`'s did (both are fresh palettes, and
-    // this is the first composition either one interns).
-    fresh.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    // this is the first composition either one interns). This is about
+    // VoxelGrid.fillVoxel's own raw-index API (unchanged by #1180) and is
+    // still needed regardless of the edits below, which carry portable
+    // composition data and re-intern on replay themselves.
+    fresh.palette.intern(cruiteComp);
     for (let y = 0; y <= 4; y++) fresh.fillVoxel(2, y, 2, rockCompId, undefined, 1);
 
     const edits = TerrainEdits.empty();
     edits.recordDig(2, 2, 4, 4);
-    edits.recordAdd(2, 2, 5, 5, rockCompId, { blingite: 0.3 });
+    edits.recordAdd(2, 2, 5, 5, cruiteComp, { blingite: 0.3 });
     edits.recordFracture(3, 3, 3, 0.6);
 
     replayTerrainEdits(fresh, edits);
