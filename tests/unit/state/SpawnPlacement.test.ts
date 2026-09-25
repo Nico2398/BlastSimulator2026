@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
-import { placeStartingCrew } from '../../../src/core/state/SpawnPlacement.js';
+import { placeStartingCrew, isVehicleRouteAcceptable } from '../../../src/core/state/SpawnPlacement.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
-import {
-  CREW_SPAWN_VEHICLE_SEPARATION,
-  CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION,
-  CREW_SPAWN_VEHICLE_ROUTE_SLACK,
-} from '../../../src/core/config/balance.js';
+import { CREW_SPAWN_VEHICLE_SEPARATION } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
@@ -164,9 +160,10 @@ function drillRigRidgeSite(size = 32): ReturnType<typeof createGame> {
 
 /**
  * Whether at least one employee licensed for `vehicle`'s role can reach it
- * along a route whose cost (`findPath`'s own `totalCost`, `avoidVehicles:
- * false`) stays within the tolerated multiple of the straight-line distance —
- * the exact formula `fixUnreachableVehicles` is specified to enforce.
+ * along a route accepted by the real `isVehicleRouteAcceptable` check —
+ * the exact formula `fixUnreachableVehicles` is specified to enforce, called
+ * here rather than reimplemented so a bug in the production formula itself
+ * cannot slip past its own test's oracle.
  * Vacuously true when no employee holds the licence at all: that is the skip
  * case, covered by its own test below, not a reachability failure.
  */
@@ -174,19 +171,13 @@ function hasReachableLicensedDriver(state: ReturnType<typeof createGame>, vehicl
   const licensed = state.employees.employees.filter(e => isLicensedForRole(e, vehicle.type));
   if (licensed.length === 0) return true;
 
-  return licensed.some(emp => {
-    const straight = Math.hypot(vehicle.x - emp.x, vehicle.z - emp.z);
-    if (straight < 1) return true;
-    const route = findPath(state.navGrid!, {
-      agentId: 0,
-      fromX: Math.round(emp.x), fromZ: Math.round(emp.z),
-      toX: Math.round(vehicle.x), toZ: Math.round(vehicle.z),
-      avoidVehicles: false,
-    });
-    if (!route.found) return false;
-    const tolerance = CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION + CREW_SPAWN_VEHICLE_ROUTE_SLACK / straight;
-    return route.totalCost / straight <= tolerance;
-  });
+  return licensed.some(emp =>
+    isVehicleRouteAcceptable(
+      state.navGrid!,
+      { x: Math.round(emp.x), z: Math.round(emp.z) },
+      { x: Math.round(vehicle.x), z: Math.round(vehicle.z) },
+    ),
+  );
 }
 
 describe('placeStartingCrew', () => {
