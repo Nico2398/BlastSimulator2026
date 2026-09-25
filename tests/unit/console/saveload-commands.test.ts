@@ -192,4 +192,87 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     expect(ctx.state).toBe(stateBefore);
     expect(ctx.grid).toBe(gridBefore);
   });
+
+  // #1181 review: decodeVoxelGrid now runs (and can throw) *before* ctx.state
+  // is touched, so a malformed voxels payload — as opposed to a genuine
+  // version mismatch — must fail loadCommand cleanly with the distinct
+  // world.terrain_save_corrupt copy, leaving ctx entirely untouched.
+  it('refuses to load a save whose voxels payload is malformed (gen.sizeY absurd), leaving ctx.state/ctx.grid/ctx.playableArea unchanged', () => {
+    const buildCtx = makeCtx();
+    saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
+    loadCommand(buildCtx, [], { slot: 'corrupt-dimension' }); // materializes ctx.state.world.voxels with a real gen
+    expect(buildCtx.state!.world!.voxels).toBeDefined();
+    buildCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    buildCtx.grid = null; // keep the tampered payload — saveCommand only re-embeds voxels when ctx.grid is set
+    saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
+
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const playableAreaBefore = ctx.playableArea;
+
+    const result = loadCommand(ctx, [], { slot: 'corrupt-dimension' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+    expect(ctx.playableArea).toBe(playableAreaBefore);
+  });
+
+  it('refuses to load a save whose voxels payload has a malformed "added" edit segment (no composition), leaving ctx unchanged', () => {
+    const buildCtx = makeCtx();
+    const addX = 2, addZ = 2;
+    const addY = computeVoxelColumnSurfaceY(buildCtx.grid!, addX, addZ);
+    expect(addY, 'expected solid ground at the add column').toBeGreaterThanOrEqual(0);
+    saveCommand(buildCtx, [], { slot: 'corrupt-composition' });
+    loadCommand(buildCtx, [], { slot: 'corrupt-composition' }); // materializes ctx.state.world.voxels
+    expect(buildCtx.state!.world!.voxels).toBeDefined();
+    // Inject a malformed 'added' edit segment with no composition at all.
+    buildCtx.state!.world!.voxels!.editColumns.push({
+      x: addX, z: addZ,
+      segments: [{ yLo: addY, yHi: addY, kind: 'added' }],
+    });
+    buildCtx.grid = null;
+    saveCommand(buildCtx, [], { slot: 'corrupt-composition' });
+
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const playableAreaBefore = ctx.playableArea;
+
+    const result = loadCommand(ctx, [], { slot: 'corrupt-composition' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+    expect(ctx.playableArea).toBe(playableAreaBefore);
+  });
+
+  it('a malformed-payload failure carries the distinct corrupt-save message, not the version-mismatch message', () => {
+    // Genuine version mismatch, for comparison.
+    const versionCtx = makeCtx();
+    saveCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    loadCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    versionCtx.state!.world!.voxels!.gen.version += 1;
+    versionCtx.grid = null;
+    saveCommand(versionCtx, [], { slot: 'msg-version-mismatch' });
+    const versionResult = loadCommand(makeCtx(), [], { slot: 'msg-version-mismatch' });
+    expect(versionResult.success).toBe(false);
+
+    // Malformed payload (corrupt-save), not a version mismatch.
+    const corruptCtx = makeCtx();
+    saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    loadCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    corruptCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    corruptCtx.grid = null;
+    saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
+    const corruptResult = loadCommand(makeCtx(), [], { slot: 'msg-corrupt' });
+    expect(corruptResult.success).toBe(false);
+
+    // The two refusal messages are distinct — the corrupt-save copy never
+    // mentions a generator version, unlike the version-mismatch copy.
+    expect(corruptResult.output).not.toEqual(versionResult.output);
+    expect(corruptResult.output).toContain('corrupt');
+    expect(versionResult.output).not.toContain('corrupt');
+  });
 });

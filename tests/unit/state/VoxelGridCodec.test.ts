@@ -12,12 +12,13 @@
 // `throw new Error('not implemented')` stubs, so every test below fails.
 
 import { describe, it, expect } from 'vitest';
-import { generateTerrain, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { generateTerrain, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   encodeVoxelGrid, decodeVoxelGrid, TerrainGenVersionMismatchError,
   type SerializedTerrainGen, type SerializedVoxels,
 } from '../../../src/core/state/VoxelGridCodec.js';
+import type { EditSegment } from '../../../src/core/world/TerrainEdits.js';
 
 /** A small, fast-to-generate generator identity, overridable per test. */
 function makeGen(overrides: Partial<SerializedTerrainGen> = {}): SerializedTerrainGen {
@@ -260,5 +261,197 @@ describe('decodeVoxelGrid — corrupted claimed rects are clamped, not trusted v
     const decoded = decodeVoxelGrid(corrupted);
 
     expect(decoded.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: 16, maxZ: 16 });
+  });
+});
+
+// #1181 review: an unvalidated, enormous `gen.sizeY`/`sizeX`/`sizeZ` either
+// makes the yLo/yHi clamp below a no-op (turning `replayTerrainEdits`'s loop
+// unbounded) or crashes `VoxelGrid`'s `allocateChunk` with a raw
+// `RangeError: Invalid typed array length` before any clamp even runs.
+// `requireValidGenDimension` rejects outright instead, with a clean `Error`.
+describe('decodeVoxelGrid — requireValidGenDimension rejects a malformed gen.size* (#1181 review)', () => {
+  it('rejects a sizeY far past MAX_TERRAIN_GEN_DIMENSION with a clean Error, not a RangeError from allocateChunk', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+
+    // Safely over MAX_TERRAIN_GEN_DIMENSION (4096) — large enough to be
+    // rejected, nowhere near large enough to risk actually allocating.
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 1e9 } };
+
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+    // Never a bare RangeError escaping from VoxelGrid's typed-array allocation.
+    let caught: unknown;
+    try {
+      decodeVoxelGrid(corrupted);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(RangeError);
+  });
+
+  it('rejects a sizeX far past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeX: 1e9 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeX/);
+  });
+
+  it('rejects a sizeZ far past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeZ: 1e9 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeZ/);
+  });
+
+  it('rejects a value exactly one past MAX_TERRAIN_GEN_DIMENSION', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      gen: { ...payload.gen, sizeY: MAX_TERRAIN_GEN_DIMENSION + 1 },
+    };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a non-integer sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 3.7 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects NaN sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: NaN } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects Infinity sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: Infinity } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a zero sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: 0 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+
+  it('rejects a negative sizeY', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, sizeY: -16 } };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeY/);
+  });
+});
+
+// #1181 review: `CompositionPalette.intern` dereferences `.rocks`
+// unconditionally, so a malformed `'added'` segment's composition (or a
+// malformed boundary's composition) must never reach it — `isValidComposition`
+// / `requireValidBoundary` must turn that into a clean `Error` refusal instead
+// of a raw `TypeError`.
+describe('decodeVoxelGrid — isValidComposition / requireValidBoundary reject malformed edit data (#1181 review)', () => {
+  const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
+
+  function payloadWithSegment(segment: EditSegment): SerializedVoxels {
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    return { ...payload, editColumns: [{ x: 5, z: 5, segments: [segment] }] };
+  }
+
+  it('rejects an "added" segment with no composition field at all, with a clean Error not a TypeError', () => {
+    const payload = payloadWithSegment({ yLo: 0, yHi: 0, kind: 'added' });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: added edit segment/);
+    let caught: unknown;
+    try {
+      decodeVoxelGrid(payload);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(TypeError);
+  });
+
+  it('rejects an "added" segment whose composition.rocks is not an array', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'added',
+      composition: { rocks: 'not-an-array' } as unknown as EditSegment['composition'],
+    });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: added edit segment/);
+  });
+
+  it('rejects a bottomBoundary with a non-finite density', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'dug',
+      bottomBoundary: { density: NaN, composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] } },
+    });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: bottom boundary/);
+  });
+
+  it('rejects a topBoundary with a missing/malformed composition', () => {
+    const payload = payloadWithSegment({
+      yLo: 0, yHi: 0, kind: 'dug',
+      topBoundary: { density: 1, composition: { rocks: undefined } as unknown as EditSegment['composition'] },
+    });
+
+    expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: top boundary/);
+  });
+});
+
+// #1181 review: an unclamped `yLo`/`yHi` from a tampered/corrupted save (e.g.
+// `1e15`) would turn `replayTerrainEdits`'s per-voxel loop into an unbounded
+// scan. `clampSavePosition`/`clampAxis` must clamp both into `[0, sizeY-1]`
+// instead — proven here by asserting on the RESULT (the decode completes and
+// the decoded grid's edited range sits inside real bounds), not by trusting
+// that a bad value merely "didn't hang".
+describe('decodeVoxelGrid — clampSavePosition clamps a corrupted yLo/yHi into [0, sizeY-1] (#1181 review)', () => {
+  it('clamps a NaN yLo/yHi pair to the fallback row 0, rather than leaving them unbounded', () => {
+    const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      editColumns: [{ x: 5, z: 5, segments: [{ yLo: NaN, yHi: NaN, kind: 'dug' }] }],
+    };
+
+    const decoded = decodeVoxelGrid(corrupted);
+
+    // Clamped to row 0 only — not every row, not a crash.
+    expect(decoded.densityAt(5, 0, 5)).toBe(0);
+  });
+
+  it('clamps a wildly out-of-range yHi (1e15) into sizeY-1, completing the decode instead of scanning to 1e15', () => {
+    const gen = makeGen({ sizeX: 16, sizeY: 8, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      editColumns: [{ x: 6, z: 6, segments: [{ yLo: 0, yHi: 1e15, kind: 'dug' }] }],
+    };
+
+    const decoded = decodeVoxelGrid(corrupted);
+
+    // The whole real column (0..sizeY-1) is dug — the clamp bounded yHi to
+    // sizeY-1 rather than the raw 1e15, and the decode actually completed.
+    for (let y = 0; y < gen.sizeY; y++) {
+      expect(decoded.densityAt(6, y, 6), `expected row ${y} of column (6,6) to be dug (clamped)`).toBe(0);
+    }
   });
 });
