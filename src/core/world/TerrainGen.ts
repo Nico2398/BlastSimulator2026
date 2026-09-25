@@ -10,6 +10,16 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
+/**
+ * Version of the terrain generator's algorithm — stamped into every save's
+ * embedded terrain identity (`SerializedTerrainGen.version`) and checked on
+ * load. The game is unreleased: this stays 1 and is never incremented for a
+ * pre-release generator change (project owner policy, #1181). A save whose
+ * terrain generator version does not match this constant is refused, never
+ * migrated.
+ */
+export const TERRAIN_GENERATOR_VERSION = 1;
+
 export interface TerrainConfig {
   sizeX: number;
   sizeY: number;

@@ -96,21 +96,34 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
 }
 
 /**
- * The generation datum to embed in a save, so pristine chunks regenerate on
- * load instead of being stored (#473 D4). Undefined when the state carries no
- * world or an unknown mine type, which makes `encodeVoxelGrid` fall back to
- * storing every chunk.
+ * The generation datum to embed in a save (#1181) — the complete generator
+ * identity `decodeVoxelGrid` regenerates pristine terrain from. Undefined
+ * when the state carries no world or an unknown mine type.
  */
-export function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
-  const config = terrainConfigOf(state);
-  if (!config) return undefined;
-  return {
-    seed: config.seed,
-    climateBias: [config.climateBias[0], config.climateBias[1]],
-    sizeX: config.sizeX,
-    sizeY: config.sizeY,
-    sizeZ: config.sizeZ,
-  };
+export function terrainGenDatum(_state: GameState): SerializedTerrainGen | undefined {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
+ * The params `regenerateGrid`'s size/hardness fields should carry for a
+ * no-voxels load fallback — the level's ORIGINAL base size (#1181, fixing a
+ * pre-#1181 defect where that fallback regenerated at the live, possibly
+ * site-expanded size instead).
+ */
+export function regenerateGridParams(_state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
+ * A player-facing refusal message when `voxels`' embedded generator version
+ * doesn't match this build's `TERRAIN_GENERATOR_VERSION`, or null when they
+ * match and the save may load.
+ */
+export function terrainVersionMismatch(_voxels: SerializedVoxels): string | null {
+  // TODO: implement
+  throw new Error('not implemented');
 }
 
 /** The whole site, as a terrain:updated region. */

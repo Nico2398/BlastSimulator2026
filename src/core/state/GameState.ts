@@ -112,7 +112,17 @@ import type { RampDef } from '../mining/Ramp.js';
 // driving Employee/VehicleState.reservations). `reservedForActionId` folds
 // into `vehiclesContainer.reservations`; the rest carry nothing forward.
 // See SaveLoad.ts's migrateV21ToV22.
-export const SAVE_VERSION = 22;
+// v22 -> v23: WorldState gained `mixedRockHardness?: boolean` (#1181 —
+// terrain saves stop embedding dense chunk data and start embedding the
+// complete generator identity, which includes this field; two pre-#1181
+// save-load defects it also fixes: terrainConfigOf/terrainGenDatum never
+// read mixedRockHardness back at all, and the no-voxels fallback
+// regenerated at the live (possibly site-expanded) size instead of the
+// level's base size). Purely additive and optional — a pre-v23 save
+// simply has it undefined, which `regenerateGridParams`/`terrainConfigOf`
+// already treat as "use the biome's normal strata". No migration
+// function needed, matching precedent for a pure addition.
+export const SAVE_VERSION = 23;
 
 export interface GameConfig {
   seed: number;
@@ -441,8 +451,13 @@ export interface WorldState {
    * on saves from before v6 or on a state that hasn't been saved yet; a
    * loader falls back to regenerating pristine terrain from the seed in that
    * case (the pre-v6 behaviour — blast craters/ramps don't survive that path).
+   * The embedded payload's own `gen` (#1181) is the generator identity of
+   * record once present; this field's `mixedRockHardness` below only matters
+   * for the no-voxels regeneration fallback.
    */
   voxels?: SerializedVoxels;
+  /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */
+  mixedRockHardness?: boolean;
 }
 
 export interface SavedBlastPlan {
