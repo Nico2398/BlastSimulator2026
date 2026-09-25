@@ -353,9 +353,23 @@ export class TerrainMesh {
     for (const { cx, cz } of this.grid.ownedChunks()) {
       const rect = this.grid.chunkRect(cx, cz);
       if (!rect) continue;
-      const cyRange = this.chunkVerticalSlabRange(rect);
-      if (!cyRange) continue;
-      for (let cy = cyRange.cyMin; cy <= cyRange.cyMax; cy++) {
+      // Union of the surface-derived range and whatever is already
+      // materialized: a surface-height scan only ever sees a column's
+      // topmost solid-to-air crossing, so real ground genuinely disconnected
+      // from that top (a block written below an air gap, never swept through
+      // from the surface) needs the already-allocated-slab signal too (#1188).
+      const surfaceRange = this.chunkVerticalSlabRange(rect);
+      const allocRange = this.grid.allocatedCyRange(cx, cz);
+      if (!surfaceRange && !allocRange) continue;
+      const cyMin = Math.min(
+        surfaceRange ? surfaceRange.cyMin : Infinity,
+        allocRange ? allocRange.min : Infinity,
+      );
+      const cyMax = Math.max(
+        surfaceRange ? surfaceRange.cyMax : -Infinity,
+        allocRange ? allocRange.max : -Infinity,
+      );
+      for (let cy = cyMin; cy <= cyMax; cy++) {
         totalVerts += this.rebuildChunk(cx, cy, cz);
       }
     }
@@ -481,6 +495,15 @@ export class TerrainMesh {
    * ground extent, or null when `rect` has no ground at all (#1188,
    * replacing chunk loops that assumed a fixed `[0, ncy)` vertical band).
    *
+   * Pads by exactly one voxel on the low side, not a whole chunk: a column's
+   * surface height is its topmost solid voxel, and marching cubes reads a
+   * cube's corners up to y+1, so the solid-to-air crossing at that surface is
+   * captured by the cube at index `minY - 1` on the way in and `maxY` itself
+   * on the way out (no pad needed there — `maxY` already IS the crossing
+   * cube). Same halo `remeshRegion` already applies to a dirty region's min
+   * edge. Padding a whole `CHUNK_SIZE` here (the bug this replaced) always
+   * pulled `cyMin` one chunk lower than the real ground ever reaches.
+   *
    * Public rather than private, following this file's existing convention
    * for internals exposed for diagnostics/tests (`getChunkMesh`,
    * `chunkGridDims`, `currentEdgeHeightSampler`) — used by `buildAll` below.
@@ -489,8 +512,8 @@ export class TerrainMesh {
     const range = computeColumnRangeY(this.grid, rect.minX, rect.maxX - 1, rect.minZ, rect.maxZ - 1);
     if (!range) return null;
     return {
-      cyMin: chunkIndexOf(range.minY - CHUNK_SIZE),
-      cyMax: chunkIndexOf(range.maxY + CHUNK_SIZE),
+      cyMin: chunkIndexOf(range.minY - 1),
+      cyMax: chunkIndexOf(range.maxY),
     };
   }
 
