@@ -127,12 +127,13 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     const ctx = makeCtx();
     const digX = 2, digZ = 2;
     const digY = computeVoxelColumnSurfaceY(ctx.grid!, digX, digZ);
+    expect(digY).not.toBeNull();
     expect(digY, 'expected solid ground at the dig column').toBeGreaterThanOrEqual(0);
-    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBeGreaterThan(0);
+    expect(ctx.grid!.densityAt(digX, digY!, digZ)).toBeGreaterThan(0);
 
-    const dugComposition = ctx.grid!.compositionAt(digX, digY - 1, digZ); // the voxel below survives — sanity reference
-    ctx.grid!.clearVoxel(digX, digY, digZ);
-    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBe(0);
+    const dugComposition = ctx.grid!.compositionAt(digX, digY! - 1, digZ); // the voxel below survives — sanity reference
+    ctx.grid!.clearVoxel(digX, digY!, digZ);
+    expect(ctx.grid!.densityAt(digX, digY!, digZ)).toBe(0);
 
     saveCommand(ctx, [], { slot: 'dig-replay' });
 
@@ -141,9 +142,9 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
 
     expect(result.success).toBe(true);
     expect(ctx.grid).not.toBeNull();
-    expect(ctx.grid!.densityAt(digX, digY, digZ)).toBe(0);
+    expect(ctx.grid!.densityAt(digX, digY!, digZ)).toBe(0);
     // Everything below the dig is untouched — generation alone reproduces it, unaffected by the edit record.
-    expect(ctx.grid!.compositionAt(digX, digY - 1, digZ).rocks).toEqual(dugComposition.rocks);
+    expect(ctx.grid!.compositionAt(digX, digY! - 1, digZ).rocks).toEqual(dugComposition.rocks);
   });
 
   it('the no-voxels fallback regenerates at the level base size, not the live (possibly site-expanded) size', () => {
@@ -223,6 +224,7 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     const buildCtx = makeCtx();
     const addX = 2, addZ = 2;
     const addY = computeVoxelColumnSurfaceY(buildCtx.grid!, addX, addZ);
+    expect(addY).not.toBeNull();
     expect(addY, 'expected solid ground at the add column').toBeGreaterThanOrEqual(0);
     saveCommand(buildCtx, [], { slot: 'corrupt-composition' });
     loadCommand(buildCtx, [], { slot: 'corrupt-composition' }); // materializes ctx.state.world.voxels
@@ -230,7 +232,7 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     // Inject a malformed 'added' edit segment with no composition at all.
     buildCtx.state!.world!.voxels!.editColumns.push({
       x: addX, z: addZ,
-      segments: [{ yLo: addY, yHi: addY, kind: 'added' }],
+      segments: [{ yLo: addY!, yHi: addY!, kind: 'added' }],
     });
     buildCtx.grid = null;
     saveCommand(buildCtx, [], { slot: 'corrupt-composition' });

@@ -492,14 +492,11 @@ const FLOOR_TARGET_EPSILON = 1e-6;
 export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
   if (cell.fillTarget !== undefined) {
     const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
-    // A column with no ground at all (bare air) reads NaN (#1184's "no
-    // ground" signal), not a real height — treat it as sitting at -Infinity,
-    // i.e. always below fillTarget and therefore always pending. The old
-    // `Number.isFinite(currentHeight) && ...` gate read that same NaN as
-    // "not pending", wrongly treating an entirely-unfilled fill column as
-    // already done from tick zero.
-    const effectiveHeight = Number.isFinite(currentHeight) ? currentHeight : -Infinity;
-    return effectiveHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
+    // NaN means the column has no ground at all (#1184) — that floor sits
+    // below any real fillTarget, so the cell is still pending. Only a real,
+    // already-at-or-above-target height counts as done.
+    if (!Number.isFinite(currentHeight)) return true;
+    return currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
   }
   return grid.densityAt(cell.x, cell.y, cell.z) > 0;
 }
@@ -569,6 +566,16 @@ function carveRampCell(
 }
 
 /**
+ * Folds one ramp cell's `bandedMaxY` result (null when that cell banded no
+ * column) into a running maximum. `-Infinity` is the "no band yet" sentinel
+ * both callers seed their accumulator with — it never collides with a real
+ * (possibly negative) banded height, unlike -1 (#1184).
+ */
+function mergeBandedMaxY(current: number, candidate: number | null): number {
+  return Math.max(current, candidate ?? -Infinity);
+}
+
+/**
  * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
  * the affected region. Density is re-checked per cell at carve time — a cell
  * already cleared by something else (a blast, another ramp) since
@@ -578,8 +585,6 @@ function carveRampCell(
 export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput, emitter?: EventEmitter): { voxelsCleared: number; voxelsFilled: number } {
   let voxelsCleared = 0;
   let voxelsFilled = 0;
-  // -Infinity is the internal "no band yet" sentinel — never collides with a
-  // real (possibly negative) banded height, unlike -1 (#1184).
   let bandedMaxY = -Infinity;
   // Fill cells excluded: captureColumnTopsForCarve/renormaliseCarvedColumns'
   // sweep assumes a column's top only ever drops after a carve; a freshly
@@ -590,7 +595,7 @@ export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentCarveInput
     const result = carveRampCell(grid, cell);
     if (result.cleared) voxelsCleared++;
     if (result.filled) voxelsFilled++;
-    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY ?? -Infinity);
+    bandedMaxY = mergeBandedMaxY(bandedMaxY, result.bandedMaxY);
   }
 
   if ((voxelsCleared > 0 || Number.isFinite(bandedMaxY)) && segment.region) {
@@ -666,8 +671,6 @@ export function carveRampSegmentSlice(
 ): { voxelsCleared: number; voxelsFilled: number; region: RampSegmentDef['region'] } {
   let voxelsCleared = 0;
   let voxelsFilled = 0;
-  // -Infinity is the internal "no band yet" sentinel — never collides with a
-  // real (possibly negative) banded height, unlike -1 (#1184).
   let bandedMaxY = -Infinity;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
@@ -678,7 +681,7 @@ export function carveRampSegmentSlice(
     const cell = cells[i];
     if (!cell) continue;
     const result = carveRampCell(grid, cell);
-    bandedMaxY = Math.max(bandedMaxY, result.bandedMaxY ?? -Infinity);
+    bandedMaxY = mergeBandedMaxY(bandedMaxY, result.bandedMaxY);
     if (result.cleared) voxelsCleared++;
     if (result.filled) voxelsFilled++;
     if (result.cleared || result.bandedMaxY !== null) {

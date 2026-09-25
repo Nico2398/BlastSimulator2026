@@ -19,7 +19,9 @@ describe('getTerrainSurfaceY (#1007)', () => {
     const grid = new VoxelGrid(16, 8, 16);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1); // topmost solid at y=4, y=5 stays air (density 0)
 
-    const oldIntegerHeight = computeVoxelColumnSurfaceY(grid, 3, 3) + 1; // 5
+    const columnTop = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(columnTop).not.toBeNull();
+    const oldIntegerHeight = columnTop! + 1; // 5
     const surfaceY = getTerrainSurfaceY(grid, 3, 3);
 
     // t = (0.5 - 1.0) / (0.0 - 1.0) = 0.5 -> crossing at y=4.5.

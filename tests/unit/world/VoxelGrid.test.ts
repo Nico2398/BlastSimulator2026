@@ -1119,6 +1119,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
     const touched = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
 
     const newTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
+    expect(newTopY).not.toBeNull();
     expect(newTopY).toBe(5);
     expect(grid.densityAt(3, newTopY!, 3)).toBe(1);
     // No residue existed above the old top and the new top is plain solid rock,
@@ -1144,6 +1145,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
     const touched = renormaliseVoxelColumnAfterCarve(grid, X, Z, oldTopY);
 
     const newTopY = computeVoxelColumnSurfaceY(grid, X, Z);
+    expect(newTopY).not.toBeNull();
     expect(newTopY).toBe(4);
     // The newly exposed top is itself mid-band (a genuine crossing), not plain rock.
     const newTopDensity = grid.densityAt(X, newTopY!, Z);

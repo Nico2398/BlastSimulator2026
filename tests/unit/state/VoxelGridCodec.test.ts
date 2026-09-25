@@ -108,16 +108,18 @@ describe('encodeVoxelGrid / decodeVoxelGrid — edited grid', () => {
     // ── Dig ──
     const digX = 5, digZ = 5;
     const digY = computeVoxelColumnSurfaceY(grid, digX, digZ);
+    expect(digY).not.toBeNull();
     expect(digY, 'expected solid ground at the dig column').toBeGreaterThanOrEqual(0);
-    expect(grid.densityAt(digX, digY, digZ)).toBeGreaterThan(0);
-    grid.clearVoxel(digX, digY, digZ);
-    expect(grid.densityAt(digX, digY, digZ)).toBe(0);
+    expect(grid.densityAt(digX, digY!, digZ)).toBeGreaterThan(0);
+    grid.clearVoxel(digX, digY!, digZ);
+    expect(grid.densityAt(digX, digY!, digZ)).toBe(0);
 
     // ── Add, with an ore composition distinct from anything generation produced here ──
     const addX = 10, addZ = 10;
     const addSurfaceY = computeVoxelColumnSurfaceY(grid, addX, addZ);
+    expect(addSurfaceY).not.toBeNull();
     expect(addSurfaceY, 'expected solid ground at the add column').toBeGreaterThanOrEqual(0);
-    const addY = Math.min(gen.sizeY - 1, addSurfaceY + 2); // above the natural surface — genuinely "added"
+    const addY = Math.min(gen.sizeY - 1, addSurfaceY! + 2); // above the natural surface — genuinely "added"
     const addedComposition = { rocks: [{ rockId: 'cruite', coefficient: 0.7 }, { rockId: 'sandite', coefficient: 0.3 }] };
     const addedOres = { dirtite: 0.42 };
     const addedCompId = grid.palette.intern(addedComposition);
@@ -128,20 +130,21 @@ describe('encodeVoxelGrid / decodeVoxelGrid — edited grid', () => {
     // ── Fracture ──
     const fractureX = 15, fractureZ = 15;
     const fractureY = computeVoxelColumnSurfaceY(grid, fractureX, fractureZ);
+    expect(fractureY).not.toBeNull();
     expect(fractureY, 'expected solid ground at the fracture column').toBeGreaterThanOrEqual(0);
-    grid.setFractureAt(fractureX, fractureY, fractureZ, 0.37);
-    expect(grid.fractureAt(fractureX, fractureY, fractureZ)).toBeCloseTo(0.37, 10);
+    grid.setFractureAt(fractureX, fractureY!, fractureZ, 0.37);
+    expect(grid.fractureAt(fractureX, fractureY!, fractureZ)).toBeCloseTo(0.37, 10);
 
     const decoded = decodeVoxelGrid(encodeVoxelGrid(grid, gen));
 
     // Every touched voxel matches exactly, not just "close enough".
-    expect(decoded.densityAt(digX, digY, digZ)).toBe(0);
+    expect(decoded.densityAt(digX, digY!, digZ)).toBe(0);
 
     expect(decoded.densityAt(addX, addY, addZ)).toBe(1.0);
     expect(decoded.compositionAt(addX, addY, addZ).rocks).toEqual(addedComposition.rocks);
     expect(decoded.oresAt(addX, addY, addZ)).toEqual(addedOres);
 
-    expect(decoded.fractureAt(fractureX, fractureY, fractureZ)).toBeCloseTo(0.37, 10);
+    expect(decoded.fractureAt(fractureX, fractureY!, fractureZ)).toBeCloseTo(0.37, 10);
 
     // And the whole footprint reproduces the live grid voxel for voxel — the
     // edits above plus everything generation alone produced.
@@ -212,8 +215,9 @@ describe('encodeVoxelGrid — payload size tracks edited volume, not chunk/voxel
     const digColumns: Array<[number, number]> = [[3, 3], [9, 9], [21, 5]];
     for (const [x, z] of digColumns) {
       const y = computeVoxelColumnSurfaceY(grid, x, z);
+      expect(y).not.toBeNull();
       expect(y, `expected solid ground at (${x}, ${z})`).toBeGreaterThanOrEqual(0);
-      grid.clearVoxel(x, y, z);
+      grid.clearVoxel(x, y!, z);
     }
 
     const payloadBeforeFracture = encodeVoxelGrid(grid, gen);
@@ -222,8 +226,9 @@ describe('encodeVoxelGrid — payload size tracks edited volume, not chunk/voxel
 
     const fractureX = 25, fractureZ = 25;
     const fractureY = computeVoxelColumnSurfaceY(grid, fractureX, fractureZ);
+    expect(fractureY).not.toBeNull();
     expect(fractureY, 'expected solid ground at the fracture column').toBeGreaterThanOrEqual(0);
-    grid.setFractureAt(fractureX, fractureY, fractureZ, 0.3);
+    grid.setFractureAt(fractureX, fractureY!, fractureZ, 0.3);
 
     const payloadAfterFracture = encodeVoxelGrid(grid, gen);
     expect(payloadAfterFracture.editFractures).toHaveLength(1);

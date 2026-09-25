@@ -1424,8 +1424,7 @@ export function surfaceDensityAt(y: number, surfaceH: number): number {
  * computeVoxelColumnSurfaceY's top-down scan, but returns the fractional
  * crossing height (via densityAt interpolation between the topmost solid
  * voxel and the one above it), matching what TerrainMesh's marching cubes
- * actually renders at that column right now, pre- or post-blast. Returns 0
- * for an owned column with no solid voxel at all.
+ * actually renders at that column right now, pre- or post-blast.
  *
  * Unlike computeVoxelColumnSurfaceY, does NOT clamp an out-of-bounds (x, z)
  * to the edge column — it returns NaN instead (#559). LandscapeMesh's live
@@ -1461,6 +1460,19 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
 }
 
 /**
+ * Largest gap, in voxels, between a column's existing surface and a newly
+ * written one that `setVoxelColumnSurfaceHeight` will still sweep-clear
+ * between. Both ends are unclamped (#1184) — `existingTopY` comes from a
+ * generator surface plus a replayed edit record, `height` from the caller —
+ * so a corrupted or extreme save can put them arbitrarily far apart and turn
+ * the write loop below into one iteration per voxel of that gap. Real
+ * terrain spans at most a few hundred metres; 1000 is generous headroom
+ * above that, chosen so no legitimate column (e.g. one carved down to -50
+ * against a ~20-high generator surface) is ever affected.
+ */
+const MAX_SURFACE_SWEEP_GAP = 1000;
+
+/**
  * Writes column (x, z)'s top surface to continuous height `height`: fully
  * solid below the crossing, the straddling pair carrying the fractional
  * density surfaceDensityAt defines, zero above — so
@@ -1485,6 +1497,7 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
  * no-op (unowned column or non-finite height) — for a caller tracking a
  * dirty-region bound (`renormaliseVoxelColumnAfterCarve`).
  */
+
 export function setVoxelColumnSurfaceHeight(
   grid: VoxelGrid,
   x: number,
@@ -1503,11 +1516,15 @@ export function setVoxelColumnSurfaceHeight(
   // crossing band needs" — never reaches below either surface, so an
   // overhang or cavity buried deeper in the column is left untouched. With
   // no existing ground, only the new target's own band applies — there is no
-  // old surface to sweep down from.
+  // old surface to sweep down from. Same when the existing surface sits
+  // implausibly far from the target: treat it like "no old surface to sweep
+  // down from" rather than clearing the whole gap (#1184 security review).
   const targetLowY = Math.floor(height) - SURFACE_BAND_HALF + 1;
   const targetHighY = Math.ceil(height) + SURFACE_BAND_HALF - 1;
-  const lowY = existingTopY === null ? targetLowY : Math.min(existingTopY + 1, targetLowY);
-  const highY = existingTopY === null ? targetHighY : Math.max(existingTopY, targetHighY);
+  const sweepFromExistingTop =
+    existingTopY !== null && Math.abs(existingTopY - height) <= MAX_SURFACE_SWEEP_GAP ? existingTopY : null;
+  const lowY = sweepFromExistingTop === null ? targetLowY : Math.min(sweepFromExistingTop + 1, targetLowY);
+  const highY = sweepFromExistingTop === null ? targetHighY : Math.max(sweepFromExistingTop, targetHighY);
 
   const cx = Math.floor(x);
   const cz = Math.floor(z);

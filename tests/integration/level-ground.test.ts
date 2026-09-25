@@ -296,7 +296,7 @@ describe('level_ground — console round trip (#1009)', () => {
     const footprint: Array<readonly [number, number]> = [];
     for (let dz = 0; dz <= 1; dz++) for (let dx = 0; dx <= 3; dx++) footprint.push([dx, dz]);
     const spread = footprintHeightSpread(
-      footprint, 25, 25, (cx: number, cz: number) => computeVoxelColumnSurfaceY(grid, cx, cz),
+      footprint, 25, 25, (cx: number, cz: number) => computeVoxelColumnSurfaceY(grid, cx, cz)!,
     );
     expect(spread).toBe(0);
   });

@@ -142,8 +142,9 @@ describe('TerrainEdits — record and replay against a dusty_hollow-shaped grid 
     // ── 4. Single-voxel dig ─────────────────────────────────────────────
     const digX = 5, digZ = 5;
     const digSurfaceY = computeVoxelColumnSurfaceY(live, digX, digZ);
+    expect(digSurfaceY).not.toBeNull();
     expect(digSurfaceY, 'expected solid ground at the dig column').toBeGreaterThanOrEqual(0);
-    const digResult = digVoxel(live, digX, digSurfaceY, digZ);
+    const digResult = digVoxel(live, digX, digSurfaceY!, digZ);
     expect(digResult.success).toBe(true);
 
     // ── Replay onto a fresh, independently generated grid ────────────────

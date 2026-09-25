@@ -160,7 +160,11 @@ export function estimateSurveyResult(
       let yLevels: number[];
       if (method === 'aerial') {
         const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
-        yLevels = [surfaceY, surfaceY - 1].filter(y => y >= 0 && y < grid.sizeY);
+        // No lower bound: voxel storage has no vertical floor (#1184) and a
+        // column's ground can legitimately sit below y=0, so surfaceY itself
+        // can be negative. Only the upper bound still means anything here —
+        // it caps sampling at the grid's declared vertical extent.
+        yLevels = [surfaceY, surfaceY - 1].filter(y => y < grid.sizeY);
       } else {
         yLevels = [];
         for (let y = 0; y < grid.sizeY; y++) yLevels.push(y);

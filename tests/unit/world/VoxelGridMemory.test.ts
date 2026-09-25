@@ -52,7 +52,7 @@ function touchEveryColumnSurfaceComposition(grid: VoxelGrid): void {
   for (let z = grid.minZ; z < grid.maxZ; z += step) {
     for (let x = grid.minX; x < grid.maxX; x += step) {
       const y = computeVoxelColumnSurfaceY(grid, x, z);
-      if (y >= 0) grid.compositionAt(x, y, z);
+      if (y !== null && y >= 0) grid.compositionAt(x, y, z);
     }
   }
 }
@@ -196,9 +196,11 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
     for (const [x, z] of samples) {
       const surfaceBase = computeVoxelColumnSurfaceY(gridBase, x, z);
       const surfaceTall = computeVoxelColumnSurfaceY(gridTall, x, z);
-      expect(surfaceTall - surfaceBase, `surface shift at (${x},${z}) should equal the known ground-offset delta`).toBe(expectedShift);
-      expect(gridTall.densityAt(x, surfaceTall, z), `density at the shifted surface (${x},${z}) should match`)
-        .toBeCloseTo(gridBase.densityAt(x, surfaceBase, z), 10);
+      expect(surfaceBase).not.toBeNull();
+      expect(surfaceTall).not.toBeNull();
+      expect(surfaceTall! - surfaceBase!, `surface shift at (${x},${z}) should equal the known ground-offset delta`).toBe(expectedShift);
+      expect(gridTall.densityAt(x, surfaceTall!, z), `density at the shifted surface (${x},${z}) should match`)
+        .toBeCloseTo(gridBase.densityAt(x, surfaceBase!, z), 10);
     }
   });
 });

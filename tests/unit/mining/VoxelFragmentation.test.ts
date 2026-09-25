@@ -276,13 +276,14 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     // stray fractional crossing above it.
     setVoxelColumnSurfaceHeight(grid, COLUMN_X, COLUMN_Z, 6.5, compId);
     const oldTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
+    expect(oldTopY).not.toBeNull();
     expect(oldTopY).toBe(6);
-    expect(grid.densityAt(COLUMN_X, oldTopY + 1, COLUMN_Z)).toBeGreaterThan(0);
+    expect(grid.densityAt(COLUMN_X, oldTopY! + 1, COLUMN_Z)).toBeGreaterThan(0);
 
     const roofBefore: number[] = [];
     for (let y = 0; y < grid.sizeY; y++) roofBefore.push(grid.densityAt(ROOF_X, y, ROOF_Z));
 
-    return { grid, compId, oldTopY, roofBefore };
+    return { grid, compId, oldTopY: oldTopY!, roofBefore };
   }
 
   /** Fragments and clears the column's topmost voxel, mirroring BlastExecution's own identify -> toClear -> clearVoxel loop. */
@@ -317,8 +318,9 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     // renormalisation leaves a hard step rather than manufacturing a band
     // that never existed pre-carve.
     const newTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
-    expect(grid.densityAt(COLUMN_X, newTopY, COLUMN_Z)).toBe(1);
-    for (let y = newTopY + 1; y < grid.sizeY; y++) {
+    expect(newTopY).not.toBeNull();
+    expect(grid.densityAt(COLUMN_X, newTopY!, COLUMN_Z)).toBe(1);
+    for (let y = newTopY! + 1; y < grid.sizeY; y++) {
       expect(grid.densityAt(COLUMN_X, y, COLUMN_Z), `density at y=${y} should be 0`).toBe(0);
     }
   });
