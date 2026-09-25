@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -135,12 +135,27 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * no-voxels load fallback — the level's ORIGINAL base size (#1181, fixing a
  * pre-#1181 defect where that fallback regenerated at the live, possibly
  * site-expanded size instead).
+ *
+ * `state.world`'s size fields come straight off untrusted save JSON (unlike
+ * the default-size branch above, a trusted constant), so each is checked
+ * with `requireValidGenDimension` before it can reach `generateTerrain` —
+ * the same guard `decodeVoxelGrid` (VoxelGridCodec.ts) applies to its own
+ * embedded generator identity, closing the sibling gap on this no-voxels
+ * fallback path (#1218). Throws; `loadGridForState`'s surrounding try/catch
+ * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
+ * `ctx` back.
  */
 function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
   }
-  return worldSizeParams(state.world);
+  const params = worldSizeParams(state.world);
+  return {
+    ...params,
+    sizeX: requireValidGenDimension(params.sizeX, 'world.baseSizeX'),
+    sizeY: requireValidGenDimension(params.sizeY, 'world.sizeY'),
+    sizeZ: requireValidGenDimension(params.sizeZ, 'world.baseSizeZ'),
+  };
 }
 
 /**
