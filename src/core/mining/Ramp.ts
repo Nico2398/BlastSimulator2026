@@ -492,7 +492,14 @@ const FLOOR_TARGET_EPSILON = 1e-6;
 export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells'][number]): boolean {
   if (cell.fillTarget !== undefined) {
     const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
-    return Number.isFinite(currentHeight) && currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
+    // A column with no ground at all (bare air) reads NaN (#1184's "no
+    // ground" signal), not a real height — treat it as sitting at -Infinity,
+    // i.e. always below fillTarget and therefore always pending. The old
+    // `Number.isFinite(currentHeight) && ...` gate read that same NaN as
+    // "not pending", wrongly treating an entirely-unfilled fill column as
+    // already done from tick zero.
+    const effectiveHeight = Number.isFinite(currentHeight) ? currentHeight : -Infinity;
+    return effectiveHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
   }
   return grid.densityAt(cell.x, cell.y, cell.z) > 0;
 }
