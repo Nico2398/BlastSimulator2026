@@ -15,8 +15,7 @@
 // same way `new_game` builds it, same as this file's whole history (#408).
 
 import type { GameContext } from './world.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum } from './world.js';
-import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, regenerateGridParams, terrainVersionMismatch } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
@@ -37,8 +36,9 @@ export function saveCommand(
   if (err) return err;
   const state = ctx.state!;
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
-  if (ctx.grid && state.world) {
-    state.world = { ...state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(state)) };
+  const gen = terrainGenDatum(state);
+  if (ctx.grid && state.world && gen) {
+    state.world = { ...state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
   }
   quickSaveSlots.set(slot, serialize(state));
   return { success: true, output: `Saved to slot "${slot}".` };
@@ -57,14 +57,20 @@ export function loadCommand(
   const biome = getBiome(state.mineType);
   if (!biome) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
 
+  if (state.world?.voxels) {
+    const mismatch = terrainVersionMismatch(state.world.voxels);
+    if (mismatch) return { success: false, output: mismatch };
+  }
+
   ctx.state = state;
   if (state.world?.voxels) {
     restoreGrid(ctx, state.world.voxels);
   } else {
-    const { sizeX, sizeY, sizeZ } = state.world ?? {
-      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-    };
-    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+    const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+    regenerateGrid(ctx, {
+      seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+      ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    });
   }
 
   return { success: true, output: `Loaded from slot "${slot}".` };

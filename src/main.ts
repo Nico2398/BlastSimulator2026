@@ -27,7 +27,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, regenerateGridParams, terrainVersionMismatch } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -171,7 +171,10 @@ savesModal.setGetState(() => {
   // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
+    const gen = terrainGenDatum(ctx.state);
+    if (gen) {
+      ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
+    }
   }
   return ctx.state;
 });
@@ -1043,15 +1046,24 @@ savesModal.setOnLoad((state) => {
   // without that payload (pre-v6, or one taken with no grid) falls back to
   // regenerating pristine terrain from seed, same as the console `load`
   // command and this codebase's whole prior history here (#408).
+  if (state.world?.voxels) {
+    const mismatch = terrainVersionMismatch(state.world.voxels);
+    if (mismatch) {
+      uiManager.notify({ severity: 'warn', title: t('ui.saves.title'), body: mismatch });
+      return;
+    }
+  }
+
   ctx.state = state;
   const biome = getBiome(state.mineType);
   if (state.world?.voxels) {
     restoreGrid(ctx, state.world.voxels);
   } else if (biome) {
-    const { sizeX, sizeY, sizeZ } = state.world ?? {
-      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-    };
-    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+    const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+    regenerateGrid(ctx, {
+      seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+      ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    });
   }
   // Close any overlay whose visibility is a stale carry-over from the
   // previous session's ended state (e.g. BlastReportModal left open from an

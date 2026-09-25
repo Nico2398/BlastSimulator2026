@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -92,6 +92,7 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
     sizeX: state.world.baseSizeX,
     sizeY: state.world.sizeY,
     sizeZ: state.world.baseSizeZ,
+    ...(state.world.mixedRockHardness !== undefined ? { mixedRockHardness: state.world.mixedRockHardness } : {}),
   };
 }
 
@@ -100,9 +101,18 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
  * identity `decodeVoxelGrid` regenerates pristine terrain from. Undefined
  * when the state carries no world or an unknown mine type.
  */
-export function terrainGenDatum(_state: GameState): SerializedTerrainGen | undefined {
-  // TODO: implement
-  throw new Error('not implemented');
+export function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
+  const config = terrainConfigOf(state);
+  if (!config) return undefined;
+  return {
+    version: TERRAIN_GENERATOR_VERSION,
+    seed: config.seed,
+    climateBias: config.climateBias as [number, number],
+    sizeX: config.sizeX,
+    sizeY: config.sizeY,
+    sizeZ: config.sizeZ,
+    ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
+  };
 }
 
 /**
@@ -111,9 +121,16 @@ export function terrainGenDatum(_state: GameState): SerializedTerrainGen | undef
  * pre-#1181 defect where that fallback regenerated at the live, possibly
  * site-expanded size instead).
  */
-export function regenerateGridParams(_state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
-  // TODO: implement
-  throw new Error('not implemented');
+export function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+  if (!state.world) {
+    return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
+  }
+  return {
+    sizeX: state.world.baseSizeX,
+    sizeY: state.world.sizeY,
+    sizeZ: state.world.baseSizeZ,
+    ...(state.world.mixedRockHardness !== undefined ? { mixedRockHardness: state.world.mixedRockHardness } : {}),
+  };
 }
 
 /**
@@ -121,9 +138,9 @@ export function regenerateGridParams(_state: GameState): { sizeX: number; sizeY:
  * doesn't match this build's `TERRAIN_GENERATOR_VERSION`, or null when they
  * match and the save may load.
  */
-export function terrainVersionMismatch(_voxels: SerializedVoxels): string | null {
-  // TODO: implement
-  throw new Error('not implemented');
+export function terrainVersionMismatch(voxels: SerializedVoxels): string | null {
+  if (voxels.gen.version === TERRAIN_GENERATOR_VERSION) return null;
+  return t('world.terrain_version_mismatch', { saved: voxels.gen.version, current: TERRAIN_GENERATOR_VERSION });
 }
 
 /** The whole site, as a terrain:updated region. */
@@ -170,6 +187,9 @@ export function regenerateGrid(
     sizeX, sizeY, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
   };
+  if (ctx.state.world && mixedRockHardness !== undefined) {
+    ctx.state.world.mixedRockHardness = mixedRockHardness;
+  }
   ctx.grid = generateTerrain(config);
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   ctx.playableArea = new PlayableArea(ctx.grid, config);

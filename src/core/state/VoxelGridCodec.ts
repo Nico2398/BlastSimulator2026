@@ -7,7 +7,8 @@
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
 import { VoxelGrid } from '../world/VoxelGrid.js';
-import type { EditSegment } from '../world/TerrainEdits.js';
+import { replayTerrainEdits, type EditSegment } from '../world/TerrainEdits.js';
+import { generateTerrainRegion, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
  * The complete generator identity a save's terrain is regenerated from —
@@ -52,9 +53,18 @@ export class TerrainGenVersionMismatchError extends Error {
  * Encode a grid's claimed-chunk set and edit record against the generator
  * identity it was produced from.
  */
-export function encodeVoxelGrid(_grid: VoxelGrid, _gen: SerializedTerrainGen): SerializedVoxels {
-  // TODO: implement
-  throw new Error('not implemented');
+export function encodeVoxelGrid(grid: VoxelGrid, gen: SerializedTerrainGen): SerializedVoxels {
+  const claimed: SerializedVoxels['claimed'] = [];
+  for (const { cx, cz } of grid.ownedChunks()) {
+    const rect = grid.chunkRect(cx, cz);
+    if (!rect) continue;
+    claimed.push([cx, cz, rect.minX, rect.minZ, rect.maxX, rect.maxZ]);
+  }
+
+  const editColumns = grid.edits.columns().map(({ x, z, segments }) => ({ x, z, segments: [...segments] }));
+  const editFractures = grid.edits.fractureEntries();
+
+  return { v: 8, gen, claimed, editColumns, editFractures };
 }
 
 /**
@@ -63,7 +73,51 @@ export function encodeVoxelGrid(_grid: VoxelGrid, _gen: SerializedTerrainGen): S
  * `TerrainGenVersionMismatchError` when `payload.gen.version` doesn't match
  * the running build's generator.
  */
-export function decodeVoxelGrid(_payload: SerializedVoxels): VoxelGrid {
-  // TODO: implement
-  throw new Error('not implemented');
+export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
+  if (payload.v !== 8) {
+    throw new Error(`unsupported save payload version: ${payload.v}`);
+  }
+  if (payload.gen.version !== TERRAIN_GENERATOR_VERSION) {
+    throw new TerrainGenVersionMismatchError(payload.gen.version, TERRAIN_GENERATOR_VERSION);
+  }
+
+  const config: TerrainConfig = {
+    sizeX: payload.gen.sizeX,
+    sizeY: payload.gen.sizeY,
+    sizeZ: payload.gen.sizeZ,
+    seed: payload.gen.seed,
+    climateBias: payload.gen.climateBias,
+    ...(payload.gen.mixedRockHardness !== undefined ? { mixedRockHardness: payload.gen.mixedRockHardness } : {}),
+  };
+
+  // Empty at construction — every claimed chunk below is added and
+  // generated explicitly, from the claimed rects the save recorded, not
+  // from config.sizeX/sizeZ (a site-expanded save owns chunks past them).
+  const grid = new VoxelGrid(0, config.sizeY, 0);
+  const terrain = buildTerrainContext(config);
+
+  for (const [cx, cz, minX, minZ, maxX, maxZ] of payload.claimed) {
+    grid.addChunkWithRect(cx, cz, { minX, minZ, maxX, maxZ });
+    const rect = grid.chunkRect(cx, cz);
+    if (!rect) continue;
+    generateTerrainRegion(grid, terrain, config, rect);
+    grid.markChunkPristine(cx, cz);
+  }
+
+  for (const { x, z, segments } of payload.editColumns) {
+    for (const seg of segments) {
+      if (seg.kind === 'added') {
+        grid.edits.recordAdd(x, z, seg.yLo, seg.yHi, seg.composition!, seg.ores, seg.bottomBoundary, seg.topBoundary);
+      } else {
+        grid.edits.recordDig(x, z, seg.yLo, seg.yHi, seg.bottomBoundary, seg.topBoundary);
+      }
+    }
+  }
+  for (const { x, y, z, modifier } of payload.editFractures) {
+    grid.edits.recordFracture(x, y, z, modifier);
+  }
+
+  replayTerrainEdits(grid, grid.edits);
+
+  return grid;
 }
