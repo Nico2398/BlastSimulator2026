@@ -225,13 +225,13 @@ describe('digVoxel', () => {
     expect(result.newSurfaceY).toBe(2);
   });
 
-  it('newSurfaceY is -1 when the last voxel in the column is dug', () => {
+  it('newSurfaceY is null when the last voxel in the column is dug', () => {
     // Column at (2, z=2): only y=3 is solid — digging it leaves an empty column
     grid.setVoxel(2, 3, 2, solidVoxel());
 
     const result = digVoxel(grid, 2, 3, 2);
 
-    expect(result.newSurfaceY).toBe(-1);
+    expect(result.newSurfaceY).toBeNull();
   });
 
   it('newSurfaceY is unchanged when a non-top voxel is dug', () => {

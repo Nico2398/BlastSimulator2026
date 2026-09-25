@@ -168,10 +168,10 @@ describe('NavGrid.computeSurfaceY', () => {
     expect(y).toBe(4.5);
   });
 
-  it('returns -1 for a column with no rock (all air)', () => {
+  it('returns NaN for a column with no rock (all air)', () => {
     const grid = new VoxelGrid(10, 10, 10);
     const y = NavGrid.computeSurfaceY(grid, 0, 0);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 
   it('clamps out-of-bounds x coordinate to grid limits', () => {
@@ -188,14 +188,14 @@ describe('NavGrid.computeSurfaceY', () => {
     expect(y).toBe(4.5);
   });
 
-  it('returns -1 when clamped column still has no solid voxel', () => {
+  it('returns NaN when clamped column still has no solid voxel', () => {
     const grid = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
     // Column (5,5) has rock; column (20,5) clamps to (9,5) which has no rock
     const y = NavGrid.computeSurfaceY(grid, 20, 5);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 
-  it('returns -1 for a column where density is below 0.5', () => {
+  it('returns NaN for a column where density is below 0.5', () => {
     const grid = new VoxelGrid(10, 10, 10);
     // Set voxel at y=5 with density 0.3 (below the 0.5 threshold)
     grid.setVoxel(0, 5, 0, {
@@ -205,7 +205,7 @@ describe('NavGrid.computeSurfaceY', () => {
       fractureModifier: 1.0,
     });
     const y = NavGrid.computeSurfaceY(grid, 0, 0);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 });
 
@@ -561,14 +561,14 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     expect(NavGrid.computeSurfaceY(grid, 3, 3)).not.toBe(computeVoxelColumnSurfaceY(grid, 3, 3));
   });
 
-  it('still returns -1 (the void sentinel) for a genuinely void/out-of-bounds column', () => {
+  it('still returns NaN (the void sentinel) for a genuinely void/out-of-bounds column', () => {
     const voidGrid = new VoxelGrid(10, 10, 10); // all air
-    expect(NavGrid.computeSurfaceY(voidGrid, 0, 0)).toBe(-1);
+    expect(NavGrid.computeSurfaceY(voidGrid, 0, 0)).toBeNaN();
 
     // A single solid column queried far outside itself: the clamped column
     // still has no solid voxel, per makeSingleColumnGrid's own contract.
     const single = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
-    expect(NavGrid.computeSurfaceY(single, 20, 5)).toBe(-1);
+    expect(NavGrid.computeSurfaceY(single, 20, 5)).toBeNaN();
   });
 
   it('two adjacent columns with a genuine sub-voxel graded difference classify as ramp — the continuous delta is now the correct ramp gate (#1151)', () => {
