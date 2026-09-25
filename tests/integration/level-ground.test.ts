@@ -542,7 +542,7 @@ describe('level_ground — console round trip (#1009)', () => {
     expect(nav.cellAt(building.x, building.z + sizeZ)!.type).not.toBe('blocked');
   });
 
-  it('24. a column just past the true footprint, lowered well below it, does not drag the pad target down toward it', () => {
+  it('23. a column just past the true footprint, lowered well below it, does not drag the pad target down toward it', () => {
     const engine = makeStaffedRunner();
     const grid = engine.ctx.grid!;
 
@@ -572,7 +572,7 @@ describe('level_ground — console round trip (#1009)', () => {
     }
   });
 
-  it('25. two adjacent buildings, touching with zero gap: levelling one never carves into the true footprint of the other (#1198 simplified regression for removed #1144 occupancy guard)', () => {
+  it('24. two adjacent buildings, touching with zero gap: levelling one never carves into the true footprint of the other (#1198 simplified regression for removed #1144 occupancy guard)', () => {
     const engine = makeStaffedRunner();
     const grid = engine.ctx.grid!;
 

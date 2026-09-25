@@ -97,7 +97,7 @@ describe('levelBuildingFootprint (#1198)', () => {
     expect(result.region!.maxZ).toBeLessThan(OWN_SIZE_Z);
   });
 
-  it('boundary: a 1x1 footprint carves only its own single column', () => {
+  it("a 1x1 footprint's target always equals its own height — levelling it is a structural no-op; the neighbour stays untouched", () => {
     const grid = flatGrid(10);
     const compId = grid.palette.intern(ROCK_COMPOSITION);
     // The footprint's own (and only) column sits proud — target is derived
@@ -114,6 +114,7 @@ describe('levelBuildingFootprint (#1198)', () => {
     expect(result.targetY).toBeCloseTo(15, 6);
     expect(computeVoxelColumnSurfaceHeight(grid, 0, 0)).toBeCloseTo(15, 6);
     expect(computeVoxelColumnSurfaceHeight(grid, 1, 0)).toBeCloseTo(10, 6);
+    expect(result.voxelsCleared).toBe(0);
   });
 
   it('no-op: an already-level footprint clears 0 voxels', () => {
