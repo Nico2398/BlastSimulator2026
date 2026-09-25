@@ -9,7 +9,7 @@
 // Voxel cell size: 1 m × 1 m × 1 m (SI units throughout). All grid
 // coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
-import { TerrainEdits, oresDeepEqual, replaySegmentsInRange, type EditBoundary } from './TerrainEdits';
+import { TerrainEdits, oresDeepEqual, replaySegmentsInRange, boundaryAt, type EditBoundary } from './TerrainEdits';
 import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance';
 
 export interface VoxelRockComposition {
@@ -302,15 +302,8 @@ export class VoxelGrid {
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
   private readonly dirty = new Set<number>();
-  /**
-   * Generator + edit-record backing this grid's chunks, or null when nothing
-   * is attached (#1183). `protected`, not `private`: until the materialize-on-
-   * read helpers below are wired into `ensureSlab`'s dispatch (implementation
-   * phase), nothing in this file reads it, which `private` would make a
-   * strict-mode compile error (TS6133) on a skeleton-phase field with no
-   * logic yet to read it.
-   */
-  protected chunkSource: VoxelChunkSource | null = null;
+  /** Generator + edit-record backing this grid's chunks, or null when nothing is attached (#1183). */
+  private chunkSource: VoxelChunkSource | null = null;
 
   /** Live bounding box of the owned region, max exclusive. Empty grid reports a zero-size box at the origin. */
   private bMinX = 0;
@@ -560,7 +553,7 @@ export class VoxelGrid {
    * attached `chunkSource` — a conservative [min, max] read straight from the
    * generator/edits without materializing the band into a slab (#1183).
    */
-  protected cheapChunkDensityRange(chunk: VoxelChunk, cy: number): { min: number; max: number } {
+  private cheapChunkDensityRange(chunk: VoxelChunk, cy: number): { min: number; max: number } {
     const bandY0 = cy * CHUNK_SIZE;
     if (bandY0 >= this.sizeY) return { min: 0, max: 0 }; // entirely past the grid's declared vertical extent
 
@@ -589,8 +582,8 @@ export class VoxelGrid {
       }
     }
 
-    if (bandY1 <= minSurface - SURFACE_BAND_HALF) return { min: 1, max: 1 }; // entirely solid
-    if (bandY0 >= maxSurface + SURFACE_BAND_HALF) return { min: 0, max: 0 }; // entirely air
+    if (surfaceDensityAt(bandY1, minSurface) >= 1) return { min: 1, max: 1 }; // entirely solid
+    if (surfaceDensityAt(bandY0, maxSurface) <= 0) return { min: 0, max: 0 }; // entirely air
     return { min: 0, max: 1 }; // straddles the surface somewhere in the band
   }
 
@@ -655,7 +648,7 @@ export class VoxelGrid {
    * which never allocates (#1183). Returns undefined when no source is
    * attached and no slab has been written directly.
    */
-  protected ensureSlab(chunk: VoxelChunk, y: number): VoxelSlab | undefined {
+  private ensureSlab(chunk: VoxelChunk, y: number): VoxelSlab | undefined {
     const existing = this.slabAt(chunk, y);
     if (existing) return existing;
     if (!this.chunkSource) return undefined;
@@ -663,7 +656,7 @@ export class VoxelGrid {
   }
 
   /** Materialize chunk `chunk`'s y-band `cy` from `chunkSource`'s generator fill, then `replayEditsForBand` on top (#1183). */
-  protected materializeSlabFromSource(chunk: VoxelChunk, cy: number): VoxelSlab {
+  private materializeSlabFromSource(chunk: VoxelChunk, cy: number): VoxelSlab {
     // Allocate/register the (blank) slab FIRST — the generator fill below
     // writes into it via `writeGeneratedVoxel`, which requires the slab to
     // already be resident, and edit replay's own mutators resolve their
@@ -677,7 +670,7 @@ export class VoxelGrid {
   }
 
   /** Replay this grid's own `TerrainEdits` falling within y-band `cy` of `chunk`, on top of a freshly generator-filled slab (#1183). */
-  protected replayEditsForBand(chunk: VoxelChunk, cy: number): void {
+  private replayEditsForBand(chunk: VoxelChunk, cy: number): void {
     const yLo = cy * CHUNK_SIZE;
     const yHi = yLo + CHUNK_SIZE - 1;
     this.withoutEditRecording(() => {
@@ -915,7 +908,7 @@ export class VoxelGrid {
    * `sourceColumnDensity` below, on a column not backed by this grid's own
    * storage.
    */
-  protected cheapDensityAt(chunk: VoxelChunk, x: number, y: number, z: number): number {
+  private cheapDensityAt(chunk: VoxelChunk, x: number, y: number, z: number): number {
     const edited = this.editedDensityAt(x, y, z);
     if (edited !== undefined) return edited;
     if (!this.chunkSource) return 0;
@@ -966,11 +959,11 @@ export class VoxelGrid {
   }
 
   /** Density at (x, y, z) as recorded in `this.edits`, or undefined when this voxel carries no edit (#1183). */
-  protected editedDensityAt(x: number, y: number, z: number): number | undefined {
+  private editedDensityAt(x: number, y: number, z: number): number | undefined {
     for (const seg of this.edits.segmentsAt(x, z)) {
       if (y < seg.yLo || y > seg.yHi) continue;
-      if (y === seg.yLo && seg.bottomBoundary) return seg.bottomBoundary.density;
-      if (y === seg.yHi && seg.topBoundary) return seg.topBoundary.density;
+      const boundary = boundaryAt(seg, y);
+      if (boundary) return boundary.density;
       return seg.kind === 'added' ? 1 : 0;
     }
     return undefined;

@@ -251,10 +251,20 @@ export class TerrainEdits {
 }
 
 /**
- * Apply `edits` onto `grid` (assumed freshly generated) so it reproduces the
- * live grid the edits were recorded from, voxel for voxel. Writes through
- * `grid.withoutEditRecording` so replay never re-records itself.
+ * The boundary override, if any, that applies to row `y` within `seg` —
+ * `y === seg.yLo` and `seg.bottomBoundary`, or `y === seg.yHi` and
+ * `seg.topBoundary`. Shared by `VoxelGrid.editedDensityAt` and
+ * `replaySegmentsInRange`, which both need to answer "is this row a
+ * boundary edge, and if so with what value" for the same segment shape —
+ * extracted so the two paths can't disagree on which rows carry an override
+ * (#1183 review).
  */
+export function boundaryAt(seg: EditSegment, y: number): EditBoundary | undefined {
+  if (y === seg.yLo && seg.bottomBoundary) return seg.bottomBoundary;
+  if (y === seg.yHi && seg.topBoundary) return seg.topBoundary;
+  return undefined;
+}
+
 /**
  * Apply `segments` (a slice of one column's edit segments, e.g. from
  * `TerrainEdits.segmentsAt`) onto `grid` restricted to `[yLo, yHi]` — the
@@ -271,9 +281,7 @@ export function replaySegmentsInRange(
       const loY = Math.max(seg.yLo, yLo);
       const hiY = Math.min(seg.yHi, yHi);
       for (let y = loY; y <= hiY; y++) {
-        const boundary = y === seg.yLo && seg.bottomBoundary ? seg.bottomBoundary
-          : y === seg.yHi && seg.topBoundary ? seg.topBoundary
-          : undefined;
+        const boundary = boundaryAt(seg, y);
         if (boundary) {
           // `boundary.composition` is portable composition data, not a
           // palette index — re-intern it into the TARGET grid's own
@@ -292,6 +300,11 @@ export function replaySegmentsInRange(
   });
 }
 
+/**
+ * Apply `edits` onto `grid` (assumed freshly generated) so it reproduces the
+ * live grid the edits were recorded from, voxel for voxel. Writes through
+ * `grid.withoutEditRecording` so replay never re-records itself.
+ */
 export function replayTerrainEdits(grid: VoxelGrid, edits: TerrainEdits): void {
   grid.withoutEditRecording(() => {
     for (const { x, z, segments } of edits.columns()) {

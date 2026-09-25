@@ -116,10 +116,10 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
   // original assertions assumed allocatedSlabCount would be IDENTICAL
   // between gridBase and gridTall — measured instead: 318 vs 972 slabs, a
   // genuine ~3.06x growth, not zero. Root cause, confirmed by reading
-  // TerrainGen.ts's generateColumn and WorldGen.ts's createWorldGenContext:
+  // TerrainGen.ts's generateColumnRange and WorldGen.ts's createWorldGenContext:
   // `groundOffset = floor(sizeY * 0.55) - centerHeight` shifts the whole
   // generated crust's vertical DATUM by a fixed fraction of the declared
-  // sizeY, and generateColumn fills solid rock from y=0 up to that shifted
+  // sizeY, and generateColumnRange fills solid rock from y=0 up to that shifted
   // surface — an absolute volume, not just a repositioned fixed-thickness
   // band. So a taller declared grid legitimately generates a deeper crust:
   // this is pre-existing WorldGen/TerrainGen behaviour, unrelated to #1182's

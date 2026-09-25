@@ -156,7 +156,7 @@ describe('TerrainGen — sub-voxel surface placement (#458)', () => {
 // ── createChunkSource — lazy chunk materialization (#1183) ─────────────────
 //
 // `createChunkSource` builds a `VoxelChunkSource` from the same sampling
-// context `generateColumn` already uses (buildTerrainContext), so a chunk
+// context `generateColumnRange` already uses (buildTerrainContext), so a chunk
 // materializes identically whether it was generated up front or lazily on
 // first read. These tests exercise the source object directly — its own
 // `surfaceHeightAt`/`materializeSlab` contract — independent of how/whether

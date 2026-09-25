@@ -196,8 +196,8 @@ export class PlayableArea {
     }
 
     // `contains` said no, so the chunk was either absent or partially owned;
-    // either way materializeChunk reports the rect that just became ours.
-    const rect = this.materializeChunk(cx, cz);
+    // either way claimChunk reports the rect that just became ours.
+    const rect = this.claimChunk(cx, cz);
 
     return { claimed: true, chunk: { cx, cz }, rect, alreadyOwned: false };
   }
@@ -275,7 +275,7 @@ export class PlayableArea {
     for (const chunk of required.values()) {
       claimedChunks.push(chunk);
       if (this.isFullyOwned(chunk.cx, chunk.cz)) continue;
-      const rect = this.materializeChunk(chunk.cx, chunk.cz);
+      const rect = this.claimChunk(chunk.cx, chunk.cz);
       minX = Math.min(minX, rect.minX);
       minZ = Math.min(minZ, rect.minZ);
       maxX = Math.max(maxX, rect.maxX);
@@ -426,15 +426,15 @@ export class PlayableArea {
   }
 
   /**
-   * Bring chunk (cx, cz) into the grid — the ownership step `claim` and
-   * `claimArea` both need once a chunk has cleared their own refusal checks.
-   * Registers ownership only (#1183): content comes from the grid's attached
+   * Register ownership of chunk (cx, cz) — the step `claim` and `claimArea`
+   * both need once a chunk has cleared their own refusal checks. Registers
+   * ownership only (#1183): content comes from the grid's attached
    * `VoxelChunkSource` lazily, on whatever a caller actually reads, not from
    * an eager fill here. Returns the rect that became owned, since `addChunk`
    * reports it when the chunk grows an existing partial edge chunk rather
    * than adding a fresh one.
    */
-  private materializeChunk(cx: number, cz: number): Rect {
+  private claimChunk(cx: number, cz: number): Rect {
     const grown = this.grid.addChunk(cx, cz);
     return grown ?? PlayableArea.chunkRect(cx, cz);
   }
