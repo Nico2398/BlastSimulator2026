@@ -367,7 +367,13 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   // once the route resolves, exactly like an unreachable claim never taken in
   // the first place.
   if (!moveResult.success) {
-    employee.activeActionId = null;
+    // Only activeActionId was set at this point (promoteActionToActive, just
+    // before calling in here) — seedTaskTimerFields hasn't run yet (see this
+    // function's own doc comment above), so every other field
+    // clearActiveTaskFields touches is already null from the employee's prior
+    // idle state. Safe drop-in for the same "undo a claim" shape
+    // completeVehicleGatedAction below uses.
+    clearActiveTaskFields(employee);
     releaseActionToOpenPool(state, action);
   }
 }

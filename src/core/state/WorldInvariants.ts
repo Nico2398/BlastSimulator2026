@@ -187,12 +187,16 @@ function checkI5ReservationWithoutValidHolder(state: GameState): Violation[] {
     }
     // #1103: a vehicle reserved for an action still sitting in its holder's
     // OWN taskQueue (reserveOnePoolActionAhead, EmployeeDispatchSteps.ts) is
-    // legitimately not yet boarded — but only while the holder is genuinely
-    // busy WORKING a different active action (activeActionId set, not
-    // resting or walking to rest) and will walk to claim this one once that
-    // finishes (VehicleContinuity.ts's tryContinueVehicleGatedAction is the
-    // common case: continuity transfers the ABOUT-TO-FREE vehicle straight
-    // onto it instead). Neither vehicleDriverId(v) nor pendingDriverVehicleId
+    // legitimately not yet boarded — but only while the action is still in
+    // the holder's taskQueue and the holder is not resting
+    // (isPendingReserveAhead: restTicksRemaining and pendingRestDuration both
+    // null, taskQueue.includes(actionId)), regardless of whether
+    // activeActionId happens to be null in the one-tick gap between the
+    // holder going idle and dispatch promoting this action, or still set to a
+    // different in-progress action they're genuinely busy working
+    // (VehicleContinuity.ts's tryContinueVehicleGatedAction is the common
+    // case for the latter: continuity transfers the ABOUT-TO-FREE vehicle
+    // straight onto it instead). Neither vehicleDriverId(v) nor pendingDriverVehicleId
     // reflects that yet, so without this the check flagged this ordinary,
     // transient "reserved ahead, not yet started" state as a violation on
     // every multi-action taskQueue — confirmed live on
