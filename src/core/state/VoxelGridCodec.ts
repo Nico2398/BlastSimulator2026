@@ -43,7 +43,7 @@ export interface SerializedVoxels {
  * unreleased: a mismatched save is refused outright, never migrated
  * (project owner policy, #1181).
  */
-class TerrainGenVersionMismatchError extends Error {
+export class TerrainGenVersionMismatchError extends Error {
   constructor(public readonly savedVersion: number, public readonly currentVersion: number) {
     super(`Save terrain generator v${savedVersion} does not match current generator v${currentVersion}.`);
   }
