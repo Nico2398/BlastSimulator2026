@@ -730,6 +730,15 @@ if (scenarioMode) scene.setDrawingEnabled(false);
 // it awaits it here before capturing a frame it wants to show real assets.
 window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 window.__renderFrame = () => { scene.renderFrame(); };
+// Landscape chunks still queued for the current camera position (#1153's
+// streamer is budgeted per frame). A capture taken while this is non-zero
+// shows sky where ground has not been built yet, with scenery floating in
+// it — so `captureFrame` drains the queue through __landscapeFlush and
+// checks __landscapePending before it shoots. Waiting the budget out is not
+// an option there: without a GPU one drawn frame costs seconds, so the ~56
+// frames a full ladder needs are minutes per screenshot.
+window.__landscapePending = () => gameRenderer.landscapePendingChunks;
+window.__landscapeFlush = () => gameRenderer.flushLandscapeStreaming();
 
 // Debug: expose grid reference info for diagnostics
 window.__debugGridInfo = () => {
