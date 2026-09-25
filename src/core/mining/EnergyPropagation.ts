@@ -34,14 +34,18 @@ export interface BlastBox {
   maxX: number; maxY: number; maxZ: number;
 }
 
-/** Clamp a box to the region the site actually owns. Returns null if nothing is left. */
+/**
+ * Clip a box to the columns the site actually owns. Returns null if nothing is left.
+ *
+ * Only X/Z are clipped: a column has no vertical cap, so Y passes through unclamped.
+ */
 export function clampBoxToGrid(box: BlastBox, grid: VoxelGrid): BlastBox | null {
   const clamped: BlastBox = {
     minX: Math.max(box.minX, grid.minX),
-    minY: Math.max(box.minY, 0),
+    minY: box.minY,
     minZ: Math.max(box.minZ, grid.minZ),
     maxX: Math.min(box.maxX, grid.maxX),
-    maxY: Math.min(box.maxY, grid.sizeY),
+    maxY: box.maxY,
     maxZ: Math.min(box.maxZ, grid.maxZ),
   };
   if (clamped.maxX <= clamped.minX || clamped.maxY <= clamped.minY || clamped.maxZ <= clamped.minZ) return null;

@@ -1394,6 +1394,19 @@ export const SURVEY_COVERAGE_RADIUS = {
   aerial:      30,
 } as const;
 
+/**
+ * Depth (voxels) below a column's own surface that a seismic or core-sample
+ * survey scans — replaces "down to y = 0" (#1186): column storage has no
+ * floor any more (#1183/#1184), so "the whole column" is unbounded and has
+ * to become "a bounded window below wherever the surface actually sits".
+ * `aerial` needs no entry — it always samples exactly the top 2 levels
+ * (surfaceY, surfaceY - 1), unchanged by this issue.
+ */
+export const SURVEY_DEPTH_BELOW_SURFACE = {
+  seismic:     15,
+  core_sample:  8,
+} as const;
+
 /** Error reduction applied per skill level above 1 (e.g. skill 3 → 2 × 0.12 = 0.24 reduction). */
 export const SURVEY_SKILL_BONUS_PER_LEVEL = 0.12;
 

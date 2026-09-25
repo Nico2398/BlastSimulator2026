@@ -8,6 +8,7 @@ import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/co
 import { isSurveyStale, findSurveyForColumn } from '../../../src/core/mining/SurveyCalc.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 // ── Task 4.6 additions ────────────────────────────────────────────────────────
 import { createGame } from '../../../src/core/state/GameState.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
@@ -512,6 +513,70 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     const colEstimates = result.estimates['50,50'];
     expect(colEstimates).toBeDefined();
     expect(colEstimates!['silver']).toBeDefined();
+  });
+
+  // ── #1186: surface-relative depth window (no more scanning to y=0) ─────────
+
+  /**
+   * Surface at y=25 (topmost solid). One ore ('shally') well within either
+   * survey method's depth window (5 voxels below the surface); a second,
+   * distinct ore ('trentium') 23 voxels below the surface — outside both
+   * SURVEY_DEPTH_BELOW_SURFACE.seismic (15) and .core_sample (8), but still
+   * inside the OLD code's full `0..grid.sizeY-1` column scan. Because the two
+   * ores are distinct ids, whether 'trentium' shows up in the result is a
+   * clean, RNG-independent signal of whether the deep voxel was sampled at
+   * all — not a magnitude comparison.
+   */
+  function makeDepthWindowGrid(): VoxelGrid {
+    const grid = new VoxelGrid(11, 30, 11);
+    grid.setVoxel(5, 25, 5, {
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+      density: 1, oreDensities: { shally: 0.6 }, fractureModifier: 1.0,
+    });
+    grid.setVoxel(5, 20, 5, {
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+      density: 1, oreDensities: { shally: 0.6 }, fractureModifier: 1.0,
+    });
+    grid.setVoxel(5, 2, 5, {
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+      density: 1, oreDensities: { trentium: 0.6 }, fractureModifier: 1.0,
+    });
+    return grid;
+  }
+
+  it(`#1186: seismic samples only SURVEY_DEPTH_BELOW_SURFACE.seismic (${SURVEY_DEPTH_BELOW_SURFACE.seismic}) voxels below the surface, not the whole column down to y=0`, () => {
+    const grid = makeDepthWindowGrid();
+    const params: EstimateSurveyParams = { ...BASE_PARAMS, method: 'seismic', centerX: 5, centerZ: 5 };
+    const result = estimateSurveyResult(grid, params, new Random(12345));
+    const col = result.estimates['5,5'];
+    expect(col).toBeDefined();
+    expect(col!['shally']).toBeDefined();
+    expect(col!['trentium']).toBeUndefined();
+  });
+
+  it(`#1186: core_sample samples only SURVEY_DEPTH_BELOW_SURFACE.core_sample (${SURVEY_DEPTH_BELOW_SURFACE.core_sample}) voxels below the surface, not the whole column down to y=0`, () => {
+    const grid = makeDepthWindowGrid();
+    const params: EstimateSurveyParams = { ...BASE_PARAMS, method: 'core_sample', centerX: 5, centerZ: 5 };
+    const result = estimateSurveyResult(grid, params, new Random(12345));
+    const col = result.estimates['5,5'];
+    expect(col).toBeDefined();
+    expect(col!['shally']).toBeDefined();
+    expect(col!['trentium']).toBeUndefined();
+  });
+
+  it('#1186: a survey centered on a site expanded west scans columns at negative x, not clamped to x >= 0', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(-1, 0);
+    grid.setVoxel(-5, 3, 5, {
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+      density: 1, oreDensities: { gold: 0.6 }, fractureModifier: 1.0,
+    });
+
+    const params: EstimateSurveyParams = { ...BASE_PARAMS, method: 'core_sample', centerX: -5, centerZ: 5 };
+    const result = estimateSurveyResult(grid, params, new Random(12345));
+
+    expect(Object.keys(result.estimates)).toContain('-5,5');
+    expect(result.estimates['-5,5']!['gold']).toBeGreaterThan(0);
   });
 });
 

@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Survey types and noise-scaled estimation logic
 
-import { VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
 import {
   SURVEY_BASE_ERROR,
@@ -11,6 +11,7 @@ import {
   SURVEY_STALE_TICKS,
   SURVEY_COSTS,
   SURVEY_DURATION_TICKS,
+  SURVEY_DEPTH_BELOW_SURFACE,
 } from '../config/balance.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
@@ -143,14 +144,14 @@ export function estimateSurveyResult(
   const radius = SURVEY_COVERAGE_RADIUS[method];
   const estimates: Record<string, Record<string, number>> = {};
 
-  const xMin = Math.max(0, Math.floor(centerX - radius));
-  const xMax = Math.min(grid.sizeX - 1, Math.ceil(centerX + radius));
-  const zMin = Math.max(0, Math.floor(centerZ - radius));
-  const zMax = Math.min(grid.sizeZ - 1, Math.ceil(centerZ + radius));
+  const xMin = Math.max(grid.minX, Math.floor(centerX - radius));
+  const xMax = Math.min(grid.maxX - 1, Math.ceil(centerX + radius));
+  const zMin = Math.max(grid.minZ, Math.floor(centerZ - radius));
+  const zMax = Math.min(grid.maxZ - 1, Math.ceil(centerZ + radius));
 
   for (let x = xMin; x <= xMax; x++) {
     for (let z = zMin; z <= zMax; z++) {
-      if (!grid.isInBounds(x, 0, z)) continue;
+      if (!grid.containsColumn(x, z)) continue;
 
       const dx = x - centerX;
       const dz = z - centerZ;
@@ -160,14 +161,15 @@ export function estimateSurveyResult(
       let yLevels: number[];
       if (method === 'aerial') {
         const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
-        // No lower bound: voxel storage has no vertical floor (#1184) and a
-        // column's ground can legitimately sit below y=0, so surfaceY itself
-        // can be negative. Only the upper bound still means anything here —
-        // it caps sampling at the grid's declared vertical extent.
-        yLevels = [surfaceY, surfaceY - 1].filter(y => y < grid.sizeY);
+        // No ceiling to filter against any more — voxel storage has no
+        // vertical cap (#1183).
+        yLevels = [surfaceY, surfaceY - 1];
       } else {
+        const topY = computeVoxelColumnSurfaceY(grid, x, z);
+        if (topY === null) continue; // no ground in this column, nothing to sample
+        const depth = SURVEY_DEPTH_BELOW_SURFACE[method];
         yLevels = [];
-        for (let y = 0; y < grid.sizeY; y++) yLevels.push(y);
+        for (let y = topY; y > topY - depth; y--) yLevels.push(y);
       }
 
       // Collect ore IDs present in any solid voxel in the sampled range
