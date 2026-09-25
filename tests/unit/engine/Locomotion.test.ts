@@ -827,6 +827,184 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
   // routed around a building's clearance-insufficient ring happened to round
   // onto a parked debris_hauler's cell partway through, costing 20+ ticks to
   // a detour the real next step never needed.
+  // #1201: writeVehiclePosition (Locomotion.ts) hardcodes isStationaryNow to
+  // `false` on every drive step (TODO(#1138)) — it clears the vehicle's old
+  // nav cell every tick but never marks the cell it stops on, so a parked or
+  // working vehicle never sets NavCell.vehicleOccupied and pedestrians path
+  // straight through it (regression of #954). The four tests below drive
+  // that real, unfixed writeVehiclePosition end to end rather than mutating
+  // NavCell.vehicleOccupied directly — each is expected to fail against
+  // today's code and pass once #1201 lands.
+  it('#1201: a drive leg arriving at its destination marks that cell vehicleOccupied, and the driver stays mounted', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const destX = 4;
+    const destZ = 2;
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX, destZ,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 4,
+      }],
+      goal: { kind: 'reposition', x: destX, z: destZ },
+      workTicks: 0,
+      estTotalTicks: 4,
+    } satisfies Itinerary;
+
+    const MAX_TICKS = 20;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && driver.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    expect(driver.itinerary).toBeNull();
+    expect(vehicle.x).toBe(destX);
+    expect(vehicle.z).toBe(destZ);
+    // Stopped, so its cell must now block pedestrian pathfinding.
+    expect(state.navGrid!.cellAt(destX, destZ)!.vehicleOccupied).toBe(true);
+    // Still mounted — arrival with onArrive:'none' never alights the driver.
+    expect(vehicleDriverId(vehicle)).toBe(driver.id);
+    expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+  });
+
+  it('#1201: driving away from a stopped, occupied cell frees it again', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const oldX = 4;
+    const oldZ = 2;
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: oldX, destZ: oldZ,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 4,
+      }],
+      goal: { kind: 'reposition', x: oldX, z: oldZ },
+      workTicks: 0,
+      estTotalTicks: 4,
+    } satisfies Itinerary;
+
+    const MAX_TICKS = 20;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && driver.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+    // Precondition: genuinely stopped and occupying its cell — fails today
+    // since arrival never marks the cell (the same bug the previous test
+    // covers), which is why this test fails too rather than trivially
+    // passing on the departure check below.
+    expect(state.navGrid!.cellAt(oldX, oldZ)!.vehicleOccupied).toBe(true);
+
+    const moveResult = moveTo(state, driver.id, { x: 10, z: 2 }, { via: vehicle.id });
+    expect(moveResult.success).toBe(true);
+
+    tickLocomotion(state);
+
+    expect(state.navGrid!.cellAt(oldX, oldZ)!.vehicleOccupied).toBe(false);
+  });
+
+  // #1201: mirrors "drives the long way around a vehicle parked on a
+  // chokepoint..." above (~line 311), but for a FOOT leg detouring around a
+  // genuinely-parked vehicle instead of a drive leg. The blocker here is a
+  // real vehicle a driver actually drove to and stopped at — not a manually
+  // mutated NavCell — so this exercises the same writeVehiclePosition path
+  // as the two tests above: under today's bug the parked vehicle's cell is
+  // never marked occupied, so the pedestrian walks straight through it in
+  // the direct minimum number of ticks instead of detouring around it.
+  it('#1201: a foot employee detours around a stopped, occupying vehicle parked on the direct route instead of walking through it', () => {
+    const state = buildCorridorState(12);
+    const rng = new Random(SEED);
+
+    // Park a vehicle mid-corridor, directly on the straight-line route
+    // between the foot employee's start and end — driven there and stopped
+    // through the real locomotion tick, exactly like the test above.
+    const { employee: parkedDriver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    blocker.occupantIds = [parkedDriver.id];
+    parkedDriver.locomotion = { kind: 'mounted', vehicleId: blocker.id };
+    parkedDriver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: blocker.id, destX: 5, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      }],
+      goal: { kind: 'reposition', x: 5, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } satisfies Itinerary;
+
+    let parkTicks = 0;
+    while (parkTicks < 20 && parkedDriver.itinerary !== null) {
+      tickLocomotion(state);
+      parkTicks++;
+    }
+    expect(blocker.x).toBe(5);
+    expect(blocker.z).toBe(2);
+
+    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 0, 3);
+    const moveResult = moveTo(state, walker.id, { x: 11, z: 2 });
+    expect(moveResult.success).toBe(true);
+
+    const MAX_TICKS = 60;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && walker.itinerary !== null) {
+      tickLocomotion(state);
+      ticks++;
+    }
+
+    expect(walker.itinerary).toBeNull();
+    expect(walker.x).toBe(11);
+    expect(walker.z).toBe(2);
+    // Direct, unobstructed distance from (0,3) to (11,2) at AGENT_WALK_SPEED
+    // — a detour around a genuinely occupied blocker must cost strictly more
+    // ticks than this floor.
+    const directTicks = Math.ceil(11 / AGENT_WALK_SPEED);
+    expect(ticks).toBeGreaterThan(directTicks);
+  });
+
+  // #1201: isOccupiedByOtherVehicle (Locomotion.ts) compares exact float
+  // positions (`v.x === x && v.z === z`) instead of rounded cells, so a
+  // vehicle stopped at a fractional position never blocks another vehicle
+  // from entering the grid cell its position rounds to.
+  it('#1201: a driving vehicle does not advance onto a grid cell another vehicle occupies at a fractional position that rounds onto it', () => {
+    const state = buildCorridorState(10);
+    const rng = new Random(SEED);
+
+    // Idle blocker sitting at a fractional position that rounds to (5, 2) —
+    // no lane exists in this single-lane corridor for a driving vehicle to
+    // go around it.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 2);
+    blocker.x = 5.3;
+    blocker.z = 2;
+
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 4, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 9, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      }],
+      goal: { kind: 'reposition', x: 9, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } satisfies Itinerary;
+
+    tickLocomotion(state);
+
+    // Never advanced onto the blocker's rounded cell (5, 2) — stayed put and
+    // waited instead, exactly like the exact-position blocker case above.
+    expect(vehicle.x).toBe(4);
+    expect(vehicle.z).toBe(2);
+  });
+
   it('does not block on a live vehicle parked on its own current (rounded) cell when its continuous position floors to a different cell', () => {
     const state = buildFlatNavGridState(20, 5);
     const rng = new Random(SEED);
