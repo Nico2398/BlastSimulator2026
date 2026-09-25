@@ -100,14 +100,20 @@ describe('levelBuildingFootprint (#1198)', () => {
   it('boundary: a 1x1 footprint carves only its own single column', () => {
     const grid = flatGrid(10);
     const compId = grid.palette.intern(ROCK_COMPOSITION);
+    // The footprint's own (and only) column sits proud — target is derived
+    // solely from this single-column rect, so it can only ever be its own
+    // height (already "level" for a 1x1 footprint).
     setVoxelColumnSurfaceHeight(grid, 0, 0, 15, compId);
-    setVoxelColumnSurfaceHeight(grid, 1, 0, 15, compId); // just outside — must stay untouched
+    // Neighbour OUTSIDE the 1x1 footprint — no widened region exists under
+    // #1198's single-rect contract, so it must never influence the target
+    // and must stay untouched by the carve.
+    setVoxelColumnSurfaceHeight(grid, 1, 0, 10, compId);
 
     const result = levelBuildingFootprint(grid, 0, 0, 1, 1);
 
-    expect(result.targetY).toBeCloseTo(10, 6);
-    expect(computeVoxelColumnSurfaceHeight(grid, 0, 0)).toBeCloseTo(10, 6);
-    expect(computeVoxelColumnSurfaceHeight(grid, 1, 0)).toBeCloseTo(15, 6);
+    expect(result.targetY).toBeCloseTo(15, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, 0, 0)).toBeCloseTo(15, 6);
+    expect(computeVoxelColumnSurfaceHeight(grid, 1, 0)).toBeCloseTo(10, 6);
   });
 
   it('no-op: an already-level footprint clears 0 voxels', () => {
