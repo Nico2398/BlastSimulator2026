@@ -45,6 +45,26 @@ export interface RampResult {
   voxelsFilled: number;
 }
 
+// ── Endpoint-based construction (#1210) ──
+
+/**
+ * Derive a `RampDef` from a drag's start/end tile endpoints, picking the
+ * dominant axis (`abs(dz) >= abs(dx)` → north/south, else east/west) and a
+ * `length` of `abs(round(delta))` along that axis — no `+1`. This is the
+ * same dominant-axis math `buildRampCommand`'s `--start`/`--end` branch
+ * inlines today; the console command will be rewired to call this instead,
+ * so the UI's box-cut ramp tool and the console's `--start`/`--end` flag
+ * share one source of truth for turning two endpoints into a `RampDef`
+ * (#1210 — UI/core disagreement on the derived length/direction).
+ */
+export function rampDefFromEndpoints(
+  originX: number, originZ: number, endX: number, endZ: number, targetDepth: number,
+): RampDef {
+  void originX; void originZ; void endX; void endZ; void targetDepth;
+  // TODO: implement
+  return undefined as unknown as RampDef;
+}
+
 // ── Direction offsets ──
 
 const DIR_OFFSETS: Record<RampDirection, { dx: number; dz: number }> = {

@@ -34,7 +34,14 @@ export interface PlacementArmConfig {
   initialSelection?: { x: number; z: number };
 }
 
-export type PlacementConfirmHandler = (sel: PlacementSelection) => void;
+/**
+ * Return value is optional (#1210): a handler may return `false` to signal
+ * refusal (e.g. Confirm at an invalid depth) so the controller can stay in
+ * the `selected` phase instead of advancing to `confirmed`/disarming.
+ * Returning `void`/`true` (or nothing) keeps today's always-succeeds
+ * behavior — no existing caller returns a value yet.
+ */
+export type PlacementConfirmHandler = (sel: PlacementSelection) => boolean | void;
 export type PlacementChangeHandler = () => void;
 
 /** 220ms amber sweep on confirm (design doc §01, state 6) before the tool disarms itself. */
