@@ -56,7 +56,7 @@ import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
  * from opposite ends of the same gap #1090's own dismount-on-completion
  * deletion opened.
  */
-export function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
+function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
   return state.pendingActions.some(a =>
     a.status === 'queued'
     && a.requiredVehicleRole === role
