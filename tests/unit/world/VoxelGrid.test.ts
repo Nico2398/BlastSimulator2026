@@ -655,10 +655,11 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   // slabTouchedCount from that array itself rather than trust whatever the
   // chunk's summary already said. #1181 deleted that dense-restore format
   // (and restoreChunkRaw with it) in favour of regenerate-then-replay-edits;
-  // decodeVoxelGrid's surviving path (addChunkWithRect, then
-  // generateTerrainRegion + replayTerrainEdits) writes every voxel through
-  // fillVoxel/setVoxel, and both unconditionally call touchDensity (#560) on
-  // every write. There is no entry point left that can populate density data
+  // decodeVoxelGrid's surviving path (addChunkWithRect, then lazy
+  // materialization from the attached chunk source + edit record, #1183)
+  // still writes every generated/edited voxel through writeGeneratedVoxel or
+  // fillVoxel/setVoxel, all of which unconditionally call touchDensity (#560)
+  // on every write. There is no entry point left that can populate density data
   // while bypassing touchDensity, so the "stale summary" failure mode this
   // test guarded against is no longer reachable — the invariant is now a
   // structural guarantee of fillVoxel/setVoxel rather than a runtime case to
