@@ -6,7 +6,7 @@
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
-import { isImpassable } from './Pathfinding.js';
+import { isImpassable, directLineWalk } from './Pathfinding.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -527,16 +527,34 @@ function resolveTargetWaypoint(
       && freshTarget.x === committed.fromX && freshTarget.z === committed.fromZ
       && (committed.fromX !== committed.waypointX || committed.fromZ !== committed.waypointZ);
     if (isRetrace) {
-      return {
-        target: { x: destinationX, z: destinationZ },
-        committed: {
-          waypointX: destinationX,
-          waypointZ: destinationZ,
-          destX: destinationX,
-          destZ: destinationZ,
-          remainingCost: freshCost,
-        },
-      };
+      // The destination is only adopted as a raw, unchecked hop when there is
+      // a navGrid to validate it against and the full straight line to it
+      // actually validates (#1197) — otherwise this retrace recovery could
+      // walk the agent diagonally across a blocked/void corner the fresh
+      // replan never actually endorsed. Clearance is deliberately disabled
+      // here (requiredClearance 0, no pocket context) per the issue: this
+      // recovery leaves the clearance mechanism (#1154) untouched, it only
+      // gates solidity. With no navGrid at all there is nothing to validate
+      // against, so this stays the pre-#1197 unconditional adoption — the
+      // #1129 guard this branch exists for depends on it (no-navGrid callers
+      // have no other way to break the oscillation adoptFresh() would cause).
+      const lineIsUnsafe = navGrid !== null
+        && directLineWalk(navGrid, x, z, destinationX, destinationZ, avoidVehicles, 0, null, null) === null;
+      if (!lineIsUnsafe) {
+        return {
+          target: { x: destinationX, z: destinationZ },
+          committed: {
+            waypointX: destinationX,
+            waypointZ: destinationZ,
+            destX: destinationX,
+            destZ: destinationZ,
+            remainingCost: freshCost,
+          },
+        };
+      }
+      // navGrid present but the line crosses a cell that can't be proven
+      // passable — fall through to the ordinary/fresh-replan case rather than
+      // inventing an unchecked hop.
     }
     return adoptFresh();
   }

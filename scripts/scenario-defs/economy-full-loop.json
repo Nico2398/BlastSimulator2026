@@ -241,7 +241,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:10,10 diameter:0.089",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:14,6 diameter:0.089",
       "interaction": [
         {
           "type": "clickSelector",
@@ -257,10 +257,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 10,
-          "z1": 10,
-          "x2": 14,
-          "z2": 14
+          "x1": 14,
+          "z1": 6,
+          "x2": 18,
+          "z2": 10
         },
         {
           "type": "screenshot"
@@ -277,7 +277,7 @@
           "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
+      "description": "#1197/#1231: start relocated 10,10 -> 14,6 (dragTiles rectangle moved the same 4,-4 offset, 10,10-14,14 -> 14,6-18,10) -- issue #1197's diagonal corner-cutting rule (isDiagonalCornerClear, Pathfinding.ts) closes an illegal diagonal hop past a blocked/void corner that the old solver silently allowed, and the original (10,10) grid's own blast crater left its debris in a NavGrid region that only that illegal hop ever made reachable: direct-traced (a standalone repro harness driving createRunner/runCommand through this exact command sequence, then NavGrid.computeClimbReachableSet from the debris_hauler/rock_fragmenter drivers' own real post-blast positions) shows every one of the ~217 pending haul_debris/fragment_debris targets sitting in a climb-disconnected pocket from where the crew ends up standing -- confirmed permanent, not slow, by running 2000+ extra ticks with zero storedMassKg movement. Issue #1231 tracks the general defect (a blast can leave its own debris in a pocket no ground crew can ever legally reach) -- out of scope for this file, which only needs a blast whose debris a crew can actually haul. (14,6) was chosen by testing several start positions with the same repro harness: post-blast, its debris is in the SAME large connected component as the freight_warehouse (reach size 3043 vs the old site's 1508, direct-traced), and a full run of this file's own hire/build/haul sequence against the new site reaches storedMassKg > 0 by tick 106 and grows past 1500kg by tick ~465 -- comfortably over the 330kg this file's own rubble_disposal contract needs. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
     },
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",

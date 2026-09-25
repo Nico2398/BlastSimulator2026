@@ -242,6 +242,40 @@ describe('VoxelFragmentation — unsupported rock', () => {
     expect(isFragmented(result, field, 2, 3, 3)).toBe(true);
     expect(result.detachedCount).toBeGreaterThan(0);
   });
+
+  it('a lone floating voxel above a padded, unreachable maxY face still reads as unsupported', () => {
+    // Thin slab covering the whole footprint at y=0..1, plus a genuinely
+    // isolated floating voxel far above it and unconnected to anything. The
+    // box's maxY is padded well past the real rock (#1186 unclamped
+    // blast-zone padding), so the maxY face row is empty in every column —
+    // collectUnsupported anchors the slab through the literal minY row and
+    // the X/Z side walls' lateral flood-fill instead (a per-column nearest-
+    // solid fallback at the empty maxY face was tried and reverted: it
+    // couldn't tell a slab's crust from a genuinely disconnected multi-voxel
+    // island sitting mid-crater, both of which have a face-adjacent solid
+    // neighbour of their own — see this file's collectUnsupported comment).
+    // The floating voxel here, with no neighbour at all, was never at risk
+    // from that — this test just pins that removing the fallback didn't
+    // regress the isolated-voxel case either.
+    const grid = new VoxelGrid(7, 20, 7);
+    for (let z = 0; z < 7; z++) {
+      for (let x = 0; x < 7; x++) {
+        grid.setVoxel(x, 0, z, rockVoxel('cruite'));
+        grid.setVoxel(x, 1, z, rockVoxel('cruite'));
+      }
+    }
+    grid.setVoxel(3, 8, 3, rockVoxel('cruite'));
+
+    const box: BlastBox = { minX: 0, minY: 0, minZ: 0, maxX: 7, maxY: 12, maxZ: 7 };
+    const field = createEnergyField(grid, box);
+    const result = identifyFragmentedVoxels(field, grid);
+
+    expect(isFragmented(result, field, 3, 8, 3)).toBe(true);
+    expect(result.detachedCount).toBe(1);
+    // The slab itself is genuinely anchored — via the literal minY row and
+    // lateral flood-fill through the X/Z side walls — and must stay put.
+    expect(isFragmented(result, field, 0, 0, 0)).toBe(false);
+  });
 });
 
 // ── Post-carve renormalisation (#1148) ──────────────────────────────────────

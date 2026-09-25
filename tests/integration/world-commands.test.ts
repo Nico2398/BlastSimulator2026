@@ -13,6 +13,22 @@ import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { computeVoxelColumnSurfaceY, computeColumnRangeY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+
+/**
+ * Dig a pit at column (x, z) down from its current surface through
+ * `floorY` inclusive, leaving air throughout that band and untouched
+ * (natural, still-solid) rock at `floorY - 1` and below (#1187). Mirrors
+ * how a real dig/blast leaves a below-0 pit floor for the unbounded-column
+ * readers under test here to report.
+ */
+function digPitBelowZero(grid: VoxelGrid, x: number, z: number, floorY: number): void {
+  const surface = computeVoxelColumnSurfaceY(grid, x, z);
+  const top = surface ?? 0;
+  for (let y = top; y >= floorY; y--) {
+    grid.clearVoxel(x, y, z);
+  }
+}
 
 describe('Console — world commands', () => {
   let ctx: GameContext;
@@ -151,18 +167,42 @@ describe('Console — world commands', () => {
       expect(result.output).toContain('Air');
     });
 
-    it('rejects a coordinate the site does not own, naming the span it does', () => {
+    it('rejects a coordinate the site does not own, naming the span it does — with no height/sizeY mention (#1187)', () => {
       const result = inspectCommand(ctx, ['100,5,3'], {});
       expect(result.success).toBe(false);
       expect(result.output).toContain('Off site');
       // The span, not a size: the site starts wherever play has taken it (#473).
-      expect(result.output).toContain('(0,0) to (31,31)');
+      // #1187: the off-site refusal is a pure column-span message now — no
+      // height/sizeY clause, since a column has no vertical bound any more.
+      expect(result.output).toContain('(0,0) to (31,31).');
+      expect(result.output.toLowerCase()).not.toContain('height');
     });
 
     it('errors with no game loaded', () => {
       const emptyCtx = makeEmptyGameContext();
       const result = inspectCommand(emptyCtx, ['10,5,3'], {});
       expect(result.success).toBe(false);
+    });
+
+    it('reports air below 0 inside a pit dug there (#1187)', () => {
+      digPitBelowZero(ctx.grid!, 15, 15, -5);
+      const result = inspectCommand(ctx, ['15,-5,15'], {});
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('Air');
+    });
+
+    it('reports rock below a pit\'s dug floor, on the untouched natural ground beneath it (#1187)', () => {
+      digPitBelowZero(ctx.grid!, 15, 15, -5);
+      const result = inspectCommand(ctx, ['15,-6,15'], {});
+      expect(result.success).toBe(true);
+      expect(result.output).not.toContain('Air');
+    });
+
+    it('reports air, not a refusal, for a y far above the old sizeY-bounded top on an owned column (#1187)', () => {
+      const result = inspectCommand(ctx, ['15,1000,15'], {});
+      expect(result.success).toBe(true);
+      expect(result.output).not.toContain('Off site');
+      expect(result.output).toContain('Air');
     });
   });
 
@@ -185,6 +225,25 @@ describe('Console — world commands', () => {
       expect(result.output).toContain('Off site');
       expect(result.output).toContain('(0,0) to (31,31)');
     });
+
+    it('reports the real negative surface for a column dug entirely below 0 (#1187)', () => {
+      // Clear the whole column from its natural surface down through -5,
+      // leaving nothing solid at y >= -5 — the only ground left is the
+      // untouched natural rock beneath the dug floor.
+      digPitBelowZero(ctx.grid!, 15, 15, -5);
+      // Oracle: the exact value `computeVoxelColumnSurfaceY` (which the
+      // implementation is expected to delegate to) resolves for this column
+      // now, rather than a hardcoded number that would drift with terrain
+      // generation details.
+      const expectedSurfaceY = computeVoxelColumnSurfaceY(ctx.grid!, 15, 15);
+      expect(expectedSurfaceY).not.toBeNull();
+      expect(expectedSurfaceY!).toBeLessThan(0);
+
+      const result = surveyCommand(ctx, ['15,15'], {});
+      expect(result.success).toBe(true);
+      expect(result.output).not.toContain('No solid ground');
+      expect(result.output).toContain(`depth ${expectedSurfaceY}`);
+    });
   });
 
   describe('terrain_info', () => {
@@ -194,6 +253,28 @@ describe('Console — world commands', () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain('32x32x32');
       expect(result.output).toContain('mountain');
+    });
+
+    it('reports a Vertical extent line whose minY reflects ground dug below 0 (#1187)', () => {
+      ctx = makeGameContext({ mineType: 'mountain', seed: '99', size: '32' });
+      digPitBelowZero(ctx.grid!, 10, 10, -5);
+
+      // Oracle: the exact range `computeColumnRangeY` (which the
+      // implementation is expected to delegate to) resolves for the site's
+      // full column span, rather than a hardcoded number that would drift
+      // with terrain generation details.
+      const grid = ctx.grid!;
+      const expectedRange = computeColumnRangeY(grid, grid.minX, grid.maxX - 1, grid.minZ, grid.maxZ - 1);
+      expect(expectedRange).not.toBeNull();
+      expect(expectedRange!.minY).toBeLessThan(0);
+
+      const result = terrainInfoCommand(ctx, [], {});
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('Vertical extent:');
+      const match = result.output.match(/Vertical extent:\s*(-?\d+)\s+to\s+(-?\d+)/);
+      expect(match, `expected a "Vertical extent: minY to maxY" line in:\n${result.output}`).not.toBeNull();
+      expect(Number(match![1])).toBe(expectedRange!.minY);
+      expect(Number(match![2])).toBe(expectedRange!.maxY);
     });
   });
 

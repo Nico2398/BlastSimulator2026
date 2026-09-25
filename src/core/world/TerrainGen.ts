@@ -36,6 +36,27 @@ export const TERRAIN_GENERATOR_VERSION = 1;
  */
 export const MAX_TERRAIN_GEN_DIMENSION = 4096;
 
+/**
+ * A `sizeX`/`sizeY`/`sizeZ` read from untrusted save JSON must describe a
+ * grid the rest of generation can actually build: an unvalidated, enormous
+ * value (e.g. `1e9`) turns a downstream `yLo..yHi` replay loop unbounded, or
+ * crashes `VoxelGrid`'s `allocateChunk` with a raw `RangeError: Invalid
+ * typed array length` before any check runs at all (#1181 review, both
+ * reproduced live). Shared by every caller that decodes a size field off a
+ * save — `VoxelGridCodec.decodeVoxelGrid`'s embedded generator identity and
+ * `world.ts`'s no-voxels regenerate fallback (#1218) — so the formula and the
+ * message live in one place rather than two independently-written copies.
+ * Rejects outright rather than clamping: silently shrinking a save's
+ * declared world size would regenerate a different terrain than the one
+ * that was actually saved.
+ */
+export function requireValidGenDimension(value: number, label: string): number {
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0 || value > MAX_TERRAIN_GEN_DIMENSION) {
+    throw new Error(`corrupt save: ${label} (${value}) is not a valid terrain dimension`);
+  }
+  return value;
+}
+
 export interface TerrainConfig {
   sizeX: number;
   sizeY: number;

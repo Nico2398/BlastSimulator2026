@@ -122,7 +122,7 @@ describe('inspectCommand — usage guard', () => {
 // ── inspectCommand — off-site guard ──────────────────────────────────────
 
 describe('inspectCommand — off-site guard', () => {
-  const OFF_SITE_EN = 'Off site: (100,5,3). The site spans (0,0) to (31,31), height 32.';
+  const OFF_SITE_EN = 'Off site: (100,5,3). The site spans (0,0) to (31,31).';
 
   it('matches the exact English literal by default', () => {
     const ctx = makeCtx();

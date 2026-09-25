@@ -5,7 +5,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  RAMP_WIDTH, validateRampOrder, defineRampSegments,
+  RAMP_WIDTH, validateRampOrder, defineRampSegments, rampDefFromEndpoints,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import type { PlannedRamp } from '../../../core/state/GameState.js';
@@ -37,35 +37,27 @@ export function buildRampCommand(
     return cancelRampCommand(ctx, rampId);
   }
 
-  let originX: number;
-  let originZ: number;
-  let direction: RampDirection;
-  let length: number;
+  let rampDef: RampDef;
   const depth = parseInt(named['depth'] ?? '8', 10);
 
   if (named['start'] && named['end']) {
     const start = named['start'].split(',').map(Number);
     const end = named['end'].split(',').map(Number);
-    originX = start[0] ?? 0;
-    originZ = start[1] ?? 0;
-    const dx = (end[0] ?? 0) - originX;
-    const dz = (end[1] ?? 0) - originZ;
-    if (Math.abs(dz) >= Math.abs(dx)) {
-      direction = dz >= 0 ? 'south' : 'north';
-      length = Math.abs(Math.round(dz));
-    } else {
-      direction = dx >= 0 ? 'east' : 'west';
-      length = Math.abs(Math.round(dx));
-    }
+    const originX = start[0] ?? 0;
+    const originZ = start[1] ?? 0;
+    const endX = end[0] ?? 0;
+    const endZ = end[1] ?? 0;
+    rampDef = rampDefFromEndpoints(originX, originZ, endX, endZ, depth);
   } else {
     const origin = (named['origin'] ?? '0,0').split(',').map(Number);
-    originX = origin[0] ?? 0;
-    originZ = origin[1] ?? 0;
-    direction = (named['direction'] ?? 'south') as RampDirection;
-    length = parseInt(named['length'] ?? '10', 10);
+    const originX = origin[0] ?? 0;
+    const originZ = origin[1] ?? 0;
+    const direction = (named['direction'] ?? 'south') as RampDirection;
+    const length = parseInt(named['length'] ?? '10', 10);
+    rampDef = { originX, originZ, direction, length, targetDepth: depth };
   }
 
-  const rampDef: RampDef = { originX, originZ, direction, length, targetDepth: depth };
+  const { originX, originZ, direction, length } = rampDef;
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
   // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole

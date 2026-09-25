@@ -724,26 +724,29 @@ describe('Survey system — seismic building side effects', () => {
 
   it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
     hireSurveyor();
-    // Building at (14,15), survey center at (19,14) → footprint-centre
-    // Euclidean distance ≈ 4.30 (within 5). #1008 moved this off the
+    // Building at (14,15), survey center at (14,12) → footprint-centre
+    // Euclidean distance ≈ 4.74 (within 5). #1008 moved the building off the
     // original (21,15) — not flat on this seed's terrain once
-    // checkFootprintPlacement enforces it — to the nearest flat 3x3 bench
-    // that keeps the same within-radius relationship. Both sit inside the
-    // stretch of NavGrid the surveyor's spawn area is on the same bench
-    // level as (#458 T6.1/D14): bigger levels carry far more natural
-    // terrain relief than the old ones, and a route crossing onto a
-    // different bench mid-walk can hit a pathfinding instability where two
-    // near-equal routes flip from tick to tick and the surveyor never
-    // arrives — confirmed via direct reproduction at the original
-    // (20,20)/(22,20) coordinates. A deeper general fix belongs to T6.2
-    // (pathfinding at scale); this sidesteps it for the test.
+    // checkFootprintPlacement enforces it — to this flat 3x3 bench, which
+    // sits right in the middle of this seed's one steep ramp band (#458
+    // T6.1/D14: bigger levels carry far more natural terrain relief than the
+    // old ones). #1197 moved the survey centre off that band's far side,
+    // (19,14): after the building completes, its own footprint corner
+    // (16,15 here) sits on the only diagonal step leaving the surveyor's
+    // resting cell, and #1197 correctly refuses to let that diagonal cut
+    // across it — with no orthogonal detour on this single-file ramp
+    // staircase, (19,14) becomes provably unreachable rather than merely
+    // slower. (14,12) sits on the *same* staircase the surveyor is already
+    // standing on (confirmed reachable by direct BFS over the post-build
+    // NavGrid), so the walk stays inside the one corridor #1197 leaves open,
+    // while still landing within the 5-cell damage radius this test proves.
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '14,15' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
-    surveyCommand(ctx as any, ['seismic'], { x: '19', z: '14' });
+    surveyCommand(ctx as any, ['seismic'], { x: '14', z: '12' });
     resolveTick(60);
 
     expect(findBuilding(building.id).hp).toBe(hpBefore - 10);

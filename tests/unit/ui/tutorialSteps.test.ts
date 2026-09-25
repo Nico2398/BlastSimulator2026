@@ -945,3 +945,113 @@ describe('tutorialSteps', () => {
     });
   });
 });
+
+// ── #1210: box-cut step completion is order/id based, not NavGrid-based ────
+//
+// The box-cut step used to complete once a NavCell classified 'ramp'
+// appeared in state.navGrid — but navGrid classification depends on the
+// carve actually reaching walkable ground, which the earlier UI/core
+// disagreement on derived ramp length (#1210's root cause) could silently
+// prevent even after a ramp order was accepted. Completion now tracks the
+// order itself: captureSnapshot remembers `state.nextPlannedRampId` before
+// the order, and isComplete watches for a ramp whose id is at/after that
+// snapshot to disappear from `state.plannedRamps` — which happens exactly
+// once its excavation finishes (TaskCompletionEffects.ts splices a
+// PlannedRamp out once its last segment lands) or the order is cancelled.
+// A ramp order that fails validation never increments nextPlannedRampId at
+// all, so the "unchanged from the snapshot" branch alone keeps a failed
+// order from ever reading complete.
+
+describe('box-cut step (#1210) — completion tracks nextPlannedRampId/plannedRamps, not NavGrid', () => {
+  const boxCutStep = TUTORIAL_STEPS.find((s) => s.id === 'box-cut')!;
+
+  function stateWith(fields: Partial<GameState>): GameState {
+    return fields as unknown as GameState;
+  }
+
+  it('the step exists and carries a captureSnapshot', () => {
+    expect(boxCutStep).toBeDefined();
+    expect(boxCutStep.captureSnapshot).toBeDefined();
+  });
+
+  it('captureSnapshot returns { prevNextRampId: state.nextPlannedRampId ?? 1 }', () => {
+    expect(boxCutStep.captureSnapshot!(stateWith({ nextPlannedRampId: 5 }))).toEqual({ prevNextRampId: 5 });
+    expect(boxCutStep.captureSnapshot!(stateWith({ nextPlannedRampId: 1 }))).toEqual({ prevNextRampId: 1 });
+  });
+
+  it('captureSnapshot defaults prevNextRampId to 1 when nextPlannedRampId is undefined', () => {
+    expect(boxCutStep.captureSnapshot!(stateWith({}))).toEqual({ prevNextRampId: 1 });
+  });
+
+  it('isComplete is false when nextPlannedRampId is unchanged from the snapshot (no order accepted yet)', () => {
+    const before = stateWith({ nextPlannedRampId: 1, plannedRamps: [] });
+    const snap = boxCutStep.captureSnapshot!(before);
+    const after = stateWith({ nextPlannedRampId: 1, plannedRamps: [] });
+    expect(boxCutStep.isComplete(after, snap)).toBe(false);
+  });
+
+  it('isComplete stays false when nextPlannedRampId is unchanged even if plannedRamps is non-empty (an unrelated, earlier ramp still in flight)', () => {
+    const before = stateWith({ nextPlannedRampId: 3, plannedRamps: [] });
+    const snap = boxCutStep.captureSnapshot!(before);
+    const after = stateWith({
+      nextPlannedRampId: 3,
+      plannedRamps: [{ id: 1 } as unknown as GameState['plannedRamps'][number]],
+    });
+    expect(boxCutStep.isComplete(after, snap)).toBe(false);
+  });
+
+  // Depths 1-6 all validate for the box-cut's fixed 12-tile line
+  // (computeMinimumRampLength(1..6) <= 12 < computeMinimumRampLength(7)) —
+  // this loop is "any successfully-ordered ramp id progression", independent
+  // of which of those depths the player actually confirmed.
+  for (const depth of [1, 2, 3, 4, 5, 6]) {
+    it(`depth ${depth}: isComplete is false while the newly-ordered ramp (id >= prev) is still present in plannedRamps`, () => {
+      const before = stateWith({ nextPlannedRampId: 1, plannedRamps: [] });
+      const snap = boxCutStep.captureSnapshot!(before);
+      const after = stateWith({
+        nextPlannedRampId: 2,
+        plannedRamps: [{ id: 1, def: { targetDepth: depth } } as unknown as GameState['plannedRamps'][number]],
+      });
+      expect(boxCutStep.isComplete(after, snap)).toBe(false);
+    });
+
+    it(`depth ${depth}: isComplete is true once the newly-ordered ramp (id >= prev) is no longer present in plannedRamps (excavation finished or the order was cancelled)`, () => {
+      const before = stateWith({ nextPlannedRampId: 1, plannedRamps: [] });
+      const snap = boxCutStep.captureSnapshot!(before);
+      const after = stateWith({ nextPlannedRampId: 2, plannedRamps: [] });
+      expect(boxCutStep.isComplete(after, snap)).toBe(true);
+    });
+  }
+
+  it('a stale ramp with id below prev (an older, unrelated order) does not block completion', () => {
+    const before = stateWith({ nextPlannedRampId: 3, plannedRamps: [] });
+    const snap = boxCutStep.captureSnapshot!(before);
+    const after = stateWith({
+      nextPlannedRampId: 4,
+      // id 2 < prev (3): an earlier ramp from before this step opened, still
+      // mid-excavation — must not hold this step open.
+      plannedRamps: [{ id: 2 } as unknown as GameState['plannedRamps'][number]],
+    });
+    expect(boxCutStep.isComplete(after, snap)).toBe(true);
+  });
+
+  it('does not depend on NavGrid/NavCell classification at all: a populated navGrid with a ramp-classified cell does not, by itself, complete the step', () => {
+    const before = stateWith({ nextPlannedRampId: 1, plannedRamps: [] });
+    const snap = boxCutStep.captureSnapshot!(before);
+    // nextPlannedRampId unchanged -- no order was ever accepted -- yet the
+    // (old, pre-#1210) NavGrid-based check would have read this as complete:
+    // a navGrid populated with a single 'ramp'-classified cell.
+    const after = stateWith({
+      nextPlannedRampId: 1,
+      plannedRamps: [],
+      navGrid: { cells: [[{ type: 'ramp' }]] } as unknown as GameState['navGrid'],
+    });
+    expect(boxCutStep.isComplete(after, snap)).toBe(false);
+  });
+
+  it('isComplete\'s own source no longer references NavGrid/countNavCellsByType', () => {
+    const src = boxCutStep.isComplete.toString();
+    expect(src).not.toMatch(/navGrid/i);
+    expect(src).not.toContain('countNavCellsByType');
+  });
+});
