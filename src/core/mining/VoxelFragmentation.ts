@@ -188,22 +188,50 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
       seed(box.maxX - 1, y, z);
     }
   }
-  // The two Y faces anchor the nearest solid, unbroken voxel to that face in
-  // each column, not literally the edge row: BLAST_ZONE_RADIUS pads the box a
-  // little past the deepest hole, and once that padding reaches past where a
-  // fixture's (or a finite backfill's) rock actually ends, seeding right at
-  // box.minY/box.maxY-1 lands on open air. With no vertical clamp any more
-  // (#1186), that is no longer the rare case it was when minY was floored at
-  // the world's y=0 — the column's real bottom layer then gets no anchor at
-  // all and reads as unsupported, over-fragmenting a pit that never reached
-  // that deep.
+  // The two Y faces anchor the box's literal edge row, same as the X/Z faces
+  // — *unless* that whole row is padding past where the real rock ends. Real
+  // rock reaching the row means at least one column has a solid, unbroken
+  // voxel right at box.minY/box.maxY-1: trust that row across every column,
+  // same as before #1186. Only when the row is air everywhere (no column's
+  // rock actually reaches it) do we fall back, per column, to the nearest
+  // solid, unbroken voxel to that face — BLAST_ZONE_RADIUS pads the box a
+  // little past the deepest hole, and with no vertical clamp any more
+  // (#1186) that padding can now land past where a fixture's (or a finite
+  // backfill's) rock actually ends.
+  //
+  // Falling back only when the *entire* row is empty (rather than per
+  // column, unconditionally) is what keeps this from mistaking a genuinely
+  // floating or detached fragment for an anchor: a lone unsupported voxel
+  // sitting by itself in its column is never the reason the whole face reads
+  // as empty — the rows that motivate the fallback are padding past a real,
+  // multi-column slab, not a single isolated speck — so as soon as any
+  // column touches the row for real, every column in that row is read at
+  // face value and the isolated speck gets no anchor at all.
+  const rowHasSolid = (y: number): boolean => {
+    for (let z = box.minZ; z < box.maxZ; z++) {
+      for (let x = box.minX; x < box.maxX; x++) {
+        if (isSolidSurvivor(x, y, z)) return true;
+      }
+    }
+    return false;
+  };
+  const minYRowGrounded = rowHasSolid(box.minY);
+  const maxYRowGrounded = rowHasSolid(box.maxY - 1);
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      for (let y = box.minY; y < box.maxY; y++) {
-        if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+      if (minYRowGrounded) {
+        seed(x, box.minY, z);
+      } else {
+        for (let y = box.minY; y < box.maxY; y++) {
+          if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+        }
       }
-      for (let y = box.maxY - 1; y >= box.minY; y--) {
-        if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+      if (maxYRowGrounded) {
+        seed(x, box.maxY - 1, z);
+      } else {
+        for (let y = box.maxY - 1; y >= box.minY; y--) {
+          if (isSolidSurvivor(x, y, z)) { seed(x, y, z); break; }
+        }
       }
     }
   }
