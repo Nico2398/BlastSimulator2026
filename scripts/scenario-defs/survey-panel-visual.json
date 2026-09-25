@@ -64,6 +64,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 40,
+          "z": 10
+        },
+        {
           "type": "pickTile",
           "x": 40,
           "z": 10

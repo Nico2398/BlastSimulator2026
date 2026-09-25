@@ -59,6 +59,11 @@
           "value": 40
         },
         {
+          "type": "focusTile",
+          "x": 63,
+          "z": 63
+        },
+        {
           "type": "dragTiles",
           "x1": 63,
           "z1": 63,
