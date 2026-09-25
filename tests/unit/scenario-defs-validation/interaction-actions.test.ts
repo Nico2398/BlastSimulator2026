@@ -177,6 +177,16 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(typeof a.distance).toBe('number');
     expect(a.distance).toBeGreaterThan(0);
   }),
+  defineActionCheck('pickTile', 'pickTile actions have numeric x and z', (a) => {
+    expect(typeof a.x).toBe('number');
+    expect(typeof a.z).toBe('number');
+  }),
+  defineActionCheck('dragTiles', 'dragTiles actions have numeric x1, z1, x2, z2', (a) => {
+    expect(typeof a.x1).toBe('number');
+    expect(typeof a.z1).toBe('number');
+    expect(typeof a.x2).toBe('number');
+    expect(typeof a.z2).toBe('number');
+  }),
 ];
 
 describe('Dual-play scenario steps — data-driven validation', () => {
