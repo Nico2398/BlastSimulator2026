@@ -865,16 +865,26 @@ window.__worldToScreen = (x, z) => {
     if (!pick.terrain) return null; // entity occlusion or a miss — honestly a miss, never silently ignored
     return { x: pick.terrain.point.x, y: pick.terrain.point.y, z: pick.terrain.point.z };
   };
+  // onScreen is independent of tileConfirmed: it asks only whether the tile
+  // centre's own projection lands in front of the camera — the same z < 1
+  // behind-camera check the pre-#1227 code used for its own onScreen —
+  // computed here, before resolveScreenPointForTile's convergence loop ever
+  // runs. Without this, an on-screen tile that fails to resolve (entity
+  // occlusion, terraced ground) was misreported as off-screen, since both
+  // fields were set from the same success/failure branch — defeating the two
+  // distinct throws scripts/shared/tile-picker.ts's worldToScreenPoint relies
+  // on to tell "frame it with a camera move" apart from "occluded/mismatched".
+  const onScreen = project(cx, startY, cz).z < 1;
   const result: ScreenTileResolution = resolveScreenPointForTile(project, raycastForTile, x, z, startY);
   if (!result.resolved) {
-    return { px: 0, py: 0, onScreen: false, tileConfirmed: false };
+    return { px: 0, py: 0, onScreen, tileConfirmed: false };
   }
   const ndc = result.ndc;
   const rect = canvas.getBoundingClientRect();
   return {
     px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
     py: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height,
-    onScreen: ndc.z < 1,
+    onScreen,
     tileConfirmed: true,
   };
 };

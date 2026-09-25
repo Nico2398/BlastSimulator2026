@@ -23,7 +23,7 @@ describe('resolveScreenPointForTile', () => {
     const targetZ = 4;
     const startY = 2;
 
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
     const raycastForTile: RaycastForTile = () => ({ x: 3.5, y: 2, z: 4.5 });
 
     const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY);
@@ -58,8 +58,8 @@ describe('resolveScreenPointForTile', () => {
     const targetZ = 7;
     const startY = 0;
 
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
-    const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
       if (ndcY === 0) {
         // Off-tile hit, small raw distance to centre (0.6).
         return { x: 6.9, y: 1, z: 7.5 };
@@ -99,8 +99,8 @@ describe('resolveScreenPointForTile', () => {
     const startY = 3;
 
     let calls = 0;
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
-    const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
       calls++;
       // Always hits an adjacent tile, never the target — including a hit
       // whose raw distance to the target tile's centre is arbitrarily small,
@@ -122,7 +122,7 @@ describe('resolveScreenPointForTile', () => {
     const startY = 5;
 
     let calls = 0;
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
     const raycastForTile: RaycastForTile = () => {
       calls++;
       return null;
@@ -143,7 +143,7 @@ describe('resolveScreenPointForTile', () => {
     const targetZ = 10;
     const startY = 5;
 
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
     const raycastForTile: RaycastForTile = () => ({ x: 10.0, y: 5, z: 10.0 });
 
     const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY);
@@ -162,7 +162,7 @@ describe('resolveScreenPointForTile', () => {
     const startY = 5;
 
     let calls = 0;
-    const project: ProjectToNDC = (x, y, z) => ({ x, y, z: 0 });
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
     const raycastForTile: RaycastForTile = () => {
       calls++;
       return { x: 11.0, y: 5, z: 10.5 };
