@@ -6,6 +6,7 @@ import {
   buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
+  rampDefFromEndpoints,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
@@ -1226,13 +1227,22 @@ describe('validateRampOrder (#555)', () => {
     expect(result.cost).toBe(BASE_RAMP.length * RAMP_COST_PER_METER);
   });
 
-  it('rejects insufficient funds with the same message convention buildRamp uses today', () => {
+  it('rejects insufficient funds with the same message convention buildRamp uses today, carrying console.insufficient_funds + need/have params (#1210)', () => {
     const totalCost = BASE_RAMP.length * RAMP_COST_PER_METER;
     const cash = 50;
     const result = validateRampOrder(BASE_RAMP, cash);
     expect(result.success).toBe(false);
     expect(result.message).toBe(`Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`);
     expect(result.cost).toBe(0);
+    // #1210: the console layer resolves this failure through the shared
+    // console.insufficient_funds i18n key (entities.ts/vehicle.ts/mafia.ts/
+    // corruption.ts/employees.ts all already do), rather than surfacing
+    // core's own plain-English message directly.
+    expect(result.messageKey).toBe('console.insufficient_funds');
+    expect(result.messageParams).toEqual({
+      need: formatMoney(totalCost),
+      have: formatMoney(cash),
+    });
   });
 
   it('rejects a non-positive length with a finite-positive message', () => {
@@ -1354,6 +1364,129 @@ describe('computeMinimumRampLength (#1152)', () => {
   it('handles a large depth without overflow or precision loss', () => {
     const targetDepth = 5000;
     expect(computeMinimumRampLength(targetDepth)).toBeCloseTo(targetDepth / RAMP_CUT_SLOPE_RATIO, 6);
+  });
+});
+
+// ── #1210: rampDefFromEndpoints — deriving a RampDef from two drag/console
+// endpoints. Dominant axis: abs(dz) >= abs(dx) -> north/south, else
+// east/west (tie goes to north/south). length = abs(round(delta)) along the
+// dominant axis, no +1 — the exact math buildRampCommand's --start/--end
+// branch (src/console/commands/mining/ramp.ts) inlines today, so the two
+// must agree on direction/length for identical inputs.
+
+describe('rampDefFromEndpoints (#1210)', () => {
+  it('south: end is further +z than origin, |dz| > |dx|', () => {
+    const def = rampDefFromEndpoints(10, 10, 12, 20, 6);
+    expect(def.direction).toBe('south');
+    expect(def.length).toBe(10);
+    expect(def.originX).toBe(10);
+    expect(def.originZ).toBe(10);
+    expect(def.targetDepth).toBe(6);
+  });
+
+  it('north: end is further -z than origin, |dz| > |dx|', () => {
+    const def = rampDefFromEndpoints(10, 20, 11, 5, 6);
+    expect(def.direction).toBe('north');
+    expect(def.length).toBe(15);
+  });
+
+  it('east: end is further +x than origin, |dx| > |dz|', () => {
+    const def = rampDefFromEndpoints(5, 5, 20, 6, 6);
+    expect(def.direction).toBe('east');
+    expect(def.length).toBe(15);
+  });
+
+  it('west: end is further -x than origin, |dx| > |dz|', () => {
+    const def = rampDefFromEndpoints(20, 5, 5, 6, 6);
+    expect(def.direction).toBe('west');
+    expect(def.length).toBe(15);
+  });
+
+  it('tie boundary (|dx| === |dz|) resolves to the north/south axis per >=, south when dz >= 0', () => {
+    const def = rampDefFromEndpoints(10, 10, 18, 18, 6);
+    expect(def.direction).toBe('south');
+    expect(def.length).toBe(8);
+  });
+
+  it('tie boundary (|dx| === |dz|) resolves to north when dz < 0', () => {
+    const def = rampDefFromEndpoints(10, 10, 18, 2, 6);
+    expect(def.direction).toBe('north');
+    expect(def.length).toBe(8);
+  });
+
+  it('tie boundary at dx === dz === 0 (degenerate same-point case) resolves to south, length 0', () => {
+    const def = rampDefFromEndpoints(10, 10, 10, 10, 6);
+    expect(def.direction).toBe('south');
+    expect(def.length).toBe(0);
+  });
+
+  it('length rounds a fractional delta rather than truncating it', () => {
+    // dz = 10.6 -> round(10.6) = 11, matching buildRampCommand's own
+    // Math.abs(Math.round(dz)) — a console --start/--end endpoint can carry
+    // a fractional coordinate the same way a UI drag's tile pick cannot, so
+    // this exercises a path the box-cut fixture below never hits.
+    const def = rampDefFromEndpoints(0, 0, 0, 10.6, 6);
+    expect(def.direction).toBe('south');
+    expect(def.length).toBe(11);
+  });
+
+  it('matches buildRampCommand\'s own inlined --start/--end math for the same endpoints (direction + length), across all 4 directions and the tie', () => {
+    const cases: { originX: number; originZ: number; endX: number; endZ: number }[] = [
+      { originX: 10, originZ: 10, endX: 12, endZ: 20 }, // south
+      { originX: 10, originZ: 20, endX: 11, endZ: 5 }, // north
+      { originX: 5, originZ: 5, endX: 20, endZ: 6 }, // east
+      { originX: 20, originZ: 5, endX: 5, endZ: 6 }, // west
+      { originX: 10, originZ: 10, endX: 18, endZ: 18 }, // tie
+    ];
+    for (const { originX, originZ, endX, endZ } of cases) {
+      const dx = endX - originX;
+      const dz = endZ - originZ;
+      let expectedDirection: RampDirection;
+      let expectedLength: number;
+      if (Math.abs(dz) >= Math.abs(dx)) {
+        expectedDirection = dz >= 0 ? 'south' : 'north';
+        expectedLength = Math.abs(Math.round(dz));
+      } else {
+        expectedDirection = dx >= 0 ? 'east' : 'west';
+        expectedLength = Math.abs(Math.round(dx));
+      }
+      const def = rampDefFromEndpoints(originX, originZ, endX, endZ, 6);
+      expect(def.direction).toBe(expectedDirection);
+      expect(def.length).toBe(expectedLength);
+    }
+  });
+
+  // ── Cross-check against the box-cut tutorial fixture (#1210): the
+  // 12-tile north/south line from (16,19) to (16,31) — REGION.boxcut /
+  // tutorialSteps.ts's box-cut step both use this exact line. depth 6
+  // (computeMinimumRampLength(6) ~= 10.6, under the 12-tile length) must
+  // validate; depth 7 (~= 12.37, over 12) must not — regression coverage so
+  // the tutorial's fixed line can never silently become too short for its
+  // own scripted depth again.
+
+  describe('box-cut line (16,19) -> (16,31): depth 6 passes, depth 7 fails', () => {
+    it('derives a 12-tile south ramp from the box-cut endpoints', () => {
+      const def = rampDefFromEndpoints(16, 19, 16, 31, 6);
+      expect(def.direction).toBe('south');
+      expect(def.length).toBe(12);
+      expect(def.originX).toBe(16);
+      expect(def.originZ).toBe(19);
+    });
+
+    it('depth 6 validates successfully (length 12 >= computeMinimumRampLength(6))', () => {
+      const def = rampDefFromEndpoints(16, 19, 16, 31, 6);
+      expect(computeMinimumRampLength(6)).toBeLessThanOrEqual(12);
+      const result = validateRampOrder(def, Infinity);
+      expect(result.success).toBe(true);
+    });
+
+    it('depth 7 fails validation (length 12 < computeMinimumRampLength(7))', () => {
+      const def = rampDefFromEndpoints(16, 19, 16, 31, 7);
+      expect(computeMinimumRampLength(7)).toBeGreaterThan(12);
+      const result = validateRampOrder(def, Infinity);
+      expect(result.success).toBe(false);
+      expect(result.messageKey).toBe('mining.build_ramp.slope_too_steep');
+    });
   });
 });
 

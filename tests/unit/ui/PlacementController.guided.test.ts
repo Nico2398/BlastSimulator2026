@@ -366,3 +366,112 @@ describe('live area', () => {
     expect(regionSpan({ x1: 4, z1: 4, x2: 4, z2: 4 })).toBe(1);
   });
 });
+
+// ── #1210: a drag that ends off the canvas ──────────────────────────────────
+//
+// A real drag frequently ends with the pointer released past the canvas's
+// own edge — off the visible scene entirely, or over another DOM element
+// (a panel, the tutorial card). The browser still fires `mouseup`, just
+// never on the canvas itself. PlacementController's constructor only ever
+// registers `mouseup` on `canvas`, so a release outside it never reaches
+// `onMouseUp` at all: `phase` stays 'dragging' forever, and since no further
+// `mousemove` ever arrives once the button is up, nothing else can end it
+// either — the box-cut ramp tool's own line drag is exactly this shape
+// (start on the corridor, drag past its far edge, release beyond the canvas
+// while orbiting/resizing).
+
+describe('a drag that ends off the canvas (#1210)', () => {
+  it('mouseup dispatched on window, not canvas, still ends a drag in progress', () => {
+    controller.arm({ shape: 'rect' });
+    press(5, 5);
+    expect(controller.currentPhase).toBe('dragging');
+
+    tileUnderCursor = { x: 40, z: 40 };
+    const rect = canvas.getBoundingClientRect();
+    window.dispatchEvent(new MouseEvent('mouseup', {
+      button: 0,
+      clientX: rect.right + 500,
+      clientY: rect.bottom + 500,
+      bubbles: true,
+    }));
+
+    expect(controller.currentPhase).not.toBe('dragging');
+  });
+});
+
+// ── #1210: a refused confirm leaves the tool armed ──────────────────────────
+//
+// PlacementConfirmHandler is now `(sel) => boolean | void` — returning
+// `false` means the order was refused (e.g. Confirm at a depth core's own
+// validateRampOrder rejects) and the controller must stay in 'selected'
+// rather than advance to 'confirmed'/disarm, so the player can pick a
+// different depth without re-arming the tool from scratch. `confirm()`
+// today ignores the handler's return value entirely — it always sets
+// phase='confirmed' and always schedules disarm() after CONFIRM_FLASH_MS,
+// so a refusal is currently indistinguishable from a success.
+
+describe('a refused confirm leaves the tool armed (#1210)', () => {
+  // Mirrors PlacementController.ts's own private CONFIRM_FLASH_MS (220ms,
+  // design doc §01 state 6) — not exported, so duplicated here as a literal;
+  // any drift would need a source-level export, not a test-side guess.
+  const CONFIRM_FLASH_MS = 220;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a confirm handler returning false keeps the controller in "selected" and re-notifies for a re-render', () => {
+    controller.arm({ shape: 'point' });
+    press(10, 10);
+    expect(controller.currentPhase).toBe('selected');
+
+    const onChange = vi.fn();
+    controller.setChangeHandler(onChange);
+    controller.setConfirmHandler(() => false);
+
+    controller.confirm();
+
+    expect(controller.currentPhase).toBe('selected');
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it('a confirm handler returning false does NOT disarm the tool even after CONFIRM_FLASH_MS elapses', () => {
+    controller.arm({ shape: 'point' });
+    press(10, 10);
+    controller.setConfirmHandler(() => false);
+
+    controller.confirm();
+    vi.advanceTimersByTime(CONFIRM_FLASH_MS + 50);
+
+    expect(controller.isArmed).toBe(true);
+    expect(controller.currentPhase).toBe('selected');
+  });
+
+  it('a confirm handler returning true still reaches "confirmed" and disarms after CONFIRM_FLASH_MS (regression guard)', () => {
+    controller.arm({ shape: 'point' });
+    press(10, 10);
+    controller.setConfirmHandler(() => true);
+
+    controller.confirm();
+    expect(controller.currentPhase).toBe('confirmed');
+
+    vi.advanceTimersByTime(CONFIRM_FLASH_MS + 50);
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('a confirm handler returning undefined (today\'s default, no caller returns a value yet) still reaches "confirmed" and disarms after CONFIRM_FLASH_MS (regression guard)', () => {
+    controller.arm({ shape: 'point' });
+    press(10, 10);
+    controller.setConfirmHandler(() => undefined);
+
+    controller.confirm();
+    expect(controller.currentPhase).toBe('confirmed');
+
+    vi.advanceTimersByTime(CONFIRM_FLASH_MS + 50);
+    expect(controller.isArmed).toBe(false);
+  });
+});

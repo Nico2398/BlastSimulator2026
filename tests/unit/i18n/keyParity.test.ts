@@ -367,8 +367,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // embedded terrain generator version doesn't match this build's) and
     // world.terrain_save_corrupt (the save-load refusal when a save's
     // embedded terrain data is corrupt) — both locales.
+    // Baseline is now 3513 (down from 3514): #1210 removes
+    // ui.build.ramp_needs_length (confirmed unused anywhere in the
+    // codebase) as part of the box-cut ramp fix — both locales, parity
+    // preserved.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3514);
+    expect(Object.keys(en).length).toBe(3513);
   });
 });
 

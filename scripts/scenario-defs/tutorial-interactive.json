@@ -601,11 +601,6 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 6
-        },
-        {
           "type": "dragTiles",
           "x1": 16,
           "z1": 19,

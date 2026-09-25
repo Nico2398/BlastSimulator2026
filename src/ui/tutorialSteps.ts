@@ -7,7 +7,6 @@ import {
   createHireStep,
   createHireStepWithEventGuard,
   createAutoAdvanceStep,
-  countNavCellsByType,
   getEmployees,
   countVehiclesOfType,
   countBuildingsOfType,
@@ -250,17 +249,23 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     highlightTarget: TOOLBAR_TARGET.build,
     commands: ['build_ramp start:16,19 end:16,31 depth:6'],
     waitsOnWork: true,
+    // #1210: tracks the player's own ramp order(s), not NavGrid classification
+    // — a pre-existing ramp elsewhere, or any other mechanism that produces a
+    // 'ramp' NavCell, could false-trigger the old countNavCellsByType check
+    // without the player having ordered anything here. A ramp only ever gets
+    // an id (nextPlannedRampId++) on a successful order, so "id >= prev"
+    // identifies exactly the order(s) made since this step's snapshot, and
+    // `state.plannedRamps` no longer holding one means it finished (its
+    // PlannedRamp entry is spliced out once every segment is done —
+    // TaskCompletionEffects.ts).
     captureSnapshot: (state: GameState) => ({
-      prevRampCount: state.navGrid
-        ? countNavCellsByType(state.navGrid.cells, 'ramp')
-        : 0,
+      prevNextRampId: state.nextPlannedRampId ?? 1,
     }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevRampCount as number;
-      const current = state.navGrid
-        ? countNavCellsByType(state.navGrid.cells, 'ramp')
-        : 0;
-      return current > prev;
+      const prev = snapshot.prevNextRampId as number;
+      const current = state.nextPlannedRampId ?? 1;
+      if (current <= prev) return false;
+      return !(state.plannedRamps ?? []).some((r) => r.id >= prev);
     },
   },
 

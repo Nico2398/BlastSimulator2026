@@ -80,7 +80,8 @@ export class ParamStrip {
     this.reasonEl = el('div', { attrs: { id: 'bs-param-strip-reason' } });
     this.reasonEl.style.cssText = [
       'display:none', 'padding:5px 12px', 'border-radius:5px',
-      'background:rgba(255,106,90,.16)', 'border:1px solid rgba(255,106,90,.5)',
+      'background:rgba(20,10,9,.92)', 'border:1px solid rgba(255,106,90,.55)',
+      'box-shadow:0 10px 26px rgba(0,0,0,.45)',
       'color:var(--bsx-critical-text,#ff8a7e)', 'font:600 11px/1.3 var(--bsx-font-ui)',
       'max-width:520px', 'text-align:center', 'pointer-events:none',
     ].join(';');

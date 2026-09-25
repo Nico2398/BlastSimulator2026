@@ -34,7 +34,14 @@ export interface PlacementArmConfig {
   initialSelection?: { x: number; z: number };
 }
 
-export type PlacementConfirmHandler = (sel: PlacementSelection) => void;
+/**
+ * Return value is optional (#1210): a handler may return `false` to signal
+ * refusal (e.g. Confirm at an invalid depth) so the controller can stay in
+ * the `selected` phase instead of advancing to `confirmed`/disarming.
+ * Returning `void`/`true` (or nothing) keeps today's always-succeeds
+ * behavior — no existing caller returns a value yet.
+ */
+export type PlacementConfirmHandler = (sel: PlacementSelection) => boolean | void;
 export type PlacementChangeHandler = () => void;
 
 /** 220ms amber sweep on confirm (design doc §01, state 6) before the tool disarms itself. */
@@ -87,7 +94,10 @@ export class PlacementController {
     this.cameraController = cameraController;
     canvas.addEventListener('mousemove', this.handleMouseMove);
     canvas.addEventListener('mousedown', this.handleMouseDown);
-    canvas.addEventListener('mouseup', this.handleMouseUp);
+    // window, not canvas (#1210): a drag released off-canvas (over another
+    // panel, or outside the window) must still end the drag — mirrors
+    // handleKeyDown's own window-scoped listener below.
+    window.addEventListener('mouseup', this.handleMouseUp);
     canvas.addEventListener('contextmenu', this.handleContextMenu);
     window.addEventListener('keydown', this.handleKeyDown);
   }
@@ -219,11 +229,16 @@ export class PlacementController {
     if (!this.canConfirm) return;
     const sel = this.selection;
     if (!sel) return;
+    // Run the handler before flipping phase: a `false` return (#1210) means
+    // the handler refused (e.g. an invalid depth) and the tool must stay
+    // armed in 'selected' so the caller's refusal reason stays visible and
+    // Confirm is retryable, instead of disarming as if the order succeeded.
+    const result = this.onConfirmHandler?.(sel);
+    if (result === false) {
+      this.notify();
+      return;
+    }
     this.phase = 'confirmed';
-    // The confirm handler runs first — it's what arms the overlay's flash
-    // (via overlay.flashConfirm()) — so the notify() below renders with the
-    // flash already active instead of one frame behind it.
-    this.onConfirmHandler?.(sel);
     this.notify();
     setTimeout(() => this.disarm(), CONFIRM_FLASH_MS);
   }
@@ -410,7 +425,7 @@ export class PlacementController {
   dispose(): void {
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
     this.canvas.removeEventListener('mousedown', this.handleMouseDown);
-    this.canvas.removeEventListener('mouseup', this.handleMouseUp);
+    window.removeEventListener('mouseup', this.handleMouseUp);
     this.canvas.removeEventListener('contextmenu', this.handleContextMenu);
     window.removeEventListener('keydown', this.handleKeyDown);
     if (this.phase !== 'idle') this.cameraController.setArmedRemap(false);
