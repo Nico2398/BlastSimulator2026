@@ -89,26 +89,14 @@ export function meshClaimsCell(grid: VoxelGrid, x: number, z: number): boolean {
  * The surface height the playable mesh renders at an unowned halo column whose
  * neighbouring ground the landscape samples at `height`.
  *
- * The halo column stands in for ground the grid does not own, so the height to
- * put it at is the one the grid's own generator would have produced there —
- * `heightToVoxelYContinuous`, the clamp `TerrainGen` fills every real column
- * through. `height` already carries the ground offset (the landscape samples in
- * the same datum as playable voxel Y), so the offset passed here is zero and
- * only the clamp does any work.
- *
- * The clamp matters at the low corner of a level whose relief nearly fills its
- * grid: the ground beside the site dips below the world's floor datum, the march
- * has no cube below y = 0 to cross in, and an unclamped ring node asks for a
- * vertex the playable mesh cannot place — which is a hole. Clamping is the
- * answer, and clamping to the generator's own bound is what keeps the last metre
- * flat: the site's edge column was generated through exactly this call, so the
- * shared node lands on the same value instead of a metre below it, and the drop
- * to the true ground happens one node further out, inside the landscape's own
- * continuous sheet (#907).
+ * The halo column stands in for ground the grid does not own, so it runs the
+ * halo's sampled height through the exact same offset arithmetic
+ * (`heightToVoxelYContinuous`) the site's own real columns go through — that
+ * shared datum is what keeps the halo node lining up with the site's edge
+ * column instead of drifting from it (#907, #1189).
  */
-export function haloSurfaceHeight(grid: VoxelGrid, height: number): number {
-  if (!Number.isFinite(height)) return height;
-  return heightToVoxelYContinuous(height, 0, grid.sizeY);
+export function haloSurfaceHeight(_grid: VoxelGrid, height: number): number {
+  return heightToVoxelYContinuous(height, 0);
 }
 
 /**
