@@ -160,6 +160,14 @@ export function clearZone(
         && isInZone(e.x, e.z, zone)
         && !boardingEmployeeIds.has(e.id)
         && !inZoneDriverIds.has(e.id)
+        // Mirrors isIdleForReposition's own pendingDriverVehicleId reading
+        // (VehicleDriverAssignment.ts): an employee already mid-walk to
+        // board a DIFFERENT vehicle is excluded (that walk must survive this
+        // call untouched, #1042), but one already walking to board THIS
+        // exact vehicle (e.pendingDriverVehicleId === v.id) is a legitimate
+        // candidate for it — self-matching is safe because reselecting the
+        // same employee for the same vehicle changes nothing they're not
+        // already doing (#1122).
         && (e.pendingDriverVehicleId === null || e.pendingDriverVehicleId === v.id),
       )
       .map(e => e.id);

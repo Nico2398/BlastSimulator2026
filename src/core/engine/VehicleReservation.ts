@@ -30,6 +30,7 @@ import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { alight } from './Mount.js';
+import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 // Direct import from TaskLifecycleCore.ts, not TaskDispatch.ts (see this
 // module's own header comment on the cycle TaskDispatch.ts's re-export would
 // close) — TaskCancellation.ts already imports completePendingAction the
@@ -61,6 +62,25 @@ export function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRol
     && a.requiredVehicleRole === role
     && (a.targetEmployeeId === null || a.targetEmployeeId === employeeId),
   );
+}
+
+/**
+ * True when `employee`, currently mounted, holds a vehicle whose role still
+ * has a `queued` follow-up only `employee` could ever claim
+ * (hasQueuedActionForVehicleRole above). Shared by ForceShiftRest.ts's
+ * forceShiftRestIfNeededByPolicy (defers a policy-forced rest while a
+ * same-role follow-up is about to be picked up by the ordinary cost-ranked
+ * pool dispatch — see its own call site's doc comment for the #1090 livelock
+ * this closes) and RestActionHelpers.ts's beginRestTravel (keeps mount
+ * continuity through the whole rest for this one case, instead of alighting
+ * on arrival like every other rest — see that call site's own doc comment,
+ * #1122).
+ */
+export function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {
+  if (!isMounted(employee.locomotion)) return false;
+  const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
+  if (!vehicle) return false;
+  return hasQueuedActionForVehicleRole(state, vehicle.type, employee.id);
 }
 
 /**

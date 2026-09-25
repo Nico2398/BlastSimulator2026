@@ -22,7 +22,7 @@ import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
 import { cellsToTravelTicks } from './ActionSelection.js';
-import { hasQueuedActionForVehicleRole } from './VehicleReservation.js';
+import { hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -201,34 +201,6 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 }
 
 /**
- * True when `emp`, currently mounted, holds a vehicle whose role still has a
- * `queued` follow-up only `emp` could ever claim — `hasQueuedActionForVehicleRole`
- * (VehicleReservation.ts), the same "is a matching action this employee could
- * actually claim still out there for this role" question
- * `hasClaimableSameRoleFollowUp` (ForceShiftRest.ts) already asks before
- * forcing a *policy*-driven rest at all, and EmployeeDispatch.ts's own idle-
- * and-mounted eviction asks in reverse. The legacy (no-policy) forced-rest
- * path (forceShiftRestIfNeeded) and the reactive/collapse paths
- * (tickNeedRestoration, tickCollapse) carry no such guard and dispatch a rest
- * regardless — for exactly those, alighting early here would buy no fleet-
- * sharing benefit (nobody else can claim a follow-up this employee is the
- * only candidate for — untargeted with no other qualified/free driver, or
- * targeted at them by name) while still costing this same employee a real
- * dismount-then-reboard the moment rest ends, at the very hole/task they were
- * already closest to — the identical "wasted cycle on zero net progress"
- * interruptActiveAction's own walkOnlyPinnedBy pin exists to avoid (#945).
- * beginRestTravel keeps mount continuity through the WHOLE rest for this one
- * case; every other rest (idle with no matching follow-up, or one a
- * different free driver could equally pick up) still alights on arrival per
- * beginRestTravel's own general contract (#1122).
- */
-function hasClaimableVehicleGatedFollowUp(state: GameState, emp: Employee): boolean {
-  const vehicleId = mountedVehicleId(emp.locomotion);
-  const vehicle = vehicleId !== null ? state.vehicles.vehicles.find(v => v.id === vehicleId) : undefined;
-  return vehicle !== undefined && hasQueuedActionForVehicleRole(state, vehicle.type, emp.id);
-}
-
-/**
  * Start `emp` travelling to (x, z) as a rest destination, preserving mount
  * continuity: a MOUNTED employee is routed through moveTo/planItinerary like
  * any other journey, so they drive there instead of desyncing from their
@@ -236,7 +208,7 @@ function hasClaimableVehicleGatedFollowUp(state: GameState, emp: Employee): bool
  * travel-only: alightOnArrival marks the installed itinerary's final leg to
  * alight once that travel completes, freeing the vehicle at arrival — same as
  * any other arrival-gated action — rather than holding it for the whole rest,
- * unless hasClaimableVehicleGatedFollowUp says this employee is the only
+ * unless hasClaimableSameRoleFollowUp says this employee is the only
  * one who could ever reclaim it anyway, in which case alighting is skipped
  * and mount continuity holds through the whole rest instead (see that
  * function's own doc comment). An on-foot employee, and a mounted employee
@@ -253,7 +225,7 @@ function hasClaimableVehicleGatedFollowUp(state: GameState, emp: Employee): bool
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
   if (isMounted(emp.locomotion) && moveTo(state, emp.id, { x, z }).success) {
-    if (!hasClaimableVehicleGatedFollowUp(state, emp)) {
+    if (!hasClaimableSameRoleFollowUp(state, emp)) {
       alightOnArrival(emp);
     }
     emp.pendingActionType = 'rest';

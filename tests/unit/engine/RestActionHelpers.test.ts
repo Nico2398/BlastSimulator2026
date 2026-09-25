@@ -443,6 +443,40 @@ describe('beginRestTravel (#1118)', () => {
 
     expect(employee.pendingActionType).toBe('rest');
   });
+
+  // #1122: a mounted employee whose own vehicle still has a `queued`,
+  // same-role follow-up only they could claim (hasClaimableSameRoleFollowUp,
+  // VehicleReservation.ts) keeps mount continuity through the WHOLE rest,
+  // instead of alighting on arrival like the general case above — see
+  // beginRestTravel's own doc comment for why. Every other test in this
+  // describe block sets up a state with no queued pending actions at all, so
+  // none of them exercise this branch.
+  it('mounted employee with a still-queued, same-role follow-up only they could claim: keeps mount continuity — final leg stays {kind:"none"}, not alighted', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    // Untargeted queued drill_hole action of the same role (drill_rig) — the
+    // only employee who could ever claim it (nobody else is set up here),
+    // matching hasQueuedActionForVehicleRole's own claimability test.
+    state.pendingActions.push({
+      id: 900, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      targetX: 5, targetZ: 5, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+
+    beginRestTravel(state, employee, 12, 34);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const finalLeg = legs[legs.length - 1]!;
+    expect(finalLeg.mode).toBe('drive');
+    expect(finalLeg.onArrive).toEqual({ kind: 'none' });
+    expect(employee.pendingActionType).toBe('rest');
+  });
 });
 
 // #1170: a forced rest whose round trip costs more fatigue (as ticks
