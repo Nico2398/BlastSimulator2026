@@ -9,7 +9,8 @@ import { buildRampCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
 import { createVehicleState, purchaseVehicle, destroyVehicle, getVehicleDefByTier, getAllVehicleRoles, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation, resolveVehicleDriver } from '../../src/core/entities/Vehicle.js';
-import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
+import { reserveVehicle, isLicensedForRole } from '../../src/core/engine/VehicleReservation.js';
+import { isVehicleRouteAcceptable } from '../../src/core/state/SpawnPlacement.js';
 import { board, alight } from '../../src/core/engine/Mount.js';
 import {
   hireEmployee,
@@ -250,6 +251,67 @@ describe('Vehicle fleet', () => {
     expect(drivingEmp.itinerary!.legs[0]!.destX).toBe(30);
     expect(drivingEmp.itinerary!.legs[0]!.destZ).toBe(30);
     expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  // ── Spawn-time vehicle reachability (#1179) ──
+  // Old behaviour, measured on the console repro this issue was filed from:
+  // `campaign start level:tutorial_pit staffed:true` spawns the debris_hauler
+  // at (3,2) on a ridge flank with its only truck-licensed driver at (4,0) —
+  // straight-line distance ~2.24 cells — yet the driver's only legal route
+  // loops through a ramp cluster and takes ~19-20 ticks to board (reproduced
+  // here against the pre-fix code: 20). Once `placeStartingCrew`'s new
+  // vehicle-fixup phase (#1179) keeps every starting vehicle within a
+  // route-cost tolerance of a licensed driver, the same repro should board
+  // within a handful of ticks instead.
+  it('a staffed tutorial_pit debris_hauler reposition boards its driver within a small tick budget, not the ~19-20 it took looping around a ridge (#1179)', () => {
+    const engine = createRunner();
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    const debrisHauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+
+    // (3,2)/(4,0) above are the original issue's repro coordinates, quoted
+    // for context; this test's own reposition target is unrelated to them.
+    const reposition = runCommand(engine, `vehicle reposition ${debrisHauler.id} 13 2`);
+    expect(reposition.success).toBe(true);
+
+    const TICK_BUDGET = 5;
+    let boardedWithinBudget = false;
+    for (let i = 0; i < TICK_BUDGET; i++) {
+      runCommand(engine, 'tick 1');
+      if (vehicleDriverId(debrisHauler) !== null) { boardedWithinBudget = true; break; }
+    }
+
+    expect(boardedWithinBudget).toBe(true);
+    expectNoWorldInvariantViolations(state);
+  });
+
+  // dusty_hollow is the campaign issue #1179 names alongside tutorial_pit as a
+  // real level where every vehicle's licensed driver must reach it within
+  // tolerance. This drives the real terrain rather than a synthetic ridge
+  // fixture (unit-level coverage for the synthetic shape lives in
+  // SpawnPlacement.test.ts) and checks the same real formula
+  // (`isVehicleRouteAcceptable`) `fixUnreachableVehicles` is specified to
+  // enforce, for every vehicle in the fleet rather than just one.
+  it('every vehicle in a staffed dusty_hollow campaign has a licensed driver within tolerance (#1179)', () => {
+    const engine = createRunner();
+    expect(runCommand(engine, 'campaign start level:dusty_hollow staffed:true').success).toBe(true);
+
+    const state = engine.ctx.state!;
+    for (const vehicle of state.vehicles.vehicles) {
+      const licensed = state.employees.employees.filter(e => isLicensedForRole(e, vehicle.type));
+      if (licensed.length === 0) continue; // no one holds the licence: not a reachability failure
+
+      const reachable = licensed.some(emp =>
+        isVehicleRouteAcceptable(
+          state.navGrid!,
+          { x: Math.round(emp.x), z: Math.round(emp.z) },
+          { x: Math.round(vehicle.x), z: Math.round(vehicle.z) },
+        ),
+      );
+      expect(reachable).toBe(true);
+    }
+    expectNoWorldInvariantViolations(state);
   });
 
   // ── Task assignment (#1138 — assignVehicle deleted along with Vehicle.task) ──
