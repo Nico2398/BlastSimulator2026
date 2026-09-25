@@ -1205,22 +1205,31 @@ describe('findPath — climb-limit gating on surfaceY (#953)', () => {
   });
 
   it('finds a route across ground graded at ~29.6° on the only path (diagonal-only fixture)', () => {
-    // 2×2 grid, both cardinal neighbours blocked — the only route is the
-    // 0.80m diagonal step, within the (larger) diagonal slope limit.
+    // 2×2 grid — both cardinal neighbours are 'walkable' (not 'blocked'), so
+    // isDiagonalCornerClear (#1197, solidity-only) never rejects the
+    // diagonal step as a corner-cut, but each is graded far steeper than the
+    // cardinal slope limit (~0.577/m) from either endpoint, so a cardinal
+    // step onto either one is climb-rejected — the only usable route is
+    // still the 0.80m diagonal step, within the (larger) diagonal slope
+    // limit.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
-    setCell(grid, 1, 0, 'blocked');
-    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
     setCell(grid, 1, 1, 'walkable', { surfaceY: 0.8 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(true);
   });
 
   it('refuses a route across ground graded at ~31.3° on the only path (diagonal-only fixture)', () => {
+    // Same corner-cut-avoiding shape as the ~29.6° case above: (1,0)/(0,1)
+    // stay 'walkable' but climb-unreachable by a cardinal step, so the
+    // diagonal (0,0)-(1,1) step is this fixture's only route, and its own
+    // slope is what gets refused here.
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
-    setCell(grid, 1, 0, 'blocked');
-    setCell(grid, 0, 1, 'blocked');
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
     setCell(grid, 1, 1, 'walkable', { surfaceY: 0.83 });
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false });
     expect(result.found).toBe(false);
