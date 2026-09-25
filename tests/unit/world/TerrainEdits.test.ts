@@ -36,12 +36,12 @@ describe('recordDig / recordAdd — basic segment creation', () => {
     expect(segs[0]).toMatchObject({ kind: 'dug', yLo: 2, yHi: 5 });
   });
 
-  it('recordAdd creates a single added segment carrying the given compId/ores', () => {
+  it('recordAdd creates a single added segment carrying the given composition/ores', () => {
     const edits = TerrainEdits.empty();
     edits.recordAdd(1, 1, 0, 3, comp(7), { blingite: 0.4 });
     const segs = edits.segmentsAt(1, 1);
     expect(segs.length).toBe(1);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: comp(7), ores: { blingite: 0.4 } });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, composition: comp(7), ores: { blingite: 0.4 } });
   });
 
   it('segmentsAt an unedited column returns empty', () => {
@@ -51,13 +51,13 @@ describe('recordDig / recordAdd — basic segment creation', () => {
 });
 
 describe('adjacent segment merging on insert', () => {
-  it('merges two adjacent recordAdd calls with the same compId/ores into one segment', () => {
+  it('merges two adjacent recordAdd calls with the same composition/ores into one segment', () => {
     const edits = TerrainEdits.empty();
     edits.recordAdd(2, 2, 0, 2, comp(5), { dirtite: 0.1 });
     edits.recordAdd(2, 2, 3, 5, comp(5), { dirtite: 0.1 });
     const segs = edits.segmentsAt(2, 2);
     expect(segs.length).toBe(1);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 5, compId: comp(5) });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 5, composition: comp(5) });
   });
 
   it('merges two adjacent recordDig calls into one segment (dug carries no material to distinguish)', () => {
@@ -69,7 +69,7 @@ describe('adjacent segment merging on insert', () => {
     expect(segs[0]).toMatchObject({ kind: 'dug', yLo: 0, yHi: 5 });
   });
 
-  it('does NOT merge two adjacent added segments with different compId, even though kind matches', () => {
+  it('does NOT merge two adjacent added segments with different composition, even though kind matches', () => {
     const edits = TerrainEdits.empty();
     edits.recordAdd(2, 2, 0, 2, comp(5));
     edits.recordAdd(2, 2, 3, 5, comp(6));
@@ -77,7 +77,7 @@ describe('adjacent segment merging on insert', () => {
     expect(segs.length).toBe(2);
   });
 
-  it('does NOT merge two adjacent added segments with the same compId but different ores', () => {
+  it('does NOT merge two adjacent added segments with the same composition but different ores', () => {
     const edits = TerrainEdits.empty();
     edits.recordAdd(2, 2, 0, 2, comp(5), { blingite: 0.4 });
     edits.recordAdd(2, 2, 3, 5, comp(5), { blingite: 0.5 });
@@ -101,9 +101,9 @@ describe('a dig punching a hole in an existing added segment', () => {
     edits.recordDig(4, 4, 4, 6);
     const segs = [...edits.segmentsAt(4, 4)].sort((a, b) => a.yLo - b.yLo);
     expect(segs.length).toBe(3);
-    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, compId: comp(3) });
+    expect(segs[0]).toMatchObject({ kind: 'added', yLo: 0, yHi: 3, composition: comp(3) });
     expect(segs[1]).toMatchObject({ kind: 'dug', yLo: 4, yHi: 6 });
-    expect(segs[2]).toMatchObject({ kind: 'added', yLo: 7, yHi: 10, compId: comp(3) });
+    expect(segs[2]).toMatchObject({ kind: 'added', yLo: 7, yHi: 10, composition: comp(3) });
   });
 });
 
@@ -115,7 +115,7 @@ describe('an add landing inside an existing dug region', () => {
     const segs = [...edits.segmentsAt(4, 4)].sort((a, b) => a.yLo - b.yLo);
     expect(segs.length).toBe(3);
     expect(segs[0]).toMatchObject({ kind: 'dug', yLo: 0, yHi: 3 });
-    expect(segs[1]).toMatchObject({ kind: 'added', yLo: 4, yHi: 6, compId: comp(9) });
+    expect(segs[1]).toMatchObject({ kind: 'added', yLo: 4, yHi: 6, composition: comp(9) });
     expect(segs[2]).toMatchObject({ kind: 'dug', yLo: 7, yHi: 10 });
   });
 
@@ -142,13 +142,13 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
 
   it('recordDig then recordAdd of the same range/material on a previously unedited column ends in a plain added segment, not two segments', () => {
     // TerrainEdits cannot verify the caller's implicit claim that this add's
-    // compId equals the generated baseline's material, so it must not assume
+    // composition equals the generated baseline's material, so it must not assume
     // this pair cancels back to "no edit" — see #1180 review: collapsing here
     // would silently misreplay when the baseline material differs.
     const edits = TerrainEdits.empty();
     edits.recordDig(7, 7, 0, 5);
     edits.recordAdd(7, 7, 0, 5, comp(4));
-    expect(edits.segmentsAt(7, 7)).toEqual([{ yLo: 0, yHi: 5, kind: 'added', compId: comp(4) }]);
+    expect(edits.segmentsAt(7, 7)).toEqual([{ yLo: 0, yHi: 5, kind: 'added', composition: comp(4) }]);
   });
 
   it('recordDig then recordAdd of the same range/material on a previously added column does not grow beyond the pre-edit segment count', () => {
@@ -171,21 +171,21 @@ describe('fill-then-dig / dig-then-refill of the identical volume', () => {
 });
 
 describe('continuous / fractional boundaries', () => {
-  it('recordAdd with bottomBoundary/topBoundary preserves the boundary\'s own density/compId/ores, distinct from the segment\'s interior compId', () => {
+  it('recordAdd with bottomBoundary/topBoundary preserves the boundary\'s own density/composition/ores, distinct from the segment\'s interior composition', () => {
     const edits = TerrainEdits.empty();
-    const bottomBoundary: EditBoundary = { density: 0.3, compId: comp(11) };
-    const topBoundary: EditBoundary = { density: 0.6, compId: comp(12), ores: { sparkium: 0.2 } };
+    const bottomBoundary: EditBoundary = { density: 0.3, composition: comp(11) };
+    const topBoundary: EditBoundary = { density: 0.6, composition: comp(12), ores: { sparkium: 0.2 } };
     edits.recordAdd(5, 5, 2, 6, comp(9), undefined, bottomBoundary, topBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);
-    expect(segs[0]!.compId).toEqual(comp(9));
+    expect(segs[0]!.composition).toEqual(comp(9));
     expect(segs[0]!.bottomBoundary).toEqual(bottomBoundary);
     expect(segs[0]!.topBoundary).toEqual(topBoundary);
   });
 
   it('recordDig with a bottomBoundary preserves the boundary on the resulting dug segment', () => {
     const edits = TerrainEdits.empty();
-    const bottomBoundary: EditBoundary = { density: 0.4, compId: comp(2) };
+    const bottomBoundary: EditBoundary = { density: 0.4, composition: comp(2) };
     edits.recordDig(5, 5, 2, 6, bottomBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);
@@ -195,7 +195,7 @@ describe('continuous / fractional boundaries', () => {
 
   it('recordDig with a topBoundary preserves the boundary on the resulting dug segment', () => {
     const edits = TerrainEdits.empty();
-    const topBoundary: EditBoundary = { density: 0.7, compId: comp(6), ores: { rustite: 0.1 } };
+    const topBoundary: EditBoundary = { density: 0.7, composition: comp(6), ores: { rustite: 0.1 } };
     edits.recordDig(5, 5, 2, 6, undefined, topBoundary);
     const segs = edits.segmentsAt(5, 5);
     expect(segs.length).toBe(1);

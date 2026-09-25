@@ -596,8 +596,8 @@ export class VoxelGrid {
 
     if (newDensity > 0 && newDensity < 1) {
       const boundary: EditBoundary = newOres !== undefined
-        ? { density: newDensity, compId: newComposition, ores: newOres }
-        : { density: newDensity, compId: newComposition };
+        ? { density: newDensity, composition: newComposition, ores: newOres }
+        : { density: newDensity, composition: newComposition };
       if (newDensity >= SOLID_VOXEL_DENSITY_THRESHOLD) {
         this.edits.recordAdd(x, z, y, y, newComposition, newOres, boundary, boundary);
       } else {

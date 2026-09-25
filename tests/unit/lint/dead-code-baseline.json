@@ -160,7 +160,6 @@
     "src/core/world/SurfaceMaterialCatalog.ts:SurfaceMaterial",
     "src/core/world/TerrainEdits.ts:EditKind",
     "src/core/world/TerrainEdits.ts:EditSegment",
-    "src/core/world/TerrainEdits.ts:compositionDeepEqual",
     "src/core/world/WorldGen.ts:ShapingInput",
     "src/renderer/BlastEffects.ts:HoleDetonation",
     "src/renderer/BlastPlanOverlay.ts:CHARGE_ORDERED_COLOR",

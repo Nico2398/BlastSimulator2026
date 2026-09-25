@@ -1102,7 +1102,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
     expect(segs.some(s => s.kind === 'dug' && sy >= s.yLo && sy <= s.yHi)).toBe(true);
   });
 
-  it('fillVoxel with a solid density and compId records an added segment carrying that compId', () => {
+  it('fillVoxel with a solid density and compId records an added segment carrying that composition', () => {
     const grid = new VoxelGrid(8, 8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
@@ -1111,7 +1111,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
     const segs = grid.edits.segmentsAt(3, 3);
     const match = segs.find(s => s.kind === 'added' && 3 >= s.yLo && 3 <= s.yHi);
     expect(match, 'expected an added segment covering y=3').toBeDefined();
-    expect(match!.compId).toEqual(grid.palette.get(compId).comp);
+    expect(match!.composition).toEqual(grid.palette.get(compId).comp);
   });
 
   it('setFractureAt updates grid.edits.fractureAt to the new modifier', () => {
