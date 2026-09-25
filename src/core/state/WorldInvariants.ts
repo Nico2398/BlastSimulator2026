@@ -254,6 +254,13 @@ function checkI8PayloadNotInTransit(state: GameState): Violation[] {
  * it, so TickPipeline.ts's dev/test-only invariant check throws the instant
  * it finds one instead of letting the game keep running on bad state. Every
  * other violation kind keeps the existing collect-and-continue behavior.
+ *
+ * TODO(#1115): once the vehicle-reservation/rest-promotion ordering bug
+ * behind I4_vehicle_moved_without_occupant and
+ * I5_reservation_without_valid_holder is fixed at its root
+ * (EmployeeDispatchSteps.ts's releaseUnboardedTaskQueueVehicleReservations
+ * and/or VehicleReservation.ts's isPendingReserveAhead /
+ * promoteVehicleGatedAction), add both kinds here to match I8's precedent.
  */
 export const FATAL_VIOLATION_KINDS: ReadonlySet<ViolationKind> = new Set<ViolationKind>([
   'I8_payload_not_in_transit',
