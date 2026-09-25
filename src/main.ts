@@ -28,6 +28,7 @@ import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, embedVoxelsForSave } from './console/commands/world.js';
+import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -667,23 +668,30 @@ window.__gameState = () => {
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
     consoleLogs: consoleLogs.splice(0, 50),
-    // Sample voxels at blast center to check if they're cleared
+    // Sample voxels at blast center to check if they're cleared — centered on
+    // the column's real surface, not a fixed low window: the grid has no
+    // vertical cap, so a dug-below-0 or built-up site would otherwise sample
+    // the wrong rows (#1187).
     gridSample: ctx.grid ? (() => {
       const g = ctx.grid;
+      const surface = computeVoxelColumnSurfaceY(g, 15, 15) ?? 0;
       const sample: Record<string, number> = {};
-      for (let y = 0; y < Math.min(g.sizeY, 10); y++) {
+      for (let y = surface - 4; y < surface + 5; y++) {
         const v = g.getVoxel(15, y, 15);
         sample[`15,${y},15`] = v?.density ?? -1;
       }
       return sample;
     })() : null,
-    // Cross-section: sample a line of columns at y=0,1,2 through the blast center
+    // Cross-section: sample a line of columns through the blast center, each
+    // centered on its own real surface (#1187) so the section tracks uneven
+    // or dug terrain rather than a fixed low window.
     gridCrossSection: ctx.grid ? (() => {
       const g = ctx.grid;
       const xs = [10,11,12,13,14,15,16,17,18,19,20,21,22];
       const sample: Record<string, number> = {};
       for (const x of xs) {
-        for (let y = 0; y < Math.min(g.sizeY, 6); y++) {
+        const surface = computeVoxelColumnSurfaceY(g, x, 15) ?? 0;
+        for (let y = surface - 2; y < surface + 3; y++) {
           const v = g.getVoxel(x, y, 15);
           sample[`${x},${y},15`] = v?.density ?? -1;
         }
