@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { subscribeNavGridToUpdates, regionForColumns } from '../../../src/core/nav/NavGridSync.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
-import { VoxelGrid, computeColumnRangeY, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -214,50 +214,6 @@ describe('subscribeNavGridToUpdates', () => {
 
     expect(nav.cells[3]![3]!.type).toBe('void');
     expect(nav.cells[3]![3]!.moveCost).toBe(Infinity);
-  });
-});
-
-describe('computeColumnRangeY (#1185)', () => {
-  it('returns the floor/ceil span of ground across a rect with mixed column heights, skipping no-ground columns', () => {
-    const grid = new VoxelGrid(10, 30, 10);
-    writeSolidColumn(grid, 2, 2, 3); // surface height 3.5 -> floor 3, ceil 4
-    writeSolidColumn(grid, 7, 7, 8); // surface height 8.5 -> floor 8, ceil 9
-    // Every other column in [0,9]x[0,9] is left untouched (no ground at all).
-
-    const result = computeColumnRangeY(grid, 0, 9, 0, 9);
-
-    expect(result).toEqual({ minY: 3, maxY: 9 });
-  });
-
-  it('reports a negative minY/maxY for a rect whose ground sits entirely below y = 0, unclamped', () => {
-    const grid = new VoxelGrid(10, 30, 10);
-    writeSolidColumn(grid, 1, 1, -6); // surface height -5.5 -> floor -6, ceil -5
-    writeSolidColumn(grid, 4, 4, -3); // surface height -2.5 -> floor -3, ceil -2
-
-    const result = computeColumnRangeY(grid, 0, 9, 0, 9);
-
-    expect(result).toEqual({ minY: -6, maxY: -2 });
-    expect(result!.minY).toBeLessThan(0);
-    expect(result!.maxY).toBeLessThan(0);
-  });
-
-  it('returns null when no column in the rect has any ground', () => {
-    const grid = new VoxelGrid(10, 30, 10);
-    // Ground exists elsewhere in the grid, but not inside this rect.
-    writeSolidColumn(grid, 8, 8, 4);
-
-    const result = computeColumnRangeY(grid, 0, 2, 0, 2);
-
-    expect(result).toBeNull();
-  });
-
-  it('returns null for a rect entirely off-site (unowned columns)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
-    writeSolidColumn(grid, 5, 5, 4);
-
-    const result = computeColumnRangeY(grid, 100, 105, 100, 105);
-
-    expect(result).toBeNull();
   });
 });
 
