@@ -45,7 +45,7 @@ declare global {
       cancel: () => void;
     };
     /** World tile → screen pixel, for interaction mode's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
-    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
+    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean; tileConfirmed: boolean } | null;
     /**
      * Preview the loading screen without running a real (multi-second,
      * main-thread-blocking) level load — the visual-testing scenario has no
