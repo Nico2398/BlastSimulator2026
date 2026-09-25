@@ -294,8 +294,13 @@ function computeClearancePocket(
  * exercise it directly.
  */
 export function isDiagonalCornerClear(grid: NavGrid, ax: number, az: number, bx: number, bz: number): boolean {
-  void grid; void ax; void az; void bx; void bz; // TODO: implement
-  throw new Error('not implemented');
+  if (ax === bx || az === bz) return true;
+  return isCornerCellSolidityPassable(grid.cellAt(bx, az)) && isCornerCellSolidityPassable(grid.cellAt(ax, bz));
+}
+
+/** Solidity-only check for isDiagonalCornerClear's two orthogonal corner cells — a missing cell counts as solid. */
+function isCornerCellSolidityPassable(cell: NavCell | undefined): boolean {
+  return cell !== undefined && cell.type !== 'blocked' && cell.type !== 'void';
 }
 
 /** Octile distance heuristic. */
@@ -426,6 +431,12 @@ export function directLineWalk(
       const stepDz = clampedZ - prevZ;
       if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz))) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
+      // Only a genuine single-cell diagonal move needs the corner check (#1197)
+      // — a DDA step that jumps more than one cell (rounding artifact) is out
+      // of scope.
+      if (Math.abs(stepDx) === 1 && Math.abs(stepDz) === 1 && !isDiagonalCornerClear(grid, prevX, prevZ, clampedX, clampedZ)) {
+        return null;
+      }
       totalCost += isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost;
     }
 
@@ -968,6 +979,7 @@ function findOrdinaryPath(
       const neighborIdxForPocket = cellIndex(grid, nx, nz);
       const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
+      if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
       if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
 

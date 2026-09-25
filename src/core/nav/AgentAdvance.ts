@@ -8,9 +8,6 @@ import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } fr
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
 import { isImpassable, directLineWalk } from './Pathfinding.js';
 
-// TODO(#1197): directLineWalk will be reused here to fix diagonal corner-cutting.
-void directLineWalk;
-
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
   found: boolean;
@@ -530,16 +527,31 @@ function resolveTargetWaypoint(
       && freshTarget.x === committed.fromX && freshTarget.z === committed.fromZ
       && (committed.fromX !== committed.waypointX || committed.fromZ !== committed.waypointZ);
     if (isRetrace) {
-      return {
-        target: { x: destinationX, z: destinationZ },
-        committed: {
-          waypointX: destinationX,
-          waypointZ: destinationZ,
-          destX: destinationX,
-          destZ: destinationZ,
-          remainingCost: freshCost,
-        },
-      };
+      // The destination is only adopted as a raw, unchecked hop when the full
+      // straight line to it is actually validated (#1197) — otherwise this
+      // retrace recovery could walk the agent diagonally across a blocked/void
+      // corner the fresh replan never actually endorsed. Clearance is
+      // deliberately disabled here (requiredClearance 0, no pocket context)
+      // per the issue: this recovery leaves the clearance mechanism (#1154)
+      // untouched, it only gates solidity.
+      const validatedLine = navGrid
+        ? directLineWalk(navGrid, x, z, destinationX, destinationZ, avoidVehicles, 0, null, null)
+        : null;
+      if (validatedLine !== null) {
+        return {
+          target: { x: destinationX, z: destinationZ },
+          committed: {
+            waypointX: destinationX,
+            waypointZ: destinationZ,
+            destX: destinationX,
+            destZ: destinationZ,
+            remainingCost: freshCost,
+          },
+        };
+      }
+      // No navGrid, or the line crosses a cell that can't be proven passable
+      // — fall through to the ordinary/fresh-replan case rather than
+      // inventing an unchecked hop.
     }
     return adoptFresh();
   }
