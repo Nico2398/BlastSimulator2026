@@ -11,7 +11,6 @@
 import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from './scenario-types.js';
-import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
 import type { PlayerAction } from './interaction-types.js';
 import { runAction, waitForUiUpdate } from './interaction-driver.js';
@@ -20,9 +19,6 @@ import {
   CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, clickWithTransientRetry, describeUnclickable, inspectSelector,
 } from './click-retry.js';
 import type { ZeroSizeDiagnosisContext } from './click-retry.js';
-
-/** How long a tile-space action waits for its picker to open. */
-const PICKER_TIMEOUT_MS = 5000;
 
 /**
  * Consecutive `waitForTutorialStep` polls the clock may report held with no
@@ -562,23 +558,6 @@ export async function executeActionOnPage(
       }
       break;
     }
-    case 'pickTile': {
-      // P3: in-scene placement, not the old 2D canvas. Command mode drives it
-      // through window.__placement directly (interaction mode drives the same
-      // tool with real clicks instead — see interaction-driver.ts).
-      await awaitPlacementArmed(page, PICKER_TIMEOUT_MS);
-      await page.evaluate((x: number, z: number) => (window as unknown as {
-        __placement: { paintRect: (x1: number, z1: number, x2: number, z2: number) => void };
-      }).__placement.paintRect(x, z, x, z), action.x, action.z);
-      break;
-    }
-    case 'dragTiles': {
-      await awaitPlacementArmed(page, PICKER_TIMEOUT_MS);
-      await page.evaluate((x1: number, z1: number, x2: number, z2: number) => (window as unknown as {
-        __placement: { paintRect: (x1: number, z1: number, x2: number, z2: number) => void };
-      }).__placement.paintRect(x1, z1, x2, z2), action.x1, action.z1, action.x2, action.z2);
-      break;
-    }
     case 'mousedown': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
       // The action carries coordinates, so honour them rather than pressing
@@ -857,7 +836,9 @@ export async function executeActionOnPage(
     case 'awaitUsable':
     case 'zoomOut':
     case 'focusTile':
-    case 'clickEntity': {
+    case 'clickEntity':
+    case 'pickTile':
+    case 'dragTiles': {
       const { type, ...rest } = action;
       await runAction(page, { do: type, ...rest } as PlayerAction);
       break;
