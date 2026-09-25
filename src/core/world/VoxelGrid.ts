@@ -206,6 +206,28 @@ interface VoxelChunk {
   readonly touched: Uint8Array;
 }
 
+/**
+ * (#1182 — skeleton only, see @implementer) One lazily-allocated cubic
+ * 16×16×16 y-band of a chunk's column. `VoxelChunk` will hold these keyed by
+ * `cy = chunkIndexOf(y)` in a sparse `Map`, allocated only when a write
+ * differs from the implicit air default — this is what lets a column claim
+ * memory proportional to how deep it was actually generated/dug, rather than
+ * the grid's full declared `sizeY`.
+ *
+ * Not exported: internal storage detail of `VoxelGrid`, same as `VoxelChunk`
+ * itself.
+ */
+interface VoxelSlab {
+  density: Float64Array;   // CHUNK_SIZE**3 = 4096
+  compId: Uint16Array;
+  fracture: Float64Array;  // filled 1.0 on allocation
+  ores: Map<number, Record<string, number>>;
+  touched: Uint8Array;     // 1 once a position has been written
+  touchedCount: number;    // distinct positions written
+  minDensity: number;      // seeded +Infinity
+  maxDensity: number;      // seeded -Infinity
+}
+
 /** Packs a chunk coordinate pair into one collision-free numeric key. Range ±32768 chunks (±524 km). */
 function chunkKey(cx: number, cz: number): number {
   return (cx + 32768) * 65536 + (cz + 32768);
@@ -319,8 +341,18 @@ export class VoxelGrid {
   /** Number of chunks the site owns. */
   get chunkCount(): number { return this.chunks.size; }
 
+  /**
+   * True when (x, y, z) is a voxel the site can address at all — i.e. the
+   * column is owned and y sits inside the grid's declared height.
+   *
+   * (#1182) Deliberately still sizeY-bounded, unlike the raw slab accessors
+   * below (`densityAt` etc.) once @implementer's rewrite lands: those will
+   * accept y outside `[0, sizeY)` for an owned column (reading air, writing
+   * only on a non-air value) without allocating, but `isInBounds` keeps
+   * reporting the grid's own declared vertical extent.
+   */
   isInBounds(x: number, y: number, z: number): boolean {
-    return this.ownerOf(x, y, z) !== null;
+    return this.containsColumn(x, z) && y >= 0 && y < this.sizeY;
   }
 
   /** True when the site owns the column at (x, z), regardless of height. */
@@ -361,8 +393,18 @@ export class VoxelGrid {
     return chunk;
   }
 
-  /** Chunk-local flat index. x fastest, then y, then z — same axis order the dense layout used. */
-  private static localIndex(chunk: VoxelChunk, x: number, y: number, z: number, sizeY: number): number {
+  /**
+   * Chunk-local flat index into the current dense per-column arrays. x
+   * fastest, then y, then z — same axis order the dense layout used.
+   *
+   * Renamed from `localIndex` (#1182): the cubic-slab skeleton introduces a
+   * new `localIndex(chunk, cy, x, y, z)` below for the slab-local index a
+   * 16×16×16 `VoxelSlab` will use, and TypeScript can't hold two methods
+   * with the same name. This dense-array indexer keeps every existing
+   * accessor/mutator body working unchanged until @implementer replaces the
+   * dense arrays with slabs and deletes this one.
+   */
+  private static denseLocalIndex(chunk: VoxelChunk, x: number, y: number, z: number, sizeY: number): number {
     const lx = x - chunk.cx * CHUNK_SIZE;
     const lz = z - chunk.cz * CHUNK_SIZE;
     return lx + y * CHUNK_SIZE + lz * CHUNK_SIZE * sizeY;
@@ -479,6 +521,12 @@ export class VoxelGrid {
    * monotonically on every voxel write in that slab, never narrowed back down
    * except on a full reload (#560). Returns null for an unowned chunk or a
    * slab index past the grid's height.
+   *
+   * TODO(#1182): once slabs land, `null` narrows to "unowned column" only —
+   * an owned column with no allocated slab at `slabIndex` (including a
+   * `slabIndex` past the grid's declared height) instead returns
+   * `{min:0,max:0}`, the same honest-air answer an allocated-but-fully-air
+   * slab would give. Signature unchanged; body is @implementer's to rewrite.
    */
   chunkDensityRange(cx: number, cz: number, slabIndex: number): { min: number; max: number } | null {
     const chunk = this.chunks.get(chunkKey(cx, cz));
@@ -488,7 +536,7 @@ export class VoxelGrid {
     if (touched === 0) return { min: 0, max: 0 }; // nothing written — honestly all air
     const trueMin = chunk.slabMinDensity[slabIndex]!;
     const trueMax = chunk.slabMaxDensity[slabIndex]!;
-    if (touched >= this.slabVolume(chunk, slabIndex)) {
+    if (touched >= this.denseSlabVolume(chunk, slabIndex)) {
       // Every voxel in this slab has an explicit written value — no implicit
       // air left unaccounted for, so the true written min/max is exact.
       return { min: trueMin, max: trueMax };
@@ -498,18 +546,33 @@ export class VoxelGrid {
     return { min: Math.min(0, trueMin), max: Math.max(0, trueMax) };
   }
 
-  /** Voxel count of the owned span of chunk's slab `slabIndex` — the number of
-   *  distinct positions `slabTouchedCount` would need to reach for full coverage (#560). */
-  private slabVolume(chunk: VoxelChunk, slabIndex: number): number {
+  /**
+   * Voxel count of the owned span of chunk's slab `slabIndex` — the number of
+   * distinct positions `slabTouchedCount` would need to reach for full coverage (#560).
+   *
+   * Renamed from `slabVolume` (#1182): the cubic-slab skeleton introduces a
+   * new `static slabVolume(chunk)` below (fixed CHUNK_SIZE**3 volume of one
+   * cubic `VoxelSlab`), which collides in name with this dense per-band
+   * volume helper. Kept working, under this name, until @implementer's
+   * rewrite retires the dense arrays entirely.
+   */
+  private denseSlabVolume(chunk: VoxelChunk, slabIndex: number): number {
     const bandHeight = Math.min(CHUNK_SIZE, this.sizeY - slabIndex * CHUNK_SIZE);
     if (bandHeight <= 0) return 0;
     return (chunk.x1 - chunk.x0) * (chunk.z1 - chunk.z0) * bandHeight;
   }
 
-  /** Widens chunk's per-slab true written min/max density to include a write of
-   *  `density` at local index `i`, world y (#560). Dedupes via `touched` so the
-   *  same position written twice doesn't double-count toward full slab coverage. */
-  private touchDensity(chunk: VoxelChunk, i: number, y: number, density: number): void {
+  /**
+   * Widens chunk's per-slab true written min/max density to include a write of
+   * `density` at local index `i`, world y (#560). Dedupes via `touched` so the
+   * same position written twice doesn't double-count toward full slab coverage.
+   *
+   * Renamed from `touchDensity` (#1182): the cubic-slab skeleton introduces a
+   * new `touchDensity(slab, i, density)` below, operating on one `VoxelSlab`
+   * directly rather than a whole dense `VoxelChunk` — same name, different
+   * signature. Kept working under this name until @implementer's rewrite.
+   */
+  private denseTouchDensity(chunk: VoxelChunk, i: number, y: number, density: number): void {
     const slab = Math.floor(y / CHUNK_SIZE);
     if (slab < 0 || slab >= chunk.slabMinDensity.length) return;
     if (density < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = density;
@@ -518,6 +581,73 @@ export class VoxelGrid {
       chunk.touched[i] = 1;
       chunk.slabTouchedCount[slab]!++;
     }
+  }
+
+  // ── Cubic 16×16×16 slab storage (#1182 — skeleton stubs, @implementer fills these in) ──
+  //
+  // `VoxelChunk` still owns one flat, eagerly-allocated dense array set per
+  // column today (see `allocateChunk`/`density`/`compId`/`fracture` above).
+  // The methods below are the new API surface the slab rewrite lands on:
+  // one lazily-allocated `VoxelSlab` per 16-row y-band, keyed by
+  // `cy = chunkIndexOf(y)`, allocated only on a non-air write. None of them
+  // are wired into `VoxelChunk` yet — that structural change (adding
+  // `slabs: Map<number, VoxelSlab>` to `VoxelChunk` and rewriting every
+  // accessor/mutator to use it) is @implementer's, done blind to the tests
+  // @test-writer writes against this surface.
+
+  /** Allocate a fresh, all-air `VoxelSlab` (CHUNK_SIZE**3 = 4096 voxels). */
+  private allocateSlab(): VoxelSlab {
+    throw new Error('not implemented — see #1182');
+  }
+
+  /** The slab at chunk-local y-band `cy`, allocating one via `allocateSlab` if none exists yet. */
+  private getOrCreateSlab(chunk: VoxelChunk, cy: number): VoxelSlab {
+    void chunk; void cy; // TODO(#1182): implement — params unused until then
+    return this.allocateSlab();
+  }
+
+  /** The slab covering world y in `chunk`, or undefined if none has been allocated there. */
+  private slabAt(chunk: VoxelChunk, y: number): VoxelSlab | undefined {
+    void chunk; void y; // TODO(#1182): implement — params unused until then
+    return undefined;
+  }
+
+  /** Slab-local flat index (0..4095) of (x, y, z) within the slab at chunk-local y-band `cy`. */
+  private static localIndex(chunk: VoxelChunk, cy: number, x: number, y: number, z: number): number {
+    void chunk; void cy; void x; void y; void z; // TODO(#1182): implement — params unused until then
+    throw new Error('not implemented — see #1182');
+  }
+
+  /** Fixed voxel volume of one cubic slab: CHUNK_SIZE**3. */
+  private static slabVolume(chunk: VoxelChunk): number {
+    void chunk; // TODO(#1182): implement — param unused until then
+    throw new Error('not implemented — see #1182');
+  }
+
+  /** Widens `slab`'s tracked min/max density to include a write of `density` at slab-local index `i`. */
+  private touchDensity(slab: VoxelSlab, i: number, density: number): void {
+    void slab; void i; void density; // TODO(#1182): implement — params unused until then
+    throw new Error('not implemented — see #1182');
+  }
+
+  /**
+   * Total number of allocated 16×16×16 slabs across every owned column.
+   *
+   * References the new slab helpers above only so they stay reachable (and
+   * this file keeps compiling under strict unused-locals/params) until
+   * @implementer's rewrite gives them their real call sites and this getter
+   * an implementation that actually sums `chunk.slabs.size`.
+   */
+  get allocatedChunkCount(): number {
+    void this.getOrCreateSlab; void this.slabAt; void VoxelGrid.localIndex;
+    void VoxelGrid.slabVolume; void this.touchDensity;
+    throw new Error('not implemented — see #1182');
+  }
+
+  /** Number of allocated slabs in column (cx, cz); 0 if the column is unowned. */
+  slabCount(cx: number, cz: number): number {
+    void cx; void cz; // TODO(#1182): implement — params unused until then
+    throw new Error('not implemented — see #1182');
   }
 
   // ── Dirty tracking — what a save has to store voxel-by-voxel (#473 D4) ──
@@ -631,7 +761,7 @@ export class VoxelGrid {
   /** Density in [0, 1]. Coordinates the site does not own read as 0 (air). */
   densityAt(x: number, y: number, z: number): number {
     const chunk = this.ownerOfRead(x, y, z);
-    return chunk ? chunk.density[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]! : 0;
+    return chunk ? chunk.density[VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY)]! : 0;
   }
 
   /** True when density >= 0.5 — the shared "solid for meshing/physics" threshold. */
@@ -642,28 +772,28 @@ export class VoxelGrid {
   /** Fracture modifier (1.0 = normal, < 1.0 = pre-cracked). Unowned coordinates read as 1.0. */
   fractureAt(x: number, y: number, z: number): number {
     const chunk = this.ownerOfRead(x, y, z);
-    return chunk ? chunk.fracture[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]! : 1.0;
+    return chunk ? chunk.fracture[VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY)]! : 1.0;
   }
 
   /** The shared, frozen composition object for this voxel. Treat as immutable. */
   compositionAt(x: number, y: number, z: number): VoxelRockComposition {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return this.palette.get(0).comp;
-    return this.palette.get(chunk.compId[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]!).comp;
+    return this.palette.get(chunk.compId[VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY)]!).comp;
   }
 
   /** Dominant rock ID, precomputed at intern time. '' for air or unowned coordinates. */
   dominantRockAt(x: number, y: number, z: number): string {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return '';
-    return this.palette.get(chunk.compId[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]!).dominantRockId;
+    return this.palette.get(chunk.compId[VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY)]!).dominantRockId;
   }
 
   /** Ore densities at this voxel, or undefined if it carries no ore (the common case). */
   oresAt(x: number, y: number, z: number): Record<string, number> | undefined {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return undefined;
-    return chunk.ores.get(VoxelGrid.localIndex(chunk, x, y, z, this.sizeY));
+    return chunk.ores.get(VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY));
   }
 
   // ── Direct mutators — hot-path callers (generation, blast) should prefer these ──
@@ -679,7 +809,7 @@ export class VoxelGrid {
   fillVoxel(x: number, y: number, z: number, compId: number, ores?: Record<string, number>, density = 1.0): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const prevDensity = chunk.density[i]!;
     const prevCompId = chunk.compId[i]!;
     const prevOres = chunk.ores.get(i);
@@ -690,7 +820,7 @@ export class VoxelGrid {
     if (ores && Object.keys(ores).length > 0) chunk.ores.set(i, { ...ores });
     else chunk.ores.delete(i);
     this.touch(chunk);
-    this.touchDensity(chunk, i, y, density);
+    this.denseTouchDensity(chunk, i, y, density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, density, compId, chunk.ores.get(i));
     this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
@@ -698,7 +828,7 @@ export class VoxelGrid {
   setFractureAt(x: number, y: number, z: number, value: number): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const prev = chunk.fracture[i]!;
     chunk.fracture[i] = value;
     this.touch(chunk);
@@ -709,7 +839,7 @@ export class VoxelGrid {
   scaleFractureAt(x: number, y: number, z: number, factor: number): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const prev = chunk.fracture[i]!;
     const next = prev * factor;
     chunk.fracture[i] = next;
@@ -729,7 +859,7 @@ export class VoxelGrid {
   getVoxel(x: number, y: number, z: number): VoxelData | undefined {
     const chunk = this.ownerOfRead(x, y, z);
     if (!chunk) return undefined;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const ores = chunk.ores.get(i);
     return {
       composition: this.palette.get(chunk.compId[i]!).comp,
@@ -742,7 +872,7 @@ export class VoxelGrid {
   setVoxel(x: number, y: number, z: number, voxel: VoxelData): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const prevDensity = chunk.density[i]!;
     const prevCompId = chunk.compId[i]!;
     const prevOres = chunk.ores.get(i);
@@ -753,7 +883,7 @@ export class VoxelGrid {
     if (Object.keys(voxel.oreDensities).length > 0) chunk.ores.set(i, { ...voxel.oreDensities });
     else chunk.ores.delete(i);
     this.touch(chunk);
-    this.touchDensity(chunk, i, y, voxel.density);
+    this.denseTouchDensity(chunk, i, y, voxel.density);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, voxel.density, chunk.compId[i]!, chunk.ores.get(i));
     this.recordFractureWrite(x, y, z, prevFracture, voxel.fractureModifier);
   }
@@ -761,7 +891,7 @@ export class VoxelGrid {
   clearVoxel(x: number, y: number, z: number): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
     const prevDensity = chunk.density[i]!;
     const prevCompId = chunk.compId[i]!;
     const prevOres = chunk.ores.get(i);
@@ -771,7 +901,7 @@ export class VoxelGrid {
     chunk.fracture[i] = 1.0;
     chunk.ores.delete(i);
     this.touch(chunk);
-    this.touchDensity(chunk, i, y, 0);
+    this.denseTouchDensity(chunk, i, y, 0);
     this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, 0, 0, undefined);
     this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
@@ -818,7 +948,7 @@ export class VoxelGrid {
       for (let z = chunk.z0; z < chunk.z1; z++) {
         for (let y = 0; y < this.sizeY; y++) {
           for (let x = chunk.x0; x < chunk.x1; x++) {
-            const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+            const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
             if (chunk.density[i]! > 0) cb(x, y, z, chunk.compId[i]!);
           }
         }
@@ -833,7 +963,7 @@ export class VoxelGrid {
   ): void {
     this.forEachInRegion(min, max, (x, y, z) => {
       const chunk = this.ownerOf(x, y, z)!;
-      const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+      const i = VoxelGrid.denseLocalIndex(chunk, x, y, z, this.sizeY);
       if (chunk.density[i]! > 0) cb(x, y, z, chunk.compId[i]!);
     });
   }
