@@ -43,7 +43,6 @@ import { createLandscapeChunkStreamer, type LandscapeChunkStreamer } from './ter
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
-import { buildingFootprintSurfaceY } from './EntitySync.js';
 
 /**
  * How far past the playable rect manual panning may wander (#458 T6.1/D13).
@@ -150,26 +149,15 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // getTerrainSurfaceY() to see this grid, not the previous one (#408).
   deps.lastGrid = grid;
 
-  // Buildings
+  // Buildings, vehicles and characters start empty. EntitySync.syncEntitySets,
+  // which both load paths run straight after this, is the one place that adds
+  // their meshes: it records every id it adds, and it applies the rule that a
+  // mounted employee has no character mesh. Adding here as well left the
+  // sync seeing every entity as new, adding it a second time, and orphaning
+  // the first group in the scene.
   deps.buildings = new BuildingMesh(scene);
-  for (const b of state.buildings.buildings) {
-    const surfaceY = buildingFootprintSurfaceY(b, deps.getTerrainSurfaceY);
-    deps.buildings.addBuilding(b, surfaceY);
-  }
-
-  // Vehicles
   deps.vehicles = new VehicleMesh(scene);
-  for (const v of state.vehicles.vehicles) {
-    const surfaceY = deps.getTerrainSurfaceY(v.x, v.z);
-    deps.vehicles.addVehicle(v, state.vehicles, state.employees.employees, surfaceY);
-  }
-
-  // Characters (placed at terrain surface height, not y=0)
   deps.characters = new CharacterMesh(scene);
-  for (const e of state.employees.employees) {
-    const surfaceY = deps.getTerrainSurfaceY(e.x, e.z);
-    deps.characters.addEmployee(e, surfaceY);
-  }
 
   // Task progress bars — billboarded above working employees (#546)
   deps.taskProgress = new TaskProgressBar(scene, deps.sm.camera);

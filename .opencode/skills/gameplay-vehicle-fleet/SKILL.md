@@ -88,8 +88,11 @@ Seats: `occupantIds` is an array capped by `VEHICLE_SEAT_COUNT` (every role 1 fo
 **driver** is `occupantIds[0]` — the occupant whose itinerary moves the vehicle. Passengers are an
 additive change to the cap, not a change of shape.
 
-`claimedBy` holds the employee whose committed itinerary references this vehicle, so two employees
-never plan onto the same vehicle. It is released when that itinerary ends, by any route.
+A vehicle-gated action's claim on a vehicle is not stored on the vehicle. It lives in
+`VehicleState.reservations` as `{ vehicleId, actionId }` entries, read and written through
+`getVehicleReservation`, `findVehicleReservedForAction` and `removeVehicleReservation`
+(`Vehicle.ts`), so two employees never plan onto the same vehicle. It is released when the action
+that holds it ends, by any route.
 
 ### The Itinerary
 
@@ -122,17 +125,19 @@ type Goal =
   | { kind: 'rest';       buildingId: number };
 ```
 
-An employee's walk destination is `legs[0]`. No separate destination field exists on either entity.
+An employee's walk destination is `legs[0]`. `Employee.destinationX/Z` still exists: one of the
+known deviations under Status.
 
 ## Movement API
 
 ```ts
 moveTo(state, employeeId, { x, z }, opts?: { via?: number })   // via = vehicle id, a hint
 moveTo(state, employeeId, { vehicleId })                       // walk to it and board
+moveTo(state, employeeId, { actionId }, opts?: { via?: number }) // the journey a claimed action needs
 ```
 
-`moveTo` is the only entry point that starts movement. Both forms are thin wrappers over
-`planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
+`moveTo` is the only entry point that starts movement, apart from one tracked exception listed
+under Status. Every form is a thin wrapper over `planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
 foot leg to the vehicle and the board step that physically must happen.
 
 A `reposition` goal moves a vehicle with no work attached: parking the fleet clear of a blast is
@@ -203,9 +208,11 @@ Warehouse, clear debris with Rock Fragmenters before hauling.
 
 ## Invariants
 
-`assertWorldInvariants(state)` checks these at the end of every tick outside production builds, and
-every integration test and scenario step asserts it returns empty. The path-scoped `vehicles` rule
-names them; this is where they are defined.
+`assertWorldInvariants(state)` checks these at the end of every tick outside production builds. A
+kind listed in `FATAL_VIOLATION_KINDS` (`WorldInvariants.ts`) aborts the tick. Every other kind
+becomes a `WORLD INVARIANT VIOLATION` line in the tick output, and fails nothing unless a test
+checks it — `tests/helpers/worldInvariants.ts`'s `expectNoWorldInvariantViolations` is how a test
+does. The path-scoped `vehicles` rule names these invariants; this is where they are defined.
 
 | # | Invariant |
 |---|-----------|
@@ -213,59 +220,30 @@ names them; this is where they are defined.
 | I2 | A mounted employee's `x`/`z` equals their vehicle's `x`/`z` |
 | I3 | `occupantIds.length <= VEHICLE_SEAT_COUNT[v.type]`, and no employee appears in two vehicles |
 | I4 | A vehicle whose `x`/`z` changed this tick had an occupant this tick |
-| I5 | `v.claimedBy !== null` implies that employee holds an itinerary with a leg naming `v` |
+| I5 | A vehicle's reservation names a live `PendingAction` whose holder is alive and is the vehicle's driver, is walking to board it, or holds the action as a queued reserve-ahead |
 | I6 | `e.itinerary !== null` implies `legs.length > 0` |
 | I7 | `leg.mode === 'drive'` implies the employee is mounted in `leg.vehicleId` |
 | I8 | `v.payload !== null` implies that fragment's logistics state is `in_transit` |
 | I9 | `e.taskTicksRemaining !== null` implies `e.itinerary === null` (arrived, no longer travelling) |
 
-Three lint tests keep the writers singular: only the locomotion module assigns a vehicle's `x`/`z`,
-only the mount module assigns `occupantIds` or `locomotion`, and nothing outside the locomotion
-module pathfinds from a vehicle's position.
+Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only
+`Locomotion.ts` assigns a vehicle's `x`/`z`, and nothing outside it pathfinds from a vehicle's
+position. `tests/unit/lint/SingleMountWriter.test.ts`: only `Mount.ts` assigns `occupantIds` or
+`locomotion`.
 
-## Migration Status
+## Status
 
-This page specifies the target. `src/core/entities/Vehicle.ts` is the authority on what exists
-today. A migration issue updates its own row as it lands.
+The migration this page specifies is complete: phases 0a to 7 landed as #1083 to #1093. The
+tutorial box-cut, the case that started it, is asserted at no more than 2 rock-digger boardings for
+the whole ramp in both `tests/integration/needs.integration.test.ts` and the interaction-mode
+`scripts/scenario-defs/tutorial-boxcut-full.json`. The baseline measured before the migration was 3.
 
-| Phase | Delivers | Status |
-|-------|----------|--------|
-| 0a | Box-cut regression coverage under the tutorial's own conditions, interaction mode | landed |
-| 0b | `assertWorldInvariants`, warn-only, against today's fields | landed |
-| 1a | One vehicle-gated completion path | landed |
-| 1b | Tick pipeline core-owned; the second, test-only loop removed | landed |
-| 2 | `Locomotion` + `occupantIds` as the mount truth, `Mount` its only writer; renderer and 1-tile board/alight | landed |
-| 3a | `Itinerary`, `planItinerary`, and the planner/executor equivalence harness | landed |
-| 3b | `tickLocomotion` + `moveTo` become the only movers; vehicles stop pathfinding | planned |
-| 4 | Cost model delegates to the planner; continuity machinery removed | landed |
-| 5 | Haul and break become leg effects | landed |
-| 6 | `driverId`/`pendingEvacuationDestination` stripped, tier-correct upkeep/fuel, `reposition` ability | landed |
-| 6b | Last stored fields removed (`task`, `state`, `targetX`, `targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`, `reservedForActionId`); reservation moves to `VehicleState.reservations`; `computeVehicleStatus` takes `vehicleState`; fuel bills off reservation state | landed |
-| 7 | Fast transport un-gated | landed |
+Where the code still differs from this page, each difference has an owner:
 
-Phase 0a's own measured baseline (`tutorial-boxcut-full.json`, interaction mode and command mode
-both converge on the same figures): the box-cut finishes in 108 ticks (command mode) / 20 ticks for
-the final wait step (interaction mode, measured from the `build_ramp` order to full completion) —
-both bounded in the scenario's own `maxTicks: 130` ceiling — with the rock_digger boarded 3 times,
-bounded by `atMost: { vehicleBoardingCount: 4 }`. Both ceilings are measured-baseline caps later
-phases are expected to lower, not design targets. 3 boardings is far above the 2 boardings the
-mount/itinerary model targets; closing that gap is what phase 1a+ exists to do.
+| Deviation | Owner |
+|-----------|-------|
+| Only I8 is fatal. I4 and I5 fire in 14 command-mode scenarios; I1, I3, I6, I7 and I9 fire nowhere, and I2 fires only from hand-built test fixtures | #1115 |
+| A mounted employee keeps the vehicle for the whole rest, not just the drive there | #1122 |
+| On-foot rest, on-foot evacuation, and a claim unreachable when promoted still write `destinationX/Z` and walk through `Locomotion.ts`'s legacy walker, not `moveTo` | #1178 |
 
-Phase 2 kept `driverId` as a read-only mirror of `occupantIds` so the readers phases 3 to 5 rewrite
-or delete were not migrated twice. Phase 6 removed it: the driver is `occupantIds[0]`, read through
-`vehicleDriverId(vehicle)` (Vehicle.ts), and `pendingEvacuationDestination` is gone with it — an
-evacuation drive is now the driving employee's own `reposition` itinerary, ending in an `alight`
-step, with nothing stored on the vehicle. Phase 6 also fixed upkeep and fuel to bill at the
-vehicle's own tier, and gave `reposition` a player-facing path: the `vehicle reposition <id> <x> <z>`
-console command (which auto-selects the nearest idle licensed driver when the vehicle is empty, and
-refuses a vehicle reserved for a task) and the Fleet panel's per-card Reposition button, which arms
-the in-scene tile picker and dispatches it. The display-only `vehicle assign`/`vehicle move`
-subcommands are gone.
-
-Phase 6b removed the last eight fields stored on `Vehicle` for a reason other than "who is inside
-it": `task`, `state`, `targetX`, `targetZ`, `waitingTicks`, `moveConsecutiveFailures`, `isMoveStuck`,
-`reservedForActionId`. The reservation a vehicle-gated action holds now lives in
-`VehicleState.reservations` (`{ vehicleId, actionId }` entries), read and written through
-`getVehicleReservation`, `findVehicleReservedForAction`, and `removeVehicleReservation`
-(`Vehicle.ts`) rather than a field on the vehicle itself. Fuel bills off whether a vehicle holds a
-reservation, not off the now-gone `task` field.
+Remove a row when its issue lands.
