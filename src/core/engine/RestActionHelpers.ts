@@ -218,6 +218,9 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
   if (isMounted(emp.locomotion) && moveTo(state, emp.id, { x, z }).success) {
+    // TODO(#1122): call alightOnArrival(emp) here so the installed
+    // itinerary's final leg alights on arrival, freeing the vehicle once
+    // travel completes instead of holding it for the whole rest.
     emp.pendingActionType = 'rest';
     return;
   }
