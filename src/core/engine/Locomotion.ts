@@ -1,11 +1,11 @@
 // BlastSimulator2026 — Locomotion (#1089)
-// The only mover: walks every alive employee's current itinerary leg (or, for
-// an employee with no itinerary, the legacy destinationX/Z single foot leg)
-// one tick's worth of movement, and — for a mounted employee — writes their
+// The only mover: walks every alive employee's current itinerary leg one
+// tick's worth of movement, and — for a mounted employee — writes their
 // vehicle's x/z from theirs. That write is the only place a vehicle's
 // position ever changes. Replaces tickVehicle + tickEmployeeMovement
 // (EntityMovementTick.ts) and VehicleOccupancyReroute.ts, whose reroute/
-// escalation logic is absorbed below.
+// escalation logic is absorbed below. An employee with no itinerary does not
+// move (#1178, single-mover unification) — every walk goes through moveTo.
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -137,111 +137,21 @@ interface LocomotionResult {
 }
 
 /**
- * The only mover. Walks every alive employee's current itinerary leg (or, for
- * an employee with no itinerary, the legacy destinationX/Z single foot leg)
- * one tick's worth of movement, and — for a mounted employee — writes their
- * vehicle's x/z from theirs. The only place a vehicle's position ever changes.
+ * The only mover. Walks every alive employee's current itinerary leg one
+ * tick's worth of movement, and — for a mounted employee — writes their
+ * vehicle's x/z from theirs. The only place a vehicle's position ever
+ * changes. An employee with no itinerary (destinationX/Z, if set, is a
+ * read-only mirror — MoveTo.ts's syncItineraryMirrors) does not move.
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
   const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [] };
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
-
-    if (emp.itinerary !== null) {
-      advanceItinerary(state, emp, result, emitter);
-    } else if (emp.destinationX !== null && emp.destinationZ !== null) {
-      advanceLegacyFootWalk(state, emp, result, emitter);
-    }
+    if (emp.itinerary !== null) advanceItinerary(state, emp, result, emitter);
   }
 
   return result;
-}
-
-// ── Legacy on-foot movement (destinationX/Z, no itinerary) ──
-
-/**
- * Advance an employee walking toward destinationX/destinationZ directly —
- * RestActionHelpers.ts's beginRestTravel and Zone.ts's foot-evacuee branch both
- * keep writing these fields rather than building an itinerary (gameplay-
- * vehicle-fleet's phase 3b scope). Unchanged from the old tickEmployeeMovement.
- */
-function advanceLegacyFootWalk(state: GameState, emp: Employee, result: LocomotionResult, emitter?: EventEmitter): void {
-  const destX = emp.destinationX!;
-  const destZ = emp.destinationZ!;
-
-  if (emp.x === destX && emp.z === destZ) {
-    emp.destinationX = null;
-    emp.destinationZ = null;
-    return;
-  }
-
-  const avoidVehicles = !isDestinationOccupied(state, destX, destZ);
-
-  // Snapped through NavGrid's own (nearest-cell, round-based) convention
-  // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
-  // clampToGrid floors instead, which can choose a start cell up to a full
-  // diagonal away from the agent's true nearest cell — on steep terrain,
-  // that phantom floor cell can have locally poor connectivity (neighbours
-  // it alone finds climb-illegal) that the agent's real nearest cell does
-  // not, producing a needlessly long fresh replan every tick and, combined
-  // with a `committed` route already near-optimal, a stable no-progress
-  // cycle between the two. `Pathfinding.ts`'s own neighbour-expansion stays
-  // untouched; only the request's own start point moves to agree with the
-  // rest of the nav stack (`NavGrid.clampX`/`clampZ`, used throughout
-  // AgentAdvance.ts) on which cell a continuous position belongs to.
-  const fromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
-  const fromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
-  const path = state.navGrid
-    ? findPath(state.navGrid, {
-        agentId: emp.id, fromX, fromZ, toX: destX, toZ: destZ,
-        avoidVehicles,
-      })
-    : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: destX, z: destZ }] };
-
-  const outcome = advanceAlongPath({
-    x: emp.x, z: emp.z, walkSpeed: AGENT_WALK_SPEED,
-    destinationX: destX, destinationZ: destZ,
-    consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
-    path, navGrid: state.navGrid, avoidVehicles,
-    committed: readCommitted(emp),
-    ...readMoveHistory(emp),
-  });
-
-  emp.moveConsecutiveFailures = outcome.consecutiveFailures;
-  emp.isMoveStuck = outcome.isStuck;
-  writeCommitted(emp, outcome.committed);
-  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
-
-  if (!outcome.pathFound || outcome.isStuck) {
-    if (emp.isMoveStuck) {
-      if (outcome.becameStuck) {
-        result.stuck.push(emp.id);
-        emitter?.emit('agent:stuck', { employeeId: emp.id });
-      }
-      emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
-
-      if (emp.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
-        const actionId = emp.activeActionId;
-        interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
-        result.abandoned.push({ employeeId: emp.id, actionId });
-        emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
-      }
-    }
-    if (!outcome.pathFound) return;
-  }
-
-  emp.x = outcome.x;
-  emp.z = outcome.z;
-  result.moved.push(emp.id);
-
-  if (outcome.isPathComplete) {
-    emp.x = destX;
-    emp.z = destZ;
-    emp.destinationX = null;
-    emp.destinationZ = null;
-    result.arrived.push(emp.id);
-  }
 }
 
 // ── Itinerary-driven movement ──
@@ -272,9 +182,9 @@ function isLegArrived(x: number, z: number, leg: Leg): boolean {
  * instead. A no-op when `activeActionId` is already null (already released by
  * a caller further up, e.g. the stuck-move-abandon branch just below) or
  * names an on-foot action (requiredVehicleRole === null) — an on-foot
- * itinerary failure has its own recovery path (the legacy destinationX/Z
- * walker's own stuck-abandon, or a retry next tick) and this release is
- * scoped to the vehicle-reservation staleness I4/I5 exist to catch.
+ * itinerary failure has its own recovery path (a retry next tick) and this
+ * release is scoped to the vehicle-reservation staleness I4/I5 exist to
+ * catch.
  */
 function clearItineraryOnFailure(state: GameState, emp: Employee): void {
   emp.itinerary = null;
@@ -382,9 +292,11 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // drill_rig is still parked on) — mirrors the old tickEmployeeMovement.
   const avoidVehicles = isDrive ? false : !isDestinationOccupied(state, leg.destX, leg.destZ);
 
-  // Snapped through NavGrid's own round-based cell convention rather than
-  // handed to findPath continuous — see advanceLegacyFootWalk's identical
-  // fix above (#1166) for why.
+  // Snapped through NavGrid's own (nearest-cell, round-based) convention
+  // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
+  // clampToGrid floors instead, which can choose a start cell up to a full
+  // diagonal away from the agent's true nearest cell — see this file's own
+  // NavGrid.clampX/clampZ usage throughout AgentAdvance.ts for the same fix.
   const driveFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
   const driveFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
 

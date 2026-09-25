@@ -323,17 +323,19 @@ function buildDriveLeg(
   onArrive: Leg['onArrive'],
   def: ReturnType<typeof getVehicleDefByTier>,
   arrival: 'exact' | 'adjacent',
-  // TODO: implementer — #1178 single-mover unification. Placeholder param;
-  // real behavior (routing an otherwise-unreachable drive leg through) lands
-  // with the implementer phase.
+  // #1178: when true, an unreachable-right-now target still installs a leg
+  // (octile-heuristic estTicks) instead of refusing the plan — see this
+  // function's own doc comment above `dist`.
   allowUnreachable: boolean,
 ): Leg | null {
   const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false, vehicleRequiredClearanceCells(vehicle));
-  // TODO: implementer — #1178. `allowUnreachable` will let this leg build a
-  // best-effort route instead of failing outright once real logic lands; for
-  // now it still falls back to a 0-distance placeholder rather than failing.
   if (dist === null && !allowUnreachable) return null;
-  const effectiveDist = dist ?? 0;
+  // Target unreachable right now, but the caller wants a best-effort route
+  // anyway (#1178): fall back to the octile heuristic for estTicks and still
+  // install the leg. advanceLeg/advanceItinerary's existing stuck/abandon
+  // tracking (Locomotion.ts) takes it from here if the route genuinely never
+  // resolves.
+  const effectiveDist = dist ?? octileHeuristic(fromX, fromZ, toX, toZ);
 
   return {
     mode: 'drive',
@@ -352,9 +354,10 @@ function buildDriveLeg(
  * there. Shared by planItinerary's own no-vehicle-role branch and its
  * no-vehicle-available fallback for a vehicle-gated goal (see that call
  * site's own doc comment) — both plan the identical single-leg itinerary,
- * differing only in why no vehicle enters the route. Returns null when the
- * target is unreachable, same "stays queued, retries next tick" contract as
- * planItinerary itself.
+ * differing only in why no vehicle enters the route. Never refuses (#1178,
+ * single-mover unification): an unreachable-right-now target still gets a
+ * leg, timed off the octile heuristic instead of a real path — see the
+ * `dist` fallback above.
  */
 function buildFootOnlyItinerary(
   state: GameState,
@@ -365,11 +368,13 @@ function buildFootOnlyItinerary(
   targetZ: number,
   workTicks: number,
 ): Itinerary {
-  // TODO: implementer — #1178 single-mover unification. `dist` can no longer
-  // fall out to null here (an unreachable target must still produce SOME
-  // itinerary rather than none, per the planned allowUnreachable widening
-  // above); the real fallback-distance behavior lands with the implementer.
-  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ)) ?? 0;
+  // #1178: never refuse this itinerary — an unreachable-right-now target
+  // (exact fidelity, no live path) falls back to the octile heuristic for
+  // estTicks instead of failing the plan. Locomotion's existing
+  // stuck/abandon tracking (advanceLeg/advanceItinerary) covers a leg that
+  // genuinely never resolves once it's installed.
+  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ))
+    ?? octileHeuristic(employee.x, employee.z, targetX, targetZ);
 
   const footLeg: Leg = {
     mode: 'foot',
@@ -680,9 +685,9 @@ export function planItinerary(
   // in one place rather than being special-cased per goal kind.
   // `action`, for a 'work' goal, is a perf-only hint — see resolveGoal's own
   // doc comment (#1090).
-  // `allowUnreachable` (#1178, single-mover unification): TODO: implementer —
-  // threaded through to buildDriveLeg/buildFootOnlyItinerary once their own
-  // real fallback behavior lands.
+  // `allowUnreachable` (#1178, single-mover unification): threaded through to
+  // buildDriveLeg's vehicle-gated drive leg below — a best-effort route
+  // instead of a refusal when the target is unreachable right now.
   opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean },
 ): Itinerary | null {
   // haul_debris/fragment_debris (#1091): these two action types need more
@@ -716,7 +721,7 @@ export function planItinerary(
   if (role === null && via === undefined) {
     const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
 
-    if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null && footItinerary !== null) {
+    if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null) {
       // Same hint-with-fallback convention as resolveGoal's own actionHint
       // (#1090) — every current caller already supplies opts.action, this
       // just keeps a caller that doesn't from silently losing the footprint

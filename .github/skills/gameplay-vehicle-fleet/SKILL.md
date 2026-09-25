@@ -125,8 +125,8 @@ type Goal =
   | { kind: 'rest';       buildingId: number };
 ```
 
-An employee's walk destination is `legs[0]`. `Employee.destinationX/Z` still exists: one of the
-known deviations under Status.
+An employee's walk destination is `legs[0]`. `Employee.destinationX/Z` still exists as a read-only
+mirror of it, written by `moveTo`/`Locomotion.ts`/`alight()` — nothing reads it to drive movement.
 
 ## Movement API
 
@@ -136,8 +136,8 @@ moveTo(state, employeeId, { vehicleId })                       // walk to it and
 moveTo(state, employeeId, { actionId }, opts?: { via?: number }) // the journey a claimed action needs
 ```
 
-`moveTo` is the only entry point that starts movement, apart from one tracked exception listed
-under Status. Every form is a thin wrapper over `planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
+`moveTo` is the only entry point that starts movement. Every form is a thin wrapper over
+`planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
 foot leg to the vehicle and the board step that physically must happen.
 
 A `reposition` goal moves a vehicle with no work attached: parking the fleet clear of a blast is
@@ -244,6 +244,5 @@ Where the code still differs from this page, each difference has an owner:
 |-----------|-------|
 | Only I8 is fatal. I4 and I5 fire in 14 command-mode scenarios; I1, I3, I6, I7 and I9 fire nowhere, and I2 fires only from hand-built test fixtures | #1115 |
 | A mounted employee keeps the vehicle for the whole rest, not just the drive there | #1122 |
-| On-foot rest, on-foot evacuation, and a claim unreachable when promoted still write `destinationX/Z` and walk through `Locomotion.ts`'s legacy walker, not `moveTo` | #1178 |
 
 Remove a row when its issue lands.

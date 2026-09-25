@@ -564,13 +564,12 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
 
   // #1103: a currently-mounted employee claiming any OTHER on-foot action
   // (place_building, survey, charge_hole, etc.) must alight first. Without
-  // this, the legacy destinationX/Z walk below moves employee.x/z on its own
-  // every tick while the vehicle they're still nominally "mounted" in never
-  // moves (Locomotion.ts's advanceLegacyFootWalk only ever touches the
-  // employee, never a vehicle) — an immediate and then ever-widening I2
-  // (mounted-position-mismatch) violation for the rest of the walk.
-  // Mirrors the identical alight-before-boarding-elsewhere fix in
-  // PlanItinerary.ts's own vehicle-gated branch.
+  // this, the itinerary walk below moves employee.x/z on its own every tick
+  // while the vehicle they're still nominally "mounted" in never moves — an
+  // immediate and then ever-widening I2 (mounted-position-mismatch)
+  // violation for the rest of the walk. Mirrors the identical
+  // alight-before-boarding-elsewhere fix in PlanItinerary.ts's own
+  // vehicle-gated branch.
   alightIfMounted(state, employee);
 
   // #1090: every other on-foot action walks via moveTo — the only entry
@@ -593,29 +592,11 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
       if (rideVehicle) reserveVehicle(state.vehicles, rideVehicle.id, action.id);
     }
   }
-  if (!moveResult.success) {
-    // #1090 follow-up: moveTo's upfront exact-fidelity reachability check
-    // (planItinerary) refuses to install an itinerary for a target that's
-    // unreachable right now, unlike the legacy per-tick stepper it replaced
-    // here, which always started the walk and let every tick's own findPath
-    // attempt retry — incrementing moveConsecutiveFailures until isMoveStuck
-    // flips and MOVE_STUCK_ABANDON_TICKS eventually abandons it
-    // (Locomotion.ts's advanceLegacyFootWalk). Left as a silent no-op, an
-    // employee whose claim target is unreachable right now — but not
-    // provably unreachable forever — locks up permanently: activeActionId
-    // stays set (so the ordinary idle claim/promote steps never revisit
-    // them), while itinerary and destinationX/Z both stay null, which
-    // ArrivalGate reads as "arrived" without the employee ever having moved,
-    // and Locomotion's stuck-tracking never even starts (confirmed live via
-    // console-api.test.ts's own "counts an employee as stuck ... boxed in by
-    // buildings" case — a dispatch outside a sealed pocket froze silently
-    // instead of ever flipping isMoveStuck). Falling back to the legacy
-    // destinationX/Z walk here restores that same resilience for exactly
-    // this one case, without touching the itinerary path any target
-    // reachable at claim time still takes.
-    employee.destinationX = action.targetX;
-    employee.destinationZ = action.targetZ;
-  }
+  // #1178: the legacy destinationX/Z fallback for an unreachable-right-now
+  // claim target used to live here (moveTo could refuse an itinerary for it).
+  // Removed — buildFootOnlyItinerary (PlanItinerary.ts) can no longer refuse
+  // a non-vehicle-gated goal, so this moveTo call can no longer fail, and the
+  // fallback was dead code.
 
   // Non-rest actions queue their task duration here — a skill-required
   // action's claimed employee is guaranteed (by the qualification filters

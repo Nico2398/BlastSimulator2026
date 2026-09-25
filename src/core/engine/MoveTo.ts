@@ -15,9 +15,9 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number },
-  // `allowUnreachable` (#1178, single-mover unification): TODO: implementer —
-  // threaded through to planItinerary's own opts once its real fallback
-  // behavior lands.
+  // `allowUnreachable` (#1178, single-mover unification): forwarded straight
+  // to planItinerary's own opts — a best-effort route instead of a refusal
+  // when the target is unreachable right now.
   opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
@@ -111,18 +111,24 @@ export function alightOnArrival(employee: Employee | undefined): void {
 }
 
 /**
- * Keeps `employee.pendingDriverVehicleId` — the read-only mirror
- * ForceShiftRest.ts/TaskCancellation.ts/tutorialGuide.ts/FleetPanel.ts read to
- * mean "currently walking to board a vehicle" — in agreement with the
- * itinerary's own current leg: set while that leg's arrival step is a board
- * naming a vehicle, null otherwise (no itinerary, or a foot/drive leg that
- * isn't a board). Called from every point this module and Locomotion.ts
- * mutate `employee.itinerary`, so the mirror never drifts from what the
- * employee is actually walking toward.
+ * Keeps `employee.pendingDriverVehicleId` and `employee.destinationX/Z` — the
+ * read-only mirrors of the itinerary's current leg — in agreement with it.
+ * `pendingDriverVehicleId` (ForceShiftRest.ts/TaskCancellation.ts/
+ * tutorialGuide.ts/FleetPanel.ts) is set while that leg's arrival step is a
+ * board naming a vehicle, null otherwise (no itinerary, or a foot/drive leg
+ * that isn't a board). `destinationX/Z` (#1178, single-mover unification) is
+ * set from that same leg's own destX/destZ, null when there is no current
+ * leg — `isMidEvacuationWalk` (Evacuation.ts) and `isIdleForReposition`
+ * (VehicleDriverAssignment.ts) read it to mean "still walking". Called from
+ * every point this module and Locomotion.ts mutate `employee.itinerary`, so
+ * neither mirror ever drifts from what the employee is actually walking
+ * toward.
  */
 export function syncItineraryMirrors(employee: Employee): void {
   const leg = employee.itinerary?.legs[0];
   employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board'
     ? leg.onArrive.vehicleId
     : null;
+  employee.destinationX = leg !== undefined ? leg.destX : null;
+  employee.destinationZ = leg !== undefined ? leg.destZ : null;
 }
