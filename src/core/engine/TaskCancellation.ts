@@ -11,7 +11,7 @@ import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
-import { syncPendingDriverVehicleId } from './MoveTo.js';
+import { syncItineraryMirrors } from './MoveTo.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
@@ -441,11 +441,11 @@ function clearHolderWalkFields(emp: Employee): void {
   // #1090: clear any in-flight itinerary too — an interruption/cancellation
   // must never leave a moveTo-installed itinerary still attached once the
   // employee is idle-but-claimable again (WorldInvariants.ts's I9 check).
-  // syncPendingDriverVehicleId (MoveTo.ts) re-derives pendingDriverVehicleId
+  // syncItineraryMirrors (MoveTo.ts) re-derives pendingDriverVehicleId
   // from the (now null) itinerary rather than hand-setting it, reusing the
   // same syncing helper every itinerary mutation already goes through.
   emp.itinerary = null;
-  syncPendingDriverVehicleId(emp);
+  syncItineraryMirrors(emp);
 }
 
 /**

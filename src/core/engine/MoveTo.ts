@@ -15,7 +15,10 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number },
-  opts?: { via?: number },
+  // `allowUnreachable` (#1178, single-mover unification): TODO: implementer —
+  // threaded through to planItinerary's own opts once its real fallback
+  // behavior lands.
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
 export function moveTo(
@@ -42,7 +45,7 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number } | { vehicleId: number } | { actionId: number },
-  opts?: { via?: number },
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee) return { success: false, error: t('move_to.employee_not_found') };
@@ -61,7 +64,7 @@ export function moveTo(
       workTicks: 0,
       estTotalTicks: leg.estTicks,
     };
-    syncPendingDriverVehicleId(employee);
+    syncItineraryMirrors(employee);
     return { success: true };
   }
 
@@ -73,7 +76,7 @@ export function moveTo(
     if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
     employee.itinerary = itinerary;
-    syncPendingDriverVehicleId(employee);
+    syncItineraryMirrors(employee);
     return { success: true };
   }
 
@@ -81,7 +84,7 @@ export function moveTo(
   if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
   employee.itinerary = itinerary;
-  syncPendingDriverVehicleId(employee);
+  syncItineraryMirrors(employee);
   return { success: true };
 }
 
@@ -117,7 +120,7 @@ export function alightOnArrival(employee: Employee | undefined): void {
  * mutate `employee.itinerary`, so the mirror never drifts from what the
  * employee is actually walking toward.
  */
-export function syncPendingDriverVehicleId(employee: Employee): void {
+export function syncItineraryMirrors(employee: Employee): void {
   const leg = employee.itinerary?.legs[0];
   employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board'
     ? leg.onArrive.vehicleId

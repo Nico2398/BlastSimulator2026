@@ -26,7 +26,7 @@ import { board, alight } from './Mount.js';
 import { isDestinationOccupied, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
-import { moveTo, syncPendingDriverVehicleId } from './MoveTo.js';
+import { moveTo, syncItineraryMirrors } from './MoveTo.js';
 import { dismountVehicleDriver, releaseVehicleReservation } from './VehicleReservation.js';
 
 /** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
@@ -279,7 +279,7 @@ function isLegArrived(x: number, z: number, leg: Leg): boolean {
 function clearItineraryOnFailure(state: GameState, emp: Employee): void {
   emp.itinerary = null;
   clearVehicleDetour(emp);
-  syncPendingDriverVehicleId(emp);
+  syncItineraryMirrors(emp);
 
   if (emp.activeActionId !== null) {
     const action = state.pendingActions.find(a => a.id === emp.activeActionId);
@@ -348,7 +348,7 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     // #1166: the detour latch is scoped to the leg that recorded it — the
     // next leg starts from a clean route and finds its own blockers.
     clearVehicleDetour(emp);
-    syncPendingDriverVehicleId(emp);
+    syncItineraryMirrors(emp);
     if (itinerary.legs.length === 0) {
       emp.itinerary = null;
       result.arrived.push(emp.id);
