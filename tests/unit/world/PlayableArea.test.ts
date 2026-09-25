@@ -337,6 +337,54 @@ describe('PlayableArea.claimArea', () => {
   });
 });
 
+// ── #1182: cubic 16×16×16 slab allocation tracks the generated surface, ──
+// not the grid's declared sizeY. CONFIG.sizeY = 24 -> under the old dense
+// model every claimed chunk allocated ceil(24/16) = 2 full-column bands
+// regardless of how deep the terrain was actually generated.
+describe('PlayableArea.claim — cubic slab allocation matches the generated surface (#1182)', () => {
+  it("slabCount(cx,cz) equals the number of 16-row y-bands the generated surface actually spans in that chunk, not ceil(sizeY/CHUNK_SIZE)", () => {
+    const { grid, area } = makeArea();
+    const result = area.claim(35, 10);
+    expect(result.claimed).toBe(true);
+    expect(result.claimed && result.chunk).toEqual({ cx: 2, cz: 0 });
+
+    // Derive the expected band count from the ACTUAL generated writes in the
+    // claimed chunk's owned rect, rather than hardcoding a magic number.
+    const rect = grid.chunkRect(2, 0)!;
+    let maxTopY = -1;
+    for (let x = rect.minX; x < rect.maxX; x++) {
+      for (let z = rect.minZ; z < rect.maxZ; z++) {
+        for (let y = grid.sizeY - 1; y >= 0; y--) {
+          if (grid.densityAt(x, y, z) > 0) {
+            if (y > maxTopY) maxTopY = y;
+            break;
+          }
+        }
+      }
+    }
+    expect(maxTopY).toBeGreaterThanOrEqual(0); // sanity: generation actually wrote something
+
+    const expectedSlabCount = Math.ceil((maxTopY + 1) / CHUNK_SIZE);
+    // The dense-model equivalent this replaces — locks in that the new
+    // behaviour is a genuine reduction, not incidentally the same number.
+    const denseModelSlabCount = Math.ceil(grid.sizeY / CHUNK_SIZE);
+    expect(expectedSlabCount).toBeLessThan(denseModelSlabCount);
+
+    expect(grid.slabCount(2, 0)).toBe(expectedSlabCount);
+  });
+
+  it('claiming the same adjacent chunk from a second, independently generated grid at the same seed/config allocates the same slabCount (deterministic, not history-dependent)', () => {
+    const first = makeArea();
+    const second = makeArea();
+
+    first.area.claim(35, 10);
+    second.area.claim(35, 10);
+
+    expect(first.grid.slabCount(2, 0)).toBeGreaterThan(0);
+    expect(second.grid.slabCount(2, 0)).toBe(first.grid.slabCount(2, 0));
+  });
+});
+
 describe('PlayableArea.previewClaim', () => {
   it('returns null for a coordinate already inside the site', () => {
     const { area } = makeArea();

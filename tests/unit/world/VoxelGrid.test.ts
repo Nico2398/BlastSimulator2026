@@ -501,18 +501,77 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
     expect(grid.densityAt(20, 4, 4)).toBe(0);
   });
 
-  it('reports out-of-bounds reads to an installed reporter, and nothing else', () => {
+  it('reports an unowned-column read to an installed reporter, but NOT a legitimate in-column read past sizeY (#1182)', () => {
     const grid = new VoxelGrid(16, 8, 16);
     const misses: Array<[number, number, number]> = [];
     const previous = setVoxelBoundsReporter((x, y, z) => { misses.push([x, y, z]); });
     try {
-      grid.densityAt(4, 4, 4);
-      grid.densityAt(-1, 4, 4);
-      grid.densityAt(4, 99, 4);
+      grid.densityAt(4, 4, 4);   // fully in-bounds — not reported
+      grid.densityAt(-1, 4, 4);  // unowned column — reported
+      grid.densityAt(4, 99, 4);  // owned column, y past sizeY — a legitimate unallocated-slab read, NOT reported
     } finally {
       setVoxelBoundsReporter(previous);
     }
-    expect(misses).toEqual([[-1, 4, 4], [4, 99, 4]]);
+    expect(misses).toEqual([[-1, 4, 4]]);
+  });
+});
+
+describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column succeed without allocating unless non-air (#1182)', () => {
+  it('fillVoxel below y=0 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(4, -10, 4, compId, { blingite: 0.4 }, 0.9);
+    expect(grid.densityAt(4, -10, 4)).toBe(0.9);
+    expect(grid.compositionAt(4, -10, 4).rocks[0]!.rockId).toBe('cruite');
+    expect(grid.oresAt(4, -10, 4)).toEqual({ blingite: 0.4 });
+  });
+
+  it('setVoxel above y = sizeY + 10 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.setVoxel(4, 8 + 10, 4, {
+      composition: { rocks: [{ rockId: 'molite', coefficient: 1 }] },
+      density: 0.6,
+      oreDensities: { sparkium: 0.2 },
+      fractureModifier: 0.5,
+    });
+    expect(grid.densityAt(4, 18, 4)).toBe(0.6);
+    expect(grid.compositionAt(4, 18, 4).rocks[0]!.rockId).toBe('molite');
+    expect(grid.oresAt(4, 18, 4)).toEqual({ sparkium: 0.2 });
+  });
+
+  it('isInBounds still rejects y = -10 and y = sizeY + 10 for an otherwise-owned column (regression guard — already passes today)', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.isInBounds(4, -10, 4)).toBe(false);
+    expect(grid.isInBounds(4, 8 + 10, 4)).toBe(false);
+  });
+
+  it('a never-written slab above/below the declared height reads default air values without allocating', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const before = grid.slabCount(0, 0);
+    expect(grid.densityAt(4, -10, 4)).toBe(0);
+    expect(grid.fractureAt(4, -10, 4)).toBe(1.0);
+    expect(grid.densityAt(4, 30, 4)).toBe(0);
+    expect(grid.fractureAt(4, 30, 4)).toBe(1.0);
+    expect(grid.slabCount(0, 0)).toBe(before);
+  });
+
+  it('writing explicit air into a never-touched slab does not allocate it; a non-air write allocates exactly one', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const airCompId = grid.palette.intern({ rocks: [] });
+    const before = grid.slabCount(0, 0);
+
+    grid.fillVoxel(4, 30, 4, airCompId, undefined, 0); // explicit air write — must not allocate
+    expect(grid.slabCount(0, 0)).toBe(before);
+
+    grid.fillVoxel(4, 30, 4, airCompId, undefined, 1); // non-air write — must allocate exactly one slab
+    expect(grid.slabCount(0, 0)).toBe(before + 1);
+  });
+
+  it('clearVoxel on an already-air, never-written voxel does not allocate', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const before = grid.slabCount(0, 0);
+    grid.clearVoxel(4, 30, 4);
+    expect(grid.slabCount(0, 0)).toBe(before);
   });
 });
 
@@ -604,10 +663,41 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   // structural guarantee of fillVoxel/setVoxel rather than a runtime case to
   // exercise through a since-deleted bulk-restore method.
 
-  it("returns null for an unowned chunk, and for a slab index past the grid's height", () => {
-    const grid = new VoxelGrid(16, 8, 16); // nSlabs = ceil(8/16) = 1 -> only slab 0 exists
+  it('returns null for an unowned chunk', () => {
+    const grid = new VoxelGrid(16, 8, 16);
     expect(grid.chunkDensityRange(5, 5, 0)).toBeNull(); // chunk (5,5) was never claimed
-    expect(grid.chunkDensityRange(0, 0, 1)).toBeNull(); // slab 1 doesn't exist for an 8-tall grid
+  });
+
+  it("returns {min:0, max:0} — not null — for a slab index past an OWNED column's declared height (#1182)", () => {
+    // Under the old dense model, slab 1 of an 8-tall grid didn't exist at all
+    // (nSlabs = ceil(8/16) = 1) and this returned null. Under cubic slabs, the
+    // column at (0,0) is owned regardless, so a read past sizeY answers the
+    // same honest "nothing written here" {0,0} an in-range unwritten slab would.
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.chunkDensityRange(0, 0, 1)).toEqual({ min: 0, max: 0 });
+  });
+
+  it('an allocated, fully-written slab reflects its two distinct writes\' real min/max — NOT the same {0,0} an unallocated slab reads back (#1182)', () => {
+    const grid = new VoxelGrid(16, 24, 16); // single full chunk (0,0), sizeY=24
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    // Fully touch the whole y=16..31 cubic slab (slab index 1) with a baseline
+    // density, then write one voxel to a distinct, higher density — so the
+    // summary's min/max reflect BOTH writes exactly, with no implicit-air
+    // baseline folded in (this slab has no untouched positions left).
+    for (let z = 0; z < CHUNK_SIZE; z++) {
+      for (let y = 16; y < 32; y++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          grid.fillVoxel(x, y, z, compId, undefined, 0.3);
+        }
+      }
+    }
+    grid.fillVoxel(2, 20, 2, compId, undefined, 0.9);
+
+    expect(grid.chunkDensityRange(0, 0, 1)).toEqual({ min: 0.3, max: 0.9 });
+    // A neighbouring, never-touched slab in the same column still reads the
+    // honest-air {0,0} — the allocated slab above is not that same code path.
+    expect(grid.chunkDensityRange(0, 0, 2)).toEqual({ min: 0, max: 0 });
   });
 });
 
@@ -1049,6 +1139,15 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
     let calls = 0;
     grid.forEachSolidInRegion({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, () => { calls++; });
     expect(calls).toBe(0);
+  });
+
+  it('a solid voxel force-written at y = sizeY + 5 does not appear in forEachSolid — storage accepts the write, but iteration still respects [0, sizeY) (#1182)', () => {
+    const grid = new VoxelGrid(4, 4, 4);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] });
+    grid.fillVoxel(1, 4 + 5, 1, compId, undefined, 1); // y=9, well past sizeY=4
+    const visited: Array<[number, number, number]> = [];
+    grid.forEachSolid((x, y, z) => visited.push([x, y, z]));
+    expect(visited).toEqual([]);
   });
 });
 
