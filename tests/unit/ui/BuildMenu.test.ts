@@ -19,7 +19,11 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building } from '../../../src/core/entities/Building.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
+import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
+import { rampDefFromEndpoints, validateRampOrder, RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 
 /** Minimal GameState that won't crash the panel update loop. */
 function makeMockState(overrides?: Partial<GameState>): GameState {
