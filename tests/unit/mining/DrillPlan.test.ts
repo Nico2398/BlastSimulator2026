@@ -225,13 +225,13 @@ describe('digVoxel', () => {
     expect(result.newSurfaceY).toBe(2);
   });
 
-  it('newSurfaceY is -1 when the last voxel in the column is dug', () => {
+  it('newSurfaceY is null when the last voxel in the column is dug', () => {
     // Column at (2, z=2): only y=3 is solid — digging it leaves an empty column
     grid.setVoxel(2, 3, 2, solidVoxel());
 
     const result = digVoxel(grid, 2, 3, 2);
 
-    expect(result.newSurfaceY).toBe(-1);
+    expect(result.newSurfaceY).toBeNull();
   });
 
   it('newSurfaceY is unchanged when a non-top voxel is dug', () => {
@@ -269,12 +269,13 @@ describe('digVoxel', () => {
     // setVoxelColumnSurfaceHeight's own band write leaves above it.
     setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
     const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).not.toBeNull();
     expect(oldTop).toBe(3);
-    expect(grid.densityAt(2, oldTop + 1, 2)).toBeGreaterThan(0);
+    expect(grid.densityAt(2, oldTop! + 1, 2)).toBeGreaterThan(0);
 
-    digVoxel(grid, 2, oldTop, 2);
+    digVoxel(grid, 2, oldTop!, 2);
 
-    for (let y = oldTop; y < grid.sizeY; y++) {
+    for (let y = oldTop!; y < grid.sizeY; y++) {
       expect(grid.densityAt(2, y, 2), `density at y=${y} should be 0`).toBe(0);
     }
   });
@@ -289,12 +290,14 @@ describe('digVoxel', () => {
     for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
     setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
     const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).not.toBeNull();
 
-    digVoxel(grid, 2, oldTop, 2);
+    digVoxel(grid, 2, oldTop!, 2);
 
     const newTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(newTop).not.toBeNull();
     expect(newTop).toBe(2);
-    expect(grid.densityAt(2, newTop, 2)).toBe(1);
+    expect(grid.densityAt(2, newTop!, 2)).toBe(1);
   });
 
   it('digging a non-top voxel does not disturb anything above the unmoved top', () => {
@@ -302,14 +305,15 @@ describe('digVoxel', () => {
     for (let y = 0; y <= 2; y++) grid.fillVoxel(2, y, 2, compId, undefined, 1);
     setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
     const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).not.toBeNull();
     const aboveBefore: number[] = [];
-    for (let y = oldTop; y < grid.sizeY; y++) aboveBefore.push(grid.densityAt(2, y, 2));
+    for (let y = oldTop!; y < grid.sizeY; y++) aboveBefore.push(grid.densityAt(2, y, 2));
 
     digVoxel(grid, 2, 1, 2); // dig a buried, non-top voxel — the top never moves
 
     expect(computeVoxelColumnSurfaceY(grid, 2, 2)).toBe(oldTop);
     const aboveAfter: number[] = [];
-    for (let y = oldTop; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
+    for (let y = oldTop!; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
     expect(aboveAfter).toEqual(aboveBefore);
   });
 
@@ -321,19 +325,20 @@ describe('digVoxel', () => {
     // setVoxelColumnSurfaceHeight's own band write leaves above it.
     setVoxelColumnSurfaceHeight(grid, 2, 2, 3.5, compId);
     const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
+    expect(oldTop).not.toBeNull();
     expect(oldTop).toBe(3);
 
     const emitter = new EventEmitter();
     const handler = vi.fn();
     emitter.on('terrain:updated', handler);
 
-    digVoxel(grid, 2, oldTop, 2, emitter);
+    digVoxel(grid, 2, oldTop!, 2, emitter);
 
     expect(handler).toHaveBeenCalledTimes(1);
     const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
     // The dug voxel's own y is oldTop (3), but renormalisation reaches one
     // cell higher to clear the stranded residue at oldTop+1 — the emitted
     // region must widen to match, not stop at the raw dug voxel's own y.
-    expect(emitted.region.maxY).toBe(oldTop + 1);
+    expect(emitted.region.maxY).toBe(oldTop! + 1);
   });
 });

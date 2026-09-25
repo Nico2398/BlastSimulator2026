@@ -31,7 +31,7 @@ import { groupProjectiles } from './ProjectileGrouping.js';
 import { resolveFragmentLanding, type FragmentFlight } from './BlastResolve.js';
 import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
-import { VoxelGrid, computeVoxelColumnSurfaceY, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import type { AccidentRecord } from '../entities/Damage.js';
@@ -226,7 +226,7 @@ export function executeBlast(
   //     are anchored at the actual surface, not hardcoded y=0.
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
-    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+    holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
   }
 
   // 2b. Calculate blast zone bounding box anchored at the surface
@@ -506,7 +506,7 @@ function throwFractionAt(origin: Vec3, plan: BlastPlan): number {
 export function buildPlanEnergyField(plan: BlastPlan, grid: VoxelGrid): EnergyField | null {
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
-    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+    holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
   }
   return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
 }

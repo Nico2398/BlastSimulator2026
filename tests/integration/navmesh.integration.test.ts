@@ -252,9 +252,9 @@ describe('NavMesh and pathfinding', () => {
     // Edge clamped column (999, 999 → (4,4)) also returns 5.5
     expect(NavGrid.computeSurfaceY(vg, 999, 999)).toBe(5.5);
 
-    // All-air column returns -1
+    // All-air column returns NaN
     const empty = new VoxelGrid(3, 10, 3);
-    expect(NavGrid.computeSurfaceY(empty, 1, 1)).toBe(-1);
+    expect(NavGrid.computeSurfaceY(empty, 1, 1)).toBeNaN();
   });
 
   it('drill holes marked as drill_hole cells', () => {

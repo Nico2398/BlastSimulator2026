@@ -405,8 +405,9 @@ describe('carveRampSegment — post-carve renormalisation (#1148)', () => {
     });
 
     const newTop = computeVoxelColumnSurfaceY(grid, 5, 5);
+    expect(newTop).not.toBeNull();
     expect(newTop).toBe(2);
-    expect(grid.densityAt(5, newTop, 5)).toBe(1);
+    expect(grid.densityAt(5, newTop!, 5)).toBe(1);
   });
 });
 
@@ -1023,7 +1024,7 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
 
   describe('isRampCellPending', () => {
     it('a fillTarget cell whose column is still below the target reports pending (true)', () => {
-      const grid = new VoxelGrid(10, 10, 10); // column (3,3) is entirely empty -> height 0
+      const grid = new VoxelGrid(10, 10, 10); // column (3,3) is entirely empty -> no ground (NaN height, #1184)
       const cell = { x: 3, y: 5, z: 3, fillTarget: 5 };
       expect(isRampCellPending(grid, cell)).toBe(true);
     });

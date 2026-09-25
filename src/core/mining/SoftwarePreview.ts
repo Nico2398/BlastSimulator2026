@@ -5,9 +5,9 @@
 
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
-import { getDominantRockId } from '../world/VoxelGrid.js';
+import { getDominantRockId, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
-import { SOLID_VOXEL_DENSITY_THRESHOLD, SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
+import { SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
 
 export const PREVIEW_RADIUS = 5;
@@ -78,18 +78,13 @@ export function predictFragmentation(intensity: number): { pieces: number; sizeM
   return { pieces, sizeM3: 1 / pieces };
 }
 
-/** Compute surface Y for each hole by scanning the column from top to bottom. */
+/** Compute surface Y for each hole — first empty layer above ground (#1184). */
 export function getHoleSurfaceYs(plan: BlastPlan, grid: VoxelGrid): Record<string, number> {
   const result: Record<string, number> = {};
   for (const hole of plan.holes) {
     const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
     const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
-    let surfaceY = 0;
-    for (let y = grid.sizeY - 1; y >= 0; y--) {
-      const v = grid.getVoxel(gx, y, gz);
-      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) { surfaceY = y + 1; break; }
-    }
-    result[hole.id] = surfaceY;
+    result[hole.id] = firstEmptyLayerAboveGround(grid, gx, gz);
   }
   return result;
 }

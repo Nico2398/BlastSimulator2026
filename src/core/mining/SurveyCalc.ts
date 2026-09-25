@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Survey types and noise-scaled estimation logic
 
-import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
 import {
   SURVEY_BASE_ERROR,
@@ -159,8 +159,12 @@ export function estimateSurveyResult(
       // Determine which Y levels to sample
       let yLevels: number[];
       if (method === 'aerial') {
-        const surfaceY = computeVoxelColumnSurfaceY(grid, x, z) + 1;
-        yLevels = [surfaceY, surfaceY - 1].filter(y => y >= 0 && y < grid.sizeY);
+        const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
+        // No lower bound: voxel storage has no vertical floor (#1184) and a
+        // column's ground can legitimately sit below y=0, so surfaceY itself
+        // can be negative. Only the upper bound still means anything here —
+        // it caps sampling at the grid's declared vertical extent.
+        yLevels = [surfaceY, surfaceY - 1].filter(y => y < grid.sizeY);
       } else {
         yLevels = [];
         for (let y = 0; y < grid.sizeY; y++) yLevels.push(y);

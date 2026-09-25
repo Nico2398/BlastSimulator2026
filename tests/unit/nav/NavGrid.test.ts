@@ -168,10 +168,10 @@ describe('NavGrid.computeSurfaceY', () => {
     expect(y).toBe(4.5);
   });
 
-  it('returns -1 for a column with no rock (all air)', () => {
+  it('returns NaN for a column with no rock (all air)', () => {
     const grid = new VoxelGrid(10, 10, 10);
     const y = NavGrid.computeSurfaceY(grid, 0, 0);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 
   it('clamps out-of-bounds x coordinate to grid limits', () => {
@@ -188,14 +188,14 @@ describe('NavGrid.computeSurfaceY', () => {
     expect(y).toBe(4.5);
   });
 
-  it('returns -1 when clamped column still has no solid voxel', () => {
+  it('returns NaN when clamped column still has no solid voxel', () => {
     const grid = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
     // Column (5,5) has rock; column (20,5) clamps to (9,5) which has no rock
     const y = NavGrid.computeSurfaceY(grid, 20, 5);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 
-  it('returns -1 for a column where density is below 0.5', () => {
+  it('returns NaN for a column where density is below 0.5', () => {
     const grid = new VoxelGrid(10, 10, 10);
     // Set voxel at y=5 with density 0.3 (below the 0.5 threshold)
     grid.setVoxel(0, 5, 0, {
@@ -205,7 +205,7 @@ describe('NavGrid.computeSurfaceY', () => {
       fractureModifier: 1.0,
     });
     const y = NavGrid.computeSurfaceY(grid, 0, 0);
-    expect(y).toBe(-1);
+    expect(y).toBeNaN();
   });
 });
 
@@ -561,14 +561,14 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     expect(NavGrid.computeSurfaceY(grid, 3, 3)).not.toBe(computeVoxelColumnSurfaceY(grid, 3, 3));
   });
 
-  it('still returns -1 (the void sentinel) for a genuinely void/out-of-bounds column', () => {
+  it('still returns NaN (the void sentinel) for a genuinely void/out-of-bounds column', () => {
     const voidGrid = new VoxelGrid(10, 10, 10); // all air
-    expect(NavGrid.computeSurfaceY(voidGrid, 0, 0)).toBe(-1);
+    expect(NavGrid.computeSurfaceY(voidGrid, 0, 0)).toBeNaN();
 
     // A single solid column queried far outside itself: the clamped column
     // still has no solid voxel, per makeSingleColumnGrid's own contract.
     const single = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
-    expect(NavGrid.computeSurfaceY(single, 20, 5)).toBe(-1);
+    expect(NavGrid.computeSurfaceY(single, 20, 5)).toBeNaN();
   });
 
   it('two adjacent columns with a genuine sub-voxel graded difference classify as ramp — the continuous delta is now the correct ramp gate (#1151)', () => {
@@ -655,6 +655,75 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     // this to true.
     const reachableFromA = NavGrid.computeClimbReachableSet(nav, 3, 3);
     expect(reachableFromA.has(4, 3)).toBe(false);
+  });
+});
+
+// ── Ground at or below y = 0 is still ground, not void (#1184) ──────────────
+//
+// Since #1183/#1184, a column's surface can legitimately sit at 0 or below
+// (no more [0, sizeY) scan bound). The old `surfaceY === -1` void sentinel
+// used by classifyCellType/computeMaxSurfaceY can no longer double as both
+// "no ground" and a real height of -1, so a uniformly-below-zero site must
+// still classify and path exactly like any other ground.
+
+/**
+ * Build a VoxelGrid with a uniform, flat column height (same everywhere, so
+ * no cardinal neighbour reads a different surface — avoids spurious ramp
+ * classification) with its topmost solid voxel at `solidTopY`, which — unlike
+ * `makeSolidGrid` — may be zero or negative: rock fills the 5 voxels
+ * `[solidTopY - 4, solidTopY]`, not `[0, solidTopY]`.
+ */
+function makeUniformSolidGridAt(sizeX: number, sizeY: number, sizeZ: number, solidTopY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      for (let y = solidTopY - 4; y <= solidTopY; y++) {
+        grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+  }
+  return grid;
+}
+
+describe('NavGrid.buildNavGrid — ground at or below y = 0 (#1184)', () => {
+  it('a column whose surface sits below y = 0 classifies as ground (not void) and is reachable', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform rock y=-9..-5 across the whole site
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const cell = nav.cells[3]![3]!;
+
+    expect(cell.type).not.toBe('void');
+    expect(cell.moveCost).toBeLessThan(Infinity);
+    expect(cell.surfaceY).toBeCloseTo(-4.5, 6);
+
+    const reachable = NavGrid.computeReachableSet(nav, 3, 3);
+    expect(reachable.size).toBeGreaterThan(1);
+    expect(reachable.has(5, 5)).toBe(true);
+  });
+
+  it('a column whose surface sits exactly at y = 0 classifies as ground (not void) and is reachable', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, 0); // uniform rock y=-4..0 across the whole site
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const cell = nav.cells[3]![3]!;
+
+    expect(cell.type).not.toBe('void');
+    expect(cell.moveCost).toBeLessThan(Infinity);
+    expect(cell.surfaceY).toBeCloseTo(0.5, 6);
+
+    const reachable = NavGrid.computeReachableSet(nav, 3, 3);
+    expect(reachable.size).toBeGreaterThan(1);
+    expect(reachable.has(5, 5)).toBe(true);
+  });
+});
+
+describe('NavGrid.computeMaxSurfaceY — no-ground signal and unclamped negative max (#1184)', () => {
+  it('reports NaN (not -1) for an entirely off-site/empty grid, distinct from a real negative max', () => {
+    const emptyGrid = new VoxelGrid(0, 10, 0);
+    expect(Number.isNaN(NavGrid.computeMaxSurfaceY(emptyGrid))).toBe(true);
+  });
+
+  it('reports the true negative max surface Y for a site sitting entirely below y = 0, not clamped to -1', () => {
+    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform crossing at -4.5 everywhere
+    expect(NavGrid.computeMaxSurfaceY(grid)).toBeCloseTo(-4.5, 6);
   });
 });
 

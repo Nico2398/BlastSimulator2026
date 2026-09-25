@@ -4,7 +4,7 @@
 // Flatness/occupancy validation itself lives in `Building.ts`'s
 // `checkFootprintPlacement` (#1008) — this file no longer duplicates it.
 
-import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import { type VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { getBuildingDef, type Building } from './Building.js';
 
 // Re-exported so `Building.ts` (the real placement path) can take a `VoxelGrid`
@@ -16,7 +16,7 @@ export type { VoxelGrid };
  * voxel in column (x, z), or 0 if the entire column is empty.
  */
 export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
-  return computeVoxelColumnSurfaceY(voxelGrid, x, z) + 1;
+  return firstEmptyLayerAboveGround(voxelGrid, x, z);
 }
 
 /**

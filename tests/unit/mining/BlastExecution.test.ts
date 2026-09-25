@@ -155,12 +155,24 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
 
   /**
    * 2×3 hole grid over a fractional crust: every column in the fill footprint
-   * has its real top at y=10 (density 0.75) and a connected sub-threshold
-   * residue slab at y=11 (density 0.25) above it.
+   * is solid rock from y=0 up (so the charge column has real rock to seed
+   * energy into, same as the plain crater fixture), with its real top at
+   * y=10 (density 0.75) and a connected sub-threshold residue slab at y=11
+   * (density 0.25) above it.
+   *
+   * Fills 0..9 solid first (fillRegion) and only then bands the crossing at
+   * CRUST_HEIGHT via setVoxelColumnSurfaceHeight — that primitive only ever
+   * touches the band between a column's existing top and the new target's
+   * own crossing band (#1143's own design; #1184 made the "no existing top"
+   * case degenerate to *just* that band instead of flattening the whole
+   * column to y=0), so calling it against bare air, as this fixture used to,
+   * left every column a floating 2-voxel slab with nothing underneath for
+   * the charge to seed into.
    */
   function buildCrustFixture() {
     const grid = new VoxelGrid(40, 20, 40);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1.0 }] });
+    fillRegion(grid, 'molite', 5, 25, 0, 9, 5, 25);
     for (let z = 5; z <= 25; z++) {
       for (let x = 5; x <= 25; x++) {
         setVoxelColumnSurfaceHeight(grid, x, z, CRUST_HEIGHT, compId);

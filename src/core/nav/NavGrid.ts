@@ -252,24 +252,13 @@ export class NavGrid {
    * Column surface height in column (x, z), in continuous metres — the same
    * 0.5 marching-cubes crossing the terrain mesh renders
    * (computeVoxelColumnSurfaceHeight), not the rounded topmost-solid-voxel
-   * index (#1149). Returns -1 if the column is entirely void (no solid
-   * voxel with density >= 0.5). Out-of-bounds (x, z) coordinates are
-   * clamped to the grid limits.
+   * index (#1149). Returns NaN if the column is entirely void (no solid
+   * voxel with density >= 0.5) — not -1, since a real surface can now
+   * legitimately sit at 0 or below (#1184). Out-of-bounds (x, z)
+   * coordinates are clamped to the grid limits.
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
     const { cx, cz } = clampToGridColumn(voxelGrid, x, z);
-    return NavGrid.surfaceHeightFromVoxelY(voxelGrid, cx, cz, computeVoxelColumnSurfaceY(voxelGrid, cx, cz));
-  }
-
-  /**
-   * Shared tail of `computeSurfaceY`, taking the column's integer voxel-index
-   * (from `computeVoxelColumnSurfaceY`) as a parameter instead of
-   * recomputing it. `buildNavGrid`/`patchNavGrid` compute that index once per
-   * column and pass it here AND to `classifyCellType`'s ramp-delta, so the
-   * same column is no longer top-down scanned twice per cell (#1149).
-   */
-  private static surfaceHeightFromVoxelY(voxelGrid: VoxelGrid, cx: number, cz: number, voxelY: number): number {
-    if (voxelY === -1) return -1;
     return computeVoxelColumnSurfaceHeight(voxelGrid, cx, cz);
   }
 
@@ -287,25 +276,27 @@ export class NavGrid {
     buildings: Building[],
     drillHoles: DrillHole[],
   ): { voxelY: number; surfaceY: number; cellType: NavCellType } {
-    const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z);
-    const surfaceY = NavGrid.surfaceHeightFromVoxelY(voxelGrid, x, z, voxelY);
+    const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z) ?? NaN;
+    const surfaceY = computeVoxelColumnSurfaceHeight(voxelGrid, x, z);
     const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
     return { voxelY, surfaceY, cellType };
   }
 
   /**
    * Compute the maximum surface Y across all columns in the voxel grid.
-   * Returns -1 if the entire grid is void/empty.
+   * Returns NaN if the entire grid is void/empty (#1184) — stays cheap: a
+   * single pass over every column with no dependency on the grid's own
+   * `sizeY` as a bound.
    */
   static computeMaxSurfaceY(voxelGrid: VoxelGrid): number {
-    let maxY = -1;
+    let maxY = -Infinity;
     for (let z = voxelGrid.minZ; z < voxelGrid.maxZ; z++) {
       for (let x = voxelGrid.minX; x < voxelGrid.maxX; x++) {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         if (surfaceY > maxY) maxY = surfaceY;
       }
     }
-    return maxY;
+    return Number.isFinite(maxY) ? maxY : NaN;
   }
 
   /**
@@ -322,10 +313,11 @@ export class NavGrid {
    * confirmed empirically: on generated terrain, ~18% of adjacent-column
    * pairs land on a different bench under the continuous computation than
    * under this integer one, none of them differing in voxel index. Returns
-   * 0 if voxelY < 0 (void cell).
+   * 0 for a void cell (voxelY is NaN — #1184; a real voxel index can now
+   * legitimately be 0 or negative).
    */
   static computeBenchLevel(maxVoxelY: number, voxelY: number): number {
-    if (voxelY < 0) return 0;
+    if (Number.isNaN(voxelY)) return 0;
     return Math.floor((maxVoxelY - voxelY) / NAV_BENCH_HEIGHT);
   }
 
@@ -354,8 +346,9 @@ export class NavGrid {
     // Integer counterpart to maxSurfaceY: computeVoxelColumnSurfaceY's
     // topmost-solid-voxel index and Math.floor(computeVoxelColumnSurfaceHeight(...))
     // agree for every non-void column (both key off the same density >= 0.5
-    // threshold), Math.floor is monotonic, and the void sentinel -1 survives
-    // it unchanged — so the grid-wide max needs no separate rescan (#1149).
+    // threshold), Math.floor is monotonic, and the void sentinel NaN (#1184)
+    // survives it unchanged — so the grid-wide max needs no separate rescan
+    // (#1149).
     const maxVoxelY = Math.floor(maxSurfaceY);
 
     for (let z = originZ; z < originZ + height; z++) {
@@ -579,12 +572,12 @@ export class NavGrid {
   ): NavCellType {
     // surfaceY is passed in by buildNavGrid/patchNavGrid, which already
     // scanned this column once; default recomputes it for any other caller.
-    if (surfaceY === -1) return 'void';
+    if (Number.isNaN(surfaceY)) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
     for (const [dx, dz] of CARDINAL_OFFSETS) {
       const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
-      if (neighborSurfaceY === -1) continue;
+      if (Number.isNaN(neighborSurfaceY)) continue;
       const delta = Math.abs(surfaceY - neighborSurfaceY);
       if (delta > NAV_RAMP_MIN_SLOPE_DELTA && isStepClimbable(surfaceY, neighborSurfaceY, 1.0)) {
         return 'ramp';

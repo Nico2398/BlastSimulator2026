@@ -9,7 +9,7 @@
 // Used by the state bridges in src/main.ts and src/console-api.ts so a browser
 // harness and a headless run read the same numbers.
 
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import { firstEmptyLayerAboveGround, type VoxelGrid } from '../world/VoxelGrid.js';
 import { FLOATING_FRAGMENT_CLEARANCE } from '../config/balance.js';
 import type { FragmentData } from './BlastExecution.js';
 
@@ -72,7 +72,7 @@ export function fragmentClearances(
   const clearances: number[] = [];
   for (const [key, column] of byColumn) {
     const [x, z] = key.split(',').map(Number) as [number, number];
-    let pileTop = grid.containsColumn(x, z) ? computeVoxelColumnSurfaceY(grid, x, z) + 1 : 0;
+    let pileTop = firstEmptyLayerAboveGround(grid, x, z);
 
     column.sort((a, b) => (a.position.y - a.halfExtents.y) - (b.position.y - b.halfExtents.y));
     for (const fragment of column) {

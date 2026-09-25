@@ -14,7 +14,7 @@ import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { buildSurveyOverlayOptions, syncGameRendererEntities } from '../../../src/renderer/GameRendererSync.js';
 import type { SyncDeps } from '../../../src/renderer/GameRendererSync.js';
-import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -56,7 +56,7 @@ describe('buildSurveyOverlayOptions()', () => {
     expect(options).not.toBeNull();
     const point = options!.points.find(p => p.x === 5 && p.z === 5);
     expect(point).toBeDefined();
-    expect(point!.surfaceY).toBe(computeVoxelColumnSurfaceY(grid, 5, 5) + 1);
+    expect(point!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 5, 5));
     expect(point!.surfaceY).toBe(4);
   });
 
@@ -78,7 +78,7 @@ describe('buildSurveyOverlayOptions()', () => {
     // Correct: topmost isSolidAt-true voxel (y=2) + 1 = 3.
     // The unfixed manual scan returns 4 (treats y=3's density 0.2 as solid).
     expect(point!.surfaceY).toBe(3);
-    expect(point!.surfaceY).toBe(computeVoxelColumnSurfaceY(grid, 5, 5) + 1);
+    expect(point!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 5, 5));
   });
 
   it('returns surfaceY 0 for a column with no solid voxel anywhere', () => {
@@ -92,7 +92,7 @@ describe('buildSurveyOverlayOptions()', () => {
     const point = options!.points.find(p => p.x === 5 && p.z === 5);
     expect(point).toBeDefined();
     expect(point!.surfaceY).toBe(0);
-    expect(point!.surfaceY).toBe(computeVoxelColumnSurfaceY(grid, 5, 5) + 1);
+    expect(point!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 5, 5));
   });
 
   it('clamps an out-of-bounds survey column the same way computeVoxelColumnSurfaceY does', () => {
@@ -107,7 +107,7 @@ describe('buildSurveyOverlayOptions()', () => {
     expect(options).not.toBeNull();
     const point = options!.points.find(p => p.x === 1000 && p.z === 1000);
     expect(point).toBeDefined();
-    expect(point!.surfaceY).toBe(computeVoxelColumnSurfaceY(grid, 1000, 1000) + 1);
+    expect(point!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 1000, 1000));
   });
 
   it('returns null when no grid is bound', () => {
@@ -119,6 +119,31 @@ describe('buildSurveyOverlayOptions()', () => {
     const grid = new VoxelGrid(20, 8, 20);
     const state = makeState([]);
     expect(buildSurveyOverlayOptions(state, grid)).toBeNull();
+  });
+
+  // #1184: the overlay's old `(computeVoxelColumnSurfaceY(...) ?? -1) + 1`
+  // shim conflated "no ground" with a real surface at y = -1 — a column
+  // genuinely surfacing at or below y = 0 must still sit one layer above its
+  // true surface, not the no-ground fallback.
+  it('#1184: sits one layer above a real surface at or below y = 0, not the no-ground fallback', () => {
+    const grid = new VoxelGrid(20, 8, 20);
+    grid.fillVoxel(5, -5, 5, 0, undefined, 1.0); // surface below y = 0
+    grid.fillVoxel(6, 0, 6, 0, undefined, 1.0); // surface exactly at y = 0
+    const state = makeState([
+      makeSurveyResult({ estimates: { '5,5': { sparkium: 0.5 }, '6,6': { sparkium: 0.5 } } }),
+    ]);
+
+    const options = buildSurveyOverlayOptions(state, grid);
+
+    expect(options).not.toBeNull();
+    const belowZero = options!.points.find(p => p.x === 5 && p.z === 5);
+    const atZero = options!.points.find(p => p.x === 6 && p.z === 6);
+    expect(belowZero).toBeDefined();
+    expect(atZero).toBeDefined();
+    expect(belowZero!.surfaceY).toBe(-4); // one layer above y = -5, not the fallback (0)
+    expect(atZero!.surfaceY).toBe(1);
+    expect(belowZero!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 5, 5));
+    expect(atZero!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 6, 6));
   });
 });
 
