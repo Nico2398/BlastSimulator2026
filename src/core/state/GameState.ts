@@ -448,12 +448,15 @@ export interface WorldState {
   /**
    * Serialized playable voxel data (v6+, #458 T0.3), embedded lazily right
    * before a save — see saveCommand / SavesModal's getState callback. Absent
-   * on saves from before v6 or on a state that hasn't been saved yet; a
-   * loader falls back to regenerating pristine terrain from the seed in that
-   * case (the pre-v6 behaviour — blast craters/ramps don't survive that path).
-   * The embedded payload's own `gen` (#1181) is the generator identity of
-   * record once present; this field's `mixedRockHardness` below only matters
-   * for the no-voxels regeneration fallback.
+   * on a state that hasn't been saved yet; a loader falls back to
+   * regenerating pristine terrain from the seed in that case (blast
+   * craters/ramps don't survive that path). A *present* payload whose
+   * embedded `gen.version` doesn't match the running build's terrain
+   * generator is refused outright instead (`loadGridForState`, world.ts,
+   * #1181) — never silently regenerated, and never migrated. The embedded
+   * payload's own `gen` (#1181) is the generator identity of record once
+   * present; this field's `mixedRockHardness` below only matters for the
+   * no-voxels regeneration fallback.
    */
   voxels?: SerializedVoxels;
   /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */

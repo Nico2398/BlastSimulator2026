@@ -9,16 +9,17 @@
 //
 // The VoxelGrid is embedded into `ctx.state.world.voxels` right before saving
 // (#458 T0.3) and restored from there on load, so blast craters, drilled
-// holes, and ramps survive a save/load round trip. A save from before v6 (or
-// one made without a live grid) has no embedded voxels — `load` falls back
-// to regenerating pristine terrain from the saved seed/size/mine type, the
-// same way `new_game` builds it, same as this file's whole history (#408).
+// holes, and ramps survive a save/load round trip. A save with no embedded
+// voxels at all — `load` falls back to regenerating pristine terrain from
+// the saved seed/size/mine type, the same way `new_game` builds it, same as
+// this file's whole history (#408). A save whose embedded voxels carry a
+// generator version this build doesn't match is refused outright instead
+// (`loadGridForState`, world.ts, #1181) — it is never silently regenerated.
 
 import type { GameContext } from './world.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum, regenerateGridParams, terrainVersionMismatch } from './world.js';
+import { terrainGenDatum, loadGridForState } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
-import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
 import { requireGame } from './commandUtils.js';
 
@@ -54,24 +55,8 @@ export function loadCommand(
   if (!data) return { success: false, output: `No save found in slot "${slot}".` };
 
   const state = deserialize(data);
-  const biome = getBiome(state.mineType);
-  if (!biome) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
-
-  if (state.world?.voxels) {
-    const mismatch = terrainVersionMismatch(state.world.voxels);
-    if (mismatch) return { success: false, output: mismatch };
-  }
-
-  ctx.state = state;
-  if (state.world?.voxels) {
-    restoreGrid(ctx, state.world.voxels);
-  } else {
-    const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
-    regenerateGrid(ctx, {
-      seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
-      ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
-    });
-  }
+  const refusal = loadGridForState(ctx, state);
+  if (refusal) return { success: false, output: refusal };
 
   return { success: true, output: `Loaded from slot "${slot}".` };
 }

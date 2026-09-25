@@ -121,7 +121,7 @@ export function terrainGenDatum(state: GameState): SerializedTerrainGen | undefi
  * pre-#1181 defect where that fallback regenerated at the live, possibly
  * site-expanded size instead).
  */
-export function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
   }
@@ -137,8 +137,19 @@ export function regenerateGridParams(state: GameState): { sizeX: number; sizeY: 
  * A player-facing refusal message when `voxels`' embedded generator version
  * doesn't match this build's `TERRAIN_GENERATOR_VERSION`, or null when they
  * match and the save may load.
+ *
+ * `voxels` is `deserialize`'s cast of parsed save JSON — untrusted, despite
+ * the `SerializedVoxels` type — so `voxels.v`/`voxels.gen` are checked
+ * before ever touching `.gen.version`; a `v !== 8` or missing-`gen` payload
+ * gets the same refusal an ordinary version mismatch gets (this codebase has
+ * no separate "corrupt save" i18n key, and one is not worth adding for a
+ * hand-edited/truncated save this unlikely — #1181 review) rather than a raw
+ * `TypeError` reaching `loadCommand`'s uncaught call site.
  */
-export function terrainVersionMismatch(voxels: SerializedVoxels): string | null {
+function terrainVersionMismatch(voxels: SerializedVoxels): string | null {
+  if (voxels.v !== 8 || !voxels.gen || typeof voxels.gen.version !== 'number') {
+    return t('world.terrain_version_mismatch', { saved: -1, current: TERRAIN_GENERATOR_VERSION });
+  }
   if (voxels.gen.version === TERRAIN_GENERATOR_VERSION) return null;
   return t('world.terrain_version_mismatch', { saved: voxels.gen.version, current: TERRAIN_GENERATOR_VERSION });
 }
@@ -152,7 +163,6 @@ function gridDirtyRegion(grid: VoxelGrid): {
     maxX: grid.maxX - 1, maxY: grid.sizeY - 1, maxZ: grid.maxZ - 1,
   };
 }
-
 
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
@@ -247,7 +257,7 @@ export function ensureLandscape(
  * `regenerateGrid`'s navgrid-build and event-emission steps exactly; only
  * the grid's origin (decoded vs. freshly generated) differs (#458 T0.3).
  */
-export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
+function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
   if (!ctx.state) return;
   ctx.grid = decodeVoxelGrid(voxels);
   ctx.landscape = null; // stale for the restored grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
@@ -256,6 +266,49 @@ export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
   syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
+}
+
+/**
+ * Load `state`'s grid into `ctx`, sharing the version-check +
+ * restore/regenerate branch every load path needs — `regenerateGrid`'s own
+ * doc comment already warns this branch "must stay in sync" across call
+ * sites (#408); `loadCommand` (saveload.ts) and the Saves modal's load
+ * handler (main.ts) previously each wrote it out independently, which is
+ * exactly the drift that comment warns about (#1181 review). Returns a
+ * player-facing refusal message and leaves `ctx.state` untouched when the
+ * save can't load (unknown mine type, or a terrain-generator version
+ * mismatch); returns null and assigns `ctx.state = state` on success. Each
+ * call site only differs in how it reports a non-null result (command-result
+ * output vs. a UI notify toast).
+ */
+export function loadGridForState(ctx: GameContext, state: GameState): string | null {
+  const biome = getBiome(state.mineType);
+  if (!biome) {
+    // Plain dev string, not `world.unknown_mine_type` (which is
+    // `newGameCommand`'s i18n'd validation of a player-*typed* mine_type
+    // argument) — a saved state whose own `mineType` fails `getBiome` means
+    // the save itself is corrupt, the same low-probability edge
+    // `terrainVersionMismatch` reuses non-i18n copy for elsewhere in this
+    // file (#1181 review).
+    return `Save has unknown mine type "${state.mineType}".`;
+  }
+
+  if (state.world?.voxels) {
+    const mismatch = terrainVersionMismatch(state.world.voxels);
+    if (mismatch) return mismatch;
+  }
+
+  ctx.state = state;
+  if (state.world?.voxels) {
+    restoreGrid(ctx, state.world.voxels);
+  } else {
+    const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+    regenerateGrid(ctx, {
+      seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+      ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    });
+  }
+  return null;
 }
 
 export function newGameCommand(
@@ -400,10 +453,11 @@ export function terrainInfoCommand(
 /**
  * Builds (or reports the already-built) landscape map for the current game
  * — the first real trigger for `ensureLandscape`'s lazy build. Resolves
- * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`;
- * `mixedRockHardness` isn't persisted on GameState, so this always builds
- * the normal (non-mixed) strata profile even for a mixedRockHardness level —
- * a known limitation shared with `regenerateGrid`'s own load-path callers.
+ * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`,
+ * and `mixedRockHardness` from `ctx.state.world` (#1181 fixed the same gap
+ * for `regenerateGrid`'s own load-path callers, via `terrainConfigOf`/
+ * `regenerateGridParams`; this command reads the field directly since it
+ * only ever runs against an already-loaded game).
  */
 export function landscapeInfoCommand(
   ctx: GameContext,
@@ -417,8 +471,11 @@ export function landscapeInfoCommand(
   const biome = getBiome(ctx.state.mineType);
   if (!biome) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
 
-  const { sizeX, sizeY, sizeZ } = ctx.state.world;
-  const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  const { sizeX, sizeY, sizeZ, mixedRockHardness } = ctx.state.world;
+  const landscape = ensureLandscape(ctx, {
+    seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+  });
   if (!landscape) return { success: false, output: t('world.landscape_build_failed') };
 
   const { map } = landscape;

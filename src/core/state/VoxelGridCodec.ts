@@ -6,8 +6,8 @@
 // generator identity, then replays the edit record on top — reproducing the
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
-import { VoxelGrid } from '../world/VoxelGrid.js';
-import { replayTerrainEdits, type EditSegment } from '../world/TerrainEdits.js';
+import { VoxelGrid, type VoxelRockComposition } from '../world/VoxelGrid.js';
+import { replayTerrainEdits, type EditSegment, type EditBoundary } from '../world/TerrainEdits.js';
 import { generateTerrainRegion, buildTerrainContext, TERRAIN_GENERATOR_VERSION, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
@@ -43,7 +43,7 @@ export interface SerializedVoxels {
  * unreleased: a mismatched save is refused outright, never migrated
  * (project owner policy, #1181).
  */
-export class TerrainGenVersionMismatchError extends Error {
+class TerrainGenVersionMismatchError extends Error {
   constructor(public readonly savedVersion: number, public readonly currentVersion: number) {
     super(`Save terrain generator v${savedVersion} does not match current generator v${currentVersion}.`);
   }
@@ -68,10 +68,57 @@ export function encodeVoxelGrid(grid: VoxelGrid, gen: SerializedTerrainGen): Ser
 }
 
 /**
+ * Clamp an untrusted save-JSON position value into `[lo, hi]`, rounding to
+ * the nearest integer and falling back to `fallback` for non-finite input —
+ * the same treatment `clampChunkRectToTile` gives a chunk rect (#609),
+ * extended to the edit-segment replay path below: `replayTerrainEdits` loops
+ * `yLo..yHi` per segment, so an unclamped `yHi` from a tampered/corrupted
+ * save (e.g. `1e15`) would freeze the tab on load (#1181 review).
+ */
+function clampSavePosition(value: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(lo, Math.min(hi, Math.round(value)));
+}
+
+/**
+ * True when `value` is a well-formed `VoxelRockComposition` — untrusted save
+ * JSON must never reach `CompositionPalette.intern` (which dereferences
+ * `.rocks` unconditionally) without this check, else a malformed
+ * `{"kind":"added"}` segment throws a raw `TypeError` instead of a clean
+ * refusal (#1181 review).
+ */
+function isValidComposition(value: unknown): value is VoxelRockComposition {
+  if (typeof value !== 'object' || value === null) return false;
+  const rocks = (value as { rocks?: unknown }).rocks;
+  if (!Array.isArray(rocks)) return false;
+  return rocks.every(r =>
+    typeof r === 'object' && r !== null &&
+    typeof (r as { rockId?: unknown }).rockId === 'string' &&
+    typeof (r as { coefficient?: unknown }).coefficient === 'number',
+  );
+}
+
+/**
+ * Throws when `boundary` is present but malformed — its `composition` is
+ * re-interned by `replayTerrainEdits` exactly like an 'added' segment's own
+ * composition, and carries the same untrusted-save risk.
+ */
+function requireValidBoundary(boundary: EditBoundary | undefined, label: string): void {
+  if (!boundary) return;
+  if (typeof boundary.density !== 'number' || !Number.isFinite(boundary.density)) {
+    throw new Error(`corrupt save: ${label} boundary has a non-finite density`);
+  }
+  if (!isValidComposition(boundary.composition)) {
+    throw new Error(`corrupt save: ${label} boundary is missing a valid composition`);
+  }
+}
+
+/**
  * Regenerate a grid from `payload.gen`'s generator identity, then replay
  * `payload.editColumns`/`payload.editFractures` onto it. Throws
  * `TerrainGenVersionMismatchError` when `payload.gen.version` doesn't match
- * the running build's generator.
+ * the running build's generator, or a plain `Error` when the payload's edit
+ * data is malformed beyond what clamping can repair.
  */
 export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
   if (payload.v !== 8) {
@@ -104,17 +151,37 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
     grid.markChunkPristine(cx, cz);
   }
 
+  // `grid.minX/maxX/minZ/maxZ` are set by the claimed-chunk loop above —
+  // every position field below is clamped against them (and against
+  // `sizeY` for `y`), so a tampered/corrupted save can't drive the replay
+  // loop past the grid's real bounds (#1181 review; matches #609's
+  // `clampChunkRectToTile` precedent for `claimed` rects).
   for (const { x, z, segments } of payload.editColumns) {
+    const cx = clampSavePosition(x, grid.minX, grid.maxX - 1, grid.minX);
+    const cz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
     for (const seg of segments) {
+      const yLo = clampSavePosition(seg.yLo, 0, grid.sizeY - 1, 0);
+      const yHi = clampSavePosition(seg.yHi, 0, grid.sizeY - 1, 0);
+      if (yLo > yHi) {
+        throw new Error(`corrupt save: edit segment yLo (${seg.yLo}) exceeds yHi (${seg.yHi})`);
+      }
+      requireValidBoundary(seg.bottomBoundary, 'bottom');
+      requireValidBoundary(seg.topBoundary, 'top');
       if (seg.kind === 'added') {
-        grid.edits.recordAdd(x, z, seg.yLo, seg.yHi, seg.composition!, seg.ores, seg.bottomBoundary, seg.topBoundary);
+        if (!isValidComposition(seg.composition)) {
+          throw new Error('corrupt save: added edit segment is missing a valid composition');
+        }
+        grid.edits.recordAdd(cx, cz, yLo, yHi, seg.composition, seg.ores, seg.bottomBoundary, seg.topBoundary);
       } else {
-        grid.edits.recordDig(x, z, seg.yLo, seg.yHi, seg.bottomBoundary, seg.topBoundary);
+        grid.edits.recordDig(cx, cz, yLo, yHi, seg.bottomBoundary, seg.topBoundary);
       }
     }
   }
   for (const { x, y, z, modifier } of payload.editFractures) {
-    grid.edits.recordFracture(x, y, z, modifier);
+    const fx = clampSavePosition(x, grid.minX, grid.maxX - 1, grid.minX);
+    const fy = clampSavePosition(y, 0, grid.sizeY - 1, 0);
+    const fz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
+    grid.edits.recordFracture(fx, fy, fz, modifier);
   }
 
   replayTerrainEdits(grid, grid.edits);
