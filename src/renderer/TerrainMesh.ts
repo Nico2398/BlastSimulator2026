@@ -38,6 +38,14 @@ const SURFACE_THRESHOLD = 0.5;
  *  assert against the same constant the implementation uses. */
 export const SKIRT_VISIBILITY_MARGIN_M = 2;
 
+/** Chunk-key packing (#1188): `chunkKey` biases each signed coordinate by
+ *  `CHUNK_KEY_OFFSET` before packing, and the `cx`/`cz` fields have a
+ *  `CHUNK_KEY_BASE` stride between them. Shared by `chunkKey` and its decode
+ *  site in `chunkGridDims` so the two never drift apart. +/-1024 chunks per
+ *  axis, cy included, since a chunk may now sit at any signed vertical slab. */
+const CHUNK_KEY_OFFSET = 1024;
+const CHUNK_KEY_BASE = 2048;
+
 export interface DirtyRegion {
   minX: number; minY: number; minZ: number;
   maxX: number; maxY: number; maxZ: number;
@@ -460,7 +468,7 @@ export class TerrainMesh {
     if (this.chunks.size > 0) {
       let min = Infinity, max = -Infinity;
       for (const key of this.chunks.keys()) {
-        const cy = (key % 2048) - 1024;
+        const cy = (key % CHUNK_KEY_BASE) - CHUNK_KEY_OFFSET;
         if (cy < min) min = cy;
         if (cy > max) max = cy;
       }
@@ -475,9 +483,9 @@ export class TerrainMesh {
 
   // ---------- Internal ----------
 
-  /** Packs a signed (cx, cy, cz) triple into one collision-free key. Range +/-1024 chunks per axis, cy included, since a chunk may now sit at any signed vertical slab (#1188). */
+  /** Packs a signed (cx, cy, cz) triple into one collision-free key, per `CHUNK_KEY_OFFSET`/`CHUNK_KEY_BASE` above. */
   private chunkKey(cx: number, cy: number, cz: number): number {
-    return ((cx + 1024) * 2048 + (cz + 1024)) * 2048 + (cy + 1024);
+    return ((cx + CHUNK_KEY_OFFSET) * CHUNK_KEY_BASE + (cz + CHUNK_KEY_OFFSET)) * CHUNK_KEY_BASE + (cy + CHUNK_KEY_OFFSET);
   }
 
   /** Which horizontal neighbours of chunk (cx, cz) are owned — computed once per rebuild and shared by rebuildChunk/canSkipChunkMarch/boundarySkirtFloorY instead of each recomputing it (#560). */
