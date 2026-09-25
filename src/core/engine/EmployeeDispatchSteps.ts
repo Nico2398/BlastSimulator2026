@@ -579,8 +579,12 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // 'work' goal with a real actionId — required for
   // findCheapestTransportItinerary's walk-vs-ride comparison to trigger, and
   // for a transport ride's alight step to have a valid actionId to key its
-  // own release on (#1093 phase 7).
-  const moveResult = moveTo(state, employee.id, { actionId: action.id });
+  // own release on (#1093 phase 7). `allowUnreachable: true` (#1178): a
+  // claim already committed the action to this employee, so a target
+  // unreachable right now still installs a retrying itinerary instead of
+  // leaving the claim dangling with no itinerary at all — it walks the
+  // moment the way opens, or abandons at Locomotion.ts's usual threshold.
+  const moveResult = moveTo(state, employee.id, { actionId: action.id }, { allowUnreachable: true });
   // A transport-ride itinerary (#1093 phase 7) may include a mode: 'drive'
   // leg for a borrowed vehicle this action never claimed through
   // promoteVehicleGatedAction — reserve it here so it isn't claimed out from
@@ -594,7 +598,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   }
   // #1178: the legacy destinationX/Z fallback for an unreachable-right-now
   // claim target used to live here (moveTo could refuse an itinerary for it).
-  // Removed — buildFootOnlyItinerary (PlanItinerary.ts) can no longer refuse
+  // Removed — moveTo's own allowUnreachable:true above can no longer refuse
   // a non-vehicle-gated goal, so this moveTo call can no longer fail, and the
   // fallback was dead code.
 

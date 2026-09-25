@@ -442,19 +442,29 @@ describe('Zone clearing and evacuation', () => {
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
-    // driverA keeps driving vehicleA out — never redirected to an on-foot walk.
-    expect(driverA.destinationX).toBeNull();
-    expect(driverA.destinationZ).toBeNull();
+    // driverA keeps driving vehicleA out — never redirected to an on-foot
+    // walk. #1178: destinationX/Z is an unconditional mirror of the
+    // itinerary's own current leg (RestActionHelpers.test.ts's
+    // beginRestTravel tests prove the same mirror for a mounted rest-drive),
+    // so it correctly reflects driverA's own DRIVE leg destination here —
+    // the invariant this test actually guards is that driverA's itinerary
+    // never grows a separate FOOT leg of its own, not that the mirror stays
+    // null while driving.
+    expect(driverA.itinerary?.legs[0]?.mode).toBe('drive');
+    expect(driverA.destinationX).toBe(driverA.itinerary?.legs[0]?.destX);
+    expect(driverA.destinationZ).toBe(driverA.itinerary?.legs[0]?.destZ);
     expect(result.orderedEmployeeIds).not.toContain(driverA.id);
 
     // boarder is assigned to walk to and board vehicleB — never ALSO given a
     // foot-evacuation destination (findSafeDestination's own far-outside-zone
     // output, distinct from vehicleB's own in-zone position). #1089: the walk
-    // itself is a real itinerary leg (destX/destZ), not the legacy
-    // destinationX/Z fields — those stay null for a board-only itinerary.
+    // itself is a real itinerary leg (destX/destZ) — the mirror below reflects
+    // exactly that leg, never a second, independently-targeted destination.
     expect(boarder.pendingDriverVehicleId).toBe(vehicleB.id);
     expect(boarder.itinerary?.legs[0]?.destX).toBe(vehicleB.x);
     expect(boarder.itinerary?.legs[0]?.destZ).toBe(vehicleB.z);
+    expect(boarder.destinationX).toBe(vehicleB.x);
+    expect(boarder.destinationZ).toBe(vehicleB.z);
     expect(result.orderedEmployeeIds).not.toContain(boarder.id);
     expect(result.strandedEmployeeIds).not.toContain(boarder.id);
   });

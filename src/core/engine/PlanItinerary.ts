@@ -354,10 +354,15 @@ function buildDriveLeg(
  * there. Shared by planItinerary's own no-vehicle-role branch and its
  * no-vehicle-available fallback for a vehicle-gated goal (see that call
  * site's own doc comment) — both plan the identical single-leg itinerary,
- * differing only in why no vehicle enters the route. Never refuses (#1178,
- * single-mover unification): an unreachable-right-now target still gets a
- * leg, timed off the octile heuristic instead of a real path — see the
- * `dist` fallback above.
+ * differing only in why no vehicle enters the route. Refuses (returns null)
+ * for a target unreachable right now UNLESS the caller opts in via
+ * `allowUnreachable` (#1178, single-mover unification, mirroring
+ * `buildDriveLeg`'s identical gate) — an unreachable-right-now target then
+ * still gets a leg, timed off the octile heuristic instead of a real path —
+ * see the `dist` fallback below. Default `false`: a plain reposition/claim
+ * call must still fail fast for a genuinely-unreachable target (e.g. #1109's
+ * out-of-bounds case, or an employee boxed in on every neighbour cell) —
+ * only `beginRestTravel` and Zone.ts's foot-evacuee branch opt in.
  */
 function buildFootOnlyItinerary(
   state: GameState,
@@ -367,14 +372,16 @@ function buildFootOnlyItinerary(
   targetX: number,
   targetZ: number,
   workTicks: number,
-): Itinerary {
-  // #1178: never refuse this itinerary — an unreachable-right-now target
-  // (exact fidelity, no live path) falls back to the octile heuristic for
-  // estTicks instead of failing the plan. Locomotion's existing
-  // stuck/abandon tracking (advanceLeg/advanceItinerary) covers a leg that
-  // genuinely never resolves once it's installed.
-  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ))
-    ?? octileHeuristic(employee.x, employee.z, targetX, targetZ);
+  allowUnreachable: boolean,
+): Itinerary | null {
+  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ));
+  if (dist === null && !allowUnreachable) return null;
+  // Target unreachable right now, but the caller wants a best-effort route
+  // anyway (#1178): fall back to the octile heuristic for estTicks and still
+  // install the leg. advanceLeg/advanceItinerary's existing stuck/abandon
+  // tracking (Locomotion.ts) takes it from here if the route genuinely never
+  // resolves.
+  const effectiveDist = dist ?? octileHeuristic(employee.x, employee.z, targetX, targetZ);
 
   const footLeg: Leg = {
     mode: 'foot',
@@ -383,7 +390,7 @@ function buildFootOnlyItinerary(
     destZ: targetZ,
     arrival: 'exact',
     onArrive: { kind: 'none' },
-    estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED),
+    estTicks: cellsToTravelTicks(effectiveDist, AGENT_WALK_SPEED),
   };
 
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
@@ -719,7 +726,8 @@ export function planItinerary(
   );
 
   if (role === null && via === undefined) {
-    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks);
+    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false);
+    if (footItinerary === null) return null;
 
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null) {
       // Same hint-with-fallback convention as resolveGoal's own actionHint

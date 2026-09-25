@@ -39,7 +39,7 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { actionId: number },
-  opts?: { via?: number },
+  opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
 export function moveTo(
   state: GameState,
@@ -72,7 +72,7 @@ export function moveTo(
     const action = state.pendingActions.find(a => a.id === target.actionId);
     if (!action) return { success: false, error: t('move_to.no_route_available') };
 
-    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), action });
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), ...(opts?.allowUnreachable !== undefined ? { allowUnreachable: opts.allowUnreachable } : {}), action });
     if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
     employee.itinerary = itinerary;
@@ -117,12 +117,20 @@ export function alightOnArrival(employee: Employee | undefined): void {
  * tutorialGuide.ts/FleetPanel.ts) is set while that leg's arrival step is a
  * board naming a vehicle, null otherwise (no itinerary, or a foot/drive leg
  * that isn't a board). `destinationX/Z` (#1178, single-mover unification) is
- * set from that same leg's own destX/destZ, null when there is no current
- * leg — `isMidEvacuationWalk` (Evacuation.ts) and `isIdleForReposition`
- * (VehicleDriverAssignment.ts) read it to mean "still walking". Called from
- * every point this module and Locomotion.ts mutate `employee.itinerary`, so
- * neither mirror ever drifts from what the employee is actually walking
- * toward.
+ * set from that same leg's own destX/destZ regardless of mode — foot or
+ * drive — null only when there is no current leg at all (RestActionHelpers.ts's
+ * `beginRestTravel` tests, #1178: a mounted employee's own rest-travel drive
+ * leg mirrors here exactly like a foot leg would). Every call site that needs
+ * to distinguish "walking on foot" from "driving a vehicle" reads the
+ * itinerary's own current leg mode directly instead (e.g.
+ * `isMidEvacuationDrive`, EvacuationHold.ts) rather than relying on this
+ * mirror to encode that distinction on its own.
+ * `isMidEvacuationWalk` (Evacuation.ts) and `isIdleForReposition`
+ * (VehicleDriverAssignment.ts) read it to mean "still travelling toward
+ * something" (an itinerary check already guards both ahead of it). Called
+ * from every point this module and Locomotion.ts mutate `employee.itinerary`,
+ * so neither mirror ever drifts from what the employee is actually en route
+ * to.
  */
 export function syncItineraryMirrors(employee: Employee): void {
   const leg = employee.itinerary?.legs[0];
