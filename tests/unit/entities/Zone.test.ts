@@ -451,6 +451,32 @@ describe('Zone clearing and evacuation', () => {
     expect(result.orderedVehicleIds).not.toContain(newVehicle.id);
   });
 
+  it('includes an employee already mid-walk to board the EXACT vehicle being evaluated as a valid candidate, rather than excluding them (#1122)', () => {
+    const state = makeState(38);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    // driverless — occupantIds defaults to [] on purchase
+    const rng = new Random(37);
+    const { employee } = hireEmployee(employees, 'driller', rng, 16, 16);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+
+    // Already mid-walk toward THIS exact vehicle (e.g. a manual `vehicle
+    // driver` command issued moments before the evacuation) — before #1122,
+    // clearZone's own candidate filter wrongly excluded this employee the
+    // same way it (correctly) excludes one walking toward a DIFFERENT
+    // vehicle (the #1042 test above).
+    employee.pendingDriverVehicleId = vehicle.id;
+    employee.destinationX = vehicle.x;
+    employee.destinationZ = vehicle.z;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    // Selected as the evacuation driver for its own vehicle — not stranded.
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+  });
+
   it('the zone is still reported occupied while a stranded entity remains inside it', () => {
     const state = makeState(37);
     const { vehicles, employees } = state;

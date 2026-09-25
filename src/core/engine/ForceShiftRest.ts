@@ -14,10 +14,9 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
-import { isMidVehicleGatedWork, hasQueuedActionForVehicleRole } from './VehicleReservation.js';
+import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
 
@@ -208,13 +207,6 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  */
 function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
   return state.vehicles.vehicles.some(v => vehicleDriverId(v) === employee.id && v.payload !== null);
-}
-
-function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {
-  if (!isMounted(employee.locomotion)) return false;
-  const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
-  if (!vehicle) return false;
-  return hasQueuedActionForVehicleRole(state, vehicle.type, employee.id);
 }
 
 /**
