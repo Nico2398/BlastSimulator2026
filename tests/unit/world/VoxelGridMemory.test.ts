@@ -13,7 +13,11 @@
 // synthetic small grid.
 //
 // Keep this file's runtime bounded: exactly the two generateTerrain calls
-// described below, nothing more (a 160x160 generation is not free).
+// described below (plus, since #1183 made chunk content lazy, one full-grid
+// `forEachSolid` walk per grid to actually materialize what generateTerrain
+// itself no longer fills up front — the same total generation cost as
+// before, just paid here instead of inside generateTerrain), nothing more (a
+// 160x160 generation is not free).
 
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
@@ -56,6 +60,12 @@ function touchEveryColumnSurfaceComposition(grid: VoxelGrid): void {
 describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #1183)', () => {
   const gridBase = generateTerrain(treraniumConfig(BASE_SIZE_Y));
   const gridTall = generateTerrain(treraniumConfig(BASE_SIZE_Y * 4));
+  // #1183: generateTerrain no longer fills chunk content up front — it only
+  // attaches the generator as a lazy chunk source. Force materialization of
+  // every solid voxel once here, so allocatedSlabCount below measures real
+  // generated content rather than an untouched, all-lazy grid.
+  gridBase.forEachSolid(() => {});
+  gridTall.forEachSolid(() => {});
 
   // ── Lazy materialization (#1183) — MUST run before any other test in this
   // describe block reads a voxel from gridBase/gridTall. A prior read would

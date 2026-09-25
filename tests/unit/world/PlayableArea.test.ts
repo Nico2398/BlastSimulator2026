@@ -341,6 +341,13 @@ describe('PlayableArea.claimArea', () => {
 // not the grid's declared sizeY. CONFIG.sizeY = 24 -> under the old dense
 // model every claimed chunk allocated ceil(24/16) = 2 full-column bands
 // regardless of how deep the terrain was actually generated.
+//
+// #1183 made a claimed chunk's content itself lazy: `claim` only registers
+// ownership, and `densityAt` answers from the generator's cheap formula
+// without materializing anything — so these tests force materialization via
+// `forEachSolidInRegion` (which only allocates the bands it finds actually
+// solid) before asserting `slabCount`, rather than relying on `claim`/
+// `densityAt` to have allocated anything on their own.
 describe('PlayableArea.claim — cubic slab allocation matches the generated surface (#1182)', () => {
   it("slabCount(cx,cz) equals the number of 16-row y-bands the generated surface actually spans in that chunk, not ceil(sizeY/CHUNK_SIZE)", () => {
     const { grid, area } = makeArea();
@@ -348,8 +355,9 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
     expect(result.claimed).toBe(true);
     expect(result.claimed && result.chunk).toEqual({ cx: 2, cz: 0 });
 
-    // Derive the expected band count from the ACTUAL generated writes in the
-    // claimed chunk's owned rect, rather than hardcoding a magic number.
+    // Derive the expected band count from the ACTUAL generated surface —
+    // cheap, does not materialize anything — rather than hardcoding a magic
+    // number.
     const rect = grid.chunkRect(2, 0)!;
     let maxTopY = -1;
     for (let x = rect.minX; x < rect.maxX; x++) {
@@ -362,13 +370,21 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
         }
       }
     }
-    expect(maxTopY).toBeGreaterThanOrEqual(0); // sanity: generation actually wrote something
+    expect(maxTopY).toBeGreaterThanOrEqual(0); // sanity: the generated surface reaches into this chunk
 
     const expectedSlabCount = Math.ceil((maxTopY + 1) / CHUNK_SIZE);
     // The dense-model equivalent this replaces — locks in that the new
     // behaviour is a genuine reduction, not incidentally the same number.
     const denseModelSlabCount = Math.ceil(grid.sizeY / CHUNK_SIZE);
     expect(expectedSlabCount).toBeLessThan(denseModelSlabCount);
+
+    // Now actually materialize — bounded to exactly [0, maxTopY], so a band
+    // above the real surface never gets allocated.
+    grid.forEachSolidInRegion(
+      { x: rect.minX, y: 0, z: rect.minZ },
+      { x: rect.maxX - 1, y: maxTopY, z: rect.maxZ - 1 },
+      () => {},
+    );
 
     expect(grid.slabCount(2, 0)).toBe(expectedSlabCount);
   });
@@ -379,6 +395,18 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
 
     first.area.claim(35, 10);
     second.area.claim(35, 10);
+
+    // Force materialization of everything the chunk's column could hold —
+    // laziness itself is orthogonal to what this test checks (that two
+    // independently generated grids converge on the same content).
+    for (const { grid } of [first, second]) {
+      const rect = grid.chunkRect(2, 0)!;
+      grid.forEachSolidInRegion(
+        { x: rect.minX, y: 0, z: rect.minZ },
+        { x: rect.maxX - 1, y: grid.sizeY - 1, z: rect.maxZ - 1 },
+        () => {},
+      );
+    }
 
     expect(first.grid.slabCount(2, 0)).toBeGreaterThan(0);
     expect(second.grid.slabCount(2, 0)).toBe(first.grid.slabCount(2, 0));

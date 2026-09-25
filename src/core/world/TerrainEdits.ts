@@ -264,34 +264,38 @@ export class TerrainEdits {
  * same as `replayTerrainEdits`.
  */
 export function replaySegmentsInRange(
-  _grid: VoxelGrid, _segments: readonly EditSegment[], _x: number, _z: number, _yLo: number, _yHi: number,
+  grid: VoxelGrid, segments: readonly EditSegment[], x: number, z: number, yLo: number, yHi: number,
 ): void {
-  // TODO: implement
+  grid.withoutEditRecording(() => {
+    for (const seg of segments) {
+      const loY = Math.max(seg.yLo, yLo);
+      const hiY = Math.min(seg.yHi, yHi);
+      for (let y = loY; y <= hiY; y++) {
+        const boundary = y === seg.yLo && seg.bottomBoundary ? seg.bottomBoundary
+          : y === seg.yHi && seg.topBoundary ? seg.topBoundary
+          : undefined;
+        if (boundary) {
+          // `boundary.composition` is portable composition data, not a
+          // palette index — re-intern it into the TARGET grid's own
+          // palette to get a locally valid index before writing dense
+          // storage (#1180).
+          const localCompId = grid.palette.intern(boundary.composition);
+          grid.fillVoxel(x, y, z, localCompId, boundary.ores, boundary.density);
+        } else if (seg.kind === 'added') {
+          const localCompId = grid.palette.intern(seg.composition!);
+          grid.fillVoxel(x, y, z, localCompId, seg.ores);
+        } else {
+          grid.clearVoxel(x, y, z);
+        }
+      }
+    }
+  });
 }
 
 export function replayTerrainEdits(grid: VoxelGrid, edits: TerrainEdits): void {
   grid.withoutEditRecording(() => {
     for (const { x, z, segments } of edits.columns()) {
-      for (const seg of segments) {
-        for (let y = seg.yLo; y <= seg.yHi; y++) {
-          const boundary = y === seg.yLo && seg.bottomBoundary ? seg.bottomBoundary
-            : y === seg.yHi && seg.topBoundary ? seg.topBoundary
-            : undefined;
-          if (boundary) {
-            // `boundary.composition` is portable composition data, not a
-            // palette index — re-intern it into the TARGET grid's own
-            // palette to get a locally valid index before writing dense
-            // storage (#1180).
-            const localCompId = grid.palette.intern(boundary.composition);
-            grid.fillVoxel(x, y, z, localCompId, boundary.ores, boundary.density);
-          } else if (seg.kind === 'added') {
-            const localCompId = grid.palette.intern(seg.composition!);
-            grid.fillVoxel(x, y, z, localCompId, seg.ores);
-          } else {
-            grid.clearVoxel(x, y, z);
-          }
-        }
-      }
+      replaySegmentsInRange(grid, segments, x, z, -Infinity, Infinity);
     }
     for (const { x, y, z, modifier } of edits.fractureEntries()) {
       grid.setFractureAt(x, y, z, modifier);
