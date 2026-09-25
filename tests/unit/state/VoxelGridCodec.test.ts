@@ -387,8 +387,8 @@ describe('decodeVoxelGrid — isValidComposition / requireValidBoundary reject m
   it('rejects an "added" segment whose composition.rocks is not an array', () => {
     const payload = payloadWithSegment({
       yLo: 0, yHi: 0, kind: 'added',
-      composition: { rocks: 'not-an-array' } as unknown as EditSegment['composition'],
-    });
+      composition: { rocks: 'not-an-array' },
+    } as unknown as EditSegment);
 
     expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: added edit segment/);
   });
@@ -405,8 +405,8 @@ describe('decodeVoxelGrid — isValidComposition / requireValidBoundary reject m
   it('rejects a topBoundary with a missing/malformed composition', () => {
     const payload = payloadWithSegment({
       yLo: 0, yHi: 0, kind: 'dug',
-      topBoundary: { density: 1, composition: { rocks: undefined } as unknown as EditSegment['composition'] },
-    });
+      topBoundary: { density: 1, composition: { rocks: undefined } },
+    } as unknown as EditSegment);
 
     expect(() => decodeVoxelGrid(payload)).toThrow(/corrupt save: top boundary/);
   });
