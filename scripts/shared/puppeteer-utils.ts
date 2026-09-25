@@ -342,8 +342,42 @@ export async function waitForModels(page: Page, timeoutMs = MODELS_READY_TIMEOUT
   return ok;
 }
 
+/**
+ * Build the landscape chunks still queued for the current camera position, so
+ * a captured frame shows ground rather than the sky behind it.
+ *
+ * The streamer builds a bounded number of chunks per frame (#1153) — right
+ * for a live 60 fps loop, where a full ladder is ~56 frames and under a
+ * second, and nobody sees the gap. A capture is the opposite case: it shoots
+ * one instant shortly after a camera move, and the chunks still queued are
+ * simply not there. The frame shows sky in their place with the scenery and
+ * vegetation that belong on them hanging in it — which reads as a rendering
+ * bug, and is a false finding the visual channel would otherwise hand you for
+ * free.
+ *
+ * Draining rather than waiting, because waiting cannot work here: without a
+ * GPU a drawn frame costs seconds, so a full ladder is minutes per capture.
+ * Returns the number of chunks built (0 against a page that predates the
+ * bridge, or one whose streaming has already converged), and never rejects.
+ */
+export async function flushLandscape(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const w = window as unknown as { __landscapeFlush?: () => number; __landscapePending?: () => number };
+    if (!w.__landscapeFlush) return 0;
+    w.__landscapeFlush();
+    // Flushing the streamer's own backlog is the whole job; report anything
+    // it still considers owed so a capture that looks wrong has a number
+    // attached rather than a guess.
+    return w.__landscapePending?.() ?? 0;
+  }).then(remaining => {
+    if (remaining > 0) console.warn(`  Landscape still owes ${remaining} chunks after a flush — capturing anyway.`);
+    return remaining;
+  }).catch(() => 0);
+}
+
 export async function captureFrame(page: Page, path: string): Promise<void> {
   await waitForModels(page);
+  await flushLandscape(page);
   await page.evaluate(() => {
     const w = window as unknown as { __renderFrame?: () => void };
     w.__renderFrame?.();

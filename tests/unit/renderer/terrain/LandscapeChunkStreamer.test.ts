@@ -342,6 +342,139 @@ describe('createLandscapeChunkStreamer — reset (#1153)', () => {
   });
 });
 
+describe('createLandscapeChunkStreamer — pendingChunkCount', () => {
+  it('counts what the budget could not build yet, falls to 0 as the ladder converges, and stays there', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, 550); // 16 root tiles
+    const desired = selectLandscapeChunks(CAMERA_X, CAMERA_Z, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+    expect(desired.length).toBe(16);
+
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    // Nothing has been asked for yet, so nothing is owed — a capture must not
+    // wait on a streamer that has never seen a camera position.
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    const seen: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      streamer.update(0, CAMERA_X, CAMERA_Z, handle, palette, FAR_CUT);
+      seen.push(streamer.pendingChunkCount());
+    }
+    // 16 desired, BUDGET(2) per call: 14, 12, ... 0 on the eighth.
+    expect(seen).toEqual([14, 12, 10, 8, 6, 4, 2, 0]);
+
+    streamer.update(0, CAMERA_X, CAMERA_Z, handle, palette, FAR_CUT);
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    mesh.dispose();
+  });
+
+  it('a camera move that wants new chunks puts the count back up', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, 550);
+    // Inside the map this time, where the ladder actually refines, so moving
+    // the camera changes which chunks are wanted — the far-away CAMERA_X the
+    // rest of this file uses always resolves to the same coarsest root tiles.
+    const [startX, startZ] = [0, 0];
+    const [movedX, movedZ] = [200, 0];
+    const startIds = selectLandscapeChunks(startX, startZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+    const movedIds = selectLandscapeChunks(movedX, movedZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+    const startKeys = new Set(startIds.map(chunkKey));
+    expect(movedIds.some(id => !startKeys.has(chunkKey(id)))).toBe(true); // premise: the move wants chunks the start position did not
+
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    for (let i = 0; i < Math.ceil(startIds.length / BUDGET); i++) {
+      streamer.update(0, startX, startZ, handle, palette, FAR_CUT);
+    }
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    streamer.update(0, movedX, movedZ, handle, palette, FAR_CUT);
+    expect(streamer.pendingChunkCount()).toBeGreaterThan(0);
+
+    mesh.dispose();
+  });
+
+  it('flush() builds the whole backlog in one call and leaves nothing pending', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, 550); // 16 root tiles
+    const desired = selectLandscapeChunks(CAMERA_X, CAMERA_Z, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    streamer.update(0, CAMERA_X, CAMERA_Z, handle, palette, FAR_CUT);
+    expect(mesh.meshCount).toBe(BUDGET);
+    expect(streamer.pendingChunkCount()).toBe(desired.length - BUDGET);
+
+    // One call, no budget: everything the camera position wants is resident.
+    expect(streamer.flush()).toBe(desired.length - BUDGET);
+    expect(mesh.meshCount).toBe(desired.length);
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    // Converged: a second flush has nothing left to do.
+    expect(streamer.flush()).toBe(0);
+
+    mesh.dispose();
+  });
+
+  it('flush() before any update() is a no-op — no camera position has been named yet', () => {
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    expect(streamer.flush()).toBe(0);
+    expect(mesh.meshCount).toBe(0);
+
+    mesh.dispose();
+  });
+
+  it('flush() finishes the residency set of the camera position update() last saw', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, 550);
+    const [startX, startZ] = [0, 0];
+    const [movedX, movedZ] = [200, 0];
+    const movedIds = selectLandscapeChunks(movedX, movedZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
+
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    streamer.update(0, startX, startZ, handle, palette, FAR_CUT);
+    streamer.update(0, movedX, movedZ, handle, palette, FAR_CUT);
+    streamer.flush();
+
+    // The moved camera's set, not the one it started from — a capture frames
+    // what the camera is looking at now.
+    expect(mesh.meshCount).toBe(movedIds.length);
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    mesh.dispose();
+  });
+
+  it('reset() clears the backlog — a reset streamer owes nothing until the next update()', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, 550);
+
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    streamer.update(0, CAMERA_X, CAMERA_Z, handle, palette, FAR_CUT);
+    expect(streamer.pendingChunkCount()).toBeGreaterThan(0);
+
+    streamer.reset();
+    expect(streamer.pendingChunkCount()).toBe(0);
+
+    mesh.dispose();
+  });
+});
+
 describe('createLandscapeChunkStreamer — neighbourSteps fallback (#1153)', () => {
   it("builds with uniformNeighbourSteps(ownStep) when a chunk's geometric neighbour is not yet built", () => {
     const { palette, compId } = makePalette();

@@ -168,6 +168,16 @@ export class GameRenderer {
     return this.lastSyncedTerrainRevision;
   }
 
+  /** Landscape chunks the streamer still owes the current camera position — 0 once streaming has converged. See LandscapeChunkStreamer.pendingChunkCount. */
+  get landscapePendingChunks(): number {
+    return this.landscapeStreamer?.pendingChunkCount() ?? 0;
+  }
+
+  /** Build the landscape chunks still owed in one go, bypassing the per-frame budget; returns how many were built. For screenshot capture — see LandscapeChunkStreamer.flush. */
+  flushLandscapeStreaming(): number {
+    return this.landscapeStreamer?.flush() ?? 0;
+  }
+
   /** Number of task-progress bars currently rendered — for diagnostics. */
   get taskProgressBarCount(): number {
     return this.taskProgress?.count ?? 0;
