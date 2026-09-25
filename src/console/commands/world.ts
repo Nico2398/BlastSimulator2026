@@ -491,6 +491,16 @@ export function inspectCommand(
   };
 }
 
+/**
+ * Format `computeColumnRangeY`'s result as the `terrain_info` "Vertical
+ * extent" report line — `null` (no column in the site has ground) reports
+ * "no ground" rather than a bogus `minY to maxY` (#1187).
+ */
+export function formatVerticalExtent(_range: { minY: number; maxY: number } | null): string {
+  // TODO: implement
+  return '';
+}
+
 export function terrainInfoCommand(
   ctx: GameContext,
   _args: string[],
