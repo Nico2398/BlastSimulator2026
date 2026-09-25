@@ -37,6 +37,13 @@ import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 // same way, for the same reason.
 import { completePendingAction, clearActiveTaskFields } from './TaskLifecycleCore.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
+// Same function-only cycle already documented above for MoveTo.ts/
+// PlanItinerary.ts: TaskCancellation.ts imports releaseVehicleReservation
+// from here, and promoteVehicleGatedAction (below) needs
+// releaseActionToOpenPool from there — both bindings are only ever read
+// inside a function body, never at module-load time, so the cycle resolves
+// fine (#1115).
+import { releaseActionToOpenPool } from './TaskCancellation.js';
 
 /**
  * True when a `queued` (unclaimed) PendingAction exists whose
@@ -335,10 +342,39 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   // planFragmentTaskItinerary drop the leading foot leg when the employee is
   // already mounted in `vehicle`, so continuity needs no boarding walk either
   // way.
-  if (isFragmentGated) {
-    moveTo(state, employee.id, { actionId: action.id }, { via: vehicle.id });
-  } else {
-    moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+  const moveResult = isFragmentGated
+    ? moveTo(state, employee.id, { actionId: action.id }, { via: vehicle.id })
+    : moveTo(state, employee.id, { x: action.targetX, z: action.targetZ }, { via: vehicle.id });
+
+  // #1115 fix: a route to the vehicle (or, continuity aside, on to the
+  // target) that planItinerary/buildBoardLeg cannot resolve RIGHT NOW — the
+  // same "stays queued, retries next tick" case findVehicleForClaim's own
+  // `ok: false` already covers at claim time (its own doc comment above) —
+  // must not leave `employee` claimed-but-frozen here: activeActionId already
+  // points at `action` (set by the caller, promoteActionToActive, before this
+  // function ever runs), but with no itinerary AND no destinationX/Z fallback
+  // (unlike promoteActionToActive's own on-foot branch, whose #1090-follow-up
+  // doc comment covers exactly this failure mode for the on-foot case), the
+  // employee never moves again and the reservation this claim just took stays
+  // reserved for a driver who will never reach it — WorldInvariants.ts's I5
+  // check flags exactly this stale state (confirmed live via
+  // vehicles.integration.test.ts's own "destroying the reserved vehicle
+  // mid-drive" case, once I4/I5 became fatal: a re-claim's own moveTo failed
+  // this same way and the reservation never resolved for the rest of the
+  // run). Undoing the claim — activeActionId back to null, action back to
+  // 'queued' via the same releaseActionToOpenPool every other release site
+  // uses — lets the ordinary dispatch loop retry it (this employee or another)
+  // once the route resolves, exactly like an unreachable claim never taken in
+  // the first place.
+  if (!moveResult.success) {
+    // Only activeActionId was set at this point (promoteActionToActive, just
+    // before calling in here) — seedTaskTimerFields hasn't run yet (see this
+    // function's own doc comment above), so every other field
+    // clearActiveTaskFields touches is already null from the employee's prior
+    // idle state. Safe drop-in for the same "undo a claim" shape
+    // completeVehicleGatedAction below uses.
+    clearActiveTaskFields(employee);
+    releaseActionToOpenPool(state, action);
   }
 }
 
@@ -542,12 +578,18 @@ export interface VehicleGoneInterruption {
  * True when `actionId`'s reservation is an ordinary reserve-ahead
  * (reserveOnePoolActionAhead, EmployeeDispatchSteps.ts) still sitting in
  * `holder`'s own `taskQueue`, not yet promoted — `holder.activeActionId`
- * naming a DIFFERENT action is exactly what that state looks like, since the
- * whole point of reserving ahead is claiming a follow-up while genuinely busy
- * on something else. Restricted to a holder genuinely working elsewhere (not
- * resting, not walking to rest) the same way WorldInvariants.ts's I5 check
- * already does (#1103) — this is that identical shape, needed a second time
- * by reconcileVehicleReservations below, which independently reinvented the
+ * naming a DIFFERENT action (including null, #1115) is exactly what that
+ * state looks like, since the whole point of reserving ahead is claiming a
+ * follow-up before it is needed, whether that's while genuinely busy on
+ * something else OR in the one-tick gap between finishing the prior active
+ * action and dispatch's next pass promoting this one (tickEmployees runs
+ * once per tick — a completion at tickTaskProgress, later the same tick, can
+ * leave `holder` idle with this reservation still queued for the rest of
+ * that tick, WorldInvariants.ts's own end-of-tick I5 check included).
+ * Restricted to a holder genuinely not mid-rest (not resting, not walking to
+ * rest) the same way WorldInvariants.ts's I5 check already does (#1103) —
+ * this is that identical shape, needed a second time by
+ * reconcileVehicleReservations below, which independently reinvented the
  * same "activeActionId doesn't name this reservation" test (#928) with no
  * exception for it: an employee busy on one action with a DIFFERENT one
  * reserved ahead onto their vehicle read exactly like #928's genuine staleness
@@ -560,10 +602,22 @@ export interface VehicleGoneInterruption {
  * SAME action id a second time, producing a `[id, id]` duplicate that starves
  * `findStarvedActionForEmployee` forever behind it (confirmed live via
  * rock-fragmenter-breaking.json's interaction-mode run, #1089).
+ *
+ * The original version of this check additionally required
+ * `holder.activeActionId !== null` — narrower than the actual "not yet
+ * promoted" shape it means to recognize: an idle holder (activeActionId
+ * null) with this reservation still in taskQueue is just as legitimately
+ * "reserved ahead, not yet promoted" as a busy one, and reads identically
+ * once promotion catches up on dispatch's very next pass. Confirmed live via
+ * tutorial.integration.test.ts's/tutorial-pause.integration.test.ts's own
+ * automatic-haul-debris cases, once I4/I5 became fatal (#1115): a driller's
+ * drill_hole follow-up sat correctly reserved-ahead in taskQueue for the one
+ * tick their prior action finished (activeActionId already null, dispatch not
+ * yet run again) and I5 flagged it, even though nothing about it was ever
+ * stale.
  */
 export function isPendingReserveAhead(holder: Employee, actionId: number): boolean {
-  return holder.activeActionId !== null
-    && holder.restTicksRemaining === null
+  return holder.restTicksRemaining === null
     && holder.pendingRestDuration === null
     && holder.taskQueue.includes(actionId);
 }

@@ -266,6 +266,11 @@ export function runTick(
   // from vehicle.state.
   const vehiclePositionsAtTickStart = new Map(state.vehicles.vehicles.map(v => [v.id, { x: v.x, z: v.z }]));
   const movementResult = tickLocomotion(state, emitter);
+  // #1115: the authoritative set of vehicles a genuine, occupant-validated
+  // drive leg actually moved this tick — see checkI4VehicleMovedWithoutOccupant's
+  // own doc comment (WorldInvariants.ts) for why I4 checks against this
+  // instead of vehicle.occupantIds' own tick-end state.
+  const vehiclesDrivenThisTick = new Set(movementResult.vehiclesMoved);
   const stuckEmployees = movementResult.stuck;
   const abandonedActions = movementResult.abandoned;
 
@@ -300,7 +305,7 @@ export function runTick(
   // computes against it, so continuing to run on it hides the defect rather
   // than surfacing it where it happened.
   const worldInvariantViolations = options.checkInvariants
-    ? assertWorldInvariants(state, vehiclePositionsAtTickStart)
+    ? assertWorldInvariants(state, vehiclePositionsAtTickStart, vehiclesDrivenThisTick)
     : [];
 
   const fatalViolation = worldInvariantViolations.find(v => FATAL_VIOLATION_KINDS.has(v.kind));

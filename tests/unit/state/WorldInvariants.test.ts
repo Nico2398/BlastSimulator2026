@@ -14,7 +14,7 @@
 // fail against that stub, not against a syntax/import error.
 
 import { describe, it, expect } from 'vitest';
-import { assertWorldInvariants } from '../../../src/core/state/WorldInvariants.js';
+import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../../../src/core/state/WorldInvariants.js';
 import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
@@ -225,14 +225,32 @@ describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', 
     expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('no violation when an occupied vehicle moved this tick', () => {
+  it('no violation when a vehicle in vehiclesDrivenThisTick moved this tick', () => {
     const state = makeState();
     const emp = addEmployee(state, { x: 15, z: 15 });
     const v = addVehicle(state, { x: 15, z: 15, occupantIds: [emp.id] });
     emp.locomotion = { kind: 'mounted', vehicleId: v.id };
     const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    expect(assertWorldInvariants(state, snapshot)).toEqual([]);
+    expect(assertWorldInvariants(state, snapshot, new Set([v.id]))).toEqual([]);
+  });
+
+  // #1115: a driver who alights the instant their drive leg arrives (a
+  // mounted-rest arrival, or a #1093 transport ride's own drop-off) — or who
+  // boards, drives, and alights again all within one tick (a short reposition
+  // ride) — is a legitimate "drove it, then got off it": the vehicle was
+  // genuinely, occupant-validated driven for the whole move
+  // (`vehiclesDrivenThisTick`, tickLocomotion's own authoritative
+  // LocomotionResult.vehiclesMoved), even though `occupantIds` reads empty by
+  // the time this tick's own end-state is checked, and even if it also read
+  // empty at tick-start. Only a vehicle whose position changed WITHOUT ever
+  // appearing in `vehiclesDrivenThisTick` is a real violation.
+  it('no violation when a vehicle unoccupied at both tick start and tick end is in vehiclesDrivenThisTick', () => {
+    const state = makeState();
+    const v = addVehicle(state, { x: 15, z: 15, occupantIds: [] }); // already alighted by tick end
+    const snapshot = new Map([[v.id, { x: 10, z: 10 }]]); // unoccupied at tick start too
+
+    expect(assertWorldInvariants(state, snapshot, new Set([v.id]))).toEqual([]);
   });
 
   it('no violation for a vehicle with no baseline entry (created this tick)', () => {
@@ -243,12 +261,12 @@ describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', 
     expect(assertWorldInvariants(state, snapshot)).toEqual([]);
   });
 
-  it('violation when an unoccupied vehicle\'s position differs from its tick-start snapshot', () => {
+  it('violation when a vehicle not in vehiclesDrivenThisTick has a position differing from its tick-start snapshot', () => {
     const state = makeState();
     const v = addVehicle(state, { x: 15, z: 15, occupantIds: [] });
     const snapshot = new Map([[v.id, { x: 10, z: 10 }]]);
 
-    const violations = assertWorldInvariants(state, snapshot);
+    const violations = assertWorldInvariants(state, snapshot, new Set());
 
     expect(violations).toHaveLength(1);
     expect(violations[0]!.kind).toBe('I4_vehicle_moved_without_occupant');
@@ -316,6 +334,27 @@ describe('assertWorldInvariants — I5_reservation_without_valid_holder', () => 
     expect(violations).toHaveLength(1);
     expect(violations[0]!.kind).toBe('I5_reservation_without_valid_holder');
     expect(violations[0]!.vehicleId).toBe(v.id);
+  });
+});
+
+// #1115: I4/I5 are framed throughout WorldInvariants.ts's own doc comments as
+// violations that "should never occur if the mount/itinerary/task machinery
+// is correct" — the same standard I8 is already held to via
+// FATAL_VIOLATION_KINDS (aborting the tick outright rather than merely being
+// collected and reported). Once the vehicle-reservation/rest-promotion
+// ordering bug behind I4/I5 is fixed at its root, both join I8 in that set —
+// today only I8 is a member, so this fails until that lands.
+describe('FATAL_VIOLATION_KINDS — I4/I5 fatality (#1115)', () => {
+  it('includes I4_vehicle_moved_without_occupant, matching I8\'s existing precedent', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I4_vehicle_moved_without_occupant')).toBe(true);
+  });
+
+  it('includes I5_reservation_without_valid_holder, matching I8\'s existing precedent', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I5_reservation_without_valid_holder')).toBe(true);
+  });
+
+  it('still includes I8_payload_not_in_transit (pre-existing, must not regress)', () => {
+    expect(FATAL_VIOLATION_KINDS.has('I8_payload_not_in_transit')).toBe(true);
   });
 });
 

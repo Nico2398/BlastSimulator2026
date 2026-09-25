@@ -442,10 +442,26 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
  * whole detour — another driver can claim it immediately instead.
  *
  * Skips a taskQueue entry that is on-foot (`requiredVehicleRole === null`) or
- * whose reserved vehicle is already boarded (defensive — should not occur for a
- * taskQueue-only entry). Fully releases matching entries: removes them from
- * `employee.taskQueue` and hands the action + vehicle back to the pool via the
- * existing `releaseActionToOpenPool` helper.
+ * whose reserved vehicle is already boarded BY `employee` THEMSELF (the
+ * continuity case, findFreeVehicleForRole's own driven-by-self clause — a
+ * taskQueue entry reserved onto a vehicle this employee already drives). A
+ * DIFFERENT employee's occupancy is never a reason to leave the reservation in
+ * place (#1115 fix): the reservation is still exclusively `employee`'s — a
+ * taskQueue entry's vehicle can only ever have been boarded by someone else
+ * through a path outside the ordinary reservation-checked claim (a manual
+ * `vehicle driver`/test drive, e.g.) — so it is exactly the stale/invalid
+ * reservation this release exists to clear, not a reason to leave it locked to
+ * an employee about to go idle for a whole rest/detour. The old unconditional
+ * `vehicleDriverId(vehicle) !== null` skip treated ANY occupant, self or
+ * otherwise, as "already boarded, leave it" — silently leaving a reservation
+ * on the pool exclusively claimed by (but unusable to) `employee` for the
+ * whole rest/detour whenever a different driver held the seat
+ * (WorldInvariants.ts's I5 check flags exactly this: the reservation's holder
+ * is `employee`, per the action's own holderId, but the vehicle's actual
+ * driver is someone else — none of I5's own validity branches accept that).
+ * Fully releases matching entries: removes them from `employee.taskQueue` and
+ * hands the action + vehicle back to the pool via the existing
+ * `releaseActionToOpenPool` helper.
  */
 export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, employee: Employee): void {
   const queuedIds = [...employee.taskQueue];
@@ -455,7 +471,9 @@ export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, e
     if (!action || action.requiredVehicleRole === null) continue;
 
     const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
-    if (!vehicle || vehicleDriverId(vehicle) !== null) continue;
+    if (!vehicle) continue;
+    const driverId = vehicleDriverId(vehicle);
+    if (driverId !== null && driverId === employee.id) continue;
 
     employee.taskQueue = employee.taskQueue.filter(id => id !== action.id);
     releaseActionToOpenPool(state, action);

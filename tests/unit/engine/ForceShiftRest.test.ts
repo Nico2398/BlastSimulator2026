@@ -997,7 +997,7 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     expect(employee.taskQueue).toEqual([]);
   });
 
-  it('leaves a boarded vehicle (driverId already set) for a taskQueue action untouched — releaseUnboardedTaskQueueVehicleReservations\' own guard still holds through this new call site', () => {
+  it('releases a taskQueue action whose vehicle is already boarded by a DIFFERENT employee (#1115: stale/invalid, not a reason to leave it locked)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
@@ -1015,11 +1015,14 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
-    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(gatedAction.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
+    // The other employee's own occupancy is untouched — only the reservation
+    // (exclusively held by `employee`, not by whoever is actually driving) is
+    // released.
     expect(vehicleDriverId(vehicle)).toBe(otherEmployee.id);
-    expect(gatedAction.status).toBe('assigned');
-    expect(gatedAction.holderId).toBe(employee.id);
-    expect(employee.taskQueue).toContain(gatedAction.id);
+    expect(gatedAction.status).toBe('queued');
+    expect(gatedAction.holderId).toBeNull();
+    expect(employee.taskQueue).not.toContain(gatedAction.id);
   });
 
   it('a second shift-rest interruption on the same employee/queue later in the run does not leak either', () => {
