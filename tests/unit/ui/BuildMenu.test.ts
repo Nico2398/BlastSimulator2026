@@ -225,18 +225,26 @@ describe('BuildMenu — placed-row affordability guard (issue #511)', () => {
 // PlacementController/SelectionOverlay/ParamStrip, enough surface for
 // BuildMenu's own arm/confirm logic without a real Three.js scene or canvas.
 
-function makeMockKit() {
+/**
+ * `activeRegion` (#1210, additive): a caller arming the ramp tool against a
+ * pinned exact region (the tutorial's guided box-cut line) needs the mock
+ * controller to report it back, so BuildMenu can pre-fill the depth field
+ * from it. Defaults to `null` — every pre-existing call site (`makeMockKit()`
+ * with no argument) is unaffected, matching today's always-unconstrained mock.
+ */
+function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
   let armed = false;
   let phase: 'idle' | 'armed' | 'selected' = 'idle';
   let selection: PlacementSelection | null = null;
   let confirmHandler: PlacementConfirmHandler | null = null;
   let changeHandler: PlacementChangeHandler | null = null;
+  const activeRegion = options?.activeRegion ?? null;
 
   const controller = {
     get isArmed() { return armed; },
     get currentPhase() { return phase; },
     get selection() { return selection; },
-    get activeRegion() { return null; },
+    get activeRegion() { return activeRegion; },
     get canConfirm() { return selection !== null; },
     setConfirmHandler: (cb: PlacementConfirmHandler) => { confirmHandler = cb; },
     setCancelHandler: vi.fn(),
@@ -381,6 +389,121 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(controller.isArmed).toBe(true);
     rampBtn.click();
     expect(controller.isArmed).toBe(false);
+  });
+
+  // ── #1210: BuildMenu's own confirmEnabled gate must never disagree with
+  // core's validateRampOrder — today it doesn't consult validateRampOrder at
+  // all: `tiles` is computed locally with a +1 buildRampCommand's own
+  // --start/--end math (and rampDefFromEndpoints, which that command will be
+  // rewired to call) never adds, and there is no cash/affordability check on
+  // the ramp tool's Confirm at all. The box-cut tutorial's fixed line (16,19)
+  // -> (16,31) is exactly 12 tiles (dz=12, no +1) — the fixture every case
+  // below shares.
+  describe('Ramp tool: confirmEnabled agrees with core validateRampOrder, at any depth (#1210)', () => {
+    const BOX_CUT_ENDS = { x1: 16, z1: 19, x2: 16, z2: 31 };
+
+    /**
+     * Drives the depth stepper's onInc/onDec from the panel's own default (8)
+     * to `target`, reading the latest `strip.show()` field state after each
+     * click — generalizes the single onInc/onDec exercise above (~line 370)
+     * to an arbitrary target depth instead of one hardcoded pair.
+     */
+    function setRampDepth(
+      strip: ReturnType<typeof makeMockKit>['strip'], target: number,
+    ): { confirmEnabled: boolean; confirmDisabledReason: string | undefined; depthValue: number } {
+      let showArgs = strip.show.mock.calls.at(-1)![0];
+      let depthField = showArgs.fields[0];
+      while (depthField.value < target) {
+        depthField.onInc();
+        showArgs = strip.show.mock.calls.at(-1)![0];
+        depthField = showArgs.fields[0];
+      }
+      while (depthField.value > target) {
+        depthField.onDec();
+        showArgs = strip.show.mock.calls.at(-1)![0];
+        depthField = showArgs.fields[0];
+      }
+      return { confirmEnabled: showArgs.confirmEnabled, confirmDisabledReason: showArgs.confirmDisabledReason, depthValue: depthField.value };
+    }
+
+    /** Arms the ramp tool and selects the box-cut line, returning the kit's own pieces for the caller to drive further. */
+    function armAndSelectBoxCut(options?: { activeRegion?: TileRegion | null }) {
+      const { kit, controller, strip } = makeMockKit(options);
+      menu.setPlacementKit(kit);
+      const rampBtn = container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!;
+      rampBtn.click();
+      controller.simulateSelect({ ...BOX_CUT_ENDS });
+      return { kit, controller, strip };
+    }
+
+    it.each(Array.from({ length: 15 }, (_, i) => i + 1))(
+      'depth %i on the box-cut line: BuildMenu confirmEnabled matches validateRampOrder(rampDefFromEndpoints(...), cash).success',
+      (depth) => {
+        const state = makeMockState({ cash: 99999 });
+        menu.update(state);
+        const { strip } = armAndSelectBoxCut();
+
+        const { confirmEnabled, depthValue } = setRampDepth(strip, depth);
+        expect(depthValue).toBe(depth);
+
+        const rampDef = rampDefFromEndpoints(BOX_CUT_ENDS.x1, BOX_CUT_ENDS.z1, BOX_CUT_ENDS.x2, BOX_CUT_ENDS.z2, depth);
+        const expected = validateRampOrder(rampDef, state.cash).success;
+        expect(
+          confirmEnabled,
+          `depth ${depth}: BuildMenu confirmEnabled=${confirmEnabled}, core validateRampOrder success=${expected}`,
+        ).toBe(expected);
+      },
+    );
+
+    it('depth 6 explicitly: confirmEnabled is true (computeMinimumRampLength(6) <= the line\'s 12-tile length)', () => {
+      const state = makeMockState({ cash: 99999 });
+      menu.update(state);
+      const { strip } = armAndSelectBoxCut();
+
+      const { confirmEnabled } = setRampDepth(strip, 6);
+      expect(confirmEnabled).toBe(true);
+    });
+
+    it('depth 7 explicitly: confirmEnabled is false (computeMinimumRampLength(7) > the line\'s 12-tile length)', () => {
+      const state = makeMockState({ cash: 99999 });
+      menu.update(state);
+      const { strip } = armAndSelectBoxCut();
+
+      const { confirmEnabled } = setRampDepth(strip, 7);
+      expect(confirmEnabled).toBe(false);
+    });
+
+    it('a cash balance below the ramp\'s cost disables confirm with the shared insufficient-funds reason, at an otherwise-valid depth', () => {
+      const rampDef = rampDefFromEndpoints(BOX_CUT_ENDS.x1, BOX_CUT_ENDS.z1, BOX_CUT_ENDS.x2, BOX_CUT_ENDS.z2, 6);
+      const cost = rampDef.length * RAMP_COST_PER_METER;
+      const state = makeMockState({ cash: cost - 1 });
+      menu.update(state);
+      const { strip } = armAndSelectBoxCut();
+
+      const { confirmEnabled, confirmDisabledReason } = setRampDepth(strip, 6);
+      expect(confirmEnabled).toBe(false);
+      expect(confirmDisabledReason).toBe(t('console.insufficient_funds', {
+        need: formatMoney(cost),
+        have: formatMoney(state.cash),
+      }));
+    });
+
+    it('arming the ramp tool with controller.activeRegion pinned to the box-cut line pre-fills depth 6, not the default 8, with no stepper interaction', () => {
+      // Deliberately arms only — no simulateSelect, no onInc/onDec — the
+      // pre-fill must be visible from the arm-time refresh() call alone.
+      const { kit, strip } = makeMockKit({
+        activeRegion: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
+      });
+      menu.setPlacementKit(kit);
+      const state = makeMockState({ cash: 99999 });
+      menu.update(state);
+
+      const rampBtn = container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!;
+      rampBtn.click();
+
+      const showArgs = strip.show.mock.calls.at(-1)![0];
+      expect(showArgs.fields[0].value).toBe(6);
+    });
   });
 
   it('Terrain section: Level Ground button arms the rect tool; confirming dispatches level_ground', () => {
