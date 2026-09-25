@@ -197,20 +197,22 @@ function decodeV6(payload: SerializedVoxelsV6): VoxelGrid {
   const fracture = new Float64Array(fractureBytes.buffer, fractureBytes.byteOffset, n);
   const ores = new Map(payload.ores);
 
-  for (let z = 0; z < sizeZ; z++) {
-    for (let y = 0; y < sizeY; y++) {
-      for (let x = 0; x < sizeX; x++) {
-        const i = x + y * sizeX + z * sizeX * sizeY;
-        const d = density[i]!;
-        const f = fracture[i]!;
-        const c = compId[i]!;
-        const ore = ores.get(i);
-        if (d === 0 && f === 1 && c === 0 && !ore) continue;
-        grid.fillVoxel(x, y, z, c, ore, d);
-        if (f !== 1) grid.setFractureAt(x, y, z, f);
+  grid.withoutEditRecording(() => {
+    for (let z = 0; z < sizeZ; z++) {
+      for (let y = 0; y < sizeY; y++) {
+        for (let x = 0; x < sizeX; x++) {
+          const i = x + y * sizeX + z * sizeX * sizeY;
+          const d = density[i]!;
+          const f = fracture[i]!;
+          const c = compId[i]!;
+          const ore = ores.get(i);
+          if (d === 0 && f === 1 && c === 0 && !ore) continue;
+          grid.fillVoxel(x, y, z, c, ore, d);
+          if (f !== 1) grid.setFractureAt(x, y, z, f);
+        }
       }
     }
-  }
+  });
   return grid;
 }
 

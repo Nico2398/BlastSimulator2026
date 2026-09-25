@@ -9,6 +9,9 @@
 // Voxel cell size: 1 m × 1 m × 1 m (SI units throughout). All grid
 // coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
+import { TerrainEdits, oresDeepEqual, type EditBoundary } from './TerrainEdits';
+import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance';
+
 export interface VoxelRockComposition {
   /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
   rocks: Array<{ rockId: string; coefficient: number }>;
@@ -251,6 +254,8 @@ export class VoxelGrid {
 
   readonly sizeY: number;
   readonly palette = new CompositionPalette();
+  /** Log of edits made to this grid since generation — see `TerrainEdits`. */
+  readonly edits: TerrainEdits;
 
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
@@ -275,6 +280,7 @@ export class VoxelGrid {
    */
   constructor(sizeX: number, sizeY: number, sizeZ: number) {
     this.sizeY = sizeY;
+    this.edits = new TerrainEdits();
     if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) return;
 
     for (let cz = 0; cz < Math.ceil(sizeZ / CHUNK_SIZE); cz++) {
@@ -541,6 +547,77 @@ export class VoxelGrid {
     this.dirty.add(chunkKey(chunk.cx, chunk.cz));
   }
 
+  /** True while a `withoutEditRecording` call is in progress — nested calls save/restore this. */
+  private editingSuppressed = false;
+
+  /**
+   * Run `fn` with edit recording suspended — mutators called inside `fn` do
+   * not append to `this.edits`. For `replayTerrainEdits` and generation,
+   * neither of which should re-record what they are themselves replaying.
+   */
+  withoutEditRecording<T>(fn: () => T): T {
+    const prev = this.editingSuppressed;
+    this.editingSuppressed = true;
+    try {
+      return fn();
+    } finally {
+      this.editingSuppressed = prev;
+    }
+  }
+
+  /**
+   * Classify and record a density/compId/ores write at (x, y, z) — shared by
+   * `fillVoxel` and `setVoxel`. A no-op write (nothing actually changed) is
+   * never recorded. A density landing exactly on the grid's fully-solid (1)
+   * or fully-clear (0) extreme is recorded as a plain interior row; anything
+   * strictly between is a genuine fractional crossing, recorded with a
+   * boundary override carrying the write's exact density/compId/ores so
+   * replay reproduces it exactly. The `SOLID_VOXEL_DENSITY_THRESHOLD` this
+   * file already uses for "solid" (`isSolidAt`) decides which side of that
+   * fractional band counts as dug vs added.
+   *
+   * `prevCompId`/`newCompId` are this grid's own local `CompositionPalette`
+   * indices, used only for the no-op equality check above — cheap and valid
+   * since both come from the same instance. What actually reaches
+   * `TerrainEdits` is the portable composition value (`this.palette.get(...)
+   * .comp`), never the raw index: an `EditSegment`/`EditBoundary` may be
+   * replayed onto a different `VoxelGrid` instance whose palette assigns
+   * that same composition a different index (#1180).
+   */
+  private recordVoxelWrite(
+    x: number, y: number, z: number,
+    prevDensity: number, prevCompId: number, prevOres: Record<string, number> | undefined,
+    newDensity: number, newCompId: number, newOres: Record<string, number> | undefined,
+  ): void {
+    if (this.editingSuppressed) return;
+    if (prevDensity === newDensity && prevCompId === newCompId && oresDeepEqual(prevOres, newOres)) return;
+
+    const newComposition = this.palette.get(newCompId).comp;
+
+    if (newDensity > 0 && newDensity < 1) {
+      const boundary: EditBoundary = newOres !== undefined
+        ? { density: newDensity, composition: newComposition, ores: newOres }
+        : { density: newDensity, composition: newComposition };
+      if (newDensity >= SOLID_VOXEL_DENSITY_THRESHOLD) {
+        this.edits.recordAdd(x, z, y, y, newComposition, newOres, boundary, boundary);
+      } else {
+        this.edits.recordDig(x, z, y, y, boundary, boundary);
+      }
+      return;
+    }
+
+    if (newDensity >= SOLID_VOXEL_DENSITY_THRESHOLD) {
+      this.edits.recordAdd(x, z, y, y, newComposition, newOres);
+    } else {
+      this.edits.recordDig(x, z, y, y);
+    }
+  }
+
+  /** Record a fracture-modifier change at (x, y, z) when it actually changed and recording isn't suppressed — shared by every mutator that writes `chunk.fracture`. */
+  private recordFractureWrite(x: number, y: number, z: number, prev: number, next: number): void {
+    if (!this.editingSuppressed && prev !== next) this.edits.recordFracture(x, y, z, next);
+  }
+
   // ── Direct field accessors — no allocation, hot-path callers should prefer these ──
 
   /** Density in [0, 1]. Coordinates the site does not own read as 0 (air). */
@@ -595,6 +672,10 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const prevDensity = chunk.density[i]!;
+    const prevCompId = chunk.compId[i]!;
+    const prevOres = chunk.ores.get(i);
+    const prevFracture = chunk.fracture[i]!;
     chunk.density[i] = density;
     chunk.compId[i] = compId;
     chunk.fracture[i] = 1.0;
@@ -602,13 +683,18 @@ export class VoxelGrid {
     else chunk.ores.delete(i);
     this.touch(chunk);
     this.touchDensity(chunk, i, y, density);
+    this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, density, compId, chunk.ores.get(i));
+    this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
-    chunk.fracture[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)] = value;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const prev = chunk.fracture[i]!;
+    chunk.fracture[i] = value;
     this.touch(chunk);
+    this.recordFractureWrite(x, y, z, prev, value);
   }
 
   /** Multiply the fracture modifier in place (e.g. cracking a voxel that didn't fully fracture). */
@@ -616,8 +702,11 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
-    chunk.fracture[i] = chunk.fracture[i]! * factor;
+    const prev = chunk.fracture[i]!;
+    const next = prev * factor;
+    chunk.fracture[i] = next;
     this.touch(chunk);
+    this.recordFractureWrite(x, y, z, prev, next);
   }
 
   // ── Compatibility API — materializes a VoxelData-shaped object per call ──
@@ -646,6 +735,10 @@ export class VoxelGrid {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const prevDensity = chunk.density[i]!;
+    const prevCompId = chunk.compId[i]!;
+    const prevOres = chunk.ores.get(i);
+    const prevFracture = chunk.fracture[i]!;
     chunk.compId[i] = this.palette.intern(voxel.composition);
     chunk.density[i] = voxel.density;
     chunk.fracture[i] = voxel.fractureModifier;
@@ -653,18 +746,26 @@ export class VoxelGrid {
     else chunk.ores.delete(i);
     this.touch(chunk);
     this.touchDensity(chunk, i, y, voxel.density);
+    this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, voxel.density, chunk.compId[i]!, chunk.ores.get(i));
+    this.recordFractureWrite(x, y, z, prevFracture, voxel.fractureModifier);
   }
 
   clearVoxel(x: number, y: number, z: number): void {
     const chunk = this.ownerOf(x, y, z);
     if (!chunk) return;
     const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    const prevDensity = chunk.density[i]!;
+    const prevCompId = chunk.compId[i]!;
+    const prevOres = chunk.ores.get(i);
+    const prevFracture = chunk.fracture[i]!;
     chunk.density[i] = 0;
     chunk.compId[i] = 0;
     chunk.fracture[i] = 1.0;
     chunk.ores.delete(i);
     this.touch(chunk);
     this.touchDensity(chunk, i, y, 0);
+    this.recordVoxelWrite(x, y, z, prevDensity, prevCompId, prevOres, 0, 0, undefined);
+    this.recordFractureWrite(x, y, z, prevFracture, 1.0);
   }
 
   // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──
