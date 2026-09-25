@@ -386,41 +386,51 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     if (outcome.becameStuck) emitter?.emit('agent:stuck', { employeeId: emp.id });
     emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
 
+    // #986/#1138: the stuck mirror lived on the vehicle so a freshly idle
+    // vehicle wouldn't re-accumulate a stale count on its next driver — now
+    // that isMoveStuck/moveConsecutiveFailures live only on the employee
+    // (cleared by dismountVehicleDriver's own alight, which drops the
+    // occupant relationship entirely), there is nothing left on `vehicle`
+    // itself to reset here.
     if (emp.moveConsecutiveFailures >= MOVE_STUCK_ABANDON_TICKS) {
-      const actionId = emp.activeActionId;
-      interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
-      // #986: interruptActiveAction(..., actionId: null, ...) is a no-op —
-      // nothing to release via an action — so a vehicle driven with no
-      // PendingAction at all (a manual `vehicle driver`/`vehicle haul`
-      // console command) would otherwise never dismount here and stay stuck
-      // forever. Mirrors the pre-itinerary tickVehicleOnNavGrid's own
-      // explicit, unconditional dismountVehicleDriver call on this same
-      // abandon path (EntityMovementTick.ts, deleted) — releaseVehicleReservation
-      // already calls this as part of releasing a real action, so this is a
-      // harmless no-op (past its own idempotent abort) in that case. Also
-      // clears the now-invalid drive leg immediately (I7: a drive leg's
-      // employee must be mounted in that leg's vehicle) — the ordinary
-      // aborted-leg self-heal (advanceLeg's own occupant-mismatch check,
-      // above) only runs on the NEXT tickLocomotion pass, one tick too late
-      // to cover this employee's own itinerary within the very call that
-      // just alighted them.
-      if (isDrive) {
-        dismountVehicleDriver(state, vehicle!, emitter);
-        clearItineraryOnFailure(state, emp);
-      }
-      result.abandoned.push({ employeeId: emp.id, actionId });
-      emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
-      // #986/#1138: the stuck mirror lived on the vehicle so a freshly idle
-      // vehicle wouldn't re-accumulate a stale count on its next driver — now
-      // that isMoveStuck/moveConsecutiveFailures live only on the employee
-      // (cleared by dismountVehicleDriver's own alight, which drops the
-      // occupant relationship entirely), there is nothing left on `vehicle`
-      // itself to reset here.
+      abandonStuckMovement(state, emp, isDrive ? vehicle : undefined, result, emitter);
     }
     return 'blocked';
   }
 
   return 'moved';
+}
+
+/**
+ * The shared abandon sequence both `advanceLeg`'s own stuck-abandon tail
+ * (above) and `handleOccupancyBlock`'s stall escalation (below) fire on
+ * their own rising edge, once their respective stuck counter reaches
+ * MOVE_STUCK_ABANDON_TICKS: releases the active action, and — for a drive
+ * leg — dismounts the driver and clears the now-invalid itinerary. `vehicle`
+ * is `undefined` for a foot leg's own abandon; always defined for a drive
+ * leg's (both `advanceLeg`'s isDrive branch and `handleOccupancyBlock`,
+ * which is drive-only).
+ *
+ * #986: `interruptActiveAction(..., actionId: null, ...)` is a no-op —
+ * nothing to release via an action — so a vehicle driven with no
+ * PendingAction at all (a manual `vehicle driver`/`vehicle haul` console
+ * command) would otherwise never dismount here and stay stuck forever.
+ * Dismounting also clears the now-invalid drive leg immediately (I7: a
+ * drive leg's employee must be mounted in that leg's vehicle) — the
+ * ordinary aborted-leg self-heal (`advanceLeg`'s own occupant-mismatch
+ * check) only runs on the NEXT tickLocomotion pass, one tick too late to
+ * cover this employee's own itinerary within the very call that just
+ * alighted them.
+ */
+function abandonStuckMovement(state: GameState, emp: Employee, vehicle: Vehicle | undefined, result: LocomotionResult, emitter?: EventEmitter): void {
+  const actionId = emp.activeActionId;
+  interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
+  if (vehicle) {
+    dismountVehicleDriver(state, vehicle, emitter);
+    clearItineraryOnFailure(state, emp);
+  }
+  result.abandoned.push({ employeeId: emp.id, actionId });
+  emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
 }
 
 /**
@@ -536,14 +546,11 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
   // own, unrelated slowdown) missing its charge window at blast time.
   // Escalating here, on the same VEHICLE_OCCUPANCY_REROUTE_THRESHOLD-gated
   // tick cadence `vehicleWaitingTicks` already counts in ticks (not a
-  // separate counter), mirrors advanceLeg's own abandon branch exactly.
+  // separate counter), reuses advanceLeg's own abandon sequence exactly
+  // (abandonStuckMovement, defined just after advanceLeg) rather than a
+  // hand-synchronized copy of it.
   if (emp.vehicleWaitingTicks >= MOVE_STUCK_ABANDON_TICKS) {
-    const actionId = emp.activeActionId;
-    interruptActiveAction(state, emp, actionId, { forceOpenPool: true });
-    dismountVehicleDriver(state, vehicle, emitter);
-    clearItineraryOnFailure(state, emp);
-    result.abandoned.push({ employeeId: emp.id, actionId });
-    emitter?.emit('agent:action_abandoned', { employeeId: emp.id, actionId });
+    abandonStuckMovement(state, emp, vehicle, result, emitter);
   }
 
   return 'blocked';
@@ -663,11 +670,11 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
  * vehicle's x/z ever changes — and keeps NavCell.vehicleOccupied in step:
  * `isStationaryNow` is the calling leg's own arrival test (`isLegArrived`)
  * passing this tick, so a leg that just arrived marks the cell it stopped on,
- * and a leg still mid-route leaves it unmarked. The cell is freed the next
- * tick a new leg's `writeVehiclePosition` call finds the rounded cell has
- * changed (`updateVehicleCellOccupancy`'s own `cellChanged` check) — driving
- * away from a stopped, occupied cell frees it without this function needing
- * to know that on its own.
+ * and a leg still mid-route leaves it unmarked. This function always passes
+ * `wasStationary: true` to `updateVehicleCellOccupancy`, so the old cell
+ * frees the instant `isStationaryNow` reads false — the very next
+ * `writeVehiclePosition` call once a new leg starts driving the vehicle
+ * away — not only when the rounded cell itself has changed.
  */
 function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, isStationaryNow: boolean): void {
   const prevX = Math.round(vehicle.x);
