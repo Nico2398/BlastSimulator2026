@@ -478,6 +478,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 140,
+          "z": 10
+        },
+        {
           "type": "pickTile",
           "x": 140,
           "z": 10
