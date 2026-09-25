@@ -30,6 +30,7 @@ import {
   NEED_HARD_THRESHOLDS,
   AGENT_WALK_SPEED,
   NEED_DRAIN_RATES,
+  MAX_NEED_GAUGE,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -1114,7 +1115,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     expect(boardResult.success).toBe(true);
   });
 
-  it('soft-threshold proactive rest: does NOT release the vehicle — the driver keeps it and drives itself to rest', () => {
+  it('soft-threshold proactive rest: keeps the vehicle for the drive there, then releases it on arrival — freed WHILE still resting, not after (#1122)', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
     state.cash = 100_000;
@@ -1130,14 +1131,119 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     emp.activeActionId = null; // idle
     emp.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25), above the hard threshold (0)
 
+    // First tick: claims the rest action and starts the drive there — the
+    // vehicle is still legitimately in use for the travel itself, exactly
+    // like driving to any other action (building, drilling, ...).
     tickCommand(ctx, ['1'], {});
     if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
 
     expect(emp.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicle.occupantIds).toContain(empId);
     expect(vehicleDriverId(vehicle)).toBe(empId);
+    expect(emp.restTicksRemaining).toBeNull(); // still travelling, rest hasn't started yet
 
-    const violations = assertWorldInvariants(state);
-    expect(violations.filter(v => v.kind === 'I2_mounted_position_mismatch')).toHaveLength(0);
+    let sawI2Violation = false;
+    {
+      const violations = assertWorldInvariants(state);
+      if (violations.some(v => v.kind === 'I2_mounted_position_mismatch')) sawI2Violation = true;
+    }
+
+    // Keep ticking through the rest of the drive until arrival starts the
+    // rest timer (restTicksRemaining flips from null to a number,
+    // ArrivalGate.ts) — mirrors the hard-threshold-collapse test's own
+    // tick-to-arrival loop above.
+    const MAX_TICKS = 200;
+    let ticks = 1;
+    while (ticks < MAX_TICKS && emp.restTicksRemaining === null) {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      const violations = assertWorldInvariants(state);
+      if (violations.some(v => v.kind === 'I2_mounted_position_mismatch')) sawI2Violation = true;
+    }
+
+    expect(ticks).toBeLessThan(MAX_TICKS); // arrival (and rest start) must actually happen within the bound
+    expect(ticks).toBeGreaterThan(1); // travel genuinely spanned more than one tick — not a same-tick arrival
+    expect(sawI2Violation).toBe(false);
+
+    // The fix under test (#1122): arrival alighted the driver, freeing the
+    // vehicle — it is not held for the whole rest, only for the travel.
+    expect(emp.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).not.toContain(empId);
+    expect(vehicleDriverId(vehicle)).toBeNull();
+
+    // ...and this holds WHILE the employee is still resting, not once rest
+    // has already finished — the whole point of the fix.
+    expect(emp.restTicksRemaining).not.toBeNull();
+    expect(emp.collapsing).toBe(false);
+
+    // The freed vehicle is immediately eligible for another qualified driver
+    // to claim (the same eligibility test findFreeVehicleForRole itself uses:
+    // vehicleDriverId(v) === null), exactly like the hard-collapse release.
+    const otherEmpId = hireOne(ctx, 'driller');
+    assignSkill(state.employees, otherEmpId, 'driving.drill_rig', 1);
+    const otherEmp = getEmployee(ctx, otherEmpId);
+    otherEmp.x = vehicle.x;
+    otherEmp.z = vehicle.z;
+    const boardResult = board(state, vehicle.id, otherEmpId);
+    expect(boardResult.success).toBe(true);
+  });
+
+  it('soft-threshold proactive rest: the fix only changes vehicle availability — rest duration and gauge restoration are unaffected (#1122)', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 100_000;
+    const empId = hireOne(ctx, 'driller');
+    assignSkill(state.employees, empId, 'driving.drill_rig', 1);
+    const emp = getEmployee(ctx, empId);
+
+    buildLivingQuartersAndComplete(ctx, '20,20');
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
+    vehicle.occupantIds = [empId];
+    emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    emp.activeActionId = null; // idle
+    emp.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25), above the hard threshold (0)
+
+    let sawI2Violation = false;
+    const MAX_TICKS = 200;
+
+    // Tick through claim + travel until arrival starts the rest timer.
+    let ticks = 0;
+    while (ticks < MAX_TICKS && emp.restTicksRemaining === null) {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      const violations = assertWorldInvariants(state);
+      if (violations.some(v => v.kind === 'I2_mounted_position_mismatch')) sawI2Violation = true;
+    }
+    expect(ticks).toBeLessThan(MAX_TICKS);
+
+    // Alighting (Mount.ts's alight) nulls employee.itinerary itself, which is
+    // exactly the signal ArrivalGate.ts reads to start the rest timer this
+    // same tick — the fix changes WHO holds the vehicle on arrival, not WHEN
+    // rest starts, so the timer still seeds at the full, un-degraded duration
+    // (a living_quarters was found, so no NEED_REST_NO_BUILDING_DURATION_MULTIPLIER).
+    expect(emp.restTicksRemaining).toBe(NEED_REST_DURATIONS.fatigue);
+
+    // Ticking on: rest completes normally and fully restores the gauge,
+    // exactly as completeRestForEmployee always has for a with-building rest
+    // (#945) — unaffected by freeing the vehicle earlier.
+    let restTicks = 0;
+    while (restTicks < MAX_TICKS && emp.restTicksRemaining !== null) {
+      tickCommand(ctx, ['1'], {});
+      restTicks++;
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      const violations = assertWorldInvariants(state);
+      if (violations.some(v => v.kind === 'I2_mounted_position_mismatch')) sawI2Violation = true;
+    }
+
+    expect(restTicks).toBeLessThan(MAX_TICKS);
+    expect(sawI2Violation).toBe(false);
+    expect(emp.fatigue).toBe(MAX_NEED_GAUGE);
+    expect(emp.collapsing).toBe(false);
+    // The vehicle was already released on arrival, long before rest completed.
+    expect(vehicle.occupantIds).not.toContain(empId);
+    expect(vehicleDriverId(vehicle)).toBeNull();
   });
 });

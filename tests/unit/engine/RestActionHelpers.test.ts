@@ -374,6 +374,33 @@ describe('beginRestTravel (#1118)', () => {
     expect(employee.destinationZ).toBeNull();
   });
 
+  // #1122: resting is an action like any other (building, drilling, ...) —
+  // an employee travelling to rest has no reason to keep reserving their
+  // vehicle for the whole rest, only for the travel. The installed
+  // itinerary's final leg must alight on arrival (mirroring the evacuation
+  // drop-off mechanism, Zone.ts's clearZone, via MoveTo's alightOnArrival),
+  // so the vehicle is freed the instant travel completes rather than staying
+  // reserved for the entire rest duration with nobody aboard.
+  it('mounted employee, reachable target: the installed itinerary\'s final leg alights on arrival, freeing the vehicle once travel completes (#1122)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    beginRestTravel(state, employee, 12, 34);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const finalLeg = legs[legs.length - 1]!;
+    // Before the fix, RestActionHelpers.ts's beginRestTravel never calls
+    // alightOnArrival, so this leg's onArrive stays {kind:'none'} — the
+    // vehicle would remain reserved for the whole rest, not just the travel.
+    expect(finalLeg.onArrive).toEqual({ kind: 'alight' });
+  });
+
   it('mounted employee, unreachable target (no route on a built navGrid): falls back to legacy destinationX/Z, sets pendingActionType "rest"', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
