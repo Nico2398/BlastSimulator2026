@@ -18,7 +18,7 @@ import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type Serialize
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
-import type { NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
+import { regionForColumns, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -169,10 +169,10 @@ function terrainVersionMismatch(voxels: SerializedVoxels): string | null {
 function gridDirtyRegion(grid: VoxelGrid): {
   minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number;
 } {
-  return {
-    minX: grid.minX, minY: 0, minZ: grid.minZ,
-    maxX: grid.maxX - 1, maxY: grid.sizeY - 1, maxZ: grid.maxZ - 1,
-  };
+  return regionForColumns(
+    { minX: grid.minX, maxX: grid.maxX - 1, minZ: grid.minZ, maxZ: grid.maxZ - 1 },
+    grid,
+  );
 }
 
 /**

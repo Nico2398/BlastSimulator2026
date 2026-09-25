@@ -10,6 +10,7 @@ import { buildGameNavGrid, syncWorldBounds } from '../../core/state/GameState.js
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
+import { regionForColumns } from '../../core/nav/NavGridSync.js';
 
 export interface ClaimOutcome {
   /** False when at least one cell was refused — the caller must abort the action. */
@@ -68,10 +69,10 @@ export function claimForAction(
   // already built next to it sealed themselves against empty space, and those
   // walls have to come down now that there is ground on the other side.
   ctx.emitter.emit('terrain:updated', {
-    region: {
-      minX: result.rect.minX - 1, minY: 0, minZ: result.rect.minZ - 1,
-      maxX: result.rect.maxX, maxY: grid.sizeY - 1, maxZ: result.rect.maxZ,
-    },
+    region: regionForColumns(
+      { minX: result.rect.minX - 1, maxX: result.rect.maxX, minZ: result.rect.minZ - 1, maxZ: result.rect.maxZ },
+      grid,
+    ),
   });
 
   return { ok: true, expanded: true };

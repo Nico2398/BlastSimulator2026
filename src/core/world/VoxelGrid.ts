@@ -1472,9 +1472,18 @@ export function computeColumnRangeY(
   grid: VoxelGrid,
   minX: number, maxX: number, minZ: number, maxZ: number,
 ): { minY: number; maxY: number } | null {
-  void grid; void minX; void maxX; void minZ; void maxZ;
-  // TODO: implement (#1185)
-  throw new Error('not implemented');
+  let lowest = Infinity;
+  let highest = -Infinity;
+  for (let z = minZ; z <= maxZ; z++) {
+    for (let x = minX; x <= maxX; x++) {
+      const height = computeVoxelColumnSurfaceHeight(grid, x, z);
+      if (Number.isNaN(height)) continue;
+      if (height < lowest) lowest = height;
+      if (height > highest) highest = height;
+    }
+  }
+  if (lowest === Infinity) return null;
+  return { minY: Math.floor(lowest), maxY: Math.ceil(highest) };
 }
 
 /**

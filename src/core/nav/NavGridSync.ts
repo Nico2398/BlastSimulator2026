@@ -12,7 +12,7 @@
 
 import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeColumnRangeY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
@@ -35,9 +35,12 @@ export interface NavGridSyncTarget {
  * Falls back to `{ minY: 0, maxY: 0 }` when the rect has no ground anywhere.
  */
 export function regionForColumns(footprint: BlastRegion, grid: VoxelGrid): GameEventMap['terrain:updated']['region'] {
-  void footprint; void grid;
-  // TODO: implement (#1185)
-  throw new Error('not implemented');
+  const range = computeColumnRangeY(grid, footprint.minX, footprint.maxX, footprint.minZ, footprint.maxZ);
+  return {
+    minX: footprint.minX, maxX: footprint.maxX,
+    minZ: footprint.minZ, maxZ: footprint.maxZ,
+    minY: range ? range.minY : 0, maxY: range ? range.maxY : 0,
+  };
 }
 
 /**
