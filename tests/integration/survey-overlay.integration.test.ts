@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, MAX_TERRAIN_GEN_DIMENSION } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
@@ -143,8 +143,8 @@ function surveyResultsToConfidencePoints(
   // that built its own fixed-height fixture grid passes that grid's own
   // known height here; a caller passing a generator-built terrain grid
   // (whose real height isn't test-supplied) omits it and falls back to the
-  // grid's own declared sizeY, unaffected by this migration.
-  scanHeight: number = grid.sizeY,
+  // grid's fixed internal height-free size, unaffected by this migration.
+  scanHeight: number = MAX_TERRAIN_GEN_DIMENSION,
 ): SurveyConfidencePoint[] {
   const points: SurveyConfidencePoint[] = [];
 
