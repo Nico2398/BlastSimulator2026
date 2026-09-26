@@ -117,6 +117,36 @@ export function findBuildingApproachCell(
 }
 
 /**
+ * True when an already-dispatched approach target (x, z) is no longer
+ * reachable from the map's main navigable region — either built over
+ * outright, or the route to it was sealed by a footprint placed since it
+ * was picked.
+ *
+ * Deliberately narrower than "would findBuildingApproachCell pick something
+ * else now": that recomputation prefers whichever connected ring cell is
+ * nearest at call time, and a second nearby order can easily make a
+ * different — but equally reachable — cell nearest now. Rerouting on every
+ * such difference (rather than only a genuine stranding) repoints an
+ * already-fine builder's walk on essentially every order placed while an
+ * earlier one is still pending, which is ordinary multi-building
+ * construction, not the sealed-pocket case #1200 targets (confirmed:
+ * widespread tick/cash/death-count drift across full-level playthroughs that
+ * queue several buildings, orchestrator investigation for #1200).
+ */
+export function isApproachCellStranded(
+  navGrid: NavGrid,
+  building: FootprintAnchor,
+  x: number,
+  z: number,
+): boolean {
+  if (!isTraversableCell(navGrid, x, z)) return true;
+  const mainAnchor = findNearestNavigableCell(navGrid, building.x, building.z);
+  if (!isTraversableCell(navGrid, mainAnchor.x, mainAnchor.z)) return false; // nothing to compare against
+  const mainRegion = computeClimbReachableSet(navGrid, mainAnchor.x, mainAnchor.z);
+  return !mainRegion.has(x, z);
+}
+
+/**
  * The free ring cell an employee leaving a building is put out on (#1202):
  * the one nearest (fromX, fromZ) — the cell they entered from — that a
  * walker can stand on right now (`isImpassable` with vehicles avoided, so a

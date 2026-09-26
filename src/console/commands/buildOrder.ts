@@ -21,7 +21,7 @@ import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
-import { findBuildingApproachCell, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
+import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
 
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
@@ -44,9 +44,15 @@ export interface PlaceBuildingActionPayload {
  * ring cell the third office's footprint later sealed off). An order whose
  * builder has already arrived (`'in_progress'`) is left alone: they need no
  * route back out to keep working in place. `findBuildingApproachCell`
- * itself decides whether a given target actually needs to move — called
- * unconditionally here, it is a no-op for every order this new footprint
- * did not affect.
+ * itself decides where a genuinely stranded target moves to —
+ * `isApproachCellStranded` gates whether a given order needs that at all, so
+ * an order whose already-dispatched target is still perfectly reachable is
+ * left untouched even when a fresh pick would land somewhere else (#1200
+ * finding: rerouting on every such difference, not just an actual
+ * stranding, repoints an already-fine builder's walk on essentially every
+ * order placed while an earlier one is still pending — ordinary
+ * multi-building construction, confirmed as the source of widespread
+ * tick/cash/death-count drift across full-level playthroughs).
  */
 function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justOrderedActionId: number): void {
   const navGrid = state.navGrid;
@@ -55,9 +61,9 @@ function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justO
     if (action.type !== 'place_building' || action.id === justOrderedActionId || action.status === 'in_progress') continue;
     const order = state.plannedBuildings.find(pb => pb.id === action.payload['buildingOrderId']);
     if (!order) continue;
+    if (!isApproachCellStranded(navGrid, { x: order.x, z: order.z }, action.targetX, action.targetZ)) continue;
     const def = getBuildingDef(order.type, order.tier);
     const reachable = findBuildingApproachCell(navGrid, { x: order.x, z: order.z }, def, order.x, order.z);
-    if (reachable.x === action.targetX && reachable.z === action.targetZ) continue;
     action.targetX = reachable.x;
     action.targetZ = reachable.z;
     action.targetY = ctx.grid ? getSurfaceY(ctx.grid, reachable.x, reachable.z) : action.targetY;
