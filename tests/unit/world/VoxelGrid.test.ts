@@ -506,14 +506,14 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
     expect(grid.densityAt(20, 4, 4)).toBe(0);
   });
 
-  it('reports an unowned-column read to an installed reporter, but NOT a legitimate in-column read past sizeY (#1182)', () => {
+  it('reports an unowned-column read to an installed reporter, but NOT a legitimate in-column read at an unallocated y (#1182)', () => {
     const grid = new VoxelGrid(16, 16);
     const misses: Array<[number, number, number]> = [];
     const previous = setVoxelBoundsReporter((x, y, z) => { misses.push([x, y, z]); });
     try {
       grid.densityAt(4, 4, 4);   // fully in-bounds — not reported
       grid.densityAt(-1, 4, 4);  // unowned column — reported
-      grid.densityAt(4, 99, 4);  // owned column, y past sizeY — a legitimate unallocated-slab read, NOT reported
+      grid.densityAt(4, 99, 4);  // owned column, y beyond any written slab — a legitimate unallocated-slab read, NOT reported
     } finally {
       setVoxelBoundsReporter(previous);
     }
@@ -521,7 +521,7 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 });
 
-describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column succeed without allocating unless non-air (#1182)', () => {
+describe('VoxelGrid — reads/writes at any y for an owned column succeed without allocating unless non-air (#1182)', () => {
   it('fillVoxel below y=0 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
     const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
@@ -531,9 +531,9 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
     expect(grid.oresAt(4, -10, 4)).toEqual({ blingite: 0.4 });
   });
 
-  it('setVoxel above y = sizeY + 10 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
+  it('setVoxel well above the surface on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
     const grid = new VoxelGrid(16, 16);
-    grid.setVoxel(4, 8 + 10, 4, {
+    grid.setVoxel(4, 18, 4, {
       composition: { rocks: [{ rockId: 'molite', coefficient: 1 }] },
       density: 0.6,
       oreDensities: { sparkium: 0.2 },
