@@ -484,6 +484,14 @@
           "value": 2
         },
         {
+          "type": "focusTile",
+          "x": 9,
+          "z": 4,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
+        },
+        {
           "type": "dragTiles",
           "x1": 9,
           "z1": 4,

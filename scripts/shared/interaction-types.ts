@@ -49,9 +49,14 @@ export type PlayerAction =
    * never reaches the canvas beneath it). Needed before pickTile/dragTiles
    * whenever the beat's target tile isn't already clear of every docked
    * panel, the same instinctive adjustment a player makes without thinking
-   * about it.
+   * about it. `pitch` (degrees above horizon) re-aims the camera's viewing
+   * angle too, for a tile a shallower angle can't see past a ridge to reach.
+   * `yaw` (degrees, same convention as `CameraController.setOrbit`'s
+   * `yawDeg`) re-aims which side of the tile the camera views from — needed
+   * alongside pitch when the near side is blocked by terrain no pitch alone
+   * clears.
    */
-  | { do: 'focusTile'; x: number; z: number; distance?: number }
+  | { do: 'focusTile'; x: number; z: number; distance?: number; pitch?: number; yaw?: number }
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**

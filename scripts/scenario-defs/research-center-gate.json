@@ -205,6 +205,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 20,
+          "z": 24
+        },
+        {
           "type": "pickTile",
           "x": 20,
           "z": 24

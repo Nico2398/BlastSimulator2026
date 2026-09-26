@@ -903,6 +903,11 @@
           "value": 5
         },
         {
+          "type": "focusTile",
+          "x": 20,
+          "z": 25
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,

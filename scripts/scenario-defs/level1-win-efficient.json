@@ -210,6 +210,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 10,
+          "z": 10,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
+        },
+        {
           "type": "pickTile",
           "x": 10,
           "z": 10

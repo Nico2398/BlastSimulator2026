@@ -102,6 +102,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": -4,
+          "z": 10
+        },
+        {
           "type": "pickTile",
           "x": -4,
           "z": 10
@@ -193,6 +198,11 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
           "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 30,
+          "z": 20
         },
         {
           "type": "dragTiles",
@@ -466,6 +476,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 140,
+          "z": 10
         },
         {
           "type": "pickTile",

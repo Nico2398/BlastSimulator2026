@@ -261,6 +261,20 @@ describe('CameraController', () => {
       expect(yawDeg(camera, target)).toBeCloseTo(45, 3);
       expect(pitchDeg(camera, target)).toBeCloseTo(30, 3);
     });
+
+    it('setOrbit(yaw) alone leaves pitch untouched', () => {
+      controller.setOrbit(45, 30);
+      controller.setOrbit(80, undefined);
+      expect(yawDeg(camera, target)).toBeCloseTo(80, 3);
+      expect(pitchDeg(camera, target)).toBeCloseTo(30, 3);
+    });
+
+    it('setOrbit(undefined, pitch) alone leaves yaw untouched', () => {
+      controller.setOrbit(45, 30);
+      controller.setOrbit(undefined, 65);
+      expect(yawDeg(camera, target)).toBeCloseTo(45, 3);
+      expect(pitchDeg(camera, target)).toBeCloseTo(65, 3);
+    });
   });
 
   describe('right-button drag/click signal (#544)', () => {

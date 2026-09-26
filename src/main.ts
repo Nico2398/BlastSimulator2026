@@ -818,7 +818,7 @@ window.__probeSelector = (selector: string) => probeSelector(selector);
 window.__tutorialState = () => probeTutorialState(tutorial);
 
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
-window.__cameraOrbit = (yaw: number, pitch: number) => {
+window.__cameraOrbit = (yaw?: number, pitch?: number) => {
   scene.cameraController.setOrbit(yaw, pitch);
 };
 // Centre + zoom the camera on a world (x, z) point at the correct terrain
@@ -859,7 +859,31 @@ window.__worldToScreen = (x, z) => {
   // real click resolves through (pickScene/PlacementController), so an
   // occluding entity or a terraced/stepped tile is never accepted as a
   // best-guess nearest point — see ScreenTileResolution.ts.
-  const project: ProjectToNDC = (px, py, pz) => scene.cameraController.projectToNDC(px, py, pz);
+  //
+  // Quantized through integer CSS pixels, not raw NDC: a real MouseEvent's
+  // clientX/clientY are always integers (DOM spec), so a real click can
+  // only ever land on the pixel this rounds to — never the exact
+  // floating-point NDC projectToNDC returns. On steep or near-tangential
+  // terrain (a pit wall, this being an open-pit mine) that sub-pixel
+  // rounding is enough to shift the ray onto a completely different
+  // surface: verified against the unquantized NDC, pixel (442, 360) round-
+  // tripped to tile (5, 5); the same pixel, read back as an integer
+  // MouseEvent.clientX/Y the way PlacementController's tileUnderCursor
+  // does, resolved tile (1, -7) instead. Rounding to the pixel a real click
+  // will actually deliver, then re-deriving NDC from that same integer
+  // pixel before raycasting, makes every candidate this loop accepts one a
+  // real click at the returned px/py is guaranteed to reproduce.
+  const rect = canvas.getBoundingClientRect();
+  const project: ProjectToNDC = (px, py, pz) => {
+    const raw = scene.cameraController.projectToNDC(px, py, pz);
+    const quantizedPx = Math.round(rect.left + (raw.x * 0.5 + 0.5) * rect.width);
+    const quantizedPy = Math.round(rect.top + (1 - (raw.y * 0.5 + 0.5)) * rect.height);
+    return {
+      x: ((quantizedPx - rect.left) / rect.width) * 2 - 1,
+      y: -((quantizedPy - rect.top) / rect.height) * 2 + 1,
+      z: raw.z,
+    };
+  };
   const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
     const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer);
     if (!pick.terrain) return null; // entity occlusion or a miss — honestly a miss, never silently ignored
@@ -879,11 +903,13 @@ window.__worldToScreen = (x, z) => {
   if (!result.resolved) {
     return { px: 0, py: 0, onScreen, tileConfirmed: false };
   }
+  // ndc is already pixel-quantized (project() rounds it above), so this
+  // recovers exactly the integer pixel that was verified — Math.round only
+  // guards against float round-trip noise, not a second rounding decision.
   const ndc = result.ndc;
-  const rect = canvas.getBoundingClientRect();
   return {
-    px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
-    py: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height,
+    px: Math.round(rect.left + (ndc.x * 0.5 + 0.5) * rect.width),
+    py: Math.round(rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height),
     onScreen,
     tileConfirmed: true,
   };

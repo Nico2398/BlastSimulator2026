@@ -173,4 +173,36 @@ describe('resolveScreenPointForTile', () => {
     expect(result).toEqual({ resolved: false });
     expect(calls).toBeLessThanOrEqual(TILE_RESOLUTION_MAX_ITERATIONS);
   });
+
+  it('breaks a height ping-pong on a stepped surface by damping once a height repeats', () => {
+    // Models a genuinely terraced column (a bench edge or pit wall) where
+    // direct height replacement oscillates forever: guessing height 0 hits a
+    // surface at height 10 (off-tile), and guessing height 10 hits a surface
+    // back at height 0 (off-tile) — each guess's raycast reports the OTHER
+    // guess's height, so a naive "replace with the latest hit" loop revisits
+    // {0, 10, 0, 10, ...} and never spends an iteration at height 5, where
+    // the real target tile sits. Only once a height repeats (height 0 seen
+    // again at iteration 1) does the loop split the difference and try 5.
+    const targetX = 8;
+    const targetZ = 8;
+    const startY = 0;
+
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
+      if (ndcY === 0) return { x: 2, z: 2, y: 10 }; // off-tile, reports the OTHER extreme
+      if (ndcY === 10) return { x: 2, z: 2, y: 0 }; // off-tile, reports the first extreme back
+      if (ndcY === 5) return { x: 8.5, z: 8.5, y: 5 }; // the damped average — the real target
+      return null;
+    };
+
+    const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY);
+
+    // Direct replacement would still be at {resolved: false} after
+    // ping-ponging {0, 10, 0, 10, 0} for all 5 iterations; damping finds the
+    // target on iteration 2 (heights 0, 10, then 5).
+    expect(result).toEqual({
+      resolved: true,
+      ndc: { x: 8.5, y: 5, z: 0 },
+    });
+  });
 });
