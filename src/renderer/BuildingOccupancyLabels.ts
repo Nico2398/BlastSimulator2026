@@ -10,11 +10,80 @@
 
 import * as THREE from 'three';
 import type { Building } from '../core/entities/Building.js';
+import { getBuildingPeopleCapacity } from '../core/entities/Building.js';
+import { t } from '../core/i18n/I18n.js';
+import { faceCamera } from './Billboard.js';
 import { EmployeeBillboardRoster } from './EmployeeBillboardRoster.js';
+
+const LABEL_WIDTH = 1.0;
+const LABEL_HEIGHT = 0.36;
+const CANVAS_WIDTH = 128;
+const CANVAS_HEIGHT = 48;
+/** World-unit gap above the model's local roof height, so the label floats clear of the roofline. */
+const ROOF_CLEARANCE = 0.3;
+
+const NORMAL_TEXT_COLOR = '#eceff1';
+const NORMAL_BG_COLOR = 'rgba(20,20,20,0.55)';
+const FULL_TEXT_COLOR = '#ffb300';
+const FULL_BG_COLOR = 'rgba(90,40,0,0.7)';
+/** Flat-color fallback swatches when no `document` exists to draw the canvas text (see buildLabelMaterial). */
+const NORMAL_FALLBACK_COLOR = 0xeceff1;
+const FULL_FALLBACK_COLOR = 0xffb300;
 
 /** One billboard label, keyed by building id via EmployeeBillboardRoster. */
 interface OccupancyLabel {
-  mesh: THREE.Object3D;
+  mesh: THREE.Mesh;
+  material: THREE.MeshBasicMaterial;
+  /** Null in the no-DOM fallback (see buildLabelMaterial), where the material is a flat color instead. */
+  canvas: HTMLCanvasElement | null;
+  texture: THREE.CanvasTexture | null;
+  /** Last drawn values, so sync() redraws the canvas only when they actually changed. */
+  inside: number;
+  capacity: number;
+}
+
+/**
+ * Build the label's material. `document` is unavailable in this project's
+ * Node-only Vitest suites (no jsdom) — mirrors EmployeePictograms'
+ * buildIconMaterial fallback exactly: a flat-color material stands in for
+ * the canvas-text texture wherever `document` doesn't exist.
+ */
+function buildLabelMaterial(): Pick<OccupancyLabel, 'material' | 'canvas' | 'texture'> {
+  if (typeof document === 'undefined') {
+    return {
+      material: new THREE.MeshBasicMaterial({ color: NORMAL_FALLBACK_COLOR, transparent: true, depthWrite: false }),
+      canvas: null,
+      texture: null,
+    };
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_WIDTH;
+  canvas.height = CANVAS_HEIGHT;
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+  return { material, canvas, texture };
+}
+
+/** Redraw `canvas`'s background pill + "<inside>/<capacity>" text, styled distinctly when `full`. */
+function drawLabel(canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, text: string, full: boolean): void {
+  const ctx = canvas.getContext('2d')!;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = full ? FULL_BG_COLOR : NORMAL_BG_COLOR;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = full ? FULL_TEXT_COLOR : NORMAL_TEXT_COLOR;
+  ctx.font = `bold ${Math.round(h * 0.6)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, h / 2 + 1);
+  texture.needsUpdate = true;
+}
+
+/** Recolor the no-canvas flat-color fallback material to match full/normal state. */
+function recolorFallback(material: THREE.MeshBasicMaterial, full: boolean): void {
+  material.color.set(full ? FULL_FALLBACK_COLOR : NORMAL_FALLBACK_COLOR);
 }
 
 /**
@@ -23,12 +92,22 @@ interface OccupancyLabel {
  * never under a building's own model Group.
  */
 export class BuildingOccupancyLabels {
-  private readonly labels = new EmployeeBillboardRoster<OccupancyLabel>(label => label.mesh);
+  private readonly scene: THREE.Scene;
+  private readonly camera: THREE.Camera;
+  private readonly geometry: THREE.PlaneGeometry;
+  private readonly labels = new EmployeeBillboardRoster<OccupancyLabel>(
+    label => label.mesh,
+    label => {
+      label.texture?.dispose();
+      label.material.dispose();
+    },
+  );
 
-  // TODO: implement — store scene/camera once sync()/update() need them
-  // (scene as the parent labels attach under, per file header; camera for
-  // Billboard.faceCamera in update()).
-  constructor(_scene: THREE.Scene, _camera: THREE.Camera) {}
+  constructor(scene: THREE.Scene, camera: THREE.Camera) {
+    this.scene = scene;
+    this.camera = camera;
+    this.geometry = new THREE.PlaneGeometry(LABEL_WIDTH, LABEL_HEIGHT);
+  }
 
   /** Number of occupancy labels currently rendered. */
   get count(): number {
@@ -44,16 +123,55 @@ export class BuildingOccupancyLabels {
    * via `BuildingMesh.getInstance`) for label placement above the roof.
    */
   sync(
-    _buildings: readonly Building[],
-    _getPosition: (id: number) => THREE.Vector3 | null,
-    _getRoofY: (id: number) => number | null,
+    buildings: readonly Building[],
+    getPosition: (id: number) => THREE.Vector3 | null,
+    getRoofY: (id: number) => number | null,
   ): void {
-    // TODO: implement
+    const liveIds = new Set<number>();
+
+    for (const b of buildings) {
+      const capacity = getBuildingPeopleCapacity(b.type, b.tier);
+      const inside = b.occupantIds.length;
+      if (capacity <= 0 || inside <= 0) continue;
+
+      const pos = getPosition(b.id);
+      const roofY = getRoofY(b.id);
+      if (pos === null || roofY === null) continue;
+
+      liveIds.add(b.id);
+
+      let label = this.labels.get(b.id);
+      if (!label) {
+        const built = buildLabelMaterial();
+        const mesh = new THREE.Mesh(this.geometry, built.material);
+        this.scene.add(mesh);
+        label = { mesh, ...built, inside: -1, capacity: -1 };
+        this.labels.set(b.id, label);
+      }
+
+      label.mesh.position.set(pos.x, pos.y + roofY + ROOF_CLEARANCE, pos.z);
+
+      if (label.inside !== inside || label.capacity !== capacity) {
+        label.inside = inside;
+        label.capacity = capacity;
+        const full = inside === capacity;
+        if (label.canvas && label.texture) {
+          drawLabel(label.canvas, label.texture, t('building.occupancy', { inside, capacity }), full);
+        } else {
+          recolorFallback(label.material, full);
+        }
+      }
+    }
+
+    // Sweep any label whose building is no longer eligible (emptied, removed, or lost its capacity).
+    this.labels.sweep(liveIds);
   }
 
   /** Animate/refresh billboard orientation. Call every frame with elapsed seconds. */
   update(_dt: number): void {
-    // TODO: implement
+    for (const label of this.labels.values()) {
+      faceCamera(label.mesh, this.camera);
+    }
   }
 
   /** Remove all label meshes from the scene. */
@@ -63,5 +181,6 @@ export class BuildingOccupancyLabels {
 
   dispose(): void {
     this.clearAll();
+    this.geometry.dispose();
   }
 }

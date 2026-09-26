@@ -173,6 +173,15 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     );
   }
 
+  // "<inside>/<capacity>" labels above people-holding buildings — reflect Building.occupantIds each sync (#1205)
+  if (deps.buildingOccupancyLabels && deps.buildings) {
+    deps.buildingOccupancyLabels.sync(
+      state.buildings.buildings,
+      id => deps.buildings!.getPosition(id),
+      id => deps.buildings!.getInstance(id)?.bounds.max.y ?? null,
+    );
+  }
+
   // Blink employees still inside an active safety zone during clearing —
   // only while that zone is still genuinely blast-threatened (#952), since
   // the drawn zone rectangle never resets and would otherwise blink an
