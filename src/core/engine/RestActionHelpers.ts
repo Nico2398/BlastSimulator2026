@@ -171,14 +171,17 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
 }
 
 /**
- * Shared rest-completion sequence used by both RestCompletion.ts's
- * tickGeneralRestCompletion and ShiftCycle.ts's completeRestTick: replenish
- * the resting need gauge from the nearest active living_quarters (or, with no
- * building in range, up to NEED_REST_NO_BUILDING_CAP only), deduct the
- * visit's NEED_REST_COSTS entry, clear the collapsing flag, and null out
- * restTicksRemaining/activeActionId so the employee returns to normal task
- * dispatch. Callers own any remaining wrap-up specific to their rest source.
+ * Look up a PendingAction by id, tolerating a null id (the common "was any
+ * action even claimed?" case at a rest-completion site) — shared by
+ * RestCompletion.ts's tickGeneralRestCompletion, ShiftCycle.ts's
+ * completeRestTick, and isRestBuildingFull below, which had each carried this
+ * same `id !== null ? state.pendingActions.find(...) : undefined` lookup
+ * independently.
  */
+export function findPendingActionById(state: GameState, id: number | null): PendingAction | undefined {
+  return id !== null ? state.pendingActions.find(a => a.id === id) : undefined;
+}
+
 /**
  * True when `building`'s living-quarters occupancy is already at capacity —
  * #1204: routes the rest flow's "is there room to go inside" check through
@@ -191,7 +194,7 @@ export function isRestBuildingFull(state: GameState, building: Building): boolea
 
   const walkingToIt = state.employees.employees.filter(e => {
     if (e.pendingRestDuration === null || e.activeActionId === null) return false;
-    const action = state.pendingActions.find(a => a.id === e.activeActionId);
+    const action = findPendingActionById(state, e.activeActionId);
     return action !== undefined && resolveRestBuildingId(action.payload) === building.id;
   }).length;
 
@@ -208,6 +211,15 @@ export function resolveRestBuildingId(payload: Record<string, unknown>): number 
   return typeof value === 'number' ? value : undefined;
 }
 
+/**
+ * Shared rest-completion sequence used by both RestCompletion.ts's
+ * tickGeneralRestCompletion and ShiftCycle.ts's completeRestTick: replenish
+ * the resting need gauge from the nearest active living_quarters (or, with no
+ * building in range, up to NEED_REST_NO_BUILDING_CAP only), deduct the
+ * visit's NEED_REST_COSTS entry, clear the collapsing flag, and null out
+ * restTicksRemaining/activeActionId so the employee returns to normal task
+ * dispatch. Callers own any remaining wrap-up specific to their rest source.
+ */
 export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey, buildingId?: number): void {
   // #1204: the exact living_quarters this rest walked to and entered, if it
   // still exists — not re-derived from the employee's current position (they

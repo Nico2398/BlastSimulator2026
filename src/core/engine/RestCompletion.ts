@@ -10,7 +10,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
 import { completeIfOwnedRestAction } from './TaskDispatch.js';
-import { completeRestForEmployee, resolveRestBuildingId } from './RestActionHelpers.js';
+import { completeRestForEmployee, findPendingActionById, resolveRestBuildingId } from './RestActionHelpers.js';
 
 export interface GeneralRestCompletionResult {
   /** Employee/need pairs whose rest completed this tick. */
@@ -62,9 +62,7 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     // autoInsertNeedTasks), whose payloads never use that value. Only a
     // policy-forced shift rest restarts the continuous-work clock; see
     // forceShiftRestIfNeededByPolicy's doc comment (#678).
-    const completedAction = completedActionId !== null
-      ? state.pendingActions.find(a => a.id === completedActionId)
-      : undefined;
+    const completedAction = findPendingActionById(state, completedActionId);
     const isPolicyShiftRest = completedAction?.payload.triggeredBy === 'shift_cycle_policy';
 
     completeRestForEmployee(state, emp, needKey, completedAction !== undefined ? resolveRestBuildingId(completedAction.payload) : undefined);
