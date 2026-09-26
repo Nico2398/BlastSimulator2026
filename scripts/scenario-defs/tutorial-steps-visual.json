@@ -442,11 +442,11 @@
         }
       ],
       "role": "player",
-      "description": "#553: train-driller, click half -- the course is booked at the driving_center just built. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#553: train-driller, click half -- the course is booked at the driving_center just built. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase.",
       "expect": {
-        "increased": [
-          "trainingCount"
-        ]
+        "equals": {
+          "trainingCount": 0
+        }
       }
     },
     {
@@ -517,11 +517,11 @@
         }
       ],
       "role": "player",
-      "description": "#555: train-digger, click half -- dig_ramp_segment work (the box-cut step below) now requires a driving.excavator licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#555: train-digger, click half -- dig_ramp_segment work (the box-cut step below) now requires a driving.excavator licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase.",
       "expect": {
-        "increased": [
-          "trainingCount"
-        ]
+        "equals": {
+          "trainingCount": 0
+        }
       }
     },
     {
