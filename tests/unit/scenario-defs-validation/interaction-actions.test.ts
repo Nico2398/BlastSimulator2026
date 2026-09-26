@@ -181,6 +181,29 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(typeof a.x).toBe('number');
     expect(typeof a.z).toBe('number');
   }),
+  defineActionCheck('focusTile', 'focusTile actions have numeric x/z, and if present, a positive distance, an in-range pitch, and a numeric yaw', (a) => {
+    expect(typeof a.x).toBe('number');
+    expect(typeof a.z).toBe('number');
+    if (a.distance !== undefined) {
+      expect(typeof a.distance).toBe('number');
+      expect(a.distance).toBeGreaterThan(0);
+    }
+    if (a.pitch !== undefined) {
+      expect(typeof a.pitch).toBe('number');
+      // Bounds derived from CameraController's POLAR_MIN/POLAR_MAX (0.08 rad,
+      // Math.PI/2 - 0.05 rad) converted through setOrbit's own
+      // phi = degToRad(90 - pitchDeg) mapping — NOT copied from those
+      // constants' degree comments (which describe the complementary `phi`
+      // angle, not `pitchDeg`). True unclamped range is ~[2.87, 85.42];
+      // rounded conservatively inward to 3/85 so nothing valid is rejected
+      // and nothing that would silently clamp is wrongly accepted.
+      expect(a.pitch).toBeGreaterThanOrEqual(3);
+      expect(a.pitch).toBeLessThanOrEqual(85);
+    }
+    if (a.yaw !== undefined) {
+      expect(typeof a.yaw).toBe('number');
+    }
+  }),
   defineActionCheck('dragTiles', 'dragTiles actions have numeric x1, z1, x2, z2', (a) => {
     expect(typeof a.x1).toBe('number');
     expect(typeof a.z1).toBe('number');

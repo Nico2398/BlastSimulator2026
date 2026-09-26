@@ -5,7 +5,7 @@ declare global {
     __gameConsole: (cmd: string) => import('../console/ConsoleRunner.js').CommandResult;
     __gameState: () => Record<string, unknown> | null;
     __uiState: () => Record<string, unknown>;
-    __cameraOrbit: (yaw: number, pitch: number) => void;
+    __cameraOrbit: (yaw?: number, pitch?: number) => void;
     __cameraFocus: (x: number, z: number, distance: number) => void;
     __cameraReset: () => void;
     __skipBlastPlayback: () => void;

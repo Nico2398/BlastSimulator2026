@@ -818,7 +818,7 @@ window.__probeSelector = (selector: string) => probeSelector(selector);
 window.__tutorialState = () => probeTutorialState(tutorial);
 
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
-window.__cameraOrbit = (yaw: number, pitch: number) => {
+window.__cameraOrbit = (yaw?: number, pitch?: number) => {
   scene.cameraController.setOrbit(yaw, pitch);
 };
 // Centre + zoom the camera on a world (x, z) point at the correct terrain

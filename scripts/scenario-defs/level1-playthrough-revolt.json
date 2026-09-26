@@ -479,6 +479,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 6,
+          "z": 5,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
+        },
+        {
           "type": "dragTiles",
           "x1": 6,
           "z1": 5,

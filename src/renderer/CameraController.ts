@@ -235,11 +235,19 @@ export class CameraController {
     };
   }
 
-  /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
-  setOrbit(yawDeg: number, pitchDeg: number): void {
-    this.spherical.theta = THREE.MathUtils.degToRad(yawDeg);
-    const phi = THREE.MathUtils.degToRad(90 - pitchDeg);
-    this.spherical.phi = THREE.MathUtils.clamp(phi, POLAR_MIN, POLAR_MAX);
+  /**
+   * Set yaw (degrees) and/or pitch (degrees above horizon). Each axis is
+   * independent — omitting one leaves it unchanged, so a caller can bump
+   * pitch alone without silently resetting yaw (or vice versa).
+   */
+  setOrbit(yawDeg?: number, pitchDeg?: number): void {
+    if (yawDeg !== undefined) {
+      this.spherical.theta = THREE.MathUtils.degToRad(yawDeg);
+    }
+    if (pitchDeg !== undefined) {
+      const phi = THREE.MathUtils.degToRad(90 - pitchDeg);
+      this.spherical.phi = THREE.MathUtils.clamp(phi, POLAR_MIN, POLAR_MAX);
+    }
     this.apply();
   }
 
