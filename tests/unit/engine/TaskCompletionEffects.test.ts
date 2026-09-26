@@ -252,7 +252,7 @@ describe('applyTaskCompletion — place_building footprint blocking (#1200)', ()
       targetX: ringCell.x,
       targetZ: ringCell.z,
       targetY: 0,
-      payload,
+      payload: payload as Record<string, unknown>,
       targetEmployeeId: null,
       status: 'in_progress',
       holderId: employee.id,
@@ -262,7 +262,7 @@ describe('applyTaskCompletion — place_building footprint blocking (#1200)', ()
 
     const progress = baseProgress({
       actionType: 'place_building',
-      actionPayload: payload,
+      actionPayload: payload as Record<string, unknown>,
       actionId: action.id,
     });
 
@@ -304,7 +304,7 @@ describe('applyTaskCompletion — place_building footprint blocking (#1200)', ()
     const cashBefore = state.cash;
     const progress = baseProgress({
       actionType: 'place_building',
-      actionPayload: payload,
+      actionPayload: payload as Record<string, unknown>,
       actionId: order.actionId,
     });
 

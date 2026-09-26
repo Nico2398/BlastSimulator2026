@@ -14,7 +14,7 @@ import {
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
-import type { PlannedBuilding } from '../../core/state/GameState.js';
+import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
@@ -32,6 +32,36 @@ export interface PlaceBuildingActionPayload {
   cost: number;
   footprint: ReadonlyArray<readonly [number, number]>;
   durationTicks: number;
+}
+
+/**
+ * Re-point every other still-approaching `place_building` order's target at
+ * a ring cell that is still actually reachable (#1200 finding). Placing a
+ * new footprint can strand an EARLIER order's already-dispatched ring cell,
+ * not just its own — the new footprint may be the one thing that was still
+ * connecting that cell to the rest of the map (nav-path-following-visual's
+ * three-office pocket trap: the second office's builder was pointed at a
+ * ring cell the third office's footprint later sealed off). An order whose
+ * builder has already arrived (`'in_progress'`) is left alone: they need no
+ * route back out to keep working in place. `findBuildingApproachCell`
+ * itself decides whether a given target actually needs to move — called
+ * unconditionally here, it is a no-op for every order this new footprint
+ * did not affect.
+ */
+function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justOrderedActionId: number): void {
+  const navGrid = state.navGrid;
+  if (!navGrid) return;
+  for (const action of state.pendingActions) {
+    if (action.type !== 'place_building' || action.id === justOrderedActionId || action.status === 'in_progress') continue;
+    const order = state.plannedBuildings.find(pb => pb.id === action.payload['buildingOrderId']);
+    if (!order) continue;
+    const def = getBuildingDef(order.type, order.tier);
+    const reachable = findBuildingApproachCell(navGrid, { x: order.x, z: order.z }, def, order.x, order.z);
+    if (reachable.x === action.targetX && reachable.z === action.targetZ) continue;
+    action.targetX = reachable.x;
+    action.targetZ = reachable.z;
+    action.targetY = ctx.grid ? getSurfaceY(ctx.grid, reachable.x, reachable.z) : action.targetY;
+  }
 }
 
 /**
@@ -78,45 +108,52 @@ export function orderBuildingCommand(
   );
   if (!check.valid) return { success: false, output: check.error! };
 
-  // The builder's own walk target is the footprint's approach-ring cell
-  // (below), computed once here — this order's own footprint sits strictly
-  // inside the ring's bounding box (`ringBounds`), never on the ring itself,
-  // so blocking it further down can never change which ring cell this finds.
-  // Checking now, before anything is committed, means a sealed ring (several
-  // orders queued back to back can jointly block every ring cell — each
-  // order's footprint is individually clear, but the last one's ring has
-  // nothing walkable left) is refused outright instead of silently
-  // dispatching the builder at `findBuildingApproachCell`'s own unreachable
-  // fallback — a permanent softlock, since that fallback point is now itself
-  // inside the just-blocked footprint (#1200 finding).
+  // Claim the order's own id and the finished building's id now, not when
+  // the site completes: sites are built in parallel and land in whatever
+  // order the crew reaches them, so numbering at completion would hand the
+  // player ids in an order they never chose (and make `build destroy 1`
+  // name a different building each run).
+  const buildingOrderId = state.nextPlannedBuildingId++;
+  const durationTicks = Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[tier]);
+  const actionId = state.nextPendingActionId++;
+  const plannedBuilding: PlannedBuilding = {
+    id: buildingOrderId, buildingId: state.buildings.nextId++,
+    type, tier, x, z, actionId, cost: def.constructionCost,
+  };
+
+  // The footprint blocks routing from the instant it is ordered (#1200),
+  // synchronously — before any tick runs, and before the approach-ring
+  // search just below, which must see it: a footprint can otherwise be the
+  // one thing that seals off the very ring cell it is about to dispatch a
+  // builder to, in this same command (#1200 finding —
+  // nav-path-following-visual's three-office pocket trap). Reverted below
+  // if the order ends up refused.
+  state.plannedBuildings.push(plannedBuilding);
+  emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
+
+  // The builder's own walk target is the footprint's approach-ring cell.
+  // findBuildingApproachCell (#1200) prefers a ring cell that is actually
+  // connected to the map's main navigable region over the merely nearest
+  // type-open one, so a pocket several orders jointly wall off gets routed
+  // around instead of picked and then never reached. isOnBuildingRing still
+  // catches the one case that leaves nothing to pick at all: every ring
+  // cell blocked outright.
   const approach = ctx.grid ? findBuildingApproachCell(state.navGrid, { x, z }, def, x, z) : { x, z };
   if (state.navGrid && !isOnBuildingRing({ x, z }, def, approach.x, approach.z)) {
+    state.plannedBuildings.pop();
+    emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
     return { success: false, output: 'No reachable approach to this site — surroundings are fully blocked' };
   }
 
   state.cash -= def.constructionCost;
   addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
 
-  const buildingOrderId = state.nextPlannedBuildingId++;
-  const durationTicks = Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[tier]);
-  const actionId = state.nextPendingActionId++;
-
-  // Claim the finished building's id now, not when the site completes: sites are
-  // built in parallel and land in whatever order the crew reaches them, so
-  // numbering at completion would hand the player ids in an order they never
-  // chose (and make `build destroy 1` name a different building each run).
-  const plannedBuilding: PlannedBuilding = {
-    id: buildingOrderId, buildingId: state.buildings.nextId++,
-    type, tier, x, z, actionId, cost: def.constructionCost,
-  };
-  state.plannedBuildings.push(plannedBuilding);
-
-  // The footprint blocks routing from the instant it is ordered (#1200),
-  // synchronously — before any tick runs — same as a finished building's
-  // footprint. Anyone caught standing on it is relocated off it first, so
-  // the approach-cell search below sees the already-blocked footprint.
-  emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
+  // Anyone caught standing on the new footprint is relocated off it.
   relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));
+
+  // This order's own footprint can also strand an EARLIER order's builder,
+  // not just its own approach cell — see rescueStrandedApproachTargets.
+  rescueStrandedApproachTargets(ctx, state, actionId);
 
   // The builder's own walk target is the footprint's approach-ring cell
   // computed above, not the raw order origin (#1200) — the origin cell is
