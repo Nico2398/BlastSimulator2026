@@ -1,0 +1,264 @@
+{
+  "name": "ramp-foot-traffic",
+  "description": "#1206 (agent occupancy on foot — ground-cell reservation): dig a RAMP_WIDTH=3 ramp, then dispatch 6 on-foot employees down it at once. Turns on the new occupancy check via `debug occupancy on` (world.ts's new_game/sandbox start don't thread an agent_occupancy flag yet at this skeleton phase — see world.ts's own TODO(#1206)), then asserts every employee reaches the far end within a bounded tick budget with nobody left stuck. GAP for the implementer/orchestrator: there is no generic per-tick 'no two agents share a ground cell' harness assertion today (no such field in state-schema-definitions.ts/console-api.ts, and neither `expect` nor a scenario step type expresses it) — this file's own assertions (stuckEmployeeCount:0, pendingActionCount:0, employeeCount unchanged) are the closest proxy available without inventing new harness surface, which is out of scope for a scenario-definition-only change. A direct per-tick occupancy assertion, if wanted, is a state-schema/console-api addition for a follow-up issue, not this one.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0,
+          "vehicleCount": 4,
+          "employeeCount": 5
+        },
+        "note": "staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants the roster/fleet for free at game-open, including the two driving.excavator drivers and the rock_digger this scenario needs to carve the ramp below."
+      }
+    },
+    {
+      "command": "debug occupancy on",
+      "description": "Skeleton phase (#1206): agent_occupancy isn't threaded through new_game/sandbox start yet (world.ts's own TODO), so the primary toggle is this debug command against GameState.agentOccupancyEnabled. Stubbed to throw at this red phase — the implementer wires it to actually flip the flag.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "debug occupancy on"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) — see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 20,
+          "z2": 25
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
+      "timeout": 95,
+      "description": "Drain every queued dig_ramp_segment layer — the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully dug: every dig_ramp_segment layer landed."
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
+        "equals": {
+          "employeeCount": 6
+        },
+        "note": "HIRING_COSTS.surveyor = 1200 (balance.ts). Lands as employee #6, alongside staffed:true's roster of 5 (ids 1-5)."
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
+        "equals": {
+          "employeeCount": 7
+        },
+        "note": "Employee #7. With #4 driving the rock_digger, employees 1, 2, 3, 5, 6, 7 (six on foot, more than RAMP_WIDTH=3) are the crew dispatched down the ramp together below."
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:24",
+      "description": "Dispatch six on-foot employees (1, 2, 3, 5, 6, 7 — every hired employee except #4, still crewing the rock_digger) to the ramp's far end all at once, converging into the 3-wide corridor together. No UI control drives `employee dispatch` (same class as ramp-navigation.json's own use of it) — a test hook by design.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 2 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 3 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 5 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 5 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 6 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 7 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 7 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:300",
+      "timeout": 95,
+      "description": "All six dispatched walks are the only PendingActions targeting these employees, and dig work already drained to 0 above — pendingActionCount reaching 0 again means every one of the six actually arrived at (15,24) and did its token work, not merely that none is currently flagged stuck. Generous 300-tick budget: six agents funnelling through a 3-wide corridor under the new occupancy check must queue for a cell rather than deadlock, but must still all finish.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0,
+          "stuckEmployeeCount": 0,
+          "employeeCount": 7
+        },
+        "note": "Every dispatched employee reached the far side: no permanent deadlock in the corridor, nobody abandoned/removed, and the roster count is unchanged from the two hires above."
+      }
+    },
+    {
+      "command": "inspect 15,24,0",
+      "description": "Inspect the ramp's own far end — proves the column is carved (walkable), not just that the employees report unstuck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 15,24,0"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

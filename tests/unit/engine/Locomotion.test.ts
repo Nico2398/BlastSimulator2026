@@ -21,11 +21,12 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
-import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
+import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
+import { tickLocomotion, openMovementTrails, handleAgentOccupancyBlock } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
+import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupancy.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
 
@@ -150,6 +151,37 @@ function makeGeneralWorkAction(id: number): PendingAction {
     holderId: null,
     queuedAtTick: 0,
   };
+}
+
+/**
+ * A genuinely one-cell-wide foot corridor (#1206), open into a small
+ * 3-row room at each end so an occupancy-aware walker actually has
+ * somewhere to step aside/wait rather than a single dead-end lane: rows
+ * z=0 and z=2 are blocked for the mid-range columns given by
+ * `corridorXRange`, leaving only z=1 walkable there, while every other
+ * column (the two end "rooms") keeps all three rows open.
+ */
+function build1WideCorridorState(width: number, corridorXRange: [number, number]): GameState {
+  const state = createGame({ seed: SEED });
+  const grid = makeFlatNavGrid(width, 3);
+  const [lo, hi] = corridorXRange;
+  for (let x = lo; x <= hi; x++) {
+    grid.cells[0]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    grid.cells[2]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+  state.navGrid = grid;
+  return state;
+}
+
+/** `x,z` rounded to the nearest grid cell — the same convention Locomotion.ts's own isOccupiedByOtherVehicle uses. */
+function cellKey(x: number, z: number): string {
+  return `${Math.round(x)},${Math.round(z)}`;
+}
+
+/** Fails when any two of `agents` round onto the same grid cell right now. */
+function expectNoSharedCells(agents: ReadonlyArray<{ id: number; x: number; z: number }>): void {
+  const keys = agents.map(a => cellKey(a.x, a.z));
+  expect(new Set(keys).size, `expected ${agents.length} distinct cells, got: ${JSON.stringify(agents.map(a => ({ id: a.id, x: a.x, z: a.z })))}`).toBe(keys.length);
 }
 
 describe('tickLocomotion', () => {
@@ -1258,5 +1290,162 @@ describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
     expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
     tickLocomotion(state);
     expect(employee.walkTrail).toBeUndefined();
+  });
+});
+
+// ── #1206: agent occupancy on foot — ground-cell reservation ──────────────
+//
+// AgentOccupancy.ts (a stub throwing 'not implemented' at this red phase) and
+// Locomotion.ts's own `handleAgentOccupancyBlock` stub generalize the
+// vehicle-only occupancy check to every agent, foot or vehicle: one ground
+// cell holds at most one occupant. These tests exercise that behavior
+// end to end through the real `tickLocomotion`/`moveTo` path, with
+// `state.agentOccupancyEnabled` explicitly turned on — every one of them is
+// expected to fail today, either because the fixture itself calls into the
+// still-throwing `AgentOccupancy` class, or because nothing in today's
+// Locomotion.ts actually prevents two on-foot employees from ending up on
+// the same ground cell.
+describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
+  it('two employees on crossing paths never share a cell across several ticks', () => {
+    const state = buildFlatNavGridState(10, 8);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Distances chosen so that, under today's unprotected movement (no
+    // occupancy check at all), both employees land exactly on the shared
+    // crossing cell (4, 2) at the same tick (tick 2): each closes half of
+    // an 8-cell gap to the crossing point at AGENT_WALK_SPEED (2/tick).
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 4, 6);
+    expect(moveTo(state, a.id, { x: 8, z: 2 }).success).toBe(true);
+    expect(moveTo(state, b.id, { x: 4, z: 0 }).success).toBe(true);
+
+    for (let i = 0; i < 6; i++) {
+      tickLocomotion(state);
+      expectNoSharedCells([a, b]);
+    }
+  });
+
+  it('a head-on meeting in a one-cell-wide corridor resolves — both employees arrive, no permanent deadlock', () => {
+    // x: 0-1 and 7-8 are 3-row rooms; x: 2-6 is the single-lane (z=1 only)
+    // corridor. Distance 8 between the two employees' starting cells is
+    // chosen for the same reason as the crossing-paths test above: under
+    // today's unprotected movement they land on the exact same cell (4, 1)
+    // at tick 2, deep inside the one-wide section.
+    const state = build1WideCorridorState(9, [2, 6]);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 8, 1);
+    expect(moveTo(state, a.id, { x: 8, z: 1 }).success).toBe(true);
+    expect(moveTo(state, b.id, { x: 0, z: 1 }).success).toBe(true);
+
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS * 4;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && (a.itinerary !== null || b.itinerary !== null)) {
+      tickLocomotion(state);
+      expectNoSharedCells([a, b]);
+      ticks++;
+    }
+
+    expect(a.itinerary).toBeNull();
+    expect(b.itinerary).toBeNull();
+    expect(a.x).toBe(8);
+    expect(a.z).toBe(1);
+    expect(b.x).toBe(0);
+    expect(b.z).toBe(1);
+  });
+
+  it('four employees dispatched to the identical exact target cell end up on four distinct cells, none abandoned/stuck', () => {
+    const state = buildFlatNavGridState(12, 12);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 10, 5);
+    const { employee: c } = hireEmployee(state.employees, 'driller', rng, 5, 0);
+    const { employee: d } = hireEmployee(state.employees, 'driller', rng, 5, 10);
+    const crew = [a, b, c, d];
+
+    for (const emp of crew) {
+      expect(moveTo(state, emp.id, { x: 5, z: 5 }).success).toBe(true);
+    }
+
+    const MAX_TICKS = 40;
+    for (let i = 0; i < MAX_TICKS; i++) {
+      tickLocomotion(state);
+    }
+
+    for (const emp of crew) {
+      expect(emp.isMoveStuck).toBe(false);
+    }
+    expectNoSharedCells(crew);
+  });
+
+  it('a two-cell tick stops before a held second cell instead of skipping over it', () => {
+    const state = buildFlatNavGridState(20, 5);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(moveTo(state, employee.id, { x: 10, z: 0 }).success).toBe(true);
+
+    // Pre-plant an occupant holding the cell two steps ahead of the mover
+    // (AGENT_WALK_SPEED is 2 — a full tick's unobstructed hop would land
+    // exactly here) directly via AgentOccupancy, constructed manually
+    // rather than via rebuildAgentOccupancy so this test isolates the
+    // single-hop stop from the rebuild path entirely.
+    const occupancy = new AgentOccupancy();
+    const blocker: Occupant = { kind: 'employee', id: 999 };
+    expect(occupancy.tryMove(blocker, 2, 0)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    tickLocomotion(state);
+
+    // Advanced exactly one cell — to (1, 0), the first, free cell — not two.
+    expect(employee.x).toBe(1);
+    expect(employee.z).toBe(0);
+  });
+
+  it('with agentOccupancyEnabled false, movement is identical to the flag-absent baseline (regression pin)', () => {
+    const state = buildFlatNavGridState(20, 5);
+    state.agentOccupancyEnabled = false;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 12, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 6,
+      }],
+      goal: { kind: 'reposition', x: 12, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 6,
+    } satisfies Itinerary;
+
+    tickLocomotion(state);
+
+    // Identical outcome to this same fixture's un-flagged counterpart
+    // ("advances an on-foot employee with an itinerary foot leg at
+    // AGENT_WALK_SPEED" above): the flag being explicitly false must never
+    // change ordinary, uncontested movement.
+    expect(employee.x).toBe(AGENT_WALK_SPEED);
+    expect(employee.z).toBe(0);
+  });
+
+  it('handleAgentOccupancyBlock is still an unimplemented skeleton stub', () => {
+    const state = buildFlatNavGridState(20, 5);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const leg = {
+      mode: 'foot' as const, vehicleId: null, destX: 5, destZ: 0,
+      arrival: 'exact' as const, onArrive: { kind: 'none' as const }, estTicks: 3,
+    };
+    const result = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
+
+    expect(() => handleAgentOccupancyBlock(
+      state, employee, { kind: 'employee', id: employee.id }, leg, { x: 1, z: 0 },
+      new AgentOccupancy(), result,
+    )).toThrow('not implemented');
   });
 });
