@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid, surfaceDensityAt, type VoxelChunkSource } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -21,22 +21,17 @@ import { OreVeinSampler } from './OreVeins.js';
 export const TERRAIN_GENERATOR_VERSION = 1;
 
 /**
- * Largest `sizeX`/`sizeZ`/`datum` a `TerrainConfig` may legitimately carry
- * (#1181 review). Nothing in this codebase names an authoritative "biggest a
- * site can get" — site expansion (`PlayableArea`'s `claim`) is deliberately
- * unbounded in total extent, and `MAX_CLAIM_BRIDGE_CHUNKS` only limits how
- * far a single claim may bridge, not the site's eventual size — so this is a
- * defaulted, generous-but-bounded ceiling rather than a reused constant: the
- * biggest campaign level today is 160×160 (#458 D13), so 4096 leaves 25x
- * headroom for growth while still keeping any `yLo..yHi` replay loop bounded
- * to a sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects a save
- * whose embedded generator identity exceeds this rather than regenerating or
- * clamping it, since a legitimate save can never carry one.
+ * Re-exported from `VoxelGrid.ts` (a lower-level module this file already
+ * depends on) rather than declared here, so this ceiling and
+ * `VoxelGrid.ts`'s `HEIGHT_FREE_SIZE_Y` — which a height-free grid's
+ * `isInBounds`/`forEachSolid`/etc. actually bound `y` against — can't drift
+ * into two independently-hardcoded literals that only happen to agree today
+ * (#1190 review).
  */
-export const MAX_TERRAIN_GEN_DIMENSION = 4096;
+export { MAX_TERRAIN_GEN_DIMENSION };
 
 /**
- * A `sizeX`/`sizeY`/`sizeZ` read from untrusted save JSON must describe a
+ * A `sizeX`/`sizeZ`/`datum` read from untrusted save JSON must describe a
  * grid the rest of generation can actually build: an unvalidated, enormous
  * value (e.g. `1e9`) turns a downstream `yLo..yHi` replay loop unbounded, or
  * crashes `VoxelGrid`'s `allocateChunk` with a raw `RangeError: Invalid
@@ -220,8 +215,13 @@ export function createChunkSource(terrain: TerrainContext, config: TerrainConfig
   };
 }
 
-/** Check if a position is in the neutral border zone. */
-function isInBorderZone(
+/**
+ * Check if a position is in the neutral border zone. Exported so
+ * `tests/helpers/terrainFingerprint.ts`'s fingerprint can classify a sampled
+ * column the same way generation itself does, rather than reimplementing
+ * this predicate a second time (#1190 review).
+ */
+export function isInBorderZone(
   x: number, z: number,
   sizeX: number, sizeZ: number,
   borderWidth: number,

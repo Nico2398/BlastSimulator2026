@@ -6,9 +6,9 @@
 // generator identity, then replays the edit record on top — reproducing the
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
-import { VoxelGrid, clampAxis, type VoxelRockComposition } from '../world/VoxelGrid.js';
+import { VoxelGrid, clampAxis, MAX_TERRAIN_GEN_DIMENSION, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
-import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../world/TerrainGen.js';
+import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
  * The complete generator identity a save's terrain is regenerated from —

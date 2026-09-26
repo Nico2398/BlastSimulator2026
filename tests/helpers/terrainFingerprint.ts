@@ -21,7 +21,7 @@
 //   # itself to make a diverging hash pass.
 
 import { createHash } from 'crypto';
-import { buildTerrainContext, surfaceDensityAt, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
+import { buildTerrainContext, surfaceDensityAt, isInBorderZone, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
 import { sampleSurfaceHeightY } from '../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../src/core/world/VoxelGrid.js';
 
@@ -31,16 +31,6 @@ const SAMPLE_OFFSETS = [-5, -2, -1, 0, 1, 2, 5, 50, 500] as const;
 /** Serializes an ore-density record into a stable, key-order-independent string. */
 function serializeOres(ores: Record<string, number>): string {
   return Object.keys(ores).sort().map(k => `${k}=${ores[k]}`).join(',');
-}
-
-/**
- * True when column (x, z) falls in the generator's neutral border zone, where
- * ore veins are cleared (mirrors `TerrainGen.ts`'s private `isInBorderZone`,
- * which isn't exported — reimplemented here from the same public
- * `biome.borderWidth`/`config.sizeX`/`config.sizeZ` inputs it uses).
- */
-function isInBorderZone(x: number, z: number, sizeX: number, sizeZ: number, borderWidth: number): boolean {
-  return x < borderWidth || x >= sizeX - borderWidth || z < borderWidth || z >= sizeZ - borderWidth;
 }
 
 /**

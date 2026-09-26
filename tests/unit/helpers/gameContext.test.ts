@@ -76,12 +76,14 @@ describe('makeGameContext', () => {
     const ctx = makeGameContext({ size: 16 });
     expect(ctx.grid!.sizeX).toBe(16);
     expect(ctx.grid!.sizeZ).toBe(16);
+    expect(ctx.state!.world!.sizeY).toBe(16);
   });
 
   it('forwards `sizeY` independently of `size`', () => {
     const ctx = makeGameContext({ size: 16, sizeY: 8 });
     expect(ctx.grid!.sizeX).toBe(16);
     expect(ctx.grid!.sizeZ).toBe(16);
+    expect(ctx.state!.world!.sizeY).toBe(8);
   });
 
   it('forwards `cash`, overriding the STARTING_CASH default', () => {

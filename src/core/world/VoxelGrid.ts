@@ -123,8 +123,31 @@ export const CHUNK_SIZE = 16;
 /** Voxels in one cubic CHUNK_SIZE**3 slab (#1182) — shared by every `VoxelSlab` typed-array allocation below. */
 const SLAB_VOLUME = CHUNK_SIZE ** 3;
 
+/**
+ * Largest `sizeX`/`sizeZ`/`datum` a `TerrainConfig` may legitimately carry
+ * (#1181 review), and — as `HEIGHT_FREE_SIZE_Y` below — the fixed `sizeY` a
+ * height-free grid allocates regardless of its declared height. Nothing in
+ * this codebase names an authoritative "biggest a site can get" — site
+ * expansion (`PlayableArea`'s `claim`) is deliberately unbounded in total
+ * extent, and `MAX_CLAIM_BRIDGE_CHUNKS` only limits how far a single claim
+ * may bridge, not the site's eventual size — so this is a defaulted,
+ * generous-but-bounded ceiling rather than a reused constant: the biggest
+ * campaign level today is 160×160 (#458 D13), so 4096 leaves 25x headroom
+ * for growth while still keeping any `yLo..yHi` replay loop bounded to a
+ * sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects a save
+ * whose embedded generator identity exceeds this rather than regenerating or
+ * clamping it, since a legitimate save can never carry one.
+ *
+ * Defined here (not in `TerrainGen.ts`, which depends on this module) so
+ * `HEIGHT_FREE_SIZE_Y` and the save-corruption clamps in
+ * `VoxelGridCodec.ts`/`TerrainGen.ts` can't drift apart into two literals
+ * that happen to read "4096" today — `TerrainGen.ts` re-exports this same
+ * constant rather than declaring its own copy.
+ */
+export const MAX_TERRAIN_GEN_DIMENSION = 4096;
+
 /** TODO(#1193): removed once this class drops sizeY-bounded bookkeeping. */
-const HEIGHT_FREE_SIZE_Y = 4096;
+const HEIGHT_FREE_SIZE_Y = MAX_TERRAIN_GEN_DIMENSION;
 
 /** Chunk index of a world coordinate. `>> 4` floors toward -inf, which is what signed coordinates need. */
 export function chunkIndexOf(worldCoord: number): number {
@@ -326,7 +349,13 @@ export class VoxelGrid {
    * not its size divides by CHUNK_SIZE.
    */
   constructor(sizeX: number, sizeZ: number);
-  /** TODO(#1193): kept only so tests can still declare a height. No production caller uses this after #1190. */
+  /**
+   * TODO(#1193): kept so tests can still declare a height, AND for this
+   * class's own `materializeScratchColumn` (below), which still calls this
+   * exact overload (`new VoxelGrid(0, this.sizeY, 0)`) to build its
+   * throwaway scratch grid — a genuine production caller, not just a test
+   * fixture. #1193 needs to check that call site too, not only tests.
+   */
   constructor(sizeX: number, sizeY: number, sizeZ: number);
   constructor(sizeX: number, b: number, c?: number) {
     const heightFree = c === undefined;

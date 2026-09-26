@@ -5,9 +5,14 @@
 // (the voxel y the site centre's surface lands on) and makes `VoxelGrid`
 // height-free — a pure plumbing change, not a generation-algorithm change.
 // This suite locks in that every real campaign level, sandbox's own default,
-// and `new_game`'s own default grid sizes generate BYTE-IDENTICAL terrain
-// before and after that change, via `fingerprintTerrainConfig`
-// (`tests/helpers/terrainFingerprint.ts`).
+// and `new_game`'s own default grid sizes generate the SAME
+// strided-sample fingerprint before and after that change, via
+// `fingerprintTerrainConfig` (`tests/helpers/terrainFingerprint.ts`) — a
+// SHA-256 over every 8th column (`step`) at 9 fixed depth-offsets relative to
+// each sampled column's own surface. That is a strong regression guard
+// against any change to the sampled data, not literal byte-for-byte identity
+// over every voxel: columns between stride steps and depths outside
+// `SAMPLE_OFFSETS` are never compared.
 //
 // Each case's `datum` is `Math.floor(oldSizeY * 0.55)` — the exact conversion
 // `computeGroundOffset` used to perform internally (pre-#1190) and which
