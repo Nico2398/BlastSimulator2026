@@ -450,6 +450,36 @@
       }
     },
     {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        },
+        {
+          "type": "focusTile",
+          "x": 6,
+          "z": 15,
+          "distance": 16
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "description": "(#1205) Pauses on the driller's arrival at the driving_center (trainingCount promoted from pendingTrainingState to 1, matching building-training-visual.json's own wait_until trainingCount==1 + focusTile + screenshot pattern) and screenshots the (6,15) pin this file builds the driving_center at while the course is genuinely mid-way -- the driving_center now holds one occupant of its 4-person capacity, the visual proof point for BuildingOccupancyLabels' billboard.",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        },
+        "note": "The driller has walked to and entered the driving_center -- mesh hidden, course now ticking, one occupant of 4 inside. Screenshot taken right after arrival, for BuildingOccupancyLabels visual inspection (#1205)."
+      }
+    },
+    {
       "command": "tick 25",
       "timeout": 90,
       "interaction": [

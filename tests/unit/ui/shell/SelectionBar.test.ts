@@ -81,6 +81,46 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Focus'))).toBe(true);
   });
 
+  it('shows occupancy count and an occupant-name listing for a people-holding building with occupants (#1205)', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
+    const { employee: a } = hireEmployee(state.employees, 'driller', new Random(1));
+    const { employee: b } = hireEmployee(state.employees, 'driller', new Random(2));
+    building.occupantIds = [a.id, b.id];
+
+    bar.show(entity('building', building.id), state);
+
+    // driving_center tier 1 has a 4-person capacity (getBuildingPeopleCapacity).
+    expect(root.textContent).toContain('2/4');
+    expect(root.textContent).toContain(a.name);
+    expect(root.textContent).toContain(b.name);
+    expect(root.textContent).toContain('Inside:');
+  });
+
+  it('shows the occupancy count with no occupant listing for a people-holding building with zero occupants (#1205)', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+
+    bar.show(entity('building', building.id), state);
+
+    expect(root.textContent).toContain('0/4');
+    expect(root.textContent).not.toContain('Inside:');
+  });
+
+  it('shows neither an occupancy count nor an occupant listing for a building with no people capacity (#1205)', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'freight_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; hp: number } };
+
+    bar.show(entity('building', building.id), state);
+
+    expect(root.textContent).toContain(String(Math.round(building.hp)));
+    expect(root.textContent).not.toContain('/');
+    expect(root.textContent).not.toContain('Inside:');
+  });
+
   it('hides when the shown entity no longer exists in state', () => {
     const { bar, root } = makeBar();
     bar.show(entity('employee', 9999), makeState());

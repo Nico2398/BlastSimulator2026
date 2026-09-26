@@ -15,6 +15,7 @@ import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
@@ -44,6 +45,8 @@ export interface SyncDeps {
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  /** "<inside>/<capacity>" labels above people-holding buildings; optional since not every SyncDeps caller (e.g. tests) builds one (#1205). */
+  buildingOccupancyLabels?: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   clouds: CloudLayer | null;
   zone: ZoneBounds | null;
@@ -167,6 +170,15 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
       state.employees.employees,
       state.vehicles,
       id => deps.characters!.getGroup(id),
+    );
+  }
+
+  // "<inside>/<capacity>" labels above people-holding buildings — reflect Building.occupantIds each sync (#1205)
+  if (deps.buildingOccupancyLabels && deps.buildings) {
+    deps.buildingOccupancyLabels.sync(
+      state.buildings.buildings,
+      id => deps.buildings!.getPosition(id),
+      id => deps.buildings!.getInstance(id)?.bounds.max.y ?? null,
     );
   }
 
