@@ -126,9 +126,11 @@ export type InteractionStepAction =
   /**
    * Re-aim the camera at a world tile before clicking it. `pitch` (degrees
    * above horizon) re-aims the camera's viewing angle too, for a tile a
-   * shallower angle can't see past a ridge to reach.
+   * shallower angle can't see past a ridge to reach. `yaw` (degrees, same
+   * convention as `CameraController.setOrbit`'s `yawDeg`) re-aims which side
+   * of the tile the camera views from, for terrain no pitch alone clears.
    */
-  | { type: 'focusTile'; x: number; z: number; distance?: number; pitch?: number }
+  | { type: 'focusTile'; x: number; z: number; distance?: number; pitch?: number; yaw?: number }
   /** Click a live scene entity by kind + id rather than a baked coordinate. */
   | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
   /**

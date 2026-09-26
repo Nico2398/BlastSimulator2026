@@ -320,7 +320,9 @@
           "type": "focusTile",
           "x": 6,
           "z": 4,
-          "pitch": 68
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
         },
         {
           "type": "dragTiles",

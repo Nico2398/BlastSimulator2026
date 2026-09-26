@@ -396,13 +396,13 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'focusTile': {
-      await page.evaluate(({ x, z, distance, pitch }: { x: number; z: number; distance: number; pitch?: number }) => {
+      await page.evaluate(({ x, z, distance, pitch, yaw }: { x: number; z: number; distance: number; pitch?: number; yaw?: number }) => {
         (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
-        if (pitch !== undefined) {
-          (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(undefined, pitch);
+        if (yaw !== undefined || pitch !== undefined) {
+          (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(yaw, pitch);
         }
         (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
-      }, { x: action.x, z: action.z, distance: action.distance ?? 25, pitch: action.pitch });
+      }, { x: action.x, z: action.z, distance: action.distance ?? 25, pitch: action.pitch, yaw: action.yaw });
       break;
     }
     case 'awaitUsable': {

@@ -181,7 +181,7 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(typeof a.x).toBe('number');
     expect(typeof a.z).toBe('number');
   }),
-  defineActionCheck('focusTile', 'focusTile actions have numeric x/z, and if present, a positive distance and an in-range pitch', (a) => {
+  defineActionCheck('focusTile', 'focusTile actions have numeric x/z, and if present, a positive distance, an in-range pitch, and a numeric yaw', (a) => {
     expect(typeof a.x).toBe('number');
     expect(typeof a.z).toBe('number');
     if (a.distance !== undefined) {
@@ -192,6 +192,9 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
       expect(typeof a.pitch).toBe('number');
       expect(a.pitch).toBeGreaterThanOrEqual(5);
       expect(a.pitch).toBeLessThanOrEqual(87);
+    }
+    if (a.yaw !== undefined) {
+      expect(typeof a.yaw).toBe('number');
     }
   }),
   defineActionCheck('dragTiles', 'dragTiles actions have numeric x1, z1, x2, z2', (a) => {
