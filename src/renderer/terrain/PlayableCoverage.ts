@@ -94,6 +94,16 @@ export function meshClaimsCell(grid: VoxelGrid, x: number, z: number): boolean {
  * (`heightToVoxelYContinuous`) the site's own real columns go through — that
  * shared datum is what keeps the halo node lining up with the site's edge
  * column instead of drifting from it (#907, #1189).
+ *
+ * `_grid` is unused since #1189 removed the playable-band clamp this function
+ * used to apply through it — the body is now a pure passthrough
+ * (`heightToVoxelYContinuous(height, 0)` === `height`). Kept as a no-op
+ * parameter rather than dropped: every call site
+ * (`TerrainMesh.ts`, `GameRendererTerrain.ts`) already reads naturally as
+ * "halo height, given this grid and that sampled height", and dropping the
+ * parameter would mean changing this exported function's signature blind to
+ * its own test file's call sites. Drop `_grid` the next time this function's
+ * test coverage is touched for an unrelated reason.
  */
 export function haloSurfaceHeight(_grid: VoxelGrid, height: number): number {
   return heightToVoxelYContinuous(height, 0);
