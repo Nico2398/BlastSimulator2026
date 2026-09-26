@@ -15,28 +15,23 @@
 // session never registers it. These tests pin all three.
 
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { registeredHooks, runHook, type HookRegistry, type HookRun } from '../../helpers/claudeHooks';
 
 const ROOT = join(import.meta.dirname, '../../..');
-const GUARD = join(ROOT, '.claude/hooks/require-foreground-agents.sh');
 
 const workflow = (name: string): string =>
   readFileSync(join(ROOT, '.github/workflows', name), 'utf8');
 const action = (name: string): string =>
   readFileSync(join(ROOT, '.github/actions', name, 'action.yml'), 'utf8');
 const settings = (): {
-  hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+  env?: Record<string, string>;
+  hooks?: HookRegistry;
 } => JSON.parse(readFileSync(join(ROOT, '.claude/settings.json'), 'utf8'));
 
 /** Both runners must behave identically — the pipeline swaps between them. */
 const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml'];
-
-interface HookRun {
-  status: number;
-  stderr: string;
-}
 
 /** Runs the PreToolUse guard against a tool-input payload, as Claude Code does. */
 function runGuard(toolInput: unknown, env: Record<string, string> = {}): HookRun {
@@ -44,17 +39,7 @@ function runGuard(toolInput: unknown, env: Record<string, string> = {}): HookRun
     typeof toolInput === 'string'
       ? toolInput
       : JSON.stringify({ tool_name: 'Agent', tool_input: toolInput });
-  try {
-    execFileSync(GUARD, {
-      input: payload,
-      encoding: 'utf8',
-      env: { ...process.env, ...env },
-    });
-    return { status: 0, stderr: '' };
-  } catch (error) {
-    const failure = error as { status?: number; stderr?: string };
-    return { status: failure.status ?? -1, stderr: failure.stderr ?? '' };
-  }
+  return runHook('require-foreground-agents.mjs', payload, env);
 }
 
 describe('foreground delegation guard', () => {
@@ -101,6 +86,30 @@ describe('foreground delegation guard', () => {
     );
     expect(result.status).toBe(0);
   });
+
+  // An interactive session runs in "fork mode": the Agent tool there has no
+  // run_in_background parameter at all and backgrounds every sub-agent. The
+  // guard saw "missing" on every call and no delegation could pass, which made
+  // the orchestrator unusable at a local CLI. CLAUDE_CODE_DISABLE_BACKGROUND_TASKS
+  // makes Claude Code run every sub-agent in the foreground, so the guard has
+  // nothing left to catch.
+  it('allows every delegation when the harness forces the foreground', () => {
+    const forced = { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' };
+    expect(runGuard({ subagent_type: 'planner' }, forced).status).toBe(0);
+    expect(runGuard({ subagent_type: 'planner', run_in_background: true }, forced).status).toBe(0);
+  });
+
+  it('points a session with no run_in_background parameter at the setting that fixes it', () => {
+    expect(runGuard({ subagent_type: 'planner' }).stderr).toContain('CLAUDE_CODE_DISABLE_BACKGROUND_TASKS');
+  });
+});
+
+describe('foreground delegation is forced project-wide', () => {
+  // settings.json `env` reaches every session kind — the runner, a local CLI,
+  // Claude Code on the web — and every sub-agent they spawn.
+  it('sets CLAUDE_CODE_DISABLE_BACKGROUND_TASKS in settings.json', () => {
+    expect(settings().env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe('1');
+  });
 });
 
 describe('foreground guard registration', () => {
@@ -110,22 +119,12 @@ describe('foreground guard registration', () => {
   // orchestrator without one. settings.json hooks do fire in the runner — the
   // SessionStart hook next to it ran in the same job that lost issue #406.
   it('is registered as a PreToolUse hook in settings.json', () => {
-    const entries = settings().hooks?.PreToolUse ?? [];
-    const guards = entries.filter((entry) =>
-      (entry.hooks ?? []).some((hook) =>
-        (hook.command ?? '').endsWith('require-foreground-agents.sh')
-      )
-    );
+    const guards = registeredHooks(settings().hooks, 'PreToolUse', 'require-foreground-agents.mjs');
     expect(guards.length).toBeGreaterThan(0);
   });
 
   it('matches both spellings of the delegation tool', () => {
-    const entries = settings().hooks?.PreToolUse ?? [];
-    const guards = entries.filter((entry) =>
-      (entry.hooks ?? []).some((hook) =>
-        (hook.command ?? '').endsWith('require-foreground-agents.sh')
-      )
-    );
+    const guards = registeredHooks(settings().hooks, 'PreToolUse', 'require-foreground-agents.mjs');
     for (const tool of ['Agent', 'Task']) {
       expect(
         guards.some((entry) => new RegExp(entry.matcher ?? '.*').test(tool)),
@@ -136,7 +135,7 @@ describe('foreground guard registration', () => {
 
   it('is proven wired by validate:context, not merely proven to exist', () => {
     const validator = readFileSync(join(ROOT, 'scripts/validate-context.ts'), 'utf8');
-    expect(validator).toContain('require-foreground-agents.sh');
+    expect(validator).toContain('require-foreground-agents.mjs');
     expect(validator).toContain('SETTINGS_HOOKS');
     expect(validator).toMatch(/issues\.push\(\.\.\.checkSettings\(\)\)/);
   });

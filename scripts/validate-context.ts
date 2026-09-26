@@ -10,9 +10,11 @@
  *   1. Frontmatter keys belong to the schema for that file type
  *   2. Tool names in `tools` / `disallowedTools` resolve to real Claude Code tools
  *   3. `skills:` entries reference skills that exist
- *   4. Hook commands point at files that exist and are executable, and the hooks
- *      that only work when registered project-wide are registered in settings.json,
- *      alongside the tools that must be denied there
+ *   4. Hooks run a Node script that exists, in exec form (`command: node`,
+ *      `args: [script]`) so no shell stands between Claude Code and the hook on
+ *      any OS, and the hooks that only work when registered project-wide are
+ *      registered in settings.json, alongside the tools that must be denied and
+ *      the environment that must be set there
  *   5. Skill directory name matches its frontmatter `name`
  *   6. Body content is identical across .claude/, .github/, and .opencode/
  *   7. A command's `agent:` resolves to an agent that exists
@@ -197,14 +199,14 @@ function checkAgent(file: ParsedFile, skills: Set<string>): ContextIssue[] {
     }
   }
 
-  for (const match of file.frontmatter.matchAll(/command:\s*(\S+)/g)) {
-    const command = match[1]!.replace('${CLAUDE_PROJECT_DIR}/', '');
-    const path = join(ROOT, command);
-    if (!existsSync(path)) {
-      issues.push({ file: file.path, message: `hook command not found: ${command}` });
-    } else if (!(statSync(path).mode & 0o111)) {
-      issues.push({ file: file.path, message: `hook command not executable: ${command}` });
-    }
+  const handlers = /command:[ \t]*(\S+)[ \t]*(?:\r?\n[ \t]*args:[ \t]*\[([^\]]*)\])?/g;
+  for (const match of file.frontmatter.matchAll(handlers)) {
+    const args = (match[2] ?? '')
+      .split(',')
+      .map((arg) => arg.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean);
+    const problem = hookHandlerProblem(match[1]!, args);
+    if (problem) issues.push({ file: file.path, message: problem });
   }
 
   return issues;
@@ -514,10 +516,36 @@ function checkCrossRuntimeSync(): ContextIssue[] {
   return issues;
 }
 
+/**
+ * Why a hook handler would not run the same way on every OS, or `undefined`.
+ *
+ * A hook is a Node script under `.claude/hooks/`, registered in exec form:
+ * `command: node` with the script as its one argument. The shell scripts these
+ * replaced ran on Linux and degraded silently elsewhere — on Windows they needed
+ * Git Bash plus a python3 install they failed open without, and the stop guard's
+ * Python liveness probe (`os.kill(pid, 0)`) terminated the process it probed.
+ * Exec form also means no shell parses `${CLAUDE_PROJECT_DIR}`, so the path
+ * resolves whether Claude Code would have picked bash or PowerShell.
+ */
+function hookHandlerProblem(command: string, args: readonly string[]): string | undefined {
+  if (command !== 'node') {
+    return (
+      `hook command \`${command}\` is not portable — run a .claude/hooks/*.mjs script ` +
+      'through node in exec form (`command: node`, `args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/<name>.mjs"]`)'
+    );
+  }
+  const script = (args[0] ?? '').replace('${CLAUDE_PROJECT_DIR}/', '');
+  if (!script.startsWith('.claude/hooks/') || !script.endsWith('.mjs')) {
+    return `hook runs \`${script || '(no script)'}\` — its first arg must be a .claude/hooks/*.mjs script`;
+  }
+  if (!existsSync(join(ROOT, script))) return `hook script not found: ${script}`;
+  return undefined;
+}
+
 /** Hooks that must be registered in settings.json, not in agent frontmatter. */
 const SETTINGS_HOOKS = [
   {
-    script: '.claude/hooks/require-foreground-agents.sh',
+    script: '.claude/hooks/require-foreground-agents.mjs',
     event: 'PreToolUse',
     /** Tool names the matcher has to cover for the guard to see a delegation. */
     tools: ['Agent', 'Task'],
@@ -527,7 +555,7 @@ const SETTINGS_HOOKS = [
       'guard never ran, and issue #406 lost its run to a backgrounded sub-agent',
   },
   {
-    script: '.claude/hooks/require-foreground-bash.sh',
+    script: '.claude/hooks/require-foreground-bash.mjs',
     event: 'PreToolUse',
     /** Every shell command has to pass it, so the matcher must cover `Bash`. */
     tools: ['Bash'],
@@ -538,7 +566,7 @@ const SETTINGS_HOOKS = [
       'a background task — #604 threw away 3h11m of finished work that way',
   },
   {
-    script: '.claude/hooks/report-loop-budget.sh',
+    script: '.claude/hooks/report-loop-budget.mjs',
     event: 'PreToolUse',
     /** It speaks before every delegation, so the matcher must cover them. */
     tools: ['Agent', 'Task'],
@@ -549,7 +577,7 @@ const SETTINGS_HOOKS = [
       'five hours iterating after a one-hour TDD cycle and died on the job clock',
   },
   {
-    script: '.claude/hooks/require-settled-turn.sh',
+    script: '.claude/hooks/require-settled-turn.mjs',
     event: 'Stop',
     /** Stop carries no tool name; registration itself is the whole check. */
     tools: [],
@@ -560,7 +588,7 @@ const SETTINGS_HOOKS = [
       'must arrive inside the turn that asked for them',
   },
   {
-    script: '.claude/hooks/require-settled-turn.sh',
+    script: '.claude/hooks/require-settled-turn.mjs',
     event: 'SubagentStop',
     tools: [],
     why:
@@ -569,7 +597,7 @@ const SETTINGS_HOOKS = [
       'does — `Stop` alone never sees it',
   },
   {
-    script: '.claude/hooks/no-ask-user-question.sh',
+    script: '.claude/hooks/no-ask-user-question.mjs',
     event: 'PreToolUse',
     tools: ['AskUserQuestion'],
     why:
@@ -578,6 +606,19 @@ const SETTINGS_HOOKS = [
       'session is both the one that bypasses prompts and the one whose question can never ' +
       'be answered. The hook runs on the tool call in every mode, so it is the layer that ' +
       'holds where it matters',
+  },
+];
+
+/** Environment settings.json must set for every session kind, and why. */
+const SETTINGS_ENV = [
+  {
+    name: 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',
+    value: '1',
+    why:
+      'it makes Claude Code run every sub-agent in the foreground in every kind of session. ' +
+      'An interactive session runs in fork mode, where the `Agent` tool has no ' +
+      '`run_in_background` parameter and backgrounds every sub-agent — so the delegation ' +
+      'guard refused every call and the orchestrator could not run at a local CLI at all',
   },
 ];
 
@@ -598,9 +639,9 @@ const SETTINGS_DENIED_TOOLS = [
 /**
  * Checks `.claude/settings.json` hooks and denied tools.
  *
- * A hook file that exists and is executable still does nothing until something
+ * A hook script that exists still does nothing until something
  * registers it, and `checkAgent` above only proves the first half. Registration
- * is where this project has been bitten: `require-foreground-agents.sh` passed
+ * is where this project has been bitten: `require-foreground-agents` passed
  * every check while sitting inert, because it was declared in the one place the
  * orchestrator's session never reads. A denied tool is the same shape of
  * failure — enforced project-wide from here, or not enforced at all.
@@ -613,7 +654,8 @@ function checkSettings(): ContextIssue[] {
   }
 
   let settings: {
-    hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+    env?: Record<string, string>;
+    hooks?: Record<string, { matcher?: string; hooks?: { command?: string; args?: string[] }[] }[]>;
     permissions?: { deny?: string[] };
   };
   try {
@@ -637,17 +679,20 @@ function checkSettings(): ContextIssue[] {
     }
   }
 
+  for (const required of SETTINGS_ENV) {
+    if (settings.env?.[required.name] !== required.value) {
+      issues.push({
+        file: relative,
+        message: `env.${required.name} is not "${required.value}" — ${required.why}`,
+      });
+    }
+  }
+
   for (const [event, entries] of Object.entries(hooks)) {
     for (const entry of entries) {
       for (const hook of entry.hooks ?? []) {
-        const command = (hook.command ?? '').replace('${CLAUDE_PROJECT_DIR}/', '');
-        if (!command) continue;
-        const target = join(ROOT, command);
-        if (!existsSync(target)) {
-          issues.push({ file: relative, message: `${event} hook command not found: ${command}` });
-        } else if (!(statSync(target).mode & 0o111)) {
-          issues.push({ file: relative, message: `${event} hook command not executable: ${command}` });
-        }
+        const problem = hookHandlerProblem(hook.command ?? '', hook.args ?? []);
+        if (problem) issues.push({ file: relative, message: `${event} ${problem}` });
       }
     }
   }
@@ -655,7 +700,7 @@ function checkSettings(): ContextIssue[] {
   for (const required of SETTINGS_HOOKS) {
     const entries = hooks[required.event] ?? [];
     const registered = entries.filter((entry) =>
-      (entry.hooks ?? []).some((hook) => (hook.command ?? '').endsWith(basename(required.script)))
+      (entry.hooks ?? []).some((hook) => (hook.args?.[0] ?? '').endsWith(`/${basename(required.script)}`))
     );
     if (registered.length === 0) {
       issues.push({

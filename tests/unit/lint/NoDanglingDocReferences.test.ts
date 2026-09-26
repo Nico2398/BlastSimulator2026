@@ -21,7 +21,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, sep } from 'path';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -214,7 +214,7 @@ describe('repo-wide — no dangling references to deleted/moved docs (issue #494
   let totalTokens = 0;
 
   for (const file of files) {
-    const relPath = file.slice(ROOT.length + 1);
+    const relPath = file.slice(ROOT.length + 1).split(sep).join('/');
     if (relPath === '.gitignore') continue;
     const source = readFileSync(file, 'utf8');
     const { references, tokenCount } = scanFileForDanglingReferences(relPath, source);

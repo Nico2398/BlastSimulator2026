@@ -22,6 +22,8 @@ import { LOCALE_SHARED_VALUE_ALLOWLIST } from '../../../src/core/i18n/localeShar
 const PROJECT_ROOT = resolve(import.meta.dirname, '../../..');
 const EXEC_TIMEOUT = 30_000;
 
+const TSX_CLI = resolve(PROJECT_ROOT, 'node_modules/tsx/dist/cli.mjs');
+
 interface RunResult {
   status: number;
   stdout: string;
@@ -29,7 +31,9 @@ interface RunResult {
 
 function runParityCheck(): RunResult {
   try {
-    const stdout = execFileSync('npx', ['tsx', 'scripts/check-i18n-parity.ts'], {
+    // tsx's entry point through this Node binary: `npx` is a .cmd shim on Windows,
+    // which execFileSync cannot start without a shell.
+    const stdout = execFileSync(process.execPath, [TSX_CLI, 'scripts/check-i18n-parity.ts'], {
       cwd: PROJECT_ROOT,
       timeout: EXEC_TIMEOUT,
       encoding: 'utf-8',

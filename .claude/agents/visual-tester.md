@@ -10,7 +10,8 @@ hooks:
     - matcher: Bash
       hooks:
         - type: command
-          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.mjs"]
 ---
 
 # Visual Tester — Screenshot & Scenario Verification

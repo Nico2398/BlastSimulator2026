@@ -2,7 +2,7 @@
 //
 // `npm run long` exists because an unattended session gets one turn and three of
 // this project's required commands do not fit in one 600s Bash call. It is the
-// only sanctioned way to detach, and `require-settled-turn.sh` reads its handle
+// only sanctioned way to detach, and `require-settled-turn.mjs` reads its handle
 // directory to decide whether a turn may end — so a wrong answer here is a lost
 // run, the failure that produced PRs #594, #603 and #604.
 //
@@ -16,19 +16,30 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { shellQuote, handleFor, readState, unfinished, EXIT_RUNNING } from '../../../scripts/long-run';
+import {
+  shellQuote,
+  handleFor,
+  readState,
+  unfinished,
+  resolveBash,
+  bashPath,
+  EXIT_RUNNING,
+} from '../../../scripts/long-run';
+import { runHook } from '../../helpers/claudeHooks';
 
 const ROOT = join(import.meta.dirname, '../../..');
 const read = (path: string): string => readFileSync(path, 'utf8');
 const SCRIPT = join(ROOT, 'scripts/long-run.ts');
+/** tsx's own entry point, run through this Node — `npx` is a .cmd shim on Windows. */
+const TSX = join(ROOT, 'node_modules/tsx/dist/cli.mjs');
 
 /** Runs the CLI in an isolated cwd so handles never touch the repo's own. */
 function long(cwd: string, args: string[]): { code: number; out: string } {
-  const result = spawnSync('npx', ['tsx', SCRIPT, ...args], {
+  const result = spawnSync(process.execPath, [TSX, SCRIPT, ...args], {
     cwd,
     encoding: 'utf8',
     env: { ...process.env },
@@ -46,6 +57,55 @@ describe('shellQuote', () => {
   });
 });
 
+/**
+ * Stops every command a test left running, then removes its directory. Windows
+ * refuses to delete a log file a live process still holds open, so the tree has
+ * to go first there; elsewhere the detached wrapper leads its own process group.
+ */
+function stopAndRemove(dir: string): void {
+  const handles = join(dir, '.agentic/long');
+  if (existsSync(handles)) {
+    for (const name of readdirSync(handles).filter((n) => n.endsWith('.pid'))) {
+      const pid = Number.parseInt(read(join(handles, name)).trim(), 10);
+      if (!Number.isInteger(pid) || pid <= 0) continue;
+      if (process.platform === 'win32') {
+        spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true });
+      } else {
+        try {
+          process.kill(-pid);
+        } catch {
+          // Already gone.
+        }
+      }
+    }
+  }
+  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+}
+
+// On Windows a bare `bash` from a Node process started by PowerShell or cmd
+// is WSL: the command ran inside a Linux VM, could not write its C:\ exit file,
+// and every long run reported DIED. Windows always gets Git Bash.
+describe('resolveBash', () => {
+  it('uses bash from PATH everywhere but Windows', () => {
+    expect(resolveBash('linux', {}, () => undefined)).toBe('bash');
+    expect(resolveBash('darwin', {}, () => undefined)).toBe('bash');
+  });
+
+  it('never hands Windows a bare bash', () => {
+    const env = { CLAUDE_CODE_GIT_BASH_PATH: process.execPath };
+    expect(resolveBash('win32', env, () => undefined)).toBe(process.execPath);
+  });
+
+  it('fails loudly on Windows when no Git Bash can be found', () => {
+    expect(() => resolveBash('win32', {}, () => undefined)).toThrow(/Git Bash not found/);
+  });
+
+  it('writes Windows paths the way Git Bash reads them', () => {
+    expect(bashPath('C:\\Users\\x\\a.exit', 'win32')).toBe('C:/Users/x/a.exit');
+    expect(bashPath('/tmp/a.exit', 'linux')).toBe('/tmp/a.exit');
+  });
+});
+
 describe('npm run long', () => {
   let dir: string;
 
@@ -54,7 +114,7 @@ describe('npm run long', () => {
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    stopAndRemove(dir);
   });
 
   it('reports the command exit code even when the command exits itself', () => {
@@ -144,19 +204,14 @@ describe('readState / unfinished', () => {
 
 /** Feeds a PreToolUse payload to a hook and returns its exit code. */
 function hook(script: string, payload: unknown, env: NodeJS.ProcessEnv = {}): number {
-  const result = spawnSync(join(ROOT, '.claude/hooks', script), [], {
-    input: JSON.stringify(payload),
-    encoding: 'utf8',
-    env: { ...process.env, ...env },
-  });
-  return result.status ?? -1;
+  return runHook(script, JSON.stringify(payload), env).status;
 }
 
 const bash = (command: string, background?: boolean) => ({
   tool_input: background === undefined ? { command } : { command, run_in_background: background },
 });
 
-describe('require-foreground-bash.sh', () => {
+describe('require-foreground-bash.mjs', () => {
   it.each([
     ['a plain command', bash('npm run test')],
     ['an explicit foreground call', bash('npm run test', false)],
@@ -172,7 +227,7 @@ describe('require-foreground-bash.sh', () => {
     ['the dev server with its output redirected', bash('npm run dev > /tmp/dev.log 2>&1 &')],
     ['the dev server through the background flag', bash('npm run dev', true)],
   ])('allows %s', (_label, payload) => {
-    expect(hook('require-foreground-bash.sh', payload)).toBe(0);
+    expect(hook('require-foreground-bash.mjs', payload)).toBe(0);
   });
 
   it.each([
@@ -190,14 +245,11 @@ describe('require-foreground-bash.sh', () => {
     ['a real background command chained onto a dev server', bash('npm run dev & npx vitest run &')],
     ['a nohup hidden behind a dev server', bash('npm run dev & sleep 3; nohup npm run scenarios &')],
   ])('blocks %s', (_label, payload) => {
-    expect(hook('require-foreground-bash.sh', payload)).toBe(2);
+    expect(hook('require-foreground-bash.mjs', payload)).toBe(2);
   });
 
   it('names the wrapper in the reason it gives back', () => {
-    const result = spawnSync(join(ROOT, '.claude/hooks/require-foreground-bash.sh'), [], {
-      input: JSON.stringify(bash('npm run scenarios', true)),
-      encoding: 'utf8',
-    });
+    const result = runHook('require-foreground-bash.mjs', JSON.stringify(bash('npm run scenarios', true)));
     expect(result.stderr).toContain('npm run long -- start');
     expect(result.stderr).toContain('75');
   });
@@ -207,28 +259,21 @@ describe('require-foreground-bash.sh', () => {
   // run to an environment variable that failed to arrive.
   it('lets a human opt out', () => {
     expect(
-      hook('require-foreground-bash.sh', bash('npm run dev &'), { AGENTIC_ALLOW_BACKGROUND_BASH: '1' })
+      hook('require-foreground-bash.mjs', bash('npm run dev &'), { AGENTIC_ALLOW_BACKGROUND_BASH: '1' })
     ).toBe(0);
   });
 
   it('fails open on an unreadable payload rather than wedging every command', () => {
-    const result = spawnSync(join(ROOT, '.claude/hooks/require-foreground-bash.sh'), [], {
-      input: 'not json at all',
-      encoding: 'utf8',
-    });
+    const result = runHook('require-foreground-bash.mjs', 'not json at all');
     expect(result.status).toBe(0);
   });
 });
 
-describe('require-settled-turn.sh', () => {
+describe('require-settled-turn.mjs', () => {
   let dir: string;
 
   const stop = (env: NodeJS.ProcessEnv = {}): number =>
-    spawnSync(join(ROOT, '.claude/hooks/require-settled-turn.sh'), [], {
-      input: '{}',
-      encoding: 'utf8',
-      env: { ...process.env, CLAUDE_PROJECT_DIR: dir, ...env },
-    }).status ?? -1;
+    runHook('require-settled-turn.mjs', '{}', { CLAUDE_PROJECT_DIR: dir, ...env }).status;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'stophook-'));
@@ -261,11 +306,7 @@ describe('require-settled-turn.sh', () => {
     const handles = join(dir, '.agentic/long');
     mkdirSync(handles, { recursive: true });
     writeFileSync(join(handles, 'scenarios.pid'), String(process.pid));
-    const result = spawnSync(join(ROOT, '.claude/hooks/require-settled-turn.sh'), [], {
-      input: '{}',
-      encoding: 'utf8',
-      env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
-    });
+    const result = runHook('require-settled-turn.mjs', '{}', { CLAUDE_PROJECT_DIR: dir });
     expect(result.stderr).toContain('npm run long -- wait scenarios');
   });
 

@@ -20,10 +20,10 @@
 // in `.github/scripts/assignability.cjs` and tested in `assignability.test.ts`.
 
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'child_process';
 import { readdirSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { join } from 'path';
+import { registeredHooks, runHook, type HookRegistry } from '../../helpers/claudeHooks';
 
 const require = createRequire(import.meta.url);
 
@@ -1965,7 +1965,7 @@ describe('a pipeline PR that is neither marked nor draft', () => {
 // backgrounded shell command, a task notification — is never collected, and
 // everything not yet pushed dies with the runner VM.
 //
-// `require-foreground-agents.sh` closed this for delegation after #404 and #406.
+// `require-foreground-agents.mjs` closed this for delegation after #404 and #406.
 // It came back through the shell and cost three runs in four days, all rescued
 // as draft PRs nobody asked for:
 //
@@ -1984,23 +1984,20 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
   const settings = JSON.parse(
     readFileSync(join(ROOT, '.claude/settings.json'), 'utf8')
   ) as {
-    hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+    hooks?: HookRegistry;
   };
 
-  const registered = (event: string, script: string) =>
-    (settings.hooks?.[event] ?? []).filter((entry) =>
-      (entry.hooks ?? []).some((hook) => (hook.command ?? '').endsWith(script))
-    );
+  const registered = (event: string, script: string) => registeredHooks(settings.hooks, event, script);
 
   // In settings.json, never in agent frontmatter: a frontmatter hook registers
   // only for an agent started through the `Agent` tool, and `/agentic-run`
   // forks into the orchestrator without one. That is how the delegation guard
   // sat inert while #406 died 58 seconds in.
   it('blocks a backgrounded Bash call, from settings.json', () => {
-    const entries = registered('PreToolUse', 'require-foreground-bash.sh');
+    const entries = registered('PreToolUse', 'require-foreground-bash.mjs');
     expect(
       entries.length,
-      'require-foreground-bash.sh is not a PreToolUse hook — a backgrounded command ' +
+      'require-foreground-bash.mjs is not a PreToolUse hook — a backgrounded command ' +
       'reports on a turn that never comes'
     ).toBeGreaterThan(0);
     expect(entries.some((entry) => /(^|\|)Bash(\||$)/.test(entry.matcher ?? ''))).toBe(true);
@@ -2011,13 +2008,13 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
   // `npm run scenarios`, so its own turn can end on an unfinished handle.
   it.each(['Stop', 'SubagentStop'])('refuses to end a %s with a long run unfinished', (event) => {
     expect(
-      registered(event, 'require-settled-turn.sh').length,
-      `require-settled-turn.sh is not registered on ${event}`
+      registered(event, 'require-settled-turn.mjs').length,
+      `require-settled-turn.mjs is not registered on ${event}`
     ).toBeGreaterThan(0);
   });
 
   it('keeps the delegation guard that closed #404 and #406', () => {
-    expect(registered('PreToolUse', 'require-foreground-agents.sh').length).toBeGreaterThan(0);
+    expect(registered('PreToolUse', 'require-foreground-agents.mjs').length).toBeGreaterThan(0);
   });
 
   // The loop budget. Every pipeline loop is bounded by its own count and the
@@ -2027,19 +2024,16 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
   // and only a settings.json PreToolUse hook on delegation both reaches the
   // forked orchestrator and carries `additionalContext` to the model.
   describe('the loop budget reaches the orchestrator before every delegation', () => {
-    const script = join(ROOT, '.claude/hooks/report-loop-budget.sh');
-    const run = (env: Record<string, string>) =>
-      spawnSync('bash', [script], { input: '{}', encoding: 'utf8', env: { ...process.env, ...env } });
+    const run = (env: Record<string, string>) => runHook('report-loop-budget.mjs', '{}', env);
 
     it('is registered on delegation, from settings.json', () => {
-      const entries = registered('PreToolUse', 'report-loop-budget.sh');
+      const entries = registered('PreToolUse', 'report-loop-budget.mjs');
       expect(entries.length).toBeGreaterThan(0);
       expect(entries.some((entry) => /(^|\|)Agent(\||$)/.test(entry.matcher ?? ''))).toBe(true);
     });
 
     it('says nothing in a session nobody timed', () => {
-      const { AGENTIC_LOOP_DEADLINE_EPOCH: _dropped, ...rest } = process.env;
-      const result = spawnSync('bash', [script], { input: '{}', encoding: 'utf8', env: rest as NodeJS.ProcessEnv });
+      const result = run({});
       expect(result.status).toBe(0);
       expect(result.stdout).toBe('');
     });
