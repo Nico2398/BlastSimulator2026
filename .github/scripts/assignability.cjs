@@ -91,13 +91,15 @@ const SCOPES = Object.freeze({
   renderer: 'Drawing, sound and models: src/renderer, src/audio, assets/models',
   console: 'Headless command surface: src/console',
   scenarios: 'Scenario definitions and runners: scripts/scenario-defs',
-  pipeline: 'The pipeline itself: .github, .claude, .opencode — always runs alone',
+  pipeline: 'The agentic layer: workflows, actions, .github/scripts, agents, agentic-* skills. Runs alone',
 });
 
 /**
  * A scope that never runs beside anything. A change to the pipeline rewrites
- * the rules every live run is following — a workflow, a skill, the assignment
- * rules in this very file — so it lands with nothing else in flight.
+ * the rules every live run is following — a workflow, an `agentic-*` skill, the
+ * assignment rules in this very file — so it lands with nothing else in flight.
+ * A `gameplay-*` or `dev-*` skill is not the pipeline: it takes the scope of
+ * the code it documents.
  */
 const EXCLUSIVE_SCOPES = new Set(['pipeline']);
 

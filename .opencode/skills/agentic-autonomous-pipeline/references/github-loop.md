@@ -112,7 +112,7 @@ At most `AGENTIC_MAX_PARALLEL_RUNS` issues hold `in-progress` at a time — defa
 
 - no `scope:*` label at all — the whole backlog written before scopes existed runs one at a time until someone labels it;
 - a label naming no known scope — a typo never widens what may run side by side;
-- `scope:pipeline`, whatever else the issue declares — a change to the pipeline rewrites the rules every live run is following.
+- `scope:pipeline`, whatever else the issue declares — a change to the agentic layer (workflows, actions, decision modules, agents, hooks, `agentic-*` skills) rewrites the rules every live run is following. A `gameplay-*` or `dev-*` skill takes the scope of the code it documents.
 
 **An older issue holds its place.** An issue that could run but for a scope clash holds its claim for the rest of the pass, so nothing younger that overlaps it starts first; an older unlabelled issue holds everything, and the queue drains until it can run alone. No clock is involved — the hold lasts exactly as long as the clash. Only an issue that is otherwise assignable holds a place: one waiting on a dependency does not, or a paused issue would hold the very scope its own blocker needs.
 

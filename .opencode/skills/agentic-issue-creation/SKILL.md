@@ -97,9 +97,9 @@ With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side onl
 | `scope:renderer` | `src/renderer`, `src/audio`, 3D models |
 | `scope:console` | `src/console` |
 | `scope:scenarios` | `scripts/scenario-defs` and the scenario runners |
-| `scope:pipeline` | `.github`, `.claude`, `.opencode` — always runs alone |
+| `scope:pipeline` | The agentic layer: `.github/workflows`, `.github/actions`, `.github/scripts`, agent definitions, hooks, `agentic-*` skills — always runs alone |
 
-Files every area touches — `balance.ts`, the locale files, `main.ts`, mirrored skills — belong to no scope; name the feature's scope and let the merge gate handle the overlap. **When unsure, leave scope off.** An issue with no scope label runs alone, which costs parallelism and nothing else; a wrong one costs a conflict round. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else also runs alone.
+A `gameplay-*` or `dev-*` skill takes the scope of the code it documents, not `scope:pipeline`. Files every area touches — `balance.ts`, the locale files, `main.ts` — belong to no scope; name the feature's scope and let the merge gate handle the overlap. **When unsure, leave scope off.** An issue with no scope label runs alone, which costs parallelism and nothing else; a wrong one costs a conflict round. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else also runs alone.
 
 ## Issue Body Template
 
