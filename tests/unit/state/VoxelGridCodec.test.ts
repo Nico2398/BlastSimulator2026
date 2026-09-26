@@ -212,7 +212,13 @@ describe('encodeVoxelGrid — payload size tracks edited volume, not chunk/voxel
     const gen = makeGen();
     const grid = generateTerrain(genToConfig(gen));
 
-    const digColumns: Array<[number, number]> = [[3, 3], [9, 9], [21, 5]];
+    // (21, 15), not (21, 5): #1189 removed the WorldGen clamp that used to
+    // force every column's surface into [1, sizeY - 1]. At this seed/config
+    // (sizeY=16, a 32x32 site — too small for the pit mask's 24 m margin to
+    // ever fully saturate) raw relief legitimately pushes (21, 5)'s surface
+    // to about y=-5.6, outside the grid's declared height band, so no solid
+    // ground exists there to dig. (21, 15) stays in range at this seed.
+    const digColumns: Array<[number, number]> = [[3, 3], [9, 9], [21, 15]];
     for (const [x, z] of digColumns) {
       const y = computeVoxelColumnSurfaceY(grid, x, z);
       expect(y).not.toBeNull();

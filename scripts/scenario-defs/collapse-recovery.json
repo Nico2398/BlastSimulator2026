@@ -82,15 +82,15 @@
         "equals": {
           "collapsedCount": 0
         },
-        "note": "baseline before the forced-work run below — fresh hire's needs start full. No living_quarters is ever built in this file (deliberate, real neglect) — this driller (seed 42, dusty_hollow, spawns at (82,34)) has no rest destination anywhere on the map."
+        "note": "baseline before the forced-work run below — fresh hire's needs start full. No living_quarters is ever built in this file (deliberate, real neglect) — this driller (seed 42, dusty_hollow, spawns at (54,34) post-#1189 unclamp — the world-centre cell the old flat/clamped terrain snapped hires to is no longer walkable under real elevation, so `findNearestSpawnCell` lands here instead for seed 42 dusty_hollow) has no rest destination anywhere on the map."
       }
     },
     {
-      "command": "employee dispatch 1 x:82 z:34",
+      "command": "employee dispatch 1 x:54 z:34",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:82 z:34"
+          "command": "employee dispatch 1 x:54 z:34"
         }
       ],
       "description": "Left unmarked with role bootstrap like needs-collapse-visual's equivalent dispatch: no console command a player would reach for creates a targeted work order at an employee's own position — this exists purely to keep the driller genuinely, continuously busy (working-rate drain, no idle window autoInsertNeedTasks could route a self-rest into) so neglect is real instead of accidental.",
@@ -119,11 +119,11 @@
       }
     },
     {
-      "command": "employee dispatch 1 x:82 z:34",
+      "command": "employee dispatch 1 x:54 z:34",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:82 z:34"
+          "command": "employee dispatch 1 x:54 z:34"
         }
       ],
       "description": "Second dispatch keeps the driller continuously working across the first task's completion, the same handoff needs-collapse-visual's own second Walt dispatch documents — a redispatch issued while still busy is harmless (queues behind the active task) and this one lands right around the first task's own completion, so no idle tick opens up for autoInsertNeedTasks to route a saving rest into before the gauge crosses its collapse floor.",
@@ -148,7 +148,7 @@
           "collapsedCount": 1
         },
         "decreased": ["minFatigue"],
-        "note": "cumulative tick 50: genuine collapse via continuous unrelieved forced work, no living_quarters anywhere on the map — re-derived from a real run, not assumed. wellBeing is NOT asserted decreased here: the same batch that drives the collapse also runs the collapse-rest that immediately follows it (no building involved, so it tops gauges back up per NEED_REST_NO_BUILDING_CAP), and a real run shows wellBeing net INCREASE across this step (58.15 → 62.37) even though the employee is flagged COLLAPSING at the end of it — the gauge recovery outweighs the morale hit within this one batch."
+        "note": "cumulative tick 50: genuine collapse via continuous unrelieved forced work, no living_quarters anywhere on the map — re-derived from a real run, not assumed. wellBeing is NOT asserted here in either direction: a real run against post-#1189 real terrain (dispatch target moved to the employee's actual spawn cell, see the file's top-level description) shows wellBeing net DECREASE across this step (58.15 → 53.13) even though the collapse-rest that immediately follows the collapse tops gauges back up (no building involved, per NEED_REST_NO_BUILDING_CAP) — the morale hit from collapsing outweighs the gauge recovery within this one batch."
       }
     },
     {
@@ -179,11 +179,11 @@
       "note": "cumulative tick 110 — deliberately NOT redispatched this time (#1062 finding, see the file's own description): the collapse-rest above completes on its own and tops fatigue out at NEED_REST_NO_BUILDING_CAP (70), then 60 further idle ticks drain it via the idle rate down to ~42 — still safely above NEED_SOFT_THRESHOLDS.fatigue (25) the whole time, so no proactive rest is ever queued to race the next dispatch below. minFatigue increases net across this whole step (0 at the start, still mid-collapse-rest, to ~41.8 by the end) even though the back half of the step is pure idle drain — the rest's own recovery dominates. collapsedCount is a live snapshot of currently-collapsing employees, not a running total — by cumulative tick 110 the first collapse's rest has long since completed (~tick67), so it correctly reads 0 again here, not 1. Real run: fatigue 0 -> 70 (rest completes ~tick67) -> ~41.8 (idle drain to tick110)."
     },
     {
-      "command": "employee dispatch 1 x:82 z:34",
+      "command": "employee dispatch 1 x:54 z:34",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:82 z:34"
+          "command": "employee dispatch 1 x:54 z:34"
         }
       ],
       "description": "Dispatched now, at fatigue ~42 — already below NEED_THRESHOLDS.fatigue.low (40), so computeTaskDuration's needMultiplier stretches this single task's own fixed duration (ceil(20 / 0.75) = 27 ticks) far enough past the ~2.4/tick working drain that fatigue runs through 0 while still mid-execution. #945's mid-execution guard keeps a rest from ever being queued during that span (unlike a task claimed at full fatigue, which completes normally before ever nearing the floor), so tickCollapse's own unconditional check is what interrupts it below, not a natural completion.",

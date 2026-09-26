@@ -3,9 +3,9 @@ import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import {
   sampleBaseHeight,
   applyPitMask,
-  applyPlayableBand,
   computeGroundOffset,
   heightToVoxelY,
+  heightToVoxelYContinuous,
   createWorldGenContext,
   sampleSurfaceVoxelY,
   DEFAULT_SHAPING,
@@ -68,46 +68,27 @@ describe('applyPitMask', () => {
   });
 });
 
-describe('applyPlayableBand — the world follows the site\'s own vertical band (#1077)', () => {
-  const rect = { minX: 0, minZ: 0, maxX: 64, maxZ: 64 };
-  const sizeY = 20;
+describe('heightToVoxelY / heightToVoxelYContinuous — drop the sizeY parameter (#1189)', () => {
+  // The clamp these two used to apply (Math.max(1, Math.min(sizeY - 1, ...)))
+  // is what `applyPlayableBand` and every previously-clamped column relied
+  // on. #1189 deletes the clamp — and the parameter that drove it — from
+  // both functions entirely, so storage-only concerns (VoxelGrid) are the
+  // sole place any bound on height can come from now.
 
-  it('holds ground the grid cannot represent at the band the grid clamps it to', () => {
-    // TerrainGen fills every column through heightToVoxelYContinuous, so ground
-    // below y = 1 or above y = sizeY - 1 is simply not in the grid. A landscape
-    // that kept the true height there drew a step at the site's rectangle.
-    expect(applyPlayableBand(-3, sizeY, rect, 32, 32)).toBeCloseTo(1, 10);
-    expect(applyPlayableBand(400, sizeY, rect, 32, 32)).toBeCloseTo(sizeY - 1, 10);
+  it('heightToVoxelY takes exactly (height, groundOffset) — no sizeY parameter', () => {
+    expect(heightToVoxelY.length).toBe(2);
   });
 
-  it('leaves ground already inside the band untouched, inside the rect and out', () => {
-    for (const [x, z] of [[32, 32], [0, 0], [-200, 90], [64, 64]] as const) {
-      expect(applyPlayableBand(7.25, sizeY, rect, x, z)).toBeCloseTo(7.25, 10);
+  it('heightToVoxelYContinuous takes exactly (height, groundOffset) — no sizeY parameter', () => {
+    expect(heightToVoxelYContinuous.length).toBe(2);
+  });
+});
+
+describe('computeGroundOffset — vertical datum stays byte-for-byte unchanged (#1189)', () => {
+  it('always equals Math.floor(sizeY * 0.55) - Math.round(centerHeight)', () => {
+    for (const [centerHeight, sizeY] of [[10, 40], [0, 20], [-15.4, 64], [123.9, 200], [-0.5, 8], [1000, 24]] as const) {
+      expect(computeGroundOffset(centerHeight, sizeY)).toBe(Math.floor(sizeY * 0.55) - Math.round(centerHeight));
     }
-  });
-
-  it('still holds the band one cell past the rect — the playable mesh draws that halo', () => {
-    // PlayableCoverage.meshedCellRect marches one cell west/north of the rect,
-    // and the landscape shares those nodes: 96% of the clamp there is still a
-    // step in the ground.
-    expect(applyPlayableBand(-3, sizeY, rect, -1, 30)).toBeCloseTo(1, 10);
-    expect(applyPlayableBand(-3, sizeY, rect, 30, -1)).toBeCloseTo(1, 10);
-  });
-
-  it('releases the band over open ground, so the world keeps its own relief', () => {
-    const free = applyPlayableBand(-3, sizeY, rect, -200, 32);
-    expect(free).toBeCloseTo(-3, 10);
-  });
-
-  it('eases out rather than stepping out — no crease for a silhouette to catch', () => {
-    // Monotone, and flat at both ends (smoothstep): sampled outward from the
-    // rect edge, each step moves the height toward the true one by less than
-    // the span, and the first and last steps move it least.
-    const heights = [0, 2, 6, 12, 18, 24, 30].map(d => applyPlayableBand(-3, sizeY, rect, -d, 32));
-    for (let i = 1; i < heights.length; i++) expect(heights[i]!).toBeLessThanOrEqual(heights[i - 1]! + 1e-12);
-    const firstStep = heights[0]! - heights[1]!;
-    const middleStep = heights[3]! - heights[4]!;
-    expect(firstStep).toBeLessThan(middleStep);
   });
 });
 
@@ -115,19 +96,48 @@ describe('computeGroundOffset / heightToVoxelY', () => {
   it('places centerHeight at roughly 55% of sizeY after the datum shift', () => {
     const sizeY = 40;
     const offset = computeGroundOffset(10, sizeY);
-    const y = heightToVoxelY(10, offset, sizeY);
+    const y = heightToVoxelY(10, offset);
     expect(y).toBe(Math.floor(sizeY * 0.55));
   });
 
-  it('clamps to [1, sizeY - 1]', () => {
-    const sizeY = 20;
-    expect(heightToVoxelY(-10000, 0, sizeY)).toBe(1);
-    expect(heightToVoxelY(10000, 0, sizeY)).toBe(sizeY - 1);
+  it('rounds a large positive height without bounding it to sizeY - 1 (#1189)', () => {
+    // Pre-#1189 this clamped to sizeY - 1 = 19. The datum shift (groundOffset
+    // 0 here) leaves the raw height untouched, so the only thing standing
+    // between 10000 and this assertion is the clamp #1189 removes.
+    expect(heightToVoxelY(10000, 0)).toBe(10000);
+  });
+
+  it('rounds a large negative height without bounding it to 1 (#1189)', () => {
+    // Pre-#1189 this clamped to 1. Same removal, opposite side of the band.
+    expect(heightToVoxelY(-10000, 0)).toBe(-10000);
   });
 
   it('rounds to the nearest integer voxel', () => {
-    expect(heightToVoxelY(5.4, 0, 100)).toBe(5);
-    expect(heightToVoxelY(5.6, 0, 100)).toBe(6);
+    expect(heightToVoxelY(5.4, 0)).toBe(5);
+    expect(heightToVoxelY(5.6, 0)).toBe(6);
+  });
+});
+
+describe('heightToVoxelYContinuous — direct coverage (#1189)', () => {
+  // heightToVoxelYContinuous had no direct unit tests before #1189 — only
+  // indirect coverage through sampleSurfaceHeightY/haloSurfaceHeight.
+
+  it('shifts height by groundOffset without rounding (happy path)', () => {
+    expect(heightToVoxelYContinuous(10.25, 5)).toBeCloseTo(15.25, 10);
+  });
+
+  it('does not clamp a large positive magnitude (#1189)', () => {
+    // Pre-#1189 this clamped to sizeY - 1 = 19.
+    expect(heightToVoxelYContinuous(10000.5, 0)).toBeCloseTo(10000.5, 10);
+  });
+
+  it('does not clamp a large negative magnitude (#1189)', () => {
+    // Pre-#1189 this clamped to 1.
+    expect(heightToVoxelYContinuous(-10000.5, 0)).toBeCloseTo(-10000.5, 10);
+  });
+
+  it('passes NaN through, so "no ground here" stays distinguishable from "ground at the floor"', () => {
+    expect(Number.isNaN(heightToVoxelYContinuous(NaN, 0))).toBe(true);
   });
 });
 
@@ -188,15 +198,24 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
     expect(differences).toBeGreaterThan(0);
   });
 
-  it('always returns a voxel Y within [1, sizeY - 1]', () => {
+  it('rounds without bounding to [1, sizeY - 1] — a grid deliberately too short for its own relief (#1189)', () => {
+    // sizeY=24 is far short of DEFAULT_SHAPING's own relief range (base
+    // spline alone runs -10..90), so the raw (masked + groundOffset) value
+    // leaves the old [1, sizeY - 1] band at some of these columns — proving
+    // this, or the assertion below is testing nothing.
     const ctx = createWorldGenContext(7, 40, 24, 40);
+    let sawOutOfOldBand = false;
     for (let x = 0; x < 40; x += 5) {
       for (let z = 0; z < 40; z += 5) {
-        const y = sampleSurfaceVoxelY(ctx, x, z);
-        expect(y).toBeGreaterThanOrEqual(1);
-        expect(y).toBeLessThanOrEqual(23);
+        const masked = applyPitMask(
+          sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z)), ctx.centerHeight, ctx.playableRect, x, z,
+        );
+        const expected = Math.round(masked + ctx.groundOffset);
+        if (expected < 1 || expected > ctx.sizeY - 1) sawOutOfOldBand = true;
+        expect(sampleSurfaceVoxelY(ctx, x, z)).toBe(expected);
       }
     }
+    expect(sawOutOfOldBand, 'fixture never leaves the old band — this test proves nothing').toBe(true);
   });
 
   it('accepts a per-column shaping function built from the context\'s own fields', () => {
@@ -220,7 +239,11 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
     }
     const range = Math.max(...heights) - Math.min(...heights);
     // Not a tight bound — just confirms the mask is doing real compression
-    // work near the centre of a small grid rather than leaving raw relief.
-    expect(range).toBeLessThan(20);
+    // work near the centre of a small grid rather than leaving raw relief
+    // (this fixture's raw, unmasked range is ~30). #1189 removed the
+    // [1, sizeY - 1] clamp that used to additionally flatten this figure by
+    // flooring the low outliers, so the masked-only range is a bit wider
+    // than before but still well short of raw.
+    expect(range).toBeLessThan(25);
   });
 });

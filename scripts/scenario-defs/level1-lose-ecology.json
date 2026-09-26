@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-ecology",
-  "description": "Level 1 losing scenario: a massive blast with max krackle triggers ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). Rebuilt again for issue #554 (`charge hole:*` now queues one real, worker-performed `charge_hole` action per hole instead of writing charges instantly, mirroring #553's `drill_hole`): the file's own prior design (tuned for instant charging) blasted right after drilling finished, at tick 230, while wellBeing was still a comfortably positive 51 -- giving ecological_shutdown's 150-tick countdown a huge head start over worker_revolt's independent, wellBeing-driven one. With charging now taking real time, that head start is gone: landing all 49 queued charge_hole orders with only the original 4-crew (who also drilled) took ~305 ticks, during which the original static 15-employee filler cushion -- hired once, up front, and never touched again -- had already been idling since tick 0 and crashed to 0 wellBeing on its own clock, sustaining the 120-tick streak REVOLT_TICKS needs well before the delayed blast could even start ecology's own countdown. worker_revolt won every time.\n\nThe key mechanic this file leans on, confirmed by direct probe: once a score clamps to exactly 0, it stays there completely unassisted -- ScoreManager.ts's applyDecay only pulls a score that is strictly between 0 and 100 back toward the neutral 50 (its own `value > 0` check excludes exactly 0), and nothing on this site (no building anywhere in BuildingDefs.ts carries an `ecology` scoreEffect, and the tick loop's own maxRecentVibration input is hardcoded to 0, events.ts) ever pushes ecology back up from there. This is symmetric for wellBeing too (same applyDecay, same `value > 0` exclusion) -- which is exactly the lever this redesign uses: get wellBeing to cross zero AFTER the blast countdown has enough of a head start, rather than racing a wellBeing clock that started ticking at tick 0 and never stopped.\n\nThis redesign's fix has two parts, both scenario-JSON-only (no core change):\n\n(1) The 15-employee filler cushion is hired right AFTER drilling finishes (tick 230) instead of before it, so its own idle-decay clock starts fresh at tick 230 instead of tick 0. Confirmed by direct probe: with the original 4-crew drilling alone (no filler dilution at all, since none exist yet), wellBeing crashes to 0 by tick ~130 and sits there through the rest of drilling (with one brief, deterministic recovery blip around tick 170 from the crew's own scheduled break-need rest, back down by tick 180) -- but the instant a FRESH cushion is hired at tick 230, the composite average climbs back out, peaking around wellBeing 66 near tick 370 before beginning its own slow decline. That climb is only possible because the OLD cushion's damage (crashed since tick 0) is never inherited by the new one -- a fresh employee's `morale` starts at 60 (Employee.ts), not wherever the old cushion's had decayed to.\n\n(2) 31 temporary 'blaster'-role employees are hired at the same moment (also after drilling, before charging) purely to land the 49 queued charge_hole orders in parallel -- ROLE_STARTING_QUALIFICATION grants 'blasting' immediately at hire, and charge_hole's requiredVehicleRole is null, so no drill_rig purchase is needed for them. This cuts the charging phase from ~305 ticks (4 workers) to ~122 ticks (35 workers), landing blast at tick 352 instead of 535 (#680 recalibration: #554's original tuning used 30 temp hires and measured 118 ticks/348; #680's tri-state needs-drain fix -- idle drain while walking to a queued rest, zero drain while actually resting -- changed forced-rest timing enough that the same 30-hire crew now takes 167 ticks, late enough for worker_revolt's own independent wellBeing clock to win the race instead of ecological_shutdown; one more temp hire brings the charging phase back under a safe margin, confirmed by direct probe). They are never fired -- an earlier attempt at this exact fix tried hiring a similar temporary crew and firing them again before the blast, which hit two problems worth recording here: `employee fire` refuses a roster member who unionized while employed (`rng.chance(0.3)` at hire time, Employee.ts) -- with 20-45 temp hires, several always come up unionized and can't be dismissed, so the exact death toll became unpredictable -- and hiring at that volume also shifts the RNG-gated event-selection timer (`actionCountSinceEvent`, EventSystem.ts, incremented by every non-meta console command) enough that a normally-late random political/economic event can land inside the post-blast zero-ecology window and, if its auto-chosen option carries a positive `ecology` scoreDelta (e.g. politics_ev_mandate's default option, `{ecology: 18}`), break the sustained-zero streak outright. This redesign sidesteps both: the temp blasters are never fired (no unionization check to fail), and they die in the very blast they helped charge -- deathCount goes 0->35 (4 original crew + 31 temp blasters), while the fresh, never-tasked 15-employee filler cushion, standing at the depot the whole time, survives to carry wellBeing through the post-blast countdown.\n\nTiming, confirmed by direct probe (fully deterministic given the fixed seed and this exact command sequence -- no RNG in any of the formulas this race depends on): drilling ends at tick 230 (unchanged from every prior version of this file -- always 4 crew, always ~230 ticks for 49 holes at 2m spacing). Hiring the fresh filler + 30 temp blasters is instantaneous (hiring costs no ticks). Charging all 49 drilled holes with 35 blasting-qualified workers takes 122 ticks, landing blast at tick 352. The blast clamps ecology to exactly 0 and kills all 35 present (deathCount 35); ecological_shutdown's 150-tick countdown then runs uninterrupted (nothing on this site ever pushes ecology back up), firing at tick 502. Meanwhile the fresh filler cushion's own wellBeing, no longer dragged down by the temp blasters' fast working-rate need drain once they die in the blast, climbs for a while before resuming its own decline, crossing back to 0 around tick 442 -- REVOLT_TICKS=120 after that is ~562, a comfortable 60-tick margin behind shutdown's tick 502. events.ts's tick loop only ever sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`) -- once shutdown locks it in at tick 502, nothing later (including revolt's own counter, which is still climbing) can overwrite it.\n\n#680 follow-up: the tri-state needs-drain fix (idle drain while walking to a queued rest, zero drain while actually resting, GameLoop.ts's employeeWorkState/EmployeeNeeds.ts's tickNeedGauges) changed exactly when a forced rest interrupts an in-progress charge_hole task, stretching the charging phase for a fixed 30-hire temp-blaster crew from 118 to 167 ticks. That shift alone was enough to flip this file's own race: worker_revolt's independent wellBeing clock, unaffected by the charging-phase length, now wins instead of ecological_shutdown. Re-balanced (scenario-JSON-only, per this file's own established technique) by hiring one additional temp blaster (30 -> 31, crew 34 -> 35) to bring the charging phase back down to 122 ticks -- landing blast at tick 352 and shutdown at 502, a 60-tick margin ahead of worker_revolt's own ~562, re-derived by direct probe against the #680 branch.",
+  "description": "Level 1 losing scenario: a massive blast with max krackle triggers ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). Rebuilt again for issue #554 (`charge hole:*` now queues one real, worker-performed `charge_hole` action per hole instead of writing charges instantly, mirroring #553's `drill_hole`): the file's own prior design (tuned for instant charging) blasted right after drilling finished, at tick 230, while wellBeing was still a comfortably positive 51 -- giving ecological_shutdown's 150-tick countdown a huge head start over worker_revolt's independent, wellBeing-driven one. With charging now taking real time, that head start is gone: landing all 49 queued charge_hole orders with only the original 4-crew (who also drilled) took ~305 ticks, during which the original static 15-employee filler cushion -- hired once, up front, and never touched again -- had already been idling since tick 0 and crashed to 0 wellBeing on its own clock, sustaining the 120-tick streak REVOLT_TICKS needs well before the delayed blast could even start ecology's own countdown. worker_revolt won every time.\n\nThe key mechanic this file leans on, confirmed by direct probe: once a score clamps to exactly 0, it stays there completely unassisted -- ScoreManager.ts's applyDecay only pulls a score that is strictly between 0 and 100 back toward the neutral 50 (its own `value > 0` check excludes exactly 0), and nothing on this site (no building anywhere in BuildingDefs.ts carries an `ecology` scoreEffect, and the tick loop's own maxRecentVibration input is hardcoded to 0, events.ts) ever pushes ecology back up from there. This is symmetric for wellBeing too (same applyDecay, same `value > 0` exclusion) -- which is exactly the lever this redesign uses: get wellBeing to cross zero AFTER the blast countdown has enough of a head start, rather than racing a wellBeing clock that started ticking at tick 0 and never stopped.\n\nThis redesign's fix has two parts, both scenario-JSON-only (no core change):\n\n(1) The 15-employee filler cushion is hired right AFTER drilling finishes (tick 230) instead of before it, so its own idle-decay clock starts fresh at tick 230 instead of tick 0. Confirmed by direct probe: with the original 4-crew drilling alone (no filler dilution at all, since none exist yet), wellBeing crashes to 0 by tick ~130 and sits there through the rest of drilling (with one brief, deterministic recovery blip around tick 170 from the crew's own scheduled break-need rest, back down by tick 180) -- but the instant a FRESH cushion is hired at tick 230, the composite average climbs back out, peaking around wellBeing 66 near tick 370 before beginning its own slow decline. That climb is only possible because the OLD cushion's damage (crashed since tick 0) is never inherited by the new one -- a fresh employee's `morale` starts at 60 (Employee.ts), not wherever the old cushion's had decayed to.\n\n(2) 31 temporary 'blaster'-role employees are hired at the same moment (also after drilling, before charging) purely to land the 49 queued charge_hole orders in parallel -- ROLE_STARTING_QUALIFICATION grants 'blasting' immediately at hire, and charge_hole's requiredVehicleRole is null, so no drill_rig purchase is needed for them. This cuts the charging phase from ~305 ticks (4 workers) to ~122 ticks (35 workers), landing blast at tick 352 instead of 535 (#680 recalibration: #554's original tuning used 30 temp hires and measured 118 ticks/348; #680's tri-state needs-drain fix -- idle drain while walking to a queued rest, zero drain while actually resting -- changed forced-rest timing enough that the same 30-hire crew now takes 167 ticks, late enough for worker_revolt's own independent wellBeing clock to win the race instead of ecological_shutdown; one more temp hire brings the charging phase back under a safe margin, confirmed by direct probe). They are never fired -- an earlier attempt at this exact fix tried hiring a similar temporary crew and firing them again before the blast, which hit two problems worth recording here: `employee fire` refuses a roster member who unionized while employed (`rng.chance(0.3)` at hire time, Employee.ts) -- with 20-45 temp hires, several always come up unionized and can't be dismissed, so the exact death toll became unpredictable -- and hiring at that volume also shifts the RNG-gated event-selection timer (`actionCountSinceEvent`, EventSystem.ts, incremented by every non-meta console command) enough that a normally-late random political/economic event can land inside the post-blast zero-ecology window and, if its auto-chosen option carries a positive `ecology` scoreDelta (e.g. politics_ev_mandate's default option, `{ecology: 18}`), break the sustained-zero streak outright. This redesign sidesteps both: the temp blasters are never fired (no unionization check to fail), and they die in the very blast they helped charge -- deathCount goes 0->35 (4 original crew + 31 temp blasters), while the fresh, never-tasked 15-employee filler cushion, standing at the depot the whole time, survives to carry wellBeing through the post-blast countdown.\n\nTiming, confirmed by direct probe (fully deterministic given the fixed seed and this exact command sequence -- no RNG in any of the formulas this race depends on): drilling ends at tick 230 (unchanged from every prior version of this file -- always 4 crew, always ~230 ticks for 49 holes at 2m spacing). Hiring the fresh filler + 30 temp blasters is instantaneous (hiring costs no ticks). Charging all 49 drilled holes with 35 blasting-qualified workers takes 122 ticks, landing blast at tick 352. The blast clamps ecology to exactly 0 and kills all 35 present (deathCount 35); ecological_shutdown's 150-tick countdown then runs uninterrupted (nothing on this site ever pushes ecology back up), firing at tick 502. Meanwhile the fresh filler cushion's own wellBeing, no longer dragged down by the temp blasters' fast working-rate need drain once they die in the blast, climbs for a while before resuming its own decline, crossing back to 0 around tick 442 -- REVOLT_TICKS=120 after that is ~562, a comfortable 60-tick margin behind shutdown's tick 502. events.ts's tick loop only ever sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`) -- once shutdown locks it in at tick 502, nothing later (including revolt's own counter, which is still climbing) can overwrite it.\n\n#680 follow-up: the tri-state needs-drain fix (idle drain while walking to a queued rest, zero drain while actually resting, GameLoop.ts's employeeWorkState/EmployeeNeeds.ts's tickNeedGauges) changed exactly when a forced rest interrupts an in-progress charge_hole task, stretching the charging phase for a fixed 30-hire temp-blaster crew from 118 to 167 ticks. That shift alone was enough to flip this file's own race: worker_revolt's independent wellBeing clock, unaffected by the charging-phase length, now wins instead of ecological_shutdown. Re-balanced (scenario-JSON-only, per this file's own established technique) by hiring one additional temp blaster (30 -> 31, crew 34 -> 35) to bring the charging phase back down to 122 ticks -- landing blast at tick 352 and shutdown at 502, a 60-tick margin ahead of worker_revolt's own ~562, re-derived by direct probe against the #680 branch.\n\n#1189 follow-up: unclamping restored real terrain relief across the map. The drill grid's own origin (start:9,4) is still fully climb-reachable, but real elevation now interrupts and pins the crew driving to the grid's far corner hole often enough that drilling's own completion moves from tick 230 to tick 283 -- direct-probed to permanently cap the file at 48 charged holes instead of 49 (the one-shot `charge hole:*` step fires before that last hole finishes), which is far too little blast damage to floor ecology at 0, breaking the whole premise. A different drill-grid origin gets all 49 holes drilled inside the old 230-tick window again, but direct probe shows each alternative sits in real terrain shallow enough that the resulting blast no longer floors ecology either -- the real column height under the holes, not just their reachability, now matters. Fixed by keeping start:9,4 and extending the pre-charge tick budget by 6 more `tick 10`/`event choose 0` pairs (60 ticks, 230 -> 290) so charging always waits for the genuine 49-hole completion. Every timing figure quoted above from \"drilling ends at tick 230\" onward shifts by that same flat 60 ticks (290/412/442->502/562/622 in place of 230/352/442/502/562); direct probe confirms nothing else in this file -- no cash, wellBeing, nuisance or ecology value anywhere else in the 399 steps -- moved.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true cash:5000000",
@@ -496,7 +496,7 @@
         }
       ],
       "role": "player",
-      "description": "One decrement click on the strip's own spacing stepper (data-field=\"spacing\", DEFAULT_SPACING_M=3 -> 2, Drill.ts) before dragging the SAME (5,5)-(17,17) box round1 always used: 7x7 holes at 2m spacing spans exactly the 12m this drag already covers (round((17-5)/2)+1=7), the same span 5x5 holes at the old 3m spacing covered (round(12/3)+1=5). Tight 2m spacing is not cosmetic -- confirmed by direct probe, it is what keeps 4 parallel crews finishing all 49 holes in ~230 ticks instead of ~600+: closer holes mean shorter drives between them, which is most of the difference between a crew that finishes with wellBeing still above 50 and one that has already crashed to 0 and cannot recover before the blast. #1151: box moved from (5,5) to (9,4). Under the 30-degree slope gate four of the old box's holes -- (5,11) (7,15) (7,17) (9,17) -- sit outside the crew's climb-reachable patch on dusty_hollow, so they could never be claimed and the plan stalled short of 49 forever, surfacing as \"Missing charge\" at the blast. Measured with computeClimbReachableSet at level open; start:9,4 is the nearest origin whose whole 7x7 grid is reachable. Where the box sits is incidental to this file -- its subject is losing on ecology, which needs 49 holes blasted, not 49 holes in one particular place.",
+      "description": "One decrement click on the strip's own spacing stepper (data-field=\"spacing\", DEFAULT_SPACING_M=3 -> 2, Drill.ts) before dragging the SAME (5,5)-(17,17)-derived box round1 always used: 7x7 holes at 2m spacing spans exactly the 12m this drag already covers (round((17-5)/2)+1=7), the same span 5x5 holes at the old 3m spacing covered (round(12/3)+1=5). Tight 2m spacing is not cosmetic -- confirmed by direct probe, it is what keeps 4 parallel crews finishing all 49 holes in ~290 ticks (was ~230 pre-#1189, see below) instead of ~600+: closer holes mean shorter drives between them, which is most of the difference between a crew that finishes with wellBeing still above 50 and one that has already crashed to 0 and cannot recover before the blast. #1151: box moved from (5,5) to (9,4). Under the 30-degree slope gate four of the old box's holes -- (5,11) (7,15) (7,17) (9,17) -- sit outside the crew's climb-reachable patch on dusty_hollow, so they could never be claimed and the plan stalled short of 49 forever, surfacing as \"Missing charge\" at the blast. Measured with computeClimbReachableSet at level open; start:9,4 is the nearest origin whose whole 7x7 grid is reachable. #1189: unclamping restored real terrain relief (up to ~10m) across the map. Static reachability from computeClimbReachableSet is unaffected -- start:9,4's whole grid is still reachable post-#1189 -- but real elevation changes travel cost/path shape enough that the crew driving to the grid's far corner hole now gets interrupted mid-drive and pinned (`walkOnlyPinnedBy`, TaskCancellation.ts) more often than under the old flat/clamped terrain: that one hole finishes at tick ~283 instead of ~230. A different origin (tried: 10,4/11,4/9,2/9,6/12,4/10,5) gets all 49 holes drilled inside the old 230-tick budget again, but direct probe shows each lands in a real column shallow enough that the resulting blast volume no longer floors ecology at 0 (`ecology` settles at ~1-12 instead of exactly 0, so `ecologicalShutdown` never fires) -- moving the box trades a timing problem for an ecological-damage one, since the real terrain height under the holes is what the blast volume (and this scenario's whole premise) depends on. Kept at start:9,4 instead: the tick budget below is extended by 6 more `tick 10`/`event choose 0` pairs (60 ticks) so charging always waits for the real, slower-but-still-49-hole completion before the one-shot `charge hole:*` a few steps later fires -- the flat +60 tick shift is absorbed by the two absolute `tickCount` checkpoints later in this file and nothing else (direct-probed: every other assertion in the file, including every cash/wellBeing/nuisance/ecology value, is unchanged by the shift). Where the box sits is incidental to this file -- its subject is losing on ecology, which needs 49 holes blasted, not 49 holes in one particular place.",
       "expect": {
         "equals": {
           "orderedHoleCount": 49,
@@ -966,6 +966,126 @@
       "commandOutcome": "either"
     },
     {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "state full",
       "interaction": [
         {
@@ -974,11 +1094,11 @@
         }
       ],
       "role": "observe",
-      "description": "230 ticks (23 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 planned holes. Previously pinned at 48 -- an idle drill_rig could permanently park on H46 at (11,17), the exact tile a different pending drill_hole action needed, deadlocking it (#689). Fixed: an idle, unreserved vehicle occupying another action's target is now relocated out of the way (driving a vehicle was never licence-gated, only claiming its role-specific task was), so H46 drills like every other hole.",
+      "description": "290 ticks (29 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 planned holes. Previously pinned at 48 -- an idle drill_rig could permanently park on H46 at (11,17), the exact tile a different pending drill_hole action needed, deadlocking it (#689). Fixed: an idle, unreserved vehicle occupying another action's target is now relocated out of the way (driving a vehicle was never licence-gated, only claiming its role-specific task was), so H46 drills like every other hole. #1189: restored real terrain relief (clamp removed) changed travel cost/path shape enough that a different hole near the grid's far corner now gets mid-drive-interrupted and pinned (`walkOnlyPinnedBy`) more than it used to, pushing completion from tick ~230 to tick ~283 -- 6 more `tick 10`/`event choose 0` pairs (60 ticks) were added ahead of this step so the one-shot `charge hole:*` a few steps later still always sees all 49 holes drilled, not 48 (see the drill_plan step's own description for why the box wasn't moved instead).",
       "expect": {
         "equals": {
           "holeCount": 49,
-          "tickCount": 230
+          "tickCount": 290
         }
       }
     },
@@ -1007,7 +1127,7 @@
           "employeeCount"
         ]
       },
-      "description": "#554 recalibration: moved here (right after drilling, instead of before it) so the filler cushion's own idle-decay clock starts at tick 230, not tick 0 -- see this file's own top-level description for why: with only the original 4-crew drilling first (no filler dilution at all), wellBeing already crashes to 0 by tick ~130 and sits there through the rest of drilling, but a FRESH 15-employee cushion hired the instant drilling ends climbs back out of that hole (peaking ~66 by tick ~370) instead of continuing to decay from a roster that had already been idling since tick 0 -- exactly the margin needed against REVOLT_TICKS=120 once real charging time (#554) pushes blast hundreds of ticks later than the old instant-charge design ever had to survive."
+      "description": "#554 recalibration: moved here (right after drilling, instead of before it) so the filler cushion's own idle-decay clock starts when drilling actually ends, not tick 0 -- see this file's own top-level description for why: with only the original 4-crew drilling first (no filler dilution at all), wellBeing already crashes to 0 by tick ~130 and sits there through the rest of drilling, but a FRESH 15-employee cushion hired the instant drilling ends climbs back out of that hole instead of continuing to decay from a roster that had already been idling since tick 0 -- exactly the margin needed against REVOLT_TICKS=120 once real charging time (#554) pushes blast hundreds of ticks later than the old instant-charge design ever had to survive. #1189 pushed drilling's own end from tick 230 to tick 290 (see the state-full step just above); the cushion's clock now starts there instead, and every downstream tick this file's prose quotes (peak wellBeing, blast landing, shutdown firing) shifts by the same flat 60 ticks -- confirmed by direct probe that nothing besides the two explicit `tickCount` checkpoints needed updating."
     },
     {
       "command": "employee hire role:driver",
@@ -5037,13 +5157,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 502,
+          "tickCount": 562,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
           "revolted": false
         },
-        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 502 (blast now lands at tick 352: drilling still ends at 230 as always, and landing all 48 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) takes ~122 ticks). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 442 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~562, well after shutdown already claims levelEndReason at 502, confirmed by direct probe. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
+        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 562 (blast now lands at tick 412: #1189 pushed drilling's own end from tick 230 to tick 290 -- see the state-full and hiring step descriptions above -- and landing all 49 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) still takes ~122 ticks, unaffected by the drilling-phase shift). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 502 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~622, well after shutdown already claims levelEndReason at 562, confirmed by direct probe. Every one of these numbers is the pre-#1189 value plus the same flat 60-tick shift drilling absorbed; nothing else about the race changed. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
       }
     }
   ]

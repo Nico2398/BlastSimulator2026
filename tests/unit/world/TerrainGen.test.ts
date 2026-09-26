@@ -6,9 +6,10 @@ import {
 } from '../../../src/core/world/TerrainGen.js';
 import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
-import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
+import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeight, type WorldGenContext } from '../../../src/core/world/WorldGen.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
+import { getAllLevels } from '../../../src/core/campaign/Level.js';
 
 function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
   const biome = getBiome(biomeId)!;
@@ -365,4 +366,86 @@ describe('OreVeinSampler — depth gate at extreme depth (#1183)', () => {
       expect(inWindow['dirtite']).toBeGreaterThan(0);
     }
   });
+});
+
+// ── Unclamped columns across every campaign level's own grid (#1189) ───────
+//
+// TerrainGen never itself clamped (that lived in WorldGen.ts's
+// heightToVoxelY/heightToVoxelYContinuous, already removed by #1183's own
+// refactor pass) — but every real campaign level is exactly the shape that
+// clamp used to bite: dusty_hollow's own relief (41.10m, #1078's own
+// investigation) runs past its 40-tall grid. This locks in that the height
+// generateTerrain's own context produces for every level, at every column of
+// its rect plus its one-cell halo ring, matches the raw unclamped formula —
+// no Math.max(1, Math.min(sizeY - 1, ...)) anywhere in the pipeline.
+
+function levelTerrainConfig(levelId: string): TerrainConfig {
+  const level = getAllLevels().find(l => l.id === levelId);
+  if (!level) throw new Error(`levelTerrainConfig: no level ${levelId}`);
+  return {
+    sizeX: level.gridX,
+    sizeY: level.gridY,
+    sizeZ: level.gridZ,
+    seed: level.terrainSeed,
+    climateBias: level.climateBias,
+    mixedRockHardness: level.mixedRockHardness,
+  };
+}
+
+/**
+ * The raw, fully unclamped target formula #1189 leaves heightToVoxelY/
+ * heightToVoxelYContinuous computing — reimplemented locally (not imported)
+ * so this proves generateTerrain's OWN column output against the formula
+ * itself, not against whichever WorldGen export happens to agree with it.
+ */
+function rawSurface(ctx: WorldGenContext, x: number, z: number): { continuous: number; voxelY: number } {
+  const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
+  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
+  const continuous = masked + ctx.groundOffset;
+  return { continuous, voxelY: Math.round(continuous) };
+}
+
+describe('TerrainGen — unclamped columns across every campaign level (#1189)', () => {
+  it('dusty_hollow: every column of the grid\'s own rect and its halo ring matches the raw unclamped formula exactly', () => {
+    const config = levelTerrainConfig('dusty_hollow');
+    const { worldGen } = buildTerrainContext(config);
+    for (let x = -1; x <= config.sizeX; x++) {
+      for (let z = -1; z <= config.sizeZ; z++) {
+        const expected = rawSurface(worldGen, x, z);
+        expect(sampleSurfaceHeightY(worldGen, x, z)).toBeCloseTo(expected.continuous, 9);
+        expect(sampleSurfaceVoxelY(worldGen, x, z)).toBe(expected.voxelY);
+      }
+    }
+  });
+
+  it('dusty_hollow genuinely exceeds its own old [1, sizeY - 1] band somewhere in the rect — or the exhaustive check above proves nothing', () => {
+    const config = levelTerrainConfig('dusty_hollow');
+    const { worldGen } = buildTerrainContext(config);
+    let exceeds = false;
+    for (let x = 0; x < config.sizeX && !exceeds; x++) {
+      for (let z = 0; z < config.sizeZ && !exceeds; z++) {
+        const { continuous } = rawSurface(worldGen, x, z);
+        if (continuous < 1 || continuous > config.sizeY - 1) exceeds = true;
+      }
+    }
+    expect(exceeds).toBe(true);
+  });
+
+  for (const levelId of ['tutorial_pit', 'grumpstone_ridge', 'treranium_depths']) {
+    it(`${levelId}: spot-checks its rect's corners, centre, and halo ring against the raw unclamped formula`, () => {
+      const config = levelTerrainConfig(levelId);
+      const { worldGen } = buildTerrainContext(config);
+      const { sizeX, sizeZ } = config;
+      const columns: Array<[number, number]> = [
+        [0, 0], [sizeX - 1, 0], [0, sizeZ - 1], [sizeX - 1, sizeZ - 1],
+        [Math.floor(sizeX / 2), Math.floor(sizeZ / 2)],
+        [-1, -1], [sizeX, sizeZ], [-1, Math.floor(sizeZ / 2)], [Math.floor(sizeX / 2), -1],
+      ];
+      for (const [x, z] of columns) {
+        const expected = rawSurface(worldGen, x, z);
+        expect(sampleSurfaceHeightY(worldGen, x, z)).toBeCloseTo(expected.continuous, 9);
+        expect(sampleSurfaceVoxelY(worldGen, x, z)).toBe(expected.voxelY);
+      }
+    });
+  }
 });

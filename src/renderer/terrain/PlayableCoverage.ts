@@ -89,26 +89,24 @@ export function meshClaimsCell(grid: VoxelGrid, x: number, z: number): boolean {
  * The surface height the playable mesh renders at an unowned halo column whose
  * neighbouring ground the landscape samples at `height`.
  *
- * The halo column stands in for ground the grid does not own, so the height to
- * put it at is the one the grid's own generator would have produced there —
- * `heightToVoxelYContinuous`, the clamp `TerrainGen` fills every real column
- * through. `height` already carries the ground offset (the landscape samples in
- * the same datum as playable voxel Y), so the offset passed here is zero and
- * only the clamp does any work.
+ * The halo column stands in for ground the grid does not own, so it runs the
+ * halo's sampled height through the exact same offset arithmetic
+ * (`heightToVoxelYContinuous`) the site's own real columns go through — that
+ * shared datum is what keeps the halo node lining up with the site's edge
+ * column instead of drifting from it (#907, #1189).
  *
- * The clamp matters at the low corner of a level whose relief nearly fills its
- * grid: the ground beside the site dips below the world's floor datum, the march
- * has no cube below y = 0 to cross in, and an unclamped ring node asks for a
- * vertex the playable mesh cannot place — which is a hole. Clamping is the
- * answer, and clamping to the generator's own bound is what keeps the last metre
- * flat: the site's edge column was generated through exactly this call, so the
- * shared node lands on the same value instead of a metre below it, and the drop
- * to the true ground happens one node further out, inside the landscape's own
- * continuous sheet (#907).
+ * `_grid` is unused since #1189 removed the playable-band clamp this function
+ * used to apply through it — the body is now a pure passthrough
+ * (`heightToVoxelYContinuous(height, 0)` === `height`). Kept as a no-op
+ * parameter rather than dropped: every call site
+ * (`TerrainMesh.ts`, `GameRendererTerrain.ts`) already reads naturally as
+ * "halo height, given this grid and that sampled height", and dropping the
+ * parameter would mean changing this exported function's signature blind to
+ * its own test file's call sites. Drop `_grid` the next time this function's
+ * test coverage is touched for an unrelated reason.
  */
-export function haloSurfaceHeight(grid: VoxelGrid, height: number): number {
-  if (!Number.isFinite(height)) return height;
-  return heightToVoxelYContinuous(height, 0, grid.sizeY);
+export function haloSurfaceHeight(_grid: VoxelGrid, height: number): number {
+  return heightToVoxelYContinuous(height, 0);
 }
 
 /**

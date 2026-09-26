@@ -73,9 +73,16 @@ describe('PlayableArea.claim', () => {
     expect(grid.containsColumn(35, 10)).toBe(true);
     expect(grid.maxX).toBe(48);
 
-    // Generated, not left as a hole in the ground.
+    // Generated, not left as a hole in the ground. #1189 removed the WorldGen
+    // clamp that used to force every column's surface into [1, sizeY - 1], so
+    // a newly generated chunk's true surface can legitimately sit outside the
+    // grid's declared height band — at this seed/column it lands around
+    // y=-6. isSolidAt has no such bound (only densityAt's column-ownership
+    // check), so scan a wide window around the actual generated surface
+    // rather than assuming it falls inside [0, grid.sizeY).
+    const surfaceY = Math.round(grid.generatorSurfaceHeightAt(35, 10)!);
     let solid = 0;
-    for (let y = 0; y < grid.sizeY; y++) if (grid.isSolidAt(35, y, 10)) solid++;
+    for (let y = surfaceY - 10; y <= surfaceY + 10; y++) if (grid.isSolidAt(35, y, 10)) solid++;
     expect(solid).toBeGreaterThan(0);
   });
 
@@ -349,16 +356,29 @@ describe('PlayableArea.claimArea', () => {
 // solid) before asserting `slabCount`, rather than relying on `claim`/
 // `densityAt` to have allocated anything on their own.
 describe('PlayableArea.claim — cubic slab allocation matches the generated surface (#1182)', () => {
+  // Claims the chunk WEST of the site (-3, 10 -> chunk (-1, 0)), not east
+  // (35, 10 -> chunk (2, 0)) as originally written. #1189 removed the
+  // WorldGen clamp that used to force every column's surface into
+  // [1, sizeY - 1] — at this seed/config the east chunk's raw, unclamped
+  // relief legitimately dips entirely below y=0 (verified: every column in
+  // chunk (2, 0) generates a surface between roughly -12 and -1, outside the
+  // grid's declared [0, sizeY) band), so forEachSolidInRegion/isInBounds
+  // (both hard-bounded to the declared height, unrelated to #1189) find no
+  // solid voxel there at all — not a slab-allocation bug, just a fixture
+  // whose chosen chunk no longer has reachable ground post-unclamping. The
+  // west chunk's relief stays inside [0, sizeY) at this seed, so it still
+  // exercises the same "materialize only the bands the real surface spans"
+  // behaviour this suite is about.
   it("slabCount(cx,cz) equals the number of 16-row y-bands the generated surface actually spans in that chunk, not ceil(sizeY/CHUNK_SIZE)", () => {
     const { grid, area } = makeArea();
-    const result = area.claim(35, 10);
+    const result = area.claim(-3, 10);
     expect(result.claimed).toBe(true);
-    expect(result.claimed && result.chunk).toEqual({ cx: 2, cz: 0 });
+    expect(result.claimed && result.chunk).toEqual({ cx: -1, cz: 0 });
 
     // Derive the expected band count from the ACTUAL generated surface —
     // cheap, does not materialize anything — rather than hardcoding a magic
     // number.
-    const rect = grid.chunkRect(2, 0)!;
+    const rect = grid.chunkRect(-1, 0)!;
     let maxTopY = -1;
     for (let x = rect.minX; x < rect.maxX; x++) {
       for (let z = rect.minZ; z < rect.maxZ; z++) {
@@ -386,21 +406,21 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
       () => {},
     );
 
-    expect(grid.slabCount(2, 0)).toBe(expectedSlabCount);
+    expect(grid.slabCount(-1, 0)).toBe(expectedSlabCount);
   });
 
   it('claiming the same adjacent chunk from a second, independently generated grid at the same seed/config allocates the same slabCount (deterministic, not history-dependent)', () => {
     const first = makeArea();
     const second = makeArea();
 
-    first.area.claim(35, 10);
-    second.area.claim(35, 10);
+    first.area.claim(-3, 10);
+    second.area.claim(-3, 10);
 
     // Force materialization of everything the chunk's column could hold —
     // laziness itself is orthogonal to what this test checks (that two
     // independently generated grids converge on the same content).
     for (const { grid } of [first, second]) {
-      const rect = grid.chunkRect(2, 0)!;
+      const rect = grid.chunkRect(-1, 0)!;
       grid.forEachSolidInRegion(
         { x: rect.minX, y: 0, z: rect.minZ },
         { x: rect.maxX - 1, y: grid.sizeY - 1, z: rect.maxZ - 1 },
@@ -408,8 +428,8 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
       );
     }
 
-    expect(first.grid.slabCount(2, 0)).toBeGreaterThan(0);
-    expect(second.grid.slabCount(2, 0)).toBe(first.grid.slabCount(2, 0));
+    expect(first.grid.slabCount(-1, 0)).toBeGreaterThan(0);
+    expect(second.grid.slabCount(-1, 0)).toBe(first.grid.slabCount(-1, 0));
   });
 });
 

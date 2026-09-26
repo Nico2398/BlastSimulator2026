@@ -427,11 +427,12 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "decreased": [
           "cash"
-        ]
+        ],
+        "note": "#1189: unclamping restored real terrain relief across the map, which changed findNearestSpawnCell's snap point for a fresh hire on dusty_hollow (seed-dependent -- the old world-centre spawn cell is no longer walkable under real elevation) -- the new spawn is closer to both survey targets (10,10) and (20,20), so the surveyor's walk is shorter and both surveys resolve several ticks earlier than before (direct probe)."
       }
     },
     {
@@ -449,7 +450,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "changedBy": {
           "cash": 0
@@ -472,7 +473,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "decreased": [
           "cash"
@@ -494,7 +495,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "changedBy": {
           "cash": 0
@@ -517,7 +518,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "changedBy": {
           "cash": 0
@@ -539,7 +540,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "changedBy": {
           "cash": 0
@@ -561,11 +562,12 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "changedBy": {
           "cash": 0
-        }
+        },
+        "note": "#1189: unclamping restored real terrain relief across the map, which changed findNearestSpawnCell's snap point for a fresh hire on dusty_hollow (seed-dependent -- the old world-centre spawn cell is no longer walkable under real elevation) -- the new spawn is closer to both survey targets (10,10) and (20,20), so the surveyor's walk is shorter and both surveys resolve several ticks earlier than before (direct probe)."
       }
     },
     {
@@ -583,7 +585,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         },
         "changedBy": {
           "cash": 0
@@ -1298,7 +1300,7 @@
           "tickCount": 0
         }
       },
-      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
+      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically \u2014 e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
     },
     {
       "command": "blast",
@@ -1390,7 +1392,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1189: wellBeing 20.389999999999972 -> 20.292499999999976; ecology 46.58 -> 46.44; nuisance 41.45 -> 41.1 -- unclamping restored real terrain relief, which moved findNearestSpawnCell's snap point for the fresh surveyor hire (see the earlier survey-timing notes above); the closer spawn shifts dispatch timing throughout pattern 1's drilling/charging phase enough to nudge how much decay/drain each score has accrued by this checkpoint. Found via `--report-drift`: this step's `equals` block only ever surfaces its first mismatching field per run, so ecology and nuisance were already silently stale here before this fix too -- fixing wellBeing alone exposed ecology, and fixing ecology alone would have exposed nuisance; all three needed re-measuring together, confirmed no further field drifts by re-running with `--report-drift` after. safety/deathCount/employeeCount/activeContractCount/surveyCount all confirmed unchanged at this checkpoint.",
       "interaction": [
         {
           "type": "command",
@@ -1404,10 +1406,10 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 20.389999999999972,
+          "wellBeing": 20.292499999999976,
           "safety": 50,
-          "ecology": 46.58,
-          "nuisance": 41.45
+          "ecology": 46.44,
+          "nuisance": 41.1
         },
         "changedBy": {
           "tickCount": 0
@@ -1416,7 +1418,7 @@
     },
     {
       "command": "stats",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1201: wellBeing corrected again, 15.129999999999965 -> 20.389999999999972; ecology 46.59 -> 46.58; nuisance 41.475 -> 41.45 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so pattern 2's crew now genuinely detours around pattern 1's own still-parked drill_rig instead of cutting through it; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout), and by this checkpoint (right after pattern 1's own blast) the extra detour ticks shift exactly which real-time slice of ongoing decay/drain each score has had -- wellbeing (drained by pattern 2's own sustained drilling work, not pattern 1's dead crew's morale -- see this file's own description) reads higher since less of that work has happened yet; ecology/nuisance shift by their own small real amounts the same way. deathCount/employeeCount/activeContractCount/surveyCount/safety all confirmed unchanged at this checkpoint.",
+      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1201: wellBeing corrected again, 15.129999999999965 -> 20.389999999999972; ecology 46.59 -> 46.58; nuisance 41.475 -> 41.45 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so pattern 2's crew now genuinely detours around pattern 1's own still-parked drill_rig instead of cutting through it; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout), and by this checkpoint (right after pattern 1's own blast) the extra detour ticks shift exactly which real-time slice of ongoing decay/drain each score has had -- wellbeing (drained by pattern 2's own sustained drilling work, not pattern 1's dead crew's morale -- see this file's own description) reads higher since less of that work has happened yet; ecology/nuisance shift by their own small real amounts the same way. deathCount/employeeCount/activeContractCount/surveyCount/safety all confirmed unchanged at this checkpoint. #1189: wellBeing 20.389999999999972 -> 20.292499999999976; ecology 46.58 -> 46.44; nuisance 41.45 -> 41.1 -- same cause and same drift-masking finding as the scores step just above.",
       "interaction": [
         {
           "type": "command",
@@ -1430,10 +1432,10 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 20.389999999999972,
+          "wellBeing": 20.292499999999976,
           "safety": 50,
-          "ecology": 46.58,
-          "nuisance": 41.45
+          "ecology": 46.44,
+          "nuisance": 41.1
         },
         "changedBy": {
           "tickCount": 0
@@ -2656,7 +2658,7 @@
     },
     {
       "command": "scores",
-      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so foot traffic around pattern 1's and pattern 2's own parked drill_rigs now genuinely detours instead of cutting through; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout the whole file), and the detoured pacing shifts real time earlier relative to this checkpoint's own worker_revolt trigger, giving nuisance's own decay more of it to work with by the time the revolt lands -- same level, same ending, same deaths, only the score's real trajectory to get there differs. deathCount/employeeCount/activeContractCount/surveyCount/wellBeing/safety/ecology all confirmed unchanged.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so foot traffic around pattern 1's and pattern 2's own parked drill_rigs now genuinely detours instead of cutting through; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout the whole file), and the detoured pacing shifts real time earlier relative to this checkpoint's own worker_revolt trigger, giving nuisance's own decay more of it to work with by the time the revolt lands -- same level, same ending, same deaths, only the score's real trajectory to get there differs. deathCount/employeeCount/activeContractCount/surveyCount/wellBeing/safety/ecology all confirmed unchanged. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- unclamping restored real terrain relief, moving findNearestSpawnCell's snap point for the surveyor's fresh-hire spawn (see the earlier survey-timing notes) closer to the survey targets; that alone shifts dispatch timing throughout both patterns enough to move exactly when worker_revolt's own wellBeing-driven trigger fires, giving nuisance's decay a different real-time span to run before this checkpoint captures it. Same level, same ending (worker_revolt, deathCount 4), only the real trajectory to get there differs -- re-derived from a real run, not assumed.",
       "interaction": [
         {
           "type": "command",
@@ -2673,13 +2675,13 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 37.07000000000029
+          "nuisance": 48.72000000000029
         }
       }
     },
     {
       "command": "stats",
-      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step's own note just above for the mechanism.",
+      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step's own note just above for the mechanism. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- see the scores step's own note just above for the mechanism.",
       "interaction": [
         {
           "type": "command",
@@ -2696,13 +2698,13 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 37.07000000000029
+          "nuisance": 48.72000000000029
         }
       }
     },
     {
       "command": "campaign status",
-      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step above for the mechanism.",
+      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step above for the mechanism. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- see the scores step above for the mechanism.",
       "interaction": [
         {
           "type": "command",
@@ -2719,7 +2721,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 37.07000000000029,
+          "nuisance": 48.72000000000029,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

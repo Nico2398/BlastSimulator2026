@@ -90,16 +90,6 @@ const PIT_MASK_MARGIN = 24;
 /** Fraction of relief that survives at full compression, deep inside the rect. */
 const PIT_RELIEF_KEEP = 0.3;
 
-/** Metres outside the playable rect over which the site's vertical band stops
- *  applying and the world's own relief comes back (#1077). Matches
- *  PIT_MASK_MARGIN's scale: the same length the mask uses on its way in. */
-const SITE_BAND_MARGIN = 24;
-/** Metres outside the rect over which the band still applies in full: the one
- *  cell of sealing halo the playable mesh marches past its own rect
- *  (`PlayableCoverage.meshedCellRect`) is ground that mesh draws, so the world
- *  has to follow the band exactly there, not 96% of it. */
-const SITE_BAND_HOLD = 1;
-
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
 function distanceInsideRect(rect: Rect, x: number, z: number): number {
   const dx = Math.min(x - rect.minX, rect.maxX - x);
@@ -131,9 +121,9 @@ export function computeGroundOffset(centerHeight: number, sizeY: number): number
   return Math.floor(sizeY * 0.55) - Math.round(centerHeight);
 }
 
-/** Convert a world-metre height to a clamped, in-range voxel Y using a precomputed datum. */
-export function heightToVoxelY(height: number, groundOffset: number, sizeY: number): number {
-  return Math.max(1, Math.min(sizeY - 1, Math.round(height + groundOffset)));
+/** Convert a world-metre height to voxel Y using a precomputed datum. */
+export function heightToVoxelY(height: number, groundOffset: number): number {
+  return Math.round(height + groundOffset);
 }
 
 /**
@@ -146,40 +136,8 @@ export function heightToVoxelY(height: number, groundOffset: number, sizeY: numb
  * smooth — the two representations were reading the same field and then
  * quantizing it differently (#458).
  */
-export function heightToVoxelYContinuous(height: number, groundOffset: number, sizeY: number): number {
-  return Math.max(1, Math.min(sizeY - 1, height + groundOffset));
-}
-
-/**
- * Pull the world's ground into the vertical band the site's voxel grid can
- * actually represent, easing back to the free height field away from it.
- *
- * A voxel grid holds a surface between y = 1 and y = sizeY - 1, and
- * `heightToVoxelYContinuous` clamps every column TerrainGen fills into that
- * band. The landscape beside it has no such limit and never clamped — so on
- * any level whose ground leaves the band (all four of them: the tutorial's
- * north-east corner dips 1.2 m below the floor, and every later level's peaks
- * run 4-10 m through the ceiling) the site rendered a dead-flat plateau or
- * mesa exactly where the world kept rising or falling, and the step between
- * them fell on the site's own rectangle. That is the square a player sees
- * drawn on untouched ground, corner and all (#1077).
- *
- * The clamp itself is not the bug — a grid cannot hold ground it has no
- * voxels for. Disagreeing about it is. So the world takes the same band the
- * site does wherever the site draws (its rect, plus the halo ring), and the
- * band's pull falls off over SITE_BAND_MARGIN metres of open ground, where
- * nothing but the landscape is drawing and the true relief can return. The
- * smoothstep's zero derivative at both ends keeps that fall-off out of the
- * silhouette: no crease anywhere, rather than a straight one on the boundary.
- *
- * `height` is already in voxel-Y space (world height + groundOffset), which is
- * the datum the clamp is defined in.
- */
-export function applyPlayableBand(height: number, sizeY: number, rect: Rect, x: number, z: number): number {
-  const metresOutside = -distanceInsideRect(rect, x, z);
-  const pull = 1 - smoothstep(SITE_BAND_HOLD, SITE_BAND_HOLD + SITE_BAND_MARGIN, metresOutside);
-  if (pull <= 0) return height;
-  return height + pull * (heightToVoxelYContinuous(height, 0, sizeY) - height);
+export function heightToVoxelYContinuous(height: number, groundOffset: number): number {
+  return height + groundOffset;
 }
 
 /** Resolves the shaping input to use at a given column — e.g. BiomeCatalog's climate blend. */
@@ -226,12 +184,12 @@ export function createWorldGenContext(
 export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number): number {
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
   const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
-  return heightToVoxelY(masked, ctx.groundOffset, ctx.sizeY);
+  return heightToVoxelY(masked, ctx.groundOffset);
 }
 
 /** Continuous (unrounded) surface Y for column (x, z) — the height the mesh should actually land on. */
 export function sampleSurfaceHeightY(ctx: WorldGenContext, x: number, z: number): number {
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
   const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
-  return heightToVoxelYContinuous(masked, ctx.groundOffset, ctx.sizeY);
+  return heightToVoxelYContinuous(masked, ctx.groundOffset);
 }

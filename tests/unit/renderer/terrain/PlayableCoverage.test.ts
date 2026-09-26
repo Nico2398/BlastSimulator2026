@@ -161,13 +161,15 @@ describe('PlayableCoverage.haloSurfaceHeight (#907)', () => {
     expect(haloSurfaceHeight(grid, 7.25)).toBeCloseTo(7.25, 12);
   });
 
-  it('clamps to the same bound TerrainGen generates the site\'s own columns through', () => {
-    // heightToVoxelYContinuous is Math.max(1, Math.min(sizeY - 1, h)). Clamping
-    // to 0 instead would put the shared ring node a metre below the site's own
-    // clamped edge column and kink the ground at the claim line.
-    expect(haloSurfaceHeight(grid, -3)).toBe(1);
-    expect(haloSurfaceHeight(grid, 0.5)).toBe(1);
-    expect(haloSurfaceHeight(grid, 999)).toBe(19);
+  it('passes height through unclamped — TerrainGen no longer clamps the columns it generates through (#1189)', () => {
+    // Pre-#1189, heightToVoxelYContinuous was Math.max(1, Math.min(sizeY - 1,
+    // h)), so -3 clamped to 1 and 999 clamped to sizeY - 1 = 19. #1189 deletes
+    // that clamp everywhere, including here — the halo column's height now
+    // agrees with the site's own unclamped surface exactly, not a bounded
+    // stand-in for it.
+    expect(haloSurfaceHeight(grid, -3)).toBe(-3);
+    expect(haloSurfaceHeight(grid, 0.5)).toBe(0.5);
+    expect(haloSurfaceHeight(grid, 999)).toBe(999);
   });
 
   it('passes NaN through, so "no ground here" stays distinguishable from "ground at the floor"', () => {

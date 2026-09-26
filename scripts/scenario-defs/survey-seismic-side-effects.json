@@ -340,9 +340,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 1
         },
-        "note": "31 ticks isn't always enough for this file's longer surveyor walk to the target — verified via a real dump, the survey completes at tick ~43"
+        "note": "#1189 (real terrain relief restored, clamp removed) moved the auto-hire spawn point: the old world-centre spawn cell (~82,34) is no longer walkable under real elevation, so findNearestSpawnCell now snaps hires to (54,34) instead — closer to this survey's (20,20) target than the old spawn was, so the surveyor's walk is shorter and the survey completes at tick ~29 instead of the old ~43, already done by this cumulative tick-31 checkpoint. Re-derived via a real engine run, not assumed."
       }
     },
     {
