@@ -19,6 +19,29 @@
       }
     },
     {
+      "command": "set_policy mode:continuous",
+      "description": "(#1203) #1203's arrival-gated training turned this file's fixed `tick N` pads into `wait_until` waits on real walk time, lengthening the runway (two schools' worth of walk-there-train-walk-back, plus the drilling grind) enough that the driller's own fatigue-driven wellBeing now bottoms out and ends in a worker revolt before the blast step. A site policy's revision only takes effect once applied (forceShiftRestIfNeededByPolicy, ForceShiftRest.ts), and this policy's own rest destination is any living_quarters tier or resting in place if none exists (dest.worthwhile) -- no living_quarters is ever built in this file, so this alone is what lets the crew take a proactive rest at all through the grind ahead. Left at SITE_POLICY_DEFAULT_THRESHOLD (60, no explicit fatigue: override, unlike tutorial-interactive.json's own #1151 fix at 75): the dedicated builder's own place_building work is protected mid-execution (PROTECTED_MID_EXECUTION_ACTION_TYPES) but not its walk there, and a threshold as aggressive as 75 sent it back for rest often enough that the blasting_academy build never landed inside this step's own 300-tick wait budget -- confirmed live. Applied before any training/build step so nothing above depends on which toolbar panel this leaves open (every later step already re-clicks its own panel explicitly).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {

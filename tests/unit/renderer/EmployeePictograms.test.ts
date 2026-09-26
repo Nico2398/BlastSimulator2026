@@ -87,6 +87,10 @@ describe('pictogramKindFor', () => {
     expect(pictogramKindFor(makeActivity('working', null))).toBeNull();
   });
 
+  it('returns null for kind "training" — an employee mid-course is hidden inside the school, nothing to hang a pictogram off of (#1203)', () => {
+    expect(pictogramKindFor(makeActivity('training'))).toBeNull();
+  });
+
   it('returns "collapsed" for kind "collapsed"', () => {
     expect(pictogramKindFor(makeActivity('collapsed'))).toBe('collapsed');
   });
