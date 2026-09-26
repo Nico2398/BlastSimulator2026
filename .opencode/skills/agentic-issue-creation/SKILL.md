@@ -31,7 +31,7 @@ Two shapes are valid, and they differ in how much of the answer is already known
 | **Intent** | A human filing from the issue form or free-form | Context, Task, Verification, and any Blocked by. The planner derives the files and the tests. |
 | **Complete** | An agent decomposing a feature into atomic tasks | Every section below. The decomposition already knows the file layout, so it states it. |
 
-Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back. Entering the queue is not being picked up: runs start only on a manual dispatch of `agentic-trigger.yml`, from a merged pipeline pull request, or from a run that halted — `blocked` or `paused` — chaining past itself.
+Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back. What `ready` does require is the Definition of Ready below. Entering the queue is not being picked up: runs start only on a manual dispatch of `agentic-trigger.yml`, from a merged pipeline pull request, from a run that halted — `blocked` or `paused` — chaining past itself, or from a run that closed its own issue `done`.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
@@ -40,9 +40,14 @@ Both enter the same queue once `ready` lands on the issue — a two-line issue t
 3. Fill every section that shape carries, using the headings below verbatim
 4. Verify the Rules are satisfied
 5. Run through the Checklist
-6. Create the issue with `gh issue create`, setting labels per the Labels section below. A human who specified labels, or said the issue should wait, overrides that table
+6. Create the issue with `gh issue create`, setting labels per the Labels section below — always `agent-task` and the issue's `scope:*` labels, and `ready` only when the Definition of Ready holds. A human who specified labels, or said the issue should wait, overrides that table; a human who asked for `ready` still gets the scope labels it needs
 
-`ready` means eligible, not started: it places the issue in the queue, where it waits until a human dispatches `agentic-trigger.yml` or a merged pipeline pull request chains to it. Creating an issue never starts a run. The issue joins the queue in number order once `ready` is on it, whoever put it there.
+   ```bash
+   gh issue create --label agent-task --label ready --label scope:nav --label scope:engine \
+     --title "<feature> - <what changes>" --body-file issue.md
+   ```
+
+`ready` means eligible, not started: it places the issue in the queue, where it waits until an entry point reaches it. Creating an issue never starts a run. The issue joins the queue in number order once `ready` is on it, whoever put it there — and only while it meets the Definition of Ready.
 
 ## ▶ Duplicate check — run before filing anything
 
@@ -66,16 +71,30 @@ An issue nobody reads twice is cheap; two issues for one problem are not. They s
 
 Searching costs one command. Filing a duplicate costs a run.
 
+## ▶ Definition of Ready — what `ready` promises
+
+`ready` says *this work should be done, and the issue is good enough to start from.* An issue carries it only when every line below holds. The first two are checked by machine, the rest by whoever adds the label:
+
+1. **`agent-task`** — it is a task for the pipeline.
+2. **One or more `scope:*` labels, every one from the taxonomy below** — the areas its change will stay inside. The assigner runs issues side by side only when their scopes are disjoint, so an issue that declares none cannot be placed at all.
+3. **The outcome is stated** — Context says why, Task says what is different once it is done. A two-line intent issue can meet this.
+4. **Verification is observable** — how a reader tells it is finished, not which commands to run.
+5. **Dependencies are declared** — every issue that must land first, as `blocked_by` relationships and under `## Blocked by`; `None` when there are none.
+6. **No open question** — an issue carrying `## Open question` waits on a human and is not ready.
+7. **Confidence is high** — the Labels table below.
+
+**The checkable half is enforced where the label is spent.** `readinessVerdict` in `.github/scripts/assignability.cjs` decides lines 1 and 2. `agentic-intake.yml` takes `ready` off an issue that fails them — on open, and whenever `ready`, a scope or `agent-task` arrives or leaves — and comments what is missing; `agentic-assign` refuses the same issue on the same verdict. So `ready` never sits on an issue the queue will not take. The "Agent Task" form meets line 2 through its required Scope field, which intake turns into labels.
+
 ## ▶ Labels — `ready` is a confidence statement
 
-`agentic-assign` selects on `ready` alone. Putting it on an issue says *this work should be done, and the description is good enough to start from.* Putting it on a hunch spends a whole run discovering the hunch was wrong.
+`agentic-assign` selects on `ready`, and only among issues meeting the Definition of Ready. Putting it on a hunch spends a whole run discovering the hunch was wrong. Every issue an agent files carries `agent-task` and its `scope:*` labels whatever its confidence, so that `ready` is the only thing a human has to add when they agree.
 
 | Confidence | Labels | What follows |
 |-----------|--------|--------------|
-| **High** — a defect you reproduced, a convention you can point at, a gap you verified in the code | `agent-task`, `ready` | The work is real and specified. The issue joins the queue in number order. |
-| **Open** — something looks wrong, and a human should confirm it is worth doing or pick between two directions | `agent-task` | The issue stays out of the queue until a human adds `ready`. |
-| **Already decided by the run** — a default you implemented that a human may want to revisit | `decision-review` | Held by `agentic-decision-autonomy`, which owns that flow end to end. |
-| **In the way of a run right now** — you bypassed it with a `TODO(#N)`, or you paused behind it | `agent-task`, `ready` | Highest confidence there is: you hit it head-on. Another issue is queued behind this one, so it earns its place at the front. |
+| **High** — a defect you reproduced, a convention you can point at, a gap you verified in the code | `agent-task`, `ready`, `scope:*` | The work is real and specified. The issue joins the queue in number order. |
+| **Open** — something looks wrong, and a human should confirm it is worth doing or pick between two directions | `agent-task`, `scope:*` | The issue stays out of the queue until a human adds `ready`. |
+| **Already decided by the run** — a default you implemented that a human may want to revisit | `agent-task`, `decision-review`, `scope:*` | Held by `agentic-decision-autonomy`, which owns that flow end to end. |
+| **In the way of a run right now** — you bypassed it with a `TODO(#N)`, or you paused behind it | `agent-task`, `ready`, `scope:*` | Highest confidence there is: you hit it head-on. Another issue is queued behind this one, so it earns its place at the front. |
 
 **`paused` is not a label you put on an issue you file.** It goes on the issue whose *run* stopped — alongside `ready`, with this new issue as its `Blocked by` — and `agentic-assign` strips it when that issue is picked up again. `agentic-decision-autonomy` holds the procedure.
 
@@ -85,7 +104,7 @@ Leave `ready` off while you are uncertain. An issue carrying `agent-task` alone 
 
 ### Scope labels — where the diff will stay
 
-With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side only when their `scope:*` labels are disjoint. Add every scope the `## Files` section falls into; several are allowed:
+Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side only when their `scope:*` labels are disjoint. Add every scope the `## Files` section falls into — or, for an intent issue, every area the change will reach; several are allowed:
 
 | Label | Covers |
 |-------|--------|
@@ -98,8 +117,9 @@ With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side onl
 | `scope:console` | `src/console` |
 | `scope:scenarios` | `scripts/scenario-defs` and the scenario runners |
 | `scope:pipeline` | The agentic layer: `.github/workflows`, `.github/actions`, `.github/scripts`, agent definitions, hooks, `agentic-*` skills — always runs alone |
+| `scope:global` | Many areas at once — a cross-cutting refactor or rename — always runs alone |
 
-A `gameplay-*` or `dev-*` skill takes the scope of the code it documents, not `scope:pipeline`. Files every area touches — `balance.ts`, the locale files, `main.ts` — belong to no scope; name the feature's scope and let the merge gate handle the overlap. **When unsure, leave scope off.** An issue with no scope label runs alone, which costs parallelism and nothing else; a wrong one costs a conflict round. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else also runs alone.
+A `gameplay-*` or `dev-*` skill takes the scope of the code it documents, not `scope:pipeline`. Files every area touches — `balance.ts`, the locale files, `main.ts` — need no scope of their own; name the feature's scope and let the merge gate handle the overlap. **Between two scopes, add both; across many, `scope:global`.** A scope too narrow costs a conflict round when the run strays outside it; one too wide costs only parallelism. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else fails the Definition of Ready.
 
 ## Issue Body Template
 
@@ -292,7 +312,8 @@ recorded can be picked up in that window.
 - [ ] Verification names the scenario that drives the change, if one does — CI runs every scenario in both modes on every PR regardless
 - [ ] Open issues searched for this problem — none covers it, or the existing one was updated instead of a new one filed
 - [ ] Labels set on creation per the Labels table: `ready` only at high confidence, `agent-task` alone otherwise, unless the human specified something else
-- [ ] Every `scope:*` label the `## Files` section falls into, or none when unsure
+- [ ] Every `scope:*` label the change falls into, on every issue filed — `ready` or not
+- [ ] `ready` only when every line of the Definition of Ready holds
 - [ ] An issue held for confirmation carries `## Open question`
 - [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
 - [ ] A scope cut names its remainder issues in the pull request body and on the original issue

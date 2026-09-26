@@ -821,17 +821,16 @@ function resumeTargetFor(deliverable) {
  * otherwise take the oldest assignable issue.
  *
  * **Scope.** Above 1, an issue starts beside the live runs only when its scope
- * claim (`scopeClaim`) clashes with none of theirs. An issue with no scope label
- * claims the whole repository, so an unlabelled backlog still runs one at a
- * time: parallelism is opted into per issue.
+ * claim (`scopeClaim`) clashes with none of theirs. Every candidate declares its
+ * scopes — the Definition of Ready refuses one that does not — and
+ * `scope:global` or `scope:pipeline` claims the whole repository.
  *
  * **Its place in line.** An older issue that could run but for a scope clash
  * *holds* its claim for the rest of the pass, so nothing younger that overlaps
  * it starts first. Without that, a steady stream of small issues in one scope
  * could keep an older one in the same scope waiting forever. No clock is
  * involved: the hold lasts exactly as long as the clash does, and an older issue
- * with no scope label holds everything, so the queue drains until it can run
- * alone. Only an issue that is otherwise assignable holds a place — one waiting
+ * that runs alone holds everything, so the queue drains until it can run. Only an issue that is otherwise assignable holds a place — one waiting
  * on a dependency does not, or a paused issue would hold the very scope its own
  * blocker needs.
  *

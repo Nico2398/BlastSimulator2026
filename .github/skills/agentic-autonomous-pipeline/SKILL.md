@@ -131,13 +131,33 @@ A paused run leaves its work on a draft PR labelled `paused`, and `agentic-assig
 
 A red CI on an existing open PR is the other task shape that works this way, and `agentic-pipeline-ci-fix` describes it. The difference is only what is being finished: there, a green CI; here, the remaining task.
 
+## ▶ Definition of Done — what `done` promises
+
+`done` says *this issue's work has landed, and nothing about it is still in flight.* An issue carries it only when it is closed as completed and one of the two cases below holds. Its counterpart, what `ready` promises, is the Definition of Ready in `agentic-issue-creation`.
+
+**The deliverable is a diff:**
+
+1. A pull request carrying `Closes #<N>` on a line of its own merged through the merge gate — so every channel on its head was green, the head contained `main`'s tip, and every required job actually ran.
+2. Every verification channel the change touches ran, and the PR body says which and what each showed (Verification Gate, `dev-finishing-work`).
+3. The issue's own Verification criteria are met, or the PR names the gap and the remainder is filed as a scope cut.
+4. Every requirement the issue left open is recorded under `## Decisions taken`, and every finding is filed or recorded per the Follow-up Gate.
+
+**The deliverable is not a diff** — an answer, an executed command, a set of filed issues:
+
+1. The deliverable is on the issue: the answer, the command's outcome, or the filed issues by number.
+2. The run closed the issue as completed itself.
+
+**Both:** nothing is left saying the work is queued, owned, halted or waiting — no `ready`, `in-progress`, `blocked` or `paused`. The `scope:*` labels stay, as the record of what the change touched. An issue closed as not planned is never `done`.
+
+**What a machine holds, and what the run owes.** The merge gate holds the first line of the diff case. The merge chain (`auto-assign-next.yml`) closes the issue as completed, applies `done` and clears the other lifecycle labels; the close chain does the same for a run that closed its own issue as completed without a PR; `agentic-intake.yml` drops `done` from a reopened issue. Everything else is the run's to make true before it ends, and a reviewer's to check.
+
 ## ▶ Before ending: verify the issue, branch and PR agree
 
 Binds every session that touches a numbered issue, not only ones dispatched through `/agentic-run` or `/resolve-issue`. Before your last message, if your PR body discusses a numbered issue at all:
 
 1. **Never let a closing keyword sit immediately before a bare issue number in prose — in a PR body or any commit message in its range.** Negation, quotation, and past tense do not protect you, and neither does a commit already merged once before: squash-merging concatenates every constituent commit message into the base branch's history verbatim, and a branch updated by merging the base back in (rather than reset to it) keeps its own pre-squash commits reachable, ready to ride into the next PR's range as if new. GitHub's parser matches the substring, not the sentence, and skips only code spans and fenced blocks. `references/keyword-closing-postmortem.md` has the real incident this was learned from, in four rounds — read it once before you next write a PR that mentions an issue you are not closing.
 2. **Re-read the issue's own body, Files and Verification sections against your actual diff — not just its comment thread.** A long investigation history accumulates tangents; the issue's original ask is still the bar a closing PR has to clear. If your diff answers something the thread raised rather than what the issue itself describes, say so and leave the issue open.
-3. **Labels match the terminal state you're leaving.** A closed issue carries `done` and nothing left over from `ready`/`blocked`/`in-progress`/`paused`.
+3. **Labels match the terminal state you're leaving.** A closed issue meets the Definition of Done — `done`, and nothing left over from `ready`/`blocked`/`in-progress`/`paused`. An issue you file or put back in the queue meets the Definition of Ready — `agent-task` and its `scope:*` labels before `ready`.
 4. **Passing human review is not proof either check above happened.**
 
 ## Where the rest lives
@@ -149,6 +169,6 @@ Binds every session that touches a numbered issue, not only ones dispatched thro
 | GitHub's closing-keyword parser, and the real incident it caused | `references/keyword-closing-postmortem.md` |
 | Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor`, `agentic-pipeline-ci-fix` |
 | TDD cycle, finalization, PR status | `agentic-pipeline-tdd`, `agentic-pipeline-finalization`, `agentic-pipeline-pr-management` |
-| Writing an issue the pipeline can consume | `agentic-issue-creation` |
+| Writing an issue the pipeline can consume, its scope labels, and the Definition of Ready | `agentic-issue-creation` |
 | Editing any of these context files | `agentic-context-edition` |
 | Editing the workflows, composite actions and decision modules that run all of this | `agentic-workflow-edition` — no timer, which token raises which event, fail closed and loud |

@@ -388,6 +388,8 @@ runs:
               '',
               `Something you find that is in the way of this task is not automatically a halt: fix it on the spot when it is small, and when it is not, file it and work around it behind a \`TODO(#<new issue>)\` bypass so this run still lands. Only a finding that makes the task impossible ends the run early — and then it \`pause\`s rather than blocks. Both procedures are in \`agentic-decision-autonomy\`.`,
               '',
+              `Every issue this run files carries \`agent-task\` and the \`scope:*\` labels of the areas its change would touch, and \`ready\` only when it meets the Definition of Ready in \`agentic-issue-creation\` — an issue without them is taken back out of the queue. This issue is \`done\` only when it meets the Definition of Done in \`agentic-autonomous-pipeline\`.`,
+              '',
               `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state, and there are four:`,
               '',
               `- a merged-ready PR that closes it;`,

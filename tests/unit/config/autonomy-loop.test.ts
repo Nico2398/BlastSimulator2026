@@ -174,6 +174,16 @@ describe('every entry point assigns under the configured parallel limit', () => 
     expect(text).toContain('outputs.issues');
   });
 
+  // The assignment comment is the one text every session reads first, so it
+  // carries the two definitions a run is held to when it files or finishes.
+  it('tells every session what ready and done promise', () => {
+    const assign = readFileSync(join(ROOT, '.github/actions/agentic-assign/action.yml'), 'utf8');
+    const body = assign.slice(assign.indexOf('const body = ['));
+    expect(body).toContain('Definition of Ready in \\`agentic-issue-creation\\`');
+    expect(body).toContain('Definition of Done in \\`agentic-autonomous-pipeline\\`');
+    expect(body).toContain('\\`scope:*\\`');
+  });
+
   // The skill that tells a run which scope labels to put on an issue it files
   // lists them for the reader; the assigner's taxonomy is the authority. A
   // label the skill names that the assigner does not know runs alone forever.
