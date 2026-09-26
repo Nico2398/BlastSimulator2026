@@ -190,8 +190,15 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     }
     if (a.pitch !== undefined) {
       expect(typeof a.pitch).toBe('number');
-      expect(a.pitch).toBeGreaterThanOrEqual(5);
-      expect(a.pitch).toBeLessThanOrEqual(87);
+      // Bounds derived from CameraController's POLAR_MIN/POLAR_MAX (0.08 rad,
+      // Math.PI/2 - 0.05 rad) converted through setOrbit's own
+      // phi = degToRad(90 - pitchDeg) mapping — NOT copied from those
+      // constants' degree comments (which describe the complementary `phi`
+      // angle, not `pitchDeg`). True unclamped range is ~[2.87, 85.42];
+      // rounded conservatively inward to 3/85 so nothing valid is rejected
+      // and nothing that would silently clamp is wrongly accepted.
+      expect(a.pitch).toBeGreaterThanOrEqual(3);
+      expect(a.pitch).toBeLessThanOrEqual(85);
     }
     if (a.yaw !== undefined) {
       expect(typeof a.yaw).toBe('number');
