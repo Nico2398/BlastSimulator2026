@@ -27,7 +27,18 @@ import { computeEmployeeActivity, type EmployeeActivity } from '../core/entities
 export class EmployeeBillboardRoster<T> {
   private readonly items = new Map<number, T>();
 
-  constructor(private readonly objectOf: (item: T) => THREE.Object3D) {}
+  /**
+   * `disposeOf` is optional and called (after detaching, before dropping)
+   * only by callers whose per-item Object3D owns resources besides its
+   * shared geometry — BuildingOccupancyLabels' canvas-texture material is
+   * unique per building id, unlike EmployeePictograms/TaskProgressBar's
+   * shared-material items, which pass nothing and keep their existing
+   * behaviour (#1205).
+   */
+  constructor(
+    private readonly objectOf: (item: T) => THREE.Object3D,
+    private readonly disposeOf?: (item: T) => void,
+  ) {}
 
   get count(): number {
     return this.items.size;
@@ -45,11 +56,12 @@ export class EmployeeBillboardRoster<T> {
     return this.items.values();
   }
 
-  /** Detach `id`'s item from its parent and drop it. No-op if absent. */
+  /** Detach `id`'s item from its parent, dispose it if the caller asked, and drop it. No-op if absent. */
   remove(id: number): void {
     const item = this.items.get(id);
     if (!item) return;
     this.objectOf(item).removeFromParent();
+    this.disposeOf?.(item);
     this.items.delete(id);
   }
 

@@ -23,6 +23,7 @@ import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { TaskProgressBar } from './TaskProgressBar.js';
 import { EmployeePictograms } from './EmployeePictograms.js';
+import { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
 import { CloudLayer } from './ambient/CloudLayer.js';
@@ -71,6 +72,7 @@ export interface SceneSetupDeps {
   characters: CharacterMesh | null;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  buildingOccupancyLabels: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   windState: WindState | null;
   clouds: CloudLayer | null;
@@ -167,6 +169,9 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Non-working activity pictograms — billboarded above employees who
   // aren't working, naming why (#1013)
   deps.pictograms = new EmployeePictograms(scene, deps.sm.camera);
+
+  // "<inside>/<capacity>" labels above people-holding buildings (#1205)
+  deps.buildingOccupancyLabels = new BuildingOccupancyLabels(scene, deps.sm.camera);
 
   // Weather sky
   deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
@@ -378,6 +383,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rampArrows?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
+  deps.buildingOccupancyLabels?.dispose();
 
   deps.terrain = null;
   deps.landscapeHandle = null;
@@ -411,6 +417,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rampArrows = null;
   deps.taskProgress = null;
   deps.pictograms = null;
+  deps.buildingOccupancyLabels = null;
   deps.lastGrid = null;
 
   deps.renderedBuildingIds.clear();

@@ -15,6 +15,7 @@ import type { PickResult } from './ScenePicking.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
+import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 const ROLE_ICON: Record<string, IconName> = {
   driller: 'blast', blaster: 'explosive', driver: 'vehicle', surveyor: 'survey', manager: 'crew',
@@ -105,7 +106,11 @@ export class HoverTag {
       case 'building': {
         const b = state.buildings.buildings.find(x => x.id === entity.id);
         if (!b) return null;
-        return this.row('build', t(`building.${b.type}.t${b.tier}.name`), `HP ${Math.round(b.hp)}`);
+        const capacity = getBuildingPeopleCapacity(b.type, b.tier);
+        const sub = capacity > 0
+          ? `HP ${Math.round(b.hp)} · ${t('building.occupancy', { inside: b.occupantIds.length, capacity })}`
+          : `HP ${Math.round(b.hp)}`;
+        return this.row('build', t(`building.${b.type}.t${b.tier}.name`), sub);
       }
       case 'vehicle': {
         const v = state.vehicles.vehicles.find(x => x.id === entity.id);
