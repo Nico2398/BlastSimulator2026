@@ -20,27 +20,16 @@ import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import { terrainConfigOf } from '../../src/console/commands/world.js';
-import { makeGameContext } from '../helpers/gameContext.js';
+import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 
 const ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 const BASE_HEIGHT = 15;
-
-/**
- * `ctx.grid` (via `makeGameContext`/`createRunner`) is real generated terrain
- * (height-free, #1192) — `grid.sizeY` reads a fixed internal sentinel now,
- * not a real bound. Before the height-free migration, this file's
- * `new_game size:32` built a grid whose `sizeY` was `size` (32); real
- * generated terrain never exceeds that (unchanged by the migration,
- * byte-identical generation per #1190), so it's still the right ceiling for
- * a full-column clear/set scan.
- */
-const GRID_SIZE_Y = 32;
 
 /** Force every column in `[minX, maxX] x [minZ, maxZ]` solid up to `height`, void above. */
 function carveFlatRect(grid: VoxelGrid, minX: number, maxX: number, minZ: number, maxZ: number, height: number): void {
   for (let z = minZ; z <= maxZ; z++) {
     for (let x = minX; x <= maxX; x++) {
-      for (let y = 0; y < GRID_SIZE_Y; y++) {
+      for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) {
         if (y <= height) grid.setVoxel(x, y, z, ROCK);
         else grid.clearVoxel(x, y, z);
       }

@@ -48,6 +48,18 @@ export function makeEmptyGameContext(overrides?: GameContextOverrides): GameCont
   return ctx;
 }
 
+/**
+ * Stand-in for the old `grid.sizeY` read (#1192): the height-free `VoxelGrid`
+ * constructor now reports a fixed internal sentinel there instead of the real
+ * generated height, so a test scanning a full column of a `makeGameContext`-
+ * (or equivalent `new_game size:32`-)built grid needs its own ceiling. Real
+ * generated terrain never exceeds `size` (unchanged by the migration,
+ * byte-identical generation per #1190), so this mirrors `makeGameContext`'s
+ * own `size` default below and is the right ceiling for a full-column
+ * clear/set/scan.
+ */
+export const GENERATED_TERRAIN_GRID_SIZE_Y = 32;
+
 /** Options for `makeGameContext` — mirrors `newGameCommand`'s named-arg surface (all optional, all string|number where a raw console arg could be either). */
 export interface MakeGameContextOptions {
   mineType?: string;
@@ -68,7 +80,7 @@ export function makeGameContext(opts?: MakeGameContextOptions): GameContext {
   const named: Record<string, string> = {
     mine_type: String(opts?.mineType ?? 'desert'),
     seed: String(opts?.seed ?? 42),
-    size: String(opts?.size ?? 32),
+    size: String(opts?.size ?? GENERATED_TERRAIN_GRID_SIZE_Y),
   };
   if (opts?.cash !== undefined) named['cash'] = String(opts.cash);
   if (opts?.staffed !== undefined) named['staffed'] = String(opts.staffed);

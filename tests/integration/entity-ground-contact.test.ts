@@ -32,16 +32,7 @@ import { CharacterMesh } from '../../src/renderer/CharacterMesh.js';
 import { GhostMesh } from '../../src/renderer/GhostMesh.js';
 import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-
-/**
- * `engine.ctx.grid` is real generated terrain (height-free, #1192) —
- * `grid.sizeY` reads a fixed internal sentinel now, not a real bound. Before
- * the height-free migration, this file's `new_game size:32` built a grid
- * whose `sizeY` was `size` (32); real generated terrain never exceeds that
- * (unchanged by the migration, byte-identical generation per #1190), so it's
- * still the right ceiling for a top-down column scan.
- */
-const GRID_SIZE_Y = 32;
+import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 
 // ── Harness: drives the real production sync entry point ───────────────────
 
@@ -220,7 +211,7 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     // suite's own segment-clearing setup.
     for (let z = 25; z <= 26; z++) {
       for (let x = 25; x <= 26; x++) {
-        for (let y = GRID_SIZE_Y - 1; y >= GRID_SIZE_Y - 3; y--) {
+        for (let y = GENERATED_TERRAIN_GRID_SIZE_Y - 1; y >= GENERATED_TERRAIN_GRID_SIZE_Y - 3; y--) {
           grid.clearVoxel(x, y, z);
         }
       }
@@ -241,7 +232,7 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     for (const [dx, dz] of def.footprint) {
       const cx = building!.x + dx;
       const cz = building!.z + dz;
-      for (let y = GRID_SIZE_Y - 1; y >= 0; y--) {
+      for (let y = GENERATED_TERRAIN_GRID_SIZE_Y - 1; y >= 0; y--) {
         if (grid.densityAt(cx, y, cz) > 0) {
           grid.clearVoxel(cx, y, cz);
           break;
