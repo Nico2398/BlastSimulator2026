@@ -84,6 +84,30 @@ describe('Damage and casualty system', () => {
     expect(destroyed).toBeDefined();
   });
 
+  it('injures everyone inside a building a projection destroys (#1202, gameplay-buildings)', () => {
+    const buildings = createBuildingState();
+    const office = placeBuilding(buildings, 'management_office', 5, 5, 64, 64).building!;
+    office.hp = 10;
+    const employees = createEmployeeState();
+    const inside: Employee = {
+      id: 1, name: 'Dora', role: 'driller', salary: 500,
+      morale: 60, unionized: false, injured: false, alive: true,
+      x: 40, z: 40, // their entry cell, far from the impact — hurt by the building, not the fragment
+      qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
+      locomotion: { kind: 'inside', buildingId: office.id },
+    };
+    employees.employees.push(inside);
+    office.occupantIds = [inside.id];
+
+    processProjections(
+      [makeProjection(1, 6, 6, 50, 30)], buildings, createVehicleState(), employees, createDamageState(), 1,
+    );
+
+    expect(buildings.buildings).toHaveLength(0);
+    expect(inside.injured).toBe(true);
+    expect(inside.alive).toBe(true);
+  });
+
   it('fragment hitting employee position injures/kills based on energy', () => {
     const employees = createEmployeeState();
     // Manually add employees near impact

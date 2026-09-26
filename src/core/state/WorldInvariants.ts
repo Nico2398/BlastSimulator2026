@@ -8,8 +8,10 @@
 
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import type { Locomotion } from '../entities/EmployeeLocomotion.js';
+import { isMounted, mountedVehicleId, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
+import { getBuildingPeopleCapacity } from '../entities/Building.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { resolveReservationHolder, isPendingReserveAhead } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
@@ -19,6 +21,9 @@ export type ViolationKind =
   | 'I2_mounted_position_mismatch'
   | 'I3_employee_drives_two_vehicles'
   | 'I3_seat_capacity_exceeded'
+  // #1202: the building case of the same occupancy model.
+  | 'I3_building_capacity_exceeded'
+  | 'I3_employee_in_two_hosts'
   | 'I5_reservation_without_valid_holder'
   | 'I8_payload_not_in_transit'
   | 'I9_executing_task_still_travelling'
@@ -33,6 +38,7 @@ export interface Violation {
   kind: ViolationKind;
   employeeId?: number;
   vehicleId?: number;
+  buildingId?: number;
   actionId?: number;
   fragmentId?: number;
 }
@@ -43,28 +49,60 @@ function findLivingDriver(state: GameState, driverId: number): Employee | undefi
 }
 
 /**
- * I1: `Vehicle.occupantIds` and `Employee.locomotion` must agree in both
- * directions — every occupant must be mounted on that exact vehicle, and
- * every mounted employee must appear in their vehicle's `occupantIds`.
+ * One thing an employee can be inside — a vehicle or a building (#1202) —
+ * seen the way I1 and I3 check it: who it lists, how many it holds, and
+ * whether an employee's `locomotion` names it.
+ */
+interface OccupancyHostView {
+  ref: { vehicleId: number } | { buildingId: number };
+  occupantIds: readonly number[];
+  capacity: number;
+  isNamedBy: (locomotion: Locomotion) => boolean;
+}
+
+function occupancyHosts(state: GameState): OccupancyHostView[] {
+  return [
+    ...state.vehicles.vehicles.map((v): OccupancyHostView => ({
+      ref: { vehicleId: v.id },
+      occupantIds: v.occupantIds,
+      capacity: VEHICLE_SEAT_COUNT[v.type],
+      isNamedBy: loc => isMounted(loc) && loc.vehicleId === v.id,
+    })),
+    ...state.buildings.buildings.map((b): OccupancyHostView => ({
+      ref: { buildingId: b.id },
+      occupantIds: b.occupantIds,
+      capacity: getBuildingPeopleCapacity(b.type, b.tier),
+      isNamedBy: loc => isInsideBuilding(loc) && loc.buildingId === b.id,
+    })),
+  ];
+}
+
+/**
+ * I1: a host's `occupantIds` and its occupants' `Employee.locomotion` must
+ * agree in both directions — every occupant must be mounted on / inside that
+ * exact host, and every mounted or inside employee must appear in their
+ * host's `occupantIds`. Vehicles and buildings alike (#1202).
  */
 function checkI1OccupantLocomotionMismatch(state: GameState): Violation[] {
   const violations: Violation[] = [];
+  const hosts = occupancyHosts(state);
 
-  for (const v of state.vehicles.vehicles) {
-    for (const employeeId of v.occupantIds) {
+  for (const host of hosts) {
+    for (const employeeId of host.occupantIds) {
       const e = findLivingDriver(state, employeeId);
-      if (!e || !isMounted(e.locomotion) || mountedVehicleId(e.locomotion) !== v.id) {
-        violations.push({ kind: 'I1_occupant_locomotion_mismatch', vehicleId: v.id, employeeId });
+      if (!e || !host.isNamedBy(e.locomotion)) {
+        violations.push({ kind: 'I1_occupant_locomotion_mismatch', ...host.ref, employeeId });
       }
     }
   }
 
   for (const e of state.employees.employees) {
-    if (!e.alive || !isMounted(e.locomotion)) continue;
-    const vehicleId = mountedVehicleId(e.locomotion)!;
-    const v = state.vehicles.vehicles.find(veh => veh.id === vehicleId);
-    if (!v || !v.occupantIds.includes(e.id)) {
-      violations.push({ kind: 'I1_occupant_locomotion_mismatch', vehicleId, employeeId: e.id });
+    if (!e.alive || e.locomotion.kind === 'on_foot') continue;
+    const host = hosts.find(h => h.isNamedBy(e.locomotion));
+    if (!host || !host.occupantIds.includes(e.id)) {
+      const ref = isMounted(e.locomotion) ? { vehicleId: e.locomotion.vehicleId }
+        : isInsideBuilding(e.locomotion) ? { buildingId: e.locomotion.buildingId } : {};
+      violations.push({ kind: 'I1_occupant_locomotion_mismatch', ...ref, employeeId: e.id });
     }
   }
 
@@ -87,22 +125,28 @@ function checkI2MountedPositionMismatch(state: GameState): Violation[] {
 }
 
 /**
- * I3: a vehicle's `occupantIds` may not exceed `VEHICLE_SEAT_COUNT[type]`,
- * and no employee id may appear in more than one vehicle's `occupantIds`.
+ * I3: a host's `occupantIds` may not exceed its capacity —
+ * `VEHICLE_SEAT_COUNT[type]` for a vehicle, `getBuildingPeopleCapacity` for a
+ * building (#1202) — and no employee id may appear in more than one host's
+ * `occupantIds`. Two vehicles keep their original kinds; any case involving
+ * a building reports the building kinds.
  */
 function checkI3OccupantCapacityViolation(state: GameState): Violation[] {
   const violations: Violation[] = [];
-  const seen = new Set<number>();
-  for (const v of state.vehicles.vehicles) {
-    if (v.occupantIds.length > VEHICLE_SEAT_COUNT[v.type]) {
-      violations.push({ kind: 'I3_seat_capacity_exceeded', vehicleId: v.id });
+  const seenIn = new Map<number, OccupancyHostView>();
+  for (const host of occupancyHosts(state)) {
+    const isVehicle = 'vehicleId' in host.ref;
+    if (host.occupantIds.length > host.capacity) {
+      violations.push({ kind: isVehicle ? 'I3_seat_capacity_exceeded' : 'I3_building_capacity_exceeded', ...host.ref });
     }
-    for (const employeeId of v.occupantIds) {
-      if (seen.has(employeeId)) {
-        violations.push({ kind: 'I3_employee_drives_two_vehicles', vehicleId: v.id, employeeId });
-      } else {
-        seen.add(employeeId);
+    for (const employeeId of host.occupantIds) {
+      const earlier = seenIn.get(employeeId);
+      if (earlier === undefined) {
+        seenIn.set(employeeId, host);
+        continue;
       }
+      const bothVehicles = isVehicle && 'vehicleId' in earlier.ref;
+      violations.push({ kind: bothVehicles ? 'I3_employee_drives_two_vehicles' : 'I3_employee_in_two_hosts', ...host.ref, employeeId });
     }
   }
   return violations;

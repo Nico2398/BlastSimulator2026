@@ -6,6 +6,11 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
+import { leaveBuildingIfInside } from './Mount.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
+import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
+import { findBuildingApproachCell, isOnBuildingRing } from '../nav/BuildingApproach.js';
+import type { Itinerary } from './Itinerary.js';
 import { t } from '../i18n/I18n.js';
 
 type MoveResult = { success: true } | { success: false; error: string };
@@ -41,14 +46,59 @@ export function moveTo(
   target: { actionId: number },
   opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult;
+/**
+ * Walk to a building's ring and go inside it (#1202): the itinerary's last
+ * leg ends on the approach cell nearest the employee
+ * (`findBuildingApproachCell`) with an `enter_building` arrival step. A
+ * building that takes no people is refused up front; one that is full when
+ * the employee arrives refuses them there, leaving them on foot on its ring.
+ * An employee in a vehicle is refused too — they alight first, since an
+ * enter step is taken on foot and the vehicle they would park would stand on
+ * the very cell they need.
+ */
 export function moveTo(
   state: GameState,
   employeeId: number,
-  target: { x: number; z: number } | { vehicleId: number } | { actionId: number },
+  target: { buildingId: number },
+): MoveResult;
+export function moveTo(
+  state: GameState,
+  employeeId: number,
+  target: { x: number; z: number } | { vehicleId: number } | { actionId: number } | { buildingId: number },
   opts?: { via?: number; allowUnreachable?: boolean },
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee) return { success: false, error: t('move_to.employee_not_found') };
+
+  // Every journey starts on the ground: an employee inside a building steps
+  // out onto its ring before any route is planned from where they stand.
+  const left = leaveBuildingIfInside(state, employee);
+  if (!left.success) return left;
+
+  if ('buildingId' in target) {
+    const building = state.buildings.buildings.find(b => b.id === target.buildingId);
+    if (!building) return { success: false, error: t('move_to.building_not_found') };
+    if (getBuildingPeopleCapacity(building.type, building.tier) === 0) {
+      return { success: false, error: t('mount.building_takes_no_people') };
+    }
+    if (isMounted(employee.locomotion)) return { success: false, error: t('move_to.alight_first') };
+
+    const def = getBuildingDef(building.type, building.tier);
+    // Already on the ring: nothing to walk, the enter step alone — applied
+    // by the locomotion tick like any other arrival.
+    const itinerary = isOnBuildingRing(building, def, employee.x, employee.z)
+      ? standingItinerary(employee)
+      : planToCell(state, employee, findBuildingApproachCell(state.navGrid, building, def, employee.x, employee.z));
+    const last = itinerary?.legs[itinerary.legs.length - 1];
+    if (!itinerary || !last || last.mode !== 'foot' || last.onArrive.kind !== 'none') {
+      return { success: false, error: t('move_to.no_route_available') };
+    }
+    last.onArrive = { kind: 'enter_building', buildingId: building.id };
+
+    employee.itinerary = itinerary;
+    syncItineraryMirrors(employee);
+    return { success: true };
+  }
 
   if ('vehicleId' in target) {
     const vehicle = state.vehicles.vehicles.find(v => v.id === target.vehicleId);
@@ -86,6 +136,24 @@ export function moveTo(
   employee.itinerary = itinerary;
   syncItineraryMirrors(employee);
   return { success: true };
+}
+
+/** A reposition itinerary to `cell`, or null when the planner finds none. */
+function planToCell(state: GameState, employee: Employee, cell: { x: number; z: number }): Itinerary | null {
+  return planItinerary(state, employee, { kind: 'reposition', x: cell.x, z: cell.z }, 'exact');
+}
+
+/** A single zero-length foot leg on the employee's own cell — for an arrival step taken where they stand. */
+function standingItinerary(employee: Employee): Itinerary {
+  return {
+    legs: [{
+      mode: 'foot', vehicleId: null, destX: employee.x, destZ: employee.z,
+      arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 0,
+    }],
+    goal: { kind: 'reposition', x: employee.x, z: employee.z },
+    workTicks: 0,
+    estTotalTicks: 0,
+  };
 }
 
 /**

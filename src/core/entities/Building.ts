@@ -57,7 +57,11 @@ export interface BuildingDef {
   demolishCost: number;
   /** Operating cost per game tick ($). */
   operatingCostPerTick: number;
-  /** Capacity: employee beds, storage kg, vehicle slots, etc. */
+  /**
+   * Capacity: employee beds, storage kg, vehicle slots, etc. — its unit
+   * depends on the type. How many people fit inside is
+   * `getBuildingPeopleCapacity`, not this field read raw.
+   */
   capacity: number;
   /** Max HP before destruction from blast damage. */
   maxHp: number;
@@ -176,6 +180,36 @@ export interface Building {
   hp: number;
   active: boolean;
   storedExplosivesKg?: number;
+  /**
+   * Employees inside this building right now (#1202) — the building case of
+   * the one occupancy model `Vehicle.occupantIds` is the vehicle case of.
+   * Always empty for a type that takes no people. Written only by Mount.ts;
+   * invariant I1 requires it to agree with each occupant's
+   * `locomotion: { kind: 'inside', buildingId }`.
+   */
+  occupantIds: number[];
+}
+
+// ── People capacity (#1202) ──
+
+/**
+ * Building types people go inside of, and so have a people capacity: the
+ * four training schools and living quarters. For each of them
+ * `BuildingDef.capacity` already counts people (trainees, beds). Letting a
+ * new type take people — a Research Center's researchers — is adding it
+ * here, not editing a caller.
+ */
+const PEOPLE_HOLDING_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>([
+  'driving_center',
+  'blasting_academy',
+  'management_office',
+  'geology_lab',
+  'living_quarters',
+]);
+
+/** How many employees fit inside a building of this type and tier — 0 for a type that takes no people. */
+export function getBuildingPeopleCapacity(type: BuildingType, tier: BuildingTier): number {
+  return PEOPLE_HOLDING_TYPES.has(type) ? getBuildingDef(type, tier).capacity : 0;
 }
 
 // ── Building state ──
@@ -272,6 +306,7 @@ export function placeBuilding(
     x, z,
     hp: def.maxHp,
     active: true,
+    occupantIds: [],
   };
   // Keep the array ordered by id. With ids claimed at order time (#556) and
   // sites finishing in whatever order the crew reaches them, a plain push would

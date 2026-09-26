@@ -464,6 +464,7 @@ describe('buildGameNavGrid (task 6.10)', () => {
       z: 2,
       hp: 80,
       active: true,
+      occupantIds: [],
     };
     const drillHole: DrillHole = {
       id: 'H1',

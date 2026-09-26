@@ -46,6 +46,7 @@ describe('buildTickEventContext', () => {
       x: 0, z: 0,
       hp: 100,
       active: true,
+      occupantIds: [],
     });
     state.drillHoles.push({ id: 'h1', x: 0, z: 0, depth: 5, diameter: 0.1 });
     state.tickCount = 42;

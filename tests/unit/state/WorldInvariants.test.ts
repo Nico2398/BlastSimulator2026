@@ -19,6 +19,7 @@ import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { placeBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -208,6 +209,91 @@ describe('assertWorldInvariants — I3, seat cap and no-double-occupancy (#1087)
 // check against vehiclePositionsAtTickStart — a vehicle only ever moves as a
 // side effect of its occupant's own locomotion now (WorldInvariants.ts's own
 // #1089 header comment).
+
+describe('assertWorldInvariants — I1/I3 for buildings, the same occupancy model (#1202)', () => {
+  function addSchool(state: GameState) {
+    const placed = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    if (!placed.building) throw new Error(`test setup: ${placed.error}`);
+    return placed.building;
+  }
+
+  it('reports nothing when a building and its occupants agree', () => {
+    const state = makeState();
+    const school = addSchool(state);
+    const e = addEmployee(state, { x: 9, z: 10, locomotion: { kind: 'inside', buildingId: school.id } });
+    school.occupantIds = [e.id];
+
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it('I1: a building listing an employee who is not inside it', () => {
+    const state = makeState();
+    const school = addSchool(state);
+    const e = addEmployee(state, { x: 9, z: 10 });
+    school.occupantIds = [e.id];
+
+    expect(assertWorldInvariants(state)).toEqual([
+      { kind: 'I1_occupant_locomotion_mismatch', buildingId: school.id, employeeId: e.id },
+    ]);
+  });
+
+  it('I1: an employee inside a building that does not list them', () => {
+    const state = makeState();
+    const school = addSchool(state);
+    const e = addEmployee(state, { x: 9, z: 10, locomotion: { kind: 'inside', buildingId: school.id } });
+
+    expect(assertWorldInvariants(state)).toEqual([
+      { kind: 'I1_occupant_locomotion_mismatch', buildingId: school.id, employeeId: e.id },
+    ]);
+  });
+
+  it('I1: an employee inside a building that no longer exists', () => {
+    const state = makeState();
+    const e = addEmployee(state, { x: 9, z: 10, locomotion: { kind: 'inside', buildingId: 999 } });
+
+    expect(assertWorldInvariants(state)).toEqual([
+      { kind: 'I1_occupant_locomotion_mismatch', buildingId: 999, employeeId: e.id },
+    ]);
+  });
+
+  it('I3: a building holding more people than its people capacity', () => {
+    const state = makeState();
+    const school = addSchool(state);
+    const capacity = getBuildingPeopleCapacity(school.type, school.tier);
+    for (let i = 0; i <= capacity; i++) {
+      const e = addEmployee(state, { x: 9, z: 10, locomotion: { kind: 'inside', buildingId: school.id } });
+      school.occupantIds.push(e.id);
+    }
+
+    expect(assertWorldInvariants(state)).toEqual([
+      { kind: 'I3_building_capacity_exceeded', buildingId: school.id },
+    ]);
+  });
+
+  it('I3: any occupant at all in a building that takes no people', () => {
+    const state = makeState();
+    const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 20, 20, 64, 64).building!;
+    const e = addEmployee(state, { x: 19, z: 20, locomotion: { kind: 'inside', buildingId: warehouse.id } });
+    warehouse.occupantIds = [e.id];
+
+    expect(assertWorldInvariants(state)).toEqual([
+      { kind: 'I3_building_capacity_exceeded', buildingId: warehouse.id },
+    ]);
+  });
+
+  it('I3: one employee listed by both a vehicle and a building', () => {
+    const state = makeState();
+    const school = addSchool(state);
+    const e = addEmployee(state, { x: 9, z: 10 });
+    const v = addVehicle(state, { x: 9, z: 10, occupantIds: [e.id] });
+    e.locomotion = { kind: 'mounted', vehicleId: v.id };
+    school.occupantIds = [e.id];
+
+    const violations = assertWorldInvariants(state);
+    expect(violations).toContainEqual({ kind: 'I3_employee_in_two_hosts', buildingId: school.id, employeeId: e.id });
+    expect(violations).toContainEqual({ kind: 'I1_occupant_locomotion_mismatch', buildingId: school.id, employeeId: e.id });
+  });
+});
 
 describe('assertWorldInvariants — I4_vehicle_moved_without_occupant (#1089)', () => {
   it('vacuously satisfied with no vehiclePositionsAtTickStart snapshot supplied', () => {

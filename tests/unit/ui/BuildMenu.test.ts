@@ -38,6 +38,7 @@ function makeBuilding(overrides: Partial<Building> & Pick<Building, 'id' | 'type
     z: 5,
     hp: 100,
     active: true,
+    occupantIds: [],
     ...overrides,
   };
 }

@@ -72,11 +72,23 @@ assignment across tasks.
 ```ts
 type Locomotion =
   | { kind: 'on_foot' }
-  | { kind: 'mounted'; vehicleId: number };
+  | { kind: 'mounted'; vehicleId: number }
+  | { kind: 'inside'; buildingId: number };
 ```
 
 Movement speed is a pure function of it: `AGENT_WALK_SPEED` on foot, the vehicle's tiered `speed`
-when mounted. Nothing else reads or writes an entity's speed.
+when mounted. Nothing else reads or writes an entity's speed. An employee inside a building does
+not move at all.
+
+### One occupancy model: vehicles and buildings
+
+Mounted and inside are the two cases of one model. A **host** — a vehicle or a building — carries
+`occupantIds`, capped by its capacity: `VEHICLE_SEAT_COUNT[type]` for a vehicle,
+`getBuildingPeopleCapacity(type, tier)` for a building (0 for a type that takes no people). The
+employee side is `locomotion`. `Mount.ts` is the single writer of both sides, and every host goes
+through its one `admitOccupant`/`releaseOccupant` pair: `board`/`alight` are the vehicle case,
+`enterBuilding`/`leaveBuilding` the building case. A new kind of host is a new case of that pair
+and of `occupancyHosts` in `WorldInvariants.ts`, not a parallel copy.
 
 ### Vehicle is inert
 
@@ -110,6 +122,7 @@ type ArrivalStep =
   | { kind: 'none' }
   | { kind: 'board';  vehicleId: number }
   | { kind: 'alight' }
+  | { kind: 'enter_building'; buildingId: number }   // go inside, from a cell on its ring
   | { kind: 'effect'; effectId: string };   // haul load/unload, boulder split
 
 interface Itinerary {
@@ -134,7 +147,11 @@ mirror of it, written by `moveTo`/`Locomotion.ts`/`alight()` — nothing reads i
 moveTo(state, employeeId, { x, z }, opts?: { via?: number })   // via = vehicle id, a hint
 moveTo(state, employeeId, { vehicleId })                       // walk to it and board
 moveTo(state, employeeId, { actionId }, opts?: { via?: number }) // the journey a claimed action needs
+moveTo(state, employeeId, { buildingId })                      // walk to its ring and go inside
 ```
+
+Every form first takes an employee who is inside a building out onto its ring. The building form
+refuses a building that takes no people and an employee who is mounted — entering is done on foot.
 
 `moveTo` is the only entry point that starts movement. Every form is a thin wrapper over
 `planItinerary` — `via` is a preference, not a command, because the planner still has to insert the
@@ -181,6 +198,9 @@ Two behaviours follow and are never special-cased:
 | Board | The foot leg's `arrival` is `'adjacent'`: the employee boards from within 1 tile. Sets `locomotion`, appends to `occupantIds`, snaps the employee onto the vehicle's cell, emits `employee:mounted`. |
 | Alight | Clears `locomotion`, removes from `occupantIds`, places the employee on the nearest free walkable cell within 1 tile of the vehicle (fallback: the vehicle's own cell), emits `employee:alighted`. |
 | Render | `EntitySync.syncEntitySets` renders no character mesh for an employee whose `locomotion.kind` is `'mounted'`. The two models are never both visible. |
+| Enter | The employee stands on the building's ring (the cells just outside its footprint), on foot, and the building is under its people capacity. Sets `locomotion` to `inside`, appends to the building's `occupantIds`, emits `employee:entered_building`. The employee's `x`/`z` stays on the ring cell they entered from; they hold no ground cell, get no character mesh, no minimap dot and cannot be picked, but stay in the Crew panel. A full building refuses them: the itinerary ends there and they stay on foot on the ring. |
+| Leave | Clears `locomotion`, removes from `occupantIds`, places the employee on the free ring cell nearest the one they entered from (`findBuildingExitCell`), emits `employee:left_building`. |
+| Building removed | A building destroyed, demolished or replaced by an upgrade with people inside puts them out on its ring — `releaseOccupantsOfRemovedBuildings`, once per tick and after a console demolition. A projection that destroys it injures them first. |
 
 The employee stays mounted while working — a digger digs from the cab. Alighting happens only when
 a plan needs them on foot, or when an interruption replans them.
@@ -220,9 +240,9 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 
 | # | Invariant |
 |---|-----------|
-| I1 | `v.occupantIds.includes(e.id)` **iff** `e.locomotion` is `{ mounted, vehicleId: v.id }` |
+| I1 | `v.occupantIds.includes(e.id)` **iff** `e.locomotion` is `{ mounted, vehicleId: v.id }`, and `b.occupantIds.includes(e.id)` **iff** it is `{ inside, buildingId: b.id }` |
 | I2 | A mounted employee's `x`/`z` equals their vehicle's `x`/`z` |
-| I3 | `occupantIds.length <= VEHICLE_SEAT_COUNT[v.type]`, and no employee appears in two vehicles |
+| I3 | A host's `occupantIds.length` is within its capacity (`VEHICLE_SEAT_COUNT[v.type]`, `getBuildingPeopleCapacity(b.type, b.tier)`), and no employee appears in two hosts |
 | I4 | A vehicle whose `x`/`z` changed this tick had an occupant this tick |
 | I5 | A vehicle's reservation names a live `PendingAction` whose holder is alive and is the vehicle's driver, is walking to board it, or holds the action as a queued reserve-ahead |
 | I6 | `e.itinerary !== null` implies `legs.length > 0` |
@@ -232,8 +252,8 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 
 Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only
 `Locomotion.ts` assigns a vehicle's `x`/`z`, and nothing outside it pathfinds from a vehicle's
-position. `tests/unit/lint/SingleMountWriter.test.ts`: only `Mount.ts` assigns `occupantIds` or
-`locomotion`.
+position. `tests/unit/lint/SingleMountWriter.test.ts`: only `Mount.ts` assigns `occupantIds` — a
+vehicle's or a building's — or `locomotion`.
 
 ## Status
 

@@ -371,8 +371,13 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.build.ramp_needs_length (confirmed unused anywhere in the
     // codebase) as part of the box-cut ramp fix — both locales, parity
     // preserved.
+    // Baseline is now 3520 (up from 3513): #1202 adds the building case of
+    // the occupancy model's refusals — mount.building_not_found,
+    // mount.not_on_foot, mount.too_far_to_enter,
+    // mount.building_takes_no_people, mount.not_inside,
+    // move_to.building_not_found and move_to.alight_first — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3513);
+    expect(Object.keys(en).length).toBe(3520);
   });
 });
 

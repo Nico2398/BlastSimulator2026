@@ -22,6 +22,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
 import { evacuateZone } from '../../core/engine/Evacuation.js';
+import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
@@ -91,6 +92,7 @@ export function buildCommand(
       state.cash -= demolishCost;
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       destroyBuilding(state.buildings, id);
+      releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
       refreshLogisticsCapacity(state);
       // Notify NavGridSync via nav:occupancy_changed of the removed building's footprint
       const { sizeX: destroySizeX, sizeZ: destroySizeZ } = getDefSize(destroyDef);
@@ -154,6 +156,9 @@ export function buildCommand(
       }
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
+      // The upgraded tier is a new building: whoever was inside the old one
+      // is put back out on its ring (#1202).
+      releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
       refreshLogisticsCapacity(state);
       // Notify NavGridSync via nav:occupancy_changed, covering both old and new footprint (size may change between tiers)
       if (ctx.grid) {

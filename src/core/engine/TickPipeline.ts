@@ -50,6 +50,7 @@ import { resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
+import { releaseOccupantsOfRemovedBuildings } from './Mount.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -291,6 +292,11 @@ export function runTick(
   // (#1091): ArrivalEffects.ts's own haul_unload/boulder_split effects call
   // completeVehicleGatedAction the instant they succeed, inside this call.
   const arrivalResult = tickArrivalGate(state, grid ?? undefined);
+
+  // 8i. Anyone still inside a building that was removed this tick (blast
+  // clearing, projection/seismic damage, an upgrade's replace) is put back
+  // out on its ring (#1202) — none of those paths can reach the employees.
+  releaseOccupantsOfRemovedBuildings(state, emitter);
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).

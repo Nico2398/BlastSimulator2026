@@ -276,7 +276,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   it('marks a column under a building footprint as blocked with Infinity moveCost', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     // management_office tier 1 has footprint rect(2,2) covering cells
@@ -292,7 +292,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   it('leaves cells outside building footprint as walkable', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     // Cell (5,5) is far from the footprint at (0,0)-(1,1)
@@ -315,7 +315,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   it('gives void highest priority: void column stays void even with a building', () => {
     const grid = new VoxelGrid(10, 10, 10); // all air
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     // Column (2,2) has a building footprint but is void → should be void
@@ -325,7 +325,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   it('gives drill_hole priority over blocked (drill_hole > blocked)', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const holes: DrillHole[] = [
       { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
@@ -340,7 +340,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   it('gives blocked priority over walkable (blocked > walkable)', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     // Cell (3,3) is in building footprint → blocked
@@ -497,7 +497,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 1);
     for (let y = 0; y <= 2; y++) grid.setVoxel(2, y, 1, solidVoxel());
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     // (2,2) is in building footprint AND adjacent to height diff → blocked wins over ramp
@@ -1011,7 +1011,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
 
     // Add a building at (3,3) — management_office t1 has 2×2 footprint
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true, occupantIds: [] },
     ];
 
     // Patch region covering the entire building footprint
@@ -1032,7 +1032,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // Building at (0,0) covers (0,0)-(1,1)
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true, occupantIds: [] },
     ];
     const region: BlastRegion = { minX: 0, maxX: 3, minZ: 0, maxZ: 3 };
     NavGrid.patchNavGrid(nav, grid, buildings, [], region);
@@ -1046,7 +1046,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     // Build with building present
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const nav = NavGrid.buildNavGrid(grid, buildings, []);
     expect(nav.cells[2]![2]!.type).toBe('blocked');
@@ -1103,7 +1103,7 @@ describe('NavGrid.patchNavGrid — drill hole changes', () => {
   it('gives drill_hole priority over blocked when both overlap in a patched region', () => {
     const grid = makeSolidGrid(10, 10, 10, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
     const holes: DrillHole[] = [
       { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
@@ -1182,7 +1182,7 @@ describe('NavGrid.patchNavGrid — full-grid equivalence', () => {
   it('produces the same result as buildNavGrid when patching the full grid', () => {
     const grid = makeSolidGrid(15, 10, 15, 4);
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 5, z: 5, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 5, z: 5, hp: 80, active: true, occupantIds: [] },
     ];
     const holes: DrillHole[] = [
       { id: 'H1', x: 10, z: 10, depth: 5, diameter: 0.15 },
@@ -1248,7 +1248,7 @@ describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
 
     // Also place a building covering (2,2)
     const buildings: Building[] = [
-      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
 
     const region: BlastRegion = { minX: 1, maxX: 3, minZ: 1, maxZ: 3 };
