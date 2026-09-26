@@ -266,6 +266,9 @@
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "player",
@@ -274,10 +277,10 @@
           "cash": -2500
         },
         "equals": {
-          "trainingCount": 1
+          "trainingCount": 0
         }
       },
-      "description": "Opens the Crew panel first (#556): the two hires moved to the top of the file so there is someone to build the schools, and the build steps between them and this one leave the Build panel showing — the employee row this clicks is not on screen without it."
+      "description": "Opens the Crew panel first (#556): the two hires moved to the top of the file so there is someone to build the schools, and the build steps between them and this one leave the Build panel showing — the employee row this clicks is not on screen without it. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly — trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building; the screenshot here is taken while they are still walking, mesh visible."
     },
     {
       "command": "employee list",
@@ -290,11 +293,19 @@
       "role": "observe"
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "(#1203) Replaces a fixed `tick <N>` pad that assumed instant relocation: the walk to the school takes an unknown number of ticks depending on distance, so this waits for actual arrival (trainingState promoted from pendingTrainingState once the employee enters the building) rather than guessing.",
+      "timeout": 90,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
@@ -302,7 +313,7 @@
         "equals": {
           "trainingCount": 1
         },
-        "note": "training takes 20 ticks — still in progress at 10"
+        "note": "The employee has walked to and entered the school — mesh hidden, course now ticking. Screenshot taken right after arrival."
       }
     },
     {
@@ -316,6 +327,22 @@
       "role": "observe"
     },
     {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        },
+        "note": "training takes 20 ticks from arrival — still in progress 5 ticks in"
+      }
+    },
+    {
       "command": "event choose 0",
       "interaction": [
         {
@@ -327,11 +354,19 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 25",
+      "command": "wait_until field:trainingCount equals:0 max_ticks:300",
+      "description": "(#1203) Replaces a fixed `tick <N>` pad for course completion — the exact tick the 20-tick course (from arrival, not from the `employee train` command) lands is no longer a fixed offset since arrival itself now takes a variable number of walk ticks.",
+      "timeout": 90,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 25"
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
@@ -340,7 +375,7 @@
           "trainingCount": 0,
           "proficiencyTotal": 3
         },
-        "note": "35 ticks total now past the 20-tick training duration — driving.excavator gained (proficiencyTotal 2→3), training slot freed"
+        "note": "Course complete — driving.excavator gained (proficiencyTotal 2→3), training slot freed, employee left the building back onto its ring. Screenshot taken right after they reappear outside."
       }
     },
     {

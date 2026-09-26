@@ -6,9 +6,15 @@
 // vehicle.driverId) — but only once the employee has actually arrived
 // (destinationX === null && destinationZ === null).
 //
-// Training enrollment (enrolInTraining) is deliberately NOT arrival-gated:
-// it relocates the employee to the school instantly rather than queuing a
-// walk — see EmployeeTraining.ts and #410.
+// Training enrollment (enrolInTraining) IS arrival-gated too, since #1203:
+// enrolment queues a walk to the school (superseding #410's old instant
+// teleport) and sets `pendingTrainingState`, not `trainingState` — this file
+// is what promotes it into `trainingState` (and reports the id in
+// `trainingStarted`) once the employee has actually entered the building
+// (locomotion transitions to `{kind:'inside', buildingId}` matching
+// `pendingTrainingState.buildingId`), mirroring the pendingRestDuration/
+// pendingTaskDuration promotions above but keyed on entering the building
+// rather than merely reaching its ring. See EmployeeTraining.ts.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -130,6 +136,82 @@ describe('tickArrivalGate — rest arrival', () => {
 
     expect(employee.restTicksRemaining).toBeNull();
     expect(result.restStarted).toEqual([]);
+  });
+});
+
+// ── Training arrival (#1203) ─────────────────────────────────────────────────
+//
+// Unlike rest/task arrival above (keyed on destinationX/Z going null),
+// training's own promotion is keyed on the employee's locomotion actually
+// transitioning to `{kind:'inside', buildingId}` matching
+// `pendingTrainingState.buildingId` — the moment tickLocomotion's own
+// `enter_building` arrival step (Mount.ts's enterBuilding) has fired for this
+// employee, this same tick, before ArrivalGate runs.
+
+describe('tickArrivalGate — training arrival', () => {
+  it('promotes pendingTrainingState into trainingState once locomotion is inside the matching building, clearing pendingTrainingState and reporting trainingStarted', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.locomotion = { kind: 'inside', buildingId: 12 };
+    employee.pendingTrainingState = { buildingId: 12, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+
+    const result = tickArrivalGate(state);
+
+    expect(employee.trainingState).not.toBeNull();
+    expect(employee.trainingState!.buildingId).toBe(12);
+    expect(employee.trainingState!.skill).toBe('blasting');
+    expect(employee.trainingState!.ticksRemaining).toBe(20);
+    expect(employee.trainingState!.fee).toBe(500);
+    expect(employee.pendingTrainingState).toBeNull();
+    expect(result.trainingStarted).toEqual([employee.id]);
+  });
+
+  it('does not promote while still walking (locomotion on_foot, not yet inside)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.locomotion = { kind: 'on_foot' };
+    employee.pendingTrainingState = { buildingId: 12, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+
+    const result = tickArrivalGate(state);
+
+    expect(employee.trainingState).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+    expect(result.trainingStarted).toEqual([]);
+  });
+
+  it('does not promote when inside a different building than the one pending (defensive — should never happen in practice)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.locomotion = { kind: 'inside', buildingId: 999 };
+    employee.pendingTrainingState = { buildingId: 12, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+
+    const result = tickArrivalGate(state);
+
+    expect(employee.trainingState).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+    expect(result.trainingStarted).toEqual([]);
+  });
+
+  it('is a no-op for an arrived employee with no pending training', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.destinationX = null;
+    employee.destinationZ = null;
+
+    const result = tickArrivalGate(state);
+
+    expect(employee.trainingState).toBeNull();
+    expect(result.trainingStarted).toEqual([]);
   });
 });
 

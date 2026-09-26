@@ -246,6 +246,53 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(employee.activeActionId).toBeNull();
   });
 
+  // #1203: an employee walking to enrol in training (pendingTrainingState set)
+  // has no activeActionId of their own — like the mid-evacuation-walk/drive
+  // cases above, this is a walk outside the claim system entirely. Without an
+  // isEnrolledInTraining guard, a fatigued trainee would be rerouted to rest
+  // mid-walk, abandoning the enrolment.
+  it('does NOT route an employee walking to enrol in training even when fatigue is below threshold (#1203)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 10; // below the threshold of 25
+    employee.activeActionId = null;
+    employee.pendingTrainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+    employee.destinationX = 40;
+    employee.destinationZ = 40;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = tickNeedRestoration(state);
+
+    expect(result.routed).toHaveLength(0);
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+  });
+
+  // #1203: an employee inside a school mid-course (trainingState set) has no
+  // activeActionId either — mirrors the walking case just above, for the
+  // "already arrived and inside" half of enrolment.
+  it('does NOT route an employee mid-course inside a school even when fatigue is below threshold (#1203)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 10; // below the threshold of 25
+    employee.activeActionId = null;
+    employee.trainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 10, fee: 500 };
+    employee.locomotion = { kind: 'inside', buildingId: 5 };
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = tickNeedRestoration(state);
+
+    expect(result.routed).toHaveLength(0);
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.trainingState).not.toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+  });
+
   // #1118: tickNeedRestoration routes a mounted employee's soft-threshold
   // rest through beginRestTravel (RestActionHelpers.ts) instead of
   // beginRestWalk — a mounted employee keeps the vehicle and drives to rest,
@@ -792,6 +839,50 @@ describe('tickCollapse (7.6)', () => {
 
     expect(result.collapsed).toHaveLength(0);
     expect(employee.collapsing).toBe(false);
+  });
+
+  // #1203: tickCollapse runs "regardless of busy/idle state" (this file's own
+  // header comment), so an employee mid-course inside a school — no
+  // activeActionId, nothing to interrupt via the normal claim system — reads
+  // exactly like a genuinely idle employee here unless guarded. Without
+  // isEnrolledInTraining, a collapse mid-course would create a rest
+  // PendingAction and call checkCollapse/beginRestTravel on an employee who
+  // is physically inside a building (locomotion.kind === 'inside'), never
+  // leaving it via leaveBuilding — desyncing occupantIds from reality.
+  it('does NOT collapse an employee mid-course inside a school even below the collapse threshold (#1203)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue (0)
+    employee.activeActionId = null;
+    employee.trainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 10, fee: 500 };
+    employee.locomotion = { kind: 'inside', buildingId: 5 };
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+    expect(employee.collapsing).toBe(false);
+    expect(employee.trainingState).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: 5 });
+  });
+
+  // #1203: mirrors the guard above for the walking-to-school half of
+  // enrolment (pendingTrainingState set, not yet arrived).
+  it('does NOT collapse an employee walking to enrol in training even below the collapse threshold (#1203)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 0; // at NEED_HARD_THRESHOLDS.fatigue (0)
+    employee.activeActionId = null;
+    employee.pendingTrainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+    employee.destinationX = 40;
+    employee.destinationZ = 40;
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+    expect(employee.collapsing).toBe(false);
+    expect(employee.pendingTrainingState).not.toBeNull();
   });
 
   // ── NEW (#1062) ─────────────────────────────────────────────────────────────

@@ -178,11 +178,16 @@ describe('Employee skills', () => {
   });
 
   it('tickTraining completes after ticksRemaining reaches 0', () => {
+    // A real, placed building — tickTraining (#1203) cancels a course whose
+    // buildingId names no building in ctx.state.buildings.buildings, rather
+    // than ticking it down.
+    const building = placeBuilding(ctx.state!.buildings, 'driving_center', 5, 5, 32, 32, 1).building!;
+
     // Start training with 3 ticks
     const startResult = startTraining(
       ctx.state!.employees,
       empId,
-      1,
+      building.id,
       'driving.truck',
       3,
       300,
@@ -192,16 +197,16 @@ describe('Employee skills', () => {
     const getEmp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
 
     // Tick 1 → 2 remaining
-    tickTraining(ctx.state!.employees);
+    tickTraining(ctx.state!);
     expect(getEmp().trainingState!.ticksRemaining).toBe(2);
     expect(getEmp().qualifications.find(q => q.category === 'driving.truck')).toBeUndefined();
 
     // Tick 2 → 1 remaining
-    tickTraining(ctx.state!.employees);
+    tickTraining(ctx.state!);
     expect(getEmp().trainingState!.ticksRemaining).toBe(1);
 
     // Tick 3 → 0 → complete → qualification added
-    tickTraining(ctx.state!.employees);
+    tickTraining(ctx.state!);
     expect(getEmp().trainingState).toBeNull();
 
     const qual = getEmp().qualifications.find(q => q.category === 'driving.truck');
@@ -578,9 +583,12 @@ describe('training and natural xp accumulation land at equal xp for the same lev
       .qualifications.find(q => q.category === 'blasting')!;
     qualA.xp = 150; // partial progress toward the level-3 threshold (300)
 
-    const startA = startTraining(ctx.state!.employees, empAId, 1, 'blasting', 5, 500);
+    // A real, placed building — see the #1203 comment on the tickTraining
+    // test above for why a fake buildingId can no longer be used here.
+    const building = placeBuilding(ctx.state!.buildings, 'blasting_academy', 5, 5, 32, 32, 1).building!;
+    const startA = startTraining(ctx.state!.employees, empAId, building.id, 'blasting', 5, 500);
     expect(startA.success).toBe(true);
-    for (let i = 0; i < 5; i++) tickTraining(ctx.state!.employees);
+    for (let i = 0; i < 5; i++) tickTraining(ctx.state!);
     expect(qualA.proficiencyLevel).toBe(3);
 
     // Employee B: reaches blasting level 3 purely through gainXp, starting

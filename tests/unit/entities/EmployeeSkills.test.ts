@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { createGame, type GameState } from '../../../src/core/state/GameState.js';
+import { placeBuilding, type BuildingType } from '../../../src/core/entities/Building.js';
 import {
   createEmployeeState,
   hireEmployee,
@@ -41,6 +43,26 @@ function makeStateWithOne(): { state: EmployeeState; empId: number } {
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state, 'driller', rng);
   return { state, empId: employee.id };
+}
+
+/**
+ * Full GameState with one hired employee and one real, placed building —
+ * tickTraining now takes a GameState (#1203, not the bare EmployeeState this
+ * file's `startTraining`-only sections above still use) and cancels a course
+ * whose buildingId names no building in state.buildings.buildings, rather
+ * than ticking it down. This file's tickTraining tests only ever care that a
+ * course completes, never which building taught it — startTraining itself
+ * doesn't check building/skill agreement (enrolInTraining does, in
+ * EmployeeTraining.test.ts) — so one placed building, reused for every
+ * course regardless of skill, is enough to keep every course out of the
+ * cancellation branch.
+ */
+function makeGameStateWithOne(): { state: GameState; empId: number; buildingId: number } {
+  const state = createGame({ seed: SEED });
+  const rng = new Random(SEED);
+  const { employee } = hireEmployee(state.employees, 'driller', rng);
+  const building = placeBuilding(state.buildings, 'geology_lab', 0, 0, 64, 64).building!;
+  return { state, empId: employee.id, buildingId: building.id };
 }
 
 // ── Section 1: New fields present on a newly hired employee ──────────────────
@@ -215,36 +237,37 @@ describe('startTraining', () => {
 // ── Section 4: tickTraining ──────────────────────────────────────────────────
 
 describe('tickTraining', () => {
-  let state: EmployeeState;
+  let state: GameState;
   let empId: number;
+  let buildingId: number;
 
   beforeEach(() => {
-    ({ state, empId } = makeStateWithOne());
+    ({ state, empId, buildingId } = makeGameStateWithOne());
   });
 
   it('decrements ticksRemaining by exactly 1 per tick', () => {
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 5, 100);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 5, 100);
     tickTraining(state);
 
-    const ts: TrainingState = (state.employees.find(e => e.id === empId) as any).trainingState;
+    const ts: TrainingState = (state.employees.employees.find(e => e.id === empId) as any).trainingState;
     expect(ts.ticksRemaining).toBe(4);
   });
 
   it('does not alter employees who are not in training', () => {
     const rng2 = new Random(SEED + 1);
-    const { employee: emp2 } = hireEmployee(state, 'blaster', rng2);
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng2);
     // emp2 has no training — tickTraining must not touch emp2
     tickTraining(state);
 
-    const ts2: TrainingState | null = (state.employees.find(e => e.id === emp2.id) as any).trainingState;
+    const ts2: TrainingState | null = (state.employees.employees.find(e => e.id === emp2.id) as any).trainingState;
     expect(ts2).toBeNull();
   });
 
   it('grants the qualification and sets trainingState to null when ticksRemaining reaches 0', () => {
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state); // 1 → 0 → complete
 
-    const emp = state.employees.find(e => e.id === empId)!;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
     const ts: TrainingState | null = (emp as any).trainingState;
     const quals: SkillQualification[] = (emp as any).qualifications;
 
@@ -255,10 +278,10 @@ describe('tickTraining', () => {
   it('granted qualification has proficiencyLevel 1 when employee had no prior qualification', () => {
     // A driller is hired holding 'blasting', so training that skill is a
     // promotion rather than a first grant. 'geology' is one the role never has.
-    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
     const geology = quals.find((q: SkillQualification) => q.category === 'geology')!;
     expect(geology.proficiencyLevel).toBe(1);
   });
@@ -267,65 +290,65 @@ describe('tickTraining', () => {
     // Training a held skill used to leave the qualification untouched: the fee
     // was charged and nothing changed, which made every level above Rookie
     // unobtainable.
-    const before = (state.employees.find(e => e.id === empId) as any).qualifications
+    const before = (state.employees.employees.find(e => e.id === empId) as any).qualifications
       .find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel;
 
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const after = (state.employees.find(e => e.id === empId) as any).qualifications
+    const after = (state.employees.employees.find(e => e.id === empId) as any).qualifications
       .find((q: SkillQualification) => q.category === 'blasting')!;
     expect(after.proficiencyLevel).toBe(before + 1);
   });
 
   it('does not add a duplicate qualification when promoting', () => {
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
     expect(quals.filter((q: SkillQualification) => q.category === 'blasting')).toHaveLength(1);
   });
 
   it('never promotes past level 5', () => {
-    assignSkill(state, empId, 'blasting' as SkillCategory, 5);
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    assignSkill(state.employees, empId, 'blasting' as SkillCategory, 5);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
     expect(quals.find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel).toBe(5);
   });
 
   it('reports each completion so the caller can tell the player', () => {
-    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
-    const completions = tickTraining(state);
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
+    const { completed } = tickTraining(state);
 
-    expect(completions).toHaveLength(1);
-    expect(completions[0]!.employeeId).toBe(empId);
-    expect(completions[0]!.skill).toBe('geology');
-    expect(completions[0]!.level).toBe(1);
-    expect(completions[0]!.isNew).toBe(true);
+    expect(completed).toHaveLength(1);
+    expect(completed[0]!.employeeId).toBe(empId);
+    expect(completed[0]!.skill).toBe('geology');
+    expect(completed[0]!.level).toBe(1);
+    expect(completed[0]!.isNew).toBe(true);
   });
 
   it('reports a promotion as not new', () => {
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
-    const completions = tickTraining(state);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
+    const { completed } = tickTraining(state);
 
-    expect(completions[0]!.isNew).toBe(false);
-    expect(completions[0]!.level).toBe(2);
+    expect(completed[0]!.isNew).toBe(false);
+    expect(completed[0]!.level).toBe(2);
   });
 
   it('returns no completions while a course is still running', () => {
-    startTraining(state, empId, 1, 'geology' as SkillCategory, 3, 100);
-    expect(tickTraining(state)).toEqual([]);
-    expect(tickTraining(state)).toEqual([]);
-    expect(tickTraining(state)).toHaveLength(1);
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 3, 100);
+    expect(tickTraining(state).completed).toEqual([]);
+    expect(tickTraining(state).completed).toEqual([]);
+    expect(tickTraining(state).completed).toHaveLength(1);
   });
 
   it('raises the salary to match the new qualification', () => {
-    const emp = () => state.employees.find(e => e.id === empId)!;
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
     const before = emp().salary;
 
-    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
     tickTraining(state);
 
     expect(emp().salary).toBeGreaterThan(before);
@@ -336,29 +359,29 @@ describe('tickTraining', () => {
     // blasting is a promotion (the employee already holds it), not a fresh
     // grant — training it must not leave xp at 0, which would under-credit a
     // trained employee relative to one who reached the same level via work.
-    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
     const blasting = quals.find((q: SkillQualification) => q.category === 'blasting')!;
     expect(blasting.xp).toBe(XP_THRESHOLDS[blasting.proficiencyLevel as 1 | 2 | 3 | 4 | 5]);
   });
 
   it('freshly granted qualification has xp initialised to 0', () => {
-    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
     tickTraining(state);
 
-    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
     const geology = quals.find((q: SkillQualification) => q.category === 'geology')!;
     expect(geology.xp).toBe(0);
   });
 
   it('does not complete training early — qualification is absent while ticksRemaining > 0', () => {
-    startTraining(state, empId, 1, 'management' as SkillCategory, 3, 200);
+    startTraining(state.employees, empId, buildingId, 'management' as SkillCategory, 3, 200);
     tickTraining(state); // 3 → 2
     tickTraining(state); // 2 → 1  (still in progress)
 
-    const emp = state.employees.find(e => e.id === empId)!;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
     const quals: SkillQualification[] = (emp as any).qualifications;
     const ts: TrainingState = (emp as any).trainingState;
 
@@ -369,17 +392,32 @@ describe('tickTraining', () => {
 
   it('processes multiple employees in training in the same tick', () => {
     const rng2 = new Random(SEED + 1);
-    const { employee: emp2 } = hireEmployee(state, 'blaster', rng2);
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng2);
 
-    startTraining(state, empId,  1, 'blasting' as SkillCategory, 1, 100);
-    startTraining(state, emp2.id, 2, 'geology'  as SkillCategory, 1, 150);
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
+    startTraining(state.employees, emp2.id, buildingId, 'geology'  as SkillCategory, 1, 150);
     tickTraining(state); // should complete both
 
-    const quals1: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
-    const quals2: SkillQualification[] = (state.employees.find(e => e.id === emp2.id) as any).qualifications;
+    const quals1: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
+    const quals2: SkillQualification[] = (state.employees.employees.find(e => e.id === emp2.id) as any).qualifications;
 
     expect(quals1.some((q: SkillQualification) => q.category === 'blasting')).toBe(true);
     expect(quals2.some((q: SkillQualification) => q.category === 'geology')).toBe(true);
+  });
+
+  // ── NEW (#1203) ──────────────────────────────────────────────────────────
+  // tickTraining's own cancellation branch: a course whose buildingId names
+  // no building in state.buildings.buildings (here, never placed at all) is
+  // cancelled with a full refund instead of ticking down or granting anything.
+  it('#1203: cancels (refunding the fee) instead of granting, when the trainingState buildingId names no real building', () => {
+    startTraining(state.employees, empId, 999999, 'blasting' as SkillCategory, 1, 250);
+    const { completed, cancelled } = tickTraining(state);
+
+    expect(completed).toHaveLength(0);
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0]!.employeeId).toBe(empId);
+    expect(cancelled[0]!.refund).toBe(250);
+    expect((state.employees.employees.find(e => e.id === empId) as any).trainingState).toBeNull();
   });
 });
 
@@ -391,32 +429,33 @@ describe('tickTraining', () => {
 describe('training end-to-end — all SkillCategory values (four building types)', () => {
   const TRAINING_CASES: Array<{
     label: string;
-    skill: string;      // use string; SkillCategory type is stripped by esbuild
-    buildingId: number; // representative id for each building type
+    skill: string;              // use string; SkillCategory type is stripped by esbuild
+    buildingType: BuildingType; // real building placed so tickTraining (#1203) doesn't cancel
   }> = [
     // driving_center covers three driving sub-skills
-    { label: 'driving_center → driving.truck',      skill: 'driving.truck',      buildingId: 101 },
-    { label: 'driving_center → driving.excavator',  skill: 'driving.excavator',  buildingId: 101 },
-    { label: 'driving_center → driving.drill_rig',  skill: 'driving.drill_rig',  buildingId: 101 },
+    { label: 'driving_center → driving.truck',      skill: 'driving.truck',      buildingType: 'driving_center' },
+    { label: 'driving_center → driving.excavator',  skill: 'driving.excavator',  buildingType: 'driving_center' },
+    { label: 'driving_center → driving.drill_rig',  skill: 'driving.drill_rig',  buildingType: 'driving_center' },
     // one skill per remaining building type
-    { label: 'blasting_academy → blasting',         skill: 'blasting',           buildingId: 201 },
-    { label: 'management_office → management',      skill: 'management',         buildingId: 301 },
-    { label: 'geology_lab → geology',               skill: 'geology',            buildingId: 401 },
+    { label: 'blasting_academy → blasting',         skill: 'blasting',           buildingType: 'blasting_academy' },
+    { label: 'management_office → management',      skill: 'management',         buildingType: 'management_office' },
+    { label: 'geology_lab → geology',               skill: 'geology',            buildingType: 'geology_lab' },
   ];
 
-  for (const { label, skill, buildingId } of TRAINING_CASES) {
+  for (const { label, skill, buildingType } of TRAINING_CASES) {
     it(`grants qualification after duration elapses: ${label}`, () => {
-      const state = createEmployeeState();
+      const state = createGame({ seed: SEED });
       const rng = new Random(SEED);
-      const { employee } = hireEmployee(state, 'driller', rng);
+      const { employee } = hireEmployee(state.employees, 'driller', rng);
+      const building = placeBuilding(state.buildings, buildingType, 0, 0, 64, 64).building!;
 
-      const result = startTraining(state, employee.id, buildingId, skill as SkillCategory, 2, 250);
+      const result = startTraining(state.employees, employee.id, building.id, skill as SkillCategory, 2, 250);
       expect(result.success).toBe(true);
 
       tickTraining(state); // tick 1: 2 → 1
       tickTraining(state); // tick 2: 1 → 0 → complete
 
-      const emp = state.employees.find(e => e.id === employee.id)!;
+      const emp = state.employees.employees.find(e => e.id === employee.id)!;
       const quals: SkillQualification[] = (emp as any).qualifications;
       const ts: TrainingState | null = (emp as any).trainingState;
 
