@@ -484,6 +484,12 @@
           "value": 2
         },
         {
+          "type": "focusTile",
+          "x": 9,
+          "z": 4,
+          "pitch": 68
+        },
+        {
           "type": "dragTiles",
           "x1": 9,
           "z1": 4,

@@ -317,6 +317,12 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 6,
+          "z": 4,
+          "pitch": 68
+        },
+        {
           "type": "dragTiles",
           "x1": 6,
           "z1": 4,
