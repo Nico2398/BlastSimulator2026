@@ -28,7 +28,11 @@ const {
   resolveGraceWindowMinutes,
   DEFAULT_GRACE_WINDOW_MINUTES,
   LIVE_RUN_STATUSES,
+  RUNNER_WORKFLOWS,
   isTrustedAssignmentAuthor,
+  liveRunFor,
+  parseRunEntity,
+  runConcerns,
 } = liveness;
 
 const NOW = 1_700_000_000_000; // fixed instant, epoch ms
@@ -481,5 +485,144 @@ describe('decideRunLiveness — excludeRunId', () => {
       })
     );
     expect(result.verdict).toBe('live');
+  });
+});
+
+// With `AGENTIC_MAX_PARALLEL_RUNS` above 1, several agent sessions are live at
+// once, and "some runner run is live" stops meaning "this issue's run is live".
+// Every runner run is named after the entity it acts on (`run-name` in both
+// runner workflows), and these read that name. Unreadable identity fails toward
+// "this run might be mine" — the direction that never declares a live session
+// lost and never hands a branch to a second worker.
+describe('parseRunEntity — the runner `run-name` shape', () => {
+  it.each([
+    ['agentic-run issue-1203', { kind: 'issue', number: 1203 }],
+    ['agentic-run pr-1251', { kind: 'pr', number: 1251 }],
+    ['agentic-run manual', { kind: 'manual' }],
+    ['agentic-noop', { kind: 'noop' }],
+  ])('reads %s', (title, expected) => {
+    expect(parseRunEntity(title)).toEqual(expected);
+  });
+
+  it.each([null, undefined, '', 'Claude Pipeline', 'agentic-run issue-', 'agentic-run issue-12 extra', 'fix: something (#12)'])(
+    'recognises no identity in %p',
+    (title) => {
+      expect(parseRunEntity(title)).toBeNull();
+    }
+  );
+});
+
+describe('runConcerns — whose run is this', () => {
+  const mine = [{ kind: 'issue', number: 1200 }, { kind: 'pr', number: 1251 }];
+
+  it('counts a run naming the issue or its pull request', () => {
+    expect(runConcerns({ display_title: 'agentic-run issue-1200' }, mine)).toBe(true);
+    expect(runConcerns({ display_title: 'agentic-run pr-1251' }, mine)).toBe(true);
+  });
+
+  it('does not count another entity, even one sharing the number with a different kind', () => {
+    expect(runConcerns({ display_title: 'agentic-run issue-1203' }, mine)).toBe(false);
+    expect(runConcerns({ display_title: 'agentic-run pr-1200' }, mine)).toBe(false);
+  });
+
+  it('never counts a noop run — every comment in the repository creates one', () => {
+    expect(runConcerns({ display_title: 'agentic-noop' }, mine)).toBe(false);
+  });
+
+  // A manual dispatch with no issue, or a run from before `run-name` existed,
+  // could be working on anything. Reading it as "not mine" would let a CI
+  // handback or a recovery act underneath a session that is still running.
+  it('counts a run whose identity cannot be read', () => {
+    expect(runConcerns({ display_title: 'agentic-run manual' }, mine)).toBe(true);
+    expect(runConcerns({ display_title: 'fix: something (#12)' }, mine)).toBe(true);
+    expect(runConcerns({}, mine)).toBe(true);
+  });
+});
+
+describe('liveRunFor', () => {
+  const entities = [{ kind: 'issue', number: 1200 }];
+  const run = (id: number, status: string, display_title: string) => ({ id, status, display_title, created_at: isoSecondsAgo(60) });
+
+  it('finds a live run of this entity among other live sessions', () => {
+    const runs = [run(1, 'in_progress', 'agentic-run issue-1203'), run(2, 'queued', 'agentic-run issue-1200')];
+    expect(liveRunFor(runs, entities)?.id).toBe(2);
+  });
+
+  it('ignores other sessions and completed runs of this entity', () => {
+    const runs = [run(1, 'in_progress', 'agentic-run issue-1203'), run(2, 'completed', 'agentic-run issue-1200')];
+    expect(liveRunFor(runs, entities)).toBeNull();
+  });
+
+  it.each(LIVE_RUN_STATUSES as string[])('treats %s as live', (status) => {
+    expect(liveRunFor([run(3, status, 'agentic-run issue-1200')], entities)?.id).toBe(3);
+  });
+
+  it('skips the caller\'s own run', () => {
+    expect(liveRunFor([run(4, 'in_progress', 'agentic-run issue-1200')], entities, { excludeRunId: 4 })).toBeNull();
+  });
+});
+
+describe('decideRunLiveness — only the issue\'s own runs are evidence', () => {
+  const stale = () => [assignmentComment(ASSIGNMENT_BODY, isoMinutesAgo(DEFAULT_GRACE_WINDOW_MINUTES + 25))];
+
+  // The case parallel sessions create: #1130 lost its run while another
+  // issue's session is alive. That other session says nothing about #1130.
+  it('reads lost when the only live run belongs to another issue', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: stale(),
+        workflowRuns: [
+          { id: 7, status: 'in_progress', created_at: isoMinutesAgo(40), display_title: 'agentic-run issue-1203' },
+        ],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('lost');
+    expect(result.evidence.mostRecentRun).toBeNull();
+  });
+
+  it('reads live when this issue\'s own run is live alongside others', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: stale(),
+        workflowRuns: [
+          { id: 7, status: 'in_progress', created_at: isoMinutesAgo(40), display_title: 'agentic-run issue-1203' },
+          { id: 8, status: 'in_progress', created_at: isoMinutesAgo(90), display_title: 'agentic-run issue-1130' },
+        ],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('live');
+    expect(result.evidence.run.id).toBe(8);
+  });
+
+  it('never reads a noop run as the issue\'s most recent run', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: stale(),
+        workflowRuns: [{ id: 9, status: 'queued', created_at: isoSecondsAgo(5), display_title: 'agentic-noop' }],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('lost');
+  });
+
+  // A run from before `run-name` existed carries a title with no identity in
+  // it. At rollout that is the session already live — it must still count.
+  it('still counts a live run whose title carries no identity', () => {
+    const result = decideRunLiveness(
+      baseInput({
+        assignmentComments: stale(),
+        workflowRuns: [{ id: 10, status: 'in_progress', created_at: isoMinutesAgo(90), display_title: 'Claude Pipeline' }],
+        graceWindowMinutes: DEFAULT_GRACE_WINDOW_MINUTES,
+      })
+    );
+    expect(result.verdict).toBe('live');
+  });
+});
+
+describe('RUNNER_WORKFLOWS', () => {
+  it('names both runner workflows, and nothing else', () => {
+    expect(RUNNER_WORKFLOWS).toEqual(['claude-runner.yml', 'opencode-runner.yml']);
   });
 });

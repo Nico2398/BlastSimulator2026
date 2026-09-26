@@ -24,6 +24,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { registeredHooks, runHook, type HookRegistry } from '../../helpers/claudeHooks';
+import { evaluateTemplate } from '../../helpers/actionsExpression';
 
 const require = createRequire(import.meta.url);
 
@@ -640,14 +641,117 @@ describe('the runner concurrency group only admits a run the job will act on', (
         expect(jobIf, `${name}: job \`if:\` is missing \`${clause}\``).toContain(clause);
       }
 
-      // A matching trigger still resolves to the one shared, serialising
-      // name; anything else gets its own group keyed by this run, so it can
-      // never contend for — or evict — a real queued run.
-      expect(concurrency).toContain("&& 'agentic-runner' ||");
+      // A matching trigger resolves to its entity's serialising name;
+      // anything else gets its own group keyed by this run, so it can never
+      // contend for — or evict — a real queued run.
+      expect(concurrency).toContain("'agentic-runner-{0}'");
       expect(concurrency).toMatch(/format\('agentic-runner-noop-\{0\}',\s*github\.run_id\)/);
       expect(concurrency).toContain('cancel-in-progress: false');
     }
   );
+});
+
+/** The `${{ }}` block that follows `key` in a workflow, as written. */
+const expressionAfter = (text: string, key: string): string => {
+  const at = text.indexOf(key);
+  expect(at, `${key} not found`).toBeGreaterThan(-1);
+  const open = text.indexOf('${{', at);
+  const close = text.indexOf('}}', open);
+  return text.slice(open, close + 2);
+};
+
+// Several agent sessions can be live at once (`AGENTIC_MAX_PARALLEL_RUNS`), so
+// "a runner run is live" stopped meaning "this issue's run is live". Every
+// liveness check — the CI fail-safe's guard, the end-of-session recovery — now
+// reads *which* entity a run is working on off its `run-name`, and the runner's
+// concurrency group serialises per entity rather than repo-wide. Both are
+// expressions that fail in silence, so they are evaluated here against the
+// event payloads GitHub actually sends, not matched as text.
+describe('a runner run names the entity it works on', () => {
+  const liveness = require(join(ROOT, '.github/scripts/run-liveness.cjs'));
+
+  const cases = (mention: string) => [
+    {
+      what: 'an assignment comment on an issue',
+      event: { event_name: 'issue_comment', run_id: 1, event: { issue: { number: 1203 }, comment: { body: `${mention} — autonomous pipeline assignment for issue #1203`, user: { type: 'User' } } } },
+      entity: 'issue-1203',
+    },
+    {
+      what: 'a CI handback on a pull request',
+      event: { event_name: 'issue_comment', run_id: 2, event: { issue: { number: 1251, pull_request: { url: 'x' } }, comment: { body: `${mention} — CI is red on this pull request`, user: { type: 'User' } } } },
+      entity: 'pr-1251',
+    },
+    {
+      what: 'a review comment',
+      event: { event_name: 'pull_request_review_comment', run_id: 3, event: { pull_request: { number: 1251 }, comment: { body: `please look ${mention}`, user: { type: 'User' } } } },
+      entity: 'pr-1251',
+    },
+    {
+      what: 'a dispatch naming an issue',
+      event: { event_name: 'workflow_dispatch', run_id: 4, event: {} },
+      inputs: { issue_number: '1200' },
+      entity: 'issue-1200',
+    },
+    {
+      what: 'a dispatch naming nothing',
+      event: { event_name: 'workflow_dispatch', run_id: 5, event: {} },
+      inputs: { issue_number: '' },
+      entity: 'manual',
+    },
+  ];
+
+  const noops = [
+    { what: 'a comment with no mention', event: { event_name: 'issue_comment', run_id: 6, event: { issue: { number: 1203 }, comment: { body: 'Thanks, merged.', user: { type: 'User' } } } } },
+    { what: 'a bot quoting the mention', event: { event_name: 'issue_comment', run_id: 7, event: { issue: { number: 1203 }, comment: { body: '@claude @opencode', user: { type: 'Bot' } } } } },
+  ];
+
+  it.each([
+    ['claude-runner.yml', '@claude'],
+    ['opencode-runner.yml', '@opencode'],
+  ])('%s names each real trigger after its entity, and its group after the same one', (name, mention) => {
+    const text = workflow(name);
+    const runName = expressionAfter(text, '\nrun-name:');
+    const group = expressionAfter(text, '\n  group:');
+    for (const c of cases(mention)) {
+      const contexts = { github: c.event, inputs: c.inputs ?? {} };
+      const title = evaluateTemplate(runName, contexts);
+      expect(title, `${name}: ${c.what}`).toBe(`agentic-run ${c.entity}`);
+      expect(evaluateTemplate(group, contexts), `${name}: ${c.what}`).toBe(`agentic-runner-${c.entity}`);
+      // And the one reader of that name agrees on what it says.
+      const parsed = liveness.parseRunEntity(title);
+      expect(parsed, `${name}: ${c.what}`).not.toBeNull();
+      expect(parsed.kind === 'manual' ? 'manual' : `${parsed.kind}-${parsed.number}`).toBe(c.entity);
+    }
+  });
+
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    '%s names a trigger its job will skip `agentic-noop`, in a group of its own',
+    (name) => {
+      const text = workflow(name);
+      const runName = expressionAfter(text, '\nrun-name:');
+      const group = expressionAfter(text, '\n  group:');
+      for (const c of noops) {
+        const contexts = { github: c.event, inputs: {} };
+        expect(evaluateTemplate(runName, contexts), c.what).toBe('agentic-noop');
+        expect(evaluateTemplate(group, contexts), c.what).toBe(`agentic-runner-noop-${c.event.run_id}`);
+      }
+    }
+  );
+
+  // The run-name and the group decide "is this a real trigger" and "which
+  // entity" with the same two expressions. Written twice, so pinned equal: a
+  // run named after one entity and serialised under another would slip past
+  // every liveness check that trusts the name.
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])('%s decides both from identical expressions', (name) => {
+    const text = workflow(name);
+    const normalise = (expr: string) => expr.replace(/\s+/g, ' ');
+    const runName = normalise(expressionAfter(text, '\nrun-name:'));
+    const group = normalise(expressionAfter(text, '\n  group:'));
+    const trigger = (expr: string) => expr.slice(expr.indexOf('('), expr.indexOf('&& format('));
+    const entity = (expr: string) => expr.slice(expr.indexOf("{0}', ") + 6, expr.lastIndexOf(') ||'));
+    expect(trigger(runName)).toBe(trigger(group));
+    expect(entity(runName)).toBe(entity(group));
+  });
 });
 
 // The recovery step is the runner's own last chance to notice its group still
@@ -716,48 +820,57 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
 });
 
 // #614: the "is a runner session live" predicate used to be inlined twice —
-// here and in agentic-ci-failure.yml's guard — because the latter runs with
-// no checkout and cannot `require()` a shared .cjs module. Pinning each copy
-// on its own was not enough: agentic-ci-failure.yml has carried the full
-// non-terminal status set since #507 (13 Aug), agentic-recover-blocked
-// shipped with only `['queued', 'in_progress']` three weeks later in #641,
-// and nothing compared the two, so #614's `pending` run was invisible to one
-// check and would have been caught by the other.
+// here and in agentic-ci-failure.yml's guard. Pinning each copy on its own was
+// not enough: agentic-ci-failure.yml has carried the full non-terminal status
+// set since #507 (13 Aug), agentic-recover-blocked shipped with only
+// `['queued', 'in_progress']` three weeks later in #641, and nothing compared
+// the two, so #614's `pending` run was invisible to one check and would have
+// been caught by the other.
 //
-// #1136 removed the duplicate on the checked-out side entirely:
-// agentic-recover-blocked now `require()`s `run-liveness.cjs`'s
-// `LIVE_RUN_STATUSES` as its one source of truth instead of carrying its own
-// copy. agentic-ci-failure.yml still cannot — no checkout there — so its
-// inline `LIVE` array remains the second copy, and this still has to prove
-// that copy cannot drift from the shared module's.
-describe('the runner-liveness predicate cannot drift between its two copies', () => {
+// #1136 moved agentic-recover-blocked onto `run-liveness.cjs`. Parallel runs
+// finished the job: "live" now has to mean "live *on this entity*", which is a
+// parse of the run's `run-name`, and a third place to get that wrong is one too
+// many. Both guards read runner runs through `issue-api.cjs`'s `runnerRuns` and
+// decide with `run-liveness.cjs`, and neither carries a list of its own.
+describe('the runner-liveness predicate lives in one place', () => {
   const recover = readFileSync(
     join(ROOT, '.github/actions/agentic-recover-blocked/action.yml'), 'utf8'
   );
   const failsafe = workflow('agentic-ci-failure.yml');
   const runLiveness = require(join(ROOT, '.github/scripts/run-liveness.cjs'));
 
-  const extract = (source: string, name: string): string => {
-    const match = new RegExp(`const ${name} = (\\[[^\\]]*\\]);`).exec(source);
-    expect(match, `${name} array not found`).not.toBeNull();
-    return match![1] ?? '';
-  };
-
-  it('polls the same runner workflows in both copies', () => {
-    expect(extract(recover, 'RUNNERS')).toBe(extract(failsafe, 'RUNNERS'));
+  it.each([
+    ['agentic-recover-blocked', recover],
+    ['agentic-ci-failure.yml', failsafe],
+  ])('%s reads runner runs through the shared reader, carrying no list of its own', (_, source) => {
+    expect(source).toContain('.github/scripts/run-liveness.cjs');
+    expect(source).toContain('.github/scripts/issue-api.cjs');
+    expect(source).toContain('api.runnerRuns()');
+    expect(source).not.toMatch(/const RUNNERS = \[/);
+    expect(source).not.toMatch(/const LIVE = \[/);
   });
 
-  it('no longer carries its own status list — it requires the shared one', () => {
-    expect(recover).toContain(".github/scripts/run-liveness.cjs");
-    expect(recover).not.toMatch(/const LIVE = \[/);
+  it('polls the full set of non-terminal run statuses', () => {
+    // Pin the content, not only the agreement — a narrowed set in the one
+    // shared place would reproduce #614 everywhere at once.
+    expect(runLiveness.LIVE_RUN_STATUSES).toEqual(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
+    const api = readFileSync(join(ROOT, '.github/scripts/issue-api.cjs'), 'utf8');
+    expect(api).toContain("require('./run-liveness.cjs')");
+    expect(api).toContain('for (const status of [null, ...LIVE_RUN_STATUSES])');
+    expect(api).toContain('for (const workflow_id of RUNNER_WORKFLOWS)');
   });
 
-  it('polls the same set of non-terminal run statuses as the shared module', () => {
-    const failsafeLive = JSON.parse(extract(failsafe, 'LIVE').replace(/'/g, '"'));
-    expect(failsafeLive).toEqual(runLiveness.LIVE_RUN_STATUSES);
-    // Pin the content too, not only the agreement — a narrowed set on both
-    // sides would pass the line above and still reproduce #614.
-    expect(failsafeLive).toEqual(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
+  it('weighs only the runs that name the work in question', () => {
+    expect(recover).toContain('runLiveness.decideRunLiveness');
+    expect(failsafe).toContain('liveness.liveRunFor(runner.runs, [');
+    expect(failsafe).toContain("{ kind: 'issue', number: issueNumber }");
+    expect(failsafe).toContain("{ kind: 'pr', number: pr.number }");
+  });
+
+  // A read that failed is not an empty list: declining is the safe polarity,
+  // and the step goes red so the failure is seen.
+  it('fails the fail-safe loud when runner runs cannot be read', () => {
+    expect(failsafe).toMatch(/if \(runner\.unknown\) \{\s*\n\s*core\.setFailed\(/);
   });
 });
 
@@ -1288,12 +1401,9 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   // The guard that keeps the fail-safe from fighting `[await-ci]`: a live
   // session is already waiting on this verdict, and a second comment would queue
   // a second runner onto one branch.
-  it('declines while any agent session is live', () => {
-    expect(failsafe).toContain("const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml']");
-    for (const status of ['queued', 'in_progress']) {
-      expect(failsafe).toContain(`'${status}'`);
-    }
-    expect(failsafe).toContain('listWorkflowRuns');
+  it('declines while a session on this pull request or its issue is live', () => {
+    expect(failsafe).toContain('api.runnerRuns()');
+    expect(failsafe).toContain('liveness.liveRunFor(');
   });
 
   it('leaves a draft alone — its channel was already reported red', () => {

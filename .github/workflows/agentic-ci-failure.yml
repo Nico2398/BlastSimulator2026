@@ -77,9 +77,16 @@ jobs:
       group: agentic-ci-failure-${{ inputs.pr || github.event.workflow_run.head_branch }}
       cancel-in-progress: false
     steps:
-      # No checkout: everything below is `actions/github-script` and reads
-      # nothing from the workspace.
-      #
+      # Checked out for the live-session guard below, which reads runner runs
+      # through `issue-api.cjs` and decides whose they are with
+      # `run-liveness.cjs` — the same two modules `agentic-recover-blocked`
+      # uses, so the two guards cannot disagree about what "live" means.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
       # The PAT, not GITHUB_TOKEN, and for once the mention is the point. A
       # comment created with GITHUB_TOKEN is authored by `github-actions[bot]`,
       # and both runners filter `comment.user.type != 'Bot'` — so the nudge would
@@ -228,35 +235,49 @@ jobs:
             }
 
             // ── The guard that makes this safe to fire on every red CI ──
-            // A session that is still running is already waiting on this very
-            // verdict: `agentic-pipeline-finalization`'s `[await-ci]` step reads
-            // it and loops. Commenting now would queue a second runner behind
-            // the live one (the runners share a `cancel-in-progress: false`
-            // concurrency group), and two sessions would push to one branch.
-            // The check covers the whole runner job, not just its agent step, so
-            // a run in its rescue or auto-merge-arming steps still counts as live.
+            // A session that is still running on this work is already waiting
+            // on this very verdict: `agentic-pipeline-finalization`'s
+            // `[await-ci]` step reads it and loops. Commenting now would queue a
+            // second runner on this pull request, and two sessions would push to
+            // one branch. The check covers the whole runner job, not just its
+            // agent step, so a run in its rescue or auto-merge-arming steps
+            // still counts as live.
+            //
+            // **This work, not any work.** Several sessions can be live at once
+            // (`AGENTIC_MAX_PARALLEL_RUNS`), and before runs carried their
+            // entity in `run-name` this guard declined whenever *any* runner run
+            // was live — which, with sessions always running, would have been
+            // forever: a dead session's red PR never handed back to anyone. A
+            // run is this PR's when it names the issue the head was built for
+            // or the pull request itself; a run whose identity cannot be read
+            // counts too (`runConcerns` in `run-liveness.cjs`).
             //
             // Skipping here is not dropping the failure: `agentic-watchdog.yml`
             // sweeps open pipeline PRs whose CI is red and dispatches this
-            // workflow again, so a PR whose verdict landed while some session
-            // held the runner is picked up on the next sweep instead of waiting
-            // for a human. That is the only reason the sweep exists here — it
-            // re-raises this event, it never assigns.
-            const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml'];
-            const LIVE = ['queued', 'in_progress', 'waiting', 'requested', 'pending'];
-            for (const workflow of RUNNERS) {
-              for (const status of LIVE) {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                  owner, repo, workflow_id: workflow, status, per_page: 1
-                });
-                if (data.total_count > 0) {
-                  core.info(
-                    `#${pr.number}: ${workflow} has a ${status} run — an agent session is live and reads this ` +
-                    'verdict itself. Not commenting.'
-                  );
-                  return;
-                }
-              }
+            // workflow again, and `scan-after-runner` below re-scans the moment
+            // a runner finishes, so a PR whose verdict landed while its session
+            // was live is picked up instead of waiting for a human.
+            const liveness = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/run-liveness.cjs`);
+            const { createIssueApi } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-api.cjs`);
+            const api = createIssueApi(github, { owner, repo, log: core.info });
+            const runner = await api.runnerRuns();
+            if (runner.unknown) {
+              core.setFailed(
+                `#${pr.number}: the runner workflows' runs could not be read, so a live session on this ` +
+                'pull request cannot be ruled out. Not commenting; the watchdog re-raises it.'
+              );
+              return;
+            }
+            const live = liveness.liveRunFor(runner.runs, [
+              { kind: 'issue', number: issueNumber },
+              { kind: 'pr', number: pr.number },
+            ]);
+            if (live) {
+              core.info(
+                `#${pr.number}: runner run ${live.id} (\`${live.display_title}\`) is ${live.status} on this ` +
+                'work — its session reads this verdict itself. Not commenting.'
+              );
+              return;
             }
 
             // Anything else falls back to the default rather than disabling the

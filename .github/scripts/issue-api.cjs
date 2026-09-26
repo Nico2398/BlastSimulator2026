@@ -11,6 +11,8 @@
  * Reads only. Nothing here labels, comments, or merges.
  */
 
+const { LIVE_RUN_STATUSES, RUNNER_WORKFLOWS } = require('./run-liveness.cjs');
+
 const PER_PAGE = 100;
 
 /**
@@ -509,6 +511,55 @@ function createIssueApi(
 
       assignmentComments.set(number, result);
       return result;
+    },
+
+    /**
+     * Every agent-session run worth weighing, across both runner workflows.
+     *
+     * Two reads per workflow, unioned by run id, because each one misses what
+     * the other catches. The unfiltered listing is newest-first and bounded, so a
+     * session hours old can fall off it: every comment anywhere in the
+     * repository creates a noop run in both runner workflows, and with several
+     * sessions live that is dozens an hour. The status-filtered listings reach
+     * every live run however old, but they are eventually consistent and can
+     * omit a run seconds old — #1136, where one empty filtered read declared a
+     * live run lost. Together they cover both ends.
+     *
+     * Reads only; which run is live *for what* is `run-liveness.cjs`'s question.
+     * `unknown: true` means a read failed, and every caller treats that as "a
+     * live run cannot be ruled out".
+     *
+     * @returns {Promise<{runs: {id: number, status: string, created_at: string, display_title: string|null}[], unknown: boolean}>}
+     */
+    async runnerRuns() {
+      const found = new Map();
+      try {
+        for (const workflow_id of RUNNER_WORKFLOWS) {
+          for (const status of [null, ...LIVE_RUN_STATUSES]) {
+            const { data } = await read(`${workflow_id} runs${status ? ` (${status})` : ''}`, () =>
+              github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id,
+                per_page: PER_PAGE,
+                ...(status ? { status } : {}),
+              })
+            );
+            for (const run of data.workflow_runs || []) {
+              found.set(run.id, {
+                id: run.id,
+                status: run.status,
+                created_at: run.created_at,
+                display_title: run.display_title ?? null,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        log(`Runner runs could not be read (${error.status ?? error.message}).`);
+        return { runs: [], unknown: true };
+      }
+      return { runs: [...found.values()], unknown: false };
     },
 
     /**
