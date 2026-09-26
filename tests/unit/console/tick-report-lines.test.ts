@@ -106,9 +106,7 @@ describe('tick.ts — trainingCancellations lines', () => {
 
   it('does not push a course-cancelled line when trainingCancellations is undefined', () => {
     const ctx = makeGameContext();
-    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
-      trainingCancellations: undefined,
-    }));
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({}));
 
     const result = tickCommand(ctx, ['1'], {});
 
