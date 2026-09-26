@@ -7,7 +7,7 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
-import { processShiftCycle } from '../../../src/core/engine/ShiftCycle.js';
+import { processShiftCycle, completeRestTick } from '../../../src/core/engine/ShiftCycle.js';
 import { tickGeneralRestCompletion } from '../../../src/core/engine/RestCompletion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -20,8 +20,23 @@ import {
   SHIFT_SLEEP_DURATION_TICKS,
   SHIFT_DURATIONS_TICKS,
   MAX_NEED_GAUGE,
+  NEED_REST_NO_BUILDING_CAP,
 } from '../../../src/core/config/balance.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+
+/** A directly-editable flat, fully-walkable NavGrid (mirrors the identical helper used throughout the engine test suites, e.g. MoveTo.test.ts's setupSchool). */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -482,6 +497,57 @@ describe('processShiftCycle (7.9)', () => {
   });
 });
 
+// #1204: completeRestTick (the legacy no-policy shift-sleep completion path)
+// must thread the completed rest action's own named building (payload.
+// buildingId) into completeRestForEmployee exactly like tickGeneralRestCompletion
+// does (RestCompletion.test.ts's own #1204 suite) — so shift sleep exits the
+// building it named, not whichever living_quarters happens to be nearest the
+// employee's position at completion time.
+describe('completeRestTick — buildingId threading (#1204)', () => {
+  const SEED = 42;
+
+  it("uses the completed rest action's own named building (payload.buildingId), not whichever living_quarters is nearest the employee's position at completion time", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    employee.fatigue = 10;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = null; // legacy shift-sleep path, owned by completeRestTick
+
+    // The named building: placed, then demolished — simulates it having been
+    // removed mid-rest. The named-but-missing building must still win over a
+    // real, active alternative sitting right at the employee's own position.
+    const named = placeBuilding(state.buildings, 'living_quarters', 200, 200, 300, 300, 1);
+    expect(named.success).toBe(true);
+    const namedId = named.building!.id;
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== namedId);
+
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { buildingId: namedId },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+
+    // A DIFFERENT, still-active living_quarters right at the employee's own
+    // completion-time position — nearest-by-position search would find THIS
+    // one and grant a full restore; the fix must not use it.
+    const closer = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(closer.success).toBe(true);
+
+    const restCompleted: number[] = [];
+    completeRestTick(state, employee, restCompleted);
+
+    // Correct (#1204): the NAMED building no longer exists -> degraded,
+    // capped rest. Buggy (pre-#1204): nearest-by-position finds `closer` ->
+    // full MAX_NEED_GAUGE restore.
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+    expect(restCompleted).toEqual([employee.id]);
+  });
+});
+
 describe('processShiftCycle — under an applied policy (#678)', () => {
   const SEED = 42;
 
@@ -800,11 +866,27 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       const rng = new Random(SEED);
       applyPolicy(state, { shiftMode: 'shift_8h' });
       state.buildings.unlockedTiers.living_quarters = 3;
-      // Co-located with the employee (0,0) so arrival resolves in one step
-      // (mirrors this file's own resolveArrival doc comment).
-      placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, tier);
+      // #1204: a forced rest now walks INTO the living_quarters (beginRestTravel
+      // routes through moveTo's {buildingId} overload, entering unseen on
+      // arrival) rather than merely repositioning to it, so a genuine NavGrid
+      // and a real ring cell are required for that walk to resolve at all —
+      // without one, moveTo's building-entry branch refuses (no route) and the
+      // employee never rests. The employee starts already ON the building's
+      // ring (one cell west of its footprint, valid regardless of tier: the
+      // footprint always grows east/south from (building.x, building.z)) so
+      // the walk-in is zero-length and still resolves in a single
+      // resolveArrival() call below, exactly like every other "co-located"
+      // fixture in this file.
+      const grid = makeFlatNavGrid(24, 24);
+      for (let z = 10; z <= 13; z++) {
+        for (let x = 10; x <= 14; x++) {
+          grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+        }
+      }
+      state.navGrid = grid;
+      placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, tier);
 
-      const { employee } = hireEmployee(state.employees, 'driller', rng);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 9, 10);
       employee.activeActionId = 1100;
       employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
       employee.fatigue = 10;
