@@ -507,6 +507,51 @@ describe('NavGrid patching — footprint blocking at order time (#1200)', () => 
     expect(onOldFootprint.x).toBe(2);
     expect(onOldFootprint.z).toBe(0);
   });
+
+  it('refuses to order a building whose entire approach ring is already sealed by prior orders, with no side effects', () => {
+    const ctx = makeCtx();
+
+    // Three management_office T1 orders (2×2 footprints) at (2,0), (0,2) and
+    // (2,2), none ticked to completion, jointly seal every ring cell around
+    // the (0,0)-(1,1) pocket: (2,0)/(2,1) come from the first office, (0,2)/
+    // (1,2) from the second, and the shared corner cell (2,2) from the
+    // third — the grid's own edge supplies the remaining two sides. The
+    // pocket's own footprint cells stay walkable throughout (#1200 finding):
+    // a footprint is individually clear right up until the last order that
+    // seals its ring.
+    const first = buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(first.success).toBe(true);
+    const second = buildCommand(ctx, ['management_office'], { at: '0,2' });
+    expect(second.success).toBe(true);
+    const third = buildCommand(ctx, ['management_office'], { at: '2,2' });
+    expect(third.success).toBe(true);
+
+    const nav = ctx.state!.navGrid!;
+    expectPassable(nav.cellAt(0, 0)!);
+    expectPassable(nav.cellAt(1, 0)!);
+    expectPassable(nav.cellAt(0, 1)!);
+    expectPassable(nav.cellAt(1, 1)!);
+
+    const plannedCountBefore = ctx.state!.plannedBuildings.length;
+    const cashBefore = ctx.state!.cash;
+
+    // Ordering a fourth office to fill the now-sealed pocket must be refused
+    // outright — its own footprint (0,0)-(1,1) is still clear, but nothing
+    // on its ring is reachable — rather than dispatching a builder at an
+    // unreachable fallback target.
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No reachable approach');
+
+    // No side effects from the refused order: no cash spent, no PlannedBuilding
+    // queued, and the pocket's own footprint left exactly as it was.
+    expect(ctx.state!.plannedBuildings).toHaveLength(plannedCountBefore);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expectPassable(nav.cellAt(0, 0)!);
+    expectPassable(nav.cellAt(1, 0)!);
+    expectPassable(nav.cellAt(0, 1)!);
+    expectPassable(nav.cellAt(1, 1)!);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
