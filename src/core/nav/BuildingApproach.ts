@@ -22,7 +22,7 @@ import { isImpassable } from './Pathfinding.js';
  * occupantIds yet) satisfies it too, for the builder's own approach
  * target at order time (#1200).
  */
-export type FootprintAnchor = { x: number; z: number };
+type FootprintAnchor = { x: number; z: number };
 
 /** The inclusive bounds of the one-cell ring around a building's footprint bounding box. */
 function ringBounds(building: FootprintAnchor, def: BuildingDef): { minX: number; maxX: number; minZ: number; maxZ: number } {

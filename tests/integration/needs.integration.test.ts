@@ -1125,6 +1125,23 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
 
     buildLivingQuartersAndComplete(ctx, '20,20');
 
+    // buildLivingQuartersAndComplete's general-pool dispatch has no skill
+    // gate on `place_building` (#556) and assigns idle employees lowest-id
+    // first (EmployeeDispatch.ts), so this test's own driller — hired before
+    // the dedicated builder, and idle throughout — is who actually walks
+    // over and builds it, not the builder. #1200 moved that walk's own
+    // target from the order's raw (x,z) to the footprint's approach-ring
+    // cell (blocked from order time), so the driller parks exactly on the
+    // one ring cell nearest that origin. `findBuildingApproachCell`
+    // (RestActionHelpers.ts) computes this same rest destination as the ring
+    // cell nearest the *traveller's own* position — already true here — so
+    // starting the rest from that exact point resolves to zero distance and
+    // arrives this same tick, defeating this test's "still travelling"
+    // premise. Reset to a position genuinely away from the footprint first,
+    // so the drive below is real.
+    emp.x = 0;
+    emp.z = 0;
+
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
     vehicle.occupantIds = [empId];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
