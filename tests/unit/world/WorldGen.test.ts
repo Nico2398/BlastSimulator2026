@@ -12,20 +12,6 @@ import {
   type Rect,
 } from '../../../src/core/world/WorldGen.js';
 
-/**
- * Calls heightToVoxelY/heightToVoxelYContinuous with a trailing sizeY value
- * regardless of whether the function still declares that parameter (#1189
- * drops it entirely, along with the clamp it drove). A plain 3-argument call
- * site would stop compiling the instant the implementer removes the
- * parameter; JS itself ignores a runtime argument past a function's declared
- * arity, so routing the call through `unknown` keeps this file compiling —
- * and these tests red for the right (assertion) reason, not a signature
- * mismatch — on both sides of that change.
- */
-function callHeightFn(fn: unknown, height: number, groundOffset: number, sizeY: number): number {
-  return (fn as (a: number, b: number, c: number) => number)(height, groundOffset, sizeY);
-}
-
 describe('sampleBaseHeight', () => {
   it('is deterministic for the same fields, shaping, and coordinates', () => {
     const fields = new WorldNoiseFields(42);
@@ -110,7 +96,7 @@ describe('computeGroundOffset / heightToVoxelY', () => {
   it('places centerHeight at roughly 55% of sizeY after the datum shift', () => {
     const sizeY = 40;
     const offset = computeGroundOffset(10, sizeY);
-    const y = callHeightFn(heightToVoxelY, 10, offset, sizeY);
+    const y = heightToVoxelY(10, offset);
     expect(y).toBe(Math.floor(sizeY * 0.55));
   });
 
@@ -118,17 +104,17 @@ describe('computeGroundOffset / heightToVoxelY', () => {
     // Pre-#1189 this clamped to sizeY - 1 = 19. The datum shift (groundOffset
     // 0 here) leaves the raw height untouched, so the only thing standing
     // between 10000 and this assertion is the clamp #1189 removes.
-    expect(callHeightFn(heightToVoxelY, 10000, 0, 20)).toBe(10000);
+    expect(heightToVoxelY(10000, 0)).toBe(10000);
   });
 
   it('rounds a large negative height without bounding it to 1 (#1189)', () => {
     // Pre-#1189 this clamped to 1. Same removal, opposite side of the band.
-    expect(callHeightFn(heightToVoxelY, -10000, 0, 20)).toBe(-10000);
+    expect(heightToVoxelY(-10000, 0)).toBe(-10000);
   });
 
   it('rounds to the nearest integer voxel', () => {
-    expect(callHeightFn(heightToVoxelY, 5.4, 0, 100)).toBe(5);
-    expect(callHeightFn(heightToVoxelY, 5.6, 0, 100)).toBe(6);
+    expect(heightToVoxelY(5.4, 0)).toBe(5);
+    expect(heightToVoxelY(5.6, 0)).toBe(6);
   });
 });
 
@@ -137,21 +123,21 @@ describe('heightToVoxelYContinuous — direct coverage (#1189)', () => {
   // indirect coverage through sampleSurfaceHeightY/haloSurfaceHeight.
 
   it('shifts height by groundOffset without rounding (happy path)', () => {
-    expect(callHeightFn(heightToVoxelYContinuous, 10.25, 5, 100)).toBeCloseTo(15.25, 10);
+    expect(heightToVoxelYContinuous(10.25, 5)).toBeCloseTo(15.25, 10);
   });
 
   it('does not clamp a large positive magnitude (#1189)', () => {
     // Pre-#1189 this clamped to sizeY - 1 = 19.
-    expect(callHeightFn(heightToVoxelYContinuous, 10000.5, 0, 20)).toBeCloseTo(10000.5, 10);
+    expect(heightToVoxelYContinuous(10000.5, 0)).toBeCloseTo(10000.5, 10);
   });
 
   it('does not clamp a large negative magnitude (#1189)', () => {
     // Pre-#1189 this clamped to 1.
-    expect(callHeightFn(heightToVoxelYContinuous, -10000.5, 0, 20)).toBeCloseTo(-10000.5, 10);
+    expect(heightToVoxelYContinuous(-10000.5, 0)).toBeCloseTo(-10000.5, 10);
   });
 
   it('passes NaN through, so "no ground here" stays distinguishable from "ground at the floor"', () => {
-    expect(Number.isNaN(callHeightFn(heightToVoxelYContinuous, NaN, 0, 20))).toBe(true);
+    expect(Number.isNaN(heightToVoxelYContinuous(NaN, 0))).toBe(true);
   });
 });
 
