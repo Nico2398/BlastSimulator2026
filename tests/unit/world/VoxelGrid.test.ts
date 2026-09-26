@@ -1450,7 +1450,7 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
 // expected to FAIL in this RED phase.
 
 function smallTerrainConfig(seed: number): TerrainConfig {
-  return { sizeX: 16, sizeY: 16, sizeZ: 16, seed, climateBias: [0, 0] };
+  return { sizeX: 16, datum: 8, sizeZ: 16, seed, climateBias: [0, 0] };
 }
 
 function totalRecordedSegments(grid: VoxelGrid): number {

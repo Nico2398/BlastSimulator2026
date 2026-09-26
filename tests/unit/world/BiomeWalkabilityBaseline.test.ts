@@ -73,7 +73,7 @@ function buildSiteConfig(biomeId: BiomeId): TerrainConfig {
   const biome = getBiome(biomeId)!;
   return {
     sizeX: SITE_SIZE,
-    sizeY: SITE_SIZE,
+    datum: Math.floor(SITE_SIZE * 0.55),
     sizeZ: SITE_SIZE,
     seed: SEED,
     climateBias: biome.climateCenter,

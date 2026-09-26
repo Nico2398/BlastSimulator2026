@@ -82,21 +82,37 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
 }
 
 /**
- * The size + hardness fields `TerrainConfig` and `regenerateGrid`'s params
- * share, read from a `WorldState`'s own base (level-original) size rather
- * than its live, possibly site-expanded one — takes only the `WorldState`
- * slice it reads, not the whole `GameState`, since neither caller below
- * needs anything else off it (#1181 review — shared by `terrainConfigOf`
- * and `regenerateGridParams`, which otherwise built this same shape from
- * the same three fields independently).
+ * TODO(#1191): WorldState doesn't carry the datum yet, only sizeY. #1191
+ * threads the datum through WorldState/levels directly and this goes away.
  */
-function worldSizeParams(world: WorldState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+function datumFromSizeY(sizeY: number): number {
+  return Math.floor(sizeY * 0.55);
+}
+
+/**
+ * The base (level-original) size + hardness fields generation reads off a
+ * `WorldState` — takes only the `WorldState` slice it reads, not the whole
+ * `GameState`, since neither caller below needs anything else off it
+ * (#1181 review). The one source of truth for "which WorldState fields feed
+ * generation": `worldSizeParams` layers a `datum` on top for `TerrainConfig`,
+ * `regenerateGridParams` layers its own dimension validation on top for a
+ * no-voxels load fallback — each needing a different shape derived from the
+ * same three fields, so neither can just call the other.
+ */
+function worldGenerationFields(world: WorldState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
   return {
     sizeX: world.baseSizeX,
     sizeY: world.sizeY,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
   };
+}
+
+/** The size + hardness fields `TerrainConfig` needs, with the raw `sizeY` collapsed into its generation `datum`. */
+function worldSizeParams(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
+  const base = worldGenerationFields(world);
+  const { sizeY, ...rest } = base;
+  return { ...rest, datum: datumFromSizeY(sizeY) };
 }
 
 /** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
@@ -124,7 +140,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
     seed: config.seed,
     climateBias: config.climateBias as [number, number],
     sizeX: config.sizeX,
-    sizeY: config.sizeY,
+    datum: config.datum,
     sizeZ: config.sizeZ,
     ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
   };
@@ -149,12 +165,12 @@ function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number;
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
   }
-  const params = worldSizeParams(state.world);
+  const base = worldGenerationFields(state.world);
   return {
-    ...params,
-    sizeX: requireValidGenDimension(params.sizeX, 'world.baseSizeX'),
-    sizeY: requireValidGenDimension(params.sizeY, 'world.sizeY'),
-    sizeZ: requireValidGenDimension(params.sizeZ, 'world.baseSizeZ'),
+    ...base,
+    sizeX: requireValidGenDimension(base.sizeX, 'world.baseSizeX'),
+    sizeY: requireValidGenDimension(base.sizeY, 'world.sizeY'),
+    sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
   };
 }
 
@@ -217,8 +233,9 @@ export function regenerateGrid(
 ): void {
   if (!ctx.state) return;
   const { seed, climateBias, sizeX, sizeY, sizeZ, mixedRockHardness } = params;
+  const datum = datumFromSizeY(sizeY);
   const config: TerrainConfig = {
-    sizeX, sizeY, sizeZ, seed, climateBias,
+    sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
   };
   if (ctx.state.world && mixedRockHardness !== undefined) {
@@ -254,7 +271,7 @@ export function ensureLandscape(
   ctx: GameContext,
   params: {
     seed: number; climateBias: readonly [number, number];
-    sizeX: number; sizeY: number; sizeZ: number;
+    sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
   },
 ): LandscapeHandle | null {

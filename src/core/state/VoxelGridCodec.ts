@@ -6,7 +6,7 @@
 // generator identity, then replays the edit record on top — reproducing the
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
-import { VoxelGrid, clampAxis, type VoxelRockComposition } from '../world/VoxelGrid.js';
+import { VoxelGrid, clampAxis, MAX_TERRAIN_GEN_DIMENSION, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
 import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../world/TerrainGen.js';
 
@@ -23,7 +23,7 @@ export interface SerializedTerrainGen {
   seed: number;
   climateBias: [number, number];
   sizeX: number;
-  sizeY: number;
+  datum: number;
   sizeZ: number;
   mixedRockHardness?: boolean;
 }
@@ -133,7 +133,7 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
 
   const config: TerrainConfig = {
     sizeX: requireValidGenDimension(payload.gen.sizeX, 'gen.sizeX'),
-    sizeY: requireValidGenDimension(payload.gen.sizeY, 'gen.sizeY'),
+    datum: requireValidGenDimension(payload.gen.datum, 'gen.datum'),
     sizeZ: requireValidGenDimension(payload.gen.sizeZ, 'gen.sizeZ'),
     seed: payload.gen.seed,
     climateBias: payload.gen.climateBias,
@@ -146,7 +146,7 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
   // content is filled here (#1183): the attached chunk source materializes
   // each chunk lazily, from generation plus the edit record loaded below, on
   // whatever a caller actually reads.
-  const grid = new VoxelGrid(0, config.sizeY, 0);
+  const grid = new VoxelGrid(0, 0);
   const terrain = buildTerrainContext(config);
   grid.attachChunkSource(createChunkSource(terrain, config));
 
@@ -156,15 +156,16 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
 
   // `grid.minX/maxX/minZ/maxZ` are set by the claimed-chunk loop above —
   // every position field below is clamped against them (and against
-  // `sizeY` for `y`), so a tampered/corrupted save can't drive the (lazy,
+  // `MAX_TERRAIN_GEN_DIMENSION` for `y`, since the grid itself is now
+  // height-free), so a tampered/corrupted save can't drive the (lazy,
   // per-band) edit replay past the grid's real bounds (#1181 review; matches
   // #609's `clampChunkRectToTile` precedent for `claimed` rects).
   for (const { x, z, segments } of payload.editColumns) {
     const cx = clampSavePosition(x, grid.minX, grid.maxX - 1, grid.minX);
     const cz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
     for (const seg of segments) {
-      const yLo = clampSavePosition(seg.yLo, 0, grid.sizeY - 1, 0);
-      const yHi = clampSavePosition(seg.yHi, 0, grid.sizeY - 1, 0);
+      const yLo = clampSavePosition(seg.yLo, 0, MAX_TERRAIN_GEN_DIMENSION - 1, 0);
+      const yHi = clampSavePosition(seg.yHi, 0, MAX_TERRAIN_GEN_DIMENSION - 1, 0);
       if (yLo > yHi) {
         throw new Error(`corrupt save: edit segment yLo (${seg.yLo}) exceeds yHi (${seg.yHi})`);
       }
@@ -182,7 +183,7 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
   }
   for (const { x, y, z, modifier } of payload.editFractures) {
     const fx = clampSavePosition(x, grid.minX, grid.maxX - 1, grid.minX);
-    const fy = clampSavePosition(y, 0, grid.sizeY - 1, 0);
+    const fy = clampSavePosition(y, 0, MAX_TERRAIN_GEN_DIMENSION - 1, 0);
     const fz = clampSavePosition(z, grid.minZ, grid.maxZ - 1, grid.minZ);
     grid.edits.recordFracture(fx, fy, fz, modifier);
   }

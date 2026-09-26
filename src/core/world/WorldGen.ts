@@ -117,8 +117,8 @@ export function applyPitMask(
 }
 
 /** Vertical datum: how far to shift a world-metre height to land it in voxel-Y space. */
-export function computeGroundOffset(centerHeight: number, sizeY: number): number {
-  return Math.floor(sizeY * 0.55) - Math.round(centerHeight);
+export function computeGroundOffset(centerHeight: number, datum: number): number {
+  return datum - Math.round(centerHeight);
 }
 
 /** Convert a world-metre height to voxel Y using a precomputed datum. */
@@ -150,7 +150,6 @@ export interface WorldGenContext {
   readonly playableRect: Rect;
   readonly centerHeight: number;
   readonly groundOffset: number;
-  readonly sizeY: number;
 }
 
 /**
@@ -168,7 +167,7 @@ export interface WorldGenContext {
 export function createWorldGenContext(
   seed: number,
   sizeX: number,
-  sizeY: number,
+  datum: number,
   sizeZ: number,
   makeShapingAt: (fields: WorldNoiseFields) => ShapingAtFn = () => () => DEFAULT_SHAPING,
 ): WorldGenContext {
@@ -176,8 +175,8 @@ export function createWorldGenContext(
   const shapingAt = makeShapingAt(fields);
   const playableRect: Rect = { minX: 0, minZ: 0, maxX: sizeX, maxZ: sizeZ };
   const centerHeight = sampleBaseHeight(fields, sizeX / 2, sizeZ / 2, shapingAt(sizeX / 2, sizeZ / 2));
-  const groundOffset = computeGroundOffset(centerHeight, sizeY);
-  return { fields, shapingAt, playableRect, centerHeight, groundOffset, sizeY };
+  const groundOffset = computeGroundOffset(centerHeight, datum);
+  return { fields, shapingAt, playableRect, centerHeight, groundOffset };
 }
 
 /** Surface voxel Y for column (x, z), including the pit mask and vertical datum. */

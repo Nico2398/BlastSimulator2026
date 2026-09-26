@@ -57,7 +57,6 @@ describe('Console — world commands', () => {
       expect(ctx.state!.world!.sizeX).toBe(48);
       expect(ctx.state!.world!.sizeY).toBe(48);
       expect(ctx.state!.world!.sizeZ).toBe(48);
-      expect(ctx.grid!.sizeY).toBe(48);
     });
 
     it('breaks cubic when size_y is given explicitly (#458 T6.1/D13)', () => {
@@ -68,7 +67,6 @@ describe('Console — world commands', () => {
       expect(ctx.state!.world!.sizeY).toBe(20);
       expect(ctx.state!.world!.sizeZ).toBe(48);
       expect(ctx.grid!.sizeX).toBe(48);
-      expect(ctx.grid!.sizeY).toBe(20);
       expect(ctx.grid!.sizeZ).toBe(48);
     });
 
@@ -284,7 +282,7 @@ describe('Console — world commands', () => {
       const biome = getBiome(ctx.state!.mineType)!;
       const handle = ensureLandscape(ctx, {
         seed: ctx.state!.seed, climateBias: biome.climateCenter,
-        sizeX: 32, sizeY: 32, sizeZ: 32,
+        sizeX: 32, datum: Math.floor(32 * 0.55), sizeZ: 32,
       });
       expect(handle).not.toBeNull();
       // Sits within the voxel grid's Y range — a raw off-grid value here would
@@ -296,7 +294,7 @@ describe('Console — world commands', () => {
     it('is cached — a second call with different params still returns the first handle', () => {
       ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
       const biome = getBiome(ctx.state!.mineType)!;
-      const params = { seed: ctx.state!.seed, climateBias: biome.climateCenter, sizeX: 32, sizeY: 32, sizeZ: 32 };
+      const params = { seed: ctx.state!.seed, climateBias: biome.climateCenter, sizeX: 32, datum: Math.floor(32 * 0.55), sizeZ: 32 };
       const first = ensureLandscape(ctx, params);
       const second = ensureLandscape(ctx, { ...params, seed: params.seed + 1 });
       expect(second!.groundLevelY).toBe(first!.groundLevelY);

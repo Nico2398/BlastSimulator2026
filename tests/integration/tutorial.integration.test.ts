@@ -115,7 +115,6 @@ describe('Tutorial flow', () => {
 
     // Grid matches tutorial_pit dimensions from Level.ts (#458 T6.1/D13)
     expect(ctx.grid!.sizeX).toBe(32);
-    expect(ctx.grid!.sizeY).toBe(20);
     expect(ctx.grid!.sizeZ).toBe(32);
 
     // World state matches

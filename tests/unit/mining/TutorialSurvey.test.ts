@@ -20,7 +20,7 @@ function makeTutorialTerrain(): VoxelGrid {
   const biome = getBiome('desert_badlands')!;
   return generateTerrain({
     sizeX: 24,
-    sizeY: 12,
+    datum: Math.floor(12 * 0.55),
     sizeZ: 24,
     seed: 42,
     climateBias: biome.climateCenter,

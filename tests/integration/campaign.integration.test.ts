@@ -364,7 +364,6 @@ describe('Campaign', () => {
     // Grid should be generated
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.sizeX).toBe(32);
-    expect(ctx.grid!.sizeY).toBe(20);
     expect(ctx.grid!.sizeZ).toBe(32);
   });
 
