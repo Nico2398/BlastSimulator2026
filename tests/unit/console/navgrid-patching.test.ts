@@ -4,7 +4,7 @@
 // resulting NavGrid cell types directly (NOT via events).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildCommand } from '../../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import {
   blastCommand,
   drillPlanCommand,
@@ -16,6 +16,8 @@ import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../../helpers/gameContext.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -345,6 +347,165 @@ describe('NavGrid patching — building move', () => {
     // (the first building was never fully patched to blocked, so the "old"
     //  position check is less meaningful, but the "new" position at (5,5)
     //  should not have been double-patched)
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NavGrid patching — footprint blocking at order time, occupant relocation,
+// ring-cell builder targeting (#1200)
+//
+// Tutorial feedback: "employees walk through buildings". A planned
+// building's footprint must block routing from the moment it's ordered —
+// not just once construction completes — and free again on cancel or on a
+// failed/refunded construction. Anyone standing on a footprint that newly
+// becomes blocked (order, upgrade, move, or complete) must be relocated off
+// it. The builder's own walk target must be the footprint's approach-ring
+// cell, not the raw order origin (now unreachable the instant it blocks).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid patching — footprint blocking at order time (#1200)', () => {
+  it('blocks the footprint the instant a building is ordered, before any tick runs', () => {
+    const ctx = makeCtx();
+    const nav = ctx.state!.navGrid!;
+    // Baseline: this spot is passable before anything is ordered.
+    expectPassable(nav.cells[0]![2]!);
+
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(result.success).toBe(true);
+
+    // No tick has run — construction hasn't started, yet the footprint must
+    // already refuse routing (#1200), same as a completed building.
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![2]!.moveCost).toBe(Infinity);
+    expect(nav.cells[1]![2]!.type).toBe('blocked');
+    expect(nav.cells[0]![3]!.type).toBe('blocked');
+    expect(nav.cells[1]![3]!.type).toBe('blocked');
+
+    // Cells outside the footprint remain passable.
+    expectPassable(nav.cells[2]![2]!);
+    expectPassable(nav.cells[0]![4]!);
+  });
+
+  it('frees the footprint when the order is cancelled before construction starts', () => {
+    const ctx = makeCtx();
+    const nav = ctx.state!.navGrid!;
+    const prevType = nav.cells[0]![2]!.type;
+
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+
+    const order = ctx.state!.plannedBuildings[0]!;
+    const cancelResult = employeeCommand(ctx, ['cancel', String(order.actionId)], {});
+    expect(cancelResult.success).toBe(true);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+
+    // Cancelling the order must free the footprint back to its pre-order
+    // classification.
+    expect(nav.cells[0]![2]!.type).toBe(prevType);
+    expectPassable(nav.cells[0]![2]!);
+    expectPassable(nav.cells[1]![2]!);
+    expectPassable(nav.cells[0]![3]!);
+    expectPassable(nav.cells[1]![3]!);
+  });
+
+  it('relocates an employee standing on the footprint the instant it is newly ordered', () => {
+    const ctx = makeCtx();
+    const employee = ctx.state!.employees.employees[0]!;
+    employee.x = 2;
+    employee.z = 0;
+    employee.activeActionId = null;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(result.success).toBe(true);
+
+    // No tick has run — the employee must already have been moved off the
+    // footprint that just closed over their own tile.
+    expect(employee.x === 2 && employee.z === 0).toBe(false);
+    const cell = ctx.state!.navGrid!.cellAt(Math.round(employee.x), Math.round(employee.z));
+    expect(cell).toBeTruthy();
+    expect(cell!.type).not.toBe('blocked');
+  });
+
+  it('queues the builder\'s PendingAction at the footprint\'s approach ring cell, not the raw order origin', () => {
+    const ctx = makeCtx();
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(result.success).toBe(true);
+
+    const order = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === order.actionId)!;
+    const def = getBuildingDef(order.type, order.tier);
+
+    // The raw order origin now sits inside the (blocked) footprint —
+    // Pathfinding refuses an impassable goal outright, so a target there
+    // could never be reached. The builder's own walk target must instead be
+    // a walkable cell on the footprint's approach ring.
+    expect(action.targetX === order.x && action.targetZ === order.z).toBe(false);
+    expect(isOnBuildingRing(order, def, action.targetX, action.targetZ)).toBe(true);
+  });
+
+  it('relocates an employee standing on the new tier\'s larger footprint when upgrading', () => {
+    const ctx = makeCtx();
+    // management_office T1: rect(2,2) footprint at (2,0); T2: rect(2,3) —
+    // extra cells at z=2, walkable before the upgrade (mirrors the existing
+    // "blocks new footprint cells after upgrading T1→T2" test above).
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    tickUntilConstructionDone(ctx);
+    const buildingId = ctx.state!.buildings.buildings[0]!.id;
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+
+    const employee = ctx.state!.employees.employees[0]!;
+    employee.x = 2;
+    employee.z = 2;
+    employee.activeActionId = null;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    expect(ctx.state!.navGrid!.cellAt(2, 2)!.type).not.toBe('blocked');
+
+    const result = buildCommand(ctx, ['upgrade', String(buildingId)], {});
+    expect(result.success).toBe(true);
+
+    expect(employee.x === 2 && employee.z === 2).toBe(false);
+    const cell = ctx.state!.navGrid!.cellAt(Math.round(employee.x), Math.round(employee.z));
+    expect(cell).toBeTruthy();
+    expect(cell!.type).not.toBe('blocked');
+  });
+
+  it('relocates an employee standing on the destination footprint when moving a building, but leaves one on the vacated old footprint alone', () => {
+    const ctx = makeCtx();
+    buildCommand(ctx, ['management_office'], { at: '2,0' });
+    tickUntilConstructionDone(ctx);
+    const buildingId = ctx.state!.buildings.buildings[0]!.id;
+
+    const onDestination = ctx.state!.employees.employees[0]!;
+    onDestination.x = 4;
+    onDestination.z = 4;
+    onDestination.activeActionId = null;
+    onDestination.destinationX = null;
+    onDestination.destinationZ = null;
+
+    const onOldFootprint = ctx.state!.employees.employees[1]!;
+    onOldFootprint.x = 2;
+    onOldFootprint.z = 0;
+    onOldFootprint.activeActionId = null;
+    onOldFootprint.destinationX = null;
+    onOldFootprint.destinationZ = null;
+
+    const moveResult = buildCommand(ctx, ['move', String(buildingId)], { to: '4,4' });
+    expect(moveResult.success).toBe(true);
+
+    // The destination footprint's occupant must be relocated off it.
+    expect(onDestination.x === 4 && onDestination.z === 4).toBe(false);
+    const destCell = ctx.state!.navGrid!.cellAt(Math.round(onDestination.x), Math.round(onDestination.z));
+    expect(destCell).toBeTruthy();
+    expect(destCell!.type).not.toBe('blocked');
+
+    // The vacated old footprint is passable again — moving a building only
+    // needs to protect the NEW location, so this employee is left exactly
+    // where they were.
+    expect(onOldFootprint.x).toBe(2);
+    expect(onOldFootprint.z).toBe(0);
   });
 });
 
