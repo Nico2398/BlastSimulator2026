@@ -22,11 +22,9 @@ export const TERRAIN_GENERATOR_VERSION = 1;
 
 /**
  * Re-exported from `VoxelGrid.ts` (a lower-level module this file already
- * depends on) rather than declared here, so this ceiling and
- * `VoxelGrid.ts`'s `HEIGHT_FREE_SIZE_Y` — which a height-free grid's
- * `isInBounds`/`forEachSolid`/etc. actually bound `y` against — can't drift
- * into two independently-hardcoded literals that only happen to agree today
- * (#1190 review).
+ * depends on) rather than declared here, so this ceiling stays the single
+ * constant `VoxelGrid`'s `isInBounds`/`forEachSolid`/etc. actually bound `y`
+ * against, instead of a second hardcoded literal here (#1190 review).
  */
 export { MAX_TERRAIN_GEN_DIMENSION };
 

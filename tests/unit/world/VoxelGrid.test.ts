@@ -544,9 +544,11 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
     expect(grid.oresAt(4, 18, 4)).toEqual({ sparkium: 0.2 });
   });
 
-  it('isInBounds still rejects y = -10 for an otherwise-owned column (regression guard — already passes today)', () => {
+  it('isInBounds rejects y = -10 and y = MAX_TERRAIN_GEN_DIMENSION, but accepts y = MAX_TERRAIN_GEN_DIMENSION - 1, for an otherwise-owned column', () => {
     const grid = new VoxelGrid(16, 16);
     expect(grid.isInBounds(4, -10, 4)).toBe(false);
+    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION, 4)).toBe(false);
+    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION - 1, 4)).toBe(true);
   });
 
   it('a never-written slab above/below the declared height reads default air values without allocating', () => {
@@ -607,7 +609,7 @@ describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
 
 describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#560)', () => {
   it('returns {min:0, max:0} for a freshly claimed, ungenerated chunk', () => {
-    const grid = new VoxelGrid(32, 32); // 2x2 chunks, sizeY=8 -> nSlabs=1
+    const grid = new VoxelGrid(32, 32); // 2x2 chunks -> nSlabs=1
     expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 0 });
     expect(grid.chunkDensityRange(1, 1, 0)).toEqual({ min: 0, max: 0 });
   });
@@ -676,14 +678,15 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   it("returns {min:0, max:0} — not null — for a slab index past an OWNED column's declared height (#1182)", () => {
     // Under the old dense model, slab 1 of an 8-tall grid didn't exist at all
     // (nSlabs = ceil(8/16) = 1) and this returned null. Under cubic slabs, the
-    // column at (0,0) is owned regardless, so a read past sizeY answers the
-    // same honest "nothing written here" {0,0} an in-range unwritten slab would.
+    // column at (0,0) is owned regardless, so a read past its declared height
+    // answers the same honest "nothing written here" {0,0} an in-range
+    // unwritten slab would.
     const grid = new VoxelGrid(16, 16);
     expect(grid.chunkDensityRange(0, 0, 1)).toEqual({ min: 0, max: 0 });
   });
 
   it('an allocated, fully-written slab reflects its two distinct writes\' real min/max — NOT the same {0,0} an unallocated slab reads back (#1182)', () => {
-    const grid = new VoxelGrid(16, 16); // single full chunk (0,0), sizeY=24
+    const grid = new VoxelGrid(16, 16); // single full chunk (0,0)
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     // Fully touch the whole y=16..31 cubic slab (slab index 1) with a baseline
@@ -822,8 +825,8 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
 //
 // computeVoxelColumnSurfaceY/computeVoxelColumnSurfaceHeight must resolve
 // column surfaces directly from the generator + edit record (O(edits in that
-// column)), not by scanning [0, sizeY) — so a natural surface below y = 0 or
-// far above the grid's declared sizeY resolves correctly, with no vertical
+// column)), not by scanning from y = 0 — so a natural surface below y = 0 or
+// far above the grid's declared height resolves correctly, with no vertical
 // clamp either direction.
 
 /**
@@ -869,7 +872,7 @@ describe('VoxelGrid.generatorSurfaceHeightAt (#1184)', () => {
 
 describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no vertical cap (#1184)', () => {
   it('resolves a generator-only surface below y = 0, without scanning up from y = 0', () => {
-    const grid = new VoxelGrid(16, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = -5
+    const grid = new VoxelGrid(16, 16); // an old scan from y = 0 could never see y = -5
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, -5));
 
@@ -877,8 +880,8 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
     expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5, 6);
   });
 
-  it('resolves a generator-only surface far above the grid\'s declared sizeY, without an upper clamp', () => {
-    const grid = new VoxelGrid(16, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = 1000
+  it('resolves a generator-only surface far above the grid\'s declared height, without an upper clamp', () => {
+    const grid = new VoxelGrid(16, 16); // an old bounded scan could never see y = 1000
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 1000));
 
@@ -1151,8 +1154,8 @@ describe('setVoxelColumnSurfaceHeight — no vertical clamp (#1184)', () => {
     expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5.3, 6);
   });
 
-  it('writes a target height far above the grid\'s declared sizeY without clamping it to sizeY - 1', () => {
-    const grid = new VoxelGrid(16, 16); // sizeY = 16
+  it('writes a target height far above the grid\'s declared height without clamping it to an upper bound', () => {
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     setVoxelColumnSurfaceHeight(grid, 3, 3, 1000.2, compId);

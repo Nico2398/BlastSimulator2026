@@ -1510,8 +1510,9 @@ export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: n
  * `computeVoxelColumnSurfaceHeight`. No-ground (NaN) columns are skipped.
  * Returns `{ minY: floor(lowest), maxY: ceil(highest) }` over the columns
  * that do have ground, or `null` when no column in the rect has any (#1185)
- * — used by change producers that currently report a full-grid `minY: 0,
- * maxY: sizeY - 1` region, meaningless now the grid has no vertical cap.
+ * — used by change producers that currently report a full-grid, unbounded
+ * `minY: 0, maxY: unbounded` region, meaningless now the grid has no vertical
+ * cap.
  */
 export function computeColumnRangeY(
   grid: VoxelGrid,
@@ -1561,9 +1562,9 @@ const MAX_SURFACE_SWEEP_GAP = 1000;
  * clearVoxel's own silent-no-op convention for unowned coordinates. A
  * non-finite `height` (NaN, Infinity, -Infinity) is likewise a silent no-op.
  *
- * `height` is written as given, with no clamp toward `[0, grid.sizeY - 1]`
- * (#1184) — a column is writable at any height, negative included, since
- * rock now extends to every depth.
+ * `height` is written as given, with no clamp toward any upper bound (#1184)
+ * — a column is writable at any height, negative included, since rock now
+ * extends to every depth.
  *
  * Returns the highest Y index written or cleared by this call, or null for a
  * no-op (unowned column or non-finite height) — for a caller tracking a
