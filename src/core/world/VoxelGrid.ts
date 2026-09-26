@@ -125,29 +125,26 @@ const SLAB_VOLUME = CHUNK_SIZE ** 3;
 
 /**
  * Largest `sizeX`/`sizeZ`/`datum` a `TerrainConfig` may legitimately carry
- * (#1181 review), and — as `HEIGHT_FREE_SIZE_Y` below — the fixed `sizeY` a
- * height-free grid allocates regardless of its declared height. Nothing in
- * this codebase names an authoritative "biggest a site can get" — site
- * expansion (`PlayableArea`'s `claim`) is deliberately unbounded in total
- * extent, and `MAX_CLAIM_BRIDGE_CHUNKS` only limits how far a single claim
- * may bridge, not the site's eventual size — so this is a defaulted,
- * generous-but-bounded ceiling rather than a reused constant: the biggest
- * campaign level today is 160×160 (#458 D13), so 4096 leaves 25x headroom
- * for growth while still keeping any `yLo..yHi` replay loop bounded to a
- * sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects a save
- * whose embedded generator identity exceeds this rather than regenerating or
- * clamping it, since a legitimate save can never carry one.
+ * (#1181 review), and the fixed vertical extent every height-free grid
+ * allocates regardless of its declared height. Nothing in this codebase
+ * names an authoritative "biggest a site can get" — site expansion
+ * (`PlayableArea`'s `claim`) is deliberately unbounded in total extent, and
+ * `MAX_CLAIM_BRIDGE_CHUNKS` only limits how far a single claim may bridge,
+ * not the site's eventual size — so this is a defaulted, generous-but-bounded
+ * ceiling rather than a reused constant: the biggest campaign level today is
+ * 160×160 (#458 D13), so 4096 leaves 25x headroom for growth while still
+ * keeping any `yLo..yHi` replay loop bounded to a sane worst case.
+ * `decodeVoxelGrid` (VoxelGridCodec.ts) rejects a save whose embedded
+ * generator identity exceeds this rather than regenerating or clamping it,
+ * since a legitimate save can never carry one.
  *
  * Defined here (not in `TerrainGen.ts`, which depends on this module) so
- * `HEIGHT_FREE_SIZE_Y` and the save-corruption clamps in
+ * this grid's own vertical extent and the save-corruption clamps in
  * `VoxelGridCodec.ts`/`TerrainGen.ts` can't drift apart into two literals
  * that happen to read "4096" today — `TerrainGen.ts` re-exports this same
  * constant rather than declaring its own copy.
  */
 export const MAX_TERRAIN_GEN_DIMENSION = 4096;
-
-/** TODO(#1193): removed once this class drops sizeY-bounded bookkeeping. */
-const HEIGHT_FREE_SIZE_Y = MAX_TERRAIN_GEN_DIMENSION;
 
 /** Chunk index of a world coordinate. `>> 4` floors toward -inf, which is what signed coordinates need. */
 export function chunkIndexOf(worldCoord: number): number {
@@ -210,7 +207,7 @@ export function clampChunkRectToTile(
  * Vertical storage is a sparse `Map` of lazily-allocated cubic 16×16×16
  * `VoxelSlab`s, one per y-band `cy = chunkIndexOf(y)` (#1182) — a column
  * claims memory proportional to how deep it was actually generated/dug,
- * rather than the grid's full declared `sizeY`. An absent entry reads as air
+ * rather than the grid's full declared vertical extent. An absent entry reads as air
  * everywhere in that band; nothing allocates on a read.
  */
 interface VoxelChunk {
@@ -320,7 +317,6 @@ export class VoxelGrid {
   static nextId = 1;
   readonly id = VoxelGrid.nextId++;
 
-  readonly sizeY: number;
   readonly palette = new CompositionPalette();
   /** Log of edits made to this grid since generation — see `TerrainEdits`. */
   readonly edits: TerrainEdits;
@@ -348,23 +344,9 @@ export class VoxelGrid {
    * caller keeps the same starting site, at the same coordinates, whether or
    * not its size divides by CHUNK_SIZE.
    */
-  constructor(sizeX: number, sizeZ: number);
-  /**
-   * TODO(#1193): kept so tests can still declare a height, AND for this
-   * class's own `materializeScratchColumn` (below), which still calls this
-   * exact overload (`new VoxelGrid(0, this.sizeY, 0)`) to build its
-   * throwaway scratch grid — a genuine production caller, not just a test
-   * fixture. #1193 needs to check that call site too, not only tests.
-   */
-  constructor(sizeX: number, sizeY: number, sizeZ: number);
-  constructor(sizeX: number, b: number, c?: number) {
-    const heightFree = c === undefined;
-    const sizeY = heightFree ? HEIGHT_FREE_SIZE_Y : b;
-    const sizeZ = heightFree ? b : c!;
-
-    this.sizeY = sizeY;
+  constructor(sizeX: number, sizeZ: number) {
     this.edits = new TerrainEdits();
-    if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) return;
+    if (sizeX <= 0 || sizeZ <= 0) return;
 
     for (let cz = 0; cz < Math.ceil(sizeZ / CHUNK_SIZE); cz++) {
       for (let cx = 0; cx < Math.ceil(sizeX / CHUNK_SIZE); cx++) {
@@ -398,14 +380,14 @@ export class VoxelGrid {
    * True when (x, y, z) is a voxel the site can address at all — i.e. the
    * column is owned and y sits inside the grid's declared height.
    *
-   * (#1182) Deliberately still sizeY-bounded, unlike the raw slab accessors
-   * below (`densityAt` etc.): those accept y outside `[0, sizeY)` for an
-   * owned column (reading air, writing only on a non-air value) without
-   * allocating, but `isInBounds` keeps reporting the grid's own declared
-   * vertical extent.
+   * (#1182) Deliberately still bounded to `MAX_TERRAIN_GEN_DIMENSION`, unlike
+   * the raw slab accessors below (`densityAt` etc.): those accept y outside
+   * `[0, MAX_TERRAIN_GEN_DIMENSION)` for an owned column (reading air,
+   * writing only on a non-air value) without allocating, but `isInBounds`
+   * keeps reporting the grid's own declared vertical extent.
    */
   isInBounds(x: number, y: number, z: number): boolean {
-    return this.containsColumn(x, z) && y >= 0 && y < this.sizeY;
+    return this.containsColumn(x, z) && y >= 0 && y < MAX_TERRAIN_GEN_DIMENSION;
   }
 
   /** True when the site owns the column at (x, z), regardless of height. */
@@ -603,7 +585,7 @@ export class VoxelGrid {
    */
   private cheapChunkDensityRange(chunk: VoxelChunk, cy: number): { min: number; max: number } {
     const bandY0 = cy * CHUNK_SIZE;
-    if (bandY0 >= this.sizeY) return { min: 0, max: 0 }; // entirely past the grid's declared vertical extent
+    if (bandY0 >= MAX_TERRAIN_GEN_DIMENSION) return { min: 0, max: 0 }; // entirely past the grid's declared vertical extent
 
     const bandY1 = bandY0 + CHUNK_SIZE - 1;
 
@@ -1021,7 +1003,7 @@ export class VoxelGrid {
    * exactly, without allocating a slab this grid would ever report owning.
    */
   private materializeScratchColumn(chunk: VoxelChunk, x: number, z: number, cy: number): Float64Array {
-    const scratch = new VoxelGrid(0, this.sizeY, 0);
+    const scratch = new VoxelGrid(0, 0);
     scratch.addChunk(chunk.cx, chunk.cz);
     this.chunkSource!.materializeSlab(scratch, x, x + 1, z, z + 1, cy);
     const y0 = cy * CHUNK_SIZE;
@@ -1292,7 +1274,7 @@ export class VoxelGrid {
     const y0 = Math.max(0, min.y);
     const z0 = Math.max(this.bMinZ, min.z);
     const x1 = Math.min(this.bMaxX - 1, max.x);
-    const y1 = Math.min(this.sizeY - 1, max.y);
+    const y1 = Math.min(MAX_TERRAIN_GEN_DIMENSION - 1, max.y);
     const z1 = Math.min(this.bMaxZ - 1, max.z);
 
     for (let z = z0; z <= z1; z++) {
@@ -1306,15 +1288,15 @@ export class VoxelGrid {
 
   /**
    * Visits only solid (density > 0) voxels across the grid's whole declared
-   * height `[0, sizeY - 1]`, chunk by chunk, band by band. A band with no
-   * resident slab is skipped without materializing when either no
-   * `chunkSource` is attached (unallocated genuinely means air, as before
-   * #1183) or `cheapChunkDensityRange` reports it entirely air; a band that
-   * might hold solid content (mixed or entirely solid) is materialized via
-   * `ensureSlab` so the compId reported is the real one, not skipped.
+   * height `[0, MAX_TERRAIN_GEN_DIMENSION - 1]`, chunk by chunk, band by
+   * band. A band with no resident slab is skipped without materializing when
+   * either no `chunkSource` is attached (unallocated genuinely means air, as
+   * before #1183) or `cheapChunkDensityRange` reports it entirely air; a band
+   * that might hold solid content (mixed or entirely solid) is materialized
+   * via `ensureSlab` so the compId reported is the real one, not skipped.
    */
   forEachSolid(cb: (x: number, y: number, z: number, compId: number) => void): void {
-    const bandCount = Math.ceil(this.sizeY / CHUNK_SIZE);
+    const bandCount = Math.ceil(MAX_TERRAIN_GEN_DIMENSION / CHUNK_SIZE);
     for (const chunk of this.chunks.values()) {
       for (let cy = 0; cy < bandCount; cy++) {
         let slab = chunk.slabs.get(cy);
@@ -1325,7 +1307,7 @@ export class VoxelGrid {
           if (!slab) continue;
         }
         const y0 = Math.max(0, cy * CHUNK_SIZE);
-        const y1 = Math.min(this.sizeY - 1, cy * CHUNK_SIZE + CHUNK_SIZE - 1);
+        const y1 = Math.min(MAX_TERRAIN_GEN_DIMENSION - 1, cy * CHUNK_SIZE + CHUNK_SIZE - 1);
         if (y0 > y1) continue;
         for (let z = chunk.z0; z < chunk.z1; z++) {
           for (let y = y0; y <= y1; y++) {
