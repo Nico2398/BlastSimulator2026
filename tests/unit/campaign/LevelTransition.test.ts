@@ -3,7 +3,7 @@ import { checkLevelComplete, createGameForLevel } from '../../../src/core/campai
 import { createCampaignState, startLevel } from '../../../src/core/campaign/Campaign.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 
 describe('Level completion and transition (7.3)', () => {
@@ -87,6 +87,7 @@ describe('Level completion and transition (7.3)', () => {
     expect(newState!.cash).toBe(level1.startingCash);
     // Fresh state has no blasts
     expect(newState!.damage.blastCount).toBe(0);
+    expect(newState!.world!.datum).toBe(getLevel(level1.id)!.datum);
   });
 
   it('createGameForLevel returns null for a locked level', () => {

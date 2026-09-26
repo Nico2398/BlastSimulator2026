@@ -20,7 +20,7 @@ import {
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../../../src/core/config/balance.js';
 
 const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
   'unlockThreshold',
@@ -169,7 +169,7 @@ describe('sandboxLevelDef', () => {
         const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty, seed: 999 }));
         expect(level.gridX).toBe(DEFAULT_GRID_SIZE);
         expect(level.gridZ).toBe(DEFAULT_GRID_SIZE);
-        expect(level.gridY).toBe(SANDBOX_GRID_DEPTH);
+        expect(level.datum).toBe(SANDBOX_DATUM);
       }
     }
   });
@@ -216,7 +216,7 @@ describe('sandboxLevelDef', () => {
       biome: 'not_a_biome', difficulty: 'legendary' as SandboxDifficultyId, seed: -5,
     });
     expect(level.gridX).toBe(DEFAULT_GRID_SIZE);
-    expect(level.gridY).toBe(SANDBOX_GRID_DEPTH);
+    expect(level.datum).toBe(SANDBOX_DATUM);
     expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingCash);
   });
 });

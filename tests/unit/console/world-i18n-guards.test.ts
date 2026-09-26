@@ -60,8 +60,8 @@ describe('newGameCommand — unknown mine type', () => {
 // ── newGameCommand — new-game-success message ────────────────────────────
 
 describe('newGameCommand — new-game-success message', () => {
-  const SUCCESS_UNSTAFFED_EN = 'Game created. 32x32x32 terrain, desert biome, seed 1.';
-  const SUCCESS_STAFFED_EN = 'Game created. 32x32x32 terrain, desert biome, seed 1. Staffed.';
+  const SUCCESS_UNSTAFFED_EN = 'Game created. 32x32 terrain, desert biome, seed 1.';
+  const SUCCESS_STAFFED_EN = 'Game created. 32x32 terrain, desert biome, seed 1. Staffed.';
 
   describe('unstaffed', () => {
     it('matches the exact English literal by default', () => {

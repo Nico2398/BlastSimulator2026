@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGame, buildGameNavGrid, snapAgentsToNavigableGround } from '../../../src/core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, createWorldState } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
@@ -57,6 +57,32 @@ describe('createGame', () => {
   it('a constructed GameState has no immune field on its revolt sub-state (#681)', () => {
     const state = createGame({ seed: 42 });
     expect('immune' in state.revolt).toBe(false);
+  });
+});
+
+describe('createWorldState (#1191)', () => {
+  it('carries datum as its own field, not a height, alongside sizeX/sizeZ/gridReady', () => {
+    const world = createWorldState(32, 11, 32, true);
+    expect(world.sizeX).toBe(32);
+    expect(world.datum).toBe(11);
+    expect(world.sizeZ).toBe(32);
+    expect(world.gridReady).toBe(true);
+  });
+
+  it('seeds baseSizeX/baseSizeZ from the initial sizeX/sizeZ (the generation datum for later expansion)', () => {
+    const world = createWorldState(48, 26, 40, false);
+    expect(world.baseSizeX).toBe(48);
+    expect(world.baseSizeZ).toBe(40);
+    expect(world.gridReady).toBe(false);
+  });
+
+  it('is a boundary case at zero-size extents — does not throw and preserves the given datum', () => {
+    const world = createWorldState(0, 0, 0, false);
+    expect(world.sizeX).toBe(0);
+    expect(world.sizeZ).toBe(0);
+    expect(world.datum).toBe(0);
+    expect(world.baseSizeX).toBe(0);
+    expect(world.baseSizeZ).toBe(0);
   });
 });
 

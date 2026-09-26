@@ -31,16 +31,20 @@ import { levelGroundRect } from '../../src/core/mining/LevelGround.js';
 const DUSTY_HOLLOW_LEVEL = getLevel('dusty_hollow');
 if (!DUSTY_HOLLOW_LEVEL) throw new Error('dusty_hollow level definition not found');
 
-// The level's own declared height — used below as the scan bound in place of
-// `live.sizeY`, which is now a fixed, height-free sentinel (4096) unrelated
-// to how tall this level's terrain actually is. Scanning to the sentinel
-// would multiply the voxel-for-voxel comparison's cost by ~170x per column.
-const DECLARED_HEIGHT_FOR_SCAN = DUSTY_HOLLOW_LEVEL.gridY;
+// The level's old declared height (`gridY`, pre-#1191) — used below purely as
+// a generous scan bound in place of `live.sizeY`, which is now a fixed,
+// height-free sentinel (4096) unrelated to how tall this level's terrain
+// actually is. Scanning to the sentinel would multiply the voxel-for-voxel
+// comparison's cost by ~170x per column. #1191 dropped `gridY` from
+// `LevelDef` — dusty_hollow now authors `datum: 22` directly (the same
+// Math.floor(40 * 0.55) result `gridY: 40` used to produce) — so this bound
+// is pinned to that same literal 40 rather than derived from the level.
+const DECLARED_HEIGHT_FOR_SCAN = 40;
 
 function dustyHollowTerrainConfig(): TerrainConfig {
   return {
     sizeX: DUSTY_HOLLOW_LEVEL!.gridX,
-    datum: Math.floor(DUSTY_HOLLOW_LEVEL!.gridY * 0.55),
+    datum: DUSTY_HOLLOW_LEVEL!.datum,
     sizeZ: DUSTY_HOLLOW_LEVEL!.gridZ,
     seed: DUSTY_HOLLOW_LEVEL!.terrainSeed,
     climateBias: DUSTY_HOLLOW_LEVEL!.climateBias,

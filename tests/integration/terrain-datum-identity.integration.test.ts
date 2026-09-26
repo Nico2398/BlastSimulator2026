@@ -15,11 +15,15 @@
 // `SAMPLE_OFFSETS` are never compared.
 //
 // Each case's `datum` is `Math.floor(oldSizeY * 0.55)` — the exact conversion
-// `computeGroundOffset` used to perform internally (pre-#1190) and which
-// `datumFromSizeY` (`src/console/commands/world.ts`, `TODO(#1191)`) now
-// performs at the one remaining console-layer call site. Passing that
-// already-computed `datum` straight into `TerrainConfig` is what proves the
-// two are the same number by construction, not by coincidence.
+// `computeGroundOffset` used to perform internally (pre-#1190). #1191 finished
+// the migration this file's own header once pointed at: every `LevelDef` now
+// authors `datum` directly (no `gridY`/`sizeY` survives on it), and
+// `defaultDatumForSize` (`src/console/commands/world.ts`) is the sole
+// remaining place still deriving a datum from a size, for `new_game`'s own
+// grid and the no-`state.world` load fallback — not a shared conversion site
+// any command reaches into. `datumFromSizeY` below is this file's own local
+// helper, kept only to document how these baseline datum literals were
+// originally derived; it has no counterpart in `src/` any more.
 //
 // ── IMPORTANT — regenerating a baseline ─────────────────────────────────
 // These hashes were computed by the planner against `main`'s pre-#1190 code

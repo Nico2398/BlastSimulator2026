@@ -75,7 +75,7 @@ describe('Tutorial flow', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('tutorial_pit');
-    expect(result.output).toContain('32×20×32');
+    expect(result.output).toContain('32×32');
     expect(result.output).toContain(`$${TUTORIAL_START_CASH.toLocaleString('en-US')}`);
 
     // State should reflect the tutorial_pit level config
@@ -83,10 +83,10 @@ describe('Tutorial flow', () => {
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
     expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
 
-    // World should be set up with tutorial_pit dimensions (32×20×32, #458 T6.1/D13)
+    // World should be set up with tutorial_pit dimensions (32x32, datum 11, #458 T6.1/D13, #1191)
     expect(ctx.state!.world).not.toBeNull();
     expect(ctx.state!.world!.sizeX).toBe(32);
-    expect(ctx.state!.world!.sizeY).toBe(20);
+    expect(ctx.state!.world!.datum).toBe(11);
     expect(ctx.state!.world!.sizeZ).toBe(32);
     expect(ctx.state!.world!.gridReady).toBe(true);
   });
@@ -119,7 +119,7 @@ describe('Tutorial flow', () => {
 
     // World state matches
     expect(ctx.state!.world!.sizeX).toBe(32);
-    expect(ctx.state!.world!.sizeY).toBe(20);
+    expect(ctx.state!.world!.datum).toBe(11);
     expect(ctx.state!.world!.sizeZ).toBe(32);
     expect(ctx.state!.world!.gridReady).toBe(true);
 

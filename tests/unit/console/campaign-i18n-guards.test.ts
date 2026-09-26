@@ -244,15 +244,17 @@ describe('campaignStartCommand — unknown biome', () => {
 });
 
 // ── campaignStartCommand — start-success message ─────────────────────────
-// tutorial_pit: gridX×gridY×gridZ = 32×20×32, startingCash = $290,000 (#861
-// captured directly off getLevel — verify against getLevel('tutorial_pit')
-// rather than re-deriving the level def's own numbers by hand).
+// tutorial_pit: gridX×gridZ = 32×32, datum = 11, startingCash = $290,000
+// (#861 captured directly off getLevel — verify against
+// getLevel('tutorial_pit') rather than re-deriving the level def's own
+// numbers by hand). #1191: the message dropped its gridY segment entirely
+// (datum is a generation detail, not a site dimension worth surfacing here).
 
 describe('campaignStartCommand — start-success message', () => {
   const tutorialLevel = getLevel('tutorial_pit')!;
 
   function expectedSuccess(cash: number, staffed: boolean): string {
-    return `Started level "tutorial_pit". Grid: ${tutorialLevel.gridX}×${tutorialLevel.gridY}×${tutorialLevel.gridZ}. Cash: $${cash.toLocaleString('en-US')}.${staffed ? ' Staffed.' : ''}`;
+    return `Started level "tutorial_pit". Grid: ${tutorialLevel.gridX}×${tutorialLevel.gridZ}. Cash: $${cash.toLocaleString('en-US')}.${staffed ? ' Staffed.' : ''}`;
   }
 
   describe('unstaffed', () => {
