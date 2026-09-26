@@ -35,7 +35,7 @@
  *
  * An unattended run gets one turn. A notification delivered on a later turn is
  * never delivered, because there is no later turn — the same rule
- * `require-foreground-agents.sh` already enforces for delegation (#404, #406),
+ * `require-foreground-agents.mjs` already enforces for delegation (#404, #406),
  * arriving through a shell command instead of through a sub-agent.
  *
  * This is the supported way to do it. `start` detaches and returns immediately;
@@ -62,7 +62,7 @@
  * @module long-run
  */
 
-import { spawn } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import {
   existsSync,
   mkdirSync,
@@ -117,6 +117,59 @@ export interface Handle {
  */
 export function shellQuote(argument: string): string {
   return `'${argument.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The bash that runs the detached wrapper.
+ *
+ * Everywhere but Windows that is plain `bash` from PATH. On Windows a bare
+ * `bash` is a trap: a Node process started from PowerShell or cmd resolves it
+ * to System32\bash.exe or the WindowsApps alias — both WSL. The command then
+ * runs inside a Linux VM against a Windows checkout, cannot write the exit
+ * file, and `wait` reports DIED for a command that ran. So Windows always gets
+ * Git Bash, the same shell Claude Code's own Bash tool runs:
+ * `CLAUDE_CODE_GIT_BASH_PATH` when set, then the install `git` itself lives in,
+ * then the standard install locations.
+ */
+export function resolveBash(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  gitExecPath: () => string | undefined = defaultGitExecPath
+): string {
+  if (platform !== 'win32') return 'bash';
+  const candidates: string[] = [];
+  if (env.CLAUDE_CODE_GIT_BASH_PATH) candidates.push(env.CLAUDE_CODE_GIT_BASH_PATH);
+  const execPath = gitExecPath();
+  if (execPath) {
+    // <git>/mingw64/libexec/git-core -> <git>/bin/bash.exe
+    const gitRoot = resolve(execPath, '..', '..', '..');
+    candidates.push(join(gitRoot, 'bin', 'bash.exe'), join(gitRoot, 'usr', 'bin', 'bash.exe'));
+  }
+  const programs = env.LOCALAPPDATA ? join(env.LOCALAPPDATA, 'Programs') : undefined;
+  for (const base of [env.ProgramFiles, env['ProgramFiles(x86)'], programs]) {
+    if (base) candidates.push(join(base, 'Git', 'bin', 'bash.exe'));
+  }
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (found === undefined) {
+    throw new Error(
+      'Git Bash not found. Install Git for Windows, or set CLAUDE_CODE_GIT_BASH_PATH to its bash.exe. ' +
+      'A bare `bash` is never used on Windows: it resolves to WSL, which cannot run this checkout.'
+    );
+  }
+  return found;
+}
+
+function defaultGitExecPath(): string | undefined {
+  try {
+    return execFileSync('git', ['--exec-path'], { encoding: 'utf8', windowsHide: true }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A path as bash reads it: Git Bash takes C:/x, so backslashes become slashes there. */
+export function bashPath(path: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? path.split('\\').join('/') : path;
 }
 
 export function handleFor(label: string, dir: string = LONG_DIR): Handle {
@@ -221,7 +274,10 @@ function start(label: string, command: string[]): number {
   }
 
   const line = command.map(shellQuote).join(' ');
-  const fd = openSync(handle.logPath, 'a');
+  // 'w', not 'a': the log was removed just above, so nothing is truncated, and on
+  // Windows an append-only handle is one Git Bash programs cannot write through —
+  // every line of output was lost and a plain `echo` exited 1.
+  const fd = openSync(handle.logPath, 'w');
 
   // The detached shell writes its own exit file. No supervisor process is
   // involved, so nothing has to outlive this call for the result to survive —
@@ -234,9 +290,18 @@ function start(label: string, command: string[]): number {
   // replaces the wrapper, no exit file is ever written, and `wait` reports DIED
   // for a command that in fact ran to completion.
   const script =
-    `( ${line} )\nstatus=$?\nprintf '%s' "$status" > ${shellQuote(handle.exitPath)}\nexit $status\n`;
-  const child = spawn('bash', ['-c', script], {
+    `( ${line} )\nstatus=$?\nprintf '%s' "$status" > ${shellQuote(bashPath(handle.exitPath))}\nexit $status\n`;
+  let bash: string;
+  try {
+    bash = resolveBash();
+  } catch (error) {
+    console.error((error as Error).message);
+    closeSync(fd);
+    return 1;
+  }
+  const child = spawn(bash, ['-c', script], {
     detached: true,
+    windowsHide: true,
     stdio: ['ignore', fd, fd],
     cwd: process.cwd(),
   });

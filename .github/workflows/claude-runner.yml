@@ -176,7 +176,7 @@ jobs:
         timeout-minutes: 270
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          # Read by `.claude/hooks/report-loop-budget.sh` before every delegation:
+          # Read by `.claude/hooks/report-loop-budget.mjs` before every delegation:
           # past this epoch the session starts no new loop iteration. The same
           # absolute deadline goes to the retry, which therefore starts with its
           # loops already closed and does linear work only.

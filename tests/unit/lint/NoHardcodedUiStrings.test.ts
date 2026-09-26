@@ -33,7 +33,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, sep } from 'path';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -219,7 +219,7 @@ describe('src/ui/ and src/renderer/ — no hardcoded English UI strings (issue #
     const violations: Violation[] = [];
     for (const dir of dirs) {
       for (const file of listTsFiles(join(ROOT, dir))) {
-        const relPath = file.slice(ROOT.length + 1);
+        const relPath = file.slice(ROOT.length + 1).split(sep).join('/');
         const source = readFileSync(file, 'utf8');
         violations.push(...scanPlainQuotedAssignments(relPath, source));
         violations.push(...scanSelectedTemplateLiteral(relPath, source));
@@ -246,7 +246,7 @@ describe('src/ui/ and src/renderer/ — el() option-object literals go through t
     const violations: Violation[] = [];
     for (const dir of dirs) {
       for (const file of listTsFiles(join(ROOT, dir))) {
-        const relPath = file.slice(ROOT.length + 1);
+        const relPath = file.slice(ROOT.length + 1).split(sep).join('/');
         const source = readFileSync(file, 'utf8');
         violations.push(...scanElOptionLiterals(relPath, source));
       }

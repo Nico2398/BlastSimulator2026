@@ -4,10 +4,10 @@
 // applying without any error. This suite turns that into a test failure.
 
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'child_process';
-import { readFileSync, statSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { validateContextFiles } from '../../../scripts/validate-context.js';
+import { hookScript, runHook, type HookRegistry } from '../../helpers/claudeHooks';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -28,7 +28,7 @@ describe('context files', () => {
 describe('tools denied project-wide', () => {
   const settings = JSON.parse(readFileSync(join(ROOT, '.claude/settings.json'), 'utf8')) as {
     permissions?: { deny?: string[] };
-    hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+    hooks?: HookRegistry;
   };
 
   it('denies AskUserQuestion', () => {
@@ -54,29 +54,15 @@ describe('tools denied project-wide', () => {
       new RegExp(entry.matcher ?? '.*').test('AskUserQuestion')
     );
     const commands = guards.flatMap((entry) =>
-      (entry.hooks ?? []).map((hook) => hook.command ?? '')
+      (entry.hooks ?? []).map((hook) => hookScript(hook))
     );
-    expect(commands.some((c) => c.endsWith('no-ask-user-question.sh'))).toBe(true);
-  });
-
-  const hook = join(ROOT, '.claude/hooks/no-ask-user-question.sh');
-
-  it('ships the hook executable — a hook that cannot run blocks nothing', () => {
-    expect(statSync(hook).mode & 0o111).toBeGreaterThan(0);
+    expect(commands.some((c) => c.endsWith('/no-ask-user-question.mjs'))).toBe(true);
   });
 
   // Exit 2 is the contract: block the call and show stderr to the agent. Exit 0
   // would let the question through while every other check still passed.
   it('exits 2 and tells the agent what to do instead', () => {
-    let status = 0;
-    let stderr = '';
-    try {
-      execFileSync(hook, { input: '{"tool_name":"AskUserQuestion"}', encoding: 'utf8' });
-    } catch (error) {
-      const failure = error as { status?: number; stderr?: string };
-      status = failure.status ?? 0;
-      stderr = failure.stderr ?? '';
-    }
+    const { status, stderr } = runHook('no-ask-user-question.mjs', '{"tool_name":"AskUserQuestion"}');
     expect(status).toBe(2);
     expect(stderr).toContain('agentic-decision-autonomy');
   });

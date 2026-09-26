@@ -16,7 +16,8 @@ hooks:
     - matcher: Agent|Task
       hooks:
         - type: command
-          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/require-foreground-agents.sh
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/require-foreground-agents.mjs"]
 ---
 
 # Pipeline Orchestrator

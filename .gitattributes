@@ -1,5 +1,13 @@
-# Ensure consistent line endings across platforms
-* text=auto
+# Every text file is LF in the working tree too, on every OS.
+#
+# `text=auto` alone let Git for Windows (core.autocrlf=true by default) check
+# files out as CRLF. Workflow YAML, agent frontmatter and scripts are then read
+# by tests and validators that split on "\n" and match "^...$" per line, and on a
+# Windows checkout they failed on the carriage return rather than on anything
+# real. Pinning eol=lf makes a Windows working tree byte-identical to Linux.
+* text=auto eol=lf
 
-# Shell scripts must always use LF — CRLF breaks bash on Windows
-*.sh text eol=lf
+# Windows-only script formats keep the line ending their interpreter expects.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

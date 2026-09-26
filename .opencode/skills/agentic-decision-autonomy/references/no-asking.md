@@ -7,7 +7,7 @@ The rule is in the SKILL.md: an open choice is defaulted and recorded, never ask
 | Layer | Where | Holds when |
 |-------|-------|-----------|
 | `permissions.deny` | `.claude/settings.json` | The permission system is consulted at all |
-| `PreToolUse` hook | `.claude/hooks/no-ask-user-question.sh` | Always — a hook runs on the tool call whatever mode the session is in |
+| `PreToolUse` hook | `.claude/hooks/no-ask-user-question.mjs` | Always — a hook runs on the tool call whatever mode the session is in |
 
 The second layer is not redundancy. A session running with permissions bypassed never consults a deny rule, and an unattended session — a GitHub Actions runner, Claude Code on the web — is both the one that bypasses prompts and the one whose question can never be answered. The deny rule states the intent; the hook is what holds where it matters.
 

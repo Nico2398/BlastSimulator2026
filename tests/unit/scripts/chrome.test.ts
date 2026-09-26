@@ -8,6 +8,19 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { CHROME_MISSING_HELP, LAUNCH_ARGS, resolveChromePath, resolveChromePathOrThrow } from '../../../scripts/shared/chrome.js';
 
+/**
+ * The layout a Playwright cache uses on this OS. The resolver looks for the
+ * host's own binaries, so a Linux-only layout is never found on Windows and the
+ * test falls through to whatever Chrome the host happens to have installed.
+ */
+const LINK = process.platform === 'win32' ? 'chromium.exe' : 'chromium';
+const BINARY: readonly string[] =
+  process.platform === 'win32'
+    ? ['chrome-win', 'chrome.exe']
+    : process.platform === 'darwin'
+      ? ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']
+      : ['chrome-linux', 'chrome'];
+
 const created: string[] = [];
 const savedEnv = { ...process.env };
 
@@ -48,7 +61,7 @@ describe('resolveChromePath', () => {
 
   it('resolves the chromium symlink inside PLAYWRIGHT_BROWSERS_PATH', () => {
     const root = tempRoot();
-    const exe = join(root, 'chromium');
+    const exe = join(root, LINK);
     touch(exe);
     delete process.env.PUPPETEER_EXECUTABLE_PATH;
     process.env.PLAYWRIGHT_BROWSERS_PATH = root;
@@ -58,7 +71,7 @@ describe('resolveChromePath', () => {
 
   it('resolves a revisioned chromium directory inside PLAYWRIGHT_BROWSERS_PATH', () => {
     const root = tempRoot();
-    const exe = join(root, 'chromium-1194', 'chrome-linux', 'chrome');
+    const exe = join(root, 'chromium-1194', ...BINARY);
     touch(exe);
     delete process.env.PUPPETEER_EXECUTABLE_PATH;
     process.env.PLAYWRIGHT_BROWSERS_PATH = root;
@@ -68,8 +81,8 @@ describe('resolveChromePath', () => {
 
   it('prefers the newest revision when several are installed', () => {
     const root = tempRoot();
-    touch(join(root, 'chromium-1100', 'chrome-linux', 'chrome'));
-    const newest = join(root, 'chromium-1194', 'chrome-linux', 'chrome');
+    touch(join(root, 'chromium-1100', ...BINARY));
+    const newest = join(root, 'chromium-1194', ...BINARY);
     touch(newest);
     delete process.env.PUPPETEER_EXECUTABLE_PATH;
     process.env.PLAYWRIGHT_BROWSERS_PATH = root;
@@ -89,7 +102,7 @@ describe('resolveChromePath', () => {
 describe('resolveChromePathOrThrow', () => {
   it('returns the resolved path when a browser exists', () => {
     const root = tempRoot();
-    const exe = join(root, 'chromium');
+    const exe = join(root, LINK);
     touch(exe);
     process.env.PUPPETEER_EXECUTABLE_PATH = exe;
 
