@@ -20,12 +20,12 @@ import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { regionForColumns } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
   makeFootprintRegion, levelBuildingFootprint,
   siteBoundsForGrid, refreshLogisticsCapacity, relocateFootprintOccupants,
+  emitFootprintRegionChanged,
 } from './BuildingTaskHelpers.js';
 
 /**
@@ -245,7 +245,7 @@ export function applyTaskCompletion(
             // (isStepClimbable reads them) and not the pre-construction
             // ones. NavGridSync patches on nav:occupancy_changed; no direct
             // call here.
-            emitter.emit('nav:occupancy_changed', { region: regionForColumns(footprintRegion, grid) });
+            emitFootprintRegionChanged(emitter, grid, order.x, order.z, sizeX, sizeZ);
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just
@@ -295,9 +295,7 @@ export function applyTaskCompletion(
           // order does (buildOrder.ts's cancellation path).
           if (grid) {
             const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
-            emitter.emit('nav:occupancy_changed', {
-              region: regionForColumns(makeFootprintRegion(order.x, order.z, sizeX, sizeZ), grid),
-            });
+            emitFootprintRegionChanged(emitter, grid, order.x, order.z, sizeX, sizeZ);
           }
           report.building = {
             outcome: 'failed',

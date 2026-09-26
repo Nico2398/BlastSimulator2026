@@ -16,6 +16,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { regionForColumns } from '../nav/NavGridSync.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -53,6 +54,25 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
 export function refreshLogisticsCapacity(state: GameState): void {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+}
+
+/**
+ * Emit `nav:occupancy_changed` for a footprint of `sizeX`x`sizeZ` anchored
+ * at (x, z) — the one shared implementation for every call site that needs
+ * NavGridSync to re-patch a footprint's region without a voxel carve
+ * (construction success, construction failure/refund, and the console-layer
+ * destroy/upgrade/move commands via `buildingHelpers.ts`'s wrapper). Used to
+ * be copied three times (#1200 finding).
+ */
+export function emitFootprintRegionChanged(
+  emitter: EventEmitter,
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  sizeX: number,
+  sizeZ: number,
+): void {
+  emitter.emit('nav:occupancy_changed', { region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), grid) });
 }
 
 /**

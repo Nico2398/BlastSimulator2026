@@ -8,9 +8,8 @@
 // console-facing `siteBounds(ctx: GameContext)` wrapper so existing call
 // sites (`siteBounds(ctx)`) need no edits.
 
-import { siteBoundsForGrid, makeFootprintRegion } from '../../core/engine/BuildingTaskHelpers.js';
+import { siteBoundsForGrid, emitFootprintRegionChanged } from '../../core/engine/BuildingTaskHelpers.js';
 import type { GameContext } from './world.js';
-import { regionForColumns } from '../../core/nav/NavGridSync.js';
 
 export {
   makeFootprintRegion, levelBuildingFootprint,
@@ -35,7 +34,5 @@ export function emitFootprintOccupancyChanged(
   ctx: GameContext, x: number, z: number, sizeX: number, sizeZ: number,
 ): void {
   if (!ctx.grid) return;
-  ctx.emitter.emit('nav:occupancy_changed', {
-    region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), ctx.grid),
-  });
+  emitFootprintRegionChanged(ctx.emitter, ctx.grid, x, z, sizeX, sizeZ);
 }

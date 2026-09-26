@@ -239,7 +239,7 @@ export function regenerateGrid(
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   ctx.playableArea = new PlayableArea(ctx.grid, config);
   syncWorldBounds(ctx.state, ctx.grid);
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   // Terrain only exists now, so this is the first moment a spawn point picked
   // blind (staffed roster, campaign level literals) can be checked against it.
   // On a game's first grid the whole crew is regrouped onto one patch of
@@ -247,7 +247,7 @@ export function regenerateGrid(
   // because the vehicles carried their own `vehicleOccupied` cells with them.
   // Everywhere else — a save load — only genuinely stranded agents move.
   if (params.startingCrew && placeStartingCrew(ctx.state)) {
-    buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+    buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   snapAgentsToNavigableGround(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
@@ -308,7 +308,7 @@ function restoreGrid(ctx: GameContext, grid: VoxelGrid): void {
   const config = terrainConfigOf(ctx.state);
   ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
   syncWorldBounds(ctx.state, ctx.grid);
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 

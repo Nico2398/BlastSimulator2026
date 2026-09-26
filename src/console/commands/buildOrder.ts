@@ -21,7 +21,7 @@ import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
-import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
+import { findBuildingApproachCell, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
 
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
@@ -78,6 +78,22 @@ export function orderBuildingCommand(
   );
   if (!check.valid) return { success: false, output: check.error! };
 
+  // The builder's own walk target is the footprint's approach-ring cell
+  // (below), computed once here — this order's own footprint sits strictly
+  // inside the ring's bounding box (`ringBounds`), never on the ring itself,
+  // so blocking it further down can never change which ring cell this finds.
+  // Checking now, before anything is committed, means a sealed ring (several
+  // orders queued back to back can jointly block every ring cell — each
+  // order's footprint is individually clear, but the last one's ring has
+  // nothing walkable left) is refused outright instead of silently
+  // dispatching the builder at `findBuildingApproachCell`'s own unreachable
+  // fallback — a permanent softlock, since that fallback point is now itself
+  // inside the just-blocked footprint (#1200 finding).
+  const approach = ctx.grid ? findBuildingApproachCell(state.navGrid, { x, z }, def, x, z) : { x, z };
+  if (state.navGrid && !isOnBuildingRing({ x, z }, def, approach.x, approach.z)) {
+    return { success: false, output: 'No reachable approach to this site — surroundings are fully blocked' };
+  }
+
   state.cash -= def.constructionCost;
   addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
 
@@ -102,13 +118,13 @@ export function orderBuildingCommand(
   emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
   relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));
 
-  // The builder's own walk target is the footprint's approach-ring cell,
-  // not the raw order origin (#1200) — the origin cell is now blocked, so
-  // dispatching straight at it would send the crew to an impassable tile.
-  // The building itself is still constructed and finalized at the order's
-  // own (x, z) regardless of which ring cell this is (TaskCompletionEffects.ts
-  // keys off PlannedBuilding.x/z, not this action's target).
-  const approach = ctx.grid ? findBuildingApproachCell(state.navGrid, { x, z }, def, x, z) : { x, z };
+  // The builder's own walk target is the footprint's approach-ring cell
+  // computed above, not the raw order origin (#1200) — the origin cell is
+  // now blocked, so dispatching straight at it would send the crew to an
+  // impassable tile. The building itself is still constructed and finalized
+  // at the order's own (x, z) regardless of which ring cell this is
+  // (TaskCompletionEffects.ts keys off PlannedBuilding.x/z, not this
+  // action's target).
   const targetY = ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0;
 
   // skipQualificationCheck (#556, mirrors dig_ramp_segment/drill_hole/
