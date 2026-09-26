@@ -43,6 +43,7 @@ import { createLandscapeChunkStreamer, type LandscapeChunkStreamer } from './ter
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
+import { RampArrowLayer } from './RampArrow.js';
 
 /**
  * How far past the playable rect manual panning may wander (#458 T6.1/D13).
@@ -91,6 +92,7 @@ export interface SceneSetupDeps {
   borderWall: WorldBorderWall | null;
   blastOverlay: BlastPlanOverlay | null;
   ghosts: GhostMesh | null;
+  rampArrows: RampArrowLayer | null;
   lastGrid: VoxelGrid | null;
   lastCutBounds: string;
   terrainMeshRevision: number;
@@ -189,6 +191,9 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Ghost previews (initially empty)
   deps.ghosts = new GhostMesh(scene);
+
+  // Ramp arrows (#1211), one per ramp order still being dug
+  deps.rampArrows = new RampArrowLayer(scene, deps.getSmoothTerrainSurfaceY);
 }
 
 /**
@@ -370,6 +375,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.landscape?.dispose();
   deps.blastOverlay?.dispose();
   deps.ghosts?.dispose();
+  deps.rampArrows?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
 
@@ -402,6 +408,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.landscapeStreamer = null;
   deps.blastOverlay = null;
   deps.ghosts = null;
+  deps.rampArrows = null;
   deps.taskProgress = null;
   deps.pictograms = null;
   deps.lastGrid = null;

@@ -12,6 +12,7 @@ import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { GhostMesh } from './GhostMesh.js';
+import type { RampArrowLayer } from './RampArrow.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
@@ -37,6 +38,8 @@ export interface SyncDeps {
   lastGrid: VoxelGrid | null;
   ghosts: GhostMesh | null;
   lastGhostRevision: number;
+  /** One ground arrow per ramp order still being dug (#1211). */
+  rampArrows?: RampArrowLayer | null;
   terrainMeshRevision: number;
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
@@ -134,6 +137,11 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
       lastGhostRevision = state.ghostPreviewsRevision;
     }
   }
+
+  // Ramp arrows (#1211): each planned ramp keeps its arrow until its last
+  // segment is dug. A dig lowers the ground the arrow sampled, so a terrain
+  // change rebuilds the survivors.
+  deps.rampArrows?.sync(state.plannedRamps, terrainDirty);
 
   // Single write site for both consumers above (#1145) — living only inside
   // the ghosts block would skip updating it whenever ghosts are absent but

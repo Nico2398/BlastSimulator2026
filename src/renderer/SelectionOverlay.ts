@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Placement selection overlay (redesign P3)
 // The Three.js side of the in-scene grid-select tool: per-tile quads on
 // column tops, a border, corner accents, and hole markers for the rect
-// shape; a line + endpoint rings for ramps; a point + optional radius ring
+// shape; a ground arrow + corridor outline for ramps (RampArrow); a point + optional radius ring
 // for buildings/surveys. PlacementController (src/ui/scene/) decides state;
 // this only draws it — same split as ScenePicking/EntityHighlight in P2.
 //
@@ -15,6 +15,8 @@
 
 import * as THREE from 'three';
 import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { buildRampArrow, RAMP_ARROW_COLOR } from './RampArrow.js';
+import { rampDefFromEndpoints } from '../core/mining/Ramp.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -47,7 +49,10 @@ export interface OverlayCellsUpdate {
 
 export interface OverlayLineUpdate {
   shape: 'line';
+  /** Drag start (the ramp's upper end) and end tiles; the preview snaps them to the ramp that would be dug. */
   x1: number; z1: number; x2: number; z2: number;
+  /** The order would be refused — the ramp previews in the refusal colour. */
+  refused?: boolean;
 }
 
 export interface OverlayPointUpdate {
@@ -169,7 +174,7 @@ export class SelectionOverlay {
 
     const flashing = performance.now() < this.flashUntil;
     if (u.shape === 'rect') this.buildRect(u, flashing);
-    else if (u.shape === 'line') this.buildLine(u, flashing);
+    else if (u.shape === 'line') this.buildLine(u);
     else this.buildPoint(u, flashing);
   }
 
@@ -220,17 +225,17 @@ export class SelectionOverlay {
     }
   }
 
-  private buildLine(u: OverlayLineUpdate, flashing: boolean): void {
-    const y1 = this.surfaceYAt(u.x1, u.z1) + Y_OFFSET;
-    const y2 = this.surfaceYAt(u.x2, u.z2) + Y_OFFSET;
-    const geometry = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(u.x1 + 0.5, y1, u.z1 + 0.5),
-      new THREE.Vector3(u.x2 + 0.5, y2, u.z2 + 0.5),
-    ]);
-    const material = new THREE.LineBasicMaterial({ color: COLOR_SELECTION, transparent: true, opacity: flashing ? 1 : 0.9 });
-    this.group.add(new THREE.Line(geometry, material));
-    this.group.add(this.makeHoleMarker(u.x1, u.z1));
-    this.group.add(this.makeHoleMarker(u.x2, u.z2));
+  /**
+   * The ramp that will actually be dug (#1211): the drag snapped to its
+   * dominant cardinal axis by the same `rampDefFromEndpoints` the order runs,
+   * drawn as a bold arrow from the upper end to the lower end inside the
+   * 3-wide corridor. A zero-length drag has no ramp yet, so it marks only the
+   * anchor tile.
+   */
+  private buildLine(u: OverlayLineUpdate): void {
+    const ramp = rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0);
+    const arrow = buildRampArrow(ramp, this.sampler, { color: u.refused ? COLOR_BLOCKED : RAMP_ARROW_COLOR });
+    this.group.add(arrow ?? this.makeHoleMarker(u.x1, u.z1));
   }
 
   private buildPoint(u: OverlayPointUpdate, flashing: boolean): void {

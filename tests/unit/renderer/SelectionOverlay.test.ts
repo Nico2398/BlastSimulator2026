@@ -181,3 +181,53 @@ describe('SelectionOverlay — no sampler supplied (rejection/back-compat)', () 
     expect(allPositionYs().length).toBeGreaterThan(0);
   });
 });
+
+describe('SelectionOverlay — ramp line preview (#1211)', () => {
+  const flat: SurfaceHeightSampler = () => 0;
+
+  function body(): THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> {
+    const found = scene.getObjectByName('ramp-arrow-body');
+    expect(found).toBeDefined();
+    return found as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  }
+
+  it('previews a diagonal drag as the snapped cardinal ramp, not the raw diagonal', () => {
+    const overlay = new SelectionOverlay(scene, flat, flat);
+    // dz (10) dominates dx (3): the order runs south from (10,10), 10 steps, carving z 10..19.
+    overlay.update({ shape: 'line', x1: 10, z1: 10, x2: 13, z2: 20 });
+    const pos = body().geometry.getAttribute('position') as THREE.BufferAttribute;
+    const xs: number[] = [];
+    const zs: number[] = [];
+    for (let i = 0; i < pos.count; i++) { xs.push(pos.getX(i)); zs.push(pos.getZ(i)); }
+    // Symmetric about the snapped axis x = 10.5 — no drift toward the drag's x = 13.
+    expect(Math.max(...xs) + Math.min(...xs)).toBeCloseTo(21);
+    expect(Math.max(...xs)).toBeLessThan(12);
+    // Reaches the last dug tile (z 19) but not the drag's end tile (z 20).
+    expect(Math.max(...zs)).toBeGreaterThan(19.5);
+    expect(Math.max(...zs)).toBeLessThan(20.5);
+    const outline = scene.getObjectByName('ramp-corridor-outline') as THREE.LineLoop;
+    const opos = outline.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const oxs: number[] = [];
+    for (let i = 0; i < opos.count; i++) oxs.push(opos.getX(i));
+    expect(Math.max(...oxs) - Math.min(...oxs)).toBe(3);
+  });
+
+  it('shows the refusal colour when the order would be refused', () => {
+    const overlay = new SelectionOverlay(scene, flat, flat);
+    overlay.update({ shape: 'line', x1: 0, z1: 0, x2: 0, z2: 8 });
+    const okColor = body().material.color.getHex();
+    overlay.update({ shape: 'line', x1: 0, z1: 0, x2: 0, z2: 8, refused: true });
+    const refusedColor = body().material.color.getHex();
+    expect(refusedColor).not.toBe(okColor);
+    expect(refusedColor).toBe(0xff6a5a);
+  });
+
+  it('marks only the anchor for a zero-length drag', () => {
+    const overlay = new SelectionOverlay(scene, flat, flat);
+    overlay.update({ shape: 'line', x1: 4, z1: 4, x2: 4, z2: 4 });
+    expect(scene.getObjectByName('ramp-arrow-body')).toBeUndefined();
+    let loops = 0;
+    scene.traverse((o) => { if (o instanceof THREE.LineLoop) loops++; });
+    expect(loops).toBe(1);
+  });
+});
