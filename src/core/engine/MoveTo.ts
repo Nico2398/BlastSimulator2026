@@ -60,6 +60,10 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { buildingId: number },
+  // #1204: rest-inside-building routing needs the same best-effort-route
+  // opt-in `beginRestTravel` already uses for the (x, z) overload — see that
+  // overload's own comment. No-op until the implementer threads it through.
+  opts?: { allowUnreachable?: boolean },
 ): MoveResult;
 export function moveTo(
   state: GameState,

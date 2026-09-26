@@ -170,7 +170,31 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
  * restTicksRemaining/activeActionId so the employee returns to normal task
  * dispatch. Callers own any remaining wrap-up specific to their rest source.
  */
-export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey): void {
+/**
+ * True when `building`'s living-quarters occupancy is already at capacity —
+ * #1204: routes the rest flow's "is there room to go inside" check through
+ * the same occupancy model #1202's Mount.ts admitOccupant/enterBuilding
+ * already own, the way #1203 did for the training building.
+ */
+export function isRestBuildingFull(_state: GameState, _building: Building): boolean {
+  // TODO(skeleton): implement — see RestActionHelpers.test.ts
+  return false;
+}
+
+/**
+ * Resolves the living_quarters buildingId a rest PendingAction's payload
+ * names, if any — #1204: mirrors the equivalent lookup #1203 added for the
+ * training flow's own payload-carried buildingId.
+ */
+export function resolveRestBuildingId(_payload: Record<string, unknown>): number | undefined {
+  // TODO(skeleton): implement — see RestActionHelpers.test.ts
+  return undefined;
+}
+
+export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey, buildingId?: number): void {
+  // TODO(skeleton): use buildingId once completion routes through it — see
+  // RestActionHelpers.test.ts
+  void buildingId;
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
   if (building) {
     // A completed rest visit at any active living_quarters (any tier) fully
@@ -222,9 +246,19 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * shared entry point every rest-creating path calls, except hard-collapse
  * (tickCollapse, NeedRestoration.ts), which alights first — a genuine "give
  * up the vehicle" event (#1118).
+ *
+ * `buildingId` (#1204, skeleton phase — not yet threaded through): once the
+ * rest destination is a living_quarters ring cell rather than the building's
+ * own (x, z), this will route through `moveTo(state, emp.id, { buildingId },
+ * ...)` instead, entering the building unseen on arrival like #1203 did for
+ * the training flow. Omitted (undefined) for the no-building rest-in-place
+ * case.
  */
-export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number): void {
+export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number): void {
   const wasMounted = isMounted(emp.locomotion);
+  // TODO(skeleton): route through moveTo(state, emp.id, {buildingId}) when
+  // buildingId is defined — see RestActionHelpers.test.ts
+  void buildingId;
   const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true });
   if (wasMounted && result.success && !hasClaimableSameRoleFollowUp(state, emp)) {
     alightOnArrival(emp);

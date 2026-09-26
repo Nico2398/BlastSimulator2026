@@ -52,6 +52,7 @@ export interface ResolvedGoal {
  * (moveTo's own 'reposition'/'work' goals) has no such action in hand and
  * simply omits the hint, falling back to the lookup unchanged.
  */
+// TODO(skeleton): fix rest goal resolution — see PlanItinerary.test.ts
 function resolveGoal(state: GameState, employee: Employee, goal: Goal, actionHint?: PendingAction): ResolvedGoal | null {
   if (goal.kind === 'work') {
     const action = actionHint ?? state.pendingActions.find(a => a.id === goal.actionId);
