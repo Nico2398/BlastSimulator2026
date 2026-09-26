@@ -84,20 +84,23 @@ describe('heightToVoxelY / heightToVoxelYContinuous — drop the sizeY parameter
   });
 });
 
-describe('computeGroundOffset — vertical datum stays byte-for-byte unchanged (#1189)', () => {
-  it('always equals Math.floor(sizeY * 0.55) - Math.round(centerHeight)', () => {
-    for (const [centerHeight, sizeY] of [[10, 40], [0, 20], [-15.4, 64], [123.9, 200], [-0.5, 8], [1000, 24]] as const) {
-      expect(computeGroundOffset(centerHeight, sizeY)).toBe(Math.floor(sizeY * 0.55) - Math.round(centerHeight));
+describe('computeGroundOffset — vertical datum shift (#1190)', () => {
+  it('always equals datum - Math.round(centerHeight)', () => {
+    // datum values below are the console-layer Math.floor(sizeY * 0.55)
+    // conversion of the old sizeY concept, baked in as literals — datum is
+    // now the sole input, computeGroundOffset itself no longer knows sizeY.
+    for (const [centerHeight, datum] of [[10, 22], [0, 11], [-15.4, 35], [123.9, 110], [-0.5, 4], [1000, 13]] as const) {
+      expect(computeGroundOffset(centerHeight, datum)).toBe(datum - Math.round(centerHeight));
     }
   });
 });
 
 describe('computeGroundOffset / heightToVoxelY', () => {
-  it('places centerHeight at roughly 55% of sizeY after the datum shift', () => {
-    const sizeY = 40;
-    const offset = computeGroundOffset(10, sizeY);
+  it('places centerHeight exactly at the given datum after the shift', () => {
+    const datum = 22; // console-layer Math.floor(40 * 0.55) of the old sizeY concept
+    const offset = computeGroundOffset(10, datum);
     const y = heightToVoxelY(10, offset);
-    expect(y).toBe(Math.floor(sizeY * 0.55));
+    expect(y).toBe(datum);
   });
 
   it('rounds a large positive height without bounding it to sizeY - 1 (#1189)', () => {
@@ -181,14 +184,14 @@ describe('sampleBaseHeight — weighted shaping blend', () => {
 
 describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
   it('is deterministic for the same seed and dimensions', () => {
-    const a = createWorldGenContext(42, 32, 32, 32);
-    const b = createWorldGenContext(42, 32, 32, 32);
+    const a = createWorldGenContext(42, 32, Math.floor(32 * 0.55), 32);
+    const b = createWorldGenContext(42, 32, Math.floor(32 * 0.55), 32);
     expect(sampleSurfaceVoxelY(a, 10, 10)).toBe(sampleSurfaceVoxelY(b, 10, 10));
   });
 
   it('different seeds produce different surface heights somewhere in the grid', () => {
-    const a = createWorldGenContext(1, 32, 32, 32);
-    const b = createWorldGenContext(2, 32, 32, 32);
+    const a = createWorldGenContext(1, 32, Math.floor(32 * 0.55), 32);
+    const b = createWorldGenContext(2, 32, Math.floor(32 * 0.55), 32);
     let differences = 0;
     for (let x = 0; x < 32; x += 4) {
       for (let z = 0; z < 32; z += 4) {
@@ -199,11 +202,16 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
   });
 
   it('rounds without bounding to [1, sizeY - 1] — a grid deliberately too short for its own relief (#1189)', () => {
-    // sizeY=24 is far short of DEFAULT_SHAPING's own relief range (base
-    // spline alone runs -10..90), so the raw (masked + groundOffset) value
-    // leaves the old [1, sizeY - 1] band at some of these columns — proving
-    // this, or the assertion below is testing nothing.
-    const ctx = createWorldGenContext(7, 40, 24, 40);
+    // The old sizeY concept here was 24, far short of DEFAULT_SHAPING's own
+    // relief range (base spline alone runs -10..90) — so the raw
+    // (masked + groundOffset) value leaves the old [1, sizeY - 1] band at
+    // some of these columns, proving this, or the assertion below is testing
+    // nothing. datum is the console-layer Math.floor(24 * 0.55) conversion of
+    // that old sizeY — WorldGenContext no longer carries sizeY at all, so the
+    // old band is computed from the literal, not read off the context.
+    const oldSizeY = 24;
+    const datum = Math.floor(oldSizeY * 0.55);
+    const ctx = createWorldGenContext(7, 40, datum, 40);
     let sawOutOfOldBand = false;
     for (let x = 0; x < 40; x += 5) {
       for (let z = 0; z < 40; z += 5) {
@@ -211,7 +219,7 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
           sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z)), ctx.centerHeight, ctx.playableRect, x, z,
         );
         const expected = Math.round(masked + ctx.groundOffset);
-        if (expected < 1 || expected > ctx.sizeY - 1) sawOutOfOldBand = true;
+        if (expected < 1 || expected > oldSizeY - 1) sawOutOfOldBand = true;
         expect(sampleSurfaceVoxelY(ctx, x, z)).toBe(expected);
       }
     }
@@ -220,7 +228,7 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
 
   it('accepts a per-column shaping function built from the context\'s own fields', () => {
     const flatShaping = { baseSpline: [[-1, 5], [1, 5]] as const, reliefSpline: [[-1, 0], [1, 0]] as const, pvAmplitude: 0 };
-    const ctx = createWorldGenContext(42, 20, 20, 20, () => () => flatShaping);
+    const ctx = createWorldGenContext(42, 20, Math.floor(20 * 0.55), 20, () => () => flatShaping);
     // With zero relief and a constant base spline, every column should land
     // on the same voxel Y (only the +1.2*detail term varies it, and that's
     // tiny relative to the datum rounding at this scale).
@@ -230,7 +238,7 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
   });
 
   it('keeps relief compressed (small y-range) well inside a small grid, thanks to the pit mask', () => {
-    const ctx = createWorldGenContext(42, 32, 32, 32);
+    const ctx = createWorldGenContext(42, 32, Math.floor(32 * 0.55), 32);
     const heights: number[] = [];
     for (let x = 10; x <= 22; x += 2) {
       for (let z = 10; z <= 22; z += 2) {

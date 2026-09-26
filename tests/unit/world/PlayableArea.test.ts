@@ -7,8 +7,14 @@ import { VoxelGrid, CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
 import { MAX_CLAIM_BRIDGE_CHUNKS } from '../../../src/core/config/balance.js';
 import type { ProtectedStructures } from '../../../src/core/world/Structures.js';
 
+// The site's declared height under the old sizeY-carrying TerrainConfig was
+// 24 — kept here as a named constant so the scan-bound loops below (which
+// used to read `grid.sizeY`, now a fixed sentinel unrelated to declared
+// height) keep their original bound and runtime cost.
+const DECLARED_HEIGHT_FOR_SCAN = 24;
+
 const CONFIG: TerrainConfig = {
-  sizeX: 32, sizeY: 24, sizeZ: 32,
+  sizeX: 32, datum: Math.floor(24 * 0.55), sizeZ: 32,
   seed: 42,
   climateBias: [0, 0],
 };
@@ -382,7 +388,7 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
     let maxTopY = -1;
     for (let x = rect.minX; x < rect.maxX; x++) {
       for (let z = rect.minZ; z < rect.maxZ; z++) {
-        for (let y = grid.sizeY - 1; y >= 0; y--) {
+        for (let y = DECLARED_HEIGHT_FOR_SCAN - 1; y >= 0; y--) {
           if (grid.densityAt(x, y, z) > 0) {
             if (y > maxTopY) maxTopY = y;
             break;
@@ -395,7 +401,7 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
     const expectedSlabCount = Math.ceil((maxTopY + 1) / CHUNK_SIZE);
     // The dense-model equivalent this replaces — locks in that the new
     // behaviour is a genuine reduction, not incidentally the same number.
-    const denseModelSlabCount = Math.ceil(grid.sizeY / CHUNK_SIZE);
+    const denseModelSlabCount = Math.ceil(DECLARED_HEIGHT_FOR_SCAN / CHUNK_SIZE);
     expect(expectedSlabCount).toBeLessThan(denseModelSlabCount);
 
     // Now actually materialize — bounded to exactly [0, maxTopY], so a band
@@ -423,7 +429,7 @@ describe('PlayableArea.claim — cubic slab allocation matches the generated sur
       const rect = grid.chunkRect(-1, 0)!;
       grid.forEachSolidInRegion(
         { x: rect.minX, y: 0, z: rect.minZ },
-        { x: rect.maxX - 1, y: grid.sizeY - 1, z: rect.maxZ - 1 },
+        { x: rect.maxX - 1, y: DECLARED_HEIGHT_FOR_SCAN - 1, z: rect.maxZ - 1 },
         () => {},
       );
     }

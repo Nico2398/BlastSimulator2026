@@ -30,11 +30,13 @@ if (!treraniumDepths) {
 }
 
 const BASE_SIZE_Y = treraniumDepths.gridY;
+const BASE_DATUM = Math.floor(BASE_SIZE_Y * 0.55);
+const TALL_DATUM = Math.floor((BASE_SIZE_Y * 4) * 0.55);
 
-function treraniumConfig(sizeY: number): TerrainConfig {
+function treraniumConfig(datum: number): TerrainConfig {
   return {
     sizeX: treraniumDepths!.gridX,
-    sizeY,
+    datum,
     sizeZ: treraniumDepths!.gridZ,
     seed: treraniumDepths!.terrainSeed,
     climateBias: treraniumDepths!.climateBias,
@@ -58,8 +60,8 @@ function touchEveryColumnSurfaceComposition(grid: VoxelGrid): void {
 }
 
 describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #1183)', () => {
-  const gridBase = generateTerrain(treraniumConfig(BASE_SIZE_Y));
-  const gridTall = generateTerrain(treraniumConfig(BASE_SIZE_Y * 4));
+  const gridBase = generateTerrain(treraniumConfig(BASE_DATUM));
+  const gridTall = generateTerrain(treraniumConfig(TALL_DATUM));
   // #1183: generateTerrain no longer fills chunk content up front — it only
   // attaches the generator as a lazy chunk source. Full materialization (via
   // `forEachSolid`) is forced later, right before the first test that needs
@@ -139,22 +141,22 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
     gridBase.forEachSolid(() => {});
     gridTall.forEachSolid(() => {});
 
-    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
-    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil((BASE_SIZE_Y * 4) / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(BASE_SIZE_Y / VoxelGrid.CHUNK_SIZE);
     expect(denseModelEquivalentTall).toBe(denseModelEquivalentBase * 4); // a dense per-column array pays for declared height exactly
     expect(gridTall.allocatedSlabCount).toBeLessThan(gridBase.allocatedSlabCount * 4); // sparse storage does not
   });
 
   it('allocatedSlabCount is materially smaller than the old dense-model equivalent (genuine sparsity, not a tautology)', () => {
-    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
-    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(BASE_SIZE_Y / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil((BASE_SIZE_Y * 4) / VoxelGrid.CHUNK_SIZE);
     expect(gridBase.allocatedSlabCount).toBeLessThan(denseModelEquivalentBase);
     expect(gridTall.allocatedSlabCount).toBeLessThan(denseModelEquivalentTall);
   });
 
   it("the sparsity gap between real allocation and the dense-model equivalent widens as declared sizeY grows, rather than staying fixed or vanishing", () => {
-    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(gridBase.sizeY / VoxelGrid.CHUNK_SIZE);
-    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil(gridTall.sizeY / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentBase = gridBase.chunkCount * Math.ceil(BASE_SIZE_Y / VoxelGrid.CHUNK_SIZE);
+    const denseModelEquivalentTall = gridTall.chunkCount * Math.ceil((BASE_SIZE_Y * 4) / VoxelGrid.CHUNK_SIZE);
     const wastedFractionBase = 1 - gridBase.allocatedSlabCount / denseModelEquivalentBase;
     const wastedFractionTall = 1 - gridTall.allocatedSlabCount / denseModelEquivalentTall;
     expect(wastedFractionBase).toBeGreaterThan(0); // even the shorter grid has unused declared headroom a dense model would still pay for
@@ -177,8 +179,8 @@ describe('VoxelGrid — cubic slab storage at treranium_depths scale (#1182, #11
   // storage model change these tests exist for has zero effect on generation
   // shape. See this run's final report for the full measurement.
   it('both grids generate the same terrain shape, offset by the exact known ground-offset shift the taller declared sizeY produces — sampled at a handful of interior columns', () => {
-    const ctxBase = buildTerrainContext(treraniumConfig(BASE_SIZE_Y));
-    const ctxTall = buildTerrainContext(treraniumConfig(BASE_SIZE_Y * 4));
+    const ctxBase = buildTerrainContext(treraniumConfig(BASE_DATUM));
+    const ctxTall = buildTerrainContext(treraniumConfig(TALL_DATUM));
     const expectedShift = ctxTall.worldGen.groundOffset - ctxBase.worldGen.groundOffset;
     expect(expectedShift).toBeGreaterThan(0); // sanity: the two configs really do use a different vertical datum
 

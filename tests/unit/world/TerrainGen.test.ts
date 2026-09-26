@@ -13,7 +13,7 @@ import { getAllLevels } from '../../../src/core/campaign/Level.js';
 
 function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
   const biome = getBiome(biomeId)!;
-  return { sizeX: 32, sizeY: 32, sizeZ: 32, seed, climateBias: biome.climateCenter };
+  return { sizeX: 32, datum: Math.floor(32 * 0.55), sizeZ: 32, seed, climateBias: biome.climateCenter };
 }
 
 describe('TerrainGen — determinism', () => {
@@ -69,7 +69,7 @@ describe('TerrainGen — structure', () => {
     const grid = generateTerrain({
       ...makeConfig(42, 'alpine_granite'),
       sizeX: 64,
-      sizeY: 64,
+      datum: Math.floor(64 * 0.55),
       sizeZ: 64,
     });
     let totalSolid = 0;
@@ -153,6 +153,16 @@ describe('TerrainGen — sub-voxel surface placement (#458)', () => {
       }
     }
   });
+
+  it('has no meaningful vertical size cap (#1190): a generated grid answers a very deep and a very high column query without throwing, and with the physically correct answer', () => {
+    const grid = generateTerrain(makeConfig(42));
+    // Deep underground, far below any surface — solid rock, not an out-of-bounds air default.
+    expect(() => grid.densityAt(10, -3000, 10)).not.toThrow();
+    expect(grid.densityAt(10, -3000, 10)).toBe(1);
+    // Far above any surface — empty air, not a clamp artifact.
+    expect(() => grid.densityAt(10, 3000, 10)).not.toThrow();
+    expect(grid.densityAt(10, 3000, 10)).toBe(0);
+  });
 });
 
 // ── createChunkSource — lazy chunk materialization (#1183) ─────────────────
@@ -182,7 +192,7 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
     const config = makeConfig(42);
     const terrain = buildTerrainContext(config);
     const source = createChunkSource(terrain, config);
-    const grid = new VoxelGrid(config.sizeX, config.sizeY, config.sizeZ);
+    const grid = new VoxelGrid(config.sizeX, config.sizeZ);
 
     const cy = chunkIndexOf(-200);
     const y0 = cy * CHUNK_SIZE;
@@ -209,7 +219,7 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
     const config = makeConfig(42);
     const terrain = buildTerrainContext(config);
     const source = createChunkSource(terrain, config);
-    const grid = new VoxelGrid(config.sizeX, config.sizeY, config.sizeZ);
+    const grid = new VoxelGrid(config.sizeX, config.sizeZ);
 
     const cy = chunkIndexOf(-200);
     const y0 = cy * CHUNK_SIZE;
@@ -237,9 +247,9 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
     const y0 = cy * CHUNK_SIZE;
     const y1 = y0 + CHUNK_SIZE;
 
-    const gridA = new VoxelGrid(config.sizeX, config.sizeY, config.sizeZ);
+    const gridA = new VoxelGrid(config.sizeX, config.sizeZ);
     source.materializeSlab(gridA, 0, CHUNK_SIZE, 0, CHUNK_SIZE, cy);
-    const gridB = new VoxelGrid(config.sizeX, config.sizeY, config.sizeZ);
+    const gridB = new VoxelGrid(config.sizeX, config.sizeZ);
     source.materializeSlab(gridB, 0, CHUNK_SIZE, 0, CHUNK_SIZE, cy);
 
     for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -257,7 +267,7 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
     const config = makeConfig(42, 'alpine_granite');
     const terrain = buildTerrainContext(config);
     const source = createChunkSource(terrain, config);
-    const grid = new VoxelGrid(config.sizeX, config.sizeY, config.sizeZ);
+    const grid = new VoxelGrid(config.sizeX, config.sizeZ);
 
     const cy = chunkIndexOf(-500); // far past every ore's depthMax except treranium's 999
     const y0 = cy * CHUNK_SIZE;
@@ -384,7 +394,7 @@ function levelTerrainConfig(levelId: string): TerrainConfig {
   if (!level) throw new Error(`levelTerrainConfig: no level ${levelId}`);
   return {
     sizeX: level.gridX,
-    sizeY: level.gridY,
+    datum: Math.floor(level.gridY * 0.55),
     sizeZ: level.gridZ,
     seed: level.terrainSeed,
     climateBias: level.climateBias,
@@ -421,11 +431,15 @@ describe('TerrainGen — unclamped columns across every campaign level (#1189)',
   it('dusty_hollow genuinely exceeds its own old [1, sizeY - 1] band somewhere in the rect — or the exhaustive check above proves nothing', () => {
     const config = levelTerrainConfig('dusty_hollow');
     const { worldGen } = buildTerrainContext(config);
+    // The old (pre-#1190) sizeY-bounded band this level used to clamp into,
+    // computed from the level's own literal gridY rather than from config
+    // (which no longer carries a sizeY at all — datum is not a scan bound).
+    const oldSizeY = getAllLevels().find(l => l.id === 'dusty_hollow')!.gridY;
     let exceeds = false;
     for (let x = 0; x < config.sizeX && !exceeds; x++) {
       for (let z = 0; z < config.sizeZ && !exceeds; z++) {
         const { continuous } = rawSurface(worldGen, x, z);
-        if (continuous < 1 || continuous > config.sizeY - 1) exceeds = true;
+        if (continuous < 1 || continuous > oldSizeY - 1) exceeds = true;
       }
     }
     expect(exceeds).toBe(true);

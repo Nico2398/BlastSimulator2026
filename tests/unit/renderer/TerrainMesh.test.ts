@@ -1368,7 +1368,7 @@ describe('TerrainMesh', () => {
       // ground around ~55% of sizeY (computeGroundOffset), so most of the
       // declared height below that is solid rock nothing ever sees — the
       // "buried" chunks this guards against over-eagerly materializing.
-      const config = { sizeX: 16, sizeY: 128, sizeZ: 16, seed: 7, climateBias: [0, 0] as const };
+      const config = { sizeX: 16, datum: Math.floor(128 * 0.55), sizeZ: 16, seed: 7, climateBias: [0, 0] as const };
       const grid = generateTerrain(config);
       const tm = new TerrainMesh(new THREE.Scene(), grid);
       tm.buildAll();

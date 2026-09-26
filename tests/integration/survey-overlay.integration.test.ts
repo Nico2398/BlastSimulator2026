@@ -86,7 +86,7 @@ function makeTerrainGrid(size = 32, seed = 42): VoxelGrid {
   if (!biome) throw new Error('desert_badlands biome not found');
   return generateTerrain({
     sizeX: size,
-    sizeY: size,
+    datum: Math.floor(size * 0.55),
     sizeZ: size,
     seed,
     climateBias: biome.climateCenter,

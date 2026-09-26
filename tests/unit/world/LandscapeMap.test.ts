@@ -22,7 +22,7 @@ const EMPTY_STRUCTURES: StructureSet = { overlays: [], spatialIndex: new Map(), 
 
 function makeConfig(seed: number, biomeId = 'alpine_granite'): TerrainConfig {
   const biome = getBiome(biomeId)!;
-  return { sizeX: 40, sizeY: 30, sizeZ: 40, seed, climateBias: biome.climateCenter };
+  return { sizeX: 40, datum: Math.floor(30 * 0.55), sizeZ: 40, seed, climateBias: biome.climateCenter };
 }
 
 /**
@@ -92,7 +92,10 @@ describe('sampleLandscapeColumn — no clamp, on either side, once relief exceed
   // clamp it matched: this suite proves BOTH samplers now land on the raw,
   // fully unclamped height, not merely that they still agree with each other
   // (they always did — even the pre-#1189 band matched the clamp exactly).
-  const config: TerrainConfig = { sizeX: 40, sizeY: 20, sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
+  // The old sizeY concept this suite proves the [1, sizeY - 1] band against —
+  // config itself no longer carries a sizeY (datum is not a scan/clamp bound).
+  const oldSizeY = 20;
+  const config: TerrainConfig = { sizeX: 40, datum: Math.floor(oldSizeY * 0.55), sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
   const { worldGen, biome } = buildTerrainContext(config);
   const strata = new StrataSampler(config.seed, buildStrataProfile(biome.dominantRocks));
   const palette = new CompositionPalette();
@@ -112,7 +115,7 @@ describe('sampleLandscapeColumn — no clamp, on either side, once relief exceed
   it('the fixture genuinely leaves the old [1, sizeY - 1] band somewhere, or this suite proves nothing', () => {
     const exceeds = boundaryColumns.some(([x, z]) => {
       const free = freeHeightAt(x, z);
-      return free < 1 || free > config.sizeY - 1;
+      return free < 1 || free > oldSizeY - 1;
     });
     expect(exceeds).toBe(true);
   });
@@ -142,12 +145,12 @@ describe('sampleLandscapeColumn — no clamp, on either side, once relief exceed
 });
 
 describe('sampleLandscapeColumn — boundary agreement (#458 T2.1 accept criterion)', () => {
-  // sizeY generously larger than alpine_granite's max relief (spline tops
-  // out around 75m base + 55 pvAmplitude): a too-short grid clamps
-  // sampleSurfaceVoxelY's result (heightToVoxelY clamps to [1, sizeY-1]),
-  // which would disagree with landscape's intentionally-unclamped height
-  // for a reason that has nothing to do with boundary agreement.
-  const config: TerrainConfig = { sizeX: 40, sizeY: 200, sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
+  // A datum generously larger than alpine_granite's max relief (spline tops
+  // out around 75m base + 55 pvAmplitude) so a real column's surface stays
+  // well clear of any accidental sign confusion between the two samplers —
+  // there is no clamp on either side post-#1189/#1190, so this is no longer
+  // about avoiding a clamp, only about giving the fixture plenty of headroom.
+  const config: TerrainConfig = { sizeX: 40, datum: Math.floor(200 * 0.55), sizeZ: 40, seed: 11, climateBias: getBiome('alpine_granite')!.climateCenter };
   const { grid, worldGen, strata, structureSet } = buildAll(config, 300);
 
   it('height agrees within +-0.5 between the playable grid and an independent landscape sample at the same column', () => {
@@ -172,7 +175,7 @@ describe('sampleLandscapeColumn — boundary agreement (#458 T2.1 accept criteri
     // underneath it was — the whole site terraced into 1m steps while the
     // landscape beside it stayed smooth.
     const isoHeightAt = (x: number, z: number): number => {
-      for (let y = config.sizeY - 1; y > 0; y--) {
+      for (let y = 300; y > 0; y--) {
         const below = grid.densityAt(x, y - 1, z);
         const here = grid.densityAt(x, y, z);
         if (below >= 0.5 && here < 0.5) return (y - 1) + (0.5 - below) / (here - below);
@@ -245,7 +248,7 @@ describe('sampleLandscapeColumn — boundary agreement (#458 T2.1 accept criteri
     // Structures.ts keeps every structure's carved footprint clear of the
     // claim rect.
     const regressionConfig: TerrainConfig = {
-      sizeX: 40, sizeY: 200, sizeZ: 40, seed: 2378, climateBias: getBiome('alpine_granite')!.climateCenter,
+      sizeX: 40, datum: Math.floor(200 * 0.55), sizeZ: 40, seed: 2378, climateBias: getBiome('alpine_granite')!.climateCenter,
     };
     // 1600m extentHalf (Structures.ts's own DEFAULT_LANDSCAPE_EXTENT_HALF),
     // not the 300m this file uses elsewhere for speed: the offending river in

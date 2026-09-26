@@ -79,7 +79,6 @@ describe('loadCommand', () => {
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.id).not.toBe(gridIdBeforeSave);
     expect(ctx.grid!.sizeX).toBe(16);
-    expect(ctx.grid!.sizeY).toBe(16);
     expect(ctx.grid!.sizeZ).toBe(16);
   });
 

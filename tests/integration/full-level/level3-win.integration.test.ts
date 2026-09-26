@@ -27,7 +27,6 @@ describe('Level 3 — Win', () => {
     expect(ctx.grid).not.toBeNull();
     // Verify grid dimensions: treranium_depths = 160x64x160 (#458 T6.1/D13)
     expect(ctx.grid!.sizeX).toBe(160);
-    expect(ctx.grid!.sizeY).toBe(64);
     expect(ctx.grid!.sizeZ).toBe(160);
   });
 

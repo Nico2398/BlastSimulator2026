@@ -28,16 +28,23 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
 import { levelGroundRect } from '../../src/core/mining/LevelGround.js';
 
+const DUSTY_HOLLOW_LEVEL = getLevel('dusty_hollow');
+if (!DUSTY_HOLLOW_LEVEL) throw new Error('dusty_hollow level definition not found');
+
+// The level's own declared height — used below as the scan bound in place of
+// `live.sizeY`, which is now a fixed, height-free sentinel (4096) unrelated
+// to how tall this level's terrain actually is. Scanning to the sentinel
+// would multiply the voxel-for-voxel comparison's cost by ~170x per column.
+const DECLARED_HEIGHT_FOR_SCAN = DUSTY_HOLLOW_LEVEL.gridY;
+
 function dustyHollowTerrainConfig(): TerrainConfig {
-  const level = getLevel('dusty_hollow');
-  if (!level) throw new Error('dusty_hollow level definition not found');
   return {
-    sizeX: level.gridX,
-    sizeY: level.gridY,
-    sizeZ: level.gridZ,
-    seed: level.terrainSeed,
-    climateBias: level.climateBias,
-    mixedRockHardness: level.mixedRockHardness,
+    sizeX: DUSTY_HOLLOW_LEVEL!.gridX,
+    datum: Math.floor(DUSTY_HOLLOW_LEVEL!.gridY * 0.55),
+    sizeZ: DUSTY_HOLLOW_LEVEL!.gridZ,
+    seed: DUSTY_HOLLOW_LEVEL!.terrainSeed,
+    climateBias: DUSTY_HOLLOW_LEVEL!.climateBias,
+    mixedRockHardness: DUSTY_HOLLOW_LEVEL!.mixedRockHardness,
   };
 }
 
@@ -55,7 +62,7 @@ function assertGridsMatchVoxelForVoxel(replayed: VoxelGrid, live: VoxelGrid): vo
     const rect = live.chunkRect(cx, cz)!;
     for (let z = rect.minZ; z < rect.maxZ; z++) {
       for (let x = rect.minX; x < rect.maxX; x++) {
-        for (let y = 0; y < live.sizeY; y++) {
+        for (let y = 0; y < DECLARED_HEIGHT_FOR_SCAN; y++) {
           const liveDensity = live.densityAt(x, y, z);
           const replayedDensity = replayed.densityAt(x, y, z);
           expect(

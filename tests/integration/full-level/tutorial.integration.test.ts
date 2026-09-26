@@ -48,7 +48,6 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // Verify grid dimensions: tutorial_pit = 32x20x32 (#458 T6.1/D13)
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.sizeX).toBe(32);
-    expect(ctx.grid!.sizeY).toBe(20);
     expect(ctx.grid!.sizeZ).toBe(32);
     // No employees initially
     expect(ctx.state!.employees.employees.length).toBe(0);

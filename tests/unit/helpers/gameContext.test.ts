@@ -62,7 +62,6 @@ describe('makeGameContext', () => {
     expect(ctx.state!.mineType).toBe('desert');
     expect(ctx.state!.seed).toBe(42);
     expect(ctx.grid!.sizeX).toBe(32);
-    expect(ctx.grid!.sizeY).toBe(32);
     expect(ctx.grid!.sizeZ).toBe(32);
   });
 
@@ -76,14 +75,12 @@ describe('makeGameContext', () => {
   it('forwards `size` only, resizing the grid on all three axes (sizeY defaults to size when sizeY is not given, mirroring newGameCommand)', () => {
     const ctx = makeGameContext({ size: 16 });
     expect(ctx.grid!.sizeX).toBe(16);
-    expect(ctx.grid!.sizeY).toBe(16);
     expect(ctx.grid!.sizeZ).toBe(16);
   });
 
   it('forwards `sizeY` independently of `size`', () => {
     const ctx = makeGameContext({ size: 16, sizeY: 8 });
     expect(ctx.grid!.sizeX).toBe(16);
-    expect(ctx.grid!.sizeY).toBe(8);
     expect(ctx.grid!.sizeZ).toBe(16);
   });
 
@@ -125,7 +122,6 @@ describe('makeGameContext', () => {
     expect(ctx.state).not.toBeNull();
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.sizeX).toBe(0);
-    expect(ctx.grid!.sizeY).toBe(0);
     expect(ctx.grid!.sizeZ).toBe(0);
   });
 
