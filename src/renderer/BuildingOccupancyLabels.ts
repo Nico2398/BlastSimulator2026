@@ -45,29 +45,36 @@ interface OccupancyLabel {
 /**
  * Build the label's material. `document` is unavailable in this project's
  * Node-only Vitest suites (no jsdom) — mirrors EmployeePictograms'
- * buildIconMaterial fallback exactly: a flat-color material stands in for
- * the canvas-text texture wherever `document` doesn't exist.
+ * buildIconMaterial fallback: a flat-color material stands in for the
+ * canvas-text texture wherever `document` doesn't exist. Some test workers
+ * do provide a `document` (and thus `HTMLCanvasElement`) without the
+ * `canvas` npm package installed, in which case `getContext('2d')` itself
+ * returns null rather than `document` being undefined — checked here too,
+ * so the fallback still triggers on that path instead of drawLabel crashing.
  */
 function buildLabelMaterial(): Pick<OccupancyLabel, 'material' | 'canvas' | 'texture'> {
-  if (typeof document === 'undefined') {
-    return {
-      material: new THREE.MeshBasicMaterial({ color: NORMAL_FALLBACK_COLOR, transparent: true, depthWrite: false }),
-      canvas: null,
-      texture: null,
-    };
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    if (canvas.getContext('2d') !== null) {
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+      return { material, canvas, texture };
+    }
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.width = CANVAS_WIDTH;
-  canvas.height = CANVAS_HEIGHT;
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-  return { material, canvas, texture };
+  return {
+    material: new THREE.MeshBasicMaterial({ color: NORMAL_FALLBACK_COLOR, transparent: true, depthWrite: false }),
+    canvas: null,
+    texture: null,
+  };
 }
 
 /** Redraw `canvas`'s background pill + "<inside>/<capacity>" text, styled distinctly when `full`. */
 function drawLabel(canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, text: string, full: boolean): void {
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (ctx === null) return; // Defensive: buildLabelMaterial() already ensured a real context before handing out this canvas.
   const w = canvas.width;
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
@@ -144,6 +151,8 @@ export class BuildingOccupancyLabels {
       if (!label) {
         const built = buildLabelMaterial();
         const mesh = new THREE.Mesh(this.geometry, built.material);
+        mesh.userData['entityKind'] = 'buildingOccupancyLabel';
+        mesh.userData['entityId'] = b.id;
         this.scene.add(mesh);
         label = { mesh, ...built, inside: -1, capacity: -1 };
         this.labels.set(b.id, label);
@@ -155,8 +164,11 @@ export class BuildingOccupancyLabels {
         label.inside = inside;
         label.capacity = capacity;
         const full = inside === capacity;
+        const text = t('building.occupancy', { inside, capacity });
+        label.mesh.userData['occupancyText'] = text;
+        label.mesh.userData['full'] = full;
         if (label.canvas && label.texture) {
-          drawLabel(label.canvas, label.texture, t('building.occupancy', { inside, capacity }), full);
+          drawLabel(label.canvas, label.texture, text, full);
         } else {
           recolorFallback(label.material, full);
         }
