@@ -86,7 +86,11 @@ A policy-forced rest (`forceShiftRestIfNeededByPolicy`, see Shift System below) 
 |---------|--------|--------|--------|
 | Living Quarters (fatigue) | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
 
-(`BUILDING_REPLENISH_RATES.fatigue`.) Building full → employee waits in queue (gauge drains at normal rate for its current work state while waiting). Route to next nearest if no capacity.
+(`BUILDING_REPLENISH_RATES.fatigue`.) A full living_quarters (occupants plus everyone already walking there, `isRestBuildingFull`) is never offered by the nearest-building search — the next nearest one with a free bed wins. When every living_quarters is full, the no-building degraded rest above applies (capped gauge, doubled duration) — the same fallback as no living_quarters existing at all.
+
+## Resting Inside a Building
+
+A rest targeting a living_quarters walks the employee to its ring and inside it (#1204), unseen for the whole stay — the same occupancy model buildings and vehicles already share (#1202): `Building.occupantIds`, `Employee.locomotion: {kind:'inside', buildingId}`, admitted and released by `Mount.ts`'s `enterBuilding`/`leaveBuilding`. `completeRestForEmployee` puts them back out on a free ring cell (`leaveBuildingIfInside`) once the rest completes; a building destroyed mid-rest ejects them the same generic way every other occupant is (`releaseOccupantsOfRemovedBuildings`, #1202) — no rest-specific handling. A mounted employee's rest never enters a building at all — mount continuity (see Shift System below) takes priority, exactly as before #1204.
 
 ## Proactive Need Queuing
 

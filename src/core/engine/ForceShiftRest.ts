@@ -13,7 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
-import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
+import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
@@ -74,7 +74,7 @@ function finishForceRest(
 ): void {
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
-  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ);
+  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ, resolveRestBuildingId(restAction.payload));
   releaseUnboardedTaskQueueVehicleReservations(state, emp);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });

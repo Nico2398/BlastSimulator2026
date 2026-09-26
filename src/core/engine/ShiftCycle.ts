@@ -12,7 +12,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { completeIfOwnedRestAction } from './TaskDispatch.js';
-import { completeRestForEmployee } from './RestActionHelpers.js';
+import { completeRestForEmployee, resolveRestBuildingId } from './RestActionHelpers.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from './ForceShiftRest.js';
 
 export interface ShiftCycleResult {
@@ -113,7 +113,10 @@ export function completeRestTick(
 
   if (emp.restTicksRemaining <= 0) {
     const completedActionId = emp.activeActionId;
-    completeRestForEmployee(state, emp, 'fatigue');
+    const completedAction = completedActionId !== null
+      ? state.pendingActions.find(a => a.id === completedActionId)
+      : undefined;
+    completeRestForEmployee(state, emp, 'fatigue', completedAction !== undefined ? resolveRestBuildingId(completedAction.payload) : undefined);
     // forceShiftRestIfNeeded self-claims this action at creation, so — like
     // tickGeneralRestCompletion's own rest sources — nothing else removes it
     // from pendingActions/ghostPreviews once the rest completes (#547).

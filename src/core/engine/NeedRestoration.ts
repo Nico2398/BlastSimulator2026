@@ -85,7 +85,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // confirms the employee has walked to the building (#437).
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = needKey;
-    beginRestTravel(state, emp, approach.x, approach.z);
+    beginRestTravel(state, emp, approach.x, approach.z, building.id);
     result.routed.push(emp.id);
   }
 
@@ -245,7 +245,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
     alightIfMounted(state, emp, _emitter);
-    beginRestTravel(state, emp, targetX, targetZ);
+    beginRestTravel(state, emp, targetX, targetZ, buildingId);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
     // employee after its vehicle was destroyed mid-drive) predating this

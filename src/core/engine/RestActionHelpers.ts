@@ -8,7 +8,7 @@
 // single public surface for tick-orchestration callers.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import { getBuildingDef, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
+import { getBuildingDef, getBuildingPeopleCapacity, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { addExpense } from '../economy/Finance.js';
@@ -18,6 +18,7 @@ import {
   AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
 } from '../config/balance.js';
 import { moveTo, alightOnArrival } from './MoveTo.js';
+import { leaveBuildingIfInside } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
@@ -102,16 +103,24 @@ export function findNearestBuildingOfType(
   empZ: number,
 ): Building | null {
   const zone = state.zone.activeZone;
-  if (zone === null || (
+  const evacuationInProgress = zone !== null && !(
     isZoneClear(zone, state.vehicles, state.employees)
     && !isZoneStillBlastThreatened(state.drillHoles, zone)
-  )) {
-    return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
-  }
+  );
 
-  const outsideZone = state.buildings.buildings.filter(b => !isInZone(b.x, b.z, zone));
+  // One filter covering both exclusions this helper has ever needed: the
+  // zone-safety guard above (unchanged), and — #1204 — a full building
+  // (isRestBuildingFull) never offered as a candidate, so the search below
+  // naturally lands on the next nearest one with room, or null when none
+  // qualifies (the same "no building" fallback as never having one at all).
+  const candidates = state.buildings.buildings.filter(b => {
+    if (evacuationInProgress && isInZone(b.x, b.z, zone!)) return false;
+    if (b.type === buildingType && isRestBuildingFull(state, b)) return false;
+    return true;
+  });
+
   return findNearestActiveBuildingOfType(
-    { ...state.buildings, buildings: outsideZone }, buildingType, empX, empZ,
+    { ...state.buildings, buildings: candidates }, buildingType, empX, empZ,
   );
 }
 
@@ -176,9 +185,17 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
  * the same occupancy model #1202's Mount.ts admitOccupant/enterBuilding
  * already own, the way #1203 did for the training building.
  */
-export function isRestBuildingFull(_state: GameState, _building: Building): boolean {
-  // TODO(skeleton): implement — see RestActionHelpers.test.ts
-  return false;
+export function isRestBuildingFull(state: GameState, building: Building): boolean {
+  const capacity = getBuildingPeopleCapacity(building.type, building.tier);
+  if (capacity === 0) return false;
+
+  const walkingToIt = state.employees.employees.filter(e => {
+    if (e.pendingRestDuration === null || e.activeActionId === null) return false;
+    const action = state.pendingActions.find(a => a.id === e.activeActionId);
+    return action !== undefined && resolveRestBuildingId(action.payload) === building.id;
+  }).length;
+
+  return building.occupantIds.length + walkingToIt >= capacity;
 }
 
 /**
@@ -186,16 +203,20 @@ export function isRestBuildingFull(_state: GameState, _building: Building): bool
  * names, if any — #1204: mirrors the equivalent lookup #1203 added for the
  * training flow's own payload-carried buildingId.
  */
-export function resolveRestBuildingId(_payload: Record<string, unknown>): number | undefined {
-  // TODO(skeleton): implement — see RestActionHelpers.test.ts
-  return undefined;
+export function resolveRestBuildingId(payload: Record<string, unknown>): number | undefined {
+  const value = payload['buildingId'];
+  return typeof value === 'number' ? value : undefined;
 }
 
 export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey, buildingId?: number): void {
-  // TODO(skeleton): use buildingId once completion routes through it — see
-  // RestActionHelpers.test.ts
-  void buildingId;
-  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  // #1204: the exact living_quarters this rest walked to and entered, if it
+  // still exists — not re-derived from the employee's current position (they
+  // never moved from it while resting inside). No-building rest (buildingId
+  // undefined) and a building demolished mid-rest both fall through to the
+  // same degraded no-building path below.
+  const building = buildingId !== undefined
+    ? state.buildings.buildings.find(b => b.id === buildingId)
+    : undefined;
   if (building) {
     // A completed rest visit at any active living_quarters (any tier) fully
     // restores the gauge. The per-tick BUILDING_REPLENISH_RATES loop this
@@ -222,6 +243,11 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
   emp.restTicksRemaining = null;
   emp.restNeedKey = null;
   emp.activeActionId = null;
+
+  // #1204: put a resting-inside employee back out on their living_quarters'
+  // ring now that the visit is over — a no-op for mounted rest or a
+  // no-building rest, neither of which ever entered a building.
+  leaveBuildingIfInside(state, emp);
 }
 
 /**
@@ -247,19 +273,20 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * (tickCollapse, NeedRestoration.ts), which alights first — a genuine "give
  * up the vehicle" event (#1118).
  *
- * `buildingId` (#1204, skeleton phase — not yet threaded through): once the
- * rest destination is a living_quarters ring cell rather than the building's
- * own (x, z), this will route through `moveTo(state, emp.id, { buildingId },
- * ...)` instead, entering the building unseen on arrival like #1203 did for
- * the training flow. Omitted (undefined) for the no-building rest-in-place
- * case.
+ * `buildingId` (#1204): when given and the employee is not mounted, routes
+ * through `moveTo(state, emp.id, { buildingId }, ...)` instead of the plain
+ * (x, z) reposition — the employee walks to the living_quarters' ring and
+ * enters it unseen on arrival, exactly like #1203's training-enrolment walk.
+ * A mounted employee always keeps the plain (x, z) call (a mounted rest never
+ * enters a building — #1122), and so does the no-building rest-in-place case
+ * (buildingId undefined) — both leave the mount-continuity handling below
+ * untouched.
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number): void {
   const wasMounted = isMounted(emp.locomotion);
-  // TODO(skeleton): route through moveTo(state, emp.id, {buildingId}) when
-  // buildingId is defined — see RestActionHelpers.test.ts
-  void buildingId;
-  const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true });
+  const result = !wasMounted && buildingId !== undefined
+    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true })
+    : moveTo(state, emp.id, { x, z }, { allowUnreachable: true });
   if (wasMounted && result.success && !hasClaimableSameRoleFollowUp(state, emp)) {
     alightOnArrival(emp);
   }

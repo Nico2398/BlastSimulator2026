@@ -29,6 +29,7 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncItineraryMirrors } from './MoveTo.js';
 import { dismountVehicleDriver, releaseVehicleReservation } from './VehicleReservation.js';
+import { completeIfOwnedRestAction } from './TaskLifecycleCore.js';
 import { appendToTrail, openMovementTrail, type TrailPoint } from '../entities/MovementTrail.js';
 
 /** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
@@ -324,6 +325,20 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
           buildingId: pending.buildingId,
           refund: pending.fee,
         });
+      }
+      // Stranded rest walk-in (#1204, mirrors the training block above): the
+      // living_quarters this employee was walking into was demolished, or was
+      // full the instant enterBuilding was actually called. No fee to refund
+      // (rest has none) — just drop the pending rest claim and its stale
+      // PendingAction so the employee returns to normal dispatch instead of
+      // being left permanently "walking to rest" with a claim nothing will
+      // ever promote.
+      if (step.kind === 'enter_building' && emp.pendingRestDuration !== null) {
+        const staleActionId = emp.activeActionId;
+        emp.pendingRestDuration = null;
+        emp.pendingRestNeedKey = null;
+        emp.activeActionId = null;
+        completeIfOwnedRestAction(state, staleActionId);
       }
       clearItineraryOnFailure(state, emp);
       break;
