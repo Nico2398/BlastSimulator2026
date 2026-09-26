@@ -590,6 +590,52 @@ describe('tickLocomotion', () => {
     });
   });
 
+  // #1204: mirrors the #1203 training-demolition stranded-walk test above —
+  // a rest walk's own enter_building arrival step can fail the exact same
+  // way (the living_quarters demolished mid-walk, or filled by the time a
+  // queued rest is promoted). Left uncleared, pendingRestDuration would strand
+  // this employee "resting" forever (isMidCollapseOrForcedRest reads it as
+  // still mid-rest, permanently excluding them from claimActionsTargetedAtEmployee)
+  // with activeActionId still naming an action nothing will ever complete.
+  // Unlike training, rest has no fee — no refund/event is expected here, only
+  // the stale rest state and the stale pending action itself being cleared.
+  it("clears rest state and discards the stale action when a rest walk's enter_building step fails — building demolished mid-walk (#1204)", () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // Building id 999 deliberately absent from state.buildings.buildings —
+    // demolished out from under this employee's rest walk.
+    const actionId = state.nextPendingActionId++;
+    const restAction: PendingAction = {
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 1, targetZ: 0, targetY: 0,
+      payload: { buildingId: 999, needKey: 'fatigue', restDuration: 8 },
+      targetEmployeeId: employee.id, status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(restAction);
+    employee.activeActionId = actionId;
+    employee.pendingRestDuration = 8;
+    employee.pendingRestNeedKey = 'fatigue';
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 1, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 1, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    expect(() => tickLocomotion(state)).not.toThrow();
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.itinerary).toBeNull();
+    expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+  });
+
   // #1178: with destinationX/Z now a read-only mirror rather than a second
   // movement source, "no itinerary" alone (regardless of destinationX/Z)
   // is the whole no-op condition — this boundary case (both null too) still

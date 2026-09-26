@@ -7,7 +7,7 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
-import { processShiftCycle } from '../../../src/core/engine/ShiftCycle.js';
+import { processShiftCycle, completeRestTick } from '../../../src/core/engine/ShiftCycle.js';
 import { tickGeneralRestCompletion } from '../../../src/core/engine/RestCompletion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -20,6 +20,7 @@ import {
   SHIFT_SLEEP_DURATION_TICKS,
   SHIFT_DURATIONS_TICKS,
   MAX_NEED_GAUGE,
+  NEED_REST_NO_BUILDING_CAP,
 } from '../../../src/core/config/balance.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 
@@ -479,6 +480,57 @@ describe('processShiftCycle (7.9)', () => {
     // the interrupted one and not null.
     expect(employee.activeActionId).not.toBe(interrupted.id);
     expect(employee.activeActionId).not.toBeNull();
+  });
+});
+
+// #1204: completeRestTick (the legacy no-policy shift-sleep completion path)
+// must thread the completed rest action's own named building (payload.
+// buildingId) into completeRestForEmployee exactly like tickGeneralRestCompletion
+// does (RestCompletion.test.ts's own #1204 suite) — so shift sleep exits the
+// building it named, not whichever living_quarters happens to be nearest the
+// employee's position at completion time.
+describe('completeRestTick — buildingId threading (#1204)', () => {
+  const SEED = 42;
+
+  it("uses the completed rest action's own named building (payload.buildingId), not whichever living_quarters is nearest the employee's position at completion time", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    employee.fatigue = 10;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = null; // legacy shift-sleep path, owned by completeRestTick
+
+    // The named building: placed, then demolished — simulates it having been
+    // removed mid-rest. The named-but-missing building must still win over a
+    // real, active alternative sitting right at the employee's own position.
+    const named = placeBuilding(state.buildings, 'living_quarters', 200, 200, 300, 300, 1);
+    expect(named.success).toBe(true);
+    const namedId = named.building!.id;
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== namedId);
+
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { buildingId: namedId },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+
+    // A DIFFERENT, still-active living_quarters right at the employee's own
+    // completion-time position — nearest-by-position search would find THIS
+    // one and grant a full restore; the fix must not use it.
+    const closer = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(closer.success).toBe(true);
+
+    const restCompleted: number[] = [];
+    completeRestTick(state, employee, restCompleted);
+
+    // Correct (#1204): the NAMED building no longer exists -> degraded,
+    // capped rest. Buggy (pre-#1204): nearest-by-position finds `closer` ->
+    // full MAX_NEED_GAUGE restore.
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+    expect(restCompleted).toEqual([employee.id]);
   });
 });
 

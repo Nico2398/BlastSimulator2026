@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import {
   claimActionsTargetedAtEmployee,
@@ -1168,6 +1169,30 @@ describe('promoteActionToActive', () => {
     expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
     expect(employee.pendingRestNeedKey).toBe('fatigue');
     expect(employee.pendingTaskDuration).toBeNull();
+  });
+
+  // #1204: a queued rest action naming a REAL, existing living_quarters must
+  // route the walk through moveTo(state, id, {buildingId}) — the employee
+  // disappears inside on arrival (enter_building), rather than resting
+  // visibly on the open ground at the building's own (blocked) x/z.
+  it('threads a real buildingId through beginRestTravel so the walk ends with an enter_building arrival step, not a plain reposition (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 0, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const action = makeAction({
+      id: 10, type: 'rest', targetX: placed.building!.x, targetZ: placed.building!.z,
+      payload: { needKey: 'fatigue', buildingId: placed.building!.id },
+    });
+
+    promoteActionToActive(state, employee, action);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: placed.building!.id });
   });
 
   // #1091 follow-up: a no-building "rest in place" action's targetX/targetZ

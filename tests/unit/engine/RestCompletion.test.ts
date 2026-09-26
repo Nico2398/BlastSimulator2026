@@ -175,3 +175,87 @@ describe('tickGeneralRestCompletion', () => {
     expect(state.ghostPreviews.find(g => g.id === actionId)).toBeUndefined();
   });
 });
+
+// #1204: completion must read the completed rest action's OWN named building
+// (payload.buildingId, via RestActionHelpers.ts's resolveRestBuildingId) for
+// both the full-vs-capped restore decision and the exit ring cell — not
+// whichever living_quarters happens to be nearest the employee's position at
+// completion time. Before #1204, completeRestForEmployee always re-derived
+// the building via a fresh nearest-by-position search, which is wrong the
+// moment a second living_quarters exists closer to wherever the employee
+// happens to be standing when their OWN rest completes.
+describe('tickGeneralRestCompletion — buildingId threading (#1204)', () => {
+  const SEED = 42;
+
+  it("uses the rest action's own named building (payload.buildingId), not whichever living_quarters is nearest the employee's position at completion time", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    employee.fatigue = 10;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = 'fatigue';
+
+    // The named building: placed, then demolished — simulates it having been
+    // removed mid-rest. The named-but-missing building must still win over a
+    // real, active alternative sitting right at the employee's own position.
+    const named = placeBuilding(state.buildings, 'living_quarters', 200, 200, 300, 300, 1);
+    expect(named.success).toBe(true);
+    const namedId = named.building!.id;
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== namedId);
+
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { needKey: 'fatigue', buildingId: namedId },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+
+    // A DIFFERENT, still-active living_quarters placed right at the
+    // employee's own completion-time position — nearest-by-position search
+    // would find THIS one and grant a full restore; the fix must not use it.
+    const closer = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(closer.success).toBe(true);
+
+    tickGeneralRestCompletion(state);
+
+    // Correct (#1204): the NAMED building no longer exists -> degraded,
+    // capped rest. Buggy (pre-#1204): nearest-by-position finds `closer` ->
+    // full MAX_NEED_GAUGE restore.
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+  });
+
+  // #1204: an employee actually inside the building (locomotion {kind:
+  // 'inside', buildingId}) must be put back out onto its ring via
+  // leaveBuildingIfInside on completion — mirrors #1203's own tickTraining
+  // exit. Before #1204, completion never touched locomotion/occupancy at
+  // all, since nobody ever went inside for a rest in the first place.
+  it("exits the building on completion when locomotion is {kind:'inside', buildingId} — leaves via leaveBuildingIfInside, no longer 'inside'", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 5, 5);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    building.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'inside', buildingId: building.id };
+    employee.fatigue = 10;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = 'fatigue';
+
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: employee.x, targetZ: employee.z, targetY: 0,
+      payload: { needKey: 'fatigue', buildingId: building.id },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+
+    tickGeneralRestCompletion(state);
+
+    expect(employee.locomotion.kind).not.toBe('inside');
+    expect(building.occupantIds).not.toContain(employee.id);
+  });
+});
