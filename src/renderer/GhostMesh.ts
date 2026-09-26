@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { GhostPreview } from '../core/state/GameState.js';
 import { getFootprintSize } from '../core/entities/Building.js';
 import { footprintCenterCoord } from './MeshUtils.js';
+import { markSceneOverlay } from './post/SceneOverlay.js';
 
 // ---------- Config ----------
 
@@ -16,6 +17,12 @@ const OPACITY_MIN     = 0.20;            // dimmest pulse value
 const OPACITY_MAX     = 0.60;            // brightest pulse value
 const PULSE_SPEED     = 2.2;             // radians / second
 export const GHOST_SIZE = 0.9;           // box half-extent in metres
+/**
+ * Ghosts draw before the ramp arrow (RAMP_ARROW_RENDER_ORDER, #1211): a
+ * ramp's per-layer ghost cubes stack right on its axis, and drawn after the
+ * arrow their translucent blue would wash its yellow out.
+ */
+export const GHOST_RENDER_ORDER = 10;
 
 // Claimed ghosts (an employee has claimed the action and is en route/working
 // it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
@@ -143,6 +150,8 @@ export class GhostMesh {
         const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
         const geo = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
         const mesh = new THREE.Mesh(geo, targetMaterial);
+        mesh.renderOrder = GHOST_RENDER_ORDER;
+        markSceneOverlay(mesh);
         mesh.position.set(
           footprintCenterCoord(preview.targetX, sizeX),
           preview.targetY + GHOST_SIZE / 2,
@@ -155,6 +164,8 @@ export class GhostMesh {
 
       const geo = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
       const mesh = new THREE.Mesh(geo, targetMaterial);
+      mesh.renderOrder = GHOST_RENDER_ORDER;
+      markSceneOverlay(mesh);
       mesh.position.set(
         preview.targetX,
         preview.targetY + GHOST_SIZE / 2,

@@ -313,13 +313,14 @@ export class BuildMenu extends PanelBase {
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
-      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
       // One source of truth (#1210): the same RampDef + validateRampOrder call
       // the console command runs decides the UI gate here, so the two can
       // never disagree again about a length/depth/cash combination.
       const rampDef = sel ? rampDefFromEndpoints(sel.x1, sel.z1, sel.x2, sel.z2, this.rampDepth) : null;
       const validation = rampDef ? validateRampOrder(rampDef, this.lastState?.cash ?? 0) : null;
       const confirmEnabled = controller.canConfirm && (validation?.success ?? false);
+      // The preview turns red live, mid-drag included, whenever this ramp would be refused (#1211).
+      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, refused: !confirmEnabled } : null);
       let confirmDisabledReason: string | undefined;
       if (!controller.canConfirm) {
         confirmDisabledReason = placementRefusalReason(controller);

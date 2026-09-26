@@ -22,6 +22,8 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';
+import type { PlannedRamp } from '../../../src/core/state/GameState.js';
 
 function makeSurveyResult(overrides: Partial<SurveyResult> = {}): SurveyResult {
   return {
@@ -275,5 +277,62 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     syncGameRendererEntities(makeZoneSyncDeps(state, characters));
 
     expect(spy).toHaveBeenLastCalledWith(employee.id, false);
+  });
+});
+
+describe('syncGameRendererEntities() — ramp arrows (#1211)', () => {
+  function plannedRamp(id: number, segmentCount: number): PlannedRamp {
+    return {
+      id,
+      def: { originX: 16, originZ: 19, direction: 'south', length: 12, targetDepth: 3 },
+      footprint: { minX: 15, maxX: 17, minZ: 19, maxZ: 30 },
+      segments: Array.from({ length: segmentCount }, (_, index) => ({
+        index, actionId: 100 + index, cells: [], region: null, done: false, carvedCount: 0,
+      })),
+    };
+  }
+
+  function syncWith(state: GameState, rampArrows: RampArrowLayer): void {
+    syncGameRendererEntities({
+      ...makeZoneSyncDeps(state, new CharacterMesh(new THREE.Scene())),
+      rampArrows,
+    });
+  }
+
+  it('keeps a planned ramp\'s arrow until its last segment is dug, then draws none', () => {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    const ramp = plannedRamp(1, 3);
+    state.plannedRamps.push(ramp);
+    const scene = new THREE.Scene();
+    const arrows = new RampArrowLayer(scene, () => 0);
+
+    syncWith(state, arrows);
+    expect(arrows.count).toBe(1);
+    expect(arrows.getArrow(1)?.parent).toBe(scene);
+
+    ramp.segments[0]!.done = true;
+    ramp.segments[1]!.done = true;
+    syncWith(state, arrows);
+    expect(arrows.count).toBe(1);
+
+    ramp.segments[2]!.done = true;
+    syncWith(state, arrows);
+    expect(arrows.count).toBe(0);
+    expect(scene.getObjectByName('ramp-arrow')).toBeUndefined();
+  });
+
+  it('drops the arrow when the finished ramp leaves plannedRamps', () => {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    state.plannedRamps.push(plannedRamp(1, 2), plannedRamp(2, 2));
+    const arrows = new RampArrowLayer(new THREE.Scene(), () => 0);
+
+    syncWith(state, arrows);
+    expect(arrows.count).toBe(2);
+
+    state.plannedRamps.splice(0, 1);
+    syncWith(state, arrows);
+    expect(arrows.count).toBe(1);
+    expect(arrows.getArrow(1)).toBeNull();
+    expect(arrows.getArrow(2)).not.toBeNull();
   });
 });
