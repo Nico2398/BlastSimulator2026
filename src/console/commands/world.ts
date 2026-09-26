@@ -422,6 +422,11 @@ export function newGameCommand(
     return { success: false, output: staffedFlag.error };
   }
 
+  // TODO(#1206): thread an `agent_occupancy:true|false` flag through here the
+  // same way `staffed` is parsed above (parseBooleanFlag in commandUtils.ts),
+  // into `createGame`'s `agentOccupancyEnabled` config field, once the
+  // occupancy check itself is implemented. Left unwired in the skeleton phase
+  // — `debug occupancy on|off` (debug.ts) is the primary toggle for now.
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),

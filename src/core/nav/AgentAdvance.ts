@@ -7,6 +7,7 @@
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
 import { isImpassable, directLineWalk } from './Pathfinding.js';
+import type { Occupant, AgentOccupancy } from './AgentOccupancy.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -48,6 +49,16 @@ export interface AdvanceAlongPathInput {
    */
   moveHistoryX?: number | null;
   moveHistoryZ?: number | null;
+  /**
+   * This agent's own occupant identity (#1206), passed through to the
+   * ground-cell occupancy check the caller performs against `occupancy`.
+   * Optional/nullable so a fixture/caller predating the occupancy feature
+   * keeps compiling unchanged — omitting it disables the check entirely,
+   * matching AGENT_OCCUPANCY_ENABLED_DEFAULT's off-by-default landing.
+   */
+  mover?: Occupant | null;
+  /** The shared ground-cell occupancy index (#1206), or null/omitted when the feature is off. */
+  occupancy?: AgentOccupancy | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -80,6 +91,16 @@ interface AdvanceAlongPathOutcome {
    * renderer's trail and never saves it.
    */
   trail: Array<{ x: number; z: number }>;
+  /**
+   * The occupant this tick's advance was blocked by (#1206), or null when
+   * nothing blocked it (occupancy checking off, or no conflict this tick).
+   * Optional, like `RouteCommitment`'s own `fromX`/`fromZ` (#1129): a test
+   * fixture built before this field existed keeps compiling and reads as "no
+   * occupancy block" — the occupancy-checking logic itself is implementer's
+   * job, this field only stabilizes the outcome shape for both branches
+   * meanwhile.
+   */
+  blockedByOccupant?: Occupant | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +220,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       moveHistoryX: input.x,
       moveHistoryZ: input.z,
       trail: [],
+      blockedByOccupant: null,
     };
   }
 
@@ -392,6 +414,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     moveHistoryX: input.x,
     moveHistoryZ: input.z,
     trail,
+    blockedByOccupant: null,
   };
 }
 

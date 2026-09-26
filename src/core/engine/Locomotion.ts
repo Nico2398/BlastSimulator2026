@@ -16,11 +16,12 @@ import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVeh
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
+import type { Occupant, AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
   MOVE_STUCK_ABANDON_TICKS,
-  VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+  AGENT_OCCUPANCY_WAIT_TICKS,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { board, alight, enterBuilding } from './Mount.js';
@@ -73,7 +74,7 @@ function writeCommitted(emp: Employee, committed: RouteCommitment): void {
  * blocker as soon as the detour's first step is taken. Where the way around
  * is much longer than the way through — a chokepoint, which is what #1151's
  * slope gate turns ordinary relief into — that produces a permanent
- * back-and-forth: block, wait out VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+ * back-and-forth: block, wait out AGENT_OCCUPANCY_WAIT_TICKS,
  * one step of detour, repath, block again. Nothing escalates it, either:
  * every reroute resets isMoveStuck/moveConsecutiveFailures and the ticks in
  * between are ordinary successful movement, so the stuck-abandon path never
@@ -527,9 +528,33 @@ function abandonStuckMovement(state: GameState, emp: Employee, vehicle: Vehicle 
 }
 
 /**
+ * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
+ * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
+ * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
+ * whichever entity is actually being blocked: the employee itself for a foot
+ * leg, or its vehicle for a drive leg — mirrors `handleOccupancyBlock`'s own
+ * split (that function always escalates the employee to stuck, but the
+ * blocked *mover* on a drive leg is the vehicle). Implementer wires this in
+ * as `handleOccupancyBlock`'s replacement once `AgentOccupancy` itself is
+ * implemented; the vehicle-only functions below stay in place until then.
+ */
+export function handleAgentOccupancyBlock(
+  _state: GameState,
+  _emp: Employee,
+  _mover: Occupant,
+  _leg: Leg,
+  _blockedStep: { x: number; z: number },
+  _occupancy: AgentOccupancy,
+  _result: LocomotionResult,
+  _emitter?: EventEmitter,
+): LegMoveOutcome {
+  throw new Error('not implemented');
+}
+
+/**
  * Handles a drive leg whose next grid step is occupied by another live
  * vehicle: waits, and once `emp.vehicleWaitingTicks` reaches
- * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, attempts a one-shot reroute avoiding
+ * AGENT_OCCUPANCY_WAIT_TICKS, attempts a one-shot reroute avoiding
  * every other vehicle's current cell. A successful reroute applies its
  * outcome immediately (same tick); a failed one falls back to relocating
  * whatever blocks the destination cell itself (#689, restored below) before
@@ -549,7 +574,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
   const wasStuckBefore = emp.isMoveStuck;
   emp.vehicleWaitingTicks++;
 
-  if (emp.vehicleWaitingTicks < VEHICLE_OCCUPANCY_REROUTE_THRESHOLD) return 'blocked';
+  if (emp.vehicleWaitingTicks < AGENT_OCCUPANCY_WAIT_TICKS) return 'blocked';
 
   const reroute = findPathAvoidingOtherVehicles(state, emp, vehicle, leg.destX, leg.destZ);
   if (reroute.found) {
@@ -640,7 +665,7 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
   // drill_rig stalled on a stray blocker for the rest of the file, its target
   // hole never drilled and a different hole (drilled late by everyone else's
   // own, unrelated slowdown) missing its charge window at blast time.
-  // Escalating here, on the same VEHICLE_OCCUPANCY_REROUTE_THRESHOLD-gated
+  // Escalating here, on the same AGENT_OCCUPANCY_WAIT_TICKS-gated
   // tick cadence `vehicleWaitingTicks` already counts in ticks (not a
   // separate counter), reuses advanceLeg's own abandon sequence exactly
   // (abandonStuckMovement, defined just after advanceLeg) rather than a
@@ -798,7 +823,7 @@ function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: 
  * step to occupancy-check, and a live vehicle parked exactly there (pure
  * coincidence of position, nothing blocking the real route) read as
  * `isOccupiedByOtherVehicle`, triggering `handleOccupancyBlock`'s stuck-wait
- * and, past `VEHICLE_OCCUPANCY_REROUTE_THRESHOLD`, a full reroute away from
+ * and, past `AGENT_OCCUPANCY_WAIT_TICKS`, a full reroute away from
  * every other vehicle's cell — a multi-tick detour for an obstacle that was
  * never really in the way. Reproduced live: a drill_rig routed around a
  * building's clearance-insufficient ring (#1154) happened to cross a parked
