@@ -376,8 +376,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // mount.not_on_foot, mount.too_far_to_enter,
     // mount.building_takes_no_people, mount.not_inside,
     // move_to.building_not_found and move_to.alight_first — both locales.
+    // Baseline is now 3524 (up from 3520): #1203 adds the training walk-in's
+    // occupancy refusal and UI strings — employees.train_school_full,
+    // ui.crew.training_walking, ui.crew.training_school_full and
+    // ui.crew.task_training — both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3520);
+    expect(Object.keys(en).length).toBe(3524);
   });
 });
 

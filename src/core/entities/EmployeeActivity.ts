@@ -9,7 +9,7 @@ import type { Vehicle, VehicleState } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
-export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'idle';
+export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'training' | 'idle';
 
 export interface EmployeeActivity {
   kind: EmployeeActivityKind;
@@ -34,6 +34,10 @@ const IDLE: EmployeeActivity = { kind: 'idle', ticksRemaining: null, totalTicks:
  */
 export function computeEmployeeActivity(employee: Employee, vehicleState: VehicleState): EmployeeActivity {
   if (employee.collapsing) return { ...IDLE, kind: 'collapsed' };
+
+  if (employee.trainingState !== null) {
+    return { ...IDLE, kind: 'training', ticksRemaining: employee.trainingState.ticksRemaining };
+  }
 
   if (employee.restTicksRemaining !== null) {
     return { ...IDLE, kind: 'resting', ticksRemaining: employee.restTicksRemaining };

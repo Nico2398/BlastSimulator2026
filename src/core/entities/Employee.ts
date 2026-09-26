@@ -99,6 +99,17 @@ export interface Employee {
   z: number;
   qualifications: SkillQualification[];
   trainingState: TrainingState | null;
+  /**
+   * Course to start once the employee arrives at the school and enters it
+   * (#1203), or null when no enrolment is pending. Set alongside the walk-in
+   * itinerary by `enrolInTraining`; consumed on arrival, which moves it into
+   * `trainingState`. Mirrors `pendingRestDuration`'s claim-time/arrival-time
+   * split. Optional: many existing call sites and test fixtures construct an
+   * Employee directly without it, and old saves predate the field —
+   * `isEnrolledInTraining`/arrival handling treat an absent value the same as
+   * null (no enrolment pending) instead of fabricating one.
+   */
+  pendingTrainingState?: TrainingState | null;
   /** ID of the PendingAction currently claimed by this employee, or null if idle. */
   activeActionId: number | null;
   fatigue: number;   // 0-100
@@ -312,6 +323,7 @@ export function hireEmployee(
     // proficiency from here.
     qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
+    pendingTrainingState: null,
     activeActionId: null,
     fatigue: 100,
     collapsing: false,
@@ -508,9 +520,10 @@ export { tickNeedGauges, getNeedMultiplier, replenishNeed, needsMoraleEffect, ch
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
 export { computeXpPerTick } from './EmployeeXpRules.js';
 export type {
-  ProficiencyLevel, TrainingPlan, StartTrainingResult, TrainingCompletion,
+  ProficiencyLevel, TrainingPlan, EnrolInTrainingResult, TrainingCompletion, TrainingCancellation,
 } from './EmployeeTraining.js';
 export {
   MAX_PROFICIENCY, trainableSkills, isTrainingBuilding, schoolFor,
   planTraining, startTraining, enrolInTraining, tickTraining,
+  isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';

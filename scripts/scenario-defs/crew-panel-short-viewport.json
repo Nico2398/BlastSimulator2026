@@ -70,12 +70,12 @@
     },
     {
       "command": "employee train 1 skill:driving.drill_rig",
-      "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too.",
+      "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too. (#1203) This file's own subject is the scroll gesture, not training timing — enrolment now sends the employee walking to the school rather than relocating them instantly, so trainingCount stays 0 until arrival; cash decreasing is what proves enrolment itself succeeded.",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" }
       ],
       "role": "player",
-      "expect": { "decreased": ["cash"], "equals": { "trainingCount": 1 } }
+      "expect": { "decreased": ["cash"], "equals": { "trainingCount": 0 } }
     }
   ]
 }

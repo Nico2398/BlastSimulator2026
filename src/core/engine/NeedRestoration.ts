@@ -12,6 +12,7 @@ import type { GameState } from '../state/GameState.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
+import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { interruptActiveAction, completePendingAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import {
@@ -49,7 +50,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // destination with a walk back toward whatever building is nearest. See
     // isMidEvacuationWalk's own doc comment (Evacuation.ts) for the shared
     // reasoning across all four call sites (#557).
-    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(emp)) continue;
+    if (!emp.alive || emp.injured || emp.activeActionId !== null || isMidEvacuation(emp) || isEnrolledInTraining(emp)) continue;
 
     // First gauge (by NEED_SOFT_THRESHOLDS' own key order) below its warning
     // threshold — derived from the config map's keys rather than a
@@ -119,6 +120,10 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // collapsed mid-walk and orbited back to their pre-evacuation
     // living_quarters forever.
     if (isMidEvacuation(emp)) continue;
+    // Walking to, or already inside, a training course (#1203) — a collapse
+    // redirect here would pull them out of the school mid-course the same way
+    // the evacuation guard above protects an evacuating employee.
+    if (isEnrolledInTraining(emp)) continue;
 
     // checkCollapse nulls activeActionId itself on collapse, so the previous
     // active action (if any) must be captured before calling it — otherwise

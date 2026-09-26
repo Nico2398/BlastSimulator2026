@@ -30,6 +30,8 @@ export interface GameEventMap {
 
   // Phase 8 — Employee need events
   'employee:trained': { employeeId: number; skill: SkillCategory; level: number; isNew: boolean };
+  /** A mid-course trainee's school was demolished (#1203) — the course is cancelled and its fee refunded. */
+  'employee:training_cancelled': { employeeId: number; skill: SkillCategory; buildingId: number; refund: number };
   'employee:need_warning': { employeeId: number; needKey: string };
   'employee:collapsed': { employeeId: number; needKey: string };
   'employee:shift_change': { employeeId: number };

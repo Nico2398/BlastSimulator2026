@@ -68,6 +68,10 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
     }
 
+    for (const cancelled of report.trainingCancellations ?? []) {
+      lines.push(`[tick ${state.tickCount}] ${cancelled.employeeName}'s ${cancelled.skill} course was cancelled — school #${cancelled.buildingId} was destroyed. $${cancelled.refund} refunded.`);
+    }
+
     if (report.researchCancelled) {
       lines.push(`[tick ${state.tickCount}] Research cancelled: ${report.researchCancelled.targetType} tier ${report.researchCancelled.targetTier} — Research Center destroyed, $${report.researchCancelled.refund} refunded.`);
     }

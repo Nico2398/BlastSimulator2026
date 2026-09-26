@@ -127,7 +127,12 @@ import type { RampDef } from '../mining/Ramp.js';
 // buildings). A pre-v24 save has nobody inside any building: every building
 // gets `occupantIds: []` and every employee keeps the on-foot/mounted
 // locomotion it was saved with. See SaveLoad.ts's migrateV23ToV24.
-export const SAVE_VERSION = 24;
+// v24 -> v25: Employee gained `pendingTrainingState: TrainingState | null`
+// (#1203 — enrolment walks to and enters the school instead of teleporting,
+// so the course now starts on arrival rather than at claim time). A pre-v25
+// save has no pending enrolment in flight: every employee missing the field
+// gets `pendingTrainingState: null`. See SaveLoad.ts's migrateV24ToV25.
+export const SAVE_VERSION = 25;
 
 export interface GameConfig {
   seed: number;

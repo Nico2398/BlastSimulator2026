@@ -427,6 +427,24 @@ function migrateV23ToV24(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v24 -> v25 (#1203): Employee gained `pendingTrainingState` — the enrolment
+ * claim-time/arrival-time split `pendingRestDuration` already has. A pre-v25
+ * save has no enrolment walk in flight, so every employee missing the field
+ * gets `pendingTrainingState: null`. Mutates `obj` in place, matching every
+ * other migration block in `deserialize` below.
+ */
+function migrateV24ToV25(obj: Record<string, unknown>): Record<string, unknown> {
+  const employeesContainer = obj['employees'] as Record<string, unknown> | undefined;
+  const employeesList = employeesContainer?.['employees'] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(employeesList)) return obj;
+
+  for (const e of employeesList) {
+    if (e['pendingTrainingState'] === undefined) e['pendingTrainingState'] = null;
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -663,6 +681,11 @@ export function deserialize(json: string): GameState {
   // v23 -> v24: Building.occupantIds, nobody inside (#1202).
   if ((obj['version'] as number) < 24) {
     migrateV23ToV24(obj);
+  }
+
+  // v24 -> v25: Employee.pendingTrainingState, nothing pending (#1203).
+  if ((obj['version'] as number) < 25) {
+    migrateV24ToV25(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

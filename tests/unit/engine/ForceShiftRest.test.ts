@@ -213,6 +213,41 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     expect(employee.activeActionId).toBeNull();
   });
 
+  // #1203: a training walker/trainee has no activeActionId of their own —
+  // both shapes fall under the activeActionId === null early return above,
+  // same as any other idle employee this legacy path already leaves alone.
+  it('#1203: no-op for an employee walking to enrol in training (pendingTrainingState set, activeActionId null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = null;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    employee.pendingTrainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+    employee.destinationX = 40;
+    employee.destinationZ = 40;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+  });
+
+  it('#1203: no-op for an employee mid-course inside a school (trainingState set, activeActionId null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = null;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    employee.trainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 10, fee: 500 };
+    employee.locomotion = { kind: 'inside', buildingId: 5 };
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.trainingState).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: 5 });
+  });
+
   it('no-op when ticksWorked is below WORK_DURATION_TICKS', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
@@ -489,6 +524,48 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+
+  // #1203: unlike the legacy path above, this policy variant runs for an idle
+  // employee (activeActionId === null) exactly like a working one (#707) —
+  // so a training walker/trainee needs its own guard rather than an
+  // incidental activeActionId check.
+  it('#1203: no-op for an employee walking to enrol in training (pendingTrainingState set), even with fatigue deep below threshold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = null;
+    employee.pendingTrainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+    employee.destinationX = 40;
+    employee.destinationZ = 40;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+  });
+
+  it('#1203: no-op for an employee mid-course inside a school (trainingState set), even with fatigue deep below threshold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = null;
+    employee.trainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 10, fee: 500 };
+    employee.locomotion = { kind: 'inside', buildingId: 5 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.trainingState).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: 5 });
   });
 
   it('no-op when shouldForceRest itself returns false', () => {
