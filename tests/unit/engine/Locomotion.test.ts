@@ -22,7 +22,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDri
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
-import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
@@ -609,6 +609,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
       committed: NULL_ROUTE_COMMITMENT,
       moveHistoryX: null,
       moveHistoryZ: null,
+      trail: [],
     };
   }
 
@@ -816,6 +817,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
       committed: NULL_ROUTE_COMMITMENT,
       moveHistoryX: 0,
       moveHistoryZ: 0,
+      trail: [{ x: AGENT_WALK_SPEED, z: 0 }],
     });
 
     const result = tickLocomotion(state);
@@ -1103,5 +1105,71 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     // sitting on the cell the mover itself already occupies.
     expect(driver.isMoveStuck).toBe(false);
     expect(vehicle.x).toBeGreaterThan(2.6);
+  });
+});
+
+describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
+  function driveItinerary(vehicleId: number, destX: number, speed: number): Itinerary {
+    return {
+      legs: [{
+        mode: 'drive', vehicleId, destX, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: Math.ceil(destX / speed),
+      }],
+      goal: { kind: 'reposition', x: destX, z: 0 },
+      workTicks: 0,
+      estTotalTicks: Math.ceil(destX / speed),
+    };
+  }
+
+  it('openMovementTrails anchors every alive employee and every vehicle at its current position', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 3, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 2, 1);
+    openMovementTrails(state);
+    expect(employee.walkTrail).toEqual({ points: [{ x: 3, z: 1 }], relocated: false });
+    expect(vehicle.walkTrail).toEqual({ points: [{ x: 5, z: 2 }], relocated: false });
+  });
+
+  it('records every tick of a drive on both the driver and the vehicle, ending at their position', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0, 1);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
+    employee.itinerary = driveItinerary(vehicle.id, 12, speed);
+
+    openMovementTrails(state);
+    tickLocomotion(state);
+    tickLocomotion(state);
+
+    const trail = employee.walkTrail!;
+    expect(trail.relocated).toBe(false);
+    expect(trail.points[0]).toEqual({ x: 0, z: 0 });
+    expect(trail.points.length).toBeGreaterThanOrEqual(3);
+    expect(trail.points[trail.points.length - 1]).toEqual({ x: employee.x, z: employee.z });
+    expect(vehicle.walkTrail).toEqual(trail);
+  });
+
+  it('flags a relocation that happened between two walks in the same batch', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
+
+    openMovementTrails(state);
+    tickLocomotion(state);
+    employee.x = 5; // placed elsewhere — not a walk
+    tickLocomotion(state);
+
+    expect(employee.walkTrail!.relocated).toBe(true);
+    expect(employee.walkTrail!.points[0]).toEqual({ x: 5, z: 0 });
+  });
+
+  it('records nothing when no batch is open', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
+    tickLocomotion(state);
+    expect(employee.walkTrail).toBeUndefined();
   });
 });

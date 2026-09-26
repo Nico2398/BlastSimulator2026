@@ -2,6 +2,7 @@
 // Debris haulers, rock diggers, drill rigs, building destroyers, and rock fragmenters.
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
+import type { MovementTrail } from './MovementTrail.js';
 import {
   VEHICLE_BASE_STATS,
   VEHICLE_TIER_MULTIPLIERS,
@@ -143,6 +144,8 @@ export interface Vehicle {
    * `VEHICLE_SEAT_COUNT[role]`.
    */
   occupantIds: number[];
+  /** Cells driven since the current tick batch opened (#1199) — see `Employee.walkTrail`. Transient, never saved. */
+  walkTrail?: MovementTrail;
 }
 
 // ── Fleet state ──

@@ -73,6 +73,13 @@ interface AdvanceAlongPathOutcome {
    */
   moveHistoryX: number | null;
   moveHistoryZ: number | null;
+  /**
+   * End of every hop advanced through this tick, in walk order (#1199) — the
+   * route actually taken, turns included, not just its final point. Empty
+   * when the agent did not move. Transient: the caller hands it to the
+   * renderer's trail and never saves it.
+   */
+  trail: Array<{ x: number; z: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +198,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // moveHistoryX/Z two ticks from now.
       moveHistoryX: input.x,
       moveHistoryZ: input.z,
+      trail: [],
     };
   }
 
@@ -211,6 +219,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   let remaining = Number.isFinite(input.walkSpeed) ? Math.max(0, input.walkSpeed) : 0;
   let committed = input.committed ?? NULL_ROUTE_COMMITMENT;
   let isPathComplete = false;
+  const trail: Array<{ x: number; z: number }> = [];
 
   // Both of findPath's sources (the A* reconstruction and the direct-line
   // fallback) emit waypoints[0] as the agent's own (floor-rounded) starting
@@ -284,6 +293,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     z = hopAdvance.z;
     const walked = Math.hypot(x - beforeX, z - beforeZ);
     remaining = Math.max(0, remaining - walked);
+    if (walked > 0) trail.push({ x, z });
 
     // hopAdvance.isPathComplete here means only "reached hopTarget" (a
     // single-waypoint list is all advanceAgent was given) — true "reached
@@ -381,6 +391,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // moveHistoryX/Z two ticks from now.
     moveHistoryX: input.x,
     moveHistoryZ: input.z,
+    trail,
   };
 }
 

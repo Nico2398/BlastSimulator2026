@@ -17,6 +17,8 @@ import { SCORE_DECAY_RATE } from '../config/balance.js';
 export function serialize(state: GameState): string {
   return JSON.stringify(state, (key, value) => {
     if (key === 'navGrid') return undefined;
+    // Render-only walk trail (#1199): transient, a save never carries one.
+    if (key === 'walkTrail') return undefined;
     if (value instanceof Set) return { __type: 'Set', values: [...value] };
     return value as unknown;
   });

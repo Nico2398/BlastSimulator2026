@@ -28,6 +28,7 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncItineraryMirrors } from './MoveTo.js';
 import { dismountVehicleDriver, releaseVehicleReservation } from './VehicleReservation.js';
+import { appendToTrail, openMovementTrail, type TrailPoint } from '../entities/MovementTrail.js';
 
 /** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
 function readCommitted(emp: Employee): RouteCommitment {
@@ -152,6 +153,33 @@ export function tickLocomotion(state: GameState, emitter?: EventEmitter): Locomo
   }
 
   return result;
+}
+
+/**
+ * Opens a fresh walk trail (#1199) on every alive employee and every vehicle,
+ * anchored at where each stands now. Called once per tick batch — the span
+ * between two results the renderer draws — so the trail it reads covers
+ * exactly the movement since its last result. Transient, never saved.
+ */
+export function openMovementTrails(state: GameState): void {
+  for (const emp of state.employees.employees) {
+    if (emp.alive) emp.walkTrail = openMovementTrail(emp.x, emp.z);
+  }
+  for (const vehicle of state.vehicles.vehicles) {
+    vehicle.walkTrail = openMovementTrail(vehicle.x, vehicle.z);
+  }
+}
+
+/**
+ * Records one tick's walk from (fromX, fromZ) through `hops` onto the
+ * employee's trail — and, for a drive, the vehicle's — ending at the
+ * employee's final position (which a completed leg snaps to its exact
+ * destination). No-op for an entity with no batch open.
+ */
+function recordWalk(emp: Employee, vehicle: Vehicle | undefined, fromX: number, fromZ: number, hops: readonly TrailPoint[]): void {
+  const walk = [...hops, { x: emp.x, z: emp.z }];
+  if (emp.walkTrail) appendToTrail(emp.walkTrail, fromX, fromZ, walk);
+  if (vehicle?.walkTrail) appendToTrail(vehicle.walkTrail, fromX, fromZ, walk);
 }
 
 // ── Itinerary-driven movement ──
@@ -349,6 +377,8 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // fires on it.
   if (outcome.pathFound) {
     emp.vehicleWaitingTicks = 0;
+    const fromX = emp.x;
+    const fromZ = emp.z;
 
     emp.x = outcome.x;
     emp.z = outcome.z;
@@ -371,6 +401,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       emp.z = leg.destZ;
     }
     if (isDrive) writeVehiclePosition(state, vehicle!, emp.x, emp.z, isLegArrived(emp.x, emp.z, leg));
+    recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
 
     // Position genuinely advanced this tick — record it regardless of
     // whether the isStuck-abandon branch below also fires (an oscillating
@@ -494,9 +525,12 @@ function handleOccupancyBlock(state: GameState, emp: Employee, vehicle: Vehicle,
     // tick, never progressing (confirmed live: the tutorial's own box-cut
     // ramp order stalled a rock_digger permanently behind an idle drill_rig
     // this exact way).
+    const fromX = emp.x;
+    const fromZ = emp.z;
     emp.x = outcome.x;
     emp.z = outcome.z;
     writeVehiclePosition(state, vehicle, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
+    recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
     result.moved.push(emp.id);
     result.moved.push(vehicle.id);
     result.vehiclesMoved.push(vehicle.id);

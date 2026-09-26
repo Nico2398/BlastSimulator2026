@@ -111,10 +111,11 @@ export class CharacterMesh {
 
       entry.employee = emp;
 
-      // Ease toward work position (duration-aware tween, #520)
+      // Ease toward work position (duration-aware tween, #520), along the
+      // route the simulation actually walked this batch (#1199).
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, emp.x, emp.z, dt, heightAt);
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, emp.x, emp.z, dt, heightAt, emp.walkTrail);
       this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
 
       // Body colour for injury state

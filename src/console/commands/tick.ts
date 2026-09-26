@@ -10,6 +10,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { runTick, type TickReport, type RunTickOptions, type FiredEventReport } from '../../core/engine/TickPipeline.js';
+import { openMovementTrails } from '../../core/engine/Locomotion.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
@@ -38,6 +39,9 @@ export function tickCommand(
   const viteEnv = (import.meta as { env?: { PROD?: boolean } }).env;
   const isProd = viteEnv?.PROD === true;
   const options: RunTickOptions = { checkInvariants: !isProd };
+
+  // One batch = one result the renderer draws: its walk trails cover exactly this command's ticks (#1199).
+  openMovementTrails(state);
 
   for (let i = 0; i < count; i++) {
     const report: TickReport = runTick(state, ctx.grid ?? null, rng, emitter, options);

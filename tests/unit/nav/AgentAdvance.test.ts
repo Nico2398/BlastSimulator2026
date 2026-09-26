@@ -813,3 +813,26 @@ describe('advanceAlongPath — retrace recovery never crosses an unvalidated cel
     }
   });
 });
+
+describe('advanceAlongPath — trail of hops walked this tick (#1199)', () => {
+  it('records the end of every hop advanced through, turns included, in walk order', () => {
+    const result = advanceAlongPath(baseInput({
+      destinationX: 1, destinationZ: 3,
+      walkSpeed: 2,
+      path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 1, z: 1 }, { x: 1, z: 2 }, { x: 1, z: 3 }] },
+    }));
+
+    expect(result.trail).toEqual([{ x: 1, z: 0 }, { x: 1, z: 1 }]);
+    expect(result.trail[result.trail.length - 1]).toEqual({ x: result.x, z: result.z });
+  });
+
+  it('ends a partial hop at the agent\'s mid-hop position', () => {
+    const result = advanceAlongPath(baseInput({ walkSpeed: 1.5 }));
+    expect(result.trail).toEqual([{ x: 1.5, z: 0 }]);
+  });
+
+  it('is empty when no path was found — the agent did not move', () => {
+    const result = advanceAlongPath(baseInput({ path: { found: false, waypoints: [] } }));
+    expect(result.trail).toEqual([]);
+  });
+});
