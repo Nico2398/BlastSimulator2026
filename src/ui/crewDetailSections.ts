@@ -77,6 +77,21 @@ function well(children: (Node | null | undefined)[]): HTMLElement {
   return el('div', { className: 'bsx-well', attrs: { style: 'padding:9px 10px;display:flex;flex-direction:column;gap:6px' }, children });
 }
 
+/**
+ * A training-offer row that cannot be started right now — already at max
+ * proficiency, or the school is full (#1203) — rendered as a title + reason
+ * line with a disabled Train button. Both callers in makeTrainingSection
+ * differ only in the title text and the reason line's i18n key/params.
+ */
+function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>): void {
+  const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+  info.append(
+    el('span', { text: titleText, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+    el('span', { text: t(reasonKey, reasonParams), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+  );
+  row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+}
+
 // ── HIRED / LOCATION ──
 
 export function makeHiredLocationStrip(e: Employee, state: GameState): HTMLElement {
@@ -276,22 +291,14 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   for (const { skill, building } of offers) {
     const plan = planTraining(e, skill, building.tier);
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
-    const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
 
     if (!plan) {
-      info.append(
-        el('span', { text: t(`course.${skill}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', { text: t('ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-      );
-      row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) });
     } else if (isSchoolFull(state, building)) {
-      info.append(
-        el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', { text: t('ui.crew.training_school_full'), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-      );
-      row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+      renderLockedTrainingRow(row, `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, 'ui.crew.training_school_full');
     } else {
       anyOffered = true;
+      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
       info.append(
         el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {

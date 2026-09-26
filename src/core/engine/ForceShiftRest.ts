@@ -22,6 +22,38 @@ import { vehicleDriverId } from '../entities/Vehicle.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
 
 /**
+ * Shared leading guard of forceShiftRestIfNeeded and
+ * forceShiftRestIfNeededByPolicy: four checks identical between the two
+ * (fatigue-only legacy path and site-policy-aware path alike) before either
+ * function's own, diverging guards begin.
+ *
+ * - `restTicksRemaining !== null`: already resting.
+ * - `isEnrolledInTraining`: walking to, or already inside, a training course
+ *   (#1203) — never redirected to a shift rest mid-course.
+ * - `pendingRestDuration !== null`: already walking to a shift rest queued on
+ *   a prior tick — without this, ticksWorked stays >= WORK_DURATION_TICKS for
+ *   the whole walk (only reset on rest completion) and this would requeue a
+ *   duplicate rest action every tick until arrival (#437).
+ * - `pendingTaskDuration !== null && !isMoveStuck`: already walking to a
+ *   claimed task, not yet arrived (#928) — exempts a genuinely stuck walk
+ *   (isMoveStuck) rather than blocking unconditionally: an employee whose
+ *   claimed destination has become unreachable (e.g. boxed in by a building
+ *   placed after the walk was claimed) would otherwise never again be
+ *   eligible for either caller's own rescue-to-living-quarters path, left
+ *   defenseless (no proactive rest, no evacuation reroute) against a danger
+ *   zone it happens to be standing in — confirmed live via
+ *   vibration-budget.json's own grid-2 safety dispatch, whose target tile was
+ *   later claimed by a living_quarters build order.
+ */
+function isRestIneligible(emp: Employee): boolean {
+  if (emp.restTicksRemaining !== null) return true;
+  if (isEnrolledInTraining(emp)) return true;
+  if (emp.pendingRestDuration !== null) return true;
+  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return true;
+  return false;
+}
+
+/**
  * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
  * queues restAction, updates emp's activeActionId/destination, records the
  * shift-change bookkeeping (shiftRested/firedEvents/emitter).
@@ -60,27 +92,7 @@ export function forceShiftRestIfNeeded(
   shiftRested: number[],
   _emitter?: EventEmitter,
 ): void {
-  if (emp.restTicksRemaining !== null) return;
-  // Walking to, or already inside, a training course (#1203) — never
-  // redirected to a shift rest mid-course.
-  if (isEnrolledInTraining(emp)) return;
-  // Already walking to a shift rest queued on a prior tick — without this,
-  // ticksWorked stays >= WORK_DURATION_TICKS for the whole walk (it's only
-  // reset on rest completion) and this would requeue a duplicate rest action
-  // every tick until arrival (#437).
-  if (emp.pendingRestDuration !== null) return;
-  // Already walking to a claimed task, not yet arrived — mirrors the
-  // pendingRestDuration guard above for the task-travel case (#928). Exempts
-  // a genuinely stuck walk (isMoveStuck — EntityMovementTick.ts) rather than
-  // blocking unconditionally: an employee whose claimed destination has
-  // become unreachable (e.g. boxed in by a building placed after the walk
-  // was claimed) would otherwise never again be eligible for this function's
-  // own rescue-to-living-quarters path, left defenseless (no proactive rest,
-  // no evacuation reroute) against a danger zone it happens to be standing
-  // in — confirmed live via vibration-budget.json's own grid-2 safety
-  // dispatch, whose target tile was later claimed by a living_quarters
-  // build order.
-  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
+  if (isRestIneligible(emp)) return;
   // Already arrived and mid-execution of a claimed task (e.g. dig_ramp_segment)
   // — mirrors the pendingTaskDuration guard above for the already-arrived
   // case (#945): interrupting a task the employee is actively ticking through
@@ -288,18 +300,7 @@ export function forceShiftRestIfNeededByPolicy(
   shiftRested: number[],
   _emitter?: EventEmitter,
 ): void {
-  if (emp.restTicksRemaining !== null) return;
-  // Walking to, or already inside, a training course (#1203) — never
-  // redirected to a shift rest mid-course.
-  if (isEnrolledInTraining(emp)) return;
-  // Already walking to a queued rest — see forceShiftRestIfNeeded's own
-  // comment on the same check (#437).
-  if (emp.pendingRestDuration !== null) return;
-  // Already walking to a claimed task, not yet arrived — mirrors the
-  // pendingRestDuration guard above for the task-travel case (#928), and
-  // mirrors forceShiftRestIfNeeded's own identical stuck-walk exemption
-  // (see its own comment on the same check) for the same reason.
-  if (emp.pendingTaskDuration !== null && !emp.isMoveStuck) return;
+  if (isRestIneligible(emp)) return;
   // Boarded and driving toward, or already arrived and mid-execution of, a
   // claimed vehicle-gated action (e.g. dig_ramp_segment, drill_hole — #945;
   // see isMidVehicleGatedWork's own doc comment, VehicleReservation.ts, and

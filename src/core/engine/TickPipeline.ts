@@ -305,7 +305,20 @@ export function runTick(
   // fragment completion no longer needs a separate pass after this call
   // (#1091): ArrivalEffects.ts's own haul_unload/boulder_split effects call
   // completeVehicleGatedAction the instant they succeed, inside this call.
-  const arrivalResult = tickArrivalGate(state, grid ?? undefined);
+  const arrivalResult = tickArrivalGate(state, grid ?? undefined, emitter);
+
+  // 8h-1. A training walk-in that ended without ever entering the school
+  // (#1203 — the school was demolished mid-walk, or full at arrival) is
+  // refunded and reported the same way as tickTraining's own mid-course
+  // cancellation above — both land in one `trainingCancellations` array so
+  // console/tick.ts's existing reporting line covers both without change.
+  for (const cancellation of arrivalResult.trainingCancelled) {
+    state.cash += cancellation.refund;
+    addIncome(state.finances, cancellation.refund, 'refund',
+      `Training cancelled: ${cancellation.employeeName} — ${cancellation.skill} (never entered school)`,
+      state.tickCount);
+    trainingCancellations.push(cancellation);
+  }
 
   // 8i. Anyone still inside a building that was removed this tick (blast
   // clearing, projection/seismic damage, an upgrade's replace) is put back
