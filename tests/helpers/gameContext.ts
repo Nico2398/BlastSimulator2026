@@ -53,7 +53,6 @@ export interface MakeGameContextOptions {
   mineType?: string;
   seed?: number | string;
   size?: number | string;
-  sizeY?: number | string;
   cash?: number | string;
   staffed?: boolean;
 }
@@ -71,7 +70,6 @@ export function makeGameContext(opts?: MakeGameContextOptions): GameContext {
     seed: String(opts?.seed ?? 42),
     size: String(opts?.size ?? 32),
   };
-  if (opts?.sizeY !== undefined) named['size_y'] = String(opts.sizeY);
   if (opts?.cash !== undefined) named['cash'] = String(opts.cash);
   if (opts?.staffed !== undefined) named['staffed'] = String(opts.staffed);
 

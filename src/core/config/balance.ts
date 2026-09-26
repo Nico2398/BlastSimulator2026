@@ -86,8 +86,8 @@ export const SCORE_DECAY_RATE = 0.05;
 
 /** Grid edge length (voxels), X/Z, used when a size is not explicitly given. */
 export const DEFAULT_GRID_SIZE = 64;
-/** Fixed sandbox site depth (voxels), Y. Sandbox no longer exposes depth as a player control (#504). */
-export const SANDBOX_GRID_DEPTH = 32;
+/** Fixed sandbox generation datum (voxel Y the site centre's surface lands on). Sandbox no longer exposes depth as a player control (#504). */
+export const SANDBOX_DATUM = 17;
 
 /**
  * Largest number of intermediate chunks `PlayableArea.claimArea` will bridge

@@ -138,7 +138,7 @@ export function campaignStartCommand(
     seed: level.terrainSeed,
     climateBias: level.climateBias,
     sizeX: level.gridX,
-    sizeY: level.gridY,
+    datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     startingCrew: true,
@@ -156,7 +156,6 @@ export function campaignStartCommand(
     output: t('campaign.start_success', {
       levelId,
       gridX: level.gridX,
-      gridY: level.gridY,
       gridZ: level.gridZ,
       cash: ctx.state.cash.toLocaleString('en-US'),
       staffedSuffix: staffedSuffix(staffedFlag.staffed),
